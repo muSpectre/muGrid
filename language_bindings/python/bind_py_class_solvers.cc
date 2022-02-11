@@ -111,8 +111,8 @@ class PySolverBase : public SolverBase {
   Index_t get_nb_dof() const override {
     PYBIND11_OVERLOAD_PURE(Index_t, SolverBase, get_nb_dof);
   }
-  void action_increment(EigenCVec_t delta_grad, const Real & alpha,
-                        EigenVec_t del_flux) override {
+  void action_increment(EigenCVecRef delta_grad, const Real & alpha,
+                        EigenVecRef del_flux) override {
     PYBIND11_OVERLOAD_PURE(void, SolverBase, solve_load_increment, delta_grad,
                            alpha, del_flux);
   }

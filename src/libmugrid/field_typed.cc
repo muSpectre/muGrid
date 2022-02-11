@@ -39,7 +39,9 @@
 #include "field_typed.hh"
 #include "field_collection.hh"
 #include "field_map.hh"
+#include "field_map_static.hh"
 #include "raw_memory_operations.hh"
+#include "tensor_algebra.hh"
 
 namespace muGrid {
 
@@ -437,6 +439,288 @@ namespace muGrid {
   TypedFieldBase<T>::operator-=(const TypedFieldBase & other) {
     this->eigen_vec() -= other.eigen_vec();
     return *this;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  void TypedFieldBase<T>::tensmult(const TypedFieldBase & input,
+                                   TypedFieldBase & result) {
+    // check whether input and result have the same nb components
+    if (not(input.get_nb_components() == result.get_nb_components())) {
+      std::stringstream error{};
+      error << "The input field" << input.get_name() << " has "
+            << input.get_nb_components() << "components, while the output field"
+            << input.get_name() << " has " << result.get_nb_components()
+            << " components which do not match with each other" << std::endl;
+      throw FieldError(error.str());
+    }
+
+    // check whether input and result have same subdivision_tag
+    if (not(input.get_sub_division_tag() == result.get_sub_division_tag())) {
+      std::stringstream error{};
+      error << "The input field" << input.get_name() << "'s division_tag is "
+            << input.get_sub_division_tag()
+            << "while the tag for the output field" << input.get_name()
+            << " is " << result.get_sub_division_tag()
+            << " which do not match with each other" << std::endl;
+      throw FieldError(error.str());
+    }
+
+    // check whether input and this field (the tow multiplicands) have same
+    // subdivision_tag
+    if (not(input.get_sub_division_tag() == this->get_sub_division_tag())) {
+      std::stringstream error{};
+      error << "The input field" << input.get_name() << "'s division_tag is "
+            << input.get_sub_division_tag()
+            << "while the tag for the output field" << this->get_name()
+            << " is " << this->get_sub_division_tag()
+            << " which do not match with each other" << std::endl;
+      throw FieldError(error.str());
+    }
+
+    // calculate small rank and large rank (int square root of nb. comps)
+    const Dim_t small_rank{Dim_t(sqrt(input.get_nb_components()))};
+    const Dim_t large_rank{Dim_t(sqrt(this->get_nb_components()))};
+
+    // check if large_rank == 2 *small_rank
+    if (not(large_rank == 2 * small_rank)) {
+      std::stringstream error{};
+      error << "The input field" << input.get_name() << "'s rank is "
+            << small_rank << "while the rank for the output field"
+            << this->get_name() << " is " << large_rank
+            << " which are not compatible for a tensor multiplication."
+            << std::endl;
+      throw FieldError(error.str());
+    }
+
+    //! obtain dimension of the current field
+    const Index_t dim{this->get_spatial_dim()};
+
+    // switch case over dim and rank (nested switch cases)
+    switch (dim) {
+    case oneD: {
+      switch (small_rank) {
+      case firstOrder: {
+        this->tensmult_worker<oneD, firstOrder>(input, result);
+        break;
+      }
+      case secondOrder: {
+        this->tensmult_worker<oneD, secondOrder>(input, result);
+        break;
+      }
+      default: {
+        throw FieldError("TypeField tensor multiplication is only defined for "
+                         "first and second order inout matrices");
+        break;
+      }
+      }
+      break;
+    }
+    case twoD: {
+      switch (small_rank) {
+      case firstOrder: {
+        this->tensmult_worker<twoD, firstOrder>(input, result);
+        break;
+      }
+      case secondOrder: {
+        this->tensmult_worker<twoD, secondOrder>(input, result);
+        break;
+      }
+      default: {
+        throw FieldError("TypeField tensor multiplication is only defined for "
+                         "first and second order inout matrices");
+        break;
+      }
+      }
+      break;
+    }
+    case threeD: {
+      switch (small_rank) {
+      case firstOrder: {
+        this->tensmult_worker<threeD, firstOrder>(input, result);
+        break;
+      }
+      case secondOrder: {
+        this->tensmult_worker<threeD, secondOrder>(input, result);
+        break;
+      }
+      default: {
+        throw FieldError("TypeField tensor multiplication is only defined for "
+                         "first and second order inout matrices");
+        break;
+      }
+      }
+      break;
+    }
+    default: {
+      throw FieldError("TypeField tensor multiplication is only defined for "
+                       "1D, 2D, and 3D inout matrices");
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  void TypedFieldBase<T>::tensmult(const Eigen::Ref<EigenRep_t> & input,
+                                   TypedFieldBase & result) {
+
+    // check whether input and result have same subdivision_tag
+    if (not(this->get_sub_division_tag() == result.get_sub_division_tag())) {
+      std::stringstream error{};
+      error << "The coeff field" << this->get_name() << "'s division_tag is "
+            << this->get_sub_division_tag()
+            << "while the tag for the output field" << result.get_name()
+            << " is " << result.get_sub_division_tag()
+            << " which do not match with each other" << std::endl;
+      throw FieldError(error.str());
+    }
+
+    //! obtain dimension of the current field
+    const Index_t dim{this->get_spatial_dim()};
+
+    Dim_t small_rank{0};
+    if (input.cols() == dim and input.rows() == dim) {
+      small_rank = 2;
+    } else if ((input.cols() == 1 and input.rows() == dim) or
+               (input.cols() == dim and input.rows() == 1)) {
+      small_rank = 1;
+    } else {
+      std::stringstream error{};
+      error << "The input tensor's rank in neither 2 nor 1 which are the only "
+               "implemented ranks for the input"
+            << std::endl;
+      throw FieldError(error.str());
+    }
+
+    // calculate small rank and large rank (int square root of nb. comps)
+    const Dim_t large_rank{Dim_t(sqrt(this->get_nb_components()))};
+
+    // check if large_rank == 2 *small_rank
+    if (not(large_rank == 2 * small_rank)) {
+      std::stringstream error{};
+      error << "The input field's rank is " << small_rank
+            << "while the rank for the output field" << this->get_name()
+            << " is " << large_rank
+            << " which are not compatible for a tensor multiplication."
+            << std::endl;
+      throw FieldError(error.str());
+    }
+
+    // switch case over dim and rank (nested switch cases)
+    switch (dim) {
+    case oneD: {
+      Eigen::Matrix<T, oneD, oneD> static_input{};
+      static_input << input;
+      switch (small_rank) {
+      case firstOrder: {
+        this->tensmult_worker<oneD, 1, firstOrder>(static_input, result);
+        break;
+      }
+      case secondOrder: {
+        this->tensmult_worker<oneD, oneD, secondOrder>(static_input, result);
+        break;
+      }
+      default: {
+        throw FieldError("TypeField tensor multiplication is only defined for "
+                         "first and second order inout matrices");
+        break;
+      }
+      }
+      break;
+    }
+    case twoD: {
+      switch (small_rank) {
+      case firstOrder: {
+        Eigen::Matrix<T, twoD, 1> static_input{};
+        static_input << input;
+        this->tensmult_worker<twoD, 1, firstOrder>(static_input, result);
+        break;
+      }
+      case secondOrder: {
+        Eigen::Matrix<T, twoD, twoD> static_input{};
+        static_input << input;
+        this->tensmult_worker<twoD, twoD, secondOrder>(static_input, result);
+        break;
+      }
+      default: {
+        throw FieldError("TypeField tensor multiplication is only defined for "
+                         "first and second order inout matrices");
+        break;
+      }
+      }
+      break;
+    }
+    case threeD: {
+      switch (small_rank) {
+      case firstOrder: {
+        Eigen::Matrix<T, threeD, 1> static_input{};
+        static_input << input;
+        this->tensmult_worker<threeD, 1, firstOrder>(static_input, result);
+        break;
+      }
+      case secondOrder: {
+        Eigen::Matrix<T, threeD, threeD> static_input{};
+        static_input << input;
+        this->tensmult_worker<threeD, threeD, secondOrder>(static_input,
+                                                           result);
+        break;
+      }
+      default: {
+        throw FieldError("TypeField tensor multiplication is only defined for "
+                         "first and second order inout matrices");
+        break;
+      }
+      }
+      break;
+    }
+    default: {
+      throw FieldError("TypeField tensor multiplication is only defined for "
+                       "1D, 2D, and 3D inout matrices");
+      break;
+    }
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  template <Dim_t Dim, Dim_t SmallRank>
+  void TypedFieldBase<T>::tensmult_worker(const TypedFieldBase & input,
+                                          TypedFieldBase & result) {
+    constexpr Dim_t LargeRank{2 * SmallRank};
+    TensorFieldMap<T, Mapping::Const, LargeRank, Dim, IterUnit::SubPt> A_map{
+        *this};
+    TensorFieldMap<T, Mapping::Const, SmallRank, Dim, IterUnit::SubPt>
+        input_map{input};
+    TensorFieldMap<T, Mapping::Mut, SmallRank, Dim, IterUnit::SubPt> result_map{
+        result};
+
+    for (auto && tup : akantu::zip(A_map, input_map, result_map)) {
+      auto & A = std::get<0>(tup);
+      auto & x = std::get<1>(tup);
+      auto & b = std::get<2>(tup);
+      b = Matrices::tensmult(A, x);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  template <Dim_t Dim1, Dim_t Dim2, Dim_t SmallRank>
+  void TypedFieldBase<T>::tensmult_worker(
+      const Eigen::Ref<Eigen::Matrix<T, Dim1, Dim2>> & input,
+      TypedFieldBase & result) {
+    constexpr Dim_t LargeRank{2 * SmallRank};
+    TensorFieldMap<T, Mapping::Const, LargeRank, Dim1, IterUnit::SubPt> A_map{
+        *this};
+    TensorFieldMap<T, Mapping::Mut, SmallRank, Dim1, IterUnit::SubPt>
+        result_map{result};
+
+    for (auto && tup : akantu::zip(A_map, result_map)) {
+      auto & A = std::get<0>(tup);
+      auto & b = std::get<1>(tup);
+      auto c{Matrices::tensmult(A, input)};
+      b = c;
+    }
   }
 
   /* ---------------------------------------------------------------------- */

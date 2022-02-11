@@ -52,8 +52,8 @@ namespace muSpectre {
   class DiscreteGreensOperator : public MatrixAdaptable {
    public:
     using Parent = MatrixAdaptable;
-    using EigenCVec_t = Parent::EigenCVec_t;
-    using EigenVec_t = Parent::EigenVec_t;
+    using EigenCVecRef = Parent::EigenCVecRef;
+    using EigenVecRef = Parent::EigenVecRef;
     using RealSpaceField_t = muGrid::TypedFieldBase<Real>;
     using FourierSpaceField_t = muGrid::ComplexField;
     //! Default constructor
@@ -107,8 +107,8 @@ namespace muSpectre {
 
     Index_t get_nb_dof() const final;
 
-    void action_increment(EigenCVec_t delta_grad, const Real & alpha,
-                                    EigenVec_t del_flux) final;
+    void action_increment(EigenCVecRef delta_grad, const Real & alpha,
+                          EigenVecRef del_flux) final;
 
     const muFFT::Communicator & get_communicator() const final;
 

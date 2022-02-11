@@ -33,7 +33,7 @@
  *
  */
 
-#include "solver_single_physics.hh"
+#include "solver_single_physics_projection_base.hh"
 #include "krylov_solver_trust_region_cg.hh"
 #include "projection/projection_base.hh"
 
@@ -44,8 +44,8 @@
 
 namespace muSpectre {
 
-  class SolverTrustRegionNewtonCG : public SolverSinglePhysics {
-    using Parent = SolverSinglePhysics;
+  class SolverTrustRegionNewtonCG : public SolverSinglePhysicsProjectionBase {
+    using Parent = SolverSinglePhysicsProjectionBase;
     using Gradient_t = muFFT::Gradient_t;
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
@@ -99,83 +99,20 @@ namespace muSpectre {
         EigenStrainFunc_ref eigen_strain_func = muGrid::nullopt,
         CellExtractFieldFunc_ref cell_extract_func = muGrid::nullopt) final;
 
-    //! return the number of degrees of freedom of the solver problem
-    Index_t get_nb_dof() const final;
-
-    //! implementation of the action of the stiffness matrix
-    void action_increment(EigenCVec_t delta_grad, const Real & alpha,
-                          EigenVec_t del_flux) final;
-
     //! initialise cell data for this solver
     void initialise_cell() final;
 
-    //! return a const ref to the projection implementation
-    const ProjectionBase & get_projection() const;
+    //! getter for Krylov solver object
+    KrylovSolverBase & get_krylov_solver() final;
 
    protected:
-    void initialise_eigen_strain_storage();
-    bool has_eigen_strain_storage() const;
-    /**
-     * statically dimensioned worker for evaluating the incremental tangent
-     * operator
-     */
-    template <Dim_t DimM>
-    static void
-    action_increment_worker(const muGrid::TypedFieldBase<Real> & delta_strain,
-                            const muGrid::TypedFieldBase<Real> & tangent,
-                            const Real & alpha,
-                            muGrid::TypedFieldBase<Real> & delta_stress);
-
-    //! create a mechanics projection
-    template <Dim_t Dim>
-    void create_mechanics_projection_worker();
-    void create_mechanics_projection();
-
-    //! create a generic gradient projection
-    void create_gradient_projection();
-
-    std::shared_ptr<ProjectionBase> projection{nullptr};
-    using MappedField_t =
-        muGrid::MappedField<muGrid::FieldMap<Real, Mapping::Mut>>;
-    //! Newton loop gradient (or strain) increment
-    std::shared_ptr<MappedField_t> grad_incr{nullptr};
-    //! Gradient (or strain) field
-    std::shared_ptr<MappedField_t> grad{nullptr};
-    /**
-     * Gradient (or strain) field evaluated by the materials this pointer points
-     * usually to the same field as `grad` does, but in the case of problems
-     * with an eigen strain, these point to different fields
-     */
-    std::shared_ptr<MappedField_t> eval_grad{nullptr};
-    //! Flux (or stress) field
-    std::shared_ptr<MappedField_t> flux{nullptr};
-    //! Tangent moduli field
-    std::shared_ptr<MappedField_t> tangent{nullptr};
-    //! right-hand-side field
-    std::shared_ptr<MappedField_t> rhs{nullptr};
-
-    //! holder of the previous macroscopic load
-    Eigen::MatrixXd previous_macro_load{};
-    std::array<Index_t, 2> grad_shape{};
-
+    //! KrylovSolver instance
     std::shared_ptr<KrylovSolverTrustRegionCG> krylov_solver;
-    Real newton_tol;
-    Real equil_tol;
-    Uint max_iter;
 
     //! maximum radius of trust region
     Real max_trust_radius;
     //! threshold used in accepting or rejecting a sub-problem solution
     Real eta;
-
-    //! The gradient operator used in the projection
-    std::shared_ptr<Gradient_t> gradient;
-
-    //! number of quadrature points
-    Index_t nb_quad_pts{1};
-
-    //! The type of the mean controlled variable on the RVE:
-    MeanControl mean_control;
   };
 
 }  // namespace muSpectre

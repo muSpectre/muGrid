@@ -84,12 +84,12 @@ namespace muSpectre {
     return *this->grads.at(this->domain);
   }
 
-/* ---------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
   auto SolverSinglePhysics::get_eval_grad() const -> const MappedField_t & {
     return *this->eval_grads.at(this->domain);
   }
-/* ---------------------------------------------------------------------- */
-  auto SolverSinglePhysics::get_set_eval_grad()  ->  MappedField_t & {
+  /* ---------------------------------------------------------------------- */
+  auto SolverSinglePhysics::get_set_eval_grad() -> MappedField_t & {
     return *this->eval_grads.at(this->domain);
   }
 
@@ -98,4 +98,18 @@ namespace muSpectre {
     return *this->tangents.at(this->domain);
   }
 
+  /* ---------------------------------------------------------------------- */
+  const std::string SolverSinglePhysics::strain_symb() {
+    if (this->is_mechanics()) {
+      if (this->get_formulation() == Formulation::finite_strain) {
+        return "F";
+      } else {
+        return "ε";
+      }
+    } else {
+      return "Grad";
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre

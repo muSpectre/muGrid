@@ -48,6 +48,7 @@ set(solvers_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/solvers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_single_physics.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/solver_single_physics_projection_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_newton_cg.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_trust_region_newton_cg.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/solver_fem_trust_region_newton_cg.cc

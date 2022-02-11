@@ -155,9 +155,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void DiscreteGreensOperator::action_increment(EigenCVec_t delta_grad,
+  void DiscreteGreensOperator::action_increment(EigenCVecRef delta_grad,
                                                 const Real & alpha,
-                                                EigenVec_t delta_flux) {
+                                                EigenVecRef delta_flux) {
     auto delta_grad_field_ptr{muGrid::WrappedField<Real>::make_const(
         "Greens_operator_input_field",
         this->engine->get_real_field_collection(), this->nb_dof_per_pixel,

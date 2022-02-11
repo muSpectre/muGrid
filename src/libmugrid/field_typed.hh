@@ -160,6 +160,14 @@ namespace muGrid {
     //! subtraction assignment
     TypedFieldBase & operator-=(const TypedFieldBase & other);
 
+    //! tensor multiplication of two fields
+    void tensmult(const TypedFieldBase & input, TypedFieldBase & result);
+
+    //! tensor multiplication of a field and a single tensor
+    void tensmult(const Eigen::Ref<EigenRep_t> & input,
+                  TypedFieldBase & result);
+
+    //! return type of the stored data
     const std::type_info & get_stored_typeid() const final { return typeid(T); }
 
     //! return a vector map onto the underlying data
@@ -245,12 +253,20 @@ namespace muGrid {
      **/
     void * get_void_data_ptr() const final;
 
-   protected:
-    //! back-end for the public non-const eigen_XXX functions
+    //! non-const eigen_map with arbitrary sizes
     Eigen_map eigen_map(const Index_t & nb_rows, const Index_t & nb_cols);
-    //! back-end for the public const eigen_XXX functions
+    //! const eigen_map with arbitrary sizes
     Eigen_cmap eigen_map(const Index_t & nb_rows,
                          const Index_t & nb_cols) const;
+
+   protected:
+    //! tensor multiplication of two fields
+    template <Dim_t Dim, Dim_t SmallRank>
+    void tensmult_worker(const TypedFieldBase & input, TypedFieldBase & result);
+
+    template <Dim_t Dim1, Dim_t Dim2, Dim_t SmallRank>
+    void tensmult_worker(const Eigen::Ref<Eigen::Matrix<T, Dim1, Dim2>> & input,
+                         TypedFieldBase & result);
 
     //! set the data_ptr
     void set_data_ptr(T * ptr);

@@ -109,6 +109,7 @@ namespace muSpectre {
     solver->solve_load_increment(load);
   }
 
+  /* ----------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(solver_test, Fix, CellDataFixtures, Fix) {
     const Real young_soft{4};
     const Real young_hard{8};
@@ -190,6 +191,80 @@ namespace muSpectre {
       std::cout << "new stress result" << std::endl
                 << new_result.stress.transpose() << std::endl;
     }
+  }
+
+  /* ----------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(solver_homogenizer_test, Fix,
+                                   CellDataFixture2, Fix) {
+    const Real young_soft{4};
+    const Real young_hard{8};
+    const Real poisson{.3};
+    using Mat_t = MaterialLinearElastic1<Fix::SpatialDim>;
+    this->cell_data->set_nb_quad_pts(OneQuadPt);
+    auto & soft{Mat_t::make(this->cell_data, "soft", young_soft, poisson)};
+    auto & hard{Mat_t::make(this->cell_data, "hard", young_hard, poisson)};
+    {
+      Dim_t i{0};
+      for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
+        auto && index{std::get<0>(index_pixel)};
+        auto & pixel{std::get<1>(index_pixel)};
+        if (pixel[0] == 0) {
+          hard.add_pixel(index);
+          i++;
+        } else {
+          soft.add_pixel(index);
+        }
+      }
+      std::cout << "i: " << i << "\n";
+    }
+
+    BOOST_TEST_CHECKPOINT("after material assignment");
+
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
+    const Uint maxiter{static_cast<Uint>(this->cell_data->get_spatial_dim()) *
+                       10};
+    constexpr Verbosity verbose{Verbosity::Silent};
+
+    auto krylov_solver{
+        std::make_shared<KrylovSolverCGEigen>(cg_tol, maxiter, verbose)};
+    auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
+                                                 verbose, newton_tol, equil_tol,
+                                                 maxiter)};
+    auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
+      return 0.5 * (mat + mat.transpose());
+    }};
+    const Eigen::MatrixXd strain{
+        symmetric(Eigen::MatrixXd::Random(Fix::SpatialDim, Fix::SpatialDim)) /
+        2};
+
+    solver->set_formulation(Formulation::small_strain);
+    solver->initialise_cell();
+
+    BOOST_TEST_CHECKPOINT("before load increment");
+    std::cout << std::endl
+              << "strain:" << std::endl
+              << strain << std::endl
+              << std::endl;
+    std::cout << std::endl
+              << "symmetric(strain):" << std::endl
+              << symmetric(strain) << std::endl
+              << std::endl;
+    auto && new_result{solver->solve_load_increment(strain)};
+    BOOST_TEST_CHECKPOINT("after load increment");
+
+    auto && C_eff{solver->compute_effective_stiffness()};
+    std::cout << "C_eff:\n" << C_eff << std::endl;
+
+    // auto && error{
+    //     muGrid::testGoodies::rel_error(new_result.stress,
+    //     legacy_stress_map)};
+    // BOOST_CHECK_LE(error, tol);
+    // if (not(error < tol)) {
+    //   std::cout << "legacy stress result" << std::endl
+    //             << legacy_stress_map.transpose() << std::endl;
+    //   std::cout << "new stress result" << std::endl
+    //             << new_result.stress.transpose() << std::endl;
+    // }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

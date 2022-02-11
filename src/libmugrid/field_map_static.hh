@@ -181,7 +181,6 @@ namespace muGrid {
       return *this;
     }
 
-
     //! Subtraction-assign a matrix-like value with static size to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField && !MapType::IsScalarMapType(),
@@ -728,6 +727,7 @@ namespace muGrid {
       StaticFieldMap<T, Mutability, internal::TensorMap<T, Rank, Dim>,
                      IterationType>;
 
+  // TODO(Till Junge): check redundancy
   /**
    * Alias of `muGrid::StaticNFieldMap` over a tensor field you wish
    * to iterate over

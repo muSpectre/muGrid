@@ -258,18 +258,6 @@ namespace muSpectre {
     // max_trust_region_radius
     Real trust_region_radius{this->max_trust_radius};
 
-    const std::string strain_symb{[this]() -> std::string {
-      if (this->is_mechanics()) {
-        if (this->get_formulation() == Formulation::finite_strain) {
-          return "F";
-        } else {
-          return "ε";
-        }
-      } else {
-        return "Grad";
-      }
-    }()};
-
     if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
       std::cout << std::setw(this->default_count_width) << "STEP"
                 << std::setw(15) << "ACTION" << std::setw(15) << "OLD TR. REG."
@@ -277,7 +265,8 @@ namespace muSpectre {
                 << "Δm model" << std::setw(15) << "ΔE estim." << std::setw(15)
                 << " estim. ρ" << std::setw(15) << "|GP|"
                 << "(equi tol)" << std::setw(15)
-                << ("|δ" + strain_symb + "|/|Δ" + strain_symb + "|")
+                << ("|δ" + this->strain_symb() + "|/|Δ" + this->strain_symb() +
+                    "|")
                 << "(newt tol)" << std::endl;
     }
 
@@ -338,10 +327,11 @@ namespace muSpectre {
         err << "Failure at load step " << this->get_counter_load_step()
             << ". In Newton-Raphson step " << newt_iter << ":" << std::endl
             << error.what() << std::endl
-            << "The applied boundary condition is Δ" << strain_symb << " ="
-            << std::endl
+            << "The applied boundary condition is Δ" << this->strain_symb()
+            << " =" << std::endl
             << macro_load << std::endl
-            << "and the load increment is Δ" << strain_symb << " =" << std::endl
+            << "and the load increment is Δ" << this->strain_symb() << " ="
+            << std::endl
             << macro_load - this->previous_macro_load << std::endl;
         throw ConvergenceError(err.str());
       }
@@ -528,10 +518,11 @@ namespace muSpectre {
       std::stringstream err{};
       err << "Failure at load step " << this->get_counter_load_step()
           << ". Newton-Raphson failed to converge. "
-          << "The applied boundary condition is Δ" << strain_symb << " ="
-          << std::endl
+          << "The applied boundary condition is Δ" << this->strain_symb()
+          << " =" << std::endl
           << macro_load << std::endl
-          << "and the load increment is Δ" << strain_symb << " =" << std::endl
+          << "and the load increment is Δ" << this->strain_symb() << " ="
+          << std::endl
           << macro_load - this->previous_macro_load << std::endl;
       throw ConvergenceError(err.str());
     }
@@ -574,9 +565,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverFEMTrustRegionNewtonCG::action_increment(EigenCVec_t delta_u,
+  void SolverFEMTrustRegionNewtonCG::action_increment(EigenCVecRef delta_u,
                                                       const Real & alpha,
-                                                      EigenVec_t delta_f) {
+                                                      EigenVecRef delta_f) {
     this->K.apply_increment(this->tangent->get_field(), delta_u, alpha,
                             delta_f);
   }
@@ -607,4 +598,18 @@ namespace muSpectre {
     return this->eval_grad != this->grad;
   }
 
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMTrustRegionNewtonCG::get_rhs() -> MappedField_t & {
+    return *this->rhs;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMTrustRegionNewtonCG::get_incr() -> MappedField_t & {
+    return *this->disp_fluctuation_incr;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMTrustRegionNewtonCG::get_krylov_solver() -> KrylovSolverBase & {
+    return *this->krylov_solver;
+  }
 }  // namespace muSpectre

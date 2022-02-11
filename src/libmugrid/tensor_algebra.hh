@@ -230,30 +230,30 @@ namespace muGrid {
 
     namespace internal {
 
-      template <Dim_t SmallRank>
+      template <Dim_t Dim, Dim_t SmallRank>
       struct TensorMultiplicationProvider {};
 
-      template <>
-      struct TensorMultiplicationProvider<secondOrder> {
+      template <Dim_t Dim>
+      struct TensorMultiplicationProvider<Dim, secondOrder> {
         template <typename T4, typename T2>
         constexpr static auto multiply(const Eigen::MatrixBase<T4> & A,
                                        const Eigen::MatrixBase<T2> & B)
-            -> Tens2_t<T2::RowsAtCompileTime> {
-          constexpr Dim_t dim{T2::RowsAtCompileTime};
-          static_assert(dim == T2::ColsAtCompileTime, "B is not square");
-          static_assert(dim != Eigen::Dynamic, "B not statically sized");
-          static_assert(dim * dim == T4::RowsAtCompileTime,
+            -> Eigen::Matrix<typename T2::Scalar, T2::RowsAtCompileTime,
+                             T2::RowsAtCompileTime> {
+          static_assert(Dim == T2::ColsAtCompileTime, "B is not square");
+          static_assert(Dim != Eigen::Dynamic, "B not statically sized");
+          static_assert(Dim * Dim == T4::RowsAtCompileTime,
                         "A and B not compatible");
           static_assert(T4::RowsAtCompileTime == T4::ColsAtCompileTime,
                         "A is not square");
 
-          Tens2_t<dim> result;
+          Eigen::Matrix<typename T2::Scalar, Dim, Dim> result;
           result.setZero();
 
-          for (Dim_t i = 0; i < dim; ++i) {
-            for (Dim_t j = 0; j < dim; ++j) {
-              for (Dim_t k = 0; k < dim; ++k) {
-                for (Dim_t l = 0; l < dim; ++l) {
+          for (Dim_t i = 0; i < Dim; ++i) {
+            for (Dim_t j = 0; j < Dim; ++j) {
+              for (Dim_t k = 0; k < Dim; ++k) {
+                for (Dim_t l = 0; l < Dim; ++l) {
                   result(i, j) += get(A, i, j, k, l) * B(k, l);
                 }
               }
@@ -263,18 +263,38 @@ namespace muGrid {
         }
       };
 
-      template <>
-      struct TensorMultiplicationProvider<firstOrder> {
+      template <Dim_t Dim>
+      struct TensorMultiplicationProvider<Dim, firstOrder> {
         template <typename T2, typename T1>
         constexpr static auto multiply(const Eigen::MatrixBase<T2> & A,
                                        const Eigen::MatrixBase<T1> & B)
             -> decltype(A * B) {
           static_assert(static_cast<int>(decltype(A * B)::RowsAtCompileTime) ==
-                        static_cast<int>(T1::RowsAtCompileTime),
+                            static_cast<int>(T1::RowsAtCompileTime),
                         "Wrong number of rows");
           static_assert(static_cast<int>(decltype(A * B)::ColsAtCompileTime) ==
-                        static_cast<int>(T1::ColsAtCompileTime),
+                            static_cast<int>(T1::ColsAtCompileTime),
                         "Wrong number of cols");
+          return A * B;
+        }
+      };
+
+      template <>
+      struct TensorMultiplicationProvider<oneD, firstOrder> {
+        template <typename T2, typename T1>
+        constexpr static auto multiply(const Eigen::MatrixBase<T2> & A,
+                                       const Eigen::MatrixBase<T1> & B)
+            -> decltype(A * B) {
+          return A * B;
+        }
+      };
+
+      template <>
+      struct TensorMultiplicationProvider<oneD, secondOrder> {
+        template <typename T2, typename T1>
+        constexpr static auto multiply(const Eigen::MatrixBase<T2> & A,
+                                       const Eigen::MatrixBase<T1> & B)
+            -> decltype(A * B) {
           return A * B;
         }
       };
@@ -282,7 +302,7 @@ namespace muGrid {
     }  // namespace internal
 
     /**
-     * Standart tensor multiplication
+     * Standard tensor multiplication
      */
     template <typename TLarge, typename TSmall>
     constexpr inline decltype(auto)
@@ -293,7 +313,8 @@ namespace muGrid {
       constexpr Dim_t LargeRank{EigenCheck::tensor_rank<TLarge, Dim>::value};
       static_assert(LargeRank == 2 * SmallRank or Dim == oneD,
                     "Invalid tensor product");
-      return internal::TensorMultiplicationProvider<SmallRank>::multiply(A, B);
+      return internal::TensorMultiplicationProvider<Dim, SmallRank>::multiply(
+          A, B);
     }
 
     //! compile-time fourth-order tracer
@@ -449,19 +470,19 @@ namespace muGrid {
 
     namespace internal {
 
-      /* -------------------------------------------------------------------- */
+      /* ---------------------------------------------------------------------*/
       template <Dim_t Rank>
       struct AxisTransformer {};
 
-      /* -------------------------------------------------------------------- */
+      /* ---------------------------------------------------------------------*/
       template <>
       struct AxisTransformer<firstOrder> {
         template <class T1, class T2>
         inline static decltype(auto)
         push_forward(const Eigen::MatrixBase<T1> & t1,
                      const Eigen::MatrixBase<T2> & F) {
-          // returning without copy make results wrong(most probably because of
-          // memory issue). The return values in some cases are fully zeros
+          // returning without copy make results wrong(most probably because
+          // of memory issue). The return values in some cases are fully zeros
           // matrices.
           constexpr Dim_t Dim{EigenCheck::tensor_dim<T2>::value};
           using T1_t =
@@ -490,8 +511,8 @@ namespace muGrid {
         inline static decltype(auto)
         push_forward(const Eigen::MatrixBase<T2> & t2,
                      const Eigen::MatrixBase<T2_F> & F) {
-          // returning without copy make results wrong(most probably because of
-          // memory issue). The return values in some cases are fully zeros
+          // returning without copy make results wrong(most probably because
+          // of memory issue). The return values in some cases are fully zeros
           // matrices.
           constexpr Dim_t Dim{EigenCheck::tensor_dim<T2_F>::value};
           using T2_t =
@@ -514,15 +535,15 @@ namespace muGrid {
         }
       };
 
-      /* -------------------------------------------------------------------- */
+      /* --------------------------------------------------------------------*/
       template <>
       struct AxisTransformer<fourthOrder> {
         template <class T4, class T2>
         inline static decltype(auto)
         push_forward(const Eigen::MatrixBase<T4> & t4,
                      const Eigen::MatrixBase<T2> & F) {
-          // returning without copy make results wrong(most probably because of
-          // memory issue). The return values in some cases are fully zeros
+          // returning without copy make results wrong(most probably because
+          // of memory issue). The return values in some cases are fully zeros
           // matrices. This function is used in MaterialNeoHookeanElastic and
           // its use without copying the return value made the returned value
           // zero-filed matrix.
@@ -551,7 +572,7 @@ namespace muGrid {
 
     namespace AxisTransform {
 
-      /* -------------------------------------------------------------------- */
+      /* -------------------------------------------------------------------*/
       template <class T_in, class T2>
       inline static decltype(auto)
       push_forward(const Eigen::MatrixBase<T_in> & t,
@@ -561,7 +582,7 @@ namespace muGrid {
         return internal::AxisTransformer<Order>::push_forward(t, F);
       }
 
-      /* -------------------------------------------------------------------- */
+      /* -------------------------------------------------------------------*/
       template <class T_in, class T2>
       inline static decltype(auto) pull_back(const Eigen::MatrixBase<T_in> & t,
                                              const Eigen::MatrixBase<T2> & F) {

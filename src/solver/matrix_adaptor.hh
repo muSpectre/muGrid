@@ -159,10 +159,10 @@ namespace muSpectre {
     virtual ~MatrixAdaptable() = default;
 
     //! Ref to input/output vector
-    using EigenVec_t = Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
+    using EigenVecRef = Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
 
     //! Ref to input vector
-    using EigenCVec_t =
+    using EigenCVecRef =
         Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
 
     virtual Index_t get_nb_dof() const = 0;
@@ -176,8 +176,8 @@ namespace muSpectre {
      * absolutely no input checking. Rather, it is meant to be called by the
      * scaleAndAddTo function in the in Eigen solvers
      */
-    virtual void action_increment(EigenCVec_t delta_grad, const Real & alpha,
-                                  EigenVec_t del_flux) = 0;
+    virtual void action_increment(EigenCVecRef delta_grad, const Real & alpha,
+                                  EigenVecRef del_flux) = 0;
     //! return the communicator object
     virtual const muGrid::Communicator & get_communicator() const = 0;
 
@@ -203,8 +203,8 @@ namespace muSpectre {
   class DenseEigenAdaptor : public MatrixAdaptable {
    public:
     using Parent = MatrixAdaptable;
-    using EigenVec_t = Parent::EigenVec_t;
-    using EigenCVec_t = Parent::EigenCVec_t;
+    using EigenVec_t = Parent::EigenVecRef;
+    using EigenCVec_t = Parent::EigenCVecRef;
     //! Default constructor
     DenseEigenAdaptor() = default;
 

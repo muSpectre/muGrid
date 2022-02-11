@@ -98,6 +98,8 @@ namespace muSpectre {
   using CellDataFixtures =
       boost::mpl::list<CellDataFixture<twoD>, CellDataFixture<threeD>>;
 
+  using CellDataFixture2 = boost::mpl::list<CellDataFixture<twoD>>;
+
   /* ---------------------------------------------------------------------- */
   template <Index_t Dim>
   struct CellDataFixtureEigenStrain {

@@ -94,8 +94,8 @@ namespace muSpectre {
     Index_t get_nb_dof() const final;
 
     //! implementation of the action of the stiffness matrix
-    void action_increment(EigenCVec_t delta_u, const Real & alpha,
-                          EigenVec_t delta_f) final;
+    void action_increment(EigenCVecRef delta_u, const Real & alpha,
+                          EigenVecRef delta_f) final;
 
     //! initialise cell data for this solver
     void initialise_cell() final;
@@ -105,6 +105,16 @@ namespace muSpectre {
 
     //! Displacement field
     const MappedField_t & get_disp_fluctuation() const;
+
+    //! getter for rhs field
+    MappedField_t & get_rhs() final;
+
+    //! getter for increment field (field in this solver)
+    MappedField_t & get_incr() final;
+
+    //! getter for Krylov solver object
+    KrylovSolverBase & get_krylov_solver() final;
+
 
    protected:
     void initialise_eigen_strain_storage();

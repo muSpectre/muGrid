@@ -49,13 +49,9 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Gradient_t & gradient, const MeanControl & mean_control)
-      : Parent{cell_data, verbosity, SolverType::Spectral},
-        krylov_solver{krylov_solver},
-        newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
-        gradient{std::make_shared<Gradient_t>(gradient)},
-        nb_quad_pts{static_cast<Index_t>(gradient.size()) /
-                    (this->cell_data->get_domain_lengths().get_dim())},
-        mean_control{mean_control} {}
+      : Parent{cell_data, verbosity, newton_tol,  equil_tol,
+               max_iter,  gradient,  mean_control},
+        krylov_solver{krylov_solver} {}
 
   /* ---------------------------------------------------------------------- */
   SolverNewtonCG::SolverNewtonCG(
@@ -64,12 +60,9 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const MeanControl & mean_control)
-      : Parent{cell_data, verbosity, SolverType::Spectral},
-        krylov_solver{krylov_solver},
-        newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
-        gradient{std::make_shared<Gradient_t>(
-            muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))},
-        mean_control{mean_control} {}
+      : Parent{cell_data, verbosity, newton_tol,
+               equil_tol, max_iter,  mean_control},
+        krylov_solver{krylov_solver} {}
 
   /* ---------------------------------------------------------------------- */
   void SolverNewtonCG::initialise_cell() {
@@ -251,18 +244,6 @@ namespace muSpectre {
     bool newton_tol_test{false};
     bool equil_tol_test{false};
 
-    const std::string strain_symb{[this]() -> std::string {
-      if (this->is_mechanics()) {
-        if (this->get_formulation() == Formulation::finite_strain) {
-          return "F";
-        } else {
-          return "ε";
-        }
-      } else {
-        return "Grad";
-      }
-    }()};
-
     //! Checks two loop breaking criteria (newton tolerance and equilibrium
     //! tolerance)
     auto && early_convergence_test{[&incr_norm_mean_control, &grad_norm, this,
@@ -344,10 +325,11 @@ namespace muSpectre {
         err << "Failure at load step " << this->get_counter_load_step()
             << ". In Newton-Raphson step " << newt_iter << ":" << std::endl
             << error.what() << std::endl
-            << "The applied boundary condition is Δ" << strain_symb << " ="
-            << std::endl
+            << "The applied boundary condition is Δ" << this->strain_symb()
+            << " =" << std::endl
             << macro_load << std::endl
-            << "and the load increment is Δ" << strain_symb << " =" << std::endl
+            << "and the load increment is Δ" << this->strain_symb() << " ="
+            << std::endl
             << macro_load - this->previous_macro_load << std::endl;
         throw ConvergenceError(err.str());
       }
@@ -390,9 +372,10 @@ namespace muSpectre {
 
       if ((this->verbosity >= Verbosity::Detailed) and (comm.rank() == 0)) {
         std::cout << "at Newton step " << std::setw(this->default_count_width)
-                  << newt_iter << ", |δ" << strain_symb << "|/|Δ" << strain_symb
-                  << "|" << std::setw(17) << incr_second_norm / grad_norm
-                  << ", tol = " << newton_tol << std::endl;
+                  << newt_iter << ", |δ" << this->strain_symb() << "|/|Δ"
+                  << this->strain_symb() << "|" << std::setw(17)
+                  << incr_second_norm / grad_norm << ", tol = " << newton_tol
+                  << std::endl;
 
         if (this->verbosity > Verbosity::Detailed) {
           switch (this->mean_control) {
@@ -455,10 +438,11 @@ namespace muSpectre {
       std::stringstream err{};
       err << "Failure at load step " << this->get_counter_load_step()
           << ". Newton-Raphson failed to converge. "
-          << "The applied boundary condition is Δ" << strain_symb << " ="
-          << std::endl
+          << "The applied boundary condition is Δ" << this->strain_symb()
+          << " =" << std::endl
           << macro_load << std::endl
-          << "and the load increment is Δ" << strain_symb << " =" << std::endl
+          << "and the load increment is Δ" << this->strain_symb() << " ="
+          << std::endl
           << macro_load - this->previous_macro_load << std::endl;
       throw ConvergenceError(err.str());
     }
@@ -488,288 +472,8 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t SolverNewtonCG::get_nb_dof() const {
-    if (not this->is_initialised) {
-      throw SolverError{"Can't determine the number of degrees of freedom "
-                        "until I have been "
-                        "initialised!"};
-    }
-    return this->cell_data->get_pixels().size() *
-           this->cell_data->get_nb_quad_pts() * this->grad_shape[0] *
-           this->grad_shape[1];
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::action_increment(EigenCVec_t delta_grad,
-                                        const Real & alpha,
-                                        EigenVec_t del_flux) {
-    auto && grad_size{this->grad_shape[0] * this->grad_shape[1]};
-    auto delta_grad_ptr{muGrid::WrappedField<Real>::make_const(
-        "delta Grad", this->cell_data->get_fields(), grad_size, delta_grad,
-        QuadPtTag)};
-
-    muGrid::WrappedField<Real> del_flux_field{"delta_flux",
-                                              this->cell_data->get_fields(),
-                                              grad_size, del_flux, QuadPtTag};
-
-    switch (this->cell_data->get_material_dim()) {
-    case twoD: {
-      this->template action_increment_worker_prep<twoD>(
-          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field,
-          this->get_displacement_rank());
-      break;
-    }
-    case threeD: {
-      this->template action_increment_worker_prep<threeD>(
-          *delta_grad_ptr, this->tangent->get_field(), alpha, del_flux_field,
-          this->get_displacement_rank());
-      break;
-    }
-    default:
-      std::stringstream err{};
-      err << "unknown dimension " << this->cell_data->get_material_dim()
-          << std::endl;
-      throw SolverError(err.str());
-      break;
-    }
-    this->projection->apply_projection(del_flux_field);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM>
-  void SolverNewtonCG::action_increment_worker_prep(
-      const muGrid::TypedFieldBase<Real> & delta_grad,
-      const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
-      muGrid::TypedFieldBase<Real> & delta_flux,
-      const Index_t & displacement_rank) {
-    switch (displacement_rank) {
-    case zerothOrder: {
-      // this is a scalar problem, e.g., heat equation
-      SolverNewtonCG::template action_increment_worker<DimM, zerothOrder>(
-          delta_grad, tangent, alpha, delta_flux);
-      break;
-    }
-    case firstOrder: {
-      // this is a vectorial problem, e.g., mechanics
-      SolverNewtonCG::template action_increment_worker<DimM, firstOrder>(
-          delta_grad, tangent, alpha, delta_flux);
-      break;
-    }
-    default:
-      throw SolverError("Can only handle scalar and vectorial problems");
-      break;
-    }
-  }
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t DimM, Index_t DisplacementRank>
-  void SolverNewtonCG::action_increment_worker(
-      const muGrid::TypedFieldBase<Real> & delta_grad,
-      const muGrid::TypedFieldBase<Real> & tangent, const Real & alpha,
-      muGrid::TypedFieldBase<Real> & delta_flux) {
-    constexpr Index_t GradRank{DisplacementRank + 1};
-    static_assert(
-        (GradRank == firstOrder) or (GradRank == secondOrder),
-        "Can only handle vectors and second-rank tensors as gradients");
-    constexpr Index_t TangentRank{GradRank + GradRank};
-    muGrid::TensorFieldMap<Real, muGrid::Mapping::Const, GradRank, DimM,
-                           IterUnit::SubPt>
-        grad_map{delta_grad};
-    muGrid::TensorFieldMap<Real, muGrid::Mapping::Const, TangentRank, DimM,
-                           IterUnit::SubPt>
-        tangent_map{tangent};
-    muGrid::TensorFieldMap<Real, muGrid::Mapping::Mut, GradRank, DimM,
-                           IterUnit::SubPt>
-        flux_map{delta_flux};
-    for (auto && tup : akantu::zip(grad_map, tangent_map, flux_map)) {
-      auto & df = std::get<0>(tup);
-      auto & k = std::get<1>(tup);
-      auto & dp = std::get<2>(tup);
-      Eigen::MatrixXd tmp{alpha * Matrices::tensmult(k, df)};
-      dp += tmp;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <Dim_t Dim>
-  void SolverNewtonCG::create_mechanics_projection_worker() {
-    if (static_cast<Index_t>(this->gradient->size()) % Dim != 0) {
-      std::stringstream error{};
-      error << "There are " << this->gradient->size()
-            << " derivative operators in "
-            << "the gradient. This number must be divisible by the system "
-            << "dimension " << Dim << ".";
-      throw std::runtime_error(error.str());
-    }
-    // Deduce number of quad points from the gradient
-    auto fft_ptr{this->cell_data->get_FFT_engine()};
-    // fft_ptr->create_plan(this->nb_quad_pts);
-    // fft_ptr->create_plan(this->gradient->size());
-
-    const DynRcoord_t lengths{this->cell_data->get_domain_lengths()};
-    switch (this->get_formulation()) {
-    case Formulation::finite_strain: {
-      switch (this->nb_quad_pts) {
-      case OneQuadPt: {
-        using Projection = ProjectionFiniteStrainFast<Dim, OneQuadPt>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case TwoQuadPts: {
-        using Projection = ProjectionFiniteStrainFast<Dim, TwoQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case FourQuadPts: {
-        using Projection = ProjectionFiniteStrainFast<Dim, FourQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case FiveQuadPts: {
-        using Projection = ProjectionFiniteStrainFast<Dim, FiveQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case SixQuadPts: {
-        using Projection = ProjectionFiniteStrainFast<Dim, SixQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      default: {
-        std::stringstream error;
-        error << this->nb_quad_pts << " quadrature points are presently "
-              << "unsupported.";
-        throw std::runtime_error(error.str());
-        break;
-      }
-      }
-      break;
-    }
-    case Formulation::small_strain: {
-      switch (this->nb_quad_pts) {
-      case OneQuadPt: {
-        using Projection = ProjectionSmallStrain<Dim, OneQuadPt>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case TwoQuadPts: {
-        using Projection = ProjectionSmallStrain<Dim, TwoQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case FourQuadPts: {
-        using Projection = ProjectionSmallStrain<Dim, FourQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case FiveQuadPts: {
-        using Projection = ProjectionSmallStrain<Dim, FiveQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      case SixQuadPts: {
-        using Projection = ProjectionSmallStrain<Dim, SixQuadPts>;
-        this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
-        break;
-      }
-      default:
-        std::stringstream error;
-        error << this->nb_quad_pts << " quadrature points are presently "
-              << "unsupported.";
-        throw std::runtime_error(error.str());
-        break;
-      }
-      break;
-    }
-    default: {
-      throw std::runtime_error("Unknown formulation (in projection creation).");
-      break;
-    }
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::create_mechanics_projection() {
-    switch (this->cell_data->get_spatial_dim()) {
-    case twoD: {
-      this->template create_mechanics_projection_worker<twoD>();
-      break;
-    }
-    case threeD: {
-      this->template create_mechanics_projection_worker<threeD>();
-      break;
-    }
-    default:
-      std::stringstream error_message{};
-      error_message << "Only 2- and 3-dimensional projections are currently "
-                       "supported, you chose "
-                    << this->cell_data->get_spatial_dim() << '.';
-      throw SolverError{error_message.str()};
-      break;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::create_gradient_projection() {
-    switch (this->cell_data->get_spatial_dim()) {
-    case twoD: {
-      this->projection = std::make_shared<ProjectionGradient<twoD, firstOrder>>(
-          this->cell_data->get_FFT_engine(),
-          this->cell_data->get_domain_lengths(), this->mean_control);
-      break;
-    }
-    case threeD: {
-      this->projection =
-          std::make_shared<ProjectionGradient<threeD, firstOrder>>(
-              this->cell_data->get_FFT_engine(),
-              this->cell_data->get_domain_lengths(), this->mean_control);
-      break;
-    }
-    default:
-      std::stringstream error_message{};
-      error_message << "generic gradient projection is not implemented for "
-                    << this->cell_data->get_spatial_dim()
-                    << "-dimensional problems.";
-      throw SolverError{error_message.str()};
-      break;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void SolverNewtonCG::initialise_eigen_strain_storage() {
-    if (not this->has_eigen_strain_storage()) {
-      this->eval_grad = std::make_shared<MappedField_t>(
-          "eval_grad", this->grad_shape[0], this->grad_shape[1],
-          IterUnit::SubPt, this->cell_data->get_fields(), QuadPtTag);
-      this->eval_grads[this->domain] = this->eval_grad;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  bool SolverNewtonCG::has_eigen_strain_storage() const {
-    return this->eval_grad != this->grad;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  Index_t SolverNewtonCG::get_displacement_rank() const {
-    return this->domain.rank() - 1;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  ProjectionBase & SolverNewtonCG::get_projection() {
-    if (this->projection == nullptr) {
-      throw SolverError("Projection is not yet defined.");
-    }
-    return *this->projection;
+  auto SolverNewtonCG::get_krylov_solver() -> KrylovSolverBase & {
+    return *this->krylov_solver;
   }
 
 }  // namespace muSpectre

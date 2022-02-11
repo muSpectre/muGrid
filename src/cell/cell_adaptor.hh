@@ -97,8 +97,8 @@ namespace muSpectre {
      * absolutely no input checking. Rather, it is meant to be called by the
      * scaleAndAddTo function in the in Eigen solvers
      */
-    void action_increment(EigenCVec_t del_grad, const Real & alpha,
-                          EigenVec_t del_flux) final {
+    void action_increment(EigenCVecRef del_grad, const Real & alpha,
+                          EigenVecRef del_flux) final {
       return this->cell.add_projected_directional_stiffness(del_grad, alpha,
                                                             del_flux);
     }

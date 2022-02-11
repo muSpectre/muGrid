@@ -34,6 +34,8 @@
  */
 
 #include "solver_base.hh"
+#include "krylov_solver_base.hh"
+#include "projection/projection_base.hh"
 
 #include <libmugrid/units.hh>
 
@@ -48,6 +50,17 @@ namespace muSpectre {
    public:
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
     using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
+
+    //! Ref to input/output vector
+    using EigenVecRef = Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
+    //! Ref to input/output matrix
+    using EigenMatRef =
+        Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>>;
+
+    //! Ref to input/output vector
+    using EigenVec_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+    //! Ref to input/output matrix
+    using EigenMat_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
     //! Default constructor
     SolverSinglePhysics() = delete;
@@ -115,8 +128,21 @@ namespace muSpectre {
 
     //! getter function for grad field
     const MappedField_t & get_grad() const;
+
     //! getter and setter function for evalgrad field
     MappedField_t & get_set_eval_grad();
+
+    //! getter for rhs field
+    virtual MappedField_t & get_rhs() = 0;
+
+    //! getter for increment field
+    virtual MappedField_t & get_incr() = 0;
+
+    //! getter for Krylov solver object
+    virtual KrylovSolverBase & get_krylov_solver() = 0;
+
+    //! create strain symbol
+    const std::string strain_symb();
 
     //! getter and setter function for evalgrad field
     const MappedField_t & get_eval_grad() const;

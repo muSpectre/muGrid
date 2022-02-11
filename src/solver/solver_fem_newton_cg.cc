@@ -234,18 +234,6 @@ namespace muSpectre {
       return has_converged;
     }};
 
-    const std::string strain_symb{[this]() -> std::string {
-      if (this->is_mechanics()) {
-        if (this->get_formulation() == Formulation::finite_strain) {
-          return "F";
-        } else {
-          return "ε";
-        }
-      } else {
-        return "Grad";
-      }
-    }()};
-
     auto & grad_operator{*this->K.get_gradient_operator()};
 
     this->grad->get_map() = macro_load;
@@ -284,10 +272,11 @@ namespace muSpectre {
         err << "Failure at load step " << this->get_counter_load_step()
             << ". In Newton-Raphson step " << newt_iter << ":" << std::endl
             << error.what() << std::endl
-            << "The applied boundary condition is Δ" << strain_symb << " ="
-            << std::endl
+            << "The applied boundary condition is Δ" << this->strain_symb()
+            << " =" << std::endl
             << macro_load << std::endl
-            << "and the load increment is Δ" << strain_symb << " =" << std::endl
+            << "and the load increment is Δ" << this->strain_symb() << " ="
+            << std::endl
             << macro_load - this->previous_macro_load << std::endl;
         throw ConvergenceError(err.str());
       }
@@ -350,10 +339,11 @@ namespace muSpectre {
       std::stringstream err{};
       err << "Failure at load step " << this->get_counter_load_step()
           << ". Newton-Raphson failed to converge. "
-          << "The applied boundary condition is Δ" << strain_symb << " ="
-          << std::endl
+          << "The applied boundary condition is Δ" << this->strain_symb()
+          << " =" << std::endl
           << macro_load << std::endl
-          << "and the load increment is Δ" << strain_symb << " =" << std::endl
+          << "and the load increment is Δ" << this->strain_symb() << " ="
+          << std::endl
           << macro_load - this->previous_macro_load << std::endl;
       throw ConvergenceError(err.str());
     }
@@ -396,9 +386,9 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverFEMNewtonCG::action_increment(EigenCVec_t delta_u,
+  void SolverFEMNewtonCG::action_increment(EigenCVecRef delta_u,
                                            const Real & alpha,
-                                           EigenVec_t delta_f) {
+                                           EigenVecRef delta_f) {
     this->K.apply_increment(this->tangent->get_field(), delta_u, alpha,
                             delta_f);
   }
@@ -429,4 +419,18 @@ namespace muSpectre {
     return this->eval_grad != this->grad;
   }
 
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMNewtonCG::get_rhs() -> MappedField_t & { return *this->rhs; }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMNewtonCG::get_incr() -> MappedField_t & {
+    return *this->disp_fluctuation_incr;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverFEMNewtonCG::get_krylov_solver() -> KrylovSolverBase & {
+    return *this->krylov_solver;
+  }
+
+  /* ---------------------------------------------------------------------- */
 }  // namespace muSpectre
