@@ -195,27 +195,53 @@ namespace muSpectre {
 
   /* ----------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(solver_homogenizer_test, Fix,
-                                   CellDataFixture2, Fix) {
-    const Real young_soft{4};
-    const Real young_hard{8};
-    const Real poisson{.3};
+                                   CellDataFixturesSmall, Fix) {
+    const Real young_soft{1.};
+    const Real young_hard{2.};
+    const Real poisson{0.0};
+
+    using T2_t = Eigen::Matrix<Real, Fix::SpatialDim, Fix::SpatialDim>;
+    using T4_t = muGrid::T4Mat<Real, Fix::SpatialDim>;
     using Mat_t = MaterialLinearElastic1<Fix::SpatialDim>;
+
+    auto && ref_parallel_2_s_1_h{[](const Real & v_h, const Real & v_s) {
+      return (1. / ((2. / v_s) + (1. / v_h))) * 3.;
+    }};
+
+    auto && ref_serial_2_s_1_h{[](const Real & v_h, const Real & v_s) {
+      return ((2. * v_s) + (1. * v_h)) / 3.;
+    }};
+
     this->cell_data->set_nb_quad_pts(OneQuadPt);
     auto & soft{Mat_t::make(this->cell_data, "soft", young_soft, poisson)};
     auto & hard{Mat_t::make(this->cell_data, "hard", young_hard, poisson)};
+
+    // making evaluator for materials soft and hard  to directly obtain their
+    // stiffness
+    auto mat_eval_soft = Mat_t::make_evaluator(young_soft, poisson);
+    auto & mat_soft = *std::get<0>(mat_eval_soft);
+    auto & evaluator_soft = std::get<1>(mat_eval_soft);
+    mat_soft.add_pixel({});
+
+    auto mat_eval_hard = Mat_t::make_evaluator(young_hard, poisson);
+    auto & mat_hard = *std::get<0>(mat_eval_hard);
+    auto & evaluator_hard = std::get<1>(mat_eval_hard);
+    mat_hard.add_pixel({});
+
+    T2_t sigma_soft, sigma_hard;
+    T4_t C_soft, C_hard;
+
+    BOOST_TEST_CHECKPOINT("before material assignment");
     {
-      Dim_t i{0};
       for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
         auto && index{std::get<0>(index_pixel)};
         auto & pixel{std::get<1>(index_pixel)};
-        if (pixel[0] == 0) {
+        if (pixel[1] == 0) {
           hard.add_pixel(index);
-          i++;
         } else {
           soft.add_pixel(index);
         }
       }
-      std::cout << "i: " << i << "\n";
     }
 
     BOOST_TEST_CHECKPOINT("after material assignment");
@@ -233,38 +259,189 @@ namespace muSpectre {
     auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
       return 0.5 * (mat + mat.transpose());
     }};
+
     const Eigen::MatrixXd strain{
-        symmetric(Eigen::MatrixXd::Random(Fix::SpatialDim, Fix::SpatialDim)) /
-        2};
+        symmetric(Eigen::MatrixXd::Identity(Fix::SpatialDim, Fix::SpatialDim))};
+
+    std::tie(sigma_soft, C_soft) = evaluator_soft.evaluate_stress_tangent(
+        strain, Formulation::small_strain);
+
+    std::tie(sigma_hard, C_hard) = evaluator_hard.evaluate_stress_tangent(
+        strain, Formulation::small_strain);
 
     solver->set_formulation(Formulation::small_strain);
     solver->initialise_cell();
 
     BOOST_TEST_CHECKPOINT("before load increment");
-    std::cout << std::endl
-              << "strain:" << std::endl
-              << strain << std::endl
-              << std::endl;
-    std::cout << std::endl
-              << "symmetric(strain):" << std::endl
-              << symmetric(strain) << std::endl
-              << std::endl;
     auto && new_result{solver->solve_load_increment(strain)};
     BOOST_TEST_CHECKPOINT("after load increment");
 
     auto && C_eff{solver->compute_effective_stiffness()};
-    std::cout << "C_eff:\n" << C_eff << std::endl;
+    BOOST_TEST_CHECKPOINT("after effective tangent calculation");
 
-    // auto && error{
-    //     muGrid::testGoodies::rel_error(new_result.stress,
-    //     legacy_stress_map)};
-    // BOOST_CHECK_LE(error, tol);
-    // if (not(error < tol)) {
-    //   std::cout << "legacy stress result" << std::endl
-    //             << legacy_stress_map.transpose() << std::endl;
-    //   std::cout << "new stress result" << std::endl
-    //             << new_result.stress.transpose() << std::endl;
-    // }
+    auto && error{muGrid::testGoodies::rel_error(C_eff, C_eff.transpose())};
+    BOOST_CHECK_LE(error, tol);
+    if (not(error < tol)) {
+      std::cout << "The calculated C_eff is not symmetric"
+                << "C_eff:" << std::endl
+                << C_eff << std::endl;
+    }
+
+    for (Dim_t i{0}; i < Fix::SpatialDim * Fix::SpatialDim; i++) {
+      for (Dim_t j{0}; j < Fix::SpatialDim * Fix::SpatialDim; j++) {
+        Real ref_value{};
+        if (i == 0 and j == 0) {
+          ref_value = ref_serial_2_s_1_h(C_hard(i, j), C_soft(i, j));
+        } else {
+          ref_value = ref_parallel_2_s_1_h(C_hard(i, j), C_soft(i, j));
+        }
+        auto && error{ref_value - C_eff(i, j)};
+        BOOST_CHECK_LE(error, tol);
+        if (not(error < tol)) {
+          std::cout << "C_soft:\n" << C_soft << std::endl;
+          std::cout << "C_hard:\n" << C_hard << std::endl;
+          std::cout << "C_eff:\n" << C_eff << std::endl;
+        }
+      }
+    }
+  }
+
+  /* ----------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(solver_homogenizer_test_symmetry, Fix,
+                                   CellDataFixturesSmall, Fix) {
+    const Real young_soft{1.8462834};
+    const Real young_hard{2 * young_soft};
+    const Real poisson{.25};
+    using Mat_t = MaterialLinearElastic1<Fix::SpatialDim>;
+
+    this->cell_data->set_nb_quad_pts(OneQuadPt);
+    auto & soft{Mat_t::make(this->cell_data, "soft", young_soft, poisson)};
+    auto & hard{Mat_t::make(this->cell_data, "hard", young_hard, poisson)};
+
+    {
+      bool first{true};
+      for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
+        auto && index{std::get<0>(index_pixel)};
+        if (first) {
+          hard.add_pixel(index);
+          first = false;
+        } else {
+          soft.add_pixel(index);
+        }
+      }
+    }
+
+    BOOST_TEST_CHECKPOINT("after material assignment");
+
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
+    const Uint maxiter{static_cast<Uint>(this->cell_data->get_spatial_dim()) *
+                       10};
+    constexpr Verbosity verbose{Verbosity::Silent};
+
+    auto krylov_solver{
+        std::make_shared<KrylovSolverCGEigen>(cg_tol, maxiter, verbose)};
+    auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
+                                                 verbose, newton_tol, equil_tol,
+                                                 maxiter)};
+    auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
+      return 0.5 * (mat + mat.transpose());
+    }};
+
+    const Eigen::MatrixXd strain{
+        symmetric(Eigen::MatrixXd::Identity(Fix::SpatialDim, Fix::SpatialDim))};
+
+    solver->set_formulation(Formulation::small_strain);
+    solver->initialise_cell();
+
+    BOOST_TEST_CHECKPOINT("before load increment");
+    auto && new_result{solver->solve_load_increment(strain)};
+    BOOST_TEST_CHECKPOINT("after load increment");
+
+    Eigen::MatrixXd C_eff{solver->compute_effective_stiffness()};
+
+    BOOST_TEST_CHECKPOINT("after effective tangent calculation");
+
+    Real error{0.0};
+
+    error = muGrid::testGoodies::rel_error(C_eff, C_eff.transpose());
+    BOOST_CHECK_LE(error, tol);
+    if (not(error < tol)) {
+      std::cout << "The calculated C_eff is not symmetric"
+                << "C_eff:" << std::endl
+                << C_eff << std::endl;
+    }
+
+    // check for minor symmetries:
+    std::vector<int> ind_shear{};
+    std::vector<int> ind_shear_transpose{};
+    std::vector<int> ind_norm{};
+    switch (Fix::SpatialDim) {
+    case twoD: {
+      ind_shear.insert(ind_shear.end(), {1, 2});
+      ind_shear_transpose.insert(ind_shear_transpose.end(), {2, 1});
+      ind_norm.insert(ind_norm.end(), {0, 3});
+      break;
+    }
+    case threeD: {
+      ind_shear.insert(ind_shear.end(), {1, 2, 3, 5, 6, 7});
+      ind_shear_transpose.insert(ind_shear_transpose.end(), {3, 6, 1, 7, 2, 5});
+      ind_norm.insert(ind_norm.end(), {0, 4, 8});
+      break;
+    }
+    default: {
+      std::cout << "dimension not defined"
+                << "\n";
+      break;
+    }
+    }
+
+    // normal components:
+    for (auto && i : ind_norm) {
+      for (auto && j : ind_norm) {
+        if (i == j) {
+          error = C_eff(0, 0) - C_eff(i, j);
+          BOOST_CHECK_LE(error, tol);
+          if (not(error < tol)) {
+            std::cout << "C_eff(0, 0): " << C_eff(0, 0) << std::endl
+                      << "C(" << i << ", " << j << ")" << C_eff(i, j)
+                      << std::endl
+                      << "so C_eff does not satisfy minor symmetry";
+          }
+        } else {
+          error = poisson * C_eff(0, 0) - C_eff(i, j);
+          BOOST_CHECK_LE(error, tol);
+        }
+      }
+    }
+
+    // shear components:
+    for (auto && tup : akantu::enumerate(ind_shear)) {
+      auto & n{std::get<0>(tup)};
+      auto & i{std::get<1>(tup)};
+      for (auto && j : ind_shear) {
+        if (i == j) {
+          error = C_eff(1, 1) - C_eff(i, j);
+          BOOST_CHECK_LE(error, tol);
+          if (not(error < tol)) {
+            std::cout << "C_eff(1, 1): " << C_eff(1, 1) << std::endl
+                      << "C(" << i << ", " << j << ")" << C_eff(i, j)
+                      << std::endl
+                      << "so C_eff does not satisfy minor symmetry";
+          }
+        } else if (j == ind_shear_transpose[n]) {
+          error = C_eff(1, 1) - C_eff(i, j);
+          BOOST_CHECK_LE(error, tol);
+          if (not(error < tol)) {
+            std::cout << "C_eff(1, 1): " << C_eff(1, 1) << std::endl
+                      << "C(" << i << ", " << j << ")" << C_eff(i, j)
+                      << std::endl
+                      << "so C_eff does not satisfy minor symmetry";
+          }
+        } else {
+          BOOST_CHECK_LE(C_eff(i, j), tol);
+        }
+      }
+    }
   }
 
   BOOST_AUTO_TEST_SUITE_END();

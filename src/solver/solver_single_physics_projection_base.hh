@@ -130,8 +130,6 @@ namespace muSpectre {
 
    protected:
     void initialise_eigen_strain_storage();
-    void initialise_flux_incr_storage();
-    void initialise_flux_pert_storage();
     bool has_eigen_strain_storage() const;
     /**
      * statically dimensioned worker for evaluating the incremental tangent
@@ -178,10 +176,6 @@ namespace muSpectre {
      */
     std::shared_ptr<MappedField_t> eval_grad{nullptr};
 
-    //! Flux (or stress) field increment
-    std::shared_ptr<MappedField_t> flux_incr{nullptr};
-    std::shared_ptr<MappedField_t> flux_pert{nullptr};
-
     //! Flux (or stress) field
     std::shared_ptr<MappedField_t> flux{nullptr};
     //! Tangent moduli field
@@ -204,10 +198,6 @@ namespace muSpectre {
 
     //! The type of the mean controlled variable on the RVE:
     MeanControl mean_control;
-
-    //! Boolean expressing whether flux increment field is initialised or not
-    bool has_flux_incr{false};
-    bool has_flux_pert{false};
   };
 }  // namespace muSpectre
 

@@ -74,28 +74,6 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  void SolverSinglePhysicsProjectionBase::initialise_flux_incr_storage() {
-    if (not this->has_flux_incr) {
-      this->flux_incr = std::make_shared<MappedField_t>(
-          "flux_incr", this->grad_shape[0], this->grad_shape[1],
-          IterUnit::SubPt, this->cell_data->get_fields(), QuadPtTag);
-      this->eval_grads[this->domain] = this->eval_grad;
-      this->has_flux_incr = true;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void SolverSinglePhysicsProjectionBase::initialise_flux_pert_storage() {
-    if (not this->has_flux_pert) {
-      this->flux_pert = std::make_shared<MappedField_t>(
-          "flux_pert", this->grad_shape[0], this->grad_shape[1],
-          IterUnit::SubPt, this->cell_data->get_fields(), QuadPtTag);
-      this->eval_grads[this->domain] = this->eval_grad;
-      this->has_flux_pert = true;
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
   bool SolverSinglePhysicsProjectionBase::has_eigen_strain_storage() const {
     return this->eval_grad != this->grad;
   }
@@ -386,12 +364,12 @@ namespace muSpectre {
     auto && comm{this->cell_data->get_communicator()};
     auto && dim{this->cell_data->get_spatial_dim()};
     Dim_t dim_square{dim * dim};
-    // auto && Form{this->get_formulation()};
+
+    // unit test strains
     EigenMat_t unit_test_loads{this->create_unit_test_strain()};
 
     // The return of this method :C_eff
-    EigenMat_t effective_tangent{
-        Eigen::MatrixBase<EigenMat_t>::Identity(dim_square, dim_square)};
+    EigenMat_t effective_tangent{EigenMat_t::Identity(dim_square, dim_square)};
 
     // extracting fields
     auto && rhs_field{this->get_rhs().get_field()};
@@ -402,21 +380,22 @@ namespace muSpectre {
         dim_square, dim_square * tangent_field.get_nb_entries())};
     auto && grad_incr_vec{grad_incr_field.eigen_vec()};
 
-    // calculation of CδEᵖᵉʳᵗ s:
     for (Index_t i = 0; i < unit_test_loads.cols(); ++i) {
       auto && unit_test_load{unit_test_loads.col(i)};
 
-      // b = -G (C : δEᵖᵉʳᵗ)
-      rhs_field.eigen_vec() = tangnet_map.transpose() * unit_test_load;
+      // calculation of -CδEᵖᵉʳᵗ:
+      rhs_field.eigen_vec() = -tangnet_map.transpose() * unit_test_load;
+
+      // rhs = -G (C : δEᵖᵉʳᵗ)
       this->projection->apply_projection(rhs_field);
 
       try {
-        // solve for -GCδε = -GCδEᵖᵉʳᵗ for δε
-        grad_incr_field = this->get_krylov_solver().solve(
-            this->get_rhs().get_field().eigen_vec());
+        // solve G(C : δε) = -G(C : δEᵖᵉʳᵗ) for δε
+        grad_incr_field =
+            this->get_krylov_solver().solve(rhs_field.eigen_vec());
       } catch (ConvergenceError & error) {
         std::stringstream err{};
-        err << "Failure at calculating effective stiffenss"
+        err << "Failure at calculating effective stiffness"
             << "The applied boundary condition Δ" << this->strain_symb() << "="
             << unit_test_load << std::endl;
         throw ConvergenceError(err.str());
@@ -433,15 +412,16 @@ namespace muSpectre {
           Index_t(comm.sum(this->grad_incr->get_map().size()))};
       EigenMat_t mean_stress_pert{sum_stress_pert / size_stress_pert};
 
-      /* δσ̄ᵖᵉʳᵗ=C_eff * δEᵖᵉʳᵗ -----------------\
-       *                                    >⇒ C_eff[:,i]=σ̄ᵖᵉʳᵗ-σ̄⁰
-       * δEᵖᵉʳᵗ=[0..0,1,0..0], 1 at iᵗʰ element/
-       note: δσ̄s are vectorized*/
+      /* δσ̄ᵖᵉʳᵗ=C_eff * δEᵖᵉʳᵗ ----------------|
+       *                                        >⇒ C_eff[:,i]=σ̄ᵖᵉʳᵗ-σ̄⁰
+       * δEᵖᵉʳᵗ=[0..0,1,0..0], 1 at iᵗʰ element|
+       *note: δσ̄s are vectorized*/
 
       // vectorizing the δσ̄
       EigenVec_t mean_stress_pert_vectorized{Eigen::Map<EigenVec_t>(
           mean_stress_pert.data(),
           mean_stress_pert.cols() * mean_stress_pert.rows())};
+
       // replacing the δσ̄ in iᵗʰ row of C_eff
       effective_tangent.row(i) = mean_stress_pert_vectorized;
     }
@@ -454,19 +434,20 @@ namespace muSpectre {
     auto && dim{this->cell_data->get_spatial_dim()};
     Dim_t dim_square{dim * dim};
     // return of this function  δEᵖᵉʳᵗ s
-    EigenMat_t unit_test_loads{
-        Eigen::MatrixBase<EigenMat_t>::Identity(dim_square, dim_square)};
+    EigenMat_t unit_test_loads{EigenMat_t::Identity(dim_square, dim_square)};
 
+    // symmetrize lambda function
+    auto && symmetric{[&dim](Eigen::MatrixXd vec) -> Eigen::MatrixXd {
+      Eigen::Map<EigenMat_t> mat(vec.data(), dim, dim);
+      EigenMat_t sym_mat{0.5 * (mat + mat.transpose()).eval()};
+      Eigen::Map<EigenMat_t> sym_vec(sym_mat.data(), dim * dim, 1);
+      return sym_vec;
+    }};
+
+    // symmetrize the strain in case of small strain formulation
     auto && Form{this->get_formulation()};
     switch (Form) {
     case Formulation::small_strain: {
-      auto && symmetric{[&dim](Eigen::MatrixXd vec) -> Eigen::MatrixXd {
-        Eigen::Map<EigenMat_t> mat(vec.data(), dim, dim);
-        EigenMat_t sym_mat{0.5 * (mat + mat.transpose()).eval()};
-        Eigen::Map<EigenMat_t> sym_vec(sym_mat.data(), dim * dim, 1);
-        return sym_vec;
-      }};
-
       for (Dim_t i{0}; i < dim_square; i++) {
         auto && unit_test_load{unit_test_loads.col(i)};
         unit_test_load = symmetric(unit_test_load);

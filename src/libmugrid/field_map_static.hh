@@ -727,23 +727,6 @@ namespace muGrid {
       StaticFieldMap<T, Mutability, internal::TensorMap<T, Rank, Dim>,
                      IterationType>;
 
-  // TODO(Till Junge): check redundancy
-  /**
-   * Alias of `muGrid::StaticNFieldMap` over a tensor field you wish
-   * to iterate over
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam Dim spatial dimension of the tensor
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
-  using T1NFieldMap =
-      StaticFieldMap<T, Mutability, internal::MatrixMap<T, Dim, 1>,
-                     IterationType>;
-
   /**
    * Alias of `muGrid::StaticFieldMap` over a second-rank tensor field you wish
    * to iterate over

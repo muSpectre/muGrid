@@ -93,12 +93,59 @@ namespace muSpectre {
 
   template <Index_t Dim>
   constexpr Index_t CellDataFixture<Dim>::SpatialDim;
+  /* ---------------------------------------------------------------------- */
+  template <Index_t Dim>
+  struct CellDataFixtureSmall {
+    constexpr static Index_t SpatialDim{Dim};
+    static DynCcoord_t get_size() {
+      switch (SpatialDim) {
+      case twoD: {
+        return {3, 3};
+        break;
+      }
+      case threeD: {
+        return {3, 3, 3};
+        break;
+      }
+      default:
+        std::stringstream err_msg{};
+        err_msg << "can't give you a size for Dim = " << SpatialDim << ". "
+                << "I can only handle two- and three-dimensional problems.";
+        throw muGrid::RuntimeError{err_msg.str()};
+        break;
+      }
+    }
+
+    static DynRcoord_t get_length() {
+      switch (SpatialDim) {
+      case twoD: {
+        return {1, 1};
+        break;
+      }
+      case threeD: {
+        return {1, 1, 1};
+        break;
+      }
+      default:
+        std::stringstream err_msg{};
+        err_msg << "can't give you a size for Dim = " << SpatialDim << ". "
+                << "I can only handle two- and three-dimensional problems.";
+        throw muGrid::RuntimeError{err_msg.str()};
+        break;
+      }
+    }
+    CellDataFixtureSmall()
+        : cell_data(CellData::make(get_size(), get_length())) {}
+
+    CellData_ptr cell_data;
+  };
 
   /* ---------------------------------------------------------------------- */
   using CellDataFixtures =
       boost::mpl::list<CellDataFixture<twoD>, CellDataFixture<threeD>>;
 
-  using CellDataFixture2 = boost::mpl::list<CellDataFixture<twoD>>;
+  using CellDataFixturesSmall = boost::mpl::list<CellDataFixtureSmall<twoD>,
+                                                 CellDataFixtureSmall<threeD>>;
 
   /* ---------------------------------------------------------------------- */
   template <Index_t Dim>

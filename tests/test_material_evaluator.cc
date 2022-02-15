@@ -110,7 +110,6 @@ namespace muSpectre {
 
     auto mat_eval = Mat_t::make_evaluator(Young, Poisson);
     auto & mat = *std::get<0>(mat_eval);
-
     auto & evaluator = std::get<1>(mat_eval);
 
     using T2_t = Eigen::Matrix<Real, twoD, twoD>;
