@@ -74,6 +74,57 @@ def init_rve_mat_solver(dim, communicator, nb_domain_grid_pts, domain_lengths,
     return rve, material, solver
 
 
+def init_rve_mat_solver_2_materials(communicator, nb_domain_grid_pts,
+                                    domain_lengths, fft, Youngs_modulus,
+                                    Poisson_ratio, cg_tol, maxiter, verbose):
+
+    formulation = µ.Formulation.finite_strain
+    gradient = µ.linear_finite_elements.gradient_3d
+
+    rve = µ.Cell(nb_domain_grid_pts, domain_lengths,
+                 formulation, gradient, fft, communicator)
+
+    material_1 = µ.material.MaterialLinearElastic1_3d.make(
+        rve, "material_1", Youngs_modulus, Poisson_ratio)
+    material_2 = µ.material.MaterialLinearElastic1_3d.make(
+        rve, "material_2", Youngs_modulus/10, Poisson_ratio/10)
+
+    for pixel_index, pixel in enumerate(rve.pixels):
+        if pixel[2] < nb_domain_grid_pts[2]//2:
+            material_1.add_pixel(pixel_index)
+        else:
+            material_2.add_pixel(pixel_index)
+
+    solver = µ.solvers.KrylovSolverCG(
+        rve, cg_tol, maxiter, verbose)
+
+    material = [material_1, material_2]
+
+    return rve, material, solver
+
+
+def setup_computation_and_compute_results(
+        strain_step, comm, nb_domain_grid_pts, domain_lengths, fft,
+        Youngs_modulus, Poisson_ratio, cg_tol, newton_tol, equil_tol, maxiter,
+        verbose):
+    """
+    Return: placements, nodal_displ,
+            affine_deformed_grid,
+            grid, non_affine_displ
+    """
+    rve, mat, solver = init_rve_mat_solver_2_materials(
+        comm, nb_domain_grid_pts, domain_lengths, fft, Youngs_modulus,
+        Poisson_ratio, cg_tol, maxiter, verbose)
+
+    µ.solvers.newton_cg(rve, strain_step, solver, newton_tol, equil_tol,
+                        verbose, µ.solvers.IsStrainInitialised.No)
+
+    integration_results = µ.gradient_integration.get_complemented_positions(
+        "pdg0n", rve, periodically_complemented=False)
+
+    return integration_results, rve
+
+
 class GradientIntegrationCheck(unittest.TestCase):
     """
     Check the implementation of parallel muSpectre.gradient_integration
@@ -302,6 +353,69 @@ class GradientIntegrationCheck(unittest.TestCase):
                 self.assertTrue(
                     np.allclose(placements[2] - affine_deformed_grid[2],
                                 non_affine_displ[2]))
+
+    def test_get_complemented_positions_correct_mean_strain(self):
+        """
+        Compare the serial vs. parallel computed result
+        """
+        if self.comm.size == 1:
+            # comm.size is to small for a parallel computation
+            return 0
+
+        s = 0.01
+        strain_step = np.array([[-s, 0, 0], [0, -s, 0], [0, 0, 2*s]])
+
+        # compute reference result on all ranks in serial
+        # create new communicators with only one rank to make an effective
+        # (cell with comm that has only one rank leads to a serial
+        # computation, no mpi) serial computation.
+        comm_s = self.comm.Split(color=self.comm.rank)
+        integration_results_ref, _ = \
+            setup_computation_and_compute_results(
+                strain_step, comm_s, self.nb_domain_grid_pts,
+                self.domain_lengths, self.fft, self.Youngs_modulus,
+                self.Poisson_ratio, self.cg_tol, self.newton_tol,
+                self.equil_tol, self.maxiter, self.verbose)
+
+        placements_ref = integration_results_ref[0]
+        nodal_displ_ref = integration_results_ref[1]
+        affine_deformed_grid_ref = integration_results_ref[2]
+        grid_ref = integration_results_ref[3]
+        non_affine_displ_ref = integration_results_ref[4]
+
+        self.comm.Barrier()
+
+        # same computation in parallel
+        integration_results, rve = \
+            setup_computation_and_compute_results(
+                strain_step, self.comm, self.nb_domain_grid_pts,
+                self.domain_lengths, self.fft, self.Youngs_modulus,
+                self.Poisson_ratio, self.cg_tol, self.newton_tol,
+                self.equil_tol, self.maxiter, self.verbose)
+
+        placements = integration_results[0]
+        nodal_displ = integration_results[1]
+        affine_deformed_grid = integration_results[2]
+        grid = integration_results[3]
+        non_affine_displ = integration_results[4]
+
+        # compare the outcome with the correct part of the reference
+        snx, sny, snz = rve.nb_subdomain_grid_pts
+        slx, sly, slz = rve.subdomain_locations
+        local_slice = np.s_[:, slx:slx+snx, sly:sly+sny, slz:slz+snz]
+
+        self.assertTrue(
+            (np.abs(placements - placements_ref[local_slice]) < 1e-12).all())
+        self.assertTrue(
+            (np.abs(nodal_displ - nodal_displ_ref[local_slice]) < 1e-12).all())
+        self.assertTrue((np.abs(affine_deformed_grid
+                                - affine_deformed_grid_ref[local_slice])
+                         < 1e-12).all())
+        self.assertTrue(
+            (np.abs(grid - grid_ref[local_slice]) < 1e-12).all())
+        self.assertTrue(
+            (np.abs(non_affine_displ - non_affine_displ_ref[local_slice])
+             < 1e-12).all())
 
 
 if __name__ == '__main__':

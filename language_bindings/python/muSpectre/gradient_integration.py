@@ -249,8 +249,19 @@ def get_complemented_positions(quantities, rve, F0=None,
     Tuple build according to the first argument of the function.
     """
     strain = rve.strain
-    mean_strain = np.mean(
-        strain.array(), axis=tuple(i for i in range(2, len(strain.shape))))
+    comm = rve.communicator
+    if comm.size == 1:
+        mean_strain = np.mean(
+            strain.array(), axis=tuple(i for i in range(2, len(strain.shape))))
+    elif comm.size > 1:
+        strain_mean_per_core = np.mean(
+            strain.array(), axis=tuple(i for i in range(2, len(strain.shape))))
+        nb_elements_per_core = \
+            np.product(rve.nb_subdomain_grid_pts) * rve.nb_quad_pts
+        nb_global_elements = \
+            np.product(rve.nb_domain_grid_pts) * rve.nb_quad_pts
+        core_weight = nb_elements_per_core / nb_global_elements
+        mean_strain = comm.sum(strain_mean_per_core * core_weight)
 
     return get_complemented_positions_worker(
         quantities, rve, F0, strain, mean_strain, rve.formulation,
@@ -293,8 +304,20 @@ def get_complemented_positions_class_solver(quantities, rve, solver, F0=None,
     Tuple build according to the first argument of the function.
     """
     strain = solver.grad.field.array().reshape(solver.grad.field.shape, order="F")
-    mean_strain = np.mean(
-        strain, axis=tuple(i for i in range(2, len(strain.shape))))
+    comm = rve.communicator
+    if comm.size == 1:
+        mean_strain = np.mean(
+            strain, axis=tuple(i for i in range(2, len(strain.shape))))
+    elif comm.size > 1:
+        strain_mean_per_core = np.mean(
+            strain, axis=tuple(i for i in range(2, len(strain.shape))))
+        nb_elements_per_core = \
+            np.product(rve.get_nb_subdomain_grid_pts) * rve.nb_quad_pts
+        nb_global_elements = \
+            np.product(rve.get_nb_domain_grid_pts) * rve.nb_quad_pts
+        core_weight = nb_elements_per_core / nb_global_elements
+        mean_strain = comm.sum(strain_mean_per_core * core_weight)
+
     if solver.solver_type == solvers.SolverType.finite_elements:
         displacements = solver.disp.field.array()
         return get_complemented_positions_worker(
