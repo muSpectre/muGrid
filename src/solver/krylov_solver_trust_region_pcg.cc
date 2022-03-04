@@ -89,7 +89,6 @@ namespace muSpectre {
 
     // reset the on_bound flag of the Krylov solver
     this->is_on_bound = false;
-
     this->x_k.setZero();
     Real trust_region2{this->trust_region * this->trust_region};
 
@@ -139,13 +138,15 @@ namespace muSpectre {
     // iteration
     ++this->counter;
     Uint iter_counter{0};
-    for (Uint i = 0; i < this->maxiter; ++i, ++this->counter, ++iter_counter) {
+    Uint current_counter{0};
+    for (; current_counter < this->maxiter;
+         ++current_counter, ++this->counter, ++iter_counter) {
       this->Ap_k = matrix * this->p_k;
       Real pAp{this->dot(this->p_k, this->Ap_k)};
       if (pAp <= 0) {
         // Hessian is not positive definite, the minimizer is on the trust
         // region bound
-        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        if (verbose > Verbosity::Silent && this->comm.rank() == 0) {
           std::cout << "  CG finished, reason: Hessian is not positive "
                        "definite (pdAp:"
                     << pAp << ")" << std::endl;
@@ -165,7 +166,7 @@ namespace muSpectre {
       // we are exceeding the trust region, the minimizer is on the trust
       // region bound
       if (this->squared_norm(this->x_k) >= trust_region2) {
-        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        if (verbose > Verbosity::Silent && this->comm.rank() == 0) {
           std::cout << "  CG finished, reason: step exceeded trust region "
                        "bounds"
                     << std::endl;
@@ -182,8 +183,8 @@ namespace muSpectre {
       this->r_k += alpha * this->Ap_k;
       rdr = this->squared_norm(this->r_k);
       if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
-        std::cout << "  at CG step " << std::setw(count_width) << i
-                  << ": |r|/|b| = " << std::setw(15)
+        std::cout << "  at CG step " << std::setw(count_width)
+                  << current_counter << ": |r|/|b| = " << std::setw(15)
                   << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
                   << std::endl;
       }
@@ -202,18 +203,17 @@ namespace muSpectre {
       Real beta{new_rdy / rdy};
 
       //! CG reset worker
-      auto && reset_cg{[&beta, this, &rhs, &iter_counter]() {
+      auto && reset_cg{[&beta, this, &rhs, &iter_counter, &current_counter]() {
         this->r_k = this->matrix * this->x_k - rhs;
         this->y_k = this->preconditioner * this->r_k;
         beta = 0.0;
         iter_counter = 0;
-        if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "Reset CG"
-                    << "\n";
+        if (verbose > Verbosity::Silent && this->comm.rank() == 0) {
+          std::cout << "Reset CG at step: " << current_counter << "\n";
         }
       }};
 
-      if (i > 1) {
+      if (current_counter > 1) {
         switch (this->reset) {
         case ResetCG::no_reset: {
           break;
@@ -259,7 +259,7 @@ namespace muSpectre {
       this->convergence = Convergence::ReachedTolerance;
     } else {
       std::stringstream err{};
-      err << " After " << this->counter << " steps, the solver "
+      err << " After " << current_counter << " steps, the solver "
           << " FAILED with  |r|/|b| = " << std::setw(15)
           << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
           << std::endl;

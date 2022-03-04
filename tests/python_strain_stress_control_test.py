@@ -47,23 +47,23 @@ class StrainStressControlCheck(unittest.TestCase):
         self.domain_lens = [7., 5.]
         self.center = np.array([r // 2 for r in self.nb_grid_pts])
         self.incl = self.nb_grid_pts[0] // 5
-        self.cell_data_forward =\
+        self.cell_data_strain_control =\
             cell.CellData.make(self.nb_grid_pts, self.domain_lens)
-        self.cell_data_backward =\
+        self.cell_data_stress_control =\
             cell.CellData.make(self.nb_grid_pts, self.domain_lens)
-        self.cell_data_forward.nb_quad_pts = 1
-        self.cell_data_backward.nb_quad_pts = 1
+        self.cell_data_strain_control.nb_quad_pts = 1
+        self.cell_data_stress_control.nb_quad_pts = 1
         self.cg_tol = 1e-8
         self.newton_tol = 1e-6
         self.equil_tol = 1e-10
-        self.maxiter = self.cell_data_forward.spatial_dim * 20
+        self.maxiter = self.cell_data_strain_control.spatial_dim * 20
         self.verbose = muSpectre.Verbosity.Silent
         self.del0 = 1e-6
-        self.load_forward = np.array(
+        self.load_strain_control = np.array(
             [[self.del0/2.512, self.del0/6.157],
              [self.del0/6.157, self.del0/1.247]])
-        self.control_forward = muSpectre.solvers.MeanControl.strain_control
-        self.control_backward = muSpectre.solvers.MeanControl.stress_control
+        self.control_strain_control = muSpectre.solvers.MeanControl.strain_control
+        self.control_stress_control = muSpectre.solvers.MeanControl.stress_control
         self.formulation = muSpectre.Formulation.finite_strain
         self.E0 = 1.0e+1
 
@@ -78,67 +78,90 @@ class StrainStressControlCheck(unittest.TestCase):
                 runner_strain_stress_control(from, strain_corrector)
 
     def runner_strain_stress_control(self, formulation, strain_corrector):
-        hard_forward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_forward, "hard", 10.*self.E0, .3)
-        soft_forward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_forward, "soft", 0.1*self.E0, .3)
+        hard_strain_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_strain_control, "hard", 10.*self.E0, .3)
+        soft_strain_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_strain_control, "soft", 0.1*self.E0, .3)
         # making a ""circular"" inclusion
-        for i, pixel in self.cell_data_forward.pixels.enumerate():
+        for i, pixel in self.cell_data_strain_control.pixels.enumerate():
             if np.linalg.norm(self.center - np.array(pixel), 2) < self.incl:
-                soft_forward.add_pixel(i)
+                soft_strain_control.add_pixel(i)
             else:
-                hard_forward.add_pixel(i)
-        krylov_solver_forward = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
+                hard_strain_control.add_pixel(i)
+        krylov_solver_strain_control = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
                                                                  self.maxiter,
                                                                  self.verbose)
-        newton_solver_forward = muSpectre.solvers.SolverNewtonCG(
-            self.cell_data_forward, krylov_solver_forward,
+        newton_solver_strain_control = muSpectre.solvers.SolverNewtonCG(
+            self.cell_data_strain_control, krylov_solver_strain_control,
             self.verbose, self.newton_tol,
             self.equil_tol, self.maxiter,
-            self.control_forward)
-        newton_solver_forward.formulation = formulation
-        newton_solver_forward.initialise_cell()
-        result_forward = \
-            newton_solver_forward.solve_load_increment(self.load_forward)
+            self.control_strain_control)
+        newton_solver_strain_control.formulation = formulation
+        newton_solver_strain_control.initialise_cell()
 
-        stress_forward = result_forward.stress
-        grad_forward = result_forward.grad
-        stress_forward = stress_forward.reshape(2, 2, *self.nb_grid_pts)
-        grad_forward = grad_forward.reshape(2, 2, *self.nb_grid_pts)
+        newton_solver_strain_control_homo = muSpectre.solvers.SolverNewtonCG(
+            self.cell_data_strain_control, krylov_solver_strain_control,
+            self.verbose, self.newton_tol,
+            self.equil_tol, self.maxiter)
+        newton_solver_strain_control_homo.formulation = formulation
+        newton_solver_strain_control_homo.initialise_cell()
 
-        load_backward = stress_forward.mean(axis=(2, 3))
-        hard_backward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_backward, "hard", 10.*self.E0, .3)
-        soft_backward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_backward, "soft", 0.1*self.E0, .3)
+        result_strain_control = \
+            newton_solver_strain_control.solve_load_increment(self.load_strain_control)
+
+        C_eff_strain_control = newton_solver_strain_control_homo.compute_effective_stiffness()
+
+        stress_strain_control = result_strain_control.stress
+        grad_strain_control = result_strain_control.grad
+        stress_strain_control = stress_strain_control.reshape(2, 2, *self.nb_grid_pts)
+        grad_strain_control = grad_strain_control.reshape(2, 2, *self.nb_grid_pts)
+
+        load_stress_control = stress_strain_control.mean(axis=(2, 3))
+        hard_stress_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_stress_control, "hard", 10.*self.E0, .3)
+        soft_stress_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_stress_control, "soft", 0.1*self.E0, .3)
         # making a ""circular"" inclusion
-        for i, pixel in self.cell_data_backward.pixels.enumerate():
+        for i, pixel in self.cell_data_stress_control.pixels.enumerate():
             if np.linalg.norm(self.center - np.array(pixel), 2) < self.incl:
-                soft_backward.add_pixel(i)
+                soft_stress_control.add_pixel(i)
             else:
-                hard_backward.add_pixel(i)
-        krylov_solver_backward = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
+                hard_stress_control.add_pixel(i)
+        krylov_solver_stress_control = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
                                                                   self.maxiter,
                                                                   self.verbose)
-        newton_solver_backward = muSpectre.solvers.SolverNewtonCG(
-            self.cell_data_backward, krylov_solver_backward,
+        newton_solver_stress_control = muSpectre.solvers.SolverNewtonCG(
+            self.cell_data_stress_control, krylov_solver_stress_control,
             self.verbose, self.newton_tol,
             self.equil_tol, self.maxiter,
-            self.control_backward)
-        newton_solver_backward.formulation = formulation
-        newton_solver_backward.initialise_cell()
+            self.control_stress_control)
+        newton_solver_stress_control.formulation = formulation
+        newton_solver_stress_control.initialise_cell()
 
-        result_backward = \
-            newton_solver_backward.solve_load_increment(load_backward)
+        newton_solver_stress_control_homo = muSpectre.solvers.SolverNewtonCG(
+            self.cell_data_stress_control, krylov_solver_stress_control,
+            self.verbose, self.newton_tol,
+            self.equil_tol, self.maxiter)
 
-        stress_backward = result_backward.stress
-        grad_backward = result_backward.grad
-        stress_backward = stress_backward.reshape(2, 2, *self.nb_grid_pts)
-        grad_backward = grad_backward.reshape(2, 2, *self.nb_grid_pts)
+        newton_solver_stress_control_homo.formulation = formulation
+        newton_solver_stress_control_homo.initialise_cell()
+
+        result_stress_control = \
+            newton_solver_stress_control.solve_load_increment(load_stress_control)
+
+        C_eff_stress_control = newton_solver_stress_control_homo.compute_effective_stiffness()
+
+        stress_stress_control = result_stress_control.stress
+        grad_stress_control = result_stress_control.grad
+        stress_stress_control = stress_stress_control.reshape(2, 2, *self.nb_grid_pts)
+        grad_stress_control = grad_stress_control.reshape(2, 2, *self.nb_grid_pts)
 
         self.assertTrue(np.allclose(
-            self.load_forward,
-            (grad_backward.mean(axis=(2, 3))-strain_corrector), rtol=1e-15))
+            self.load_strain_control,
+            (grad_stress_control.mean(axis=(2, 3))-strain_corrector), rtol=1e-15))
+
+        self.assertTrue(np.allclose(
+            C_eff_stress_control, C_eff_strain_control, rtol=1e-15))
 
 
 class StressStrainControlCheck(unittest.TestCase):
@@ -147,24 +170,24 @@ class StressStrainControlCheck(unittest.TestCase):
         self.domain_lens = [7., 5.]
         self.center = np.array([r // 2 for r in self.nb_grid_pts])
         self.incl = self.nb_grid_pts[0] // 5
-        self.cell_data_forward =\
+        self.cell_data_strain_control =\
             cell.CellData.make(self.nb_grid_pts, self.domain_lens)
-        self.cell_data_backward =\
+        self.cell_data_stress_control =\
             cell.CellData.make(self.nb_grid_pts, self.domain_lens)
-        self.cell_data_forward.nb_quad_pts = 1
-        self.cell_data_backward.nb_quad_pts = 1
+        self.cell_data_strain_control.nb_quad_pts = 1
+        self.cell_data_stress_control.nb_quad_pts = 1
         self.cg_tol = 1e-8
         self.newton_tol = 1e-6
         self.equil_tol = 1e-10
-        self.maxiter = self.cell_data_forward.spatial_dim * 20
+        self.maxiter = self.cell_data_strain_control.spatial_dim * 20
         self.verbose = muSpectre.Verbosity.Silent
         self.E0 = 1.0e+1
         self.del0 = 1e-6 * self.E0
-        self.load_forward = np.array(
+        self.load_strain_control = np.array(
             [[self.del0/2.512, self.del0/6.157],
              [self.del0/6.157, self.del0/1.247]])
-        self.control_forward = muSpectre.solvers.MeanControl.stress_control
-        self.control_backward = muSpectre.solvers.MeanControl.strain_control
+        self.control_strain_control = muSpectre.solvers.MeanControl.stress_control
+        self.control_stress_control = muSpectre.solvers.MeanControl.strain_control
         self.formulation = muSpectre.Formulation.finite_strain
 
     def test_strain_stress_control(self):
@@ -178,68 +201,68 @@ class StressStrainControlCheck(unittest.TestCase):
                 runner_strain_stress_control(from, strain_corrector)
 
     def runner_stress_strain_control(self, formulation, strain_corrector):
-        hard_forward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_forward, "hard", 10.*self.E0, .3)
-        soft_forward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_forward, "soft", 0.1*self.E0, .3)
+        hard_strain_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_strain_control, "hard", 10.*self.E0, .3)
+        soft_strain_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_strain_control, "soft", 0.1*self.E0, .3)
         # making a ""circular"" inclusion
-        for i, pixel in self.cell_data_forward.pixels.enumerate():
+        for i, pixel in self.cell_data_strain_control.pixels.enumerate():
             if np.linalg.norm(self.center - np.array(pixel), 2) < self.incl:
-                soft_forward.add_pixel(i)
+                soft_strain_control.add_pixel(i)
             else:
-                hard_forward.add_pixel(i)
-        krylov_solver_forward = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
+                hard_strain_control.add_pixel(i)
+        krylov_solver_strain_control = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
                                                                  self.maxiter,
                                                                  self.verbose)
-        newton_solver_forward = muSpectre.solvers.SolverNewtonCG(
-            self.cell_data_forward, krylov_solver_forward,
+        newton_solver_strain_control = muSpectre.solvers.SolverNewtonCG(
+            self.cell_data_strain_control, krylov_solver_strain_control,
             self.verbose, self.newton_tol,
             self.equil_tol, self.maxiter,
-            self.control_forward)
-        newton_solver_forward.formulation = formulation
-        newton_solver_forward.initialise_cell()
-        result_forward = \
-            newton_solver_forward.solve_load_increment(self.load_forward)
+            self.control_strain_control)
+        newton_solver_strain_control.formulation = formulation
+        newton_solver_strain_control.initialise_cell()
+        result_strain_control = \
+            newton_solver_strain_control.solve_load_increment(self.load_strain_control)
 
-        stress_forward = result_forward.stress
-        grad_forward = result_forward.grad
-        stress_forward = stress_forward.reshape(2, 2, *self.nb_grid_pts)
-        grad_forward = grad_forward.reshape(2, 2, *self.nb_grid_pts)
+        stress_strain_control = result_strain_control.stress
+        grad_strain_control = result_strain_control.grad
+        stress_strain_control = stress_strain_control.reshape(2, 2, *self.nb_grid_pts)
+        grad_strain_control = grad_strain_control.reshape(2, 2, *self.nb_grid_pts)
 
-        load_backward = grad_forward.mean(axis=(2, 3))-strain_corrector
+        load_stress_control = grad_strain_control.mean(axis=(2, 3))-strain_corrector
 
-        hard_backward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_backward, "hard", 10.*self.E0, .3)
-        soft_backward = muSpectre.material.MaterialLinearElastic1_2d.make(
-            self.cell_data_backward, "soft", 0.1*self.E0, .3)
+        hard_stress_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_stress_control, "hard", 10.*self.E0, .3)
+        soft_stress_control = muSpectre.material.MaterialLinearElastic1_2d.make(
+            self.cell_data_stress_control, "soft", 0.1*self.E0, .3)
         # making a ""circular"" inclusion
-        for i, pixel in self.cell_data_backward.pixels.enumerate():
+        for i, pixel in self.cell_data_stress_control.pixels.enumerate():
             if np.linalg.norm(self.center - np.array(pixel), 2) < self.incl:
-                soft_backward.add_pixel(i)
+                soft_stress_control.add_pixel(i)
             else:
-                hard_backward.add_pixel(i)
-        krylov_solver_backward = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
+                hard_stress_control.add_pixel(i)
+        krylov_solver_stress_control = muSpectre.solvers.KrylovSolverCG(self.cg_tol,
                                                                   self.maxiter,
                                                                   self.verbose)
-        newton_solver_backward = muSpectre.solvers.SolverNewtonCG(
-            self.cell_data_backward, krylov_solver_backward,
+        newton_solver_stress_control = muSpectre.solvers.SolverNewtonCG(
+            self.cell_data_stress_control, krylov_solver_stress_control,
             self.verbose, self.newton_tol,
             self.equil_tol, self.maxiter,
-            self.control_backward)
-        newton_solver_backward.formulation = formulation
-        newton_solver_backward.initialise_cell()
+            self.control_stress_control)
+        newton_solver_stress_control.formulation = formulation
+        newton_solver_stress_control.initialise_cell()
 
-        result_backward = \
-            newton_solver_backward.solve_load_increment(load_backward)
+        result_stress_control = \
+            newton_solver_stress_control.solve_load_increment(load_stress_control)
 
-        stress_backward = result_backward.stress
-        grad_backward = result_backward.grad
-        stress_backward = stress_backward.reshape(2, 2, *self.nb_grid_pts)
-        grad_backward = grad_backward.reshape(2, 2, *self.nb_grid_pts)
+        stress_stress_control = result_stress_control.stress
+        grad_stress_control = result_stress_control.grad
+        stress_stress_control = stress_stress_control.reshape(2, 2, *self.nb_grid_pts)
+        grad_stress_control = grad_stress_control.reshape(2, 2, *self.nb_grid_pts)
 
         self.assertTrue(np.allclose(
-            self.load_forward,
-            (stress_backward.mean(axis=(2, 3))), rtol=1e-15))
+            self.load_strain_control,
+            (stress_stress_control.mean(axis=(2, 3))), rtol=1e-15))
 
 
 if __name__ == '__main__':

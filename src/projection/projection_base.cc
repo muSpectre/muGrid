@@ -51,7 +51,8 @@ namespace muSpectre {
         nb_quad_pts{nb_quad_pts},
         nb_components{nb_components}, gradient{gradient}, form{form},
         work_space{this->fft_engine->register_fourier_space_field(
-            "work_space", this->nb_components * this->nb_quad_pts)},
+            prepare_field_unique_name(this->fft_engine, "work_space"),
+            this->nb_components * this->nb_quad_pts)},
         mean_control{mean_control} {
     if (nb_quad_pts <= 0) {
       throw std::runtime_error("Number of quadrature points must be larger "
@@ -143,6 +144,26 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   const muFFT::Gradient_t & ProjectionBase::get_gradient() const {
     return this->gradient;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const std::string
+  ProjectionBase::prepare_field_unique_name(muFFT::FFTEngine_ptr engine,
+                                            const std::string & unique_name) {
+    if (engine->get_fourier_field_collection().field_exists(unique_name)) {
+      Index_t counter{1};
+      std::stringstream augmented_name;
+      do {
+        augmented_name.str("");
+        augmented_name.clear();
+        augmented_name << unique_name << " " << counter;
+        counter++;
+      } while (engine->get_fourier_field_collection().field_exists(
+          augmented_name.str()));
+      return augmented_name.str();
+    } else {
+      return unique_name;
+    }
   }
 
 }  // namespace muSpectre

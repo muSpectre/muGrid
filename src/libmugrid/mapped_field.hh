@@ -112,6 +112,27 @@ namespace muGrid {
           "StaticConstructor is a SFINAE parameter, do not touch it.");
     }
 
+    /**
+     * Constructor of statically sized mapped fields from a pre-existing field
+     * checking the consistency of the size of the map and the field is handled
+     * in the constructor of the FieldMap
+     */
+    template <bool StaticConstructor = IsStatic(),
+              std::enable_if_t<StaticConstructor, int> = 0>
+    explicit MappedField(TypedField<Scalar> & field)
+        : field{field}, map{this->field} {}
+
+    /**
+     * Constructor of statically sized mapped fields from a pre-existing field
+     * checking the consistency of the size of the map and the field is handled
+     * in the constructor of the FieldMap
+     */
+    template <bool StaticConstructor = IsStatic(),
+              std::enable_if_t<not StaticConstructor, int> = 0>
+    MappedField(TypedField<Scalar> & field, const Index_t & nb_rows,
+                const IterUnit & iter_type)
+        : field{field}, map{this->field, nb_rows, iter_type} {}
+
     //! Copy constructor
     MappedField(const MappedField & other) = delete;
 

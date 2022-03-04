@@ -260,8 +260,9 @@ namespace muSpectre {
       return 0.5 * (mat + mat.transpose());
     }};
 
-    const Eigen::MatrixXd strain{
+    Eigen::MatrixXd strain{
         symmetric(Eigen::MatrixXd::Identity(Fix::SpatialDim, Fix::SpatialDim))};
+    strain(0, 0) *= -1.2367;
 
     std::tie(sigma_soft, C_soft) = evaluator_soft.evaluate_stress_tangent(
         strain, Formulation::small_strain);
@@ -277,6 +278,137 @@ namespace muSpectre {
     BOOST_TEST_CHECKPOINT("after load increment");
 
     auto && C_eff{solver->compute_effective_stiffness()};
+    BOOST_TEST_CHECKPOINT("after effective tangent calculation");
+
+    auto && error{muGrid::testGoodies::rel_error(C_eff, C_eff.transpose())};
+    BOOST_CHECK_LE(error, tol);
+    if (not(error < tol)) {
+      std::cout << "The calculated C_eff is not symmetric"
+                << "C_eff:" << std::endl
+                << C_eff << std::endl;
+    }
+
+    for (Dim_t i{0}; i < Fix::SpatialDim * Fix::SpatialDim; i++) {
+      for (Dim_t j{0}; j < Fix::SpatialDim * Fix::SpatialDim; j++) {
+        Real ref_value{};
+        if (i == 0 and j == 0) {
+          ref_value = ref_serial_2_s_1_h(C_hard(i, j), C_soft(i, j));
+        } else {
+          ref_value = ref_parallel_2_s_1_h(C_hard(i, j), C_soft(i, j));
+        }
+        auto && error{ref_value - C_eff(i, j)};
+        BOOST_CHECK_LE(error, tol);
+        if (not(error < tol)) {
+          std::cout << "C_soft:\n" << C_soft << std::endl;
+          std::cout << "C_hard:\n" << C_hard << std::endl;
+          std::cout << "C_eff:\n" << C_eff << std::endl;
+        }
+      }
+    }
+  }
+
+  /* ----------------------------------------------------------------------- */
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(solver_homogenizer_test_stress_control, Fix,
+                                   CellDataFixturesSmall, Fix) {
+    const Real young_soft{1.};
+    const Real young_hard{2.};
+    const Real poisson{0.0};
+
+    using T2_t = Eigen::Matrix<Real, Fix::SpatialDim, Fix::SpatialDim>;
+    using T4_t = muGrid::T4Mat<Real, Fix::SpatialDim>;
+    using Mat_t = MaterialLinearElastic1<Fix::SpatialDim>;
+
+    auto && ref_parallel_2_s_1_h{[](const Real & v_h, const Real & v_s) {
+      return (1. / ((2. / v_s) + (1. / v_h))) * 3.;
+    }};
+
+    auto && ref_serial_2_s_1_h{[](const Real & v_h, const Real & v_s) {
+      return ((2. * v_s) + (1. * v_h)) / 3.;
+    }};
+
+    this->cell_data->set_nb_quad_pts(OneQuadPt);
+    auto & soft{Mat_t::make(this->cell_data, "soft", young_soft, poisson)};
+    auto & hard{Mat_t::make(this->cell_data, "hard", young_hard, poisson)};
+
+    // making evaluator for materials soft and hard  to directly obtain their
+    // stiffness
+    auto mat_eval_soft = Mat_t::make_evaluator(young_soft, poisson);
+    auto & mat_soft = *std::get<0>(mat_eval_soft);
+    auto & evaluator_soft = std::get<1>(mat_eval_soft);
+    mat_soft.add_pixel({});
+
+    auto mat_eval_hard = Mat_t::make_evaluator(young_hard, poisson);
+    auto & mat_hard = *std::get<0>(mat_eval_hard);
+    auto & evaluator_hard = std::get<1>(mat_eval_hard);
+    mat_hard.add_pixel({});
+
+    T2_t sigma_soft, sigma_hard;
+    T4_t C_soft, C_hard;
+
+    BOOST_TEST_CHECKPOINT("before material assignment");
+    {
+      for (auto && index_pixel : this->cell_data->get_pixels().enumerate()) {
+        auto && index{std::get<0>(index_pixel)};
+        auto & pixel{std::get<1>(index_pixel)};
+        if (pixel[1] == 0) {
+          hard.add_pixel(index);
+        } else {
+          soft.add_pixel(index);
+        }
+      }
+    }
+
+    BOOST_TEST_CHECKPOINT("after material assignment");
+
+    constexpr Real cg_tol{1e-8}, newton_tol{1e-5}, equil_tol{1e-10};
+    const Uint maxiter{static_cast<Uint>(this->cell_data->get_spatial_dim()) *
+                       10};
+    constexpr Verbosity verbose{Verbosity::Silent};
+    constexpr MeanControl mean_control{MeanControl::StressControl};
+    auto krylov_solver{
+        std::make_shared<KrylovSolverCGEigen>(cg_tol, maxiter, verbose)};
+    auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
+                                                 verbose, newton_tol, equil_tol,
+                                                 maxiter, mean_control)};
+
+    // In case of stress control solver, we need to define a new strain control
+    // solver for the cell because in the algorithm derived needs to use a
+    // strain control projection operator to zero out σ_eq.
+    auto homo_krylov_solver{
+        std::make_shared<KrylovSolverCGEigen>(cg_tol, maxiter, verbose)};
+    auto homo_solver{std::make_shared<SolverNewtonCG>(
+        this->cell_data, homo_krylov_solver, verbose, newton_tol, equil_tol,
+        maxiter)};
+
+    auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
+      return 0.5 * (mat + mat.transpose());
+    }};
+
+    Eigen::MatrixXd strain{
+        symmetric(Eigen::MatrixXd::Identity(Fix::SpatialDim, Fix::SpatialDim))};
+
+    strain(0, 0) *= -0.91236;
+
+    std::tie(sigma_soft, C_soft) = evaluator_soft.evaluate_stress_tangent(
+        strain, Formulation::small_strain);
+
+    std::tie(sigma_hard, C_hard) = evaluator_hard.evaluate_stress_tangent(
+        strain, Formulation::small_strain);
+
+    solver->set_formulation(Formulation::small_strain);
+    solver->initialise_cell();
+
+    homo_solver->set_formulation(Formulation::small_strain);
+    homo_solver->initialise_cell();
+
+    BOOST_TEST_CHECKPOINT("before load increment");
+    auto && new_result{solver->solve_load_increment(strain)};
+    BOOST_TEST_CHECKPOINT("after load increment");
+
+    BOOST_CHECK_THROW(solver->compute_effective_stiffness(), SolverError);
+
+    BOOST_TEST_CHECKPOINT("before effective tangent calculation");
+    auto && C_eff{homo_solver->compute_effective_stiffness()};
     BOOST_TEST_CHECKPOINT("after effective tangent calculation");
 
     auto && error{muGrid::testGoodies::rel_error(C_eff, C_eff.transpose())};

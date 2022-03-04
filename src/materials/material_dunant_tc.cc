@@ -65,8 +65,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialDunantTC<DimM>::initialise() {
-    Parent::initialise();
-    this->save_history_variables();
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      this->save_history_variables();
+    }
   }
 
   /* ---------------------------------------------------------------------- */

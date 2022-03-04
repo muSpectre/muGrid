@@ -52,13 +52,18 @@ namespace muSpectre {
                form,
                mean_control},
         Gfield{this->fft_engine->get_fourier_field_collection()
-                   .register_complex_field("Projection Operator",
-                                           DimS * DimS * NbQuadPts * DimS *
-                                               DimS * NbQuadPts,
-                                           PixelTag)},
+                   .register_complex_field(
+                       ProjectionDefault<DimS, NbQuadPts>::
+                           prepare_field_unique_name(this->fft_engine,
+                                                     "Projection Operator"),
+                       DimS * DimS * NbQuadPts * DimS * DimS * NbQuadPts,
+                       PixelTag)},
         Ghat{Gfield}, Ifield{this->fft_engine->get_fourier_field_collection()
                                  .register_complex_field(
-                                     "Integration Operator",
+                                     ProjectionDefault<DimS, NbQuadPts>::
+                                         prepare_field_unique_name(
+                                             this->fft_engine,
+                                             "Integration Operator"),
                                      DimS * DimS * DimS * NbQuadPts, PixelTag)},
         Ihat{Ifield} {
     if (this->get_dim() != DimS) {

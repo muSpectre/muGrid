@@ -36,7 +36,6 @@
 #include "solver_newton_cg.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
-#include "materials/material_mechanics_base.hh"
 
 #include <iomanip>
 
@@ -69,107 +68,7 @@ namespace muSpectre {
     if (this->is_initialised) {
       return;
     }
-
-    // make sure the number of subpoints is correct
-    this->cell_data->set_nb_quad_pts(this->nb_quad_pts);
-    this->cell_data->set_nb_nodal_pts(OneNode);
-
-    //! check whether formulation has been set
-    if (this->is_mechanics()) {
-      if (this->get_formulation() == Formulation::not_set) {
-        throw SolverError(
-            "Can't run a mechanics calculation without knowing the "
-            "formulation. please use the `set_formulation()` to "
-            "choose between finite and small strain");
-      } else {
-        for (auto && mat :
-             this->cell_data->get_domain_materials().at(this->domain)) {
-          auto mech{std::dynamic_pointer_cast<MaterialMechanicsBase>(mat)};
-          if (this->get_formulation() == Formulation::small_strain) {
-            mech->check_small_strain_capability();
-          }
-
-          mech->set_formulation(this->get_formulation());
-        }
-      }
-    }
-
-    this->grad_shape =
-        gradient_shape(this->domain.rank(), this->cell_data->get_spatial_dim(),
-                       this->is_mechanics(), this->get_formulation());
-
-    //! store solver fields in cell
-    auto & field_collection{this->cell_data->get_fields()};
-
-    // Corresponds to symbol δF or δε
-    this->grad_incr = std::make_shared<MappedField_t>(
-        "incrF", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
-        field_collection, QuadPtTag);
-
-    // Corresponds to symbol F or ε
-    this->grad = std::make_shared<MappedField_t>(
-        "grad", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
-        field_collection, QuadPtTag);
-
-    this->eval_grad = this->grad;
-
-    this->eval_grads[this->domain] = this->eval_grad;
-    this->grads[this->domain] = this->grad;
-
-    // Corresponds to symbol P or σ
-    this->flux = std::make_shared<MappedField_t>(
-        "flux", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
-        field_collection, QuadPtTag);
-    this->fluxes[this->domain] = this->flux;
-
-    // Corresponds to symbol K or C
-    Index_t tangent_size{this->grad_shape[0] * this->grad_shape[1]};
-    this->tangent = std::make_shared<MappedField_t>(
-        "tangent", tangent_size, tangent_size, IterUnit::SubPt,
-        field_collection, QuadPtTag);
-    this->tangents[this->domain] = this->tangent;
-
-    // field to store the rhs for cg calculations
-    this->rhs = std::make_shared<MappedField_t>(
-        "rhs", this->grad_shape[0], this->grad_shape[1], IterUnit::SubPt,
-        field_collection, QuadPtTag);
-
-    Eigen::MatrixXd default_grad_val{};
-    if (this->is_mechanics()) {
-      switch (this->get_formulation()) {
-      case Formulation::finite_strain: {
-        default_grad_val =
-            Eigen::MatrixXd::Identity(this->grad_shape[0], this->grad_shape[1]);
-        break;
-      }
-      case Formulation::small_strain: {
-        default_grad_val =
-            Eigen::MatrixXd::Zero(this->grad_shape[0], this->grad_shape[1]);
-        break;
-      }
-      default:
-        std::stringstream error_msg{};
-        error_msg << "I don't know how to handle the Formulation '"
-                  << this->get_formulation() << "'.";
-        throw SolverError{error_msg.str()};
-        break;
-      }
-    } else {
-      default_grad_val =
-          Eigen::MatrixXd::Zero(this->grad_shape[0], this->grad_shape[1]);
-    }
-    this->grad->get_map() = default_grad_val;
-
-    this->previous_macro_load.setZero(this->grad_shape[0], this->grad_shape[1]);
-
-    // make sure all materials are initialised and every pixel is covered
-    this->cell_data->check_material_coverage();
-
-    if (this->is_mechanics()) {
-      this->create_mechanics_projection();
-    } else {
-      this->create_gradient_projection();
-    }
+    this->initialise_cell_worker();
     this->projection->initialise();
     this->is_initialised = true;
 
@@ -198,13 +97,15 @@ namespace muSpectre {
       this->initialise_cell();
     }
 
-    for (auto & elem : load_step) {
-      std::cout << "the load_step for the physics domain: "
-                << elem.first.get_name() << " is:\n"
-                << elem.second << "\n";
-    }
-
     auto && comm{this->cell_data->get_communicator()};
+
+    if (this->verbosity > Verbosity::Silent and comm.rank() == 0) {
+      for (auto & elem : load_step) {
+        std::cout << "the load_step for the physics domain: "
+                  << elem.first.get_name() << " is:\n"
+                  << elem.second << "\n";
+      }
+    }
 
     // obtain this iteration's load and check its shape
     const auto & macro_load{load_step.at(this->domain)};

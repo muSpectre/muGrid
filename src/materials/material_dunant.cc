@@ -64,8 +64,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialDunant<DimM>::initialise() {
-    Parent::initialise();
-    this->save_history_variables();
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      this->save_history_variables();
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -167,8 +169,7 @@ namespace muSpectre {
     this->internal_fields->add_pixel(pixel_index);
     this->get_kappa_field().get_state_field().current().push_back(
         this->get_kappa_init());
-    this->get_kappa_init_field().get_field().push_back(
-        this->get_kappa_init());
+    this->get_kappa_init_field().get_field().push_back(this->get_kappa_init());
   }
 
   /* ---------------------------------------------------------------------- */

@@ -77,12 +77,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialViscoElasticDamageSS2<DimM>::initialise() {
-    Parent::initialise();
-    this->get_history_integral().get_map().get_current() =
-        Eigen::Matrix<Real, DimM, DimM>::Identity();
-    this->get_s_null_prev_field().get_map().get_current() =
-        Eigen::Matrix<Real, DimM, DimM>::Identity();
-    this->save_history_variables();
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      this->get_history_integral().get_map().get_current() =
+          Eigen::Matrix<Real, DimM, DimM>::Identity();
+      this->get_s_null_prev_field().get_map().get_current() =
+          Eigen::Matrix<Real, DimM, DimM>::Identity();
+      this->save_history_variables();
+    }
   }
 
   /* ---------------------------------------------------------------------- */

@@ -175,8 +175,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM, Formulation Form>
   void MaterialLaminate<DimM, Form>::initialise() {
-    Parent::initialise();
-    Parent::set_formulation(Form);
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      Parent::set_formulation(Form);
+    }
   }
   /* ----------------------------------------------------------------------*/
   template class MaterialLaminate<twoD, Formulation::finite_strain>;

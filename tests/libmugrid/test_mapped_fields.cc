@@ -71,7 +71,6 @@ namespace muGrid {
     MappedT2Field<Real, Mapping::Mut, DimS, IterUnit::SubPt> mapped_t2;
     MappedT4Field<Real, Mapping::Mut, DimS, IterUnit::SubPt> mapped_t4;
 
-
     MappedFieldFixture()
         : InitialiserBase{}, mapped_matrix{"matrix", this->fc, division_tag()},
           mapped_array{"array", this->fc, division_tag()},
@@ -109,9 +108,14 @@ namespace muGrid {
     GlobalFieldCollection collection{twoD};
     collection.set_nb_sub_pts(division_tag, NbQuad);
     collection.initialise({2, 2}, {2, 2});
+
     using Mapped_t = MappedField<FieldMap<Real, Mapping::Mut>>;
-    Mapped_t mapped_field{"name", NbRow, NbCol, IterUnit::SubPt,
-                          collection, division_tag};
+
+    using StaticMapped_t = MappedField<StaticFieldMap<
+        Real, Mapping::Mut, internal::MatrixMap<Real, NbRow * NbCol, 1>>>;
+
+    Mapped_t mapped_field{"name",          NbRow,      NbCol,
+                          IterUnit::SubPt, collection, division_tag};
 
     BOOST_CHECK_THROW(Mapped_t("name", NbRow, NbCol, IterUnit::Pixel,
                                collection, division_tag),
@@ -119,6 +123,21 @@ namespace muGrid {
 
     MatrixFieldMap<Real, Mapping::Const, NbRow, NbCol, IterUnit::SubPt>
         static_map(mapped_field.get_field());
+
+    auto && existing_field{mapped_field.get_field()};
+    // make a dynamically sized MappedField object from an existing field
+    Mapped_t mapped_field_form_field_1{existing_field, NbRow, IterUnit::SubPt};
+
+    // make a statically sized MappedField object from an existing field
+    StaticMapped_t mapped_field_form_field_2{existing_field};
+
+    // failure in making dynamically sized MappedField object from an
+    // existing field with wrong nb_rows
+    BOOST_CHECK_THROW(Mapped_t(existing_field, 3 * NbRow, IterUnit::SubPt),
+                      RuntimeError);
+
+    BOOST_CHECK_THROW(Mapped_t(existing_field, 2 * NbRow, IterUnit::SubPt),
+                      RuntimeError);
 
     for (auto && tup : akantu::zip(mapped_field.get_map(), static_map)) {
       auto & dyn{std::get<0>(tup)};
@@ -143,8 +162,7 @@ namespace muGrid {
     using FieldColl_t =
         std::conditional_t<Validity == ValidityDomain::Global,
                            GlobalFieldCollection, LocalFieldCollection>;
-    using TField_t =
-        MappedT2Field<Real, Mapping::Mut, MDim, IterUnit::SubPt>;
+    using TField_t = MappedT2Field<Real, Mapping::Mut, MDim, IterUnit::SubPt>;
     using MField_t =
         MappedMatrixField<Real, Mapping::Mut, SDim, MDim, IterUnit::SubPt>;
     using DField_t = RealField;
@@ -193,8 +211,7 @@ namespace muGrid {
     fc.initialise(sizes, sizes, {});
 
     auto nb_pixels{CcoordOps::get_size(sizes)};
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(),
-                      nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
 
@@ -204,8 +221,7 @@ namespace muGrid {
     dynamic_field2.set_pad_size(pad_size);
 
     // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(),
-                      nb_pixels);
+    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
   }
@@ -280,8 +296,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE(mapped_fields_subdivision, SubDivisionFixture) {
-    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, IterUnit::Pixel>
-      pixel{"pixel", this->fc, PixelTag};
+    MappedArrayField<Real, Mapping::Mut, NbComponent, 1, IterUnit::Pixel> pixel{
+        "pixel", this->fc, PixelTag};
     MappedArrayField<Real, Mapping::Mut, NbComponent, 1, IterUnit::SubPt>
         quad_pt{"quad_pt", this->fc, sub_division_tag()};
   }

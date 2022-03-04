@@ -61,9 +61,11 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialLinearElasticDamage1<DimM>::initialise() {
-    Parent::initialise();
-    this->kappa_field.get_map().get_current() = this->kappa_init;
-    this->save_history_variables();
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      this->kappa_field.get_map().get_current() = this->kappa_init;
+      this->save_history_variables();
+    }
   }
 
   /* ---------------------------------------------------------------------- */

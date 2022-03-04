@@ -110,6 +110,10 @@ namespace muSpectre {
         this->cell_data, krylov_solver, verbose, newton_tol, equil_tol, maxiter,
         tr, eta)};
 
+    auto homo_solver{std::make_shared<SolverTrustRegionNewtonCG>(
+        this->cell_data, krylov_solver, verbose, newton_tol, equil_tol, maxiter,
+        tr, eta)};
+
     auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
       return 0.5 * (mat + mat.transpose());
     }};
@@ -121,6 +125,9 @@ namespace muSpectre {
     solver->set_formulation(Formulation::small_strain);
     solver->initialise_cell();
 
+    homo_solver->set_formulation(Formulation::small_strain);
+    homo_solver->initialise_cell();
+
     BOOST_TEST_CHECKPOINT("before load increment");
     std::cout << std::endl
               << "strain:" << std::endl
@@ -131,6 +138,8 @@ namespace muSpectre {
               << symmetric(strain) << std::endl
               << std::endl;
     auto && new_result{solver->solve_load_increment(strain)};
+    auto && C_eff{homo_solver->compute_effective_stiffness()};
+
     std::cout << new_result.grad << "\n";
     std::cout << new_result.stress << "\n";
     BOOST_TEST_CHECKPOINT("after load increment");

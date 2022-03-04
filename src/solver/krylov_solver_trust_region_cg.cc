@@ -149,9 +149,9 @@ namespace muSpectre {
       return Vector_map(this->x_k.data(), this->x_k.size());
     }
 
-    if (verbose > Verbosity::Silent && comm.rank() == 0) {
-      std::cout << "Norm of rhs in (trust region) Steihaug CG = " << rhs_norm2
-                << std::endl;
+    if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
+      std::cout << " , Norm of rhs in (trust region) Steihaug CG = "
+                << rhs_norm2 << std::endl;
     }
 
     // Multiplication with the norm of the right hand side to get a relative
@@ -166,22 +166,25 @@ namespace muSpectre {
     Real rel_tol2 = muGrid::ipow(tol, 2) * rhs_norm2;
 
     size_t count_width{};  // for output formatting in verbose case
-    if (verbose > Verbosity::Silent) {
+    if (this->verbose > Verbosity::Silent) {
       count_width = static_cast<size_t>(std::log10(this->maxiter)) + 1;
     }
     Uint iter_counter{0};
-    for (Uint i{0}; i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
+    Uint current_counter{0};
+    for (; current_counter < this->maxiter && rdr > rel_tol2;
+         ++current_counter, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{this->dot(this->p_k, this->Ap_k)};
       if (pdAp <= 0) {
         // Hessian is not positive definite, the minimizer is on the trust
         // region bound
-        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
           std::cout << "  CG finished, reason: Hessian is not positive "
                        "definite (pdAp:"
                     << pdAp << ")" << std::endl;
         }
+        ++this->counter;
         this->convergence = Convergence::HessianNotPositiveDefinite;
         return this->bound(rhs);
       }
@@ -195,11 +198,12 @@ namespace muSpectre {
       if (this->squared_norm(x_k) >= trust_region2) {
         // we are exceeding the trust region, the minimizer is on the trust
         // region bound
-        if (verbose > Verbosity::Silent && comm.rank() == 0) {
+        if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
           std::cout << "  CG finished, reason: step exceeded trust region "
                        "bounds"
                     << std::endl;
         }
+        ++this->counter;
         this->convergence = Convergence::ExceededTrustRegionBound;
         return this->bound(rhs);
       }
@@ -218,17 +222,16 @@ namespace muSpectre {
       Real beta{new_rdr / rdr};
 
       //! CG reset worker
-      auto && reset_cg{[&beta, this, &rhs, &iter_counter]() {
+      auto && reset_cg{[&beta, this, &rhs, &iter_counter, &current_counter]() {
         this->r_k = this->matrix * this->x_k - rhs;
         beta = 0.0;
         iter_counter = 0;
-        if (verbose > Verbosity::Silent && comm.rank() == 0) {
-          std::cout << "Reset CG"
-                    << "\n";
+        if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
+          std::cout << "Reset CG at step: " << current_counter << "\n";
         }
       }};
 
-      if (i > 1) {
+      if (current_counter > 1) {
         switch (this->reset) {
         case ResetCG::no_reset: {
           break;
@@ -267,9 +270,9 @@ namespace muSpectre {
 
       rdr = new_rdr;
 
-      if (verbose > Verbosity::Silent && comm.rank() == 0) {
-        std::cout << "  at CG step " << std::setw(count_width) << i
-                  << ": |r|/|b| = " << std::setw(15)
+      if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
+        std::cout << "  at CG step " << std::setw(count_width)
+                  << current_counter << ": |r|/|b| = " << std::setw(15)
                   << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << tol
                   << std::endl;
       }
@@ -279,13 +282,13 @@ namespace muSpectre {
     }
 
     if (rdr < rel_tol2) {
-      if (verbose > Verbosity::Silent && comm.rank() == 0) {
+      if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
         std::cout << "  CG finished, reason: reached tolerance" << std::endl;
       }
       this->convergence = Convergence::ReachedTolerance;
     } else {
       std::stringstream err{};
-      err << " After " << this->counter << " steps, the solver "
+      err << " After " << current_counter << " steps, the solver "
           << " FAILED with  |r|/|b| = " << std::setw(15)
           << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << tol << std::endl;
       throw ConvergenceError("Conjugate gradient has not converged." +

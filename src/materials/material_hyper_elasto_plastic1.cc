@@ -49,8 +49,7 @@ namespace muSpectre {
       const Real & tau_y0, const Real & H,
       const std::shared_ptr<muGrid::LocalFieldCollection> &
           parent_field_collection)
-      : Parent{name, spatial_dimension, nb_quad_pts,
-      parent_field_collection},
+      : Parent{name, spatial_dimension, nb_quad_pts, parent_field_collection},
         plast_flow_field{this->get_prefix() + "cumulated plastic flow εₚ",
                          *this->internal_fields, QuadPtTag},
         F_prev_field{this->get_prefix() + "Previous placement gradient Fᵗ",
@@ -79,12 +78,14 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialHyperElastoPlastic1<DimM>::initialise() {
-    Parent::initialise();
-    this->F_prev_field.get_map().get_current() =
-        Eigen::Matrix<Real, DimM, DimM>::Identity();
-    this->be_prev_field.get_map().get_current() =
-        Eigen::Matrix<Real, DimM, DimM>::Identity();
-    this->save_history_variables();
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      this->F_prev_field.get_map().get_current() =
+          Eigen::Matrix<Real, DimM, DimM>::Identity();
+      this->be_prev_field.get_map().get_current() =
+          Eigen::Matrix<Real, DimM, DimM>::Identity();
+      this->save_history_variables();
+    }
   }
   //--------------------------------------------------------------------------//
   template <Index_t DimM>

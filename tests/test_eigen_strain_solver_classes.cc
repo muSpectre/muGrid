@@ -167,6 +167,7 @@ namespace muSpectre {
     auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
                                                  verbose, newton_tol, equil_tol,
                                                  maxiter)};
+
     auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
       return 0.5 * (mat + mat.transpose());
     }};
@@ -186,6 +187,7 @@ namespace muSpectre {
               << "symmetric(strain):" << std::endl
               << symmetric(strain) << std::endl
               << std::endl;
+
     auto && new_result{solver->solve_load_increment(strain, eigen_func_new)};
     BOOST_TEST_CHECKPOINT("after load increment");
 
@@ -291,6 +293,11 @@ namespace muSpectre {
     auto solver{std::make_shared<SolverNewtonCG>(this->cell_data, krylov_solver,
                                                  verbose, newton_tol, equil_tol,
                                                  maxiter)};
+
+    auto homo_solver{std::make_shared<SolverNewtonCG>(
+        this->cell_data, krylov_solver, verbose, newton_tol, equil_tol,
+        maxiter)};
+
     auto && symmetric{[](Eigen::MatrixXd mat) -> Eigen::MatrixXd {
       return 0.5 * (mat + mat.transpose());
     }};
@@ -300,6 +307,9 @@ namespace muSpectre {
 
     solver->set_formulation(Formulation::small_strain);
     solver->initialise_cell();
+
+    homo_solver->set_formulation(Formulation::small_strain);
+    homo_solver->initialise_cell();
 
     BOOST_TEST_CHECKPOINT("before load increment");
     std::cout << std::endl
@@ -347,6 +357,7 @@ namespace muSpectre {
                          new_result.stress.transpose()
                   << std::endl;
       }
+      auto && C_eff{homo_solver->compute_effective_stiffness()};
     }
   }
 
@@ -554,7 +565,7 @@ namespace muSpectre {
     // The function which is responsible for assigning eigen strain
     Func_t eigen_func_legacy{
         [&F_eigen](const size_t & step,
-                         muGrid::TypedFieldBase<Real> & eval_field) {
+                   muGrid::TypedFieldBase<Real> & eval_field) {
           auto && stress_coeff{step + 1};
           auto && eigen_field_map{muGrid::FieldMap<Real, Mapping::Mut>(
               eval_field, Dim, muGrid::IterUnit::SubPt)};

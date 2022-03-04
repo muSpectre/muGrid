@@ -74,8 +74,10 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
   void MaterialLinearElasticDamage2<DimM>::initialise() {
-    Parent::initialise();
-    this->save_history_variables();
+    if (not this->is_initialised_flag) {
+      Parent::initialise();
+      this->save_history_variables();
+    }
   }
 
   /* ---------------------------------------------------------------------- */

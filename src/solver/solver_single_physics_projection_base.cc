@@ -66,10 +66,127 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   void SolverSinglePhysicsProjectionBase::initialise_eigen_strain_storage() {
     if (not this->has_eigen_strain_storage()) {
+      //! store solver fields in cell
+      auto & field_collection{this->cell_data->get_fields()};
+
       this->eval_grad = std::make_shared<MappedField_t>(
-          "eval_grad", this->grad_shape[0], this->grad_shape[1],
-          IterUnit::SubPt, this->cell_data->get_fields(), QuadPtTag);
+          this->fetch_or_register_field("eval_grad", this->grad_shape[0],
+                                        this->grad_shape[1], field_collection,
+                                        QuadPtTag),
+          this->grad_shape[0], IterUnit::SubPt);
       this->eval_grads[this->domain] = this->eval_grad;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void SolverSinglePhysicsProjectionBase::initialise_cell_worker() {
+    // make sure the number of subpoints is correct
+    this->cell_data->set_nb_quad_pts(this->nb_quad_pts);
+    this->cell_data->set_nb_nodal_pts(OneNode);
+
+    //! check whether formulation has been set
+    if (this->is_mechanics()) {
+      if (this->get_formulation() == Formulation::not_set) {
+        throw SolverError(
+            "Can't run a mechanics calculation without knowing the "
+            "formulation. please use the `set_formulation()` to "
+            "choose between finite and small strain");
+      } else {
+        for (auto && mat :
+             this->cell_data->get_domain_materials().at(this->domain)) {
+          auto mech{std::dynamic_pointer_cast<MaterialMechanicsBase>(mat)};
+          if (this->get_formulation() == Formulation::small_strain) {
+            mech->check_small_strain_capability();
+          }
+          mech->set_formulation(this->get_formulation());
+        }
+      }
+    }
+
+    this->grad_shape =
+        gradient_shape(this->domain.rank(), this->cell_data->get_spatial_dim(),
+                       this->is_mechanics(), this->get_formulation());
+
+    //! store solver fields in cell
+    auto & field_collection{this->cell_data->get_fields()};
+
+    // Corresponds to symbol δF or δε
+    this->grad_incr = std::make_shared<MappedField_t>(
+        this->fetch_or_register_field("incrF", this->grad_shape[0],
+                                      this->grad_shape[1], field_collection,
+                                      QuadPtTag),
+        this->grad_shape[0], IterUnit::SubPt);
+
+    // Corresponds to symbol F or ε
+    this->grad = std::make_shared<MappedField_t>(
+        this->fetch_or_register_field("grad", this->grad_shape[0],
+                                      this->grad_shape[1], field_collection,
+                                      QuadPtTag),
+        this->grad_shape[0], IterUnit::SubPt);
+
+    this->eval_grad = this->grad;
+
+    this->eval_grads[this->domain] = this->eval_grad;
+    this->grads[this->domain] = this->grad;
+
+    // Corresponds to symbol P or σ
+    this->flux = std::make_shared<MappedField_t>(
+        this->fetch_or_register_field("flux", this->grad_shape[0],
+                                      this->grad_shape[1], field_collection,
+                                      QuadPtTag),
+        this->grad_shape[0], IterUnit::SubPt);
+    this->fluxes[this->domain] = this->flux;
+
+    // Corresponds to symbol K or C
+    Index_t tangent_size{this->grad_shape[0] * this->grad_shape[1]};
+    this->tangent = std::make_shared<MappedField_t>(
+        this->fetch_or_register_field("tangent", tangent_size, tangent_size,
+                                      field_collection, QuadPtTag),
+        this->grad_shape[0], IterUnit::SubPt);
+    this->tangents[this->domain] = this->tangent;
+
+    // field to store the rhs for cg calculations
+    this->rhs = std::make_shared<MappedField_t>(
+        this->fetch_or_register_field("rhs", this->grad_shape[0],
+                                      this->grad_shape[1], field_collection,
+                                      QuadPtTag),
+        this->grad_shape[0], IterUnit::SubPt);
+
+    Eigen::MatrixXd default_grad_val{};
+    if (this->is_mechanics()) {
+      switch (this->get_formulation()) {
+      case Formulation::finite_strain: {
+        default_grad_val =
+            Eigen::MatrixXd::Identity(this->grad_shape[0], this->grad_shape[1]);
+        break;
+      }
+      case Formulation::small_strain: {
+        default_grad_val =
+            Eigen::MatrixXd::Zero(this->grad_shape[0], this->grad_shape[1]);
+        break;
+      }
+      default:
+        std::stringstream error_msg{};
+        error_msg << "I don't know how to handle the Formulation '"
+                  << this->get_formulation() << "'.";
+        throw SolverError{error_msg.str()};
+        break;
+      }
+    } else {
+      default_grad_val =
+          Eigen::MatrixXd::Zero(this->grad_shape[0], this->grad_shape[1]);
+    }
+    this->grad->get_map() = default_grad_val;
+
+    this->previous_macro_load.setZero(this->grad_shape[0], this->grad_shape[1]);
+
+    // make sure all materials are initialised and every pixel is covered
+    this->cell_data->check_material_coverage();
+
+    if (this->is_mechanics()) {
+      this->create_mechanics_projection();
+    } else {
+      this->create_gradient_projection();
     }
   }
 
@@ -361,6 +478,25 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
   auto SolverSinglePhysicsProjectionBase::compute_effective_stiffness()
       -> EigenMat_t {
+    if (not this->is_initialised) {
+      this->initialise_cell();
+    }
+
+    if (not(this->mean_control == MeanControl::StrainControl)) {
+      std::stringstream err{};
+      err << "This function is currently only usable for solvers"
+          << " with a strain control projection operator" << std::endl
+          << "the algorithm derived needs to use a strain control"
+          << " projection operator to zero out σ_eq" << std::endl
+          << " NOTE: Please try to define an additional similar solver with"
+          << " MeanControl::StrainControl if you are using any other mean"
+          << " control for your main solver" << std::endl
+          << ", NOTE: you also need to define a new"
+          << " linear(Krylov) solver and pass it to the constructor of the"
+          << " newly defined solver" << std::endl;
+      throw SolverError(err.str());
+    }
+
     auto && comm{this->cell_data->get_communicator()};
     auto && dim{this->cell_data->get_spatial_dim()};
     Dim_t dim_square{dim * dim};
@@ -467,6 +603,21 @@ namespace muSpectre {
     }
     }
     return unit_test_loads;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  auto SolverSinglePhysicsProjectionBase::fetch_or_register_field(
+      const std::string & unique_name, const Index_t & nb_rows,
+      const Index_t & nb_cols, muGrid::FieldCollection & collection,
+      const std::string & sub_division_tag) -> RealField & {
+    if (collection.field_exists(unique_name)) {
+      auto & field{
+          dynamic_cast<RealField &>(collection.get_field(unique_name))};
+      return field;
+    } else {
+      return collection.register_field<Real>(unique_name, {nb_rows, nb_cols},
+                                             sub_division_tag);
+    }
   }
 
   /* ---------------------------------------------------------------------- */

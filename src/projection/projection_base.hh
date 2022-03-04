@@ -241,6 +241,10 @@ namespace muSpectre {
     bool initialised{false};  //! has the projection been initialised?
 
     MeanControl mean_control;
+
+    static const std::string
+    prepare_field_unique_name(muFFT::FFTEngine_ptr engine,
+                              const std::string & unique_name);
   };
 
 }  // namespace muSpectre

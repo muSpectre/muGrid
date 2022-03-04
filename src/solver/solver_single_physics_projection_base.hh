@@ -36,6 +36,7 @@
 #include "krylov_solver_base.hh"
 
 #include "projection/projection_base.hh"
+#include "materials/material_mechanics_base.hh"
 
 #ifndef SRC_SOLVER_SOLVER_SINGLE_PHYSICS_PROJECTION_BASE_HH_
 #define SRC_SOLVER_SOLVER_SINGLE_PHYSICS_PROJECTION_BASE_HH_
@@ -48,6 +49,7 @@ namespace muSpectre {
     using Gradient_t = muFFT::Gradient_t;
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
     using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
+    using RealField = muGrid::TypedField<Real>;
 
     //! Ref to input/output vector
     using EigenVecRef = Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, 1>>;
@@ -129,6 +131,7 @@ namespace muSpectre {
                           EigenVecRef del_flux) final;
 
    protected:
+    void initialise_cell_worker();
     void initialise_eigen_strain_storage();
     bool has_eigen_strain_storage() const;
     /**
@@ -160,6 +163,14 @@ namespace muSpectre {
 
     //! create a generic gradient projection
     void create_gradient_projection();
+
+    //! making a mapped_field by making a new field or fetching an existing
+    //! name with the unique_name from the field_collection
+    RealField & fetch_or_register_field(const std::string & unique_name,
+                                        const Index_t & nb_rows,
+                                        const Index_t & nb_cols,
+                                        muGrid::FieldCollection & collection,
+                                        const std::string & sub_division_tag);
 
     std::shared_ptr<ProjectionBase> projection{nullptr};
 

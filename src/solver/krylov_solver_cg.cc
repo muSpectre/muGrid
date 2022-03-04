@@ -145,7 +145,9 @@ namespace muSpectre {
     // because of the early termination criterion, we never count the last
     // iteration
     ++this->counter;
-    for (Uint i{0}; i < this->maxiter && rdr > rel_tol2; ++i, ++this->counter) {
+    Uint current_counter{0};
+    for (; current_counter < this->maxiter && rdr > rel_tol2;
+         ++current_counter, ++this->counter) {
       this->Ap_k = this->matrix * this->p_k;
 
       Real pdAp{this->dot(this->p_k, this->Ap_k)};
@@ -174,8 +176,8 @@ namespace muSpectre {
       rdr = new_rdr;
 
       if (this->verbose > Verbosity::Silent && this->comm.rank() == 0) {
-        std::cout << "  at CG step " << std::setw(count_width) << i
-                  << ": |r|/|b| = " << std::setw(15)
+        std::cout << "  at CG step " << std::setw(count_width)
+                  << current_counter << ": |r|/|b| = " << std::setw(15)
                   << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
                   << std::endl;
       }
@@ -191,7 +193,7 @@ namespace muSpectre {
       this->convergence = Convergence::ReachedTolerance;
     } else {
       std::stringstream err{};
-      err << " After " << this->counter << " steps, the solver "
+      err << " After " << current_counter << " steps, the solver "
           << " FAILED with  |r|/|b| = " << std::setw(15)
           << std::sqrt(rdr / rhs_norm2) << ", cg_tol = " << this->tol
           << std::endl;

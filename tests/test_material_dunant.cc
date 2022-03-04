@@ -95,6 +95,8 @@ namespace muSpectre {
       mat_lin.add_pixel(0);
       mat_dam.initialise();
       mat_lin.initialise();
+      mat_dam.initialise();
+      mat_lin.initialise();
     }
 
     constexpr static Real tol{1.6e-5};
