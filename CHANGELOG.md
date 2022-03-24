@@ -1,14 +1,17 @@
 Change log for µSpectre
 =======================
 
-0.23.1 (Not Released Yet)
+0.23.1 (24Mar2022)
 -------------------------
 - muSpectre: A bug fixed in the call of the constructor of FieldCollection
+- muFFT: Fixed `pip install muFFT` on macOS
+
 
 0.23.0 (15Oct2021)
 -------------------------
 - muSpectre: making vector operation methods in solver classed with communicating inside them
 - muSpectre: added logical reduction on was_last_step_nonlinear evaluation in CellData 
+
 
 0.22.0 (24Sep2021)
 -------------------------
@@ -16,17 +19,21 @@ Change log for µSpectre
 - muSpectre: mean stress control is now usable in MPI
 - muSpectre: examples using mean stress control added
 
+
 0.21.0 (26Aug2021)
 -------------------------
 - CI: Refactoring of the CI with addition of coverage and ccache
+
 
 0.20.2 (04Aug2021)
 -------------------------
 - muSpectre: deleted an unnecssary parameter from write_2d_class function in iinear_finite_elements.py
 
+
 0.20.1 (03Aug2021)
 -------------------------
 - muSpectre: improve write_2d and write_3d functions, 2D stencil for hexagonal grid
+
 
 0.20.0 (15Jul2021)
 -------------------------
@@ -37,6 +44,7 @@ Change log for µSpectre
 -------------------------
 - muGrid: correct bugs in the FileIONetCDF
 
+
 0.19.1 (23Jun2021)
 -------------------------
 - muSpectre: Fixed a minor array reshape bug in the tutorial_example_new.py that was jeopardizing the output stress plot
@@ -45,7 +53,8 @@ Change log for µSpectre
 0.19.0 (16Jun2021)
 -------------------------
 - muSpectre: added material_dunnat_tc (bilinear elastic- linear strain softening with tensile-compressive wiegthed norm as strain measure)
-- muSpectre:  added material_dunnat_t (bilinear elastic- linear strain softening with maiximum tensile principal strain as strain measure)
+- muSpectre: added material_dunnat_t (bilinear elastic- linear strain softening with maiximum tensile principal strain as strain measure)
+
 
 0.18.2 (10Jun2021)
 -------------------------
@@ -88,11 +97,13 @@ Change log for µSpectre
   equation, heat equation, etc.)
 - clang: No more warnings are emitted during compilation
 
+
 0.15.1 (30Mar21)
 -------------------------
 
 - muSpectre: Added material for phase field fracture simulations
 - muGrid: Fix support for fields with >= 2^32 elements
+
 
 0.15.0 (12Mar21)
 ----------------
@@ -107,10 +118,12 @@ Change log for µSpectre
 - all: Fixed installation via CMake and `make install`
 - all: Fixed cross platform install of NetCDF I/O
 
+
 0.14.0 (04Feb21)
 ----------------
 
 - muFFT: implement serial wrapper to FFTW hcfft
+
 
 0.13.0 (28Jan21)
 ----------------
@@ -119,6 +132,7 @@ Change log for µSpectre
 - muSpectre: Sensitivity analysis
 - Bug fix (muFFT): Handle cases where MPI processes have no grid points
 
+
 0.12.0 (19Nov20)
 ----------------
 
@@ -126,11 +140,13 @@ Change log for µSpectre
 - muFFT: Derivatives in 1D
 - muFFT: Second derivatives
 
+
 0.11.0 (07Sep20)
 ----------------
 
 - Trust-Region Newton-CG solver for nonlinear problems with instabilities
 - Updated Eigen archive URL which broke installation via pip
+
 
 0.10.0 (22Jul20)
 ----------------
@@ -139,20 +155,24 @@ Change log for µSpectre
 - User control over buffer copies in muFFT with option to avoid them completely 
 - Gradient integration for multiple quadrature points
 
+
 0.9.3 (28Jun20)
 ---------------
 - Bug fix: Packaging with sdist did not remove dirty flag which lead to a
   broken PyPI package
+
 
 0.9.2 (28Jun20)
 ---------------
 - Bug fix: operator= of TypedFieldBase passed wrong strides during strided
   copy; this broke the MPI-parallel FFTW forward transform (#130)
 
+
 0.9.1 (17Jun20)
 ---------------
 - Bug fix: Packaging with sdist only included FFT engines present during
   the packaging process
+
 
 0.9.0 (17Jun20)
 ---------------
