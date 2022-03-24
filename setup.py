@@ -488,9 +488,11 @@ def has_flag(compiler, flagname):
 
 def cpp_flag(compiler):
     """Return the -std=c++[11/14] compiler flag.
-    The c++14 is prefered over c++11 (when it is available).
+    The c++17 is prefered over c++14, which is prefered over c++11 (when it is available).
     """
-    if has_flag(compiler, '-std=c++14'):
+    if has_flag(compiler, '-std=c++17'):
+        return '-std=c++17'
+    elif has_flag(compiler, '-std=c++14'):
         return '-std=c++14'
     elif has_flag(compiler, '-std=c++11'):
         return '-std=c++11'
@@ -505,11 +507,16 @@ def has_cpp_optional(compiler):
     retval = True
     f = tempfile.NamedTemporaryFile('w', suffix='.cpp', delete=False)
     f.write(
+        '#if __cplusplus < 201703L\n'
         '#include <experimental/optional>\nint main() {\n'
-        'std::experimental::optional<double> A{};\n}')
+        'std::experimental::optional<double> A{};\n}\n'
+        '#else\n'
+        '#include <optional>\nint main() {\n'
+        'std::optional<double> A{};\n}\n'
+        '#endif\n')
     f.close()
     try:
-        compiler.compile([f.name])
+        compiler.compile([f.name], extra_preargs=[cpp_flag(compiler)])
     except setuptools.distutils.errors.CompileError:
         retval = False
     os.remove(f.name)
@@ -611,12 +618,9 @@ class build_clib_dyn(build_clib):
             self.include_dirs = self.include_dirs.split(os.pathsep)
 
     def build_libraries(self, libraries):
-        print('build_libraries')
         _customize_compiler_for_shlib(self.compiler)
-        print('A')
         copts = compiler_options(self.compiler,
                                  self.distribution.get_version())
-        print(copts)
         lopts = linker_options(self.compiler)
         for (lib_name, build_info) in libraries:
             sources = build_info.get('sources')
