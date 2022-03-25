@@ -293,6 +293,12 @@ def write_3d(file_name, rve, cell_data=None, point_data=None,
     F0 -- F0 describes an affine deformation of the undeformed grid i.e.
             * rectangular grid: F0=np.eye(3) which is the default case and
                                 corresponds to the undeformed grid.
+            * six almost regular tetrahedrons with
+                                dy = sqrt(3)/2*dx
+                                dz = sqrt(6)/3*dx
+                                F0 = np.array([[1, -1/sqrt(3),      0    ],
+                                               [0,      1    , -2/sqrt(6)],
+                                               [0,      0    ,      1    ]])
     displacement_field -- False (default): The deformed structure is stored.
                           True: The undeformed structure and the displacement
                                 field are stored. You can get the deformed

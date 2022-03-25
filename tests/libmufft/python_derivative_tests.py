@@ -36,6 +36,7 @@ Program grant you additional permission to convey the resulting work.
 
 import unittest
 import numpy as np
+import itertools
 
 from python_test_imports import muFFT
 
@@ -973,6 +974,117 @@ class DerivativeCheck3d(unittest.TestCase):
                              + self.field[x, y, (z+1) % nz])/2
                     ndiff = np.squeeze(ndiff)
                     self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+
+    def test_six_regular_tetraheda(self):
+        def get_diff_field(element, direction):
+            deriv_n = 3*element + direction
+            diffop = muFFT.Stencils3D.linear_finite_elements_6_regular[deriv_n]
+            q = self.fft.fftfreq
+            d = diffop.fourier(q)
+            diff_field = np.zeros_like(self.field, order='f')
+            self.fft.ifft(d * self.fourier_field, diff_field)
+            diff_field *= self.fft.normalisation
+            diff_field = np.squeeze(diff_field)
+
+            return diff_field
+
+        direction_str = {"0": "x",
+                         "1": "y",
+                         "2": "z"}
+
+        def error_message(element, direction):
+            print(f"Derivative test for tetrahedra {element} fails in "
+                  f"{direction_str[str(direction)]}-direction.")
+
+        def test_derivative(diff_field, element, direction):
+            s = stencils[str(element)+str(direction)]
+
+            # derivative in x-direction
+            if direction == 0:
+                for x, y, z in itertools.product(
+                        range(nx), range(ny), range(nz)):
+                    ndiff = self.field[(x+s[0, 0]) % nx,
+                                       (y+s[0, 1]) % ny,
+                                       (z+s[0, 2]) % nz]
+                    ndiff -= self.field[(x+s[1, 0]) % nx,
+                                        (y+s[1, 1]) % ny,
+                                        (z+s[1, 2]) % nz]
+                    ndiff += 1/2*self.field[(x+s[2, 0]) % nx,
+                                            (y+s[2, 1]) % ny,
+                                            (z+s[2, 2]) % nz]
+                    ndiff -= 1/2*self.field[(x+s[3, 0]) % nx,
+                                            (y+s[3, 1]) % ny,
+                                            (z+s[3, 2]) % nz]
+
+                    ndiff = np.squeeze(ndiff)
+                    if round(diff_field[x, y, z], 7) - round(ndiff, 7) != 0:
+                        error_message(element, direction)
+                        self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+                        continue  # skipp test for other field values
+            # derivative in y-direction
+            elif direction == 1:
+                for x, y, z in itertools.product(
+                        range(nx), range(ny), range(nz)):
+                    ndiff = self.field[(x+s[0, 0]) % nx,
+                                       (y+s[0, 1]) % ny,
+                                       (z+s[0, 2]) % nz]
+                    ndiff -= self.field[(x+s[1, 0]) % nx,
+                                        (y+s[1, 1]) % ny,
+                                        (z+s[1, 2]) % nz]
+                    ndiff += 2/3*self.field[(x+s[2, 0]) % nx,
+                                            (y+s[2, 1]) % ny,
+                                            (z+s[2, 2]) % nz]
+                    ndiff -= 2/3*self.field[(x+s[3, 0]) % nx,
+                                            (y+s[3, 1]) % ny,
+                                            (z+s[3, 2]) % nz]
+
+                    ndiff = np.squeeze(ndiff)
+                    if round(diff_field[x, y, z], 7) - round(ndiff, 7) != 0:
+                        error_message(element, direction)
+                        self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+                        continue  # skipp test for other field values
+            # derivative in z-direction
+            elif direction == 2:
+                for x, y, z in itertools.product(
+                        range(nx), range(ny), range(nz)):
+                    ndiff = self.field[(x+s[0, 0]) % nx,
+                                       (y+s[0, 1]) % ny,
+                                       (z+s[0, 2]) % nz]
+                    ndiff -= self.field[(x+s[1, 0]) % nx,
+                                        (y+s[1, 1]) % ny,
+                                        (z+s[1, 2]) % nz]
+
+                    ndiff = np.squeeze(ndiff)
+                    if round(diff_field[x, y, z], 7) - round(ndiff, 7) != 0:
+                        error_message(element, direction)
+                        self.assertAlmostEqual(diff_field[x, y, z], ndiff)
+                        continue  # skipp test for other field values
+
+        nx, ny, nz = self.nb_pts
+        stencils = {
+            "00": np.array([[1, 0, 0], [0, 0, 0], [1, 0, 0], [1, 1, 0]]),
+            "01": np.array([[1, 1, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]]),
+            "02": np.array([[1, 1, 1], [1, 1, 0]]),
+            "10": np.array([[1, 0, 0], [0, 0, 0], [1, 0, 1], [1, 1, 1]]),
+            "11": np.array([[1, 1, 1], [1, 0, 1], [1, 0, 0], [1, 0, 1]]),
+            "12": np.array([[1, 0, 1], [1, 0, 0]]),
+            "20": np.array([[1, 1, 0], [0, 1, 0], [0, 0, 0], [0, 1, 0]]),
+            "21": np.array([[0, 1, 0], [0, 0, 0], [1, 1, 0], [1, 1, 1]]),
+            "22": np.array([[1, 1, 1], [1, 1, 0]]),
+            "30": np.array([[1, 1, 1], [0, 1, 1], [0, 0, 0], [0, 1, 0]]),
+            "31": np.array([[0, 1, 0], [0, 0, 0], [0, 1, 0], [0, 1, 1]]),
+            "32": np.array([[0, 1, 1], [0, 1, 0]]),
+            "40": np.array([[1, 0, 1], [0, 0, 1], [1, 0, 1], [1, 1, 1]]),
+            "41": np.array([[1, 1, 1], [1, 0, 1], [0, 0, 0], [0, 0, 1]]),
+            "42": np.array([[0, 0, 1], [0, 0, 0]]),
+            "50": np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1], [0, 1, 1]]),
+            "51": np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0], [0, 0, 1]]),
+            "52": np.array([[0, 0, 1], [0, 0, 0]])
+        }
+
+        for element, direction in itertools.product(range(6), range(3)):
+            diff_field = get_diff_field(element, direction)
+            test_derivative(diff_field, element, direction)
 
 
 if __name__ == "__main__":
