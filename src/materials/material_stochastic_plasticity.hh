@@ -223,7 +223,7 @@ namespace muSpectre {
     /**
      * overload add_pixel Youngs_modulus and Poisson_ratio are defined per
      * pixel, plastic_increment, stress_threshold and eigen_strain are defined
-     * per quad point. There fore you have to hand over Eigen matrices
+     * per quad point. Therefore you have to hand over Eigen matrices
      * containing in each row the value(s) for one quad point.
      */
     void add_pixel(

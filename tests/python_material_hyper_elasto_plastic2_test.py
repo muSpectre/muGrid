@@ -47,6 +47,27 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         self.timing = False
         self.startTime = time.time()
 
+        # material/simulation parameters
+        self.lens = [7.2, 6, 3]
+        self.nb_grid_pts = [4, 5, 3]
+        self.dim = len(self.nb_grid_pts)
+
+        self.gradient = muFFT.Stencils3D.linear_finite_elements
+        self.nb_quad_pts = int(len(self.gradient) / self.dim)
+
+        self.fft = "fftw"
+        self.form = µ.Formulation.finite_strain
+
+        self.E = 1  # Youngs modulus
+        self.nu = 0.33  # Poisson ratio
+        self.hardening = 100  # Hardening modulus
+
+        self.newton_tol = 1e-6
+        self.cg_tol = 1e-6
+        self.equil_tol = 1e-6
+        self.maxiter = 200
+        self.verbose = µ.Verbosity.Silent
+
     def tearDown(self):
         if self.timing:
             t = time.time() - self.startTime
@@ -192,7 +213,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         maxiter = 200
         verbose = µ.Verbosity.Silent
         solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
-                                    verbose)
+                                          verbose)
         cell.initialise()
 
         # total deformation - elastic region
@@ -246,6 +267,53 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                 numerical_tangent[i, j] = (stress_plus - stress)/eps
 
         self.assertTrue(np.allclose(tangent, numerical_tangent))
+
+    def test_yield_strength_per_quad_point(self):
+        nb_grid_pts = [2, 3, 1]
+        yield_threshold = np.empty(
+            tuple(nb_grid_pts) + (self.nb_quad_pts, ))
+        yield_threshold[:, :, :, :] = self.E * 1E-3 \
+            * np.arange(1, self.nb_quad_pts+1)[np.newaxis, np.newaxis,
+                                               np.newaxis, :]
+
+        cell = µ.Cell(nb_grid_pts, self.lens,
+                      self.form, self.gradient, self.fft)
+        mat = µ.material.MaterialHyperElastoPlastic2_3d.make(cell, "hpl2")
+
+        for pixel_index, pixel in enumerate(cell.pixels):
+            mat.add_pixel(pixel_index, self.E, self.nu,
+                          yield_threshold[tuple(pixel)], self.hardening)
+
+        solver = µ.solvers.KrylovSolverCG(cell, self.cg_tol,
+                                          self.maxiter, self.verbose)
+        DelF = np.array([[0.05, 0.00,  0.00],
+                         [0.00, 0.00,  0.00],
+                         [0.00, 0.00,  0.00]])
+        result = µ.solvers.newton_cg(cell, DelF, solver, self.newton_tol,
+                                     self.equil_tol, self.verbose)
+
+        # check if the stress is ordered on each voxel corresponding to the
+        # hardening values on the quad points
+        def check(P, component, direction):
+            P = P[component]
+            final = True
+            for qpt in range(self.nb_quad_pts - 1):
+                if direction == "increasing":
+                    check = (P[qpt] < P[qpt + 1]).all()
+                elif direction == "decreasing":
+                    check = (P[qpt] > P[qpt + 1]).all()
+
+                final = final and check
+
+            return final
+
+        P = result.stress
+        P = P.reshape((self.dim, self.dim, self.nb_quad_pts)
+                      + tuple(nb_grid_pts), order='F')
+
+        self.assertTrue(check(P, (0, 0), "increasing"))
+        self.assertTrue(check(P, (1, 1), "decreasing"))
+        self.assertTrue(check(P, (2, 2), "decreasing"))
 
 
 if __name__ == '__main__':

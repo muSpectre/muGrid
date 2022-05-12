@@ -45,8 +45,9 @@
         - build/tests/test_results*.xml
         - build/tests/libmufft/test_results*.xml
         - build/tests/libmugrid/test_results*.xml
-      cobertura:
-        - build/coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: build/coverage.xml
 
 .tests_muspectre:
   stage: test

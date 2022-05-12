@@ -190,6 +190,16 @@ namespace muSpectre {
                    const Real & Poisson_ratio, const Real & tau_y0,
                    const Real & H);
 
+    /**
+     * overload add_pixel, and define the yield stress per quad point.
+     * All other parameters are defined per pixel.
+     */
+    void add_pixel(
+        const size_t & pixel_id, const Real & Youngs_modulus,
+        const Real & Poisson_ratio,
+        const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> & tau_y0,
+        const Real & H);
+
     //! getter for internal variable field εₚ
     FlowField_t & get_plast_flow_field() {
       return this->material_child.get_plast_flow_field();

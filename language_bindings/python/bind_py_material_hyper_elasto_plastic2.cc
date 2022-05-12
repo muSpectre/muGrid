@@ -88,6 +88,17 @@ void add_material_hyper_elasto_plastic2_helper(py::module & mod) {
           },
           "pixel_index"_a, "Youngs_modulus"_a, "Poisson_ratio"_a, "tau_y0"_a,
           "H"_a)
+      .def(
+          "add_pixel",
+          [](Mat_t & mat, const size_t & pix_id, const Real Young,
+             const Real Poisson,
+             const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+                 tau_y0,
+             const Real H) {
+            mat.add_pixel(pix_id, Young, Poisson, tau_y0, H);
+          },
+          "pixel_index"_a, "Youngs_modulus"_a, "Poisson_ratio"_a, "tau_y0"_a,
+          "H"_a)
       .def_static("make_evaluator", []() { return Mat_t::make_evaluator(); });
 }
 

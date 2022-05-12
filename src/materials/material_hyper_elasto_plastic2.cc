@@ -104,6 +104,38 @@ namespace muSpectre {
     this->K_field.get_field().push_back(K);
   }
 
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
+  void MaterialHyperElastoPlastic2<DimM>::add_pixel(
+      const size_t & pixel_id, const Real & Youngs_modulus,
+      const Real & Poisson_ratio,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> & tau_y0,
+      const Real & H) {
+    if (tau_y0.rows() != this->tau_y0_field.get_field().get_nb_sub_pts()) {
+      std::stringstream error{};
+      error << "Got a wrong shape " << std::to_string(tau_y0.rows())
+            << "×" << std::to_string(tau_y0.cols())
+            << " for the tau_y0 vector.\nI expected the shape: "
+            << std::to_string(
+                   this->tau_y0_field.get_field().get_nb_sub_pts())
+            << "×"
+            << "1";
+      throw MaterialError(error.str());
+    }
+
+    this->internal_fields->add_pixel(pixel_id);
+    Real lambda{Hooke::compute_lambda(Youngs_modulus, Poisson_ratio)};
+    Real mu{Hooke::compute_mu(Youngs_modulus, Poisson_ratio)};
+    this->lambda_field.get_field().push_back(lambda);
+    this->mu_field.get_field().push_back(mu);
+    for (Index_t i{0}; i < tau_y0.rows(); i++) {
+      this->tau_y0_field.get_field().push_back_single(tau_y0(i));
+    }
+    this->H_field.get_field().push_back(H);
+    Real K{Hooke::compute_K(Youngs_modulus, Poisson_ratio)};
+    this->K_field.get_field().push_back(K);
+  }
+
   //--------------------------------------------------------------------------//
   template <Index_t DimM>
   auto MaterialHyperElastoPlastic2<DimM>::evaluate_stress(
