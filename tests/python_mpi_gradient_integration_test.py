@@ -417,6 +417,38 @@ class GradientIntegrationCheck(unittest.TestCase):
             (np.abs(non_affine_displ - non_affine_displ_ref[local_slice])
              < 1e-12).all())
 
+    def test_get_complemented_positions_empty_cores(self):
+        """
+        np.mean returns np.nan for empty arrays. This can be the case on empty
+        processors and leads to nans in the gradient integration results.
+        """
+        if self.comm.size == 1:
+            # comm.size is to small for a parallel computation
+            return 0
+
+        s = 0.01
+        strain_step = np.array([[-s, 0, 0], [0, -s, 0], [0, 0, 2*s]])
+        nb_domain_grid_pts = [2, 3, 1]
+
+        integration_results, rve = \
+            setup_computation_and_compute_results(
+                strain_step, self.comm, nb_domain_grid_pts,
+                self.domain_lengths, self.fft, self.Youngs_modulus,
+                self.Poisson_ratio, self.cg_tol, self.newton_tol,
+                self.equil_tol, self.maxiter, self.verbose)
+
+        placements = integration_results[0]
+        nodal_displ = integration_results[1]
+        affine_deformed_grid = integration_results[2]
+        grid = integration_results[3]
+        non_affine_displ = integration_results[4]
+
+        self.assertFalse(np.isnan(placements).any())
+        self.assertFalse(np.isnan(nodal_displ).any())
+        self.assertFalse(np.isnan(affine_deformed_grid).any())
+        self.assertFalse(np.isnan(grid).any())
+        self.assertFalse(np.isnan(non_affine_displ).any())
+
 
 if __name__ == '__main__':
     unittest.main()

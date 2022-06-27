@@ -254,8 +254,13 @@ def get_complemented_positions(quantities, rve, F0=None,
         mean_strain = np.mean(
             strain.array(), axis=tuple(i for i in range(2, len(strain.shape))))
     elif comm.size > 1:
-        strain_mean_per_core = np.mean(
-            strain.array(), axis=tuple(i for i in range(2, len(strain.shape))))
+        if strain.array().size > 0:
+            strain_mean_per_core = \
+                np.mean(strain.array(),
+                        axis=tuple(i for i in range(2, len(strain.shape))))
+        else:
+            # Prevent nan values of np.mean for empty processors
+            strain_mean_per_core = np.zeros((rve.dim, rve.dim), order="F")
         nb_elements_per_core = \
             np.product(rve.nb_subdomain_grid_pts) * rve.nb_quad_pts
         nb_global_elements = \
@@ -309,8 +314,13 @@ def get_complemented_positions_class_solver(quantities, rve, solver, F0=None,
         mean_strain = np.mean(
             strain, axis=tuple(i for i in range(2, len(strain.shape))))
     elif comm.size > 1:
-        strain_mean_per_core = np.mean(
-            strain, axis=tuple(i for i in range(2, len(strain.shape))))
+        if strain.array().size > 0:
+            strain_mean_per_core = \
+                np.mean(strain,
+                        axis=tuple(i for i in range(2, len(strain.shape))))
+        else:
+            # Prevent nan values of np.mean for empty processors
+            strain_mean_per_core = np.zeros((rve.dim, rve.dim), order="F")
         nb_elements_per_core = \
             np.product(rve.get_nb_subdomain_grid_pts) * rve.nb_quad_pts
         nb_global_elements = \
