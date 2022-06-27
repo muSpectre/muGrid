@@ -234,6 +234,53 @@ namespace muSpectre {
         }
       };
 
+      /** Specialisation for getting logarithmic (Hencky) strain from the
+          displacement gradient
+          E₀ = ¹/₂ ln C = ¹/₂ ln ((H+I)ᵀ·(H+I))
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::DisplacementGradient,
+                           StrainMeasure::Log> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & H) {
+          return .5 * muGrid::logm((H + Derived::Identity()).transpose()
+                                   * (H + Derived::Identity()));
+        }
+      };
+
+      /** Specialisation for getting logarithmic strain (left stretch) from the
+          placement gradient
+          E_l = ¹/₂ ln B = ¹/₂ ln (F·Fᵀ)
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::PlacementGradient,
+                           StrainMeasure::LogLeftStretch> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & F) {
+          return .5 * muGrid::logm(F * F.transpose());
+        }
+      };
+
+      /** Specialisation for getting logarithmic strain (left stretch) from the
+          displacement gradient
+          E_l = ¹/₂ ln B = ¹/₂ ln ((H+I)·(H+I)ᵀ)
+      **/
+      template <>
+      struct ConvertStrain<StrainMeasure::DisplacementGradient,
+                           StrainMeasure::LogLeftStretch> {
+        //! returns the converted strain
+        template <class Derived>
+        inline static decltype(auto)
+        compute(const Eigen::MatrixBase<Derived> & H) {
+          return .5 * muGrid::logm((H + Derived::Identity())
+                                   * (H + Derived::Identity()).transpose());
+        }
+      };
+
     }  // namespace internal
 
     /* ---------------------------------------------------------------------- */

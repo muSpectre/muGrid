@@ -100,6 +100,10 @@ template <Index_t Dim>
 void add_material_dunant_tc_helper(py::module & mod);
 template <Index_t Dim>
 void add_material_dunant_max_helper(py::module & mod);
+template <Index_t Dim>
+void add_material_hyper_elastic1_helper(py::module & mod);
+template <Index_t Dim>
+void add_material_hyper_elastic2_helper(py::module & mod);
 /* ---------------------------------------------------------------------- */
 template <Dim_t Dim>
 void add_material_linear_diffusion_helper(py::module & mod);
@@ -302,6 +306,8 @@ void add_material_helper(py::module & mod) {
   add_material_dunant_tc_helper<Dim>(mod);
   add_material_dunant_max_helper<Dim>(mod);
   add_material_evaluator<Dim>(mod);
+  add_material_hyper_elastic1_helper<Dim>(mod);
+  add_material_hyper_elastic2_helper<Dim>(mod);
 
 #ifdef WITH_SPLIT
   add_material_laminate_helper<Dim, muSpectre::Formulation::finite_strain>(mod);

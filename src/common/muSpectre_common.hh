@@ -238,13 +238,14 @@ namespace muSpectre {
     PlacementGradient,     //!< placement gradient (δy/δx)
     DisplacementGradient,  //!< displacement gradient (δu/δx)
     Infinitesimal,         //!< small strain tensor .5(∇u + ∇uᵀ)
-    GreenLagrange,  //!< Green-Lagrange strain .5(Fᵀ·F - I) = .5(U² - I)
-    Biot,           //!< Biot strain (U - I and F = RU)
-    Log,            //!< logarithmic strain (log U and F = RU)
-    Almansi,        //!< Almansi strain .5 (I - F⁻ᵀ. F⁻¹)
-    RCauchyGreen,   //!< Right Cauchy-Green tensor (Fᵀ.F)
-    LCauchyGreen,   //!< Left Cauchy-Green tensor(F.Fᵀ)
-    no_strain_      //!< only for triggering static_assert
+    GreenLagrange,   //!< Green-Lagrange strain .5(Fᵀ·F - I) = .5(U² - I)
+    Biot,            //!< Biot strain (U - I and F = RU)
+    Log,             //!< logarithmic strain (log U and F = RU)
+    LogLeftStretch,  //!< logarithmic strain (log V and F = VR)
+    Almansi,         //!< Almansi strain .5 (I - F⁻ᵀ. F⁻¹)
+    RCauchyGreen,    //!< Right Cauchy-Green tensor (Fᵀ.F)
+    LCauchyGreen,    //!< Left Cauchy-Green tensor(F.Fᵀ)
+    no_strain_       //!< only for triggering static_assert
   };
 
   //! inserts `muSpectre::StrainMeasure`s into `std::ostream`s
