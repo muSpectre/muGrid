@@ -199,7 +199,7 @@ void add_projection_base(py::module & mod) {
       .def_property_readonly("nb_domain_grid_pts",
                              &ProjectionBase::get_nb_domain_grid_pts)
       .def_property_readonly("domain_lengths",
-                             &ProjectionBase::get_nb_domain_grid_pts);
+                             &ProjectionBase::get_domain_lengths);
 }
 
 template <class Proj, Index_t DimS>
@@ -228,7 +228,7 @@ void add_proj_helper(py::module & mod, std::string name_start) {
                              &Proj::get_subdomain_locations)
       .def_property_readonly("nb_domain_grid_pts",
                              &Proj::get_nb_domain_grid_pts)
-      .def_property_readonly("domain_lengths", &Proj::get_nb_domain_grid_pts);
+      .def_property_readonly("domain_lengths", &Proj::get_domain_lengths);
 }
 
 template <class Proj, Index_t DimS>
@@ -267,7 +267,7 @@ void add_green_proj_helper(py::module & mod, std::string name_start) {
                              &Proj::get_subdomain_locations)
       .def_property_readonly("nb_domain_grid_pts",
                              &Proj::get_nb_domain_grid_pts)
-      .def_property_readonly("domain_lengths", &Proj::get_nb_domain_grid_pts);
+      .def_property_readonly("domain_lengths", &Proj::get_domain_lengths);
 }
 
 void add_projections(py::module & mod) {
