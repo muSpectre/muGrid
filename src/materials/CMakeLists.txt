@@ -60,6 +60,7 @@ set (materials_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/material_hyper_elasto_plastic2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_stochastic_plasticity.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_phase_field_fracture.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/material_phase_field_fracture2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/s_t_material_linear_elastic_generic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_hyper_elastic1.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/material_hyper_elastic2.cc
