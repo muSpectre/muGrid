@@ -116,6 +116,13 @@ target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(version check_git)
 target_link_libraries(muGrid PUBLIC version)
 
+check_cxx_source_compiles(
+        "#include <experimental/optional>
+int main() {
+std::experimental::optional<double> A{};
+}"
+        HAS_STD_OPTIONAL)
+
 if(NOT HAS_STD_OPTIONAL)
     target_compile_definitions(muGrid PUBLIC -DNO_EXPERIMENTAL)
     # Do not trust old gcc. the std::optional has memory bugs

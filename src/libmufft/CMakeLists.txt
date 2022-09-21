@@ -35,6 +35,13 @@ cmake_minimum_required(VERSION 3.5)
 
 add_library(muFFT "")
 
+check_cxx_source_compiles(
+        "#include <experimental/optional>
+int main() {
+std::experimental::optional<double> A{};
+}"
+        HAS_STD_OPTIONAL)
+
 if(NOT HAS_STD_OPTIONAL)
     target_compile_definitions(muFFT PUBLIC -DNO_EXPERIMENTAL)
     # Do not trust old gcc. the std::optional has memory bugs
