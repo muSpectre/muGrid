@@ -42,13 +42,14 @@ namespace muSpectre {
   template <Index_t DimS, Index_t NbQuadPts>
   ProjectionDefault<DimS, NbQuadPts>::ProjectionDefault(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-      const Gradient_t & gradient, const Formulation & form,
-      const MeanControl & mean_control)
+      const Gradient_t & gradient, const Weights_t & weights,
+      const Formulation & form, const MeanControl & mean_control)
       : Parent{std::move(engine),
                lengths,
                static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
                DimS * DimS,
                gradient,
+               weights,
                form,
                mean_control},
         Gfield{this->fft_engine->get_fourier_field_collection()
@@ -92,10 +93,20 @@ namespace muSpectre {
     this->fft_engine->fft(field, this->work_space);
     Vector_map field_map{this->work_space};
     Real factor = this->fft_engine->normalisation();
+
+    // weights
+    Eigen::Matrix<muGrid::Real, DimS * DimS * NbQuadPts, 1> w;
+    for (int q = 0; q < NbQuadPts; ++q) {
+      for (int i = 0; i < DimS * DimS; ++i) {
+        w(q * DimS * DimS + i) = this->weights[q];
+      }
+    }
+
+    // projection (of the stress field!)
     for (auto && tup : akantu::zip(this->Ghat, field_map)) {
       auto && G{std::get<0>(tup)};
       auto && f{std::get<1>(tup)};
-      f = factor * (G * f).eval();
+      f = factor * (G * f.cwiseProduct(w)).eval();
     }
     this->fft_engine->ifft(this->work_space, field);
   }

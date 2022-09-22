@@ -64,8 +64,10 @@ args = parser.parse_args()
 
 # --- helper function to setup material and rve --- #
 def setup_rve(gradient_operator, phase=None):
+    nb_quad_pts = len(gradient_operator) // 2
+    weights = nb_quad_pts * [1]
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-                   msp.Formulation.finite_strain, gradient_operator)
+                   msp.Formulation.finite_strain, gradient_operator, weights)
     hard = msp.material.MaterialLinearElastic1_2d.make(rve, "hard", 1., .33)
     soft = msp.material.MaterialLinearElastic1_2d.make(rve, "soft", 0.1, 0.33)
     if phase is None:

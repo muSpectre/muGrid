@@ -103,9 +103,9 @@ verbose = msp.Verbosity.Full
 ###
 
 dim = len(nb_domain_grid_pts)
-fourier_gradient = [msp.FourierDerivative(dim, i) for i in range(dim)]
-discrete_gradient = Stencils2D.averaged_upwind
-discrete_gradient2 = Stencils2D.linear_finite_elements
+fourier_gradient = [msp.FourierDerivative(dim, i) for i in range(dim)], [1]
+discrete_gradient = Stencils2D.averaged_upwind, [1]
+discrete_gradient2 = Stencils2D.linear_finite_elements, [1, 1]
 
 gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
 
@@ -116,7 +116,7 @@ grad = {}
 phase = -np.ones(nb_domain_grid_pts, dtype=int)
 for i, gradient in enumerate(gradients):
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-                   msp.Formulation.finite_strain, gradient,
+                   msp.Formulation.finite_strain, *gradient,
                    fft='mpi', communicator=MPI.COMM_WORLD)
     hard = msp.material.MaterialLinearElastic1_2d.make(
         rve, "hard", 1., .33)
@@ -136,9 +136,9 @@ for i, gradient in enumerate(gradients):
         rve, applied_strain, solver, newton_tol=newton_tol,
         equil_tol=equil_tol, verbose=verbose)
     stress[i] = result.stress.reshape(
-        (dim, dim, len(gradient)//dim, *rve.nb_subdomain_grid_pts), order='f')
+        (dim, dim, len(gradient[0])//dim, *rve.nb_subdomain_grid_pts), order='f')
     grad[i] = result.grad.reshape(
-        (dim, dim, len(gradient)//dim, *rve.nb_subdomain_grid_pts), order='f')
+        (dim, dim, len(gradient[0])//dim, *rve.nb_subdomain_grid_pts), order='f')
 
 
 if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
@@ -149,7 +149,7 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
     names = ['Fourier', 'Discrete (1-quad)', 'Discrete (2-quad)']
     for i, gradient in enumerate(gradients):
         displ, r = msp.gradient_integration.compute_placement(
-            grad[i], domain_lengths, nb_domain_grid_pts, gradient,
+            grad[i], domain_lengths, nb_domain_grid_pts, gradient[0],
             formulation=msp.Formulation.finite_strain)
         tri = make_triangles(displ)
 

@@ -65,7 +65,6 @@
 #include <memory>
 
 using muFFT::Communicator;
-using muFFT::Gradient_t;
 using muGrid::numpy_wrap;
 using muGrid::NumpyProxy;
 using muSpectre::Ccoord_t;
@@ -73,6 +72,7 @@ using muSpectre::Cell;
 using muSpectre::Formulation;
 using muSpectre::Index_t;
 using muSpectre::Rcoord_t;
+using muSpectre::ProjectionBase;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
@@ -86,23 +86,27 @@ void add_cell_factory(py::module & mod) {
   mod.def(
       "CellFactory",
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient, Communicator comm,
+         ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
+         Communicator comm,
          const muFFT::FFT_PlanFlags & flags) {
         return muSpectre::make_cell(std::move(res), std::move(lens),
                                     std::move(form), std::move(gradient),
-                                    std::move(comm), std::move(flags));
+                                    std::move(weights), std::move(comm),
+                                    std::move(flags));
       },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a,
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a, "weights"_a,
       "communicator"_a, "flags"_a = muFFT::FFT_PlanFlags::estimate);
 
   mod.def(
       "CellFactory",
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient) {
+         ProjectionBase::Gradient_t gradient,
+         ProjectionBase::Weights_t weights) {
         return muSpectre::make_cell(std::move(res), std::move(lens),
-                                    std::move(form), std::move(gradient));
+                                    std::move(form), std::move(gradient),
+                                    std::move(weights));
       },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a);
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a, "weights"_a);
 
   mod.def(
       "CellFactory",
@@ -123,23 +127,25 @@ void add_cell_factory_for_engine(py::module & mod,
   mod.def(
       name,
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient, Communicator comm) {
+         ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
+         Communicator comm) {
         return muSpectre::make_cell<Cell, Engine>(
             std::move(res), std::move(lens), std::move(form),
-            std::move(gradient), std::move(comm));
+            std::move(gradient), std::move(weights), std::move(comm));
       },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a,
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a, "weights"_a,
       "communicator"_a);
 
   mod.def(
       name,
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient) {
+         ProjectionBase::Gradient_t gradient,
+         ProjectionBase::Weights_t weights) {
         return muSpectre::make_cell<Cell, Engine>(
             std::move(res), std::move(lens), std::move(form),
-            std::move(gradient));
+            std::move(gradient), std::move(weights));
       },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a);
+      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a, "weights"_a);
 
   mod.def(
       name,
@@ -158,12 +164,13 @@ void add_split_cell_factory_helper(py::module & mod) {
   mod.def(
       "CellFactorySplit",
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         Gradient_t gradient) {
+         ProjectionBase::Gradient_t gradient,
+         ProjectionBase::Weights_t weights) {
         return make_cell_split(std::move(res), std::move(lens), std::move(form),
-                               std::move(gradient));
+                               std::move(gradient), std::move(weights));
       },
       "resolutions"_a, "lengths"_a,
-      "formulation"_a = Formulation::finite_strain, "gradient"_a);
+      "formulation"_a = Formulation::finite_strain, "gradient"_a, "weights"_a);
 }
 #endif
 

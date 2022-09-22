@@ -44,10 +44,12 @@ namespace muSpectre {
   SolverSinglePhysicsProjectionBase::SolverSinglePhysicsProjectionBase(
       std::shared_ptr<CellData> cell_data, const muGrid::Verbosity & verbosity,
       const Real & newton_tol, const Real & equil_tol, const Uint & max_iter,
-      const Gradient_t & gradient, const MeanControl & mean_control)
+      const Gradient_t & gradient, const Weights_t & weights,
+      const MeanControl & mean_control)
       : Parent{cell_data, verbosity, SolverType::Spectral},
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         gradient{std::make_shared<Gradient_t>(gradient)},
+        weights{std::make_shared<Weights_t>(weights)},
         nb_quad_pts{static_cast<Index_t>(gradient.size()) /
                     (this->cell_data->get_domain_lengths().get_dim())},
         mean_control{mean_control} {};
@@ -61,6 +63,7 @@ namespace muSpectre {
         newton_tol{newton_tol}, equil_tol{equil_tol}, max_iter{max_iter},
         gradient{std::make_shared<Gradient_t>(
             muFFT::make_fourier_gradient(this->cell_data->get_spatial_dim()))},
+        weights{std::make_shared<Weights_t>(Weights_t{1})},
         mean_control{mean_control} {};
 
   /* ---------------------------------------------------------------------- */
@@ -319,31 +322,36 @@ namespace muSpectre {
       case OneQuadPt: {
         using Projection = ProjectionFiniteStrainFast<Dim, OneQuadPt>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case TwoQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, TwoQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case FourQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, FourQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case FiveQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, FiveQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case SixQuadPts: {
         using Projection = ProjectionFiniteStrainFast<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       default: {
@@ -361,31 +369,36 @@ namespace muSpectre {
       case OneQuadPt: {
         using Projection = ProjectionSmallStrain<Dim, OneQuadPt>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case TwoQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, TwoQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case FourQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, FourQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case FiveQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, FiveQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       case SixQuadPts: {
         using Projection = ProjectionSmallStrain<Dim, SixQuadPts>;
         this->projection = std::make_shared<Projection>(
-            std::move(fft_ptr), lengths, *this->gradient, this->mean_control);
+            std::move(fft_ptr), lengths, *this->gradient, *this->weights,
+            this->mean_control);
         break;
       }
       default:

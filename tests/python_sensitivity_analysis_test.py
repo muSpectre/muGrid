@@ -86,6 +86,7 @@ class SensitivityAnalysis_Check(unittest.TestCase):
         # Discrete Gradient
         self.gradient = [muFFT.Stencils2D.d_10_00, muFFT.Stencils2D.d_01_00,
                          muFFT.Stencils2D.d_11_01, muFFT.Stencils2D.d_11_10]
+        self.weights = [1, 1]
 
         ### ----- Aim functions ----- ###
         # Aim function = 1/Lx/Ly * int(stress_00)
@@ -177,7 +178,8 @@ class SensitivityAnalysis_Check(unittest.TestCase):
         ### ----- Equilibrium calculations (fin. diff. gradient) ----- ###
         # Cell construction
         self.cell_gradient = µ.Cell(self.nb_grid_pts, self.lengths,
-                                    self.formulation, self.gradient)
+                                    self.formulation, self.gradient,
+                                    self.weights)
         mat = µ.material.MaterialLinearElastic4_2d.make(self.cell_gradient,
                                                         "material")
         for pixel_id, pixel in self.cell_gradient.pixels.enumerate():
@@ -582,7 +584,7 @@ class SensitivityAnalysis_Check(unittest.TestCase):
         dstress_dphase_ana \
             = sa.calculate_dstress_dphase(self.cell_gradient, strains, Young,
                                           delta_Young, Poisson, delta_Poisson,
-                                          self.gradient)[0]
+                                          self.gradient, self.weights)[0]
 
         dstress_dphase_ana = dstress_dphase_ana.reshape(shape, order='F')
 
@@ -594,7 +596,8 @@ class SensitivityAnalysis_Check(unittest.TestCase):
         for pixel_id in self.cell_gradient.pixel_indices:
             # Cell with disturbed material properties
             helper_cell = µ.Cell(self.nb_grid_pts, self.lengths,
-                                 self.formulation, self.gradient)
+                                 self.formulation, self.gradient,
+                                 self.weights)
             helper_mat = LinMat.make(helper_cell, "helper material")
             for iter_pixel, pixel in helper_cell.pixels.enumerate():
                 if pixel_id == iter_pixel:
@@ -643,7 +646,8 @@ class SensitivityAnalysis_Check(unittest.TestCase):
                                                  krylov_solver_args,
                                                  solver_args = solver_args,
                                                  args=self.args, delta=1e-6,
-                                                 gradient = self.gradient)
+                                                 gradient = self.gradient,
+                                                 weights = self.weights)
         df_dstrain_fin_diff = derivatives[0][0]
         df_dphase_fin_diff = derivatives[1]
 
@@ -662,7 +666,7 @@ class SensitivityAnalysis_Check(unittest.TestCase):
         dstress_dphase \
             = sa.calculate_dstress_dphase(self.cell_gradient, strains, Young,
                                           delta_Young, Poisson, delta_Poisson,
-                                          self.gradient)
+                                          self.gradient, self.weights)
         df_dphase_ana = self.dfdphase(self.phase, strains, stresses,
                                       self.cell_gradient, Young, delta_Young,
                                       Poisson, delta_Poisson, dstress_dphase,
@@ -694,7 +698,7 @@ class SensitivityAnalysis_Check(unittest.TestCase):
                                       self.Poisson2, self.cell_gradient,
                                       self.krylov_solver_gradient, strains,
                                       stresses, gradient=self.gradient,
-                                      args=self.args)
+                                      weights=self.weights, args=self.args)
 
         ### ----- Sensitivity analysis with finite differences ----- ###
         delta_phase = 1e-6

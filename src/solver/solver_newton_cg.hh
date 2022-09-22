@@ -44,7 +44,8 @@ namespace muSpectre {
 
   class SolverNewtonCG : public SolverSinglePhysicsProjectionBase {
     using Parent = SolverSinglePhysicsProjectionBase;
-    using Gradient_t = muFFT::Gradient_t;
+    using Gradient_t = ProjectionBase::Gradient_t;
+    using Weights_t = ProjectionBase::Weights_t;
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
     using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
 
@@ -58,7 +59,7 @@ namespace muSpectre {
         std::shared_ptr<KrylovSolverBase> krylov_solver,
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
-        const Gradient_t & gradient,
+        const Gradient_t & gradient, const Weights_t & weights,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! constructor

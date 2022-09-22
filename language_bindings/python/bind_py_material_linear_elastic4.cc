@@ -87,6 +87,14 @@ void add_material_linear_elastic4_helper(py::module & mod) {
           },
           "pixel"_a, "Young"_a, "Poisson"_a)
       .def(
+          "add_pixel",
+          [](Mat_t & mat, size_t pixel_index,
+             const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+                 Young,
+             const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+                 Poisson) { mat.add_pixel(pixel_index, Young, Poisson); },
+          "pixel"_a, "Young"_a, "Poisson"_a)
+      .def(
           "set_youngs_modulus",
           [](Mat_t & mat, const size_t & quad_pt_id, const Real & Young) {
             return mat.set_youngs_modulus(quad_pt_id, Young);

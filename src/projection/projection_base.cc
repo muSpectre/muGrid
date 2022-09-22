@@ -45,20 +45,45 @@ namespace muSpectre {
                                  const Index_t & nb_quad_pts,
                                  const Index_t & nb_components,
                                  const Gradient_t & gradient,
+                                 const Weights_t & weights,
                                  const Formulation & form,
                                  const MeanControl & mean_control)
       : fft_engine{std::move(engine)}, domain_lengths{domain_lengths},
-        nb_quad_pts{nb_quad_pts},
-        nb_components{nb_components}, gradient{gradient}, form{form},
+        nb_quad_pts{nb_quad_pts}, nb_components{nb_components},
+        gradient{gradient}, weights{weights}, form{form},
         work_space{this->fft_engine->register_fourier_space_field(
             prepare_field_unique_name(this->fft_engine, "work_space"),
             this->nb_components * this->nb_quad_pts)},
         mean_control{mean_control} {
     if (nb_quad_pts <= 0) {
-      throw std::runtime_error("Number of quadrature points must be larger "
-                               "than zero.");
+      throw ProjectionError("Number of quadrature points must be larger than "
+                            "zero.");
     }
     auto nb_dim{this->get_dim()};
+    if (this->gradient.size() != static_cast<size_t>(nb_dim * nb_quad_pts)) {
+      std::stringstream message{};
+      message << "Number of gradients (= " << this->gradient.size() << ") "
+              << "must equal " << nb_dim << " times the number of quad points "
+              << "(= " << nb_quad_pts << ").";
+      throw ProjectionError{message.str()};
+    }
+    if (this->weights.size() != static_cast<size_t>(nb_quad_pts)) {
+      std::stringstream message{};
+      message << "Number of weights (= " << this->weights.size() << ") "
+              << "must equal the number of quad points (= "
+              << nb_quad_pts << ").";
+      throw ProjectionError{message.str()};
+    }
+    if (std::abs(std::accumulate(
+                     this->weights.begin(),
+                     this->weights.end(), 0.0) / nb_quad_pts  - 1.0) > 1e-9) {
+      std::stringstream message{};
+      message << "Weights should have a mean of unity, but their mean value is "
+              << std::accumulate(this->weights.begin(),
+                                 this->weights.end(), 0.0) / nb_quad_pts
+              << ".";
+      throw ProjectionError{message.str()};
+    }
     for (auto tup :
          akantu::enumerate(this->fft_engine->get_nb_domain_grid_pts())) {
       auto & dim{std::get<0>(tup)};
@@ -142,8 +167,13 @@ namespace muSpectre {
   }
 
   /* ---------------------------------------------------------------------- */
-  const muFFT::Gradient_t & ProjectionBase::get_gradient() const {
+  const ProjectionBase::Gradient_t & ProjectionBase::get_gradient() const {
     return this->gradient;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const ProjectionBase::Weights_t & ProjectionBase::get_weights() const {
+    return this->weights;
   }
 
   /* ---------------------------------------------------------------------- */

@@ -48,10 +48,12 @@ class Write2DCheck(unittest.TestCase):
         self.lengths = [1., 1.]
         self.formulation = msp.Formulation.small_strain
         self.gradient_operator = Stencils2D.linear_finite_elements
+        self.weights = [1, 1]
         self.cell = msp.Cell(self.nb_grid_pts,
                              self.lengths,
                              self.formulation,
-                             self.gradient_operator)
+                             self.gradient_operator,
+                             self.weights)
         self.young = 2.0e10
         self.poisson = 0.3
         self.mean_strain = 1.2e-1
@@ -101,7 +103,8 @@ class WriteClassSolver2DCheck(unittest.TestCase):
         self.nb_grid_pts = [3, 3]
         self.lengths = [1., 1.]
         self.formulation = msp.Formulation.small_strain
-        self.gradient_operator = Stencils2D.linear_finite_elements
+        self.gradient_operator, self.weights = \
+            msp.linear_finite_elements.gradient_2d
         self.cell = msp.cell.CellData.make(self.nb_grid_pts, self.lengths)
         self.cell.nb_quad_pts = 2
         self.young = 2.0e10
@@ -139,7 +142,8 @@ class WriteClassSolver2DCheck(unittest.TestCase):
             self.cell, krylov_solver,
             verbose, newton_tol,
             equil_tol, maxiter,
-            gradient=self.gradient_operator)
+            gradient=self.gradient_operator,
+            weights=self.weights)
         newton_solver.formulation = self.formulation
         newton_solver.initialise_cell()
         res = newton_solver.solve_load_increment(Del0)
@@ -159,11 +163,13 @@ class Write3DCheck(unittest.TestCase):
         self.nb_grid_pts = [3, 3, 3]
         self.lengths = [1., 1., 1.]
         self.formulation = msp.Formulation.finite_strain
-        self.gradient_operator = Stencils3D.linear_finite_elements
+        self.gradient_operator, self.weights = \
+            msp.linear_finite_elements.gradient_3d
         self.cell = msp.Cell(self.nb_grid_pts,
                              self.lengths,
                              self.formulation,
-                             self.gradient_operator)
+                             self.gradient_operator,
+                             self.weights)
         self.young = 2.0e10
         self.poisson = 0.3
         self.mean_strain = 1.2e-1
@@ -214,7 +220,8 @@ class WriteClassSolver3DCheck(unittest.TestCase):
         self.nb_grid_pts = [3, 3, 3]
         self.lengths = [1., 1., 1.]
         self.formulation = msp.Formulation.finite_strain
-        self.gradient_operator = Stencils3D.linear_finite_elements
+        self.gradient_operator, self.weights = \
+            msp.linear_finite_elements.gradient_3d
         self.cell = msp.cell.CellData.make(self.nb_grid_pts, self.lengths)
         self.cell.nb_quad_pts = 6
         self.young = 2.0e10
@@ -253,7 +260,8 @@ class WriteClassSolver3DCheck(unittest.TestCase):
             self.cell, krylov_solver,
             verbose, newton_tol,
             equil_tol, maxiter,
-            gradient=self.gradient_operator)
+            gradient=self.gradient_operator,
+            weights=self.weights)
         newton_solver.formulation = self.formulation
         newton_solver.initialise_cell()
         res = newton_solver.solve_load_increment(Del0)

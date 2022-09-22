@@ -53,10 +53,11 @@ namespace muSpectre {
   template <typename Cell_t = CellSplit, class FFTEngine = muFFT::FFTWEngine>
   inline Cell_t
   make_cell_split(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
-                  const Formulation & form, muFFT::Gradient_t gradient,
+                  const Formulation & form, ProjectionBase::Gradient_t gradient,
+                  ProjectionBase::Weights_t weights,
                   const muFFT::Communicator & comm = muFFT::Communicator()) {
-    auto && input{
-        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm)};
+    auto && input{cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient,
+                                        weights, comm)};
     auto cell{Cell_t(std::move(input))};
     return cell;
   }
@@ -67,10 +68,11 @@ namespace muSpectre {
   template <typename Cell_t = CellSplit, class FFTEngine = muFFT::FFTWEngine>
   std::unique_ptr<Cell_t>
   make_cell_ptr(const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
-                const Formulation & form, muFFT::Gradient_t gradient,
+                const Formulation & form, ProjectionBase::Gradient_t gradient,
+                ProjectionBase::Weights_t weights,
                 const muFFT::Communicator & comm = muFFT::Communicator()) {
-    auto && input{
-        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm)};
+    auto && input{cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient,
+                                        weights, comm)};
     return std::make_unique<Cell_t>(std::move(input));
   }
 }  // namespace muSpectre

@@ -122,8 +122,9 @@ eta = 1.0e-3
 
 # numerical derivative, two quadrature points
 gradient = Stencils2D.linear_finite_elements
+weights = [1, 1]
 
-###
+####
 
 rve = msp.cell.CellData.make(nb_domain_grid_pts, domain_lengths)
 rve.nb_quad_pts = 2
@@ -148,7 +149,7 @@ solver = msp.solvers.SolverTRNewtonCG(rve, krylov_solver,
                                       msp.Verbosity.Full,
                                       newton_tol, equil_tol,
                                       maxiter, max_trust_region,
-                                      eta, gradient,
+                                      eta, gradient, weights,
                                       msp.solvers.MeanControl.strain_control)
 
 

@@ -122,10 +122,11 @@ trust_region = 100.0
 
 ## numerical derivative, two quadrature points
 gradient = Stencils2D.linear_finite_elements
+weights = [1, 1]
 
 ###
 rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-               msp.Formulation.finite_strain, gradient,
+               msp.Formulation.finite_strain, gradient, weights,
                fft='fftw', communicator=MPI.COMM_WORLD)
 hard = msp.material.MaterialLinearElastic1_2d.make(rve, "hard", 1., .33)
 vacuum = msp.material.MaterialLinearElastic1_2d.make(rve, "vacuum", 0.0, 0.33)

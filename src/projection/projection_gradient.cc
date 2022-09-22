@@ -44,12 +44,14 @@ namespace muSpectre {
   template <Index_t DimS, Index_t GradientRank, Index_t NbQuadPts>
   ProjectionGradient<DimS, GradientRank, NbQuadPts>::ProjectionGradient(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-      const Gradient_t & gradient, const MeanControl & mean_control)
+      const Gradient_t & gradient, const Weights_t & weights,
+      const MeanControl & mean_control)
       : Parent{std::move(engine),
                lengths,
                static_cast<Index_t>(gradient.size()) / lengths.get_dim(),
                muGrid::ipow(DimS, GradientRank),
                gradient,
+               weights,
                Formulation::finite_strain,
                mean_control},
         proj_field{"Projection Operator",
@@ -79,6 +81,7 @@ namespace muSpectre {
       const MeanControl & mean_control)
       : ProjectionGradient{std::move(engine), lengths,
                            muFFT::make_fourier_gradient(lengths.get_dim()),
+                           {1},
                            mean_control} {
     if (NbQuadPts != OneQuadPt) {
       throw ProjectionError(
@@ -181,10 +184,23 @@ namespace muSpectre {
       zero_freq_projected =
           factor * (this->zero_freq_proj * PixelVec_map(field_map[0].data()));
     }
+
+    // weights
+    Eigen::Matrix<muGrid::Real, NbGradRow, DimS * NbQuadPts> w;
+    for (int j = 0; j < NbGradRow; ++j) {
+      for (int q = 0; q < NbQuadPts; ++q) {
+        for (int i = 0; i < DimS; ++i) {
+          w(j, q * DimS + i) = this->weights[q];
+        }
+      }
+    }
+
+    // projection (of the stress field!)
     for (auto && tup : akantu::zip(this->proj_field.get_map(), field_map)) {
       auto & proj_op{std::get<0>(tup)};
       auto & f{std::get<1>(tup)};
-      f = factor * ((f * proj_op.conjugate()).eval() * proj_op.transpose());
+      f = factor * ((f.cwiseProduct(w) *
+                     proj_op.conjugate()).eval() * proj_op.transpose());
     }
     if (this->get_subdomain_locations() == Ccoord{}) {
       PixelVec_map(field_map[0].data()) = zero_freq_projected;
@@ -292,7 +308,8 @@ namespace muSpectre {
   ProjectionGradient<DimS, GradientRank, NbQuadPts>::clone() const {
     return std::make_unique<ProjectionGradient>(this->get_fft_engine().clone(),
                                                 this->get_domain_lengths(),
-                                                this->get_gradient());
+                                                this->get_gradient(),
+                                                this->get_weights());
   }
 
   template class ProjectionGradient<oneD, firstOrder, OneQuadPt>;

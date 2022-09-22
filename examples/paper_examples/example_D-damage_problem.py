@@ -616,13 +616,15 @@ def main():
         reset_cg, reset_count)
 
     # creating the trust region solver
+    nb_quad_pts = len(gradient) // 2
+    weights = nb_quad_pts * [1]
     solver = µ.solvers.SolverTRNewtonCG(
         cell, krylov_solver,
         verbosity_newton,
         newton_tol,
         equil_tol, maxiter_newton,
         trust_region, eta_solver,
-        gradient, control_mean)
+        gradient, weights, control_mean)
 
     solver.formulation = msp.Formulation.small_strain
     solver.initialise_cell()

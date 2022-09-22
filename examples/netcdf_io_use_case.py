@@ -75,8 +75,7 @@ lens = nb_grid_pts  # lengths of the box
 dim = len(nb_grid_pts)  # dimension of the problem
 
 # 2D
-fd_gradient_2 = Stencils2D.linear_finite_elements
-gradient_op = fd_gradient_2
+gradient_op, weights = msp.linear_finite_elements.gradient_2d
 
 
 # materials
@@ -89,7 +88,8 @@ def run_cell(case):
         formulation = msp.Formulation.small_strain
     elif case == "C":
         formulation = msp.Formulation.finite_strain
-    cell = msp.Cell(nb_grid_pts, lens, formulation, gradient_op, fft, comm)
+    cell = msp.Cell(nb_grid_pts, lens, formulation,
+                    gradient_op, weights, fft, comm)
     mat_vac = msp.material.MaterialLinearElastic1_2d.make(
         cell, "2d-vacuum", 0.0, 0)
     if case == "A":
@@ -324,24 +324,14 @@ def run_cell_data(case):
         field_collection=cell.fields)
 
     if case in ("A", "B"):
-        solver = msp.solvers.SolverNewtonCG(cell,
-                                            krylov_solver,
-                                            verbose,
-                                            newton_tol,
-                                            equil_tol,
-                                            maxiter,
-                                            fd_gradient_2)
+        solver = msp.solvers.SolverNewtonCG(
+            cell, krylov_solver, verbose, newton_tol,
+            equil_tol, maxiter, gradient_op, weights)
         solver.formulation = msp.Formulation.small_strain
     elif case == "C":
-        solver = msp.solvers.SolverTRNewtonCG(cell,
-                                              krylov_solver,
-                                              verbose,
-                                              newton_tol,
-                                              equil_tol,
-                                              maxiter,
-                                              trust_region,
-                                              1e-3,
-                                              fd_gradient_2)
+        solver = msp.solvers.SolverTRNewtonCG(
+            cell, krylov_solver, verbose, newton_tol, equil_tol,
+            maxiter, trust_region, 1e-3, gradient_op, weights)
         solver.formulation = msp.Formulation.finite_strain
     cell.get_fields().set_nb_sub_pts("quad", 2)
     solver.initialise_cell()

@@ -52,7 +52,8 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         self.nb_grid_pts = [4, 5, 3]
         self.dim = len(self.nb_grid_pts)
 
-        self.gradient = muFFT.Stencils3D.linear_finite_elements
+        self.gradient, self.weights = \
+            µ.linear_finite_elements.gradient_3d
         self.nb_quad_pts = int(len(self.gradient) / self.dim)
 
         self.fft = "fftw"
@@ -104,9 +105,12 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
+        discrete_weights = [1]
 
-        cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
-        cell2 = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
+        cell = µ.Cell(nb_grid_pts, lens, form,
+                      discrete_gradient, discrete_weights, fft=fft)
+        cell2 = µ.Cell(nb_grid_pts, lens, form,
+                       discrete_gradient, discrete_weights, fft=fft)
 
         # stores a hyper elasto plastic 1 material for each pixel
         mat_hpl1_array = np.empty((3, 3, 3), dtype=object)
@@ -186,8 +190,10 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
+        discrete_weights = [1]
 
-        cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
+        cell = µ.Cell(nb_grid_pts, lens, form,
+                      discrete_gradient, discrete_weights, fft=fft)
 
         mat_vac = µ.material.MaterialLinearElastic1_3d.make(
             cell, "3d-vacuum", 0.5*Young, Poisson)
@@ -277,7 +283,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
                                                np.newaxis, :]
 
         cell = µ.Cell(nb_grid_pts, self.lens,
-                      self.form, self.gradient, self.fft)
+                      self.form, self.gradient, self.weights, self.fft)
         mat = µ.material.MaterialHyperElastoPlastic2_3d.make(cell, "hpl2")
 
         for pixel_index, pixel in enumerate(cell.pixels):

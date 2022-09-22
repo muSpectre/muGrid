@@ -53,8 +53,8 @@ from python_stochastic_plasticity_search_test import \
     init_cg_solver, init_file_io_object, eps_voigt_vector
 
 
-def init_cell(res, lens, formulation, gradient, fft, comm):
-    return µ.Cell(res, lens, formulation, gradient, fft, comm)
+def init_cell(res, lens, formulation, gradient, weights, fft, comm):
+    return µ.Cell(res, lens, formulation, gradient, weights, fft, comm)
 
 
 def init_mat(cell, young, poisson, yield_stress,
@@ -143,7 +143,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         self.dim = len(self.res)
         self.lens = [1, 1.2, 1]
         self.formulation = µ.Formulation.small_strain
-        self.gradient = Stencils3D.linear_finite_elements
+        self.gradient, self.weights = µ.linear_finite_elements.gradient_3d
         self.nb_quad_pts = int(len(self.gradient) / self.dim)
 
         # material parameters
@@ -188,7 +188,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
     def test_update_eigen_strain(self):
         """Test if the eigen strain is updated properly on each core"""
         cell = init_cell(self.res, self.lens,
-                         self.formulation, self.gradient,
+                         self.formulation, self.gradient, self.weights,
                          self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, self.yield_stress,
                        self.plastic_increment, self.eigen_strain)
@@ -237,7 +237,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
     def test_set_new_threshold(self):
         cell = init_cell(self.res, self.lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, self.yield_stress,
                        self.plastic_increment, self.eigen_strain)
 
@@ -277,7 +277,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         strain load.
         """
         cell = init_cell(self.res, self.lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         strain_xy = 0.1
         weak_pixel = np.array(tuple(cell.subdomain_locations)) \
             + np.array([1, 0, 0])*self.comm.rank
@@ -389,7 +389,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         fixed_yield_stress[tuple(weak_pixel) + (weak_quad_pt,)] = \
             low_yield_stress
         cell = init_cell(self.res, self.lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        self.plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol,
@@ -496,7 +496,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         fixed_yield_stress[tuple(weak_pix_2) + (w_qpt_2,)] = \
             low_yield_stress + small_yield_difference
         cell = init_cell(self.res, self.lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        self.plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol,
@@ -607,7 +607,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             qpt_4 = 0
             fixed_yield_stress[tuple(pixel_4) + (qpt_4,)] = eq_stress_3
         cell = init_cell(res, lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol,
@@ -718,7 +718,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
         # ------- 2. ------- #
         cell = init_cell(res, lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol,
@@ -787,7 +787,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         def setup_material():
             # helper function to set up the material which is needed four times
             cell = init_cell(res, lens, self.formulation,
-                             self.gradient, self.fft, self.comm)
+                             self.gradient, self.weights, self.fft, self.comm)
             mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                            plastic_increment, self.eigen_strain)
             cg_solver = init_cg_solver(cell, self.cg_tol,
@@ -897,7 +897,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
             F_tot[1, 0] = F_tot[0, 1]
 
         cell = init_cell(self.res, self.lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, self.yield_stress,
                        self.plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol, self.maxiter,
@@ -982,7 +982,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         if self.comm.rank == 0:
             fft_s = "fftw"
             cell_s = init_cell(res, self.lens, self.formulation,
-                               self.gradient, fft_s, comm_s)
+                               self.gradient, self.weights, fft_s, comm_s)
             mat_s = init_mat(cell_s, self.young, self.poisson,
                              fixed_yield_stress, plastic_increment,
                              self.eigen_strain)
@@ -1014,7 +1014,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         fft_p = "fftwmpi"
         comm_p = self.comm
         cell_p = init_cell(res, self.lens, self.formulation,
-                           self.gradient, fft_p, comm_p)
+                           self.gradient, self.weights, fft_p, comm_p)
         mat_p = init_mat(cell_p, self.young, self.poisson, fixed_yield_stress,
                          plastic_increment, self.eigen_strain)
         cg_solver_p = init_cg_solver(cell_p, self.cg_tol,
@@ -1099,7 +1099,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         fixed_yield_stress[tuple(pixel_2) + (qpt_2,)] = eq_stress
         fixed_yield_stress[tuple(pixel_3) + (qpt_3,)] = eq_stress
         cell = init_cell(res, lens, self.formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
         mat = init_mat(cell, self.young, self.poisson, fixed_yield_stress,
                        plastic_increment, self.eigen_strain)
         cg_solver = init_cg_solver(cell, self.cg_tol,
@@ -1199,7 +1199,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
 
         res = [3, 3, 1]
         cell = init_cell(res, self.lens, formulation,
-                         self.gradient, self.fft, self.comm)
+                         self.gradient, self.weights, self.fft, self.comm)
 
         mat = init_mat(cell, self.young, self.poisson, self.yield_stress,
                        self.plastic_increment, self.eigen_strain)

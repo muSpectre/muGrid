@@ -56,6 +56,8 @@ namespace muSpectre {
     using Parent = ProjectionDefault<DimS, NbQuadPts>;  //!< base class
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
+    //! weight for each quadrature point
+    using Weights_t = typename Parent::Weights_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! Fourier-space field containing the projection operator itself
@@ -70,7 +72,7 @@ namespace muSpectre {
     //! Constructor with fft_engine
     ProjectionSmallStrain(
         muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-        const Gradient_t & gradient,
+        const Gradient_t & gradient, const Weights_t & weights,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Constructor with fft_engine and default (Fourier) gradient

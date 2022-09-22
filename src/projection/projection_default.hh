@@ -58,7 +58,9 @@ namespace muSpectre {
     using Parent = ProjectionBase;               //!< base class
     using Vector_t = typename Parent::Vector_t;  //!< to represent fields
     //! gradient, i.e. derivatives in each Cartesian direction
-    using Gradient_t = muFFT::Gradient_t;
+    using Gradient_t = Parent::Gradient_t;
+    //! weight for each quadrature point
+    using Weights_t = typename Parent::Weights_t;
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! global field collection
@@ -87,7 +89,8 @@ namespace muSpectre {
     //! Constructor with cell sizes and formulation
     ProjectionDefault(
         muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-        const Gradient_t & gradient, const Formulation & form,
+        const Gradient_t & gradient, const Weights_t & weights,
+        const Formulation & form,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor

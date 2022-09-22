@@ -42,9 +42,10 @@ namespace muSpectre {
   template <Index_t DimS, Index_t NbQuadPts>
   ProjectionSmallStrain<DimS, NbQuadPts>::ProjectionSmallStrain(
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-      const Gradient_t & gradient, const MeanControl & mean_control)
-      : Parent{std::move(engine), lengths, gradient, Formulation::small_strain,
-               mean_control} {}
+      const Gradient_t & gradient, const Weights_t & weights,
+      const MeanControl & mean_control)
+      : Parent{std::move(engine), lengths, gradient, weights,
+               Formulation::small_strain, mean_control} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS, Index_t NbQuadPts>
@@ -53,6 +54,7 @@ namespace muSpectre {
       const MeanControl & mean_control)
       : ProjectionSmallStrain{std::move(engine), lengths,
                               muFFT::make_fourier_gradient(lengths.get_dim()),
+                              {1},
                               mean_control} {}
 
   /* ---------------------------------------------------------------------- */
@@ -201,7 +203,7 @@ namespace muSpectre {
   ProjectionSmallStrain<DimS, NbQuadPts>::clone() const {
     return std::make_unique<ProjectionSmallStrain>(
         this->get_fft_engine().clone(), this->get_domain_lengths(),
-        this->get_gradient());
+        this->get_gradient(), this->get_weights());
   }
 
   template class ProjectionSmallStrain<oneD, OneQuadPt>;

@@ -416,6 +416,8 @@ namespace muSpectre {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(idempotent_test, fix, fixlistRankTwo, fix) {
     // check if the exact projection operator is a valid projection operator.
     // Thus it has to be idempotent, G^2=G or G:G:test_field = G:test_field.
+    // Note that this is the case up to the weights that are multiplied into
+    // the projection.
     constexpr Dim_t sdim{fix::sdim}, mdim{fix::mdim};
     using Fields = muGrid::GlobalFieldCollection;
     using FieldT = muGrid::TypedField<Real>;

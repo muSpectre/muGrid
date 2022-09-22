@@ -46,7 +46,8 @@ namespace muSpectre {
   class SolverSinglePhysicsProjectionBase : public SolverSinglePhysics {
    public:
     using Parent = SolverSinglePhysics;
-    using Gradient_t = muFFT::Gradient_t;
+    using Gradient_t = ProjectionBase::Gradient_t;
+    using Weights_t = ProjectionBase::Weights_t;
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
     using CellExtractFieldFunc_ref = Parent::CellExtractFieldFunc_ref;
     using RealField = muGrid::TypedField<Real>;
@@ -74,6 +75,7 @@ namespace muSpectre {
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
         const Gradient_t & gradient,
+        const Weights_t & weights,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! constructor with units of input fields
@@ -203,6 +205,9 @@ namespace muSpectre {
 
     //! The gradient operator used in the projection
     std::shared_ptr<Gradient_t> gradient;
+
+    //! The weights used in the projection;
+    std::shared_ptr<Weights_t> weights;
 
     //! number of quadrature points
     Index_t nb_quad_pts{1};

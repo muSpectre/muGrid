@@ -56,8 +56,8 @@ using muSpectre::Verbosity;
 
 using pybind11::literals::operator""_a;
 
-using muFFT::Gradient_t;
 using muSpectre::CellData;
+using muSpectre::ProjectionBase;
 using muSpectre::SolverBase;
 using muSpectre::SolverFEMNewtonCG;
 using muSpectre::SolverFEMNewtonPCG;
@@ -230,9 +230,11 @@ void add_spectral_newton_cg_solver(py::module & mod) {
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverBase>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
-                    const Gradient_t &, const MeanControl &>(),
+                    const ProjectionBase::Gradient_t &,
+                    const ProjectionBase::Weights_t &,
+                    const MeanControl &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
-           "equil_tol"_a, "max_iter"_a, "gradient"_a,
+           "equil_tol"_a, "max_iter"_a, "gradient"_a, "weights"_a,
            "mean_control"_a = MeanControl::StrainControl)
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverBase>,
@@ -256,11 +258,14 @@ void add_spectral_trust_region_newton_cg_solver(py::module & mod) {
       .def(py::init<std::shared_ptr<CellData>,
                     std::shared_ptr<muSpectre::KrylovSolverTrustRegionCG>,
                     const Verbosity &, const Real &, const Real &, const Uint &,
-                    const Real &, const Real &, const Gradient_t &,
+                    const Real &, const Real &,
+                    const ProjectionBase::Gradient_t &,
+                    const ProjectionBase::Weights_t &,
                     const MeanControl &>(),
            "cell_data"_a, "krylov_solver"_a, "verbosity"_a, "newton_tol"_a,
            "equil_tol"_a, "max_iter"_a, "trust_region_max"_a, "eta"_a,
-           "gradient"_a, "mean_control"_a = MeanControl::StrainControl);
+           "gradient"_a, "weights"_a,
+           "mean_control"_a = MeanControl::StrainControl);
 }
 
 void add_fem_newton_cg_solver(py::module & mod) {

@@ -355,11 +355,13 @@ class SimpleCompositeTest(unittest.TestCase):
         self.nb_grid_pts = [3, 1]
         self.lengths = [4, 2]
         self.formulation = µ.Formulation.small_strain
-        self.gradient = µ.linear_finite_elements.gradient_2d
+        self.gradient, self.weights =\
+            µ.linear_finite_elements.gradient_2d
         self.cell = µ.Cell(self.nb_grid_pts,
                            self.lengths,
                            self.formulation,
-                           self.gradient)
+                           self.gradient,
+                           self.weights)
 
         self.young1 = 12.3
         self.poisson1 = 0.33
@@ -593,11 +595,13 @@ def build_fe_test(nb_grid_pts, lengths, Young=1.0, Poisson=0.33):
             self.nb_grid_pts = nb_grid_pts
             self.lengths = lengths
             self.formulation = µ.Formulation.small_strain
-            self.gradient = µ.linear_finite_elements.gradient_2d
+            self.gradient, self.weights =\
+                µ.linear_finite_elements.gradient_2d
             self.cell = µ.Cell(self.nb_grid_pts,
                                self.lengths,
                                self.formulation,
-                               self.gradient)
+                               self.gradient,
+                               self.weights)
             self.young = Young*np.ones(self.nb_grid_pts)
             self.poisson = Poisson*np.ones(self.nb_grid_pts)
             self.young = 1.0 + 0.2*np.random.random(self.nb_grid_pts)

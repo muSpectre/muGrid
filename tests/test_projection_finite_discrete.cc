@@ -419,7 +419,7 @@ namespace muSpectre {
         muGrid::MatrixFieldMap<Real, Mapping::Mut, 1, mdim, IterUnit::SubPt>;
     using Vector = Eigen::Matrix<Real, dim, 1>;
 
-    Gradient_t gradient{fix::GradientGiver::get_gradient()};
+    ProjectionBase::Gradient_t gradient{fix::GradientGiver::get_gradient()};
 
     Fields fields{sdim};
     fields.set_nb_sub_pts(QuadPtTag, nb_quad);
@@ -538,7 +538,7 @@ namespace muSpectre {
     using FieldMapNodal =
         muGrid::ScalarFieldMap<Real, Mapping::Mut, IterUnit::SubPt>;
 
-    Gradient_t gradient{fix::GradientGiver::get_gradient()};
+    ProjectionBase::Gradient_t gradient{fix::GradientGiver::get_gradient()};
 
     Fields fields{sdim};
     fields.set_nb_sub_pts(QuadPtTag, nb_quad);

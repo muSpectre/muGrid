@@ -46,7 +46,8 @@ namespace muSpectre {
 
   class SolverTrustRegionNewtonCG : public SolverSinglePhysicsProjectionBase {
     using Parent = SolverSinglePhysicsProjectionBase;
-    using Gradient_t = muFFT::Gradient_t;
+    using Gradient_t = Parent::Gradient_t;
+    using Weights_t = Parent::Weights_t;
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     using Matrix_t = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
     using EigenStrainFunc_ref = Parent::EigenStrainFunc_ref;
@@ -72,7 +73,7 @@ namespace muSpectre {
         const muGrid::Verbosity & verbosity, const Real & newton_tol,
         const Real & equil_tol, const Uint & max_iter,
         const Real & max_trust_radius, const Real & eta,
-        const Gradient_t & gradient,
+        const Gradient_t & gradient, const Weights_t & weights,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor

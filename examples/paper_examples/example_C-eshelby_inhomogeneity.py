@@ -247,8 +247,10 @@ for i, grad_type in enumerate(grad_types):
                            .format(grad_type))
 
     del_x_mu_int = np.array(lengths)/nb_grid_pts_mu_int
+    nb_quad_pts = len(gradient) // 2
+    weights = nb_quad_pts * [1]
     rve = msp.Cell(nb_grid_pts_mu_int, lengths, formulation,
-                   gradient)
+                   gradient, weights)
     matrix = msp.material.MaterialLinearElastic1_2d.make(
         rve, "matrix", E, nu)
     inhomogeneity = msp.material.MaterialLinearElastic1_2d.make(

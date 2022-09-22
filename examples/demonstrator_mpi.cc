@@ -100,14 +100,15 @@ int main(int argc, char * argv[]) {
 
   const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<dim>(fsize)};
   const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<dim>(size)};
+  const ProjectionBase::Weights_t weights{1};
 
   {
     muFFT::Communicator comm{MPI_COMM_WORLD};
     MPI_Init(&argc, &argv);
 
-    auto cell{make_cell<Cell, FFTWMPIEngine>(nb_grid_pts, lengths, form,
-                                             make_fourier_gradient(dim), comm,
-                                             muFFT::FFT_PlanFlags::measure)};
+    auto cell{make_cell<Cell, FFTWMPIEngine>(
+        nb_grid_pts, lengths, form, make_fourier_gradient(dim), weights, comm,
+        muFFT::FFT_PlanFlags::measure)};
 
     constexpr Real E{1.0030648180242636};
     constexpr Real nu{0.29930675909878679};

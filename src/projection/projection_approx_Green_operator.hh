@@ -46,6 +46,8 @@ namespace muSpectre {
     using Parent = ProjectionDefault<DimS>;  //!< base class
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = typename Parent::Gradient_t;
+    //! weight for each quadrature point
+    using Weights_t = typename Parent::Weights_t;
     using Ccoord = typename Parent::Ccoord;  //!< cell coordinates type
     using Rcoord = typename Parent::Rcoord;  //!< spatial coordinates type
     //! Fourier-space field containing the projection operator itself
@@ -66,7 +68,7 @@ namespace muSpectre {
         muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
         const Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
             C_ref,
-        Gradient_t gradient);
+        Gradient_t gradient, const Weights_t & weights);
 
     //! Constructor with fft_engine and default (Fourier) gradient
     ProjectionApproxGreenOperator(

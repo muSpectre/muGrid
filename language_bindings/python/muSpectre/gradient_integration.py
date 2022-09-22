@@ -749,6 +749,8 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
         fft_engine = muFFT.FFT(nb_grid_pts)
         fft_engine.create_plan(dim * dim)  # FFT for (dim,dim) matrix
         fft_engine.create_plan(dim)  # FFT for (dim) vector
+    else:
+        raise NotImplementedError('`fft` argument is not yet implemented.')
     # compute the placement
     nodal_positions, _ = make_grid(lengths, nb_grid_pts)
     grid_spacing = np.array(lengths / nb_grid_pts)

@@ -165,6 +165,74 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
                                mat.get_youngs_modulus(random_quad_pt_id_3),
                                places=8)
 
+    def test_young_and_poisson_per_quad_point(self):
+        nb_grid_pts = [2, 3, 1]
+        lengths = nb_grid_pts
+        dim = len(nb_grid_pts)
+        form = µ.Formulation.finite_strain
+        gradient, weights = µ.linear_finite_elements.gradient_3d
+        nb_quad_pts = len(weights)
+        cg_tol = 1e-6
+        newton_tol = 1e-6
+        equil_tol = newton_tol
+        maxiter = 100
+        verbose = µ.Verbosity.Silent
+        young = np.empty(tuple(nb_grid_pts) + (nb_quad_pts, ))
+        young[:, :, :, :] = \
+            np.arange(1, nb_quad_pts+1)[np.newaxis, np.newaxis, np.newaxis, :]
+        poisson = 0.33 * np.ones(tuple(nb_grid_pts) + (nb_quad_pts, ))
+
+        cell = µ.Cell(nb_grid_pts, lengths, form, gradient, weights)
+        mat = µ.material.MaterialLinearElastic4_3d.make(cell, "le4")
+
+        # test for error message
+        message = lambda name: "Got a wrong shape " + str(nb_quad_pts-1) \
+            + "×1 for the " + name + " vector.\n" \
+            + "I expected the shape: " + str(nb_quad_pts) + "×1"
+
+        with self.assertRaises(RuntimeError) as context:
+            mat.add_pixel(0, young[0, 0, 0, :-1], poisson[0, 0, 0])
+        self.assertTrue(message("Youngs modulus")[:78]
+                        == str(context.exception)[:78])
+
+        with self.assertRaises(RuntimeError) as context:
+            mat.add_pixel(0, young[0, 0, 0], poisson[0, 0, 0, :-1])
+        self.assertTrue(message("Poisson ratio")[:77]
+                        == str(context.exception)[:77])
+
+        for pixel_index, pixel in enumerate(cell.pixels):
+            mat.add_pixel(pixel_index,
+                          young[tuple(pixel)], poisson[tuple(pixel)])
+
+        solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter, verbose)
+        DelF = np.array([[0.05, 0.00,  0.00],
+                         [0.00, -0.1,  0.00],
+                         [0.00, 0.00,  0.02]])
+        result = µ.solvers.newton_cg(cell, DelF, solver,
+                                     newton_tol, equil_tol, verbose)
+
+        # check if the stress is ordered on each voxel corresponding to the
+        # Youngs modulus on the quad points
+        def check(P, component, direction):
+            P = P[component]
+            final = True
+            for qpt in range(nb_quad_pts - 1):
+                if direction == "increasing":
+                    check = (P[qpt] < P[qpt + 1]).all()
+                elif direction == "decreasing":
+                    check = (P[qpt] > P[qpt + 1]).all()
+
+                final = final and check
+
+            return final
+
+        P = result.stress
+        P = P.reshape((dim, dim, nb_quad_pts) + tuple(nb_grid_pts), order='F')
+
+        self.assertTrue(check(P, (0, 0), "increasing"))
+        self.assertTrue(check(P, (1, 1), "decreasing"))
+        self.assertTrue(check(P, (2, 2), "decreasing"))
+
 
 if __name__ == '__main__':
     unittest.main()

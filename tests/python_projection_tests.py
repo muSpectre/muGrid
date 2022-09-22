@@ -41,6 +41,7 @@ from python_test_imports import µ, muFFT, muGrid
 from python_goose_ref import SmallStrainProjectionGooseFFT,\
     FiniteStrainProjectionGooseFFT
 import _muSpectre
+import muSpectre as msp
 
 from muFFT import Stencils2D
 
@@ -179,7 +180,7 @@ def build_multiple_quad_pt_check(Projection1q, Projection2q, name):
 
             fft = muFFT.FFT(self.nb_grid_pts)
             projection = Projection1q(fft, [float(x) for x in self.nb_grid_pts],
-                                      gradient)
+                                      gradient, [1])
             projection.initialise()
 
             coll = muGrid.GlobalFieldCollection(nb_dim)
@@ -227,7 +228,8 @@ def build_multiple_quad_pt_check(Projection1q, Projection2q, name):
 
             fft = muFFT.FFT(self.nb_grid_pts)
             projection = Projection2q(
-                fft, [float(x) for x in self.nb_grid_pts], gradient)
+                fft, [float(x) for x in self.nb_grid_pts],
+                gradient, [1, 1])
             projection.initialise()
 
             coll = muGrid.GlobalFieldCollection(nb_dim)
@@ -276,7 +278,7 @@ def build_multiple_quad_pt_check(Projection1q, Projection2q, name):
                 for dim in range(nb_dim):
                     for d in range(2*nb_dim):
                         gradient[d].apply(in_field, dim, out_field,
-                                            dim + nb_dim * d)
+                                          dim + nb_dim * d)
 
             nb_dim = len(self.nb_grid_pts)
             gradient = [Stencils2D.d_10_00, Stencils2D.d_01_00,
@@ -315,13 +317,85 @@ def build_multiple_quad_pt_check(Projection1q, Projection2q, name):
 
             projection = µ.Projection(self.nb_grid_pts,
                                       [float(x) for x in self.nb_grid_pts],
-                                      gradient=gradient)
+                                      gradient=gradient, weights=[1, 1])
             projection.initialise()
             projection.apply_projection(grad_arr)
 
             self.assertTrue(np.allclose(out_arr, grad_arr))
 
     return ProjectionMultipleQuadPtsCheck
+
+
+def build_5_tet_gauss_weight_check(name):
+    class Projection5TetWeightCheck(unittest.TestCase):
+        def __init__(self, methodName='runTest'):
+            super().__init__(methodName)
+            self.__class__.__qualname__ = name
+
+        def setUp(self):
+            self.nb_grid_pts = [2, 2, 2]
+            self.lengths = self.nb_grid_pts
+            self.dim = len(self.nb_grid_pts)
+            self.Youngs_modulus = 1
+            self.Poisson_ratio = 0.33
+            self.formulation = msp.Formulation.finite_strain
+            self.gradient, self.weights = \
+                msp.linear_finite_elements.gradient_3d_5tet
+            self.nb_qpts = len(self.weights)
+
+            # solver
+            self.cg_tol = 1e-6
+            self.newton_tol = 1e-6
+            self.equilibrium_tol = self.newton_tol
+            self.verbosity = msp.Verbosity.Silent
+            self.maxiter = 100
+
+        def test_for_equal_stress_and_strain(self):
+            """
+            check if the stress and strain in each element of a voxel is equal.
+            """
+            def setup_and_run_simulation(weights):
+                cell = msp.Cell(self.nb_grid_pts, self.lengths,
+                                self.formulation, self.gradient, weights)
+                mat = msp.material.MaterialLinearElastic1_3d.make(
+                    cell, "single_linear_elastic_voxel",
+                    self.Youngs_modulus, self.Poisson_ratio)
+                for pixel_id, _ in cell.pixels.enumerate():
+                    mat.add_pixel(pixel_id)
+
+                solver = msp.solvers.KrylovSolverCG(cell, self.cg_tol,
+                                                    self.maxiter,
+                                                    self.verbosity)
+                DelF = np.array([[0, 0.1, 0],
+                                 [0, 0.2, 0.02],
+                                 [0.3, 0, 0.01]])
+                res = msp.solvers.newton_cg(cell, DelF, solver,
+                                            self.newton_tol,
+                                            self.equilibrium_tol,
+                                            self.verbosity)
+                strain = res.grad.reshape((self.dim, self.dim,
+                                           self.nb_qpts, -1),
+                                          order="F").T.swapaxes(2, 3)
+                stress = res.stress.reshape((self.dim, self.dim,
+                                             self.nb_qpts, -1),
+                                            order="F").T.swapaxes(2, 3)
+
+                return stress, strain
+
+            # give correct weights
+            stress, strain = setup_and_run_simulation(weights=self.weights)
+            self.assertTrue(np.allclose(strain, np.roll(strain, 1, axis=1)))
+            self.assertTrue(np.allclose(stress, np.roll(stress, 1, axis=1)))
+
+            # give wrong weights
+            stress, strain = setup_and_run_simulation(weights=[1]*self.nb_qpts)
+
+            # Also with wrong weights the result is correct! This is the case
+            # because of the strong confinement for a single pixel
+            self.assertTrue(np.allclose(strain, np.roll(strain, 1, axis=1)))
+            self.assertTrue(np.allclose(stress, np.roll(stress, 1, axis=1)))
+
+    return Projection5TetWeightCheck
 
 
 def get_goose(ndim, proj_type): return proj_type(
@@ -391,6 +465,9 @@ multi_finite_fast_2 = build_multiple_quad_pt_check(
     _muSpectre.ProjectionFiniteStrainFast_2d,
     _muSpectre.ProjectionFiniteStrainFast_2q_2d,
     "FiniteStrainFastProjection2d")
+
+# five tetrahedra gauss weights check
+five_tet_1 = build_5_tet_gauss_weight_check(name="FiniteStrain5Tet")
 
 if __name__ == "__main__":
     unittest.main()

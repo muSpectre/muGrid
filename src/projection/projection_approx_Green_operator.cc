@@ -47,8 +47,12 @@ namespace muSpectre {
       muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
       const Eigen::Ref<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> &
           C_ref_,
-      Gradient_t gradient)
-      : Parent{std::move(engine), lengths, gradient, Formulation::small_strain},
+      Gradient_t gradient, const Weights_t & weights)
+      : Parent{std::move(engine),
+               lengths,
+               gradient,
+               weights,
+               Formulation::small_strain},
         C_ref_holder{std::make_unique<C_t>(C_ref_)}, C_ref{
                                                          *this->C_ref_holder} {
     if (C_ref_.rows() != DimS * DimS) {
@@ -67,7 +71,7 @@ namespace muSpectre {
           C_ref)
       : ProjectionApproxGreenOperator{
             std::move(engine), lengths, C_ref,
-            muFFT::make_fourier_gradient(lengths.get_dim())} {}
+            muFFT::make_fourier_gradient(lengths.get_dim()), {1}} {}
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimS>
@@ -135,7 +139,7 @@ namespace muSpectre {
   ProjectionApproxGreenOperator<DimS>::clone() const {
     return std::make_unique<ProjectionApproxGreenOperator>(
         this->get_fft_engine().clone(), this->get_domain_lengths(), this->C_ref,
-        this->get_gradient());
+        this->get_gradient(), this->get_weights());
   }
 
   template class ProjectionApproxGreenOperator<oneD>;

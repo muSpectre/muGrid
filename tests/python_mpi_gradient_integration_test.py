@@ -51,12 +51,12 @@ def init_rve_mat_solver(dim, communicator, nb_domain_grid_pts, domain_lengths,
                         formulation, fft, Youngs_modulus, Poisson_ratio,
                         cg_tol, maxiter, verbose):
     if dim == 2:
-        gradient = µ.linear_finite_elements.gradient_2d
+        gradient, weights = µ.linear_finite_elements.gradient_2d
     elif dim == 3:
-        gradient = µ.linear_finite_elements.gradient_3d
+        gradient, weights = µ.linear_finite_elements.gradient_3d
 
     rve = µ.Cell(nb_domain_grid_pts[:dim], domain_lengths[:dim],
-                 formulation, gradient, fft, communicator)
+                 formulation, gradient, weights, fft, communicator)
 
     if dim == 2:
         material = µ.material.MaterialLinearElastic1_2d.make(
@@ -79,10 +79,10 @@ def init_rve_mat_solver_2_materials(communicator, nb_domain_grid_pts,
                                     Poisson_ratio, cg_tol, maxiter, verbose):
 
     formulation = µ.Formulation.finite_strain
-    gradient = µ.linear_finite_elements.gradient_3d
+    gradient, weights = µ.linear_finite_elements.gradient_3d
 
     rve = µ.Cell(nb_domain_grid_pts, domain_lengths,
-                 formulation, gradient, fft, communicator)
+                 formulation, gradient, weights, fft, communicator)
 
     material_1 = µ.material.MaterialLinearElastic1_3d.make(
         rve, "material_1", Youngs_modulus, Poisson_ratio)

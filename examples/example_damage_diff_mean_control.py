@@ -279,6 +279,7 @@ def compute_rve_fem_solver(control_mean,
         reset_cg, reset_count)
 
     gradient = Stencils2D.linear_finite_elements
+    weights = [1, 1]
 
     newton_solver = µ.solvers.SolverTRNewtonCG(
         cell, krylov_solver,
@@ -286,7 +287,8 @@ def compute_rve_fem_solver(control_mean,
         newton_tol,
         equil_tol, maxiter_newton,
         trust_region, eta_solver,
-        gradient, control_mean)
+        gradient, weights,
+        control_mean)
 
     newton_solver.formulation = msp.Formulation.small_strain
     newton_solver.initialise_cell()

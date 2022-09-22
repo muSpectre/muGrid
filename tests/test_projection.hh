@@ -37,6 +37,7 @@
 #include "tests.hh"
 #include <libmufft/derivative.hh>
 #include <libmufft/fftw_engine.hh>
+#include <projection/projection_base.hh>
 #ifdef WITH_MPI
 #include <libmufft/fftwmpi_engine.hh>
 #include "libmufft/mpi_context.hh"
@@ -49,7 +50,7 @@
 #ifndef TESTS_TEST_PROJECTION_HH_
 #define TESTS_TEST_PROJECTION_HH_
 
-using muFFT::Gradient_t;
+using muSpectre::ProjectionBase;
 
 namespace muSpectre {
 
@@ -98,36 +99,48 @@ namespace muSpectre {
   struct FourierGradient {};
   template <>
   struct FourierGradient<twoD> {
-    static Gradient_t get_gradient() {
-      return Gradient_t{std::make_shared<muFFT::FourierDerivative>(twoD, 0),
-                        std::make_shared<muFFT::FourierDerivative>(twoD, 1)};
+    static ProjectionBase::Gradient_t get_gradient() {
+      return ProjectionBase::Gradient_t{
+          std::make_shared<muFFT::FourierDerivative>(twoD, 0),
+          std::make_shared<muFFT::FourierDerivative>(twoD, 1)};
+    }
+    static ProjectionBase::Weights_t get_weights() {
+      return ProjectionBase::Weights_t{1};
     }
   };
   template <>
   struct FourierGradient<threeD> {
-    static Gradient_t get_gradient() {
-      return Gradient_t{std::make_shared<muFFT::FourierDerivative>(threeD, 0),
-                        std::make_shared<muFFT::FourierDerivative>(threeD, 1),
-                        std::make_shared<muFFT::FourierDerivative>(threeD, 2)};
+    static ProjectionBase::Gradient_t get_gradient() {
+      return ProjectionBase::Gradient_t{
+          std::make_shared<muFFT::FourierDerivative>(threeD, 0),
+          std::make_shared<muFFT::FourierDerivative>(threeD, 1),
+          std::make_shared<muFFT::FourierDerivative>(threeD, 2)};
+    }
+    static ProjectionBase::Weights_t get_weights() {
+      return ProjectionBase::Weights_t{1};
     }
   };
   template <Dim_t DimS, Dim_t NbQuadPts = OneQuadPt>
   struct DiscreteGradient {};
   template <>
   struct DiscreteGradient<twoD, OneQuadPt> {
-    static Gradient_t get_gradient() {
-      return Gradient_t{std::make_shared<muFFT::DiscreteDerivative>(
-                            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
-                            std::vector<Real>{-0.5, -0.5, 0.5, 0.5}),
-                        std::make_shared<muFFT::DiscreteDerivative>(
-                            DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
-                            std::vector<Real>{-0.5, 0.5, -0.5, 0.5})};
+    static ProjectionBase::Gradient_t get_gradient() {
+      return ProjectionBase::Gradient_t{
+          std::make_shared<muFFT::DiscreteDerivative>(
+              DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
+              std::vector<Real>{-0.5, -0.5, 0.5, 0.5}),
+          std::make_shared<muFFT::DiscreteDerivative>(
+              DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
+              std::vector<Real>{-0.5, 0.5, -0.5, 0.5})};
+    }
+    static ProjectionBase::Weights_t get_weights() {
+      return ProjectionBase::Weights_t{1};
     }
   };
   template <>
   struct DiscreteGradient<twoD, TwoQuadPts> {
-    static Gradient_t get_gradient() {
-      return Gradient_t{
+    static ProjectionBase::Gradient_t get_gradient() {
+      return ProjectionBase::Gradient_t{
           std::make_shared<muFFT::DiscreteDerivative>(
               DynCcoord_t{2, 1}, DynCcoord_t{0, 0}, std::vector<Real>{-1, 1}),
           std::make_shared<muFFT::DiscreteDerivative>(
@@ -139,11 +152,14 @@ namespace muSpectre {
               DynCcoord_t{2, 2}, DynCcoord_t{0, 0},
               std::vector<Real>{0, -1, 0, 1})};
     }
+    static ProjectionBase::Weights_t get_weights() {
+      return ProjectionBase::Weights_t{1, 1};
+    }
   };
   template <>
   struct DiscreteGradient<threeD, OneQuadPt> {
-    static Gradient_t get_gradient() {
-      return Gradient_t{
+    static ProjectionBase::Gradient_t get_gradient() {
+      return ProjectionBase::Gradient_t{
           std::make_shared<muFFT::DiscreteDerivative>(
               DynCcoord_t{2, 2, 2}, DynCcoord_t{0, 0, 0},
               std::vector<Real>{-0.5, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5}),
@@ -153,6 +169,9 @@ namespace muSpectre {
           std::make_shared<muFFT::DiscreteDerivative>(
               DynCcoord_t{2, 2, 2}, DynCcoord_t{0, 0, 0},
               std::vector<Real>{-0.5, 0.5, -0.5, 0.5, -0.5, 0.5, -0.5, 0.5})};
+    }
+    static ProjectionBase::Weights_t get_weights() {
+      return ProjectionBase::Weights_t{1};
     }
   };
 
@@ -173,7 +192,8 @@ namespace muSpectre {
         : projector(std::make_unique<Engine>(
                         DynCcoord_t(SizeGiver::get_nb_grid_pts())),
                     DynRcoord_t(SizeGiver::get_lengths()),
-                    Gradient_t{GradientGiver::get_gradient()}) {}
+                    ProjectionBase::Gradient_t{GradientGiver::get_gradient()},
+                    ProjectionBase::Weights_t{GradientGiver::get_weights()}) {}
 
     Parent projector;
   };
@@ -195,7 +215,8 @@ namespace muSpectre {
                         DynCcoord_t(SizeGiver::get_nb_grid_pts()),
                         muFFT::MPIContext::get_context().comm),
                     DynRcoord_t(SizeGiver::get_lengths()),
-                    Gradient_t{GradientGiver::get_gradient()}) {}
+                    ProjectionBase::Gradient_t{GradientGiver::get_gradient()},
+                    ProjectionBase::Weights_t{GradientGiver::get_weights()}) {}
     Parent projector;
   };
 #endif /*defined(WITH_FFTWMPI) || defined(WITH_PFFT) */

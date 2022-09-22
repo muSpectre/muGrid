@@ -65,7 +65,8 @@ namespace muSpectre {
     template <size_t DimS, class FFTEngine>
     inline std::unique_ptr<ProjectionBase> cell_input_helper(
         const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
-        const Formulation & form, muFFT::Gradient_t gradient,
+        const Formulation & form,
+        ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
         const muFFT::Communicator & comm = muFFT::Communicator(),
         const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
       auto && dim{nb_grid_pts.get_dim()};
@@ -84,23 +85,23 @@ namespace muSpectre {
         if (nb_quad_pts == OneQuadPt) {
           using Projection = ProjectionFiniteStrainFast<DimS, OneQuadPt>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == TwoQuadPts) {
           using Projection = ProjectionFiniteStrainFast<DimS, TwoQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == FourQuadPts) {
           using Projection = ProjectionFiniteStrainFast<DimS, FourQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == FiveQuadPts) {
           using Projection = ProjectionFiniteStrainFast<DimS, FiveQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == SixQuadPts) {
           using Projection = ProjectionFiniteStrainFast<DimS, SixQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else {
           std::stringstream error;
           error << nb_quad_pts << " quadrature points are presently "
@@ -112,19 +113,19 @@ namespace muSpectre {
         if (nb_quad_pts == OneQuadPt) {
           using Projection = ProjectionSmallStrain<DimS, OneQuadPt>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == TwoQuadPts) {
           using Projection = ProjectionSmallStrain<DimS, TwoQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == FourQuadPts) {
           using Projection = ProjectionSmallStrain<DimS, FourQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else if (nb_quad_pts == SixQuadPts) {
           using Projection = ProjectionSmallStrain<DimS, SixQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
-                                              gradient);
+                                              gradient, weights);
         } else {
           std::stringstream error;
           error << nb_quad_pts << " quadrature points are presently "
@@ -159,7 +160,8 @@ namespace muSpectre {
   template <class FFTEngine = muFFT::FFTWEngine>
   inline std::unique_ptr<ProjectionBase> cell_input(
       const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
-      const Formulation & form, muFFT::Gradient_t gradient,
+      const Formulation & form,
+      ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
       const muFFT::Communicator & comm = muFFT::Communicator(),
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     const Index_t dim{nb_grid_pts.get_dim()};
@@ -172,17 +174,17 @@ namespace muSpectre {
     switch (dim) {
     case oneD: {
       return internal::cell_input_helper<oneD, FFTEngine>(
-          nb_grid_pts, lengths, form, gradient, comm, flags);
+          nb_grid_pts, lengths, form, gradient, weights, comm, flags);
       break;
     }
     case twoD: {
       return internal::cell_input_helper<twoD, FFTEngine>(
-          nb_grid_pts, lengths, form, gradient, comm, flags);
+          nb_grid_pts, lengths, form, gradient, weights, comm, flags);
       break;
     }
     case threeD: {
       return internal::cell_input_helper<threeD, FFTEngine>(
-          nb_grid_pts, lengths, form, gradient, comm, flags);
+          nb_grid_pts, lengths, form, gradient, weights, comm, flags);
       break;
     }
     default:
@@ -212,8 +214,8 @@ namespace muSpectre {
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     const Index_t dim{nb_grid_pts.get_dim()};
     return cell_input<FFTEngine>(nb_grid_pts, lengths, form,
-                                 muFFT::make_fourier_gradient(dim), comm,
-                                 flags);
+                                 muFFT::make_fourier_gradient(dim), {1},
+                                 comm, flags);
   }
 
   /**
@@ -231,12 +233,12 @@ namespace muSpectre {
   template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
   inline std::shared_ptr<Cell_t> make_cell(
       DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
-      muFFT::Gradient_t gradient,
+      ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
       const muFFT::Communicator & comm = muFFT::Communicator(),
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     return std::make_shared<Cell_t>(
-        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, comm,
-                              flags));
+        cell_input<FFTEngine>(nb_grid_pts, lengths, form, gradient, weights,
+                              comm, flags));
   }
 
   /**
@@ -257,7 +259,8 @@ namespace muSpectre {
       const muFFT::FFT_PlanFlags & flags = muFFT::FFT_PlanFlags::estimate) {
     const Index_t dim{nb_grid_pts.get_dim()};
     return make_cell<Cell_t, FFTEngine>(nb_grid_pts, lengths, form,
-                                        muFFT::make_fourier_gradient(dim), comm,
+                                        muFFT::make_fourier_gradient(dim), {1},
+                                        comm,
                                         flags);
   }
 
@@ -279,6 +282,7 @@ namespace muSpectre {
     const Index_t dim{nb_grid_pts.get_dim()};
     return make_cell<Cell_t, FFTEngine>(nb_grid_pts, lengths, form,
                                         muFFT::make_fourier_gradient(dim),
+                                        {1},
                                         muFFT::Communicator(), flags);
   }
 

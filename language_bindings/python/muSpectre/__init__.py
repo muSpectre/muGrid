@@ -92,7 +92,7 @@ _projections = {
 
 
 def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
-         gradient=None, fft='serial', communicator=None,
+         gradient=None, weights=None, fft='serial', communicator=None,
          is_cell_split=SplitCell.non_split):
     """
     Instantiate a muSpectre Cell class.
@@ -112,6 +112,10 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
         `DerivativeBase` per spatial direction). It is used to automatically
         construct the projection operator. The default is FourierDerivative for
         each direction.
+    weights: list of floating point numbers
+        Those are the weights associated with each quadrature points.
+        Default: None; The quadrature point weight is set to one ([1]) if there
+        is only a single quadrature point, otherwise an error is raised.
     fft: string
         FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
         if you need a serial engine. It is also possible to specifically
@@ -140,8 +144,18 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
             fft = 'fftw'
 
     if gradient is None:
+        if weights is not None:
+            raise ValueError('You cannot provide quadrature point weights if '
+                             'no gradient is specified.')
         dims = len(nb_grid_pts)
         gradient = [FourierDerivative(dims, i) for i in range(dims)]
+        weights = [1]
+    elif weights is None:
+        if len(gradient) == len(nb_grid_pts):
+            weights = [1]
+        else:
+            raise ValueError('You must provide quadrature point weights if '
+                             'you specify more than one quadrature point.')
 
     nb_grid_pts = list(nb_grid_pts)
     domain_lengths = list(domain_lengths)
@@ -157,15 +171,16 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
         raise KeyError("FFT engine '{}' has not been compiled into the "
                        "muSpectre library.".format(fft))
     if communicator.size == 1:
-        return factory(nb_grid_pts, domain_lengths, formulation, gradient)
+        return factory(nb_grid_pts, domain_lengths, formulation, gradient, weights)
     else:
-        return factory(nb_grid_pts, domain_lengths, formulation, gradient,
+        return factory(nb_grid_pts, domain_lengths, formulation, gradient, weights,
                        communicator)
 
 
 def Projection(nb_grid_pts, lengths,
                formulation=Formulation.finite_strain,
                gradient=None,
+               weights=None,
                fft='serial', communicator=None):
     """
     Instantiate a muSpectre Projection class.
@@ -181,6 +196,8 @@ def Projection(nb_grid_pts, lengths,
     gradient: list of subclasses of DerivativeBase
         Type of the derivative operator used for the projection for each
         Cartesian direction. Default is FourierDerivative for each direction.
+    weights: list of floating point numbers
+        Those are the weights associated with each quadrature points.
     fft: string
         FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
         if you need a serial engine. It is also possible to specifically
@@ -200,7 +217,17 @@ def Projection(nb_grid_pts, lengths,
 
     dims = len(nb_grid_pts)
     if gradient is None:
+        if weights is not None:
+            raise ValueError('You cannot provide quadrature point weights if '
+                             'no gradient is specified.')
         gradient = [FourierDerivative(dims, i) for i in range(dims)]
+        weights = [1]
+    elif weights is None:
+        if len(gradient) == len(nb_grid_pts):
+            weights = [1]
+        else:
+            raise ValueError('You must provide quadrature point weights if '
+                             'you specify more than one quadrature point.')
 
     nb_quad_pts = len(gradient)//dims
     if nb_quad_pts == 1:
@@ -215,4 +242,4 @@ def Projection(nb_grid_pts, lengths,
     except KeyError:
         raise KeyError("Projection engine '{}' has not been compiled into the "
                        "muSpectre library.".format(class_name))
-    return factory(fft, lengths, gradient)
+    return factory(fft, lengths, gradient, weights)

@@ -44,12 +44,14 @@ from .gradient_integration import get_complemented_positions
 from .gradient_integration import get_complemented_positions_class_solver
 
 # Linear finite elements in 2D (each pixel is subdivided into two triangles)
-gradient_2d = muFFT.Stencils2D.linear_finite_elements
-gradient_2d_hexagonal = muFFT.Stencils2D.hexagonal_linear_finite_elements
+gradient_2d = muFFT.Stencils2D.linear_finite_elements, 2 * [1]
+gradient_2d_hexagonal = muFFT.Stencils2D.hexagonal_linear_finite_elements, 2 * [1]
 
 
 # Linear finite elements in 3D (each voxel is subdivided into six tetrahedra)
-gradient_3d = muFFT.Stencils3D.linear_finite_elements
+gradient_3d = muFFT.Stencils3D.linear_finite_elements, 6 * [1]
+gradient_3d_5tet = muFFT.Stencils3D.linear_finite_elements_5, \
+    (np.array([2, 1, 1, 1, 1]) * 5/6).tolist()
 
 
 #################### common functions implementation #############

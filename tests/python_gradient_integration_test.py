@@ -702,17 +702,49 @@ class GradientIntegration_Check(unittest.TestCase):
 
         #  Run muSpectre #
         # -------------- #
+        # Fourier gradient on one quadrature point
         fourier_gradient =\
             [µ.FourierDerivative(dim, i) for i in range(dim)]
+        fourier_weights = [1]
+
+        # Fourier gradient on two quadrature points
+        fourier_grad_qpt1 = [µ.FourierDerivative(dim, i,
+                                                 [-1/6, -1/6, -1/6][:dim])
+                             for i in range(dim)]
+        fourier_grad_qpt2 = [µ.FourierDerivative(dim, i, [1/6, 1/6, 1/6][:dim])
+                             for i in range(dim)]
+        fourier_gradient_2qpt = fourier_grad_qpt1 + fourier_grad_qpt2
+
         # finite strain:
         DelF = F_amp * np.array([[+0.50, +0.20, +0.00],
                                  [+0.00, -0.03, +0.15],
                                  [+0.00, +0.15, +0.40]])
         F = np.identity(DelF.shape[0]) + DelF
 
+        # This should raise no Error because the missing weight of [1] is
+        # automatically added if one has only a single quadrature point per
+        # voxel.
+        µ.Cell(nb_grid_pts, lengths, µ.Formulation.finite_strain,
+               fourier_gradient)
+
+        # This should raise a ValueError because the weights are missing
+        with self.assertRaises(ValueError):
+            µ.Cell(nb_grid_pts, lengths, µ.Formulation.finite_strain,
+                   fourier_gradient_2qpt)
+
+        # This should raise a RuntimeError because the weights do not sum to unity
+        with self.assertRaises(RuntimeError):
+            µ.Cell(nb_grid_pts, lengths, µ.Formulation.finite_strain,
+                   fourier_gradient, [0.5])
+
+        # This should raise a RuntimeError because there are too many weights
+        with self.assertRaises(RuntimeError):
+            µ.Cell(nb_grid_pts, lengths, µ.Formulation.finite_strain,
+                   fourier_gradient, [0.5, 0.5])
+
         cell_finite =\
             µ.Cell(nb_grid_pts, lengths, µ.Formulation.finite_strain,
-                   fourier_gradient)
+                   fourier_gradient, fourier_weights)
         mat_finite =\
             µ.material.MaterialLinearElastic4_3d.make(cell_finite,
                                                       "material_finite")
@@ -733,7 +765,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         cell_small =\
             µ.Cell(nb_grid_pts, lengths, µ.Formulation.small_strain,
-                   fourier_gradient)
+                   fourier_gradient, fourier_weights)
         mat_small =\
             µ.material.MaterialLinearElastic4_3d.make(cell_small,
                                                       "material_small")
@@ -773,8 +805,8 @@ class GradientIntegration_Check(unittest.TestCase):
 
         for dim in [2, 3]:
             if dim == 2:
-                discrete_gradient = [Stencils2D.d_10_00, Stencils2D.d_01_00,
-                                     Stencils2D.d_11_01, Stencils2D.d_11_10]
+                discrete_stencil = [Stencils2D.d_10_00, Stencils2D.d_01_00,
+                                    Stencils2D.d_11_01, Stencils2D.d_11_10], [1, 1]
                 # We are compressing 10% in lateral and 50% in normal direction
                 DelF = np.array([[delF_lat, 0.0],
                                  [0.0, delF_surf]])
@@ -785,21 +817,21 @@ class GradientIntegration_Check(unittest.TestCase):
                                                [[-0.25, 0.25], [-0.25, 0.25]]])
                 dy = dz.rollaxes(-1)
                 dx = dy.rollaxes(-1)
-                discrete_gradient = [dx, dy, dz]
+                discrete_stencil = [dx, dy, dz], [1]
                 # We are compressing 10% in lateral and 50% in normal direction
                 DelF = np.array([[delF_lat, 0.0, 0.0],
                                  [0.0, delF_lat, 0.0],
                                  [0.0, 0.0, delF_surf]])
                 mat = µ.material.MaterialLinearElastic1_3d
 
-            fourier_gradient = [µ.FourierDerivative(dim, d) for d in range(dim)]
+            fourier_stencil = [µ.FourierDerivative(dim, d) for d in range(dim)], [1]
 
             lengths = [1.]*dim
             nb_grid_pts = [nb_pts]*dim
 
-            for k, gradient_op in enumerate([fourier_gradient,
-                                             discrete_gradient]):
-                cell = µ.Cell(nb_grid_pts, lengths, form, gradient_op)
+            for k, gradient in enumerate([fourier_stencil, discrete_stencil]):
+                gradient_op, weights = gradient
+                cell = µ.Cell(nb_grid_pts, lengths, form, gradient_op, weights)
 
                 mat_vac = mat.make(cell, "vacuum", 0, 0)
                 mat_sol = mat.make(cell, "el", 1, Poisson)
@@ -894,12 +926,12 @@ class GradientIntegration_Check(unittest.TestCase):
         maxiter = 1000  # for linear cell solver
 
         # numerical derivative, six elements
-        gradient = µ.linear_finite_elements.gradient_3d
+        gradient, weights = µ.linear_finite_elements.gradient_3d
 
         for form in [µ.Formulation.small_strain,
                      µ.Formulation.finite_strain]:
             rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
-                         fft='fftw')
+                         weights, fft='fftw')
             material = µ.material.MaterialLinearElastic1_3d.make(
                 rve, "material", Youngs_modulus, Poisson_ratio)
             for pixel_index, pixel in enumerate(rve.pixels):
@@ -973,12 +1005,12 @@ class GradientIntegration_Check(unittest.TestCase):
         maxiter = 1000  # for linear cell solver
 
         # numerical derivative, two elements for a hexagonal lattice
-        gradient = µ.linear_finite_elements.gradient_2d_hexagonal
+        gradient, weights = µ.linear_finite_elements.gradient_2d_hexagonal
 
         form = µ.Formulation.finite_strain
 
         rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
-                     fft='fftw')
+                     weights, fft='fftw')
         material = µ.material.MaterialLinearElastic1_2d.make(
             rve, "material", Youngs_modulus, Poisson_ratio)
         for pixel_index, pixel in enumerate(rve.pixels):

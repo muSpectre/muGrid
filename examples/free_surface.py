@@ -113,12 +113,12 @@ maxiter = 1000  # for linear cell solver
 trust_region = 100.0
 
 ## numerical derivative, six elements
-gradient = msp.linear_finite_elements.gradient_3d
+gradient, weights = msp.linear_finite_elements.gradient_3d
 
 ###
 
 rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-               msp.Formulation.finite_strain, gradient,
+               msp.Formulation.finite_strain, gradient, weights,
                fft='fftw', communicator=MPI.COMM_WORLD)
 material = msp.material.MaterialHyperElastoPlastic2_3d.make(rve, "material")
 vacuum = msp.material.MaterialLinearElastic1_3d.make(rve, "vacuum", 0.0, 0.33)

@@ -101,7 +101,7 @@ def split_rve_constructor(res, lens, form, inclusions, Del0, maxiter=401,
                           contrast=10, cg_tol=1e-8):
     rve = msp.Cell(res,
                    lengths,
-                   formulation, None, 'fftw', None,
+                   formulation, None, None, 'fftw', None,
                    msp.SplitCell.split)
     # rve.set_splitness(msp.SplitCell.split)
     e = 70e9

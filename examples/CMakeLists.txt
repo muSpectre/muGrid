@@ -104,7 +104,7 @@ endif()
 
 ################## Pyhton examples ###################
 if(${SPLIT_CELL})
-  muSpectre_add_example(ringing_split_laminate_py_example
+  muSpectre_add_example(circle_gibbs_ringing_simple_split_laminate_py_example
     TYPE PYTHON  circle_gibbs_ringing_simple_split_laminate.py 1)
 endif()
 

@@ -39,7 +39,7 @@ import muSpectre as µ
 
 ### ----- Helper function ----- ###
 def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
-                              delta_Poisson, gradient=None):
+                              delta_Poisson, gradient=None, weights=None):
     """
     Function to calculate the partial derivative of the stress with respect
     to the phase for a linear interpolation of the Youngs modulus and the
@@ -62,6 +62,8 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
     gradient: list of subclasses of DerivativeBase
         Type of the derivative operator used for the projection for each
         Cartesian direction. Default is FourierDerivative for each direction.
+    weights: list of floating point number
+        Quadrature point weights
 
     Returns
     -------
@@ -86,7 +88,7 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
 
     # Helper cell construction
     helper_cell = µ.Cell(cell.nb_domain_grid_pts, cell.domain_lengths,
-                         cell.formulation, gradient)
+                         cell.formulation, gradient, weights)
     LinMat = µ.material.MaterialLinearElastic4_2d
     helper_material = LinMat.make(helper_cell, "helper_material")
     for pixel_id, pixel in helper_cell.pixels.enumerate():
@@ -105,7 +107,7 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
 def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
                          Poisson1, Young2, Poisson2, cell, krylov_solver,
                          strains, stresses, equil_tol=1e-8, gradient=None,
-                         args=()):
+                         weights=None, args=()):
     """
     Function to perform a sensitivity analysis based on the discrete
     adjoint method. The two materials of the problem must both be linear
@@ -192,7 +194,8 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
     Poisson = delta_Poisson*phase + Poisson1
     dstress_dphase_list = calculate_dstress_dphase(cell, strains, Young,
                                                    delta_Young, Poisson,
-                                                   delta_Poisson, gradient)
+                                                   delta_Poisson, gradient,
+                                                   weights)
     f_deriv_phase_array = f_deriv_phase(phase, strains, stresses, cell, Young,
                                         delta_Young, Poisson, delta_Poisson,
                                         dstress_dphase_list, args)
@@ -208,7 +211,7 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
 ### ----- Testing the partial derivatives ----- ###
 def partial_derivatives_finite_diff(aim_function, phase_ini, Young1, Poisson1,
                                     Young2, Poisson2, nb_grid_pts, lengths,
-                                    formulation, DelFs, gradient=None,
+                                    formulation, DelFs, gradient=None, weights=None,
                                     krylov_solver_type = µ.solvers.KrylovSolverCG,
                                     krylov_solver_args = (1e-8, 100),
                                     solver = µ.solvers.newton_cg,
@@ -250,6 +253,8 @@ def partial_derivatives_finite_diff(aim_function, phase_ini, Young1, Poisson1,
     gradient: list of subclasses of DerivativeBase
         Type of the derivative operator used for the projection for each
         Cartesian direction. Default is FourierDerivative for each direction.
+    weights: list of floating point number
+        Quadrature point weights
     krylov_solver_type: callable µSpectre krylov solver
         Default is µ.solvers.KrylovSolverCG
     krylov_solver_args: List of additional arguments for the krylov_solver
@@ -289,7 +294,7 @@ def partial_derivatives_finite_diff(aim_function, phase_ini, Young1, Poisson1,
         raise Exception("The sensitivity analysis is only implemented for 2D.")
 
     # Construct cell with initial phase distribution
-    cell_ini = µ.Cell(nb_grid_pts, lengths, formulation, gradient)
+    cell_ini = µ.Cell(nb_grid_pts, lengths, formulation, gradient, weights)
     krylov_solver = krylov_solver_type(cell_ini, *krylov_solver_args)
     mat = µ.material.MaterialLinearElastic4_2d.make(cell_ini, "material")
     Young = (Young2 - Young1)*phase_ini + Young1
@@ -322,7 +327,8 @@ def partial_derivatives_finite_diff(aim_function, phase_ini, Young1, Poisson1,
     for i in range(phase_ini.size):
         phase_dist[i] = phase_dist[i] + delta
         # Construct cell with disturbed phase distribution
-        cell_dist = µ.Cell(nb_grid_pts, lengths, formulation, gradient)
+        cell_dist = µ.Cell(nb_grid_pts, lengths, formulation, gradient,
+                           weights)
         mat_dist = µ.material.MaterialLinearElastic4_2d.make(cell_dist,
                                                              "material")
         Young = (Young2 - Young1)*phase_dist + Young1

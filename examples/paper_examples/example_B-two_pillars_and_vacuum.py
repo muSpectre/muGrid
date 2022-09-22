@@ -187,8 +187,10 @@ for i, grad_type in enumerate(grad_types):
         raise RuntimeError("The given gradient '{}' type is not supported!"
                            .format(grad_type))
 
+    nb_quad_pts = len(gradient) // 2
+    weights = nb_quad_pts * [1]
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
-                   formulation, gradient)
+                   formulation, gradient, weights)
     pillar = msp.material.MaterialLinearElastic1_2d.make(
         rve, "pillar",   1.0, 0.33)
     inclusion = msp.material.MaterialLinearElastic1_2d.make(

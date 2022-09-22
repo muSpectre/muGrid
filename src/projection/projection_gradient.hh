@@ -101,7 +101,9 @@ namespace muSpectre {
    public:
     using Parent = ProjectionBase;  //!< base class
     //! gradient, i.e. derivatives in each Cartesian direction
-    using Gradient_t = muFFT::Gradient_t;
+    using Gradient_t = Parent::Gradient_t;
+    //! weight for each quadrature point
+    using Weights_t = typename Parent::Weights_t;
     using Ccoord = Ccoord_t<DimS>;  //!< cell coordinates type
     using Rcoord = Rcoord_t<DimS>;  //!< spatial coordinates type
     //! Real space second order tensor fields (to be projected)
@@ -143,7 +145,7 @@ namespace muSpectre {
     //! Constructor with FFT engine
     ProjectionGradient(
         muFFT::FFTEngine_ptr engine, const DynRcoord_t & lengths,
-        const Gradient_t & gradient,
+        const Gradient_t & gradient, const Weights_t & weights,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Constructor with FFT engine and default (Fourier) gradient

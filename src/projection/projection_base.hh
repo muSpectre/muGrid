@@ -76,6 +76,8 @@ namespace muSpectre {
     using Vector_t = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
     //! gradient, i.e. derivatives in each Cartesian direction
     using Gradient_t = muFFT::Gradient_t;
+    //! weight for each quadrature point
+    using Weights_t = std::vector<muGrid::Real>;
     //! global FieldCollection
     using GFieldCollection_t =
         typename muFFT::FFTEngineBase::GFieldCollection_t;
@@ -96,7 +98,8 @@ namespace muSpectre {
     ProjectionBase(
         muFFT::FFTEngine_ptr engine, const DynRcoord_t & domain_lengths,
         const Index_t & nb_quad_pts, const Index_t & nb_components,
-        const Gradient_t & gradient, const Formulation & form,
+        const Gradient_t & gradient, const Weights_t & weights,
+        const Formulation & form,
         const MeanControl & mean_control = MeanControl::StrainControl);
 
     //! Copy constructor
@@ -207,6 +210,8 @@ namespace muSpectre {
 
     const Gradient_t & get_gradient() const;
 
+    const Weights_t & get_weights() const;
+
     //! perform a deep copy of the projector (this should never be necessary in
     //! c++)
     virtual std::unique_ptr<ProjectionBase> clone() const = 0;
@@ -222,6 +227,10 @@ namespace muSpectre {
      * or through a weighted residual
      */
     Gradient_t gradient;
+    /**
+     * quadrature point weights
+     */
+    Weights_t weights;
     /**
      * formulation this projection can be applied to (determines
      * whether the projection enforces gradients, small strain tensor

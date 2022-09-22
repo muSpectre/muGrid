@@ -76,6 +76,46 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
+  void MaterialLinearElastic4<DimM>::add_pixel(
+      const size_t & pixel_id,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+          Youngs_modulus,
+      const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+          Poisson_ratio) {
+    auto & nb_sub_pts(this->lambda_field.get_field().get_nb_sub_pts());
+    if (Youngs_modulus.rows() != nb_sub_pts) {
+      std::stringstream error{};
+      error << "Got a wrong shape " << std::to_string(Youngs_modulus.rows())
+            << "×" << std::to_string(Youngs_modulus.cols())
+            << " for the Youngs modulus vector.\nI expected the shape: "
+            << std::to_string(this->lambda_field.get_field().get_nb_sub_pts())
+            << "×"
+            << "1";
+      throw MaterialError(error.str());
+    }
+    if (Poisson_ratio.rows() != nb_sub_pts) {
+      std::stringstream error{};
+      error << "Got a wrong shape " << std::to_string(Poisson_ratio.rows())
+            << "×" << std::to_string(Poisson_ratio.cols())
+            << " for the Poisson ratio vector.\nI expected the shape: "
+            << std::to_string(this->lambda_field.get_field().get_nb_sub_pts())
+            << "×"
+            << "1";
+      throw MaterialError(error.str());
+    }
+
+    this->internal_fields->add_pixel(pixel_id);
+
+    for (Index_t i{0}; i < nb_sub_pts; i++) {
+      Real lambda{Hooke::compute_lambda(Youngs_modulus(i), Poisson_ratio(i))};
+      Real mu{Hooke::compute_mu(Youngs_modulus(i), Poisson_ratio(i))};
+      this->lambda_field.get_field().push_back_single(lambda);
+      this->mu_field.get_field().push_back_single(mu);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
   void MaterialLinearElastic4<DimM>::set_youngs_modulus(
       const size_t & quad_pt_id, const Real & Youngs_modulus) {
     auto && lambda_map{this->lambda_field.get_map()};

@@ -64,6 +64,7 @@ namespace muSpectre {
     const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(Index_t{3})};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
+    const ProjectionBase::Weights_t weights{1};
 
     // number of layers in the hard material
     constexpr Index_t nb_lays{1};
@@ -75,8 +76,8 @@ namespace muSpectre {
     }
 
     const auto & comm = muFFT::MPIContext::get_context().comm;
-    auto cell{make_cell<Cell, FFTWMPIEngine>(nb_grid_pts, lengths, form,
-                                             make_fourier_gradient(Dim), comm)};
+    auto cell{make_cell<Cell, FFTWMPIEngine>(
+        nb_grid_pts, lengths, form, make_fourier_gradient(Dim), weights, comm)};
 
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
@@ -113,6 +114,7 @@ namespace muSpectre {
     const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(grid_size)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::small_strain};
+    const ProjectionBase::Weights_t weights{1};
 
     // number of layers in the hard material
     constexpr Index_t nb_lays{1};
@@ -124,8 +126,8 @@ namespace muSpectre {
     }
 
     auto comm{muFFT::MPIContext::get_context().comm};
-    auto cell{make_cell<Cell, FFTWMPIEngine>(nb_grid_pts, lengths, form,
-                                             make_fourier_gradient(Dim), comm)};
+    auto cell{make_cell<Cell, FFTWMPIEngine>(
+        nb_grid_pts, lengths, form, make_fourier_gradient(Dim), weights, comm)};
 
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};
@@ -232,6 +234,7 @@ namespace muSpectre {
     const DynCcoord_t nb_grid_pts{muGrid::CcoordOps::get_cube<Dim>(GridSize)};
     const DynRcoord_t lengths{muGrid::CcoordOps::get_cube<Dim>(1.)};
     constexpr Formulation form{Formulation::finite_strain};
+    const ProjectionBase::Weights_t weights{1};
     // because we compare finitie strain results to small strain predictions
     constexpr Real loose_tol(1e-6);
 
@@ -245,8 +248,8 @@ namespace muSpectre {
     }
 
     auto comm{muFFT::MPIContext::get_context().comm};
-    auto cell{make_cell<Cell, FFTWMPIEngine>(nb_grid_pts, lengths, form,
-                                             make_fourier_gradient(Dim), comm)};
+    auto cell{make_cell<Cell, FFTWMPIEngine>(
+        nb_grid_pts, lengths, form, make_fourier_gradient(Dim), weights, comm)};
 
     using Mat_t = MaterialLinearElastic1<Dim>;
     constexpr Real Young{2.}, Poisson{.33};

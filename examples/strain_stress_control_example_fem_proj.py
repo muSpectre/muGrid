@@ -55,6 +55,7 @@ def compute_func(control, Del0, E0, formulation):
     # Domain dimensions
     domain_lengths = [7., 5.]
     gradient = Stencils2D.linear_finite_elements
+    weights = [1, 1]
     # build a computational domain
     cell = msp.cell.CellData.make(nb_grid_pts,
                                   domain_lengths)
@@ -91,7 +92,7 @@ def compute_func(control, Del0, E0, formulation):
     newton_solver = msp.solvers.SolverNewtonCG(
         cell, krylov_solver,
         verbose, tol, equi_tol, maxiter,
-        gradient, control)
+        gradient, weights, control)
     newton_solver.formulation = formulation
     newton_solver.initialise_cell()
     newton_solver.evaluate_stress_tangent()

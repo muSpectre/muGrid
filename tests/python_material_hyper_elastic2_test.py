@@ -81,9 +81,10 @@ class MaterialHyperElastic2_Check(unittest.TestCase):
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
+        weights = [1]
 
-        cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
-        cell2 = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
+        cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, weights, fft)
+        cell2 = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, weights, fft)
 
         # stores a hyper elastic 1 material for each pixel
         mat_he1_array = np.empty(nb_grid_pts, dtype=object)
@@ -160,8 +161,9 @@ class MaterialHyperElastic2_Check(unittest.TestCase):
         dy = dz.rollaxes(-1)
         dx = dy.rollaxes(-1)
         discrete_gradient = [dx, dy, dz]
+        weights = [1]
 
-        cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, fft)
+        cell = µ.Cell(nb_grid_pts, lens, form, discrete_gradient, weights, fft)
         mat = µ.material.MaterialHyperElastic2_3d.make(
             cell, "material")
 
@@ -175,7 +177,7 @@ class MaterialHyperElastic2_Check(unittest.TestCase):
         maxiter = 200
         verbose = µ.Verbosity.Silent
         solver = µ.solvers.KrylovSolverCG(cell, cg_tol, maxiter,
-                                    verbose)
+                                          verbose)
         cell.initialise()
 
         # Total deformation

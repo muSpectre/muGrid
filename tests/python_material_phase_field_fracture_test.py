@@ -64,7 +64,7 @@ def test_tangent_worker(testobj, dim):
     # use e.g. average upwind differences
     fourier_gradient = [µ.FourierDerivative(dim , i) for i in range(dim)]
 
-    cell = µ.Cell(nb_grid_pts, lens, form, fourier_gradient, fft)
+    cell = µ.Cell(nb_grid_pts, lens, form, fourier_gradient, fft=fft)
     if (dim == 2):
         mat = µ.material.MaterialPhaseFieldFracture_2d.make(
             cell, "material_small", ksmall)
@@ -157,7 +157,7 @@ class MaterialPhaseFieldFracture_Check(unittest.TestCase):
         # use e.g. average upwind differences
         fourier_gradient = [µ.FourierDerivative(dim , i) for i in range(dim)]
 
-        cell = µ.Cell(nb_grid_pts, lens, form, fourier_gradient, fft)
+        cell = µ.Cell(nb_grid_pts, lens, form, fourier_gradient, fft=fft)
         mat = µ.material.MaterialPhaseFieldFracture_3d.make(
             cell, "material_small", ksmall)
 

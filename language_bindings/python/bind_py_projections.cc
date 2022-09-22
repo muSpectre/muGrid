@@ -56,7 +56,6 @@
 #include <libmufft/pfft_engine.hh>
 #endif
 
-using muFFT::Gradient_t;
 using muGrid::DynRcoord_t;
 using muGrid::Index_t;
 using muGrid::numpy_wrap;
@@ -75,10 +74,11 @@ class ProjectionBaseUnclonable : public ProjectionBase {
                            const DynRcoord_t & domain_lengths,
                            const Index_t & nb_quad_pts,
                            const Index_t & nb_components,
-                           const Gradient_t & gradient,
+                           const ProjectionBase::Gradient_t & gradient,
+                           const ProjectionBase::Weights_t & weights,
                            const Formulation & form)
       : ProjectionBase(engine, domain_lengths, nb_quad_pts, nb_components,
-                       gradient, form) {}
+                       gradient, weights, form) {}
 
   std::unique_ptr<ProjectionBase> clone() const final {
     throw RuntimeError(
@@ -103,9 +103,11 @@ class PyProjectionBase : public ProjectionBaseUnclonable {
   PyProjectionBase(const muFFT::FFTEngine_ptr & engine,
                    const DynRcoord_t & domain_lengths,
                    const Index_t & nb_quad_pts, const Index_t & nb_components,
-                   const Gradient_t & gradient, const Formulation & form)
+                   const ProjectionBase::Gradient_t & gradient,
+                   const ProjectionBase::Weights_t & weights,
+                   const Formulation & form)
       : ProjectionBaseUnclonable(engine, domain_lengths, nb_quad_pts,
-                                 nb_components, gradient, form) {}
+                                 nb_components, gradient, weights, form) {}
 
   void apply_projection(Field_t & field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, apply_projection, field);
@@ -130,7 +132,9 @@ void add_projection_base(py::module & mod) {
              PyProjectionBase                  // trampoline base
              >(mod, "ProjectionBase")
       .def(py::init<const muFFT::FFTEngine_ptr &, const DynRcoord_t &,
-                    const Index_t &, const Index_t &, const Gradient_t &,
+                    const Index_t &, const Index_t &,
+                    const ProjectionBase::Gradient_t &,
+                    const ProjectionBase::Weights_t &,
                     const Formulation &>())
       // apply_projection that takes Fields
       .def("apply_projection", &ProjectionBase::apply_projection)
@@ -211,8 +215,9 @@ void add_proj_helper(py::module & mod, std::string name_start) {
              std::shared_ptr<Proj>,  // holder
              ProjectionBase          // trampoline base
              >(mod, name.str().c_str())
-      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &, Gradient_t>(),
-           "fft_engine"_a, "domain_lengths"_a, "gradient"_a)
+      .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &,
+                    ProjectionBase::Gradient_t, ProjectionBase::Weights_t>(),
+           "fft_engine"_a, "domain_lengths"_a, "gradient"_a, "weights"_a)
       .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &>(),
            "fft_engine"_a, "domain_lengths"_a)
       .def("initialise", &Proj::initialise,
@@ -244,7 +249,7 @@ void add_green_proj_helper(py::module & mod, std::string name_start) {
       .def(py::init<muFFT::FFTEngine_ptr, const DynRcoord_t &,
                     const Eigen::Ref<Eigen::Matrix<muFFT::Real, Eigen::Dynamic,
                                                    Eigen::Dynamic>> &,
-                    Gradient_t>())
+                    ProjectionBase::Gradient_t, ProjectionBase::Weights_t>())
       .def(py::init([](muFFT::FFTEngine_ptr fft_engine,
                        const DynRcoord_t & domain_lenghts,
                        py::EigenDRef<Eigen::MatrixXd> C_ref) {

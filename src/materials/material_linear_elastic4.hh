@@ -167,6 +167,17 @@ namespace muSpectre {
                    const Real & Poisson_ratio);
 
     /**
+     * overload add_pixel, and define the Youngs modulus and the Poissons ratio
+     * per quad point.
+     */
+    void
+    add_pixel(const size_t & pixel_id,
+              const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+                  Youngs_modulus,
+              const Eigen::Ref<const Eigen::Matrix<Real, Eigen::Dynamic, 1>> &
+                  Poisson_ratio);
+
+    /**
      * (re)set the Youngs modulus on a quad_point with quad_point_id
      * The internal stored first and second Lame constants are updated due to
      * the update of the Youngs modulus.

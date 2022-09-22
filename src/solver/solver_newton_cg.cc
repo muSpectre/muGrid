@@ -47,9 +47,10 @@ namespace muSpectre {
       std::shared_ptr<KrylovSolverBase> krylov_solver,
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
-      const Gradient_t & gradient, const MeanControl & mean_control)
-      : Parent{cell_data, verbosity, newton_tol,  equil_tol,
-               max_iter,  gradient,  mean_control},
+      const Gradient_t & gradient, const Weights_t & weights,
+      const MeanControl & mean_control)
+      : Parent{cell_data, verbosity, newton_tol, equil_tol,
+               max_iter, gradient, weights, mean_control},
         krylov_solver{krylov_solver} {}
 
   /* ---------------------------------------------------------------------- */

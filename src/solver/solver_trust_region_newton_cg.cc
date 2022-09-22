@@ -48,9 +48,10 @@ namespace muSpectre {
       const muGrid::Verbosity & verbosity, const Real & newton_tol,
       const Real & equil_tol, const Uint & max_iter,
       const Real & max_trust_radius, const Real & eta,
-      const Gradient_t & gradient, const MeanControl & mean_control)
-      : Parent{cell_data, verbosity, newton_tol,  equil_tol,
-               max_iter,  gradient,  mean_control},
+      const Gradient_t & gradient, const Weights_t & weights,
+      const MeanControl & mean_control)
+      : Parent{cell_data, verbosity, newton_tol, equil_tol,
+               max_iter, gradient, weights, mean_control},
         krylov_solver{krylov_solver},
         max_trust_radius{max_trust_radius}, eta{eta} {}
 
