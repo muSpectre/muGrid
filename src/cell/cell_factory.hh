@@ -122,6 +122,10 @@ namespace muSpectre {
           using Projection = ProjectionSmallStrain<DimS, FourQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,
                                               gradient, weights);
+        } else if (nb_quad_pts == FiveQuadPts) {
+          using Projection = ProjectionSmallStrain<DimS, FiveQuadPts>;
+          return std::make_unique<Projection>(std::move(fft_ptr), lengths,
+                                              gradient, weights);
         } else if (nb_quad_pts == SixQuadPts) {
           using Projection = ProjectionSmallStrain<DimS, SixQuadPts>;
           return std::make_unique<Projection>(std::move(fft_ptr), lengths,

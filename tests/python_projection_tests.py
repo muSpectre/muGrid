@@ -326,7 +326,7 @@ def build_multiple_quad_pt_check(Projection1q, Projection2q, name):
     return ProjectionMultipleQuadPtsCheck
 
 
-def build_5_tet_gauss_weight_check(name):
+def build_5_tet_gauss_weight_check(formulation, name):
     class Projection5TetWeightCheck(unittest.TestCase):
         def __init__(self, methodName='runTest'):
             super().__init__(methodName)
@@ -338,7 +338,7 @@ def build_5_tet_gauss_weight_check(name):
             self.dim = len(self.nb_grid_pts)
             self.Youngs_modulus = 1
             self.Poisson_ratio = 0.33
-            self.formulation = msp.Formulation.finite_strain
+            self.formulation = formulation
             self.gradient, self.weights = \
                 msp.linear_finite_elements.gradient_3d_5tet
             self.nb_qpts = len(self.weights)
@@ -369,6 +369,8 @@ def build_5_tet_gauss_weight_check(name):
                 DelF = np.array([[0, 0.1, 0],
                                  [0, 0.2, 0.02],
                                  [0.3, 0, 0.01]])
+                if self.formulation == msp.Formulation.small_strain:
+                    DelF = 1/2*(DelF + DelF.T)
                 res = msp.solvers.newton_cg(cell, DelF, solver,
                                             self.newton_tol,
                                             self.equilibrium_tol,
@@ -467,7 +469,13 @@ multi_finite_fast_2 = build_multiple_quad_pt_check(
     "FiniteStrainFastProjection2d")
 
 # five tetrahedra gauss weights check
-five_tet_1 = build_5_tet_gauss_weight_check(name="FiniteStrain5Tet")
+five_tet_fs = build_5_tet_gauss_weight_check(
+    formulation=msp.Formulation.finite_strain,
+    name="FiniteStrain5Tet")
+
+five_tet_ss = build_5_tet_gauss_weight_check(
+    formulation=msp.Formulation.small_strain,
+    name="SmallStrain5Tet")
 
 if __name__ == "__main__":
     unittest.main()
