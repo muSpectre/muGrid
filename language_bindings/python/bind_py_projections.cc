@@ -300,6 +300,10 @@ void add_projections(py::module & mod) {
       muGrid::threeD>(mod, "ProjectionSmallStrain_2q");
 
   add_proj_helper<
+      muSpectre::ProjectionSmallStrain<muGrid::threeD, muGrid::FiveQuadPts>,
+      muGrid::threeD>(mod, "ProjectionSmallStrain_5q");
+
+  add_proj_helper<
       muSpectre::ProjectionFiniteStrain<muGrid::twoD, muGrid::TwoQuadPts>,
       muGrid::twoD>(mod, "ProjectionFiniteStrain_2q");
   add_proj_helper<
@@ -312,6 +316,10 @@ void add_projections(py::module & mod) {
   add_proj_helper<
       muSpectre::ProjectionFiniteStrainFast<muGrid::threeD, muGrid::TwoQuadPts>,
       muGrid::threeD>(mod, "ProjectionFiniteStrainFast_2q");
+
+  add_proj_helper<muSpectre::ProjectionFiniteStrainFast<muGrid::threeD,
+                                                        muGrid::FiveQuadPts>,
+                  muGrid::threeD>(mod, "ProjectionFiniteStrainFast_5q");
 
   add_green_proj_helper<muSpectre::ProjectionApproxGreenOperator<muGrid::twoD>,
                         muGrid::twoD>(mod, "ProjectionApproxGreenOperator");

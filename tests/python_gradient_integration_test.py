@@ -987,6 +987,85 @@ class GradientIntegration_Check(unittest.TestCase):
             self.assertTrue(np.allclose(y_def - gy, ndy))
             self.assertTrue(np.allclose(z_def - gz, ndz))
 
+    def test_get_complemented_positions_worker(self):
+        """
+        check if the complemented positions worker can also handel
+        nump.ndarrays as input. This can be the case if you manipulate the
+        strain befor you do the integration, i.e you integrate 1/2(F+F^T) but
+        do not want to overwrite the state of the muGrid Field.
+        """
+        nx, ny, nz = nb_domain_grid_pts = 2, 3, 4
+        sx, sy, sz = domain_lengths = 1.3, 1.1, 1.7
+
+        Youngs_modulus = 1
+        Poisson_ratio = 0.33
+
+        newton_tol = 1e-6
+        equil_tol = newton_tol
+        cg_tol = 1e-6
+
+        s = 0.01
+        strain_step = np.array([[-s, 0, 0], [0, -s, 0], [0, 0, 2*s]])
+
+        maxiter = 1000  # for linear cell solver
+
+        # numerical derivative, six elements
+        gradient, weights = µ.linear_finite_elements.gradient_3d
+
+        form = µ.Formulation.finite_strain
+        rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
+                     weights, fft='fftw')
+        material = µ.material.MaterialLinearElastic1_3d.make(
+            rve, "material", Youngs_modulus, Poisson_ratio)
+        for pixel_index, pixel in enumerate(rve.pixels):
+            material.add_pixel(pixel_index)
+
+        solver = µ.solvers.KrylovSolverCG(
+            rve, cg_tol, maxiter=maxiter, verbose=µ.Verbosity.Silent)
+
+        µ.solvers.newton_cg(
+            rve, strain_step, solver,
+            newton_tol=newton_tol,
+            equil_tol=equil_tol,
+            IsStrainInitialised=µ.solvers.IsStrainInitialised.No,
+            verbose=µ.Verbosity.Silent)
+
+        [dx, dy, dz] = µ.gradient_integration.get_complemented_positions(
+            "d", rve, periodically_complemented=True)
+
+        # using the complemented positions worker with strain as
+        # numpy.ndarray input
+        strain = rve.strain.array()
+        comm = rve.communicator
+        if comm.size == 1:
+            mean_strain = np.mean(
+                strain, axis=tuple(i for i in range(2, len(strain.shape))))
+        elif comm.size > 1:
+            if strain.size > 0:
+                strain_mean_per_core = \
+                    np.mean(strain,
+                            axis=tuple(i for i in range(2, len(strain.shape))))
+            else:
+                # Prevent nan values of np.mean for empty processors
+                strain_mean_per_core = np.zeros((rve.dim, rve.dim), order="F")
+            nb_elements_per_core = \
+                np.product(rve.nb_subdomain_grid_pts) * rve.nb_quad_pts
+            nb_global_elements = \
+                np.product(rve.nb_domain_grid_pts) * rve.nb_quad_pts
+            core_weight = nb_elements_per_core / nb_global_elements
+            mean_strain = comm.sum(strain_mean_per_core * core_weight)
+
+        [dx_w, dy_w, dz_w] = \
+            µ.gradient_integration.get_complemented_positions_worker(
+                "d", rve, None, strain,
+                mean_strain, rve.formulation,
+                rve.dim, projection=rve.projection,
+                periodically_complemented=True)
+
+        self.assertTrue(np.allclose(dx, dx_w))
+        self.assertTrue(np.allclose(dy, dy_w))
+        self.assertTrue(np.allclose(dz, dz_w))
+
     def test_get_complemented_positions_hexagonal_grid(self):
         nx, ny = nb_domain_grid_pts = 2, 3
         sx = 2

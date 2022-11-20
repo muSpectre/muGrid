@@ -128,8 +128,8 @@ def get_complemented_positions_worker(
                   * hexagonal grid 2D: with dy = sqrt(3)/2*dx
                                     F0 = np.array([[ 1, 1/sqrt(3)],
                                                    [ 0,     1    ]])
-    strain -- strain Field
-    mean_strain -- The mean stress of the RVE
+    strain -- strain Field (muGrid.RealField), or numpy.ndarray of field
+    mean_strain -- The mean strain of the RVE
     dim -- dimension of the the RVE for example 2 for 2D
     projection -- Projection Object obtained either from the Cell object
                   or a Solver object in an upstream function
@@ -173,8 +173,17 @@ def get_complemented_positions_worker(
                                                     rve.spatial_dim)
     elif disps is None and not (projection is None):
         # Nodal nonaffine displacements
-        displacements = projection.integrate_nonaffine_displacements(strain)\
-                                  .array(muGrid.IterUnit.Pixel)
+        if isinstance(strain, muGrid._muGrid.RealField):
+            displacements = \
+                projection.integrate_nonaffine_displacements(strain)\
+                .array(muGrid.IterUnit.Pixel)
+        elif isinstance(strain, np.ndarray):
+            displacements = \
+                projection.integrate_nonaffine_displacements(strain)\
+                .reshape(cell_coords.shape)  # reshape to IterUnit.Pixel
+        else:
+            raise ValueError("Not allowed type '{type(strain)}' for strain.")
+
         if periodically_complemented:
             displacements = complement_periodically(displacements, dim)
     else:
