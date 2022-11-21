@@ -1,6 +1,12 @@
 Change log for µSpectre
 =======================
 
+0.24.0 (not yet released)
+-------------------------
+
+- muFFT: Changed Python install procedure; default to no MPI and MPI now needs
+  to be explicitly enabled
+
 0.23.1 (24Mar2022)
 -------------------------
 - muSpectre: A bug fixed in the call of the constructor of FieldCollection

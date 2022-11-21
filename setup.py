@@ -32,7 +32,6 @@ import setuptools
 import subprocess
 from subprocess import PIPE
 
-from distutils import sysconfig
 from distutils.spawn import find_executable
 from distutils.sysconfig import customize_compiler, get_config_var
 from setuptools import setup, Extension
@@ -43,13 +42,18 @@ from setuptools.command.build_ext import build_ext
 get_config_var("LDSHARED")
 from distutils.sysconfig import _config_vars as _CONFIG_VARS
 
-###
+#
+# MPI support will be compiled only if mpi4py is present.
+# To install explicitly with MPI support, install muFFT[mpi].
+# (This adds mpi4py as a dependency.)
+#
 
-disable_mpi = False
-if '--disable-mpi' in sys.argv:
-    index = sys.argv.index('--disable-mpi')
+# MPI needs to be manually enabled
+mpi = False
+if '--mpi' in sys.argv:
+    index = sys.argv.index('--mpi')
     sys.argv.pop(index)  # Removes the '--disable-mpi'
-    disable_mpi = True
+    mpi = True
 
 verbose = False
 if '--verbose' in sys.argv:
@@ -100,6 +104,7 @@ pnetcdf_info = {
     'define_macro': 'WITH_NETCDF_IO'
 }
 
+
 ###
 
 def get_version_from_git():
@@ -122,6 +127,10 @@ def get_version_from_git():
     if verbose:
         print('GIT Version detected:', version)
 
+    # Make version PEP 440 compliant
+    version = version.replace('-', '.dev', 1)
+    version = version.replace('-', '+', 1)
+
     return version.endswith('dirty'), version, hash
 
 
@@ -130,7 +139,7 @@ def get_version_from_cc(fn):
     dirty = bool(re.search('constexpr bool git_dirty{(true|false)};',
                            text).group(1))
     version = re.search(
-        'constexpr char git_describe\[\]{"([A-Za-z0-9_.-]*)"};', text
+        r'constexpr char git_describe\[\]{"([A-Za-z0-9_.+-]*)"};', text
     ).group(1)
     hash = re.search('constexpr char git_hash\[\]{"([A-Za-z0-9_.-]*)"};',
                      text).group(1)
@@ -150,7 +159,7 @@ def detect_library(info):
     if 'environ' in info and info['environ'] in os.environ:
         if verbose:
             print("  * Looking for environment variable '{}'"
-                .format(info['environ']))
+                  .format(info['environ']))
         root = os.environ[info['environ']]
         found = True
     if not found:
@@ -173,7 +182,7 @@ def detect_library(info):
                                    '/../lib')
         if verbose:
             print("  * Attempting to load library '{}' in path '{}'"
-                .format(libname, root))
+                  .format(libname, root))
         import ctypes
         found = True
         try:
@@ -185,7 +194,7 @@ def detect_library(info):
     library_dirs = []
     if found:
         if root is not None and (root.endswith('/bin') or \
-            root.endswith('/lib')):
+                                 root.endswith('/lib')):
             root = root[:-4]
 
         if verbose:
@@ -194,7 +203,7 @@ def detect_library(info):
                       "search path".format(info['name']))
             else:
                 print("  * Detected library '{}' in path '{}'"
-                    .format(info['name'], root))
+                      .format(info['name'], root))
 
         for lib in info['required_libraries']:
             if root is not None:
@@ -224,7 +233,7 @@ def get_eigen_include(eigen_version='3.3.5'):
             'curl -L https://gitlab.com/libeigen/eigen/-/archive/{0}/eigen-{0}'
             '.tar.bz2 | tar -jx -C {1} --strip-components 1'
             .format(eigen_version, eigen_path))
-    return(eigen_path)
+    return (eigen_path)
 
 
 def get_pybind11_include(pybind11_version='2.2.3'):
@@ -240,7 +249,8 @@ def get_pybind11_include(pybind11_version='2.2.3'):
             'curl -L https://github.com/pybind/pybind11/archive/v{}'
             '.tar.gz | tar -zx -C {} --strip-components 1'
             .format(pybind11_version, pybind11_path))
-    return('{}/include'.format(pybind11_path))
+    return ('{}/include'.format(pybind11_path))
+
 
 ###
 
@@ -261,7 +271,17 @@ def _customize_compiler_for_shlib(compiler):
     else:
         customize_compiler(compiler)
 
+
 ###
+
+if mpi:
+    if verbose:
+        print('=== TRYING TO IMPORT mpi4py ===')
+    try:
+        import mpi4py
+    except ModuleNotFoundError:
+        raise RuntimeError('mpi4py needs to be installed for MPI support')
+    print('  * Success!')
 
 if verbose:
     print('=== DETECTING FFT LIBRARIES ===')
@@ -309,17 +329,13 @@ pymufft_sources = [
 ]
 
 macros = []
-include_dirs = [get_eigen_include(), # Path to pybind11 headers
-                get_pybind11_include(), # Path to Eigen headers
+include_dirs = [get_eigen_include(),  # Path to pybind11 headers
+                get_pybind11_include(),  # Path to Eigen headers
                 'src']
 mufft_libraries = []
 mufft_library_dirs = []
 
-# Did we manually disable MPI?
-if disable_mpi:
-    mpi = False
-    print('MPI disabled with command line argument --disable-mpi.')
-else:
+if mpi:
     # We only enable MPI if mpicc is in the path
     try:
         mpicc = os.environ['MPICC']
@@ -341,9 +357,10 @@ else:
     except FileNotFoundError:
         mpicc_successful = False
     if not mpicc_successful:
-        print('MPI disabled because MPI compiler wrappers were not '
-              'found or could not be executed.')
-    mpi = mpicc_successful
+        raise RuntimeError('MPI compiler wrappers were not found or could not '
+                           'be executed. (You can specify the compiler '
+                           'wrappers through the MPICC and MPICXX environment '
+                           'variables.)')
 
 if mpi:
     mugrid_sources += ['src/libmugrid/communicator.cc']
@@ -368,16 +385,10 @@ for info, _sources in [(fftw_info, ['src/libmufft/fftw_engine.cc']),
             has_mpi_enabled_fft = True
 
 if mpi and not has_mpi_enabled_fft:
-    print('MPI disabled because no MPI-enabled FFT library was '
-          'found.')
-    mpi = False
+    raise RuntimeError('No MPI-enabled FFT library was found.')
 
 if mpi:
-    print('ENABLING MPI: At least one of the FFT libraries is '
-          'MPI-parallel and the MPI compiler wrappers were found '
-          'in the path.')
-    print('(You can specify the compiler wrappers through the MPICC '
-          'and MPICXX environment variables.)')
+    print('*** ENABLING MPI for muFFT ***')
 
     macros += [('WITH_MPI', None)]
     # FIXME! This is a brute-force override.
@@ -392,6 +403,8 @@ if mpi:
     if verbose:
         print('  * C-compiler: {}'.format(os.environ['CC']))
         print('  * C++-compiler: {}'.format(os.environ['CXX']))
+else:
+    print('*** muFFT will be build WITHOUT MPI SUPPORT ***')
 
 # Detect NetCDF
 mugrid_libraries = []
@@ -431,7 +444,7 @@ ext_libraries = [
           library_dirs=mugrid_library_dirs,
           language='c++',
           extra_link_args=extra_link_args)
-    ),
+     ),
     ('muFFT',
      dict(sources=mufft_sources,
           macros=macros,
@@ -440,7 +453,7 @@ ext_libraries = [
           library_dirs=mufft_library_dirs,
           language='c++',
           extra_link_args=extra_link_args)
-    ),
+     ),
 ]
 
 # We compile two Python interfaces, _muGrid and _muFFT that use the
@@ -466,6 +479,7 @@ ext_modules = [
         language='c++',
     ),
 ]
+
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
@@ -544,7 +558,7 @@ def compiler_options(compiler, version):
 
 
 def linker_options(compiler):
-    opts = [cpp_flag(compiler)] # Not sure if this is necessary
+    opts = [cpp_flag(compiler)]  # Not sure if this is necessary
     if sys.platform == 'darwin':
         if has_flag(compiler, "-stdlib=libc++"):
             # compiler is clang
@@ -557,6 +571,7 @@ class build_ext_custom(build_ext):
     """
     A custom build extension for adding compiler-specific options.
     """
+
     def build_extension(self, ext):
         sources = ext.sources
 
@@ -602,6 +617,7 @@ class build_clib_dyn(build_clib):
     """
     A custom build extension for adding compiler-specific options.
     """
+
     def finalize_options(self):
         self.set_undefined_options('build',
                                    ('build_lib', 'build_clib'),
@@ -626,13 +642,13 @@ class build_clib_dyn(build_clib):
             sources = build_info.get('sources')
             if sources is None or not isinstance(sources, (list, tuple)):
                 raise DistutilsSetupError(
-                       "in 'libraries' option (library '%s'), "
-                       "'sources' must be present and must be "
-                       "a list of source filenames" % lib_name)
+                    "in 'libraries' option (library '%s'), "
+                    "'sources' must be present and must be "
+                    "a list of source filenames" % lib_name)
             sources = list(sources)
 
             language = build_info.get('language') or \
-                self.compiler.detect_language(sources)
+                       self.compiler.detect_language(sources)
 
             macros = build_info.get('macros')
             include_dirs = build_info.get('include_dirs')
@@ -647,15 +663,15 @@ class build_clib_dyn(build_clib):
                                             extra_postargs=extra_args,
                                             debug=self.debug)
             library_dirs = (build_info.get('library_dirs') or []) + \
-                [self.build_clib]
+                           [self.build_clib]
 
             library_filename = self.compiler.library_filename(
                 lib_name, lib_type="shared")
 
             if sys.platform == 'darwin':
                 extra_args = (build_info.get('extra_link_args') or []) + \
-                    lopts + ['-Wl,-install_name,@loader_path/{}'
-                             .format(library_filename)]
+                             lopts + ['-Wl,-install_name,@loader_path/{}'
+                                      .format(library_filename)]
 
             self.compiler.link_shared_object(
                 objects,
@@ -667,9 +683,6 @@ class build_clib_dyn(build_clib):
                 debug=self.debug,
                 target_lang=language)
 
-requirements = ['numpy']
-if mpi:
-    requirements += ['mpi4py']
 
 ### Discover version and write version.cc
 
@@ -689,9 +702,9 @@ try:
             print('  * Writing new src/libmugrid/version.cc')
         open('src/libmugrid/version.cc', 'w').write(
             open('src/libmugrid/version.cc.skeleton').read()
-                .replace('@GIT_IS_DIRTY@', 'true' if dirty else 'false')
-                .replace('@GIT_COMMIT_DESCRIBE@', version)
-                .replace('@GIT_HEAD_SHA1@', hash))
+            .replace('@GIT_IS_DIRTY@', 'true' if dirty else 'false')
+            .replace('@GIT_COMMIT_DESCRIBE@', version)
+            .replace('@GIT_HEAD_SHA1@', hash))
 except:
     # Detection via git failed. Get version from version.cc file.
     try:
@@ -703,25 +716,9 @@ except:
                            'does not exist.')
 
 setup(
-    name='muFFT',
     version=version,
-    author='Till Junge',
-    author_email='till.junge@altermail.ch',
-    url='https://gitlab.com/muspectre/muspectre',
-    description='muFFT is a wrapper for common FFT libraries with '
-                'support for MPI parallelization',
-    long_description='',
-    packages = ['muFFT', 'muGrid'],
-    package_dir = {
-        'muFFT': 'language_bindings/libmufft/python/muFFT',
-        'muGrid': 'language_bindings/libmugrid/python/muGrid'
-    },
     libraries=ext_libraries,
     ext_modules=ext_modules,
     cmdclass={'build_clib': build_clib_dyn,
               'build_ext': build_ext_custom},
-    zip_safe=False,
-    test_suite='tests',
-    setup_requires=requirements,
-    install_requires=requirements
 )
