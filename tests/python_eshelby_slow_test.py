@@ -36,6 +36,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import os
 import unittest
 import warnings
 import numpy as np
@@ -681,7 +682,9 @@ class MuSpectre_Eshelby_Slow_Check(unittest.TestCase):
         """
         # ESHELBY INCLUSION #
         # read reference data and initialise inclusion parameters
-        reference = np.load("reference_computations/eshelby_inclusion.ref.npz")
+        reference = np.load(
+            "{}/reference_computations/eshelby_inclusion.ref.npz"
+                .format(os.getenv('MUSPECTRE_TEST_DIR', default='.')))
 
         inclusion_parameters = reference["ellip"]
         x_0 = inclusion_parameters[0:3]*1e-3  # center of the inclusion
@@ -734,7 +737,8 @@ class MuSpectre_Eshelby_Slow_Check(unittest.TestCase):
         # ESHELBY INHOMOGENEITY #
         # read reference data and initialise inclusion parameters
         reference = np.load(
-            "reference_computations/eshelby_inhomogeneity.ref.npz")
+            "{}/reference_computations/eshelby_inhomogeneity.ref.npz"
+            .format(os.getenv('MUSPECTRE_TEST_DIR', default='.')))
 
         inclusion_parameters = reference["ellip"]
         x_0 = inclusion_parameters[0:3]*1e-3  # center of the inclusion

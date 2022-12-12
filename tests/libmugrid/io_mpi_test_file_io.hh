@@ -43,7 +43,7 @@
 #include <libmugrid/field_collection_global.hh>
 #include <libmugrid/field_map_static.hh>
 
-#include <src/libmugrid/communicator.hh>
+#include <libmugrid/communicator.hh>
 
 namespace muGrid {
   struct FileIOFixture {

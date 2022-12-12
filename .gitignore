@@ -3,6 +3,10 @@
 /build/*
 /build-o3/
 /build*
+/cmake-build-*
+
+*.pyc
 
 .vscode
+.idea
 .ccls-cache

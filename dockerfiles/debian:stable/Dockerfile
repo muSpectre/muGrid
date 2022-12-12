@@ -18,20 +18,24 @@ RUN apt-get -qq update && apt-get -y -qq install \
     libfftw3-mpi-dev \
     libgmp-dev \
     libhdf5-mpi-dev \
+    libopenmpi-dev \
+    libopenblas-dev \
     libpnetcdf-dev \
     libnetcdf-dev \
     locales \
+    meson \
     m4 \
+    ninja-build \
+    pybind11-dev \
     python3-breathe \
     python3-dev \
     python3-mpi4py \
-    python3-numpy \
     python3-pip \
     python3-pytest \
-    python3-scipy \
-    python3-setuptools \
     python3-sphinx \
     python3-sphinx-rtd-theme \
+    python3-venv \
+    valgrind \
     gcovr \
     ccache \
     && rm -rf /var/lib/apt/lists/*
@@ -42,4 +46,14 @@ RUN apt-get -qq update && apt-get -y -qq install \
 RUN  sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen &&     dpkg-reconfigure --frontend=noninteractive locales &&  update-locale LANG=en_US.UTF-8
 ENV LANG C.UTF-8
 
-RUN python3 -m pip install uvw meshio[all]>=4.3.10
+RUN python3 -m pip install --no-binary numpy --no-binary scipy uvw meshio[all]>=4.3.10 build twine cibuildwheel numpy>=1.20.0 scipy
+
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
+RUN cd /tmp \
+    && git clone https://github.com/mpip/pfft.git \
+    && cd pfft \
+    && ./bootstrap.sh \
+    && CFLAGS="-O2 -march=sandybridge -mno-avx512f" ./configure --disable-fortran --enable-shared --prefix=/usr/local \
+    && make -j 4 \
+    && make install

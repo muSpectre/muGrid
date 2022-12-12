@@ -1,9 +1,10 @@
-.builds:
+.cmake_build:
   stage: build
   script:
     - free -h
     - df -h
     - grep -c ^processor /proc/cpuinfo
+    - mkdir build
     - cd build
     - echo "Build type ${BUILD_TYPE} -- additional flags ${CMAKE_ADDITIONAL_FLAGS}"
     - cmake -DCMAKE_BUILD_TYPE:STRING=${BUILD_TYPE}
@@ -20,7 +21,43 @@
       - build/**/*.o
     expire_in: 5h
 
-.tests:
+.meson_build:
+  stage: build
+  script:
+    - free -h
+    - df -h
+    - grep -c ^processor /proc/cpuinfo
+    - echo "Build type ${BUILD_TYPE} -- additional flags ${MESON_ADDITIONAL_FLAGS}"
+    - python3 discover_version.py
+    - meson setup --buildtype=${BUILD_TYPE} ${MESON_ADDITIONAL_FLAGS} build
+    - cd build
+    - ninja
+    - df -h
+  artifacts:
+    when: on_success
+    paths:
+      - build
+    exclude:
+      - build/**/*.o
+    expire_in: 5h
+
+.pip_build:
+  stage: build
+  script:
+    - free -h
+    - grep -c ^processor /proc/cpuinfo
+    - python3 -m venv venv
+    - source venv/activate
+    - pip install build
+    - python3 -m build . -s
+    - python3 -m pip install --user dist/*.tar.gz
+  artifacts:
+    when: on_success
+    paths:
+      - venv
+    expire_in: 5h
+
+.cmake_tests:
   stage: test
   script:
     - cd build
@@ -49,7 +86,25 @@
         coverage_format: cobertura
         path: build/coverage.xml
 
-.tests_muspectre:
+.meson_tests:
+  stage: test
+  variables:
+    # This is needed to force OpenMPI to run because tests are run as root
+    OMPI_ALLOW_RUN_AS_ROOT: 1
+    OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+  script:
+    - cd build
+    - meson test -v --no-rebuild
+    - echo "Build type ${BUILD_TYPE}"
+    - if [ "${BUILD_TYPE}" = "Coverage" ]; then
+    -   gcovr --xml
+      --gcov-executable "${GCOV_EXECUTABLE}"
+      --output coverage.xml
+      --object-directory ${CI_PROJECT_DIR}/build
+      --root ${CI_PROJECT_DIR}  -s || true
+    - fi
+
+.valgrind_muspectre:
   stage: test
   script:
     - cd build
@@ -98,142 +153,145 @@
     - ccache --show-stats || true
 
 # ------------------------------------------------------------------------------
-build:testing_gcc_mpi:
+build:stable_cmake_mpi_gcc:
   variables:
     BUILD_TYPE: Coverage
     CMAKE_ADDITIONAL_FLAGS: -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2
     CACHE_PREFIX: "_mpi"
   extends:
-    - .builds
+    - .cmake_build
     - .cache_build
     - .compiler_gcc
-    - .image_debian_testing
+    - .image_debian_stable
 
-test:testing_gcc_mpi:
+test:stable_cmake_mpi_gcc:
   variables:
     BUILD_TYPE: Coverage
     OMPI_ALLOW_RUN_AS_ROOT: 1
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
     OMPI_MCA_rmaps_base_oversubscribe: 1
   extends:
-    - .tests
+    - .cmake_tests
     - .compiler_gcc
-    - .image_debian_testing
+    - .image_debian_stable
   needs:
-    - job: build:testing_gcc_mpi
-      artifacts: true
-
-test_muspectre:testing_gcc:
-  extends:
-    - .tests_muspectre
-    - .image_debian_testing
-  needs:
-    - job: build:testing_gcc_mpi
+    - job: build:stable_cmake_mpi_gcc
       artifacts: true
 
 # ------------------------------------------------------------------------------
-build:testing_gcc:
+build:stable_cmake_clang:
   variables:
     BUILD_TYPE: Release
   extends:
-    - .builds
-    - .cache_build
-    - .compiler_gcc
-    - .image_debian_stable
-
-test:testing_gcc:
-  extends:
-    - .tests
-    - .image_debian_stable
-  needs:
-    - job: build:testing_gcc
-      artifacts: true
-
-# ------------------------------------------------------------------------------
-build:testing_clang:
-  variables:
-    BUILD_TYPE: Release
-  extends:
-    - .builds
+    - .cmake_build
     - .cache_build
     - .compiler_clang
-    - .image_debian_testing
+    - .image_debian_stable
 
-test:testing_clang:
+test:stable_cmake_clang:
   extends:
-    - .tests
-    - .image_debian_testing
+    - .cmake_tests
+    - .image_debian_stable
   needs:
-    - job: build:testing_clang
+    - job: build:stable_cmake_clang
       artifacts: true
 
-test_muspectre:testing_clang:
+valgrind:stable_cmake_clang:
   extends:
-    - .tests_muspectre
-    - .image_debian_testing
+    - .valgrind_muspectre
+    - .image_debian_stable
   needs:
-    - job: build:testing_clang
+    - job: build:stable_cmake_clang
       artifacts: true
 
 # ------------------------------------------------------------------------------
-build:stable_gcc:
+build:stable_cmake_gcc:
   variables:
     BUILD_TYPE: Release
   extends:
-    - .builds
+    - .cmake_build
     - .cache_build
     - .compiler_gcc
     - .image_debian_stable
 
-test:stable_gcc:
+test:stable_cmake_gcc:
   extends:
-    - .tests
+    - .cmake_tests
     - .image_debian_stable
   needs:
-    - job: build:stable_gcc
+    - job: build:stable_cmake_gcc
       artifacts: true
 
 # ------------------------------------------------------------------------------
-build:testing_gcc_split:
+build:stable_cmake_split_gcc:
   variables:
     BUILD_TYPE: Release
     CMAKE_ADDITIONAL_FLAGS: -DSPLIT_CELL=ON
     CACHE_PREFIX: "_split"
   extends:
-    - .builds
+    - .cmake_build
     - .cache_build
     - .compiler_gcc
-    - .image_debian_testing
+    - .image_debian_stable
 
-test:testing_gcc_split:
+test:stable_cmake_split_gcc:
   variables:
     BUILD_TYPE: Release
   extends:
-    - .tests
+    - .cmake_tests
     - .compiler_gcc
-    - .image_debian_testing
+    - .image_debian_stable
   needs:
-    - job: build:testing_gcc_split
+    - job: build:stable_cmake_split_gcc
       artifacts: true
 
 # ------------------------------------------------------------------------------
-build:testing_gcc_setuptools:
+build:stable_meson_gcc:
+  variables:
+    BUILD_TYPE: release
   extends:
-    - .builds
+    - .meson_build
+    - .compiler_gcc
+    - .image_debian_stable
+
+test:stable_meson_gcc:
+  extends:
+    - .meson_tests
+    - .image_debian_stable
+  needs:
+    - job: build:stable_meson_gcc
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:testing_meson_gcc:
+  variables:
+    BUILD_TYPE: release
+  extends:
+    - .meson_build
+    - .compiler_gcc
     - .image_debian_testing
-  script:
-    - free -h
-    - grep -c ^processor /proc/cpuinfo
-    - python3 setup.py sdist
-    - python3 -m pip install --user dist/*.tar.gz
-    - cd tests/libmufft
-    - python3 python_binding_tests.py
+
+test:testing_meson_gcc:
+  extends:
+    - .meson_tests
+    - .image_debian_testing
+  needs:
+    - job: build:testing_meson_gcc
+      artifacts: true
+
+# ------------------------------------------------------------------------------
+build:stable_pip_gcc:
+  extends:
+    - .pip_build
+    - .cmake_build
+    - .image_debian_stable
 
 # ------------------------------------------------------------------------------
 build:test_documention:
   stage: build
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:
+    - mkdir build
     - cd build
     - cmake -DMUSPECTRE_MAKE_DOC_TARGET=ON ..
     - make dev_doc
@@ -262,8 +320,7 @@ pages:
   stage: deploy
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:
-    - python3 -m pip install twine
-    - python3 setup.py sdist
+    - python3 -m build . -s
     - python3 -m twine upload --non-interactive --username __token__ --password $PYPI_PASSWORD dist/*
   only:
     - tags

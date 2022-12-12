@@ -1,3 +1,38 @@
 [build-system]
-requires = ['setuptools>=40.8.0']
-build-backend = 'setuptools.build_meta'
+requires = ["meson>=0.46.0", "meson-python>=0.11.0", "ninja", "numpy>=1.20.0"]
+build-backend = "mesonpy"
+
+[project]
+name = "muSpectre"
+description = "µSpectre is an open-source platform for efficient FFT-based continuum mesoscale modelling"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Till Junge", email = "till.junge@altermail.ch" },
+    { name = "Lars Pastewka", email = "lars.pastewka@imtek.uni-freiburg.de" },
+    { name = "Ali Falsafi", email = "ali.falsafi@epfl.ch" },
+    { name = "Richard Leute", email = "richard.leute@imtek.uni-freiburg.de" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python"
+]
+requires-python = ">=3.5.0"
+dynamic = [ "version" ]
+dependencies = [
+    "scipy",
+    "uvw",
+    "meshio",
+    "h5py"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov"
+]
+
+[project.urls]
+documentation = "https://muspectre.gitlab.io/muspectre/index.html"
+repository = "https://gitlab.com/muspectre/muspectre"
+changelog = "https://gitlab.com/muspectre/muspectre/-/blob/master/CHANGELOG.md"

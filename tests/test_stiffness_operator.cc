@@ -50,7 +50,7 @@
 #include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/mapped_field.hh>
 
-#include <src/projection/discrete_greens_operator.hh>
+#include <projection/discrete_greens_operator.hh>
 
 #include "cell/cell_data.hh"
 

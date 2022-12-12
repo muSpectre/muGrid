@@ -1,8 +1,14 @@
 Change log for µSpectre
 =======================
 
-0.24.0 (not yet released)
+0.25.0 (not yet released)
 -------------------------
+
+- Added Meson build files (Python package now exclusively build using Meson)
+- Defaulted again to autodetecting MPI
+
+0.24.0 (22Nov2022)
+------------------
 
 - muFFT: Changed Python install procedure; default to no MPI and MPI now needs
   to be explicitly enabled

@@ -36,14 +36,14 @@
 #ifndef TESTS_LIBMUGRID_IO_TEST_FILE_IO_HH_
 #define TESTS_LIBMUGRID_IO_TEST_FILE_IO_HH_
 
-#include "tests/libmufft/tests.hh"
+#include "../libmufft/tests.hh"
 #include "mpi_context.hh"
 
 #include <libmugrid/field_collection_local.hh>
 #include <libmugrid/field_collection_global.hh>
 #include <libmugrid/field_map_static.hh>
 
-#include <src/libmugrid/communicator.hh>
+#include <libmugrid/communicator.hh>
 
 namespace muGrid {
   struct FileIOFixture {

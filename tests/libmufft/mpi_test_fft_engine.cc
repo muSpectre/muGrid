@@ -39,7 +39,7 @@
 #include <boost/mpl/list.hpp>
 
 #include "tests.hh"
-#include "tests/libmugrid/mpi_context.hh"
+#include "../libmugrid/mpi_context.hh"
 #include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>

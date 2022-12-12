@@ -25,13 +25,14 @@ The latter option requires you to have a user account on gitlab (`create
 
 Building *µ*\Spectre
 ********************
-You can compile *µ*\Spectre using `CMake <https://cmake.org/>`_ (3.5.0 or
-higher). 
+You can compile *µ*\Spectre using `Meson <https://mesonbuild.com/>`_
+(0.42.0 or higher) or `CMake <https://cmake.org/>`_ (3.5.0 or
+higher).
 
 Dependencies of *µ*\Spectre
  The current (and possibly incomplete list of) dependencies are
 
-- `CMake <https://cmake.org/>`_ (3.5.0 or higher)
+- `Meson <https://mesonbuild.com/>`_ (0.42.0 or higher) or `CMake <https://cmake.org/>`_ (3.5.0 or higher)
 - `Boost unit test framework <http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html>`_
 - `FFTW <http://www.fftw.org>`_
 - `git <https://git-scm.com/>`_
@@ -74,10 +75,35 @@ It does *not* compile on Intel's most recent compiler, as it is still lacking
 some C++14 support. Work-arounds are planned, but will have to wait for someone
 to pick up the `task <https://gitlab.com/muspectre/muspectre/issues/93>`_.
 
-Instructions for compiling *µ*\Spectre
- To compile, go into the build folder and configure the CMake project. If you do
- this in the folder you cloned in the previous step, it can look for instance
- like this:
+Instructions for compiling *µ*\Spectre with Meson
+*************************************************
+
+To compile for *development*, i.e. with debug options turned on, first setup
+the build folder:
+
+.. code-block:: sh
+
+   $ meson setup meson-build-debug
+
+To compile for *production*, i.e. with code optimizations turned on, setup the
+build folder while specifying the `release` build type.
+
+.. code-block:: sh
+
+   $ meson setup --buildtype release meson-build-release
+
+The compilation is handled with `ninja`. Navigate to the build folder and run:
+
+.. code-block:: sh
+
+   $ ninja
+
+Instructions for compiling *µ*\Spectre with CMake
+*************************************************
+
+To compile, go into the build folder and configure the CMake project. If you do
+this in the folder you cloned in the previous step, it can look for instance
+like this:
 
 .. code-block:: sh
 

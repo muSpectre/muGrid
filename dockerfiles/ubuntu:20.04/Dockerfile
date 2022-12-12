@@ -1,5 +1,5 @@
-FROM ubuntu:18.04
-MAINTAINER Till Junge <till.junge@epfl.ch>
+FROM ubuntu:20.04
+MAINTAINER Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
 
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8

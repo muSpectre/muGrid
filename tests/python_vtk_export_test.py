@@ -360,8 +360,8 @@ class VtkExport_Check(unittest.TestCase):
                     "vtk_export() was not able to write the {}D output file "\
                     "'{}.vtr'.".format(dim, file_name)
                 cmp_data = file_name + '.vtr'
-                ref_data = '../reference_computations/' \
-                           + file_name + '.ref.vtr'
+                ref_data = '{}/reference_computations/{}.ref.vtr' \
+                    .format(os.getenv('MUSPECTRE_TEST_DIR', default='..'), file_name)
                 ref_tree = XmlTree.binary_file_to_tree(ref_data)
                 cmp_tree = XmlTree.binary_file_to_tree(cmp_data)
                 with XmlTree() as comparator:

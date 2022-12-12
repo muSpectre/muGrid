@@ -37,7 +37,7 @@
 
 #include "mpi_context.hh"
 
-#include <tests/libmufft/tests.hh>
+#include "../libmufft/tests.hh"
 #include <libmugrid/file_io_base.hh>
 #include <libmugrid/file_io_netcdf.hh>
 

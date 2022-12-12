@@ -37,7 +37,7 @@
 #include "tests.hh"
 #include "libmugrid/test_goodies.hh"
 
-#include "src/projection/discrete_greens_operator.hh"
+#include "projection/discrete_greens_operator.hh"
 #include <libmufft/fftw_engine.hh>
 
 #include <libmugrid/iterators.hh>

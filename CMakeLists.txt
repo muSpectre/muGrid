@@ -140,7 +140,7 @@ endif()
 
 ################################################################################
 # compile the library
-add_compile_options(-Werror)
+#add_compile_options(-Werror)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(MUCHOICE MATCHES "muSpectre")
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/language_bindings)

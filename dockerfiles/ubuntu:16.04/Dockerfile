@@ -22,7 +22,9 @@ RUN apt-get -qq update && apt-get -y -qq install \
     libhdf5-mpi-dev \
     libpnetcdf-dev \
     libnetcdf-dev \
+    meson \
     m4 \
+    ninja-build \
     python3-breathe \
     python3-dev \
     python3-mpi4py \
@@ -33,6 +35,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
     python3-setuptools \
     python3-sphinx \
     python3-sphinx-rtd-theme \
+    python3-venv \
     gcovr \
     ccache \
     && rm -rf /var/lib/apt/lists/*
