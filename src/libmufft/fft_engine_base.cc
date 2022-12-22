@@ -49,7 +49,8 @@ namespace muFFT {
                                Communicator comm,
                                const FFT_PlanFlags & plan_flags,
                                bool allow_temporary_buffer,
-                               bool allow_destroy_input)
+                               bool allow_destroy_input,
+                               bool engine_has_rigid_memory_layout)
       : spatial_dimension{nb_grid_pts.get_dim()}, comm{comm},
         real_field_collection{this->spatial_dimension,
                               GlobalFieldCollection::SubPtMap_t{{PixelTag, 1}}},
@@ -67,6 +68,7 @@ namespace muFFT {
         fourier_strides{get_col_major_strides(nb_fourier_grid_pts)},
         allow_temporary_buffer{allow_temporary_buffer},
         allow_destroy_input{allow_destroy_input},
+        engine_has_rigid_memory_layout{engine_has_rigid_memory_layout},
         norm_factor{1. / muGrid::CcoordOps::get_size(nb_grid_pts)},
         plan_flags{plan_flags} {}
 
@@ -93,7 +95,7 @@ namespace muFFT {
             << "' passed to the forward FFT is " << input_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -105,7 +107,7 @@ namespace muFFT {
             << "' passed to the forward FFT is " << output_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -205,7 +207,7 @@ namespace muFFT {
             << "' passed to the inverse FFT is " << input_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_fourier_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -217,7 +219,7 @@ namespace muFFT {
             << "' passed to the inverse FFT is " << output_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -317,7 +319,7 @@ namespace muFFT {
             << "' passed to the forward FFT is " << input_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -329,7 +331,7 @@ namespace muFFT {
             << "' passed to the forward FFT is " << output_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -429,7 +431,7 @@ namespace muFFT {
             << "' passed to the inverse FFT is " << input_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -441,7 +443,7 @@ namespace muFFT {
             << "' passed to the inverse FFT is " << output_field.get_nb_pixels()
             << " and does not match the size "
             << muGrid::CcoordOps::get_size(this->nb_subdomain_grid_pts)
-            << " of the (sub)domain handled by FFTWEngine.";
+            << " of the (sub)domain handled by this FFT engine.";
       throw FFTEngineError(error.str());
     }
 
@@ -743,6 +745,11 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   bool FFTEngineBase::check_real_space_field(const RealField_t & field) const {
+    if (!this->engine_has_rigid_memory_layout) {
+      // If there is no requirements on the memory layout, this field is always
+      // acceptable.
+      return true;
+    }
     return field.get_collection().has_same_memory_layout(
         this->real_field_collection);
   }
@@ -750,11 +757,21 @@ namespace muFFT {
   /* ---------------------------------------------------------------------- */
   bool
   FFTEngineBase::check_fourier_space_field(const FourierField_t & field) const {
+    if (!this->engine_has_rigid_memory_layout) {
+      // If there is no requirements on the memory layout, this field is always
+      // acceptable.
+      return true;
+    }
     return field.get_collection().has_same_memory_layout(
         this->fourier_field_collection);
   }
 
   bool FFTEngineBase::check_halfcomplex_field(const RealField_t & field) const {
+    if (!this->engine_has_rigid_memory_layout) {
+      // If there is no requirements on the memory layout, this field is always
+      // acceptable.
+      return true;
+    }
     return field.get_collection().has_same_memory_layout(
         this->halfcomplex_field_collection);
   }
@@ -763,14 +780,14 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTEngineBase::compute_hcfft(const RealField_t & /*input_field*/,
-                                    RealField_t & /*output_field*/) const {
+                                    RealField_t & /*output_field*/) {
     throw FFTEngineError("Real to half-complex"
                          "transform not implemented in this FFTEngine");
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTEngineBase::compute_ihcfft(const RealField_t & /*input_field*/,
-                                     RealField_t & /*output_field*/) const {
+                                     RealField_t & /*output_field*/) {
     throw FFTEngineError("Real to half-complex "
                          "inverse transform not implemented in this FFTEngine");
   }

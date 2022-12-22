@@ -48,7 +48,9 @@
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_approx_Green_operator.hh"
 
+#ifdef WITH_FFTW
 #include <libmufft/fftw_engine.hh>
+#endif
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
 #endif

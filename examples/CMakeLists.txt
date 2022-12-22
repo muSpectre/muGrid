@@ -172,10 +172,10 @@ muSpectre_add_example(example_damage_diff_mean_control
   TYPE PYTHON example_damage_diff_mean_control.py)
 
 
-if (NETCDF_IO)
+if (${MUGRID_NETCDF_IO})
   muSpectre_add_example(netcdf_io_use_case
     TYPE PYTHON netcdf_io_use_case.py)
-endif(NETCDF_IO)
+endif(${MUGRID_NETCDF_IO})
 
 muSpectre_add_example(free_surface_py_example
   TYPE PYTHON free_surface.py)

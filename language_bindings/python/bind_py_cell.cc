@@ -49,6 +49,9 @@
 #include <libmugrid/numpy_tools.hh>
 #include <libmugrid/communicator.hh>
 
+#ifdef WITH_FFTW
+#include "libmufft/fftw_engine.hh"
+#endif
 #ifdef WITH_FFTWMPI
 #include "libmufft/fftwmpi_engine.hh"
 #endif
@@ -76,51 +79,8 @@ using muSpectre::ProjectionBase;
 using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
-/**
- * the cell factory is only bound for default template parameters
- */
-void add_cell_factory(py::module & mod) {
-  using DynCcoord_t = muGrid::DynCcoord_t;
-  using DynRcoord_t = muGrid::DynRcoord_t;
-
-  mod.def(
-      "CellFactory",
-      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
-         Communicator comm,
-         const muFFT::FFT_PlanFlags & flags) {
-        return muSpectre::make_cell(std::move(res), std::move(lens),
-                                    std::move(form), std::move(gradient),
-                                    std::move(weights), std::move(comm),
-                                    std::move(flags));
-      },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a, "weights"_a,
-      "communicator"_a, "flags"_a = muFFT::FFT_PlanFlags::estimate);
-
-  mod.def(
-      "CellFactory",
-      [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
-         ProjectionBase::Gradient_t gradient,
-         ProjectionBase::Weights_t weights) {
-        return muSpectre::make_cell(std::move(res), std::move(lens),
-                                    std::move(form), std::move(gradient),
-                                    std::move(weights));
-      },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a, "gradient"_a, "weights"_a);
-
-  mod.def(
-      "CellFactory",
-      [](DynCcoord_t res, DynRcoord_t lens, Formulation form) {
-        return muSpectre::make_cell(std::move(res), std::move(lens),
-                                    std::move(form));
-      },
-      "nb_grid_pts"_a, "lengths"_a, "formulation"_a);
-}
-
-#if defined(WITH_FFTWMPI) || defined(WITH_PFFT)
 template <class Engine>
-void add_cell_factory_for_engine(py::module & mod,
-                                 const char * name) {
+void add_cell_factory(py::module & mod, const char * name) {
   using DynCcoord_t = muGrid::DynCcoord_t;
   using DynRcoord_t = muGrid::DynRcoord_t;
 
@@ -155,14 +115,13 @@ void add_cell_factory_for_engine(py::module & mod,
       },
       "nb_grid_pts"_a, "lengths"_a, "formulation"_a);
 }
-#endif
 
 #ifdef WITH_SPLIT
 void add_split_cell_factory_helper(py::module & mod) {
   using DynCcoord_t = muGrid::DynCcoord_t;
   using DynRcoord_t = muGrid::DynRcoord_t;
   mod.def(
-      "CellFactorySplit",
+      "FFTWCellFactorySplit",
       [](DynCcoord_t res, DynRcoord_t lens, Formulation form,
          ProjectionBase::Gradient_t gradient,
          ProjectionBase::Weights_t weights) {
@@ -437,7 +396,7 @@ void add_cell_split_helper(py::module & mod) {
 #endif
 
 void add_cell(py::module & mod) {
-  add_cell_factory(mod);
+  add_cell_factory<muFFT::PocketFFTEngine>(mod, "PocketFFTCellFactory");
 
 #ifdef WITH_SPLIT
   add_split_cell_factory_helper(mod);
@@ -447,13 +406,15 @@ void add_cell(py::module & mod) {
   add_cell_helper(mod);
 #endif
 
+#ifdef WITH_FFTW
+  add_cell_factory<muFFT::FFTWEngine>(mod, "FFTWCellFactory");
+#endif
+
 #ifdef WITH_FFTWMPI
-  add_cell_factory_for_engine<muFFT::FFTWMPIEngine>(
-      mod, "FFTWMPICellFactory");
+  add_cell_factory<muFFT::FFTWMPIEngine>(mod, "FFTWMPICellFactory");
 #endif
 
 #ifdef WITH_PFFT
-  add_cell_factory_for_engine<muFFT::PFFTEngine>(
-      mod, "PFFTCellFactory");
+  add_cell_factory<muFFT::PFFTEngine>(mod, "PFFTCellFactory");
 #endif
 }

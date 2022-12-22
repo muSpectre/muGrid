@@ -72,7 +72,7 @@ from muFFT import (Communicator, DiscreteDerivative, FourierDerivative,
                    FFT_PlanFlags)
 from _muGrid import Verbosity
 from muFFT import Communicator, FourierDerivative, DiscreteDerivative, FFT, \
-    FFT_PlanFlags
+    FFT_PlanFlags, mangle_engine_identifier, UnknownFFTEngineError
 
 from . import eshelby_slow
 from . import gradient_integration
@@ -83,7 +83,8 @@ from . import linear_finite_elements
 
 from . import _muSpectre
 
-_factories = {'fftw': ('CellFactory', False),
+_factories = {'pocketfft': ('PocketFFTCellFactory', False),
+              'fftw': ('FFTWCellFactory', False),
               'fftwmpi': ('FFTWMPICellFactory', True),
               'pfft': ('PFFTCellFactory', True)}
 
@@ -121,11 +122,11 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
     fft: string
         FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
         if you need a serial engine. It is also possible to specifically
-        choose 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
+        choose 'pocketfft', 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
         Default: 'serial'.
     communicator: mpi4py or muFFT communicator
         communicator object passed to parallel FFT engines. Note that
-        the default 'fftw' engine does not support parallel execution.
+        the 'pocketfft' and 'fftw' engines do not support parallel execution.
 
 
     Returns
@@ -133,17 +134,7 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
     cell: object
         Return a muSpectre Cell object.
     """
-    fft = 'fftw' if fft == 'serial' else fft
-
-    communicator = Communicator(communicator)
-
-    # 'mpi' is a convenience setting that falls back to 'fftw' for single
-    # process jobs and to 'fftwmpi' for multi-process jobs
-    if fft == 'mpi':
-        if communicator.size > 1:
-            fft = 'fftwmpi'
-        else:
-            fft = 'fftw'
+    fft, communicator = mangle_engine_identifier(fft, communicator)
 
     if gradient is None:
         if weights is not None:
@@ -164,14 +155,23 @@ def Cell(nb_grid_pts, domain_lengths, formulation=Formulation.finite_strain,
     try:
         factory_name, is_parallel = _factories[fft]
     except KeyError:
-        raise KeyError("Unknown FFT engine '{}'.".format(fft))
+        factory_name = None
+    if factory_name is None:
+        raise UnknownFFTEngineError("Unknown FFT engine '{}'.".format(fft))
+
     if is_cell_split == SplitCell.split:
         factory_name = factory_name + "Split"
+
     try:
         factory = _muSpectre.cell.__dict__[factory_name]
     except KeyError:
-        raise KeyError("FFT engine '{}' has not been compiled into the "
-                       "muSpectre library.".format(fft))
+        factory = None
+
+    if factory is None:
+        raise UnknownFFTEngineError(
+            "It seem that FFT engine '{}' has not been compiled into the "
+            "muSpectre library, because the factory function '{}' is "
+            "missing.".format(fft, factory_name))
     if communicator.size == 1:
         return factory(nb_grid_pts, domain_lengths, formulation, gradient, weights)
     else:

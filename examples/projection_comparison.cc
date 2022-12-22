@@ -32,20 +32,23 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-#include "common/muSpectre_common.hh"
-#include "cell/cell_factory.hh"
-#include "materials/material_linear_elastic1.hh"
-#include "solver/solvers.hh"
-#include "solver/krylov_solver_cg.hh"
-#include "projection/projection_approx_Green_operator.hh"
-
-#include <libmugrid/ccoord_operations.hh>
-
-#include "external/cxxopts.hpp"
 
 #include <iostream>
 #include <memory>
 #include <chrono>
+
+#include <external/cxxopts.hpp>
+
+#include <libmugrid/ccoord_operations.hh>
+
+#include <libmufft/pocketfft_engine.hh>
+
+#include <common/muSpectre_common.hh>
+#include <cell/cell_factory.hh>
+#include <materials/material_linear_elastic1.hh>
+#include <solver/solvers.hh>
+#include <solver/krylov_solver_cg.hh>
+#include <projection/projection_approx_Green_operator.hh>
 
 using opt_ptr = std::unique_ptr<cxxopts::Options>;
 
@@ -119,7 +122,7 @@ int small_sym(int argc, char * argv[]) {
 
   auto && C_ref(muGrid::Matrices::Iiden<Dim>());
 
-  auto && fft_pointer(std::make_unique<muFFT::FFTWEngine>(
+  auto && fft_pointer(std::make_unique<muFFT::PocketFFTEngine>(
       DynCcoord_t(nb_grid_pts), FFT_PlanFlags::measure));
 
   std::unique_ptr<ProjectionBase> projection_ptr{};

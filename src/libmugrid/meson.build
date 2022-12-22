@@ -9,7 +9,6 @@ version_file = configure_file(
 )
 
 mugrid_sources = [
-    'muGrid',
     'exception.cc',
     'grid_common.cc',
     'ccoord_operations.cc',
@@ -30,7 +29,7 @@ mugrid_sources = [
     version_file
 ]
 
-if mu_with_netcdf
+if mugrid_with_netcdf
     mugrid_sources += [
         'file_io_netcdf.cc',
     ]
@@ -43,6 +42,7 @@ if mu_with_mpi
 endif
 
 mugrid = shared_library(
+    'muGrid',
     mugrid_sources,
     dependencies: muspectre_dependencies
 )

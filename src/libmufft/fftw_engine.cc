@@ -222,7 +222,7 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_fft(const RealField_t & input_field,
-                               FourierField_t & output_field) const {
+                               FourierField_t & output_field) {
     fftw_execute_dft_r2c(this->fft_plans.at(input_field.get_nb_dof_per_pixel()),
                          input_field.data(),
                          reinterpret_cast<fftw_complex *>(output_field.data()));
@@ -230,7 +230,7 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_ifft(const FourierField_t & input_field,
-                                RealField_t & output_field) const {
+                                RealField_t & output_field) {
     fftw_execute_dft_c2r(
         this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
         reinterpret_cast<fftw_complex *>(input_field.data()),
@@ -239,14 +239,14 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_hcfft(const RealField_t & input_field,
-                                 RealField_t & output_field) const {
+                                 RealField_t & output_field) {
     fftw_execute_r2r(this->hcfft_plans.at(input_field.get_nb_dof_per_pixel()),
                      input_field.data(), output_field.data());
   }
 
   /* ---------------------------------------------------------------------- */
   void FFTWEngine::compute_ihcfft(const RealField_t & input_field,
-                                  RealField_t & output_field) const {
+                                  RealField_t & output_field) {
     fftw_execute_r2r(this->ihcfft_plans.at(input_field.get_nb_dof_per_pixel()),
                      input_field.data(), output_field.data());
   }

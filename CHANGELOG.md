@@ -4,6 +4,7 @@ Change log for µSpectre
 0.25.0 (not yet released)
 -------------------------
 
+- muFFT: Added PocketFFT engine (that does not require external dependencies)
 - Added Meson build files (Python package now exclusively build using Meson)
 - Defaulted again to autodetecting MPI
 

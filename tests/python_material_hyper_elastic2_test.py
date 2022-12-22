@@ -72,7 +72,7 @@ class MaterialHyperElastic2_Check(unittest.TestCase):
         E = Young * (0.6 + 0.3 * np.random.random(nb_grid_pts))
 
         # µSpectre init stuff
-        fft = "fftw"
+        fft = "serial"
         form = µ.Formulation.finite_strain
         # use e.g. average upwind differences
         dz = muFFT.DiscreteDerivative([0, 0, 0],
@@ -153,7 +153,7 @@ class MaterialHyperElastic2_Check(unittest.TestCase):
         mu = Young / (2*(1+Poisson))
 
         # µSpectre init stuff
-        fft = "fftw"
+        fft = "serial"
         form = µ.Formulation.finite_strain
         dz = muFFT.DiscreteDerivative([0, 0, 0],
                                       [[[-0.25, 0.25], [-0.25, 0.25]],

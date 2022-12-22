@@ -57,7 +57,7 @@ set(mufft_HDRS
   ${CMAKE_CURRENT_SOURCE_DIR}/derivative.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.hh
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_utils.hh
-  ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine.hh
+  ${CMAKE_CURRENT_SOURCE_DIR}/pocketfft_engine.hh
   )
 
 set(mufft_SRCS
@@ -65,8 +65,15 @@ set(mufft_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/derivative.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_engine_base.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fft_utils.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/pocketfft_engine.cc
+  )
+
+set(fft_engine_FFTW_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine.cc
-        ../projection/discrete_greens_operator.cc
+  )
+
+set(fft_engine_FFTW_HDRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/fftw_engine.hh
   )
 
 set(fft_engine_FFTWMPI_SRCS
@@ -85,8 +92,12 @@ set(fft_engine_PFFT_HDRS
   ${CMAKE_CURRENT_SOURCE_DIR}/pfft_engine.hh
   )
 
-find_package(FFTW3 COMPONENTS double REQUIRED)
-target_link_libraries(muFFT PUBLIC fftw3::double)
+if (${MUFFT_FFTW})
+  find_package(FFTW3 COMPONENTS double REQUIRED)
+  target_link_libraries(muFFT PUBLIC fftw3::double)
+  list(APPEND mufft_SRCS ${fft_engine_FFTW_SRCS})
+  list(APPEND mufft_HDRS ${fft_engine_FFTW_HDRS})
+endif(${MUFFT_FFTW})
 
 if(BUILD_SHARED_LIBS STREQUAL "OFF")
   set_target_properties(muFFT PROPERTIES
@@ -99,14 +110,10 @@ if(${MUSPECTRE_MPI_PARALLEL})
 
   target_link_libraries(muFFT PUBLIC ${MPI_LIBRARIES})
   target_include_directories(muFFT SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
-  target_compile_definitions(muFFT PUBLIC -DWITH_MPI)
-
-  option(MUFFT_USE_FFTWMPI "If on, the mpi-parallel FFTW engine is built" ON)
-  option(MUFFT_USE_PFFT "If on, the mpi-parallel PFFT engine is built" OFF)
 
   set(_using_mpi FALSE)
   foreach (_fft FFTWMPI PFFT)
-    if (${MUFFT_USE_${_fft}})
+    if (${MUFFT_${_fft}})
       if("${_fft}" STREQUAL "FFTWMPI")
         find_package(FFTW3 COMPONENTS double mpi REQUIRED)
         target_link_libraries(muFFT PUBLIC fftw3::double::mpi)

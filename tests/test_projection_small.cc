@@ -33,29 +33,84 @@
  *
  */
 
-#include "test_projection.hh"
-#include "libmugrid/test_goodies.hh"
-
-#include "projection/projection_small_strain.hh"
-#include "projection/projection_approx_Green_operator.hh"
+#include <Eigen/Dense>
 
 #include <libmufft/fft_utils.hh>
+#include <libmufft/pocketfft_engine.hh>
 
-#include <Eigen/Dense>
+#include <projection/projection_small_strain.hh>
+#include <projection/projection_approx_Green_operator.hh>
+
+#include "libmugrid/test_goodies.hh"
+
+#include "test_projection.hh"
+
 
 namespace muSpectre {
 
   BOOST_AUTO_TEST_SUITE(projection_small_strain);
 
   using fixlist = boost::mpl::list<
-      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
-                        ProjectionSmallStrain<twoD>>,
-      ProjectionFixture<threeD, threeD, Squares<threeD>,
-                        FourierGradient<threeD>, ProjectionSmallStrain<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
-                        ProjectionSmallStrain<twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
-                        ProjectionSmallStrain<threeD>>>;
+      ProjectionFixture<twoD,
+                        twoD,
+                        Squares<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionSmallStrain<twoD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Squares<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionSmallStrain<threeD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Sizes<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionSmallStrain<twoD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Sizes<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionSmallStrain<threeD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>
+#ifdef WITH_FFTW
+      ,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Squares<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionSmallStrain<twoD>,
+                        OneQuadPt,
+                        muFFT::FFTWEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Squares<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionSmallStrain<threeD>,
+                        OneQuadPt,
+                        muFFT::FFTWEngine>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Sizes<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionSmallStrain<twoD>,
+                        OneQuadPt,
+                        muFFT::FFTWEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Sizes<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionSmallStrain<threeD>,
+                        OneQuadPt,
+                        muFFT::FFTWEngine>
+#endif
+      >;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlist, fix) {
@@ -169,7 +224,7 @@ namespace muSpectre {
     auto && C_ref(muGrid::Matrices::Isymm<fix::sdim>());
     // create a Green operator projector
 
-    auto && fft_pointer{std::make_unique<muFFT::FFTWEngine>(
+    auto && fft_pointer{std::make_unique<muFFT::PocketFFTEngine>(
         DynCcoord_t(fix::SizeGiver::get_nb_grid_pts()))};
 
     ProjectionApproxGreenOperator<fix::mdim> green_projection{

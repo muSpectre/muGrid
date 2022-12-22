@@ -724,6 +724,9 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                 .all())
 
         def create_save_and_test_fields(f_name, cell):
+            if 'FileIONetCDF' not in dir(muGrid):
+                return None
+
             file_io_object = init_file_io_object(f_name, cell)
 
             def save_and_test_fields(cell, n_strain_loop, before_avalanche):
@@ -1039,6 +1042,9 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
                 .all())
 
         def create_save_and_test_fields(f_name, cell):
+            if 'FileIONetCDF' not in dir(muGrid):
+                return None
+
             file_io_object = init_file_io_object(f_name, cell)
 
             def save_and_test_fields(cell, n_strain_loop, before_avalanche):

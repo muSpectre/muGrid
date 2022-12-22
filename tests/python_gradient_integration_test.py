@@ -931,7 +931,7 @@ class GradientIntegration_Check(unittest.TestCase):
         for form in [µ.Formulation.small_strain,
                      µ.Formulation.finite_strain]:
             rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
-                         weights, fft='fftw')
+                         weights, fft='serial')
             material = µ.material.MaterialLinearElastic1_3d.make(
                 rve, "material", Youngs_modulus, Poisson_ratio)
             for pixel_index, pixel in enumerate(rve.pixels):
@@ -1014,7 +1014,7 @@ class GradientIntegration_Check(unittest.TestCase):
 
         form = µ.Formulation.finite_strain
         rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
-                     weights, fft='fftw')
+                     weights, fft='serial')
         material = µ.material.MaterialLinearElastic1_3d.make(
             rve, "material", Youngs_modulus, Poisson_ratio)
         for pixel_index, pixel in enumerate(rve.pixels):
@@ -1089,7 +1089,7 @@ class GradientIntegration_Check(unittest.TestCase):
         form = µ.Formulation.finite_strain
 
         rve = µ.Cell(nb_domain_grid_pts, domain_lengths, form, gradient,
-                     weights, fft='fftw')
+                     weights, fft='serial')
         material = µ.material.MaterialLinearElastic1_2d.make(
             rve, "material", Youngs_modulus, Poisson_ratio)
         for pixel_index, pixel in enumerate(rve.pixels):

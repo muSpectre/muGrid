@@ -126,11 +126,11 @@ namespace muFFT {
    protected:
     //! forward transform
     void compute_fft(const RealField_t & field,
-                     FourierField_t & output_field) const override;
+                     FourierField_t & output_field) override;
 
     //! inverse transform
     void compute_ifft(const FourierField_t & input_field,
-                      RealField_t & output_field) const override;
+                      RealField_t & output_field) override;
 
     //! check whether real-space buffer has the correct memory layout
     bool check_real_space_field(const RealField_t & field) const final;

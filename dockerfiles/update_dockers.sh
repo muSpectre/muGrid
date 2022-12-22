@@ -1,5 +1,10 @@
 #!/bin/bash
 
+cd alpine:3.16/
+docker build -t registry.gitlab.com/muspectre/muspectre:alpine3.16 .
+docker push registry.gitlab.com/muspectre/muspectre:alpine3.16
+cd -
+
 cd debian:stable/
 docker build -t registry.gitlab.com/muspectre/muspectre:debian_stable .
 docker push registry.gitlab.com/muspectre/muspectre:debian_stable

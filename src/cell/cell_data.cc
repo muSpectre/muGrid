@@ -35,8 +35,12 @@
 
 #include "cell_data.hh"
 
+#ifdef WITH_FFTW
 #include <libmufft/fftw_engine.hh>
-#ifdef WITH_MPI
+#else
+#include <libmufft/pocketfft_engine.hh>
+#endif
+#ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
 #endif
 
@@ -74,12 +78,16 @@ namespace muSpectre {
   std::shared_ptr<CellData>
   CellData::make(const DynCcoord_t & nb_domain_grid_pts,
                  const DynRcoord_t & domain_lengths) {
+#ifdef WITH_FFTW
     auto fft_ptr{std::make_shared<muFFT::FFTWEngine>(nb_domain_grid_pts)};
+#else
+    auto fft_ptr{std::make_shared<muFFT::PocketFFTEngine>(nb_domain_grid_pts)};
+#endif
     return CellData::make(fft_ptr, domain_lengths);
   }
 
   /* ---------------------------------------------------------------------- */
-#ifdef WITH_MPI
+#ifdef WITH_FFTWMPI
   std::shared_ptr<CellData>
   CellData::make_parallel(const DynCcoord_t & nb_domain_grid_pts,
                           const DynRcoord_t & domain_lengths,

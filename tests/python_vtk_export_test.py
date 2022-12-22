@@ -303,6 +303,7 @@ class VtkExport_Check(unittest.TestCase):
         # the afterwards existing folder
         # 'vtr-test-folder' (False)
 
+    @unittest.skip
     def test_vtk_export(self):
         """
         Check the possibility to write scalar-, vector- and second rank tensor-

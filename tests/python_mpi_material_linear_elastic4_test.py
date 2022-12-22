@@ -99,7 +99,7 @@ def build_test_classes(fft):
     return MaterialLinearElastic4_Check
 
 linear_elastic4 = {}
-for fft, is_transposed, is_parallel in muFFT.fft_engines:
+for fft, (factory, is_transposed, is_parallel) in muFFT.fft_engines.items():
     if is_parallel:
         linear_elastic4[fft] = build_test_classes(fft)
 

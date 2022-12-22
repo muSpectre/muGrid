@@ -40,17 +40,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-#include "libmufft/derivative.hh"
+#include <libmugrid/ccoord_operations.hh>
 #include <libmugrid/numpy_tools.hh>
-#include "libmugrid/ccoord_operations.hh"
 
-#include <libmufft/fftw_engine.hh>
-#ifdef WITH_FFTWMPI
-#include <libmufft/fftwmpi_engine.hh>
-#endif
-#ifdef WITH_PFFT
-#include <libmufft/pfft_engine.hh>
-#endif
+#include <libmufft/derivative.hh>
+#include <libmufft/fft_engine_base.hh>
 
 using muFFT::DerivativeBase;
 using muFFT::DiscreteDerivative;

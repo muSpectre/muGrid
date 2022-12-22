@@ -44,6 +44,7 @@ set (projection_SRC
   ${CMAKE_CURRENT_SOURCE_DIR}/stiffness_operator.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fem_stencil.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/discretisation.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/discrete_greens_operator.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/fem_library.cc
   )
 

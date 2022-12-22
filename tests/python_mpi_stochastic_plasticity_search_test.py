@@ -980,7 +980,7 @@ class StochasticPlasticitySearch_Check(unittest.TestCase):
         # computation, no mpi) serial computation.
         comm_s = self.comm.Split(color=self.comm.rank)
         if self.comm.rank == 0:
-            fft_s = "fftw"
+            fft_s = "serial"
             cell_s = init_cell(res, self.lens, self.formulation,
                                self.gradient, self.weights, fft_s, comm_s)
             mat_s = init_mat(cell_s, self.young, self.poisson,

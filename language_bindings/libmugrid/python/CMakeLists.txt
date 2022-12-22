@@ -58,7 +58,7 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_options_dictionary.cc
   )
 
-if(${NETCDF_IO})
+if(${MUGRID_NETCDF_IO})
   set (PY_BINDING_SRCS
     ${PY_BINDING_SRCS}
     ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_file_io.cc
@@ -71,12 +71,12 @@ find_package(PythonLibsNew ${MUGRID_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   add_compile_options(-Wno-deprecated-declarations)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-if (${NETCDF_IO})
+if(${MUGRID_NETCDF_IO})
   set (PY_BINDING_SRCS
     ${PY_BINDING_SRCS}
     ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_file_io.cc
     )
-endif (${NETCDF_IO})
+endif(${MUGRID_NETCDF_IO})
 
 pybind11_add_module(pyMuGridLib ${PY_BINDING_SRCS})
 target_link_libraries(pyMuGridLib PRIVATE muGrid)
@@ -85,7 +85,7 @@ set_target_properties(pyMuGridLib PROPERTIES OUTPUT_NAME _muGrid)
 
 target_include_directories(pyMuGridLib PUBLIC ${PYTHON_INCLUDE_DIRS})
 
-if(${NETCDF_IO})
+if(${MUGRID_NETCDF_IO})
   target_compile_definitions(pyMuGridLib PUBLIC -DWITH_NETCDF_IO)
 endif()
 

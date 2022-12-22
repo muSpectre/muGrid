@@ -4,16 +4,18 @@
 
 incdirs = include_directories('../../src')
 
-main_test_suite = executable('main_test_suite',
-    'main_test_suite.cc',
-    'test_fft_utils.cc',
-    'test_fftw_engine.cc',
-    include_directories: incdirs,
-    link_with: [mugrid, mufft, muspectre],
-    dependencies: [muspectre_dependencies, boost_test])
+if mu_with_c_tests
+    main_test_suite = executable('main_test_suite',
+        'main_test_suite.cc',
+        'test_fft_utils.cc',
+        'test_serial_fft_engines.cc',
+        include_directories: incdirs,
+        link_with: [mugrid, mufft, muspectre],
+        dependencies: [muspectre_dependencies, boost_test])
 
-test('mufft_main_test_suite',
-    main_test_suite)
+    test('mufft_main_test_suite',
+        main_test_suite)
+endif
 
 #
 # Python unit tests
@@ -31,18 +33,22 @@ test('mufft_python_binding_tests',
 #
 
 if mu_with_mpi
-    mpi_main_test_suite = executable('mpi_main_test_suite',
-        'mpi_main_test_suite.cc',
-        'mpi_test_fft_engine.cc',
-        include_directories: incdirs,
-        link_with: [mugrid, mufft, muspectre],
-        dependencies: [muspectre_dependencies, boost_test])
+    if mu_with_c_tests
+        mpi_main_test_suite = executable('mpi_main_test_suite',
+            'mpi_main_test_suite.cc',
+            'mpi_test_fft_engine.cc',
+            include_directories: incdirs,
+            link_with: [mugrid, mufft, muspectre],
+            dependencies: [muspectre_dependencies, boost_test])
+    endif
 
     foreach n : mpi_processes
-        test('mpi_mufft_main_test_suite-np_' + n,
-             mpiexec,
-             args: ['-n', n, '--oversubscribe', mpi_main_test_suite],
-             is_parallel: false)  # Don't run any other test in parallel
+        if mu_with_c_tests
+            test('mpi_mufft_main_test_suite-np_' + n,
+                 mpiexec,
+                 args: ['-n', n, '--oversubscribe', mpi_main_test_suite],
+                 is_parallel: false)  # Don't run any other test in parallel
+        endif
 
         test('mpi_mufft_python_binding_tests',
              mpiexec,

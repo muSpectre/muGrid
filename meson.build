@@ -16,12 +16,22 @@ version_str = version[1]
 version_hash = version[2]
 
 eigen3 = dependency('eigen3', version: '>=3.3.0')
-fftw3 = dependency('fftw3')
+fftw3 = dependency('fftw3', required: false)
+if fftw3.found()
+    mu_with_fftw3 = true
+    message('muSpectre FFTW: *** YES ***')
+    add_global_arguments('-DWITH_FFTW', language : ['c', 'cpp'])
+else
+    mu_with_fftw3 = false
+    message('muSpectre FFTW: no')
+endif
 
+# Those are requirements on *some* systems, hence optional
 cc = meson.get_compiler('c')
 dl = cc.find_library('dl', required: false)
+execinfo = cc.find_library('execinfo', required: false)
 
-muspectre_dependencies = [eigen3, dl, fftw3]
+muspectre_dependencies = [eigen3, dl, execinfo, fftw3]
 
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_global_arguments('-Weffc++', language: 'cpp')
@@ -59,17 +69,19 @@ if mpi.found()
     mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
 else
     mu_with_mpi = false
+    mu_with_fftw3mpi = false
+    mu_with_pfft = false
     message('muSpectre MPI: no')
     netcdf = dependency('netcdf', required: false)
     muspectre_dependencies += [netcdf]
 endif
 
 if netcdf.found()
-    mu_with_netcdf = true
+    mugrid_with_netcdf = true
     message('muSpectre NetCDF I/O: *** YES ****')
     add_global_arguments('-DWITH_NETCDF_IO', language : ['c', 'cpp'])
 else
-    mu_with_netcdf = false
+    mugrid_with_netcdf = false
     message('muSpectre NetCDF I/O: no')
 endif
 

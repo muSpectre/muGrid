@@ -1,55 +1,28 @@
 # µSpectre
 
-Copyright © 2018 Till Junge <till.junge@epfl.ch>
+Project µSpectre aims at providing an **open-source platform for efficient
+FFT-based continuum mesoscale modelling**. This README contains only a small
+quick start guide. Please refer to the
+[full documentation](https://muspectre.gitlab.io/muspectre) for more help.
 
-µSpectre is free software; you can redistribute it and/or modify it under the
-terms of the GNU Lesser General Public License as published by the Free Software
-Foundation, either version 3, or (at your option) any later version.
+## Quick start
 
-µSpectre is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU General Public License for more details.
+To install µSpectre, run
 
-You should have received a copy of the GNU Lesser General Public License along
-with µSpectre; see the file COPYING. If not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+    pip install muSpectre
 
-Additional permission under GNU GPL version 3 section 7
+Note that on most platforms this will install a binary wheel, that was
+compiled with a minimal configuration. To compile for your specific platform
+use
 
-If you modify this Program, or any covered work, by linking or combining it with
-proprietary FFT implementations or numerical libraries, containing parts covered
-by the terms of those libraries' licenses, the licensors of this Program grant
-you additional permission to convey the resulting work.
+    pip install -v --no-binary muSpectre muSpectre
 
-
-This README contains only a small quick start guide. Please refer to the [full
-documentation](https://muspectre.gitlab.io/muspectre) for more help.
-
-## Building µSpectre
-For the first installation of µSpectre, please refer to the 
-[full documentation - getting started](https://muspectre.gitlab.io/muspectre/GettingStarted.html#)
-for more information.
-
-µSpectre is a CMake project that uses C++14. It depends on the Boost unit test
-framework for testing and uses uses python3 as secondary API. You will need a
-modern C++ compiler (µSpectre was tested with gcc-6 , gcc-7, clang-4 and clang5)
-and CMake version 3.5.0 or higher.
-
-### Compilation
-
-  1. git clone https://gitlab.com/muspectre/muspectre.git
-  2. cd build
-  3. cmake -DCMAKE_BUILD_TYPE=Release ..
-  4. make
-
-µSpectre makes use of expression templates, as a result, production code
-**must** be compiled with the `CMAKE_BUILD_TYPE` flag set to `Release` in order
-to get performance (under gcc, non-optimised code is about 50 times slower than
-the release). Be careful with parallel compilation: compiling µSpectre is quite
-memory-hungry because of the use of expression templates, a parallel `make -j`
-requires currently about 10 GB of RAM under GCC.
+which will compile the code. Monitor output for the compilation options
+printed on screen. µSpectre will autodetect various options and report
+which ones were enabled.
 
 ## Simple usage example
+
 The following is a simple example for using µSpectre through its convenient
 Python interface
 

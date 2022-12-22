@@ -34,18 +34,25 @@
  *
  */
 
-#include "tests.hh"
-#include <libmufft/derivative.hh>
-#include <libmufft/fftw_engine.hh>
-#include <projection/projection_base.hh>
-#ifdef WITH_MPI
-#include <libmufft/fftwmpi_engine.hh>
-#include "libmufft/mpi_context.hh"
-#endif
-#include <boost/mpl/list.hpp>
-#include <Eigen/Dense>
 #include <iostream>
 #include <type_traits>
+
+#include <Eigen/Dense>
+
+#include <boost/mpl/list.hpp>
+
+#include <libmufft/derivative.hh>
+#include <libmufft/pocketfft_engine.hh>
+#ifdef WITH_FFTW
+#include <libmufft/fftw_engine.hh>
+#endif
+#ifdef WITH_MPI
+#include "libmufft/mpi_context.hh"
+#include <libmufft/fftwmpi_engine.hh>
+#endif
+#include <projection/projection_base.hh>
+
+#include "tests.hh"
 
 #ifndef TESTS_TEST_PROJECTION_HH_
 #define TESTS_TEST_PROJECTION_HH_
@@ -177,10 +184,8 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Dim_t DimS, Dim_t DimM, class SizeGiver_, class GradientGiver_,
-            class Proj, Dim_t NbQuadPts = 1>
+            class Proj, Dim_t NbQuadPts, class Engine>
   struct ProjectionFixture {
-    using Engine = muFFT::FFTWEngine;
-
     using Parent = Proj;
     using SizeGiver = SizeGiver_;
     using GradientGiver = GradientGiver_;
@@ -201,7 +206,8 @@ namespace muSpectre {
   /* ---------------------------------------------------------------------- */
 #if defined(WITH_FFTWMPI) || defined(WITH_PFFT)
   template <Dim_t DimS, Dim_t DimM, class SizeGiver_, class GradientGiver_,
-            class Proj, Dim_t NbQuadPts = 1, class Engine = muFFT::FFTWEngine>
+            class Proj, Dim_t NbQuadPts = 1,
+            class Engine = muFFT::FFTWMPIEngine>
   struct MPIProjectionFixture {
     using Parent = Proj;
     using SizeGiver = SizeGiver_;

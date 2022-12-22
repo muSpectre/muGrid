@@ -36,20 +36,18 @@
 #ifndef SRC_CELL_CELL_FACTORY_HH_
 #define SRC_CELL_CELL_FACTORY_HH_
 
+#include <memory>
+
+#include <libmugrid/ccoord_operations.hh>
+#include <libmugrid/communicator.hh>
+
+#include <libmufft/derivative.hh>
+#include <libmufft/pocketfft_engine.hh>
+
 #include "common/muSpectre_common.hh"
 #include "cell/cell.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "projection/projection_small_strain.hh"
-#include <libmugrid/ccoord_operations.hh>
-#include <libmufft/derivative.hh>
-#include <libmufft/fftw_engine.hh>
-
-#ifdef WITH_MPI
-#include <libmugrid/communicator.hh>
-#include <libmufft/fftwmpi_engine.hh>
-#endif
-
-#include <memory>
 
 using muGrid::RuntimeError;
 
@@ -161,7 +159,7 @@ namespace muSpectre {
    * finite differences, etc)
    * @param comm communicator used for solving distributed problems
    */
-  template <class FFTEngine = muFFT::FFTWEngine>
+  template <class FFTEngine = muFFT::PocketFFTEngine>
   inline std::unique_ptr<ProjectionBase> cell_input(
       const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
       const Formulation & form,
@@ -210,7 +208,7 @@ namespace muSpectre {
    * @param form problem formulation (small vs finite strain)
    * @param comm communicator used for solving distributed problems
    */
-  template <class FFTEngine = muFFT::FFTWEngine>
+  template <class FFTEngine = muFFT::PocketFFTEngine>
   inline std::unique_ptr<ProjectionBase> cell_input(
       const DynCcoord_t & nb_grid_pts, const DynRcoord_t & lengths,
       const Formulation & form,
@@ -234,7 +232,7 @@ namespace muSpectre {
    * finite differences, etc)
    * @param comm communicator used for solving distributed problems
    */
-  template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
+  template <typename Cell_t = Cell, class FFTEngine = muFFT::PocketFFTEngine>
   inline std::shared_ptr<Cell_t> make_cell(
       DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
       ProjectionBase::Gradient_t gradient, ProjectionBase::Weights_t weights,
@@ -256,7 +254,7 @@ namespace muSpectre {
    * @param form problem formulation (small vs finite strain)
    * @param comm communicator used for solving distributed problems
    */
-  template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
+  template <typename Cell_t = Cell, class FFTEngine = muFFT::PocketFFTEngine>
   inline std::shared_ptr<Cell_t> make_cell(
       DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
       const muFFT::Communicator & comm = muFFT::Communicator(),
@@ -279,7 +277,7 @@ namespace muSpectre {
    * @param form problem formulation (small vs finite strain)
    * @param comm communicator used for solving distributed problems
    */
-  template <typename Cell_t = Cell, class FFTEngine = muFFT::FFTWEngine>
+  template <typename Cell_t = Cell, class FFTEngine = muFFT::PocketFFTEngine>
   inline std::shared_ptr<Cell_t> make_cell(
       DynCcoord_t nb_grid_pts, DynRcoord_t lengths, Formulation form,
       const muFFT::FFT_PlanFlags & flags) {

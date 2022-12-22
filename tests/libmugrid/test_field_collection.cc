@@ -163,12 +163,10 @@ namespace muGrid {
                                    GlobalFCFixtures, Fix) {
     Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
     Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
-    Dim_t nb_pixels{1};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
       nb_domain_grid_pts[i] = nb_grid;
       nb_subdomain_grid_pts[i] = nb_grid;
-      nb_pixels *= nb_grid;
     }
     CcoordOps::Pixels<Fix::spatial_dimension()> pixels{nb_subdomain_grid_pts};
     BOOST_CHECK(not Fix::fc.is_initialised());
@@ -215,13 +213,11 @@ namespace muGrid {
                                    Fix) {
     Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
     Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
-    Dim_t nb_pixels{1};
     constexpr Dim_t NbQuad{3};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
       nb_domain_grid_pts[i] = nb_grid;
       nb_subdomain_grid_pts[i] = nb_grid;
-      nb_pixels *= nb_grid;
     }
     Fix::fc.set_nb_sub_pts(this->sub_division_tag(), NbQuad);
     Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts);
@@ -272,13 +268,11 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(global_clone, Fix, GlobalFCFixtures, Fix) {
     Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
     Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
-    Dim_t nb_pixels{1};
     constexpr Dim_t NbQuad{3};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
       nb_domain_grid_pts[i] = nb_grid;
       nb_subdomain_grid_pts[i] = nb_grid;
-      nb_pixels *= nb_grid;
     }
     Fix::fc.set_nb_sub_pts(this->sub_division_tag(), NbQuad);
     Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts);

@@ -178,7 +178,7 @@ namespace muSpectre {
     // first index.
     this->fft_engine->fft(field, this->work_space);
     Grad_map field_map{this->work_space};
-    Real factor = this->fft_engine->normalisation();
+    Real factor{this->fft_engine->normalisation()};
     PixelVec_t zero_freq_projected;
     if (this->get_subdomain_locations() == Ccoord{}) {
       zero_freq_projected =

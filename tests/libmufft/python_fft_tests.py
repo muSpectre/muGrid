@@ -43,9 +43,11 @@ from python_test_imports import muFFT, muGrid
 
 if muFFT.has_mpi:
     from mpi4py import MPI
+
     communicator = muFFT.Communicator(MPI.COMM_WORLD)
 else:
     communicator = muFFT.Communicator()
+
 
 class FFT_Check(unittest.TestCase):
     def setUp(self):
@@ -62,7 +64,7 @@ class FFT_Check(unittest.TestCase):
         if muFFT.has_mpi:
             self.engines = ['fftwmpi', 'pfft']
         if self.communicator.size == 1:
-            self.engines += ['fftw']
+            self.engines += ['pocketfft', 'fftw']
 
     def test_constructor(self):
         """Check that engines can be initialized with either bare MPI
@@ -74,28 +76,34 @@ class FFT_Check(unittest.TestCase):
                 s = MPI.COMM_WORLD.Get_size()
                 try:
                     nb_dof = 6
-                    engine = muFFT.FFT([6*s, 4*s], fft=engine_str,
+                    engine = muFFT.FFT([6 * s, 4 * s], fft=engine_str,
                                        communicator=MPI.COMM_WORLD)
                     engine.create_plan(nb_dof)
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
 
             s = self.communicator.size
             nb_dof = 6
-            engine = muFFT.FFT([6*s, 4*s],
-                               fft=engine_str,
-                               communicator=self.communicator)
-            engine.create_plan(nb_dof)
+            try:
+                engine = muFFT.FFT([6 * s, 4 * s],
+                                   fft=engine_str,
+                                   communicator=self.communicator)
+                engine.create_plan(nb_dof)
+            except muFFT.UnknownFFTEngineError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
+
             self.assertEqual(
                 self.communicator.sum(np.prod(engine.nb_subdomain_grid_pts)),
                 np.prod(engine.nb_domain_grid_pts),
                 msg='{} engine'.format(engine_str))
 
             comm = engine.communicator
-            self.assertEqual(comm.sum(comm.rank+4),
-                             comm.size*(comm.size+1)/2 + 3*comm.size,
+            self.assertEqual(comm.sum(comm.rank + 4),
+                             comm.size * (comm.size + 1) / 2 + 3 * comm.size,
                              msg='{} engine'.format(engine_str))
 
     # Disable this test for now because it requires a lot of memory. This is
@@ -109,13 +117,13 @@ class FFT_Check(unittest.TestCase):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
-                nb_grid_pts = s*np.array(nb_grid_pts)
+                nb_grid_pts = s * np.array(nb_grid_pts)
                 try:
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -149,14 +157,14 @@ class FFT_Check(unittest.TestCase):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
-                nb_grid_pts = list(s*np.array(nb_grid_pts))
+                nb_grid_pts = list(s * np.array(nb_grid_pts))
 
                 try:
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -197,14 +205,14 @@ class FFT_Check(unittest.TestCase):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
-                nb_grid_pts = s*np.array(nb_grid_pts)
+                nb_grid_pts = s * np.array(nb_grid_pts)
 
                 try:
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -247,14 +255,14 @@ class FFT_Check(unittest.TestCase):
         for engine_str in self.engines:
             for nb_grid_pts, dims in self.grids:
                 s = self.communicator.size
-                nb_grid_pts = list(s*np.array(nb_grid_pts))
+                nb_grid_pts = list(s * np.array(nb_grid_pts))
 
                 try:
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -293,7 +301,7 @@ class FFT_Check(unittest.TestCase):
                 engine.ifft(fourier_field, out_field)
                 err = np.linalg.norm(
                     out_ref -
-                    out_field.array(muGrid.Pixel)*engine.normalisation)
+                    out_field.array(muGrid.Pixel) * engine.normalisation)
                 self.assertLess(err, tol, msg='{} engine'.format(engine_str))
 
     def test_nb_components1_forward_transform(self):
@@ -307,7 +315,7 @@ class FFT_Check(unittest.TestCase):
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -340,7 +348,7 @@ class FFT_Check(unittest.TestCase):
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -358,8 +366,8 @@ class FFT_Check(unittest.TestCase):
                 engine.fft(in_arr, out_msp)
 
                 # Check that the output array does not have a unit first dimension
-                self.assertEqual(tuple(out_msp.shape), engine.nb_fourier_grid_pts),# \
-                    #                "{} not equal to {}".format(out_msp.shape,
+                self.assertEqual(tuple(out_msp.shape), engine.nb_fourier_grid_pts),  # \
+                #                "{} not equal to {}".format(out_msp.shape,
                 #                                            engine.nb_fourier_grid_pts)
                 # TODO(pastewka): I think this test is out of date. the numpy
                 # rfftn shortens a different dimension, and therefore gets a
@@ -370,7 +378,7 @@ class FFT_Check(unittest.TestCase):
                 # Convenience interface that returns an array
                 out_msp = engine.fft(in_arr)
                 # Check that the output array does not have a unit first dimension
-                self.assertEqual(tuple(out_msp.shape), engine.nb_fourier_grid_pts),# \
+                self.assertEqual(tuple(out_msp.shape), engine.nb_fourier_grid_pts),  # \
 
                 # Convenience interface with flattened array (should not give a
                 # segmentation fault)
@@ -391,7 +399,7 @@ class FFT_Check(unittest.TestCase):
                                        fft=engine_str,
                                        communicator=self.communicator)
                     engine.create_plan(np.prod(dims))
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
@@ -404,7 +412,7 @@ class FFT_Check(unittest.TestCase):
                 global_in_arr.imag = np.random.random(global_in_arr.shape)
 
                 in_arr = global_in_arr[engine.fourier_slices]
-                in_arr.shape =(*dims, *engine.nb_fourier_grid_pts)
+                in_arr.shape = (*dims, *engine.nb_fourier_grid_pts)
                 out_msp = np.empty((1, *engine.nb_subdomain_grid_pts),
                                    order="f")
                 engine.ifft(in_arr, out_msp)
@@ -420,27 +428,33 @@ class FFT_Check(unittest.TestCase):
     @unittest.skipIf(communicator.size > 1,
                      'MPI parallel FFTs do not support 1D transforms')
     def test_1d_transform(self):
-        nb_grid_pts = [128, ]
+        for fft in ['pocketfft', 'fftw']:
+            nb_grid_pts = [128, ]
 
-        # Only serial engines support 1d transforms
-        engine = muFFT.FFT(nb_grid_pts, fft='fftw')
+            # Only serial engines support 1d transforms
+            try:
+                engine = muFFT.FFT(nb_grid_pts, fft=fft)
+            except muFFT.UnknownFFTEngineError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
 
-        nb_dof = 1
-        engine.create_plan(nb_dof)
-        arr = np.random.random(nb_grid_pts * nb_dof)
+            nb_dof = 1
+            engine.create_plan(nb_dof)
+            arr = np.random.random(nb_grid_pts * nb_dof)
 
-        fft_arr_ref = np.fft.rfft(arr)
-        fft_arr = engine.register_fourier_space_field("fourier work space",
-                                                      nb_dof)
-        self.assertFalse(fft_arr.array().flags.owndata)
-        self.assertEqual(fft_arr.shape, [nb_grid_pts[0]//2+1])
-        engine.fft(arr, fft_arr)
-        self.assertTrue(np.allclose(fft_arr_ref, fft_arr))
+            fft_arr_ref = np.fft.rfft(arr)
+            fft_arr = engine.register_fourier_space_field("fourier work space",
+                                                          nb_dof)
+            self.assertFalse(fft_arr.array().flags.owndata)
+            self.assertEqual(fft_arr.shape, [nb_grid_pts[0] // 2 + 1])
+            engine.fft(arr, fft_arr)
+            self.assertTrue(np.allclose(fft_arr_ref, fft_arr))
 
-        out_arr = np.empty_like(arr)
-        engine.ifft(fft_arr, out_arr)
-        out_arr *= engine.normalisation
-        self.assertTrue(np.allclose(out_arr, arr))
+            out_arr = np.empty_like(arr)
+            engine.ifft(fft_arr, out_arr)
+            out_arr *= engine.normalisation
+            self.assertTrue(np.allclose(out_arr, arr))
 
     def test_fftfreq_numpy(self):
         for engine_str in self.engines:
@@ -449,20 +463,20 @@ class FFT_Check(unittest.TestCase):
                     continue
 
                 s = self.communicator.size
-                nb_grid_pts = list(s*np.array(nb_grid_pts))
+                nb_grid_pts = list(s * np.array(nb_grid_pts))
 
                 try:
                     engine = muFFT.FFT(nb_grid_pts,
                                        fft=engine_str,
                                        communicator=self.communicator)
-                except AttributeError:
+                except muFFT.UnknownFFTEngineError:
                     # This FFT engine has not been compiled into the code. Skip
                     # test.
                     continue
 
                 freq = np.array(
                     np.meshgrid(*(np.fft.fftfreq(n) for n in nb_grid_pts),
-                        indexing='ij'))
+                                indexing='ij'))
 
                 freq = freq[(..., *engine.fourier_slices)]
                 assert np.allclose(engine.fftfreq, freq)
@@ -477,20 +491,20 @@ class FFT_Check(unittest.TestCase):
         qx, qy = engine.fftfreq
 
         qarr = np.zeros(engine.nb_fourier_grid_pts, dtype=complex)
-        qarr[np.logical_and(np.abs(np.abs(qx)*nx - 1) < 1e-6,
-                            np.abs(np.abs(qy)*ny - 0) < 1e-6)] = 0.5
+        qarr[np.logical_and(np.abs(np.abs(qx) * nx - 1) < 1e-6,
+                            np.abs(np.abs(qy) * ny - 0) < 1e-6)] = 0.5
 
         rarr = np.zeros(nb_grid_pts, order='f')
         engine.ifft(qarr, rarr)
         assert np.allclose(rarr, rarr[:, 0].reshape(-1, 1))
-        assert np.allclose(rarr[:, 0], np.cos(np.arange(nx)*2*np.pi/nx))
+        assert np.allclose(rarr[:, 0], np.cos(np.arange(nx) * 2 * np.pi / nx))
 
         qarr = np.zeros(engine.nb_fourier_grid_pts, dtype=complex)
-        qarr[np.logical_and(np.abs(np.abs(qx)*nx - 0) < 1e-6,
-                            np.abs(np.abs(qy)*ny - 1) < 1e-6)] = 0.5
+        qarr[np.logical_and(np.abs(np.abs(qx) * nx - 0) < 1e-6,
+                            np.abs(np.abs(qy) * ny - 1) < 1e-6)] = 0.5
         engine.ifft(qarr, rarr)
         assert np.allclose(rarr, rarr[0, :].reshape(1, -1))
-        assert np.allclose(rarr[0, :], np.cos(np.arange(ny)*2*np.pi/ny))
+        assert np.allclose(rarr[0, :], np.cos(np.arange(ny) * 2 * np.pi / ny))
 
     def test_buffer_lifetime(self):
         res = [2, 3]
@@ -520,44 +534,52 @@ class FFT_Check(unittest.TestCase):
                 engine = muFFT.FFT([3, 5, 7], fft=engine_str,
                                    communicator=self.communicator)
                 engine.create_plan(1)
-            except AttributeError:
+            except muFFT.UnknownFFTEngineError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.
                 continue
 
-            if engine_str == 'fftw':
-                assert engine.subdomain_strides == (1, 3, 15),\
-                    '{} - {}'.format(engine_str, engine.subdomain_strides) # column-major
-                assert engine.fourier_strides == (1, 2, 10), \
-                    '{} - {}'.format(engine_str, engine.fourier_strides) # column-major
-            elif engine_str == 'fftwmpi':
+            if engine_str == 'fftwmpi':
                 assert engine.subdomain_strides == (1, 4, 20), \
-                    '{} - {}'.format(engine_str, engine.subdomain_strides) # padding in first dimension
+                    '{} - {}'.format(engine_str, engine.subdomain_strides)  # padding in first dimension
                 assert engine.fourier_strides == (1, 14, 2), \
-                    '{} - {}'.format(engine_str, engine.fourier_strides) # transposed output
+                    '{} - {}'.format(engine_str, engine.fourier_strides)  # transposed output
             elif engine_str == 'pfft':
                 assert engine.subdomain_strides == (1, 4, 20), \
-                    '{} - {}'.format(engine_str, engine.subdomain_strides) # padding in first dimension
+                    '{} - {}'.format(engine_str, engine.subdomain_strides)  # padding in first dimension
                 assert engine.fourier_strides == (7, 14, 1), \
-                    '{} - {}'.format(engine_str, engine.fourier_strides) # transposed output
+                    '{} - {}'.format(engine_str, engine.fourier_strides)  # transposed output
+            else:
+                assert engine.subdomain_strides == (1, 3, 15), \
+                    '{} - {}'.format(engine_str, engine.subdomain_strides)  # column-major
+                assert engine.fourier_strides == (1, 2, 10), \
+                    '{} - {}'.format(engine_str, engine.fourier_strides)  # column-major
 
     @unittest.skipIf(communicator.size > 1,
                      'This test only works on a single MPI process')
     def test_raises_incompatible_buffer(self):
         """
-        asserts that the output is of shape ( , ) and not ( , , 1)
+        checks for exception of buffer has incompatible memory layout
+        (FFTW only since PocketFFT can deal with any layout)
         """
-        engine = muFFT.FFT([3, 2],
-                           fft='fftw', allow_temporary_buffer=False)
-        engine.create_plan(1)
+        for fft in ['fftw']:
+            try:
+                engine = muFFT.FFT([3, 2],
+                                   fft=fft, allow_temporary_buffer=False)
+            except muFFT.UnknownFFTEngineError:
+                # This FFT engine has not been compiled into the code. Skip
+                # test.
+                continue
 
-        in_data = np.random.random(engine.nb_subdomain_grid_pts)
-        out_data = np.zeros(engine.nb_fourier_grid_pts, dtype=complex)
-        with self.assertRaises(RuntimeError):
-            engine.fft(in_data, out_data)
+            engine.create_plan(1)
+
+            in_data = np.random.random(engine.nb_subdomain_grid_pts)
+            out_data = np.zeros(engine.nb_fourier_grid_pts, dtype=complex)
+            with self.assertRaises(RuntimeError):
+                engine.fft(in_data, out_data)
 
     def test_zero_grid_pts(self):
-        nb_grid_pts = [3, 3] # Gives one CPU with zero points on 4 processes
+        nb_grid_pts = [3, 3]  # Gives one CPU with zero points on 4 processes
         axes = (0, 1)
 
         try:
@@ -565,7 +587,7 @@ class FFT_Check(unittest.TestCase):
                                fft='fftwmpi',
                                communicator=self.communicator)
             engine.create_plan(1)
-        except AttributeError:
+        except muFFT.UnknownFFTEngineError:
             # This FFT engine has not been compiled into the code. Skip
             # test.
             return
@@ -587,6 +609,7 @@ class FFT_Check(unittest.TestCase):
         err = np.linalg.norm(out_ref - out_msp)
         self.assertLess(err, tol)
 
+
 class FFTCheckSerialOnly(unittest.TestCase):
     def setUp(self):
         #               v- grid
@@ -606,19 +629,21 @@ class FFTCheckSerialOnly(unittest.TestCase):
         if muFFT.has_mpi:
             self.engines = ['fftwmpi', 'pfft']
         if self.communicator.size == 1:
-            self.engines += ['fftw']
+            self.engines += ['pocketfft', 'fftw']
 
     @unittest.skipIf(communicator.size > 1,
                      'fftw only')
     def test_rffth2c_2d_sin(self):
 
-        engine = muFFT.FFT([5,5], fft="fftw", 
-            allow_temporary_buffer=False,
-            allow_destroy_input=True)
+        try:
+            engine = muFFT.FFT([5, 5], fft="fftw",
+                               allow_temporary_buffer=False,
+                               allow_destroy_input=True)
+        except muFFT.UnkownFFTEngineError:
+            return
 
-
-        in_data = np.cos(np.pi * 2 * np.arange(5) / 5).reshape(1,-1) * np.ones((5,1)) 
-        out_data = np.zeros((5,5), dtype=float)
+        in_data = np.cos(np.pi * 2 * np.arange(5) / 5).reshape(1, -1) * np.ones((5, 1))
+        out_data = np.zeros((5, 5), dtype=float)
 
         # Allocate buffers and create plan for one degree of freedom
         real_buffer = engine.register_halfcomplex_field(
@@ -626,39 +651,41 @@ class FFTCheckSerialOnly(unittest.TestCase):
         fourier_buffer = engine.register_halfcomplex_field(
             "fourier-space", 1)
 
-        real_buffer.array()[...] = np.cos(np.pi * 2 * np.arange(5) / 5).reshape(1,-1) * np.ones((5,1)) 
+        real_buffer.array()[...] = np.cos(np.pi * 2 * np.arange(5) / 5).reshape(1, -1) * np.ones((5, 1))
 
         engine.hcfft(real_buffer, fourier_buffer)
 
-        expected = np.zeros((5,5))
-        expected[0,1] = 1/2 / engine.normalisation
+        expected = np.zeros((5, 5))
+        expected[0, 1] = 1 / 2 / engine.normalisation
         np.testing.assert_allclose(fourier_buffer, expected, atol=1e-14)
 
-        real_buffer.array()[...] = np.sin(np.pi * 2 * np.arange(5) / 5).reshape(1,-1) * np.ones((5,1)) 
+        real_buffer.array()[...] = np.sin(np.pi * 2 * np.arange(5) / 5).reshape(1, -1) * np.ones((5, 1))
 
         engine.hcfft(real_buffer, fourier_buffer)
 
-        expected = np.zeros((5,5))
-        
+        expected = np.zeros((5, 5))
+
         # The halfcomplex array is:     
         # r0, r1, r2, ..., rn/2, i(n+1)/2-1, ..., i2, i1
         # with r, i the real and imaginary parts of the first half of the complex spectrum
         # Euler formula: 
         # sin = - i * 1/2 * (e^qx - e^-qx ) 
-        expected[0,-1] = - 1/2 / engine.normalisation
+        expected[0, -1] = - 1 / 2 / engine.normalisation
         np.testing.assert_allclose(fourier_buffer, expected, atol=1e-14)
-
 
     @unittest.skipIf(communicator.size > 1,
                      'fftw only')
     def test_rffth2c_2d_roundtrip(self):
-        
-        for nb_grid_pts in [(5,5),(4,4), (4,5),(5,4)]:
+
+        for nb_grid_pts in [(5, 5), (4, 4), (4, 5), (5, 4)]:
             nx, ny = nb_grid_pts
 
-            engine = muFFT.FFT(nb_grid_pts, fft="fftw", 
-                allow_temporary_buffer=False,
-                allow_destroy_input=True)
+            try:
+                engine = muFFT.FFT(nb_grid_pts, fft="fftw",
+                                   allow_temporary_buffer=False,
+                                   allow_destroy_input=True)
+            except muFFT.UnkownFFTEngineError:
+                return
 
             # Allocate buffers and create plan for one degree of freedom
             real_buffer = engine.register_halfcomplex_field(
@@ -677,10 +704,13 @@ class FFTCheckSerialOnly(unittest.TestCase):
     @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_2d_convenience_interface(self):
 
-        nb_grid_pts = (5,5)
+        nb_grid_pts = (5, 5)
         nx, ny = nb_grid_pts
 
-        engine = muFFT.FFT(nb_grid_pts, fft="fftw")
+        try:
+            engine = muFFT.FFT(nb_grid_pts, fft="fftw")
+        except muFFT.UnkownFFTEngineError:
+            return
         engine.create_plan(1)
 
         original = np.random.normal(size=nb_grid_pts)
@@ -701,13 +731,13 @@ class FFTCheckSerialOnly(unittest.TestCase):
     def test_rffth2c_multiple_dofs(self):
         for nb_grid_pts, dims in self.grids:
             s = self.communicator.size
-            nb_grid_pts = s*np.array(nb_grid_pts)
+            nb_grid_pts = s * np.array(nb_grid_pts)
             try:
                 engine = muFFT.FFT(nb_grid_pts,
                                    fft="fftw",
                                    communicator=self.communicator)
                 engine.create_plan(np.prod(dims))
-            except AttributeError:
+            except muFFT.UnknownFFTEngineError:
                 # This FFT engine has not been compiled into the code. Skip
                 # test.
                 continue
@@ -741,13 +771,13 @@ class FFTCheckSerialOnly(unittest.TestCase):
 
     @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_1d_roundtrip(self):
-        
-        for nb_grid_pts in [(5,),(4,)]:
+
+        for nb_grid_pts in [(5,), (4,)]:
             nx, = nb_grid_pts
 
-            engine = muFFT.FFT(nb_grid_pts, fft="fftw", 
-                allow_temporary_buffer=False,
-                allow_destroy_input=True)
+            engine = muFFT.FFT(nb_grid_pts, fft="fftw",
+                               allow_temporary_buffer=False,
+                               allow_destroy_input=True)
 
             # Allocate buffers and create plan for one degree of freedom
             real_buffer = engine.register_halfcomplex_field(
@@ -765,12 +795,11 @@ class FFTCheckSerialOnly(unittest.TestCase):
 
     @unittest.skipIf(communicator.size > 1, 'fftw only')
     def test_rffth2c_3d_roundtrip(self):
-    
-        for nb_grid_pts in [(5,4,5),(4,5,4), (4,4,5) ,(5,5,5), (4,4,4)]:
 
-            engine = muFFT.FFT(nb_grid_pts, fft="fftw", 
-                allow_temporary_buffer=False,
-                allow_destroy_input=True)
+        for nb_grid_pts in [(5, 4, 5), (4, 5, 4), (4, 4, 5), (5, 5, 5), (4, 4, 4)]:
+            engine = muFFT.FFT(nb_grid_pts, fft="fftw",
+                               allow_temporary_buffer=False,
+                               allow_destroy_input=True)
 
             # Allocate buffers and create plan for one degree of freedom
             real_buffer = engine.register_halfcomplex_field(
@@ -790,22 +819,21 @@ class FFTCheckSerialOnly(unittest.TestCase):
                      'This test only works on a single MPI process')
     def test_r2hc_incompatible_engines_raise(self):
         for engine in self.engines:
-            if engine != "fftw":
-                try:
-                    engine = muFFT.FFT([3,5], fft=engine, 
-                        allow_temporary_buffer=False,
-                        allow_destroy_input=True)
-                except AttributeError: # One of the engines is not installed, skip it
-                    continue 
-                # Allocate buffers and create plan for one degree of freedom
-                real_buffer = engine.register_halfcomplex_field(
-                    "real-space", 1)
-                fourier_buffer = engine.register_halfcomplex_field(
-                    "fourier-space", 1)
-                with self.assertRaises(RuntimeError) as context:
-                    engine.hcfft(real_buffer, fourier_buffer)
+            try:
+                engine = muFFT.FFT([3, 5], fft=engine,
+                                   allow_temporary_buffer=False,
+                                   allow_destroy_input=True)
+            except muFFT.UnknownFFTEngineError:  # One of the engines is not installed, skip it
+                continue
+            # Allocate buffers and create plan for one degree of freedom
+            real_buffer = engine.register_halfcomplex_field(
+                "real-space", 1)
+            fourier_buffer = engine.register_halfcomplex_field(
+                "fourier-space", 1)
+            with self.assertRaises(RuntimeError) as context:
+                engine.hcfft(real_buffer, fourier_buffer)
 
-                self.assertTrue("not implemented " in str(context.exception), str(context.exception))
+            self.assertTrue("not implemented " in str(context.exception), str(context.exception))
 
 
 if __name__ == '__main__':

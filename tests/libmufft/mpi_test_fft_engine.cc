@@ -40,7 +40,10 @@
 
 #include "tests.hh"
 #include "../libmugrid/mpi_context.hh"
+#include <libmufft/pocketfft_engine.hh>
+#ifdef WITH_FFTW
 #include <libmufft/fftw_engine.hh>
+#endif
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
 #endif
@@ -112,7 +115,10 @@ namespace muFFT {
       FFTW_fixture<PFFTEngine, twoD, 4>, FFTW_fixture<PFFTEngine, threeD, 4>,
       FFTW_fixture_python_segfault<PFFTEngine>,
 #endif
-      FFTW_fixture<FFTWEngine, twoD, 3, true>>;
+#ifdef WITH_FFTW
+      FFTW_fixture<FFTWEngine, twoD, 3, true>,
+#endif
+      FFTW_fixture<PocketFFTEngine, twoD, 3, true>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(Constructor_test, Fix, fixlist, Fix) {

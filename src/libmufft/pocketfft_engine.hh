@@ -1,12 +1,11 @@
-
 /**
- * @file   fftw_engine.hh
+ * @file   pocketfft_engine.hh
  *
- * @author Till Junge <till.junge@altermail.ch>
+ * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   03 Dec 2017
+ * @date   20 Nov 2022
  *
- * @brief  FFT engine using FFTW
+ * @brief  FFT engine using PocketFFT
  *
  * Copyright © 2017 Till Junge
  *
@@ -34,20 +33,19 @@
  *
  */
 
-#ifndef SRC_LIBMUFFT_FFTW_ENGINE_HH_
-#define SRC_LIBMUFFT_FFTW_ENGINE_HH_
+#ifndef SRC_LIBMUFFT_POCKETFFT_ENGINE_HH_
+#define SRC_LIBMUFFT_POCKETFFT_ENGINE_HH_
 
 #include "fft_engine_base.hh"
-
-#include <fftw3.h>
 
 namespace muFFT {
 
   /**
-   * implements the `muFFT::FftEngine_Base` interface using the
-   * FFTW library
+   * implements the `muFFT::FftEngine_Base` interface using
+   * PocketFFT (that is shipped as part of this code).
+   * See pocketfft/LICENSE.md for PocketFFT's license.
    */
-  class FFTWEngine : public FFTEngineBase {
+  class PocketFFTEngine : public FFTEngineBase {
    public:
     using Parent = FFTEngineBase;  //!< base class
     //! field for Fourier transform of second-order tensor
@@ -55,7 +53,7 @@ namespace muFFT {
     //! real-valued second-order tensor
     using RealField_t = typename Parent::RealField_t;
     //! Default constructor
-    FFTWEngine() = delete;
+    PocketFFTEngine() = delete;
 
     /**
      * Constructor with the domain's number of grid points in each direction,
@@ -67,11 +65,11 @@ namespace muFFT {
      *        during the FFT
      * @comm MPI communicator object
      */
-    FFTWEngine(const DynCcoord_t & nb_grid_pts,
-               Communicator comm = Communicator(),
-               const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
-               bool allow_temporary_buffer = true,
-               bool allow_destroy_input = false);
+    PocketFFTEngine(const DynCcoord_t & nb_grid_pts,
+                    Communicator comm = Communicator(),
+                    const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
+                    bool allow_temporary_buffer = true,
+                    bool allow_destroy_input = false);
     /**
      * Constructor with the domain's number of grid points in each direction and
      * the fft planner flags
@@ -82,25 +80,25 @@ namespace muFFT {
      *        during the FFT
      * @comm MPI communicator object
      */
-    FFTWEngine(const DynCcoord_t & nb_grid_pts,
-               const FFT_PlanFlags & plan_flags,
-               bool allow_temporary_buffer = true,
-               bool allow_destroy_input = false);
+    PocketFFTEngine(const DynCcoord_t & nb_grid_pts,
+                    const FFT_PlanFlags & plan_flags,
+                    bool allow_temporary_buffer = true,
+                    bool allow_destroy_input = false);
 
     //! Copy constructor
-    FFTWEngine(const FFTWEngine & other) = delete;
+    PocketFFTEngine(const PocketFFTEngine & other) = delete;
 
     //! Move constructor
-    FFTWEngine(FFTWEngine && other) = delete;
+    PocketFFTEngine(PocketFFTEngine && other) = delete;
 
     //! Destructor
-    virtual ~FFTWEngine() noexcept;
+    virtual ~PocketFFTEngine() noexcept;
 
     //! Copy assignment operator
-    FFTWEngine & operator=(const FFTWEngine & other) = delete;
+    PocketFFTEngine & operator=(const PocketFFTEngine & other) = delete;
 
     //! Move assignment operator
-    FFTWEngine & operator=(FFTWEngine && other) = delete;
+    PocketFFTEngine & operator=(PocketFFTEngine && other) = delete;
 
     // compute the plan, etc
     void create_plan(const Index_t & nb_dof_per_pixel) override;
@@ -117,29 +115,8 @@ namespace muFFT {
     //! inverse transform
     void compute_ifft(const FourierField_t & input_field,
                       RealField_t & output_field) override;
-
-    //! forward half complex transform
-    void compute_hcfft(const RealField_t & input_field,
-                 RealField_t & output_field) override;
-
-    //! inverse half complex transform
-    void compute_ihcfft(const RealField_t & input_field,
-                      RealField_t & output_field) override;
-
-    //! holds the plans for forward fourier transforms
-    std::map<Index_t, fftw_plan> fft_plans{};
-    //! holds the plans for inversefourier transforms
-    std::map<Index_t, fftw_plan> ifft_plans{};
-
-    //! holds the plans for forward half-complex fourier transforms
-    std::map<Index_t, fftw_plan> hcfft_plans{};
-
-    //! holds the plans for inverse half-complex fourier transforms
-    std::map<Index_t, fftw_plan> ihcfft_plans{};
-
-    static Index_t nb_engines;
   };
 
 }  // namespace muFFT
 
-#endif  // SRC_LIBMUFFT_FFTW_ENGINE_HH_
+#endif  // SRC_LIBMUFFT_POCKETFFT_ENGINE_HH_

@@ -35,7 +35,3 @@
 # =============================================================================
 
 add_subdirectory(python)
-
-if (${WITH_NETCDF_IO})
-  add_definitions(-DWITH_NETCDF_IO)
-endif(${WITH_NETCDF_IO})

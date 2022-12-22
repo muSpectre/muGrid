@@ -38,11 +38,11 @@ macro(muGrid_add_test)
   muTools_add_test(${ARGN} LINK_LIBRARIES ${MUGRID_NAMESPACE}muGrid TEST_LIST mugrid_tests)
 endmacro()
 
-if (${NETCDF_IO})
+if (${MUGRID_NETCDF_IO})
   set(RUN_NETCDF_TESTS "True")
 else()
   set(RUN_NETCDF_TESTS "False")
-endif(${NETCDF_IO})
+endif(${MUGRID_NETCDF_IO})
 
 file(GLOB PY_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/python_*.py")
 foreach(pytest ${PY_TEST_SRCS})
@@ -64,7 +64,7 @@ endforeach(header_test ${HEADER_TEST_SRCS})
 
 # build library tests
 file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cc")
-if(${NETCDF_IO})
+if(${MUGRID_NETCDF_IO})
   file(GLOB IO_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/io_test_*.cc")
 endif()
 muGrid_add_test(main_mugrid_test_suite
@@ -76,7 +76,7 @@ muGrid_add_test(mugrid_python_binding_tests TYPE PYTHON python_binding_tests.py)
 if(${MUSPECTRE_MPI_PARALLEL})
   # add MPI tests
   file(GLOB TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/mpi_*.cc")
-  if(${NETCDF_IO})
+  if(${MUGRID_NETCDF_IO})
     file(GLOB IO_TEST_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/io_mpi_*.cc")
   endif()
   muGrid_add_test(mpi_main_mugrid_test_suite1

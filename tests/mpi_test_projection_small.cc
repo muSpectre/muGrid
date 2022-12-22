@@ -41,7 +41,6 @@
 #include "libmugrid/test_goodies.hh"
 
 #include <libmufft/fft_utils.hh>
-#include <libmufft/fftw_engine.hh>
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
 #endif

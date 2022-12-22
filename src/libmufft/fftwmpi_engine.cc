@@ -244,7 +244,7 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::compute_fft(const RealField_t & input_field,
-                                  FourierField_t & output_field) const {
+                                  FourierField_t & output_field) {
     // Compute FFT
     fftw_mpi_execute_dft_r2c(
         this->fft_plans.at(input_field.get_nb_dof_per_pixel()),
@@ -254,7 +254,7 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void FFTWMPIEngine::compute_ifft(const FourierField_t & input_field,
-                                   RealField_t & output_field) const {
+                                   RealField_t & output_field) {
     fftw_mpi_execute_dft_c2r(
         this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
         reinterpret_cast<fftw_complex *>(input_field.data()),

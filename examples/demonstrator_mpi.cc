@@ -44,6 +44,7 @@
 #include "solver/krylov_solver_cg.hh"
 
 #include <libmugrid/ccoord_operations.hh>
+#include <libmufft/fftwmpi_engine.hh>
 
 #include <iostream>
 #include <memory>

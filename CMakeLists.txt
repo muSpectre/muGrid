@@ -51,14 +51,25 @@ endif()
 set(MUSPECTRE_PYTHON_MAJOR_VERSION 3)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+option(MUSPECTRE_MPI_PARALLEL "If on, MPI-parallel solvers become available" OFF)
+
+# ------------------------------------------------------------------------------
+option(MUGRID_NETCDF_IO "If on, NETCDF/PNETCDF IO is available" OFF)
+
+# ------------------------------------------------------------------------------
+option(MUFFT_FFTW "If on, the serial FFTW engine is built" ON)
+if(${MUSPECTRE_MPI_PARALLEL})
+  option(MUFFT_FFTWMPI "If on, the mpi-parallel FFTW engine is built" ON)
+  option(MUFFT_PFFT "If on, the mpi-parallel PFFT engine is built" OFF)
+endif()
+
 # ------------------------------------------------------------------------------
 option(MUSPECTRE_MAKE_DOC_TARGET "If on, a target dev_doc (which builds the documentation) is added" OFF)
 option(MUSPECTRE_MAKE_TESTS "If on, several ctest targets will be built automatically" ON)
 option(MUSPECTRE_MAKE_EXAMPLES "If on, the executables in the bin folder will be compiled" ON)
 option(MUSPECTRE_MAKE_BENCHMARKS "If on, the benchmarks will be compiled" ON)
-option(MUSPECTRE_MPI_PARALLEL "If on, MPI-parallel solvers become available" OFF)
 option(SPLIT_CELL "If on, split cell, cork and gmp are accessible" OFF)
-option(NETCDF_IO "If on, NETCDF/PNETCDF IO is available" OFF)
+
 set(MUCHOICE "muSpectre" CACHE STRING "Which µLevel is required")
 set_property(CACHE MUCHOICE PROPERTY STRINGS
   "muGrid"
@@ -91,19 +102,37 @@ if(NOT CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 endif()
 
 # ------------------------------------------------------------------------------
+if (${MUSPECTRE_MPI_PARALLEL})
+  add_definitions(-DWITH_MPI)
+endif()
+
+if (${MUGRID_NETCDF_IO})
+  add_definitions(-DWITH_NETCDF_IO)
+endif()
+
+if (${MUFFT_FFTW})
+  add_definitions(-DWITH_FFTW)
+endif(${MUFFT_FFTW})
+
+if (${MUFFT_FFTWMPI})
+  add_definitions(-DWITH_FFTWMPI)
+endif(${MUFFT_FFTWMPI})
+
+if (${MUFFT_PFFT})
+  add_definitions(-DWITH_PFFT)
+endif(${MUFFT_PFFT})
+
+# ------------------------------------------------------------------------------
 include(muspectreTools)
 include(muspectreExtraCompilationProfiles)
 include(muTools)
 include(cpplint)
 mark_as_advanced_prefix(CPPLINT)
 
-
-
 # ------------------------------------------------------------------------------
 add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
 add_external_package(pybind11 VERSION 2.6.2 CONFIG)
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
-
 
 if(${SPLIT_CELL})
   add_external_package(gmp)

@@ -40,6 +40,9 @@
 #include <libmugrid/field_typed.hh>
 #include <libmugrid/state_field.hh>
 #include <libmugrid/field_map.hh>
+
+#include <libmufft/pocketfft_engine.hh>
+
 #include <cell/cell_factory.hh>
 #include <materials/material_linear_elastic1.hh>
 
@@ -88,7 +91,7 @@ namespace muSpectre {
     DynCcoord_t nb_grid_pts{3, 3};
     DynRcoord_t lengths{2.3, 2.7};
     Formulation form{Formulation::finite_strain};
-    auto fft_ptr{std::make_unique<muFFT::FFTWEngine>(nb_grid_pts)};
+    auto fft_ptr{std::make_unique<muFFT::PocketFFTEngine>(nb_grid_pts)};
     auto proj_ptr{std::make_unique<ProjectionFiniteStrainFast<dim>>(
         std::move(fft_ptr), lengths)};
     auto sys{std::make_shared<Cell>(std::move(proj_ptr))};

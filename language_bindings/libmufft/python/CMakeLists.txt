@@ -56,14 +56,6 @@ set (PY_BINDING_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/bind_py_fftengine.cc
   )
 
-if (${USE_FFTWMPI})
-  add_definitions(-DWITH_FFTWMPI)
-endif(${USE_FFTWMPI})
-
-if (${USE_PFFT})
-  add_definitions(-DWITH_PFFT)
-endif(${USE_PFFT})
-
 find_package(PythonLibsNew ${MUFFT_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
 # On OS X, add -Wno-deprecated-declarations

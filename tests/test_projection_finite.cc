@@ -32,16 +32,20 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-#include "projection/projection_finite_strain.hh"
-#include "projection/projection_finite_strain_fast.hh"
-#include "test_projection.hh"
+
+#include <Eigen/Dense>
+
+#include <libmugrid/field_typed.hh>
+
+#include <libmufft/fft_utils.hh>
+#include <libmufft/pocketfft_engine.hh>
+
+#include <projection/projection_finite_strain.hh>
+#include <projection/projection_finite_strain_fast.hh>
 
 #include "libmugrid/test_goodies.hh"
 
-#include <libmufft/fft_utils.hh>
-#include <libmugrid/field_typed.hh>
-
-#include <Eigen/Dense>
+#include "test_projection.hh"
 
 namespace muSpectre {
 
@@ -49,36 +53,93 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   using fixlistRankTwo = boost::mpl::list<
-      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrain<twoD>>,
-      ProjectionFixture<threeD, threeD, Squares<threeD>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Squares<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionFiniteStrain<twoD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Squares<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionFiniteStrain<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrain<twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
-                        ProjectionFiniteStrain<threeD>>,
+                        ProjectionFiniteStrain<threeD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Sizes<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionFiniteStrain<twoD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Sizes<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionFiniteStrain<threeD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
 
-      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrainFast<twoD>>,
-      ProjectionFixture<threeD, threeD, Squares<threeD>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Squares<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionFiniteStrainFast<twoD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Squares<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionFiniteStrainFast<threeD>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
-                        ProjectionFiniteStrainFast<twoD>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
-                        ProjectionFiniteStrainFast<threeD>>>;
+                        ProjectionFiniteStrainFast<threeD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Sizes<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionFiniteStrainFast<twoD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Sizes<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionFiniteStrainFast<threeD>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>>;
 
   using fixlistRankOne = boost::mpl::list<
-      ProjectionFixture<twoD, twoD, Squares<twoD>, FourierGradient<twoD>,
-                        ProjectionGradient<twoD, firstOrder>>,
-      ProjectionFixture<threeD, threeD, Squares<threeD>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Squares<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionGradient<twoD, firstOrder>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Squares<threeD>,
                         FourierGradient<threeD>,
-                        ProjectionGradient<threeD, firstOrder>>,
-      ProjectionFixture<twoD, twoD, Sizes<twoD>, FourierGradient<twoD>,
-                        ProjectionGradient<twoD, firstOrder>>,
-      ProjectionFixture<threeD, threeD, Sizes<threeD>, FourierGradient<threeD>,
-                        ProjectionGradient<threeD, firstOrder>>>;
+                        ProjectionGradient<threeD, firstOrder>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<twoD,
+                        twoD,
+                        Sizes<twoD>,
+                        FourierGradient<twoD>,
+                        ProjectionGradient<twoD, firstOrder>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>,
+      ProjectionFixture<threeD,
+                        threeD,
+                        Sizes<threeD>,
+                        FourierGradient<threeD>,
+                        ProjectionGradient<threeD, firstOrder>,
+                        OneQuadPt,
+                        muFFT::PocketFFTEngine>>;
 
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, fix, fixlistRankTwo, fix) {
@@ -87,7 +148,7 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(even_grid_test) {
-    using Engine = muFFT::FFTWEngine;
+    using Engine = muFFT::PocketFFTEngine;
     using proj = ProjectionFiniteStrainFast<twoD>;
     auto nb_dof{2 * 2};
     auto engine = std::make_unique<Engine>(DynCcoord_t{2, 3});

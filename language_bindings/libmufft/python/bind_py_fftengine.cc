@@ -41,7 +41,10 @@
 #include <libmugrid/raw_memory_operations.hh>
 
 #include <libmufft/fft_utils.hh>
+#include <libmufft/pocketfft_engine.hh>
+#ifdef WITH_FFTW
 #include <libmufft/fftw_engine.hh>
+#endif
 #ifdef WITH_FFTWMPI
 #include <libmufft/fftwmpi_engine.hh>
 #endif
@@ -106,12 +109,12 @@ class PyFFTEngineBase : public FFTEngineBaseUnclonable {
                                 allow_temporary_buffer, allow_destroy_input) {}
 
   void compute_fft(const RealField_t & input_field,
-                   FourierField_t & output_field) const override {
+                   FourierField_t & output_field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, fft, input_field, output_field);
   }
 
   void compute_ifft(const FourierField_t & input_field,
-                    RealField_t & output_field) const override {
+                    RealField_t & output_field) override {
     PYBIND11_OVERLOAD_PURE(void, Parent, ifft, input_field, output_field);
   }
 
@@ -491,7 +494,10 @@ void add_engine_helper(py::module & mod, const std::string & name) {
 
 void add_fft_engines(py::module & mod) {
   add_fft_engine_base(mod);
+  add_engine_helper<muFFT::PocketFFTEngine>(mod, "PocketFFT");
+#ifdef WITH_FFTW
   add_engine_helper<muFFT::FFTWEngine>(mod, "FFTW");
+#endif
 #ifdef WITH_FFTWMPI
   add_engine_helper<muFFT::FFTWMPIEngine>(mod, "FFTWMPI");
 #endif

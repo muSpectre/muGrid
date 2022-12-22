@@ -225,14 +225,14 @@ namespace muFFT {
       MPI_Comm_free(&this->mpi_comm);
     }
     // TODO(Till): We cannot run fftw_mpi_cleanup since also calls fftw_cleanup
-    // and any running FFTWEngine will fail afterwards.
+    // and any running PFFTEngine will fail afterwards.
     // this->nb_engines--;
     // if (!this->nb_engines) pfft_cleanup();
   }
 
   /* ---------------------------------------------------------------------- */
   void PFFTEngine::compute_fft(const RealField_t & input_field,
-                               FourierField_t & output_field) const {
+                               FourierField_t & output_field) {
     // Compute FFT
     pfft_execute_dft_r2c(
         this->fft_plans.at(input_field.get_nb_dof_per_pixel()),
@@ -242,7 +242,7 @@ namespace muFFT {
 
   /* ---------------------------------------------------------------------- */
   void PFFTEngine::compute_ifft(const FourierField_t & input_field,
-                                   RealField_t & output_field) const {
+                                   RealField_t & output_field) {
     pfft_execute_dft_c2r(
         this->ifft_plans.at(input_field.get_nb_dof_per_pixel()),
         reinterpret_cast<pfft_complex *>(input_field.data()),

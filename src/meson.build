@@ -2,7 +2,6 @@ subdir('libmugrid')
 subdir('libmufft')
 
 muspectre_sources = [
-    'muSpectre',
     'cell/cell.cc',
     'cell/cell_data.cc',
 #    'cell/cell_split.cc',
@@ -75,6 +74,7 @@ muspectre_sources = [
 ]
 
 muspectre = shared_library(
+    'muSpectre',
     muspectre_sources,
     link_with: [mugrid, mufft],
     dependencies: muspectre_dependencies

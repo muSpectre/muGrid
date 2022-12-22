@@ -59,7 +59,7 @@ def test_tangent_worker(testobj, dim):
     ksmall = 1e-4
 
     # µSpectre init stuff
-    fft = "fftw"
+    fft = "serial"
     form = µ.Formulation.small_strain
     # use e.g. average upwind differences
     fourier_gradient = [µ.FourierDerivative(dim , i) for i in range(dim)]
@@ -152,7 +152,7 @@ class MaterialPhaseFieldFracture2_Check(unittest.TestCase):
         ksmall = 1e-4
 
         # µSpectre init stuff
-        fft = "fftw"
+        fft = "serial"
         form = µ.Formulation.small_strain
         # use e.g. average upwind differences
         fourier_gradient = [µ.FourierDerivative(dim , i) for i in range(dim)]

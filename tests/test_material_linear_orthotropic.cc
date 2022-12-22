@@ -39,7 +39,7 @@
 #include "solver/solvers.hh"
 #include "solver/krylov_solver_cg.hh"
 #include "solver/krylov_solver_eigen.hh"
-#include "libmufft/fftw_engine.hh"
+#include "libmufft/pocketfft_engine.hh"
 #include "projection/projection_finite_strain_fast.hh"
 #include "materials/material_linear_elastic1.hh"
 #include "materials/material_linear_orthotropic.hh"
@@ -59,14 +59,14 @@ namespace muSpectre {
     const DynCcoord_t resolutions{5, 5};
     const DynRcoord_t lengths{5, 5};
     auto fft_ptr_non{
-        std::make_unique<muFFT::FFTWEngine>(resolutions)};
+        std::make_unique<muFFT::PocketFFTEngine>(resolutions)};
 
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
     auto sys_non{std::make_shared<Cell>(std::move(proj_ptr_non))};
 
     auto fft_ptr_lin{
-        std::make_unique<muFFT::FFTWEngine>(resolutions)};
+        std::make_unique<muFFT::PocketFFTEngine>(resolutions)};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
     auto sys_lin{std::make_shared<Cell>(std::move(proj_ptr_lin))};
@@ -137,13 +137,13 @@ namespace muSpectre {
     const DynCcoord_t resolutions{5, 5, 5};
     const DynRcoord_t lengths{5, 5, 5};
     auto fft_ptr_non{
-        std::make_unique<muFFT::FFTWEngine>(resolutions)};
+        std::make_unique<muFFT::PocketFFTEngine>(resolutions)};
     auto proj_ptr_non{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_non), lengths)};
     auto sys_non{std::make_shared<Cell>(std::move(proj_ptr_non))};
 
     auto fft_ptr_lin{
-        std::make_unique<muFFT::FFTWEngine>(resolutions)};
+        std::make_unique<muFFT::PocketFFTEngine>(resolutions)};
     auto proj_ptr_lin{std::make_unique<ProjectionFiniteStrainFast<Dim>>(
         std::move(fft_ptr_lin), lengths)};
     auto sys_lin{std::make_shared<Cell>(std::move(proj_ptr_lin))};

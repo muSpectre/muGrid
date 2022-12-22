@@ -36,6 +36,8 @@
 #ifndef TESTS_LIBMUFFT_MPI_CONTEXT_HH_
 #define TESTS_LIBMUFFT_MPI_CONTEXT_HH_
 
+#include <boost/test/unit_test.hpp>
+
 #include <libmugrid/communicator.hh>
 
 using muGrid::Communicator;

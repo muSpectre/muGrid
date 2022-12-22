@@ -153,12 +153,11 @@ if(${MUSPECTRE_MPI_PARALLEL})
 
   target_link_libraries(muGrid PUBLIC ${MPI_LIBRARIES})
   target_include_directories(muGrid SYSTEM PUBLIC ${MPI_C_INCLUDE_PATH})
-  target_compile_definitions(muGrid PUBLIC -DWITH_MPI)
 
   set(mugrid_SRCS ${mugrid_SRCS} ../libmugrid/communicator.cc)
 endif()
 
-if(${NETCDF_IO})
+if(${MUGRID_NETCDF_IO})
   if(${MUSPECTRE_MPI_PARALLEL})
     # find and link PnetCDF
     find_package(PnetCDF REQUIRED)

@@ -1,11 +1,16 @@
+incdirs = include_directories('..')
+
 mufft_sources = [
-    'muFFT',
     'version.cc',
     'derivative.cc',
     'fft_engine_base.cc',
     'fft_utils.cc',
-    'fftw_engine.cc',
+    'pocketfft_engine.cc'
 ]
+
+if mu_with_fftw3
+    mufft_sources += ['fftw_engine.cc']
+endif
 
 if mu_with_fftw3mpi
     mufft_sources += ['fftwmpi_engine.cc']
@@ -16,8 +21,9 @@ if mu_with_pfft
 endif
 
 mufft = shared_library(
+    'muFFT',
     mufft_sources,
-    include_directories: include_directories('..'),
-    link_with: mugrid,
+    include_directories: incdirs,
+    link_with: [mugrid],
     dependencies: muspectre_dependencies
 )

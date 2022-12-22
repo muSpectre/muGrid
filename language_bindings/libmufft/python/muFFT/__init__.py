@@ -55,27 +55,112 @@ from muGrid import Communicator
 
 has_mpi = _muGrid.Communicator.has_mpi
 
+
+class UnknownFFTEngineError(Exception):
+    """
+    Exception used to indicate and unknown FFT engine identifier.
+    """
+    pass
+
+
 # This is a list of FFT engines that are potentially available.
-#              |------------------------------- Identifier for 'FFT' class
-#              |           |------------------- Name of engine class
-#              |           |          |-------- MPI parallel calcs
-#              v           v          v      v- Transposed output
-_factories = {'fftw':    ('FFTW',    False, False),
-              'fftwmpi': ('FFTWMPI', True,  True),
-              'pfft':    ('PFFT',    True,  True)}
+#              |--------------------------------- String identifier for 'FFT' class
+#              |             |------------------- Name of engine class
+#              |             |          |-------- Is output transposed?
+#              v             v          v      v- Supports MPI parallel calculations?
+_factories = {'pocketfft': ('PocketFFT', False, False),
+              'fftw': ('FFTW', False, False),
+              'fftwmpi': ('FFTWMPI', True, True),
+              'pfft': ('PFFT', True, True)}
 
 
 # Detect FFT engines. This is a convenience dictionary that allows enumeration
 # of all engines that have been compiled into the library.
 def _find_fft_engines():
-    fft_engines = []
+    fft_engines = {}
     for fft, (factory_name, is_transposed, is_parallel) in _factories.items():
-        if factory_name in dir(_muFFT):
-            fft_engines += [(fft, is_transposed, is_parallel)]
+        try:
+            factory = getattr(_muFFT, factory_name)
+            fft_engines[fft] = (factory, is_transposed, is_parallel)
+        except AttributeError:
+            pass  # FFT engine is not compiled into the C++ code
     return fft_engines
 
 
 fft_engines = _find_fft_engines()
+
+
+def mangle_engine_identifier(fft, communicator=None):
+    """
+    Return normalized engine identifier. This will turn 'serial' and 'mpi'
+    engine identifiers into the respective best-performing engine compiled
+    into the code.
+
+    Parameters
+    ----------
+    fft : string
+        FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
+        if you need a serial engine. It is also possible to specifically
+        choose 'pocketfft', 'fftw', 'fftwmpi' or 'pfft'.
+    communicator : mpi4py or muGrid communicator
+        communicator object passed to parallel FFT engines. Note that
+        the 'pocketfft' and 'fftw' engines do not support parallel execution.
+        Default: None
+    """
+    communicator = Communicator(communicator)
+    if fft == 'mpi' and communicator.size == 1:
+        fft = 'serial'
+    if fft == 'serial':
+        if 'fftw' in fft_engines:
+            # Use FFTW for serial calculations if available since it is more
+            # optimized than PocketFFT.
+            return 'fftw', communicator
+        else:
+            return 'pocketfft', communicator
+    elif fft == 'mpi':
+        if 'fftwmpi' in fft_engines:
+            return 'fftwmpi', communicator
+        elif 'pfft' in fft_engines:
+            # This is a fallback in case there is not FFTWMPI. May not work
+            # in all cases.
+            return 'pfft', communicator
+        else:
+            raise RuntimeError('No MPI parallel FFT engine was compiled into the code.')
+
+    return fft, communicator
+
+
+def get_engine_factory(fft, communicator=None):
+    """
+    Get engine factory given factory string identifier.
+
+    Parameters
+    ----------
+    fft : string
+        FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
+        if you need a serial engine. It is also possible to specifically
+        choose 'pocketfft', 'fftw', 'fftwmpi' or 'pfft'.
+    communicator : mpi4py or muGrid communicator
+        communicator object passed to parallel FFT engines. Note that
+        the 'pocketfft' and 'fftw' engines do not support parallel execution.
+        Default: None
+    """
+    original_identifier = fft
+    fft, communicator = mangle_engine_identifier(fft, communicator)
+
+    try:
+        factory, is_transposed, is_parallel = fft_engines[fft]
+    except KeyError:
+        factory = None
+
+    if factory is None:
+        raise UnknownFFTEngineError(
+            "FFT engine with identifier '{}' (internally mangled to '{}') "
+            "does not exist. If you believe this engine should exist, check "
+            "that the code has been compiled with support for it."
+            .format(original_identifier, fft))
+
+    return factory, communicator
 
 
 def FFT(nb_grid_pts, fft='serial', communicator=None, **kwargs):
@@ -89,38 +174,17 @@ def FFT(nb_grid_pts, fft='serial', communicator=None, **kwargs):
 
     Parameters
     ----------
-    nb_grid_pts: list
+    nb_grid_pts : list
         Grid nb_grid_pts in the Cartesian directions.
-    fft: string
+    fft : string
         FFT engine to use. Use 'mpi' if you want a parallel engine and 'serial'
         if you need a serial engine. It is also possible to specifically
-        choose 'fftw', 'fftwmpi', 'pfft' or 'p3dfft'.
+        choose 'pocketfft', 'fftw', 'fftwmpi' or 'pfft'.
         Default: 'serial'.
-    communicator: mpi4py or muGrid communicator
+    communicator : mpi4py or muGrid communicator
         communicator object passed to parallel FFT engines. Note that
-        the default 'fftw' engine does not support parallel execution.
+        the 'pocketfft' and 'fftw' engines do not support parallel execution.
         Default: None
     """
-    fft = 'fftw' if fft == 'serial' else fft
-
-    communicator = Communicator(communicator)
-
-    # 'mpi' is a convenience setting that falls back to 'fftw' for single
-    # process jobs and to 'fftwmpi' for multi-process jobs
-    if fft == 'mpi':
-        if communicator.size > 1:
-            fft = 'fftwmpi'
-        else:
-            fft = 'fftw'
-
-    try:
-        factory_name, is_transposed, is_parallel = _factories[fft]
-    except KeyError:
-        raise KeyError("Unknown FFT engine '{}'.".format(fft))
-    try:
-        factory = getattr(_muFFT, factory_name)
-    except KeyError:
-        raise KeyError("FFT engine '{}' has not been compiled into the "
-                       "muFFT library.".format(factory_name))
-    engine = factory(nb_grid_pts, communicator, **kwargs)
-    return engine
+    factory, communicator = get_engine_factory(fft, communicator)
+    return factory(nb_grid_pts, communicator, **kwargs)

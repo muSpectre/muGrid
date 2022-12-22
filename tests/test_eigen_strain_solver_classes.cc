@@ -52,7 +52,7 @@
 
 #include <libmugrid/iterators.hh>
 #include <libmugrid/ccoord_operations.hh>
-#include <libmufft/fftw_engine.hh>
+#include <libmufft/pocketfft_engine.hh>
 #include <libmugrid/exception.hh>
 
 #include <boost/mpl/list.hpp>

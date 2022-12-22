@@ -103,7 +103,8 @@ namespace muFFT {
                   Communicator comm = Communicator(),
                   const FFT_PlanFlags & plan_flags = FFT_PlanFlags::estimate,
                   bool allow_temporary_buffer = true,
-                  bool allow_destroy_input = false);
+                  bool allow_destroy_input = false,
+                  bool engine_has_rigid_memory_layout = true);
 
     //! Copy constructor
     FFTEngineBase(const FFTEngineBase & other) = delete;
@@ -133,22 +134,18 @@ namespace muFFT {
     void create_plan(const Shape_t & shape);
 
     //! forward transform, performs copy of buffer if required
-    void fft(const RealField_t & input_field,
-             FourierField_t & output_field);
+    void fft(const RealField_t & input_field, FourierField_t & output_field);
 
     //! inverse transform, performs copy of buffer if required
-    void ifft(const FourierField_t & input_field,
-              RealField_t & output_field);
+    void ifft(const FourierField_t & input_field, RealField_t & output_field);
 
     //! forward transform using half-complex data storage,
     // performs copy of buffer if required
-    void hcfft(const RealField_t & input_field,
-             RealField_t & output_field);
+    void hcfft(const RealField_t & input_field, RealField_t & output_field);
 
     //! inverse transform using half-complex data storage,
     // performs copy of buffer if required
-    void ihcfft(const RealField_t & input_field,
-             RealField_t & output_field);
+    void ihcfft(const RealField_t & input_field, RealField_t & output_field);
 
     /**
      * Create a Fourier-space field with the ideal strides and dimensions for
@@ -215,7 +212,7 @@ namespace muFFT {
      */
     RealField_t &
     fetch_or_register_halfcomplex_field(const std::string & unique_name,
-                                          const Index_t & nb_dof_per_pixel);
+                                        const Index_t & nb_dof_per_pixel);
 
     /**
      * Fetches a Fourier-space field with the ideal strides and dimensions for
@@ -224,7 +221,7 @@ namespace muFFT {
      */
     RealField_t &
     fetch_or_register_halfcomplex_field(const std::string & unique_name,
-                                  const Shape_t & shape);
+                                        const Shape_t & shape);
 
 
     /**
@@ -375,19 +372,19 @@ namespace muFFT {
 
     //! forward transform, assumes that the buffer has the correct memory layout
     virtual void compute_fft(const RealField_t & input_field,
-                             FourierField_t & output_field) const = 0;
+                             FourierField_t & output_field) = 0;
 
     //! inverse transform, assumes that the buffer has the correct memory layout
     virtual void compute_ifft(const FourierField_t & input_field,
-                              RealField_t & output_field) const = 0;
+                              RealField_t & output_field) = 0;
 
     //! forward half complex transform
     virtual void compute_hcfft(const RealField_t & input_field,
-                                RealField_t & output_field) const;
+                                RealField_t & output_field);
 
     //! inverse half complex transform
     virtual void compute_ihcfft(const RealField_t & input_field,
-                                RealField_t & output_field) const;
+                                RealField_t & output_field);
 
     //! check whether real-space buffer has the correct memory layout
     virtual bool check_real_space_field(const RealField_t & field) const;
@@ -435,12 +432,15 @@ namespace muFFT {
     //!< transformed data
     DynCcoord_t fourier_strides;
 
-
-    //! allow the FFTEngine to create temporary copies
+    //! allow the FFTEngine to create temporary copies (if it cannot work with
+    //! a specific memory layout)
     bool allow_temporary_buffer;
 
     //! allow the FFTEngine to destroy input buffers
     bool allow_destroy_input;
+
+    //! the underlying FFT engine requires a fixed memory layout
+    bool engine_has_rigid_memory_layout;
 
     //!< normalisation coefficient of fourier transform
     const Real norm_factor;

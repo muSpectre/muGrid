@@ -38,7 +38,7 @@
 #include "libmugrid/test_goodies.hh"
 
 #include "projection/discrete_greens_operator.hh"
-#include <libmufft/fftw_engine.hh>
+#include <libmufft/pocketfft_engine.hh>
 
 #include <libmugrid/iterators.hh>
 #include <libmugrid/field_collection_global.hh>
@@ -163,7 +163,7 @@ namespace muSpectre {
     }
     // create an fft engine
     muFFT::FFTEngine_ptr engine{
-        std::make_shared<muFFT::FFTWEngine>(nb_subdomain_grid_pts)};
+        std::make_shared<muFFT::PocketFFTEngine>(nb_subdomain_grid_pts)};
 
     /**
      * TODO(junge) After rebase, this should be done by the operators

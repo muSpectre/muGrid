@@ -56,7 +56,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
             µ.linear_finite_elements.gradient_3d
         self.nb_quad_pts = int(len(self.gradient) / self.dim)
 
-        self.fft = "fftw"
+        self.fft = "serial"
         self.form = µ.Formulation.finite_strain
 
         self.E = 1  # Youngs modulus
@@ -96,7 +96,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         hardening = 1
 
         # µSpectre init stuff
-        fft = "fftw"
+        fft = "serial"
         form = µ.Formulation.finite_strain
         # use e.g. average upwind differences
         dz = muFFT.DiscreteDerivative([0, 0, 0],
@@ -182,7 +182,7 @@ class MaterialHyperElastoPlastic2_Check(unittest.TestCase):
         hardening = 100
 
         # µSpectre init stuff
-        fft = "fftw"
+        fft = "serial"
         form = µ.Formulation.finite_strain
         dz = muFFT.DiscreteDerivative([0, 0, 0],
                                       [[[-0.25, 0.25], [-0.25, 0.25]],
