@@ -169,32 +169,6 @@ variables:
     - ccache --show-stats || true
 
 # ------------------------------------------------------------------------------
-build:stable_cmake_mpi_gcc:
-  variables:
-    BUILD_TYPE: Coverage
-    CMAKE_ADDITIONAL_FLAGS: -DMUSPECTRE_MPI_PARALLEL=ON -DMPIEXEC_MAX_NUMPROCS=2
-    CACHE_PREFIX: "_mpi"
-  extends:
-    - .cmake_build
-    - .cache_build
-    - .compiler_ccache_gcc
-    - .image_debian_stable
-
-test:stable_cmake_mpi_gcc:
-  variables:
-    BUILD_TYPE: Coverage
-    OMPI_ALLOW_RUN_AS_ROOT: 1
-    OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
-    OMPI_MCA_rmaps_base_oversubscribe: 1
-  extends:
-    - .cmake_tests
-    - .compiler_ccache_gcc
-    - .image_debian_stable
-  needs:
-    - job: build:stable_cmake_mpi_gcc
-      artifacts: true
-
-# ------------------------------------------------------------------------------
 build:stable_cmake_gcc:
   variables:
     BUILD_TYPE: Release
@@ -331,8 +305,6 @@ build:test_documention:
 wheel:linux:
   stage: wheel
   image: python:3.8
-  needs:
-    - job: test:stable_meson_gcc
   # make a docker daemon available for cibuildwheel to use
   services:
     - name: docker:dind
@@ -363,6 +335,7 @@ wheel:linux:
       - wheelhouse/
   only:
     - master
+    - tags
 
 #------------------------------------------------------------------------------
 deploy:pages:
