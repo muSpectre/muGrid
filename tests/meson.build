@@ -37,7 +37,7 @@ endif
 subdir('libmugrid')
 subdir('libmufft')
 
-incdirs = include_directories('../src')
+incdirs = [eigen3_incdir, include_directories('../src')]
 
 if mu_with_c_tests
     #

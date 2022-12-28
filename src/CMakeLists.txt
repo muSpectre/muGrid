@@ -88,7 +88,7 @@ endif()
 
 
 if(${SPLIT_CELL})
-    target_link_libraries(muSpectre PUBLIC Eigen3::Eigen   corkpp gmp )
+  target_link_libraries(muSpectre PUBLIC Eigen3::Eigen corkpp gmp)
 else()
   target_link_libraries(muSpectre PUBLIC Eigen3::Eigen)
 endif()

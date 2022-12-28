@@ -76,6 +76,8 @@ muspectre_sources = [
 muspectre = shared_library(
     'muSpectre',
     muspectre_sources,
+    include_directories: eigen3_incdir,
     link_with: [mugrid, mufft],
-    dependencies: muspectre_dependencies
+    dependencies: muspectre_dependencies,
+    install: true  # needed, otherwise it is not copied to wheel
 )

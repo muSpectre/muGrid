@@ -9,9 +9,9 @@ mufft_python = python.extension_module(
     '_muFFT', # Name of the module
     mufft_python_sources,
     install: true,  # Install it
-    include_directories: include_directories('../../../src'),
+    include_directories: [eigen3_incdir, pybind11_incdir, include_directories('../../../src')],
     link_with: [mugrid, mufft],
-    dependencies: [pybind11, muspectre_dependencies]
+    dependencies: [muspectre_dependencies, python3_dependency]
 )
 
 subdir('muFFT')

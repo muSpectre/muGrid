@@ -12,14 +12,13 @@ RUN apk add \
     valgrind \
     libexecinfo libexecinfo-dev \
     cmake \
+    ccache \
     meson \
     ninja \
-    python3 \
+    python3 python3-dev \
     py3-pip \
     py3-numpy \
     py3-scipy \
-    py3-pybind11-dev \
-    eigen-dev \
     netcdf-dev \
     hdf5-dev
 

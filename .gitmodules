@@ -1,0 +1,11 @@
+[submodule "external/pybind11"]
+	path = external/pybind11
+	url = https://github.com/pybind/pybind11.git
+	branch = stable
+[submodule "external/eigen3"]
+	path = external/eigen3
+	url = https://gitlab.com/libeigen/eigen.git
+	branch = 3.4
+[submodule "external/cork"]
+	path = external/cork
+	url = https://github.com/pastewka/cork

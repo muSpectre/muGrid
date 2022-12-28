@@ -125,7 +125,7 @@ II   = dyad22(I,I)
 Ghat4  = np.zeros([3,3,3,3,Nx,Ny,Nz])                # projection operator
 x      = np.zeros([3      ,Nx,Ny,Nz],dtype='int64')  # position vectors
 q      = np.zeros([3      ,Nx,Ny,Nz],dtype='int64')  # frequency vectors
-delta  = lambda i,j: np.float(i==j)                  # Dirac delta function
+delta  = lambda i,j: np.array(i == j, dtype=float)   # Dirac delta function
 # - set "x" as position vector of all grid-points   [grid of vector-components]
 x[0],x[1],x[2] = np.mgrid[:Nx,:Ny,:Nz]
 # - convert positions "x" to frequencies "q"        [grid of vector-components]

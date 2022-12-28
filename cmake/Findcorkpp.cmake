@@ -1,5 +1,5 @@
 download_external_project(corkpp
-  URL "https://github.com/afalsafi/cork.git"
+  URL "https://github.com/pastewka/cork.git"
   TAG "${_corkpp}"
   BACKEND GIT
   THIRD_PARTY_SRC_DIR ${_corkpp_external_dir}

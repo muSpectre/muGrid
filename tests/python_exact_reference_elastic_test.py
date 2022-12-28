@@ -106,7 +106,9 @@ II = dyad22(I, I)
 # - support function / look-up list / zero initialize
 
 
-def delta(i, j): return np.float(i == j)            # Dirac delta function
+def delta(i, j):
+    """Dirac delta function"""
+    return np.array(i == j, dtype=float)
 
 
 freq = np.arange(-(N-1)/2., +(N+1)/2.)        # coordinate axis -> freq. axis

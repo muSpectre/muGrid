@@ -111,6 +111,7 @@ namespace muSpectre {
     bool is_initialised() const;
 
     //! returns the number of degrees of freedom in the cell
+    //! returns the number of degrees of freedom in the cell
     Index_t get_nb_dof() const final;
 
     //! number of pixels on this processor

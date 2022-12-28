@@ -13,7 +13,6 @@ RUN apt-get -qq update && apt-get -y -qq install \
     git \
     libboost-test-dev \
     libcurl4-openssl-dev \
-    libeigen3-dev \
     libfftw3-dev \
     libfftw3-mpi-dev \
     libgmp-dev \
@@ -26,7 +25,6 @@ RUN apt-get -qq update && apt-get -y -qq install \
     meson \
     m4 \
     ninja-build \
-    pybind11-dev \
     python3-breathe \
     python3-dev \
     python3-mpi4py \

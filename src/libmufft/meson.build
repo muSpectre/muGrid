@@ -23,7 +23,8 @@ endif
 mufft = shared_library(
     'muFFT',
     mufft_sources,
-    include_directories: incdirs,
-    link_with: [mugrid],
-    dependencies: muspectre_dependencies
+    include_directories: [eigen3_incdir, incdirs],
+    link_with: mugrid,
+    dependencies: muspectre_dependencies,
+    install: true  # needed, otherwise it is not copied to wheel
 )

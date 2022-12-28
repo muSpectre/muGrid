@@ -1,5 +1,16 @@
+stages:
+  - build
+  - test
+  - wheel
+  - deploy
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
 .cmake_build:
   stage: build
+  variables:
+    BUILD_SYSTEM_NAME: cmake
   script:
     - free -h
     - df -h
@@ -23,6 +34,8 @@
 
 .meson_build:
   stage: build
+  variables:
+    BUILD_SYSTEM_NAME: meson
   script:
     - free -h
     - df -h
@@ -31,7 +44,7 @@
     - python3 discover_version.py
     - meson setup --buildtype=${BUILD_TYPE} ${MESON_ADDITIONAL_FLAGS} build
     - cd build
-    - ninja
+    - meson compile
     - df -h
   artifacts:
     when: on_success
@@ -107,24 +120,22 @@
 .valgrind_muspectre:
   stage: test
   script:
-    - cd build
+    - cd build/tests
     - valgrind --track-origins=yes --leak-check=full --error-exitcode=1 ./main_test_suite
 
 # ------------------------------------------------------------------------------
 .compiler_ccache_gcc:
   variables:
-    COMPILER_NAME: gcc
-    CC: /usr/lib/ccache/gcc
-    CXX: /usr/lib/ccache/g++
-    FC: gfortran
+    COMPILER_NAME: ccache-gcc
+    CC: ccache gcc
+    CXX: ccache g++
     GCOV_EXECUTABLE: gcov
 
 .compiler_ccache_clang:
   variables:
-    COMPILER_NAME: clang
-    CC: /usr/lib/ccache/clang
-    CXX: /usr/lib/ccache/clang++
-    FC: gfortran
+    COMPILER_NAME: ccache-clang
+    CC: ccache clang
+    CXX: ccache clang++
     GCOV_EXECUTABLE: llvm-cov gcov
 
 .image_alpine:
@@ -148,7 +159,7 @@
     CCACHE_DIR: ${CI_PROJECT_DIR}/.ccache
     CCACHE_MAXSIZE: 1Gi
   cache:
-    key: ${IMAGE_NAME}_${COMPILER_NAME}${CACHE_PREFIX}
+    key: ${IMAGE_NAME}_${BUILD_SYSTEM_NAME}_${COMPILER_NAME}${CACHE_PREFIX}
     policy: pull-push
     paths:
       - .ccache/
@@ -181,32 +192,6 @@ test:stable_cmake_mpi_gcc:
     - .image_debian_stable
   needs:
     - job: build:stable_cmake_mpi_gcc
-      artifacts: true
-
-# ------------------------------------------------------------------------------
-build:stable_cmake_clang:
-  variables:
-    BUILD_TYPE: Release
-  extends:
-    - .cmake_build
-    - .cache_build
-    - .compiler_ccache_clang
-    - .image_debian_stable
-
-test:stable_cmake_clang:
-  extends:
-    - .cmake_tests
-    - .image_debian_stable
-  needs:
-    - job: build:stable_cmake_clang
-      artifacts: true
-
-valgrind:stable_cmake_clang:
-  extends:
-    - .valgrind_muspectre
-    - .image_debian_stable
-  needs:
-    - job: build:stable_cmake_clang
       artifacts: true
 
 # ------------------------------------------------------------------------------
@@ -244,7 +229,6 @@ test:stable_cmake_split_gcc:
     BUILD_TYPE: Release
   extends:
     - .cmake_tests
-    - .compiler_ccache_gcc
     - .image_debian_stable
   needs:
     - job: build:stable_cmake_split_gcc
@@ -256,6 +240,8 @@ build:alpine_meson_gcc:
     BUILD_TYPE: release
   extends:
     - .meson_build
+    - .cache_build
+    - .compiler_ccache_gcc
     - .image_alpine
 
 test:alpine_meson_gcc:
@@ -272,6 +258,8 @@ build:stable_meson_gcc:
     BUILD_TYPE: release
   extends:
     - .meson_build
+    - .cache_build
+    - .compiler_ccache_gcc
     - .image_debian_stable
 
 test:stable_meson_gcc:
@@ -283,11 +271,39 @@ test:stable_meson_gcc:
       artifacts: true
 
 # ------------------------------------------------------------------------------
+build:stable_meson_clang:
+  variables:
+    BUILD_TYPE: release
+  extends:
+    - .meson_build
+    - .cache_build
+    - .compiler_ccache_clang
+    - .image_debian_stable
+
+test:stable_meson_clang:
+  extends:
+    - .meson_tests
+    - .image_debian_stable
+  needs:
+    - job: build:stable_meson_clang
+      artifacts: true
+
+valgrind:stable_meson_clang:
+  extends:
+    - .valgrind_muspectre
+    - .image_debian_stable
+  needs:
+    - job: build:stable_meson_clang
+      artifacts: true
+
+# ------------------------------------------------------------------------------
 build:testing_meson_gcc:
   variables:
     BUILD_TYPE: release
   extends:
     - .meson_build
+    - .cache_build
+    - .compiler_ccache_gcc
     - .image_debian_testing
 
 test:testing_meson_gcc:
@@ -297,13 +313,6 @@ test:testing_meson_gcc:
   needs:
     - job: build:testing_meson_gcc
       artifacts: true
-
-# ------------------------------------------------------------------------------
-build:stable_pip_gcc:
-  extends:
-    - .pip_build
-    - .cmake_build
-    - .image_debian_stable
 
 # ------------------------------------------------------------------------------
 build:test_documention:
@@ -319,8 +328,44 @@ build:test_documention:
       - build/doc/html
 
 #------------------------------------------------------------------------------
+wheel:linux:
+  stage: wheel
+  image: python:3.8
+  needs:
+    - job: test:stable_meson_gcc
+  # make a docker daemon available for cibuildwheel to use
+  services:
+    - name: docker:dind
+      entrypoint: ["env", "-u", "DOCKER_HOST"]
+      command: ["dockerd-entrypoint.sh"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+    # See https://github.com/docker-library/docker/pull/166
+    DOCKER_TLS_CERTDIR: ""
+    # meson-python needs Python 3.7 or larger
+    CIBW_ARCHS: x86_64
+    CIBW_BUILD_VERBOSITY: 3
+    CIBW_TEST_COMMAND: python {project}/tests/python_binding_tests.py
+  parallel:
+    matrix:
+      - CIBW_BUILD:
+        - cp37-manylinux*
+        - cp38-manylinux*
+        - cp39-manylinux*
+        - cp310-manylinux*
+  script:
+    - curl -sSL https://get.docker.com/ | sh
+    - python -m pip install cibuildwheel==2.11.3
+    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir wheelhouse
+  artifacts:
+    paths:
+      - wheelhouse/
+  only:
+    - master
 
-pages:
+#------------------------------------------------------------------------------
+deploy:pages:
   stage: deploy
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   dependencies: []
@@ -336,11 +381,14 @@ pages:
   only:
     - master
 
-.pypi:
+deploy:pypi:
   stage: deploy
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:
     - python3 -m build . -s
-    - python3 -m twine upload --non-interactive --username __token__ --password $PYPI_PASSWORD dist/*
+    - python3 -m twine upload --verbose --non-interactive --username __token__ --password "$PYPI_PASSWORD" dist/* wheelhouse/*
+  needs:
+    - job: wheel:linux
+      artifacts: true
   only:
     - tags

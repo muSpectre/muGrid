@@ -58,7 +58,7 @@ II    = dyad22(I,I)
 # projection operator                                         [grid of tensors]
 # NB can be vectorized (faster, less readable), see: "elasto-plasticity.py"
 # - support function / look-up list / zero initialize
-delta  = lambda i,j: np.float(i==j)            # Dirac delta function
+delta  = lambda i,j: np.array(i == j, dtype=float) # Dirac delta function
 freq   = np.arange(-(N-1)/2.,+(N+1)/2.)        # coordinate axis -> freq. axis
 Ghat4  = np.zeros([ndim,ndim,ndim,ndim,N,N]) # zero initialize
 # - compute

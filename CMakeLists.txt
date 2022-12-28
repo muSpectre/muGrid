@@ -134,12 +134,11 @@ add_external_package(Eigen3 VERSION 3.3.0 CONFIG)
 add_external_package(pybind11 VERSION 2.6.2 CONFIG)
 find_package(PythonLibsNew ${MUSPECTRE_PYTHON_MAJOR_VERSION} MODULE REQUIRED)
 
-if(${SPLIT_CELL})
-  add_external_package(gmp)
-  add_external_package(corkpp)
-endif()
-
 add_subdirectory(external)
+
+if(${SPLIT_CELL})
+  include_directories("external/cork/src")
+endif()
 
 muSpectre_set_global_compile_options()
 

@@ -44,5 +44,7 @@ endif
 mugrid = shared_library(
     'muGrid',
     mugrid_sources,
-    dependencies: muspectre_dependencies
+    include_directories: eigen3_incdir,
+    dependencies: muspectre_dependencies,
+    install: true  # needed, otherwise it is not copied to wheel
 )

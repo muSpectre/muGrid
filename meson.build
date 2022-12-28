@@ -15,7 +15,8 @@ version_dirty = version[0]
 version_str = version[1]
 version_hash = version[2]
 
-eigen3 = dependency('eigen3', version: '>=3.3.0')
+eigen3_incdir = include_directories('external/eigen3')
+
 fftw3 = dependency('fftw3', required: false)
 if fftw3.found()
     mu_with_fftw3 = true
@@ -31,7 +32,7 @@ cc = meson.get_compiler('c')
 dl = cc.find_library('dl', required: false)
 execinfo = cc.find_library('execinfo', required: false)
 
-muspectre_dependencies = [eigen3, dl, execinfo, fftw3]
+muspectre_dependencies = [dl, execinfo, fftw3]
 
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_global_arguments('-Weffc++', language: 'cpp')

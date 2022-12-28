@@ -19,6 +19,11 @@ or if you prefer identifying yourself using a public ssh-key, run
 The latter option requires you to have a user account on gitlab (`create
 <https://gitlab.com/users/sign_in#register-pane>`_).
 
+Note that *µ*\Spectre uses submodules that need to be initialized with
+
+.. code-block:: bash
+
+   $ git submodule update --init
 
 .. _gitlab: https://gitlab.com
 
@@ -29,28 +34,30 @@ You can compile *µ*\Spectre using `Meson <https://mesonbuild.com/>`_
 (0.42.0 or higher) or `CMake <https://cmake.org/>`_ (3.5.0 or
 higher).
 
-Dependencies of *µ*\Spectre
- The current (and possibly incomplete list of) dependencies are
+The current (and possibly incomplete list of) dependencies are
 
 - `Meson <https://mesonbuild.com/>`_ (0.42.0 or higher) or `CMake <https://cmake.org/>`_ (3.5.0 or higher)
-- `Boost unit test framework <http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html>`_
-- `FFTW <http://www.fftw.org>`_
 - `git <https://git-scm.com/>`_
 - `Python3 <https://www.python.org/>`_ including the header files
 - `numpy <http://www.numpy.org/>`_ and `scipy <https://scipy.org/>`_
 - `UVW <https://c4science.ch/source/uvw/>`_ (0.3.1 or higher) for the visualization
+
+The following dependencies are included as submodules:
+
 - `pybind11 <https://pybind11.readthedocs.io/en/stable/>`_ (2.2.4 or higher)
-- `NetCDF4 <https://unidata.github.io/netcdf4-python/netCDF4/index.html>`_ 
+- `Eigen <http://eigen.tuxfamily.org/>`_ (3.3.0 or higher)
+
+The following dependencies are optional:
+
+- `Boost unit test framework <http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html>`_
+- `FFTW <http://www.fftw.org>`_
+- `NetCDF4 <https://unidata.github.io/netcdf4-python/netCDF4/index.html>`_
 
 Recommended:
 
 - `Sphinx <http://www.sphinx-doc.org>`_ and `Breathe
   <https://breathe.readthedocs.io>`_ (necessary if you want to build the
   documentation (turned off by default)
-- `Eigen <http://eigen.tuxfamily.org/>`_ (3.3.0 or higher). If you do not
-  install this, it will be downloaded automatically at configuration time, so
-  this is not strictly necessary. The download can be slow, though, so we
-  recommend installing it on your system.
 - The CMake curses graphical user interface (``ccmake``).
 
 Possible compilers
@@ -69,7 +76,7 @@ and using clang-4.0 under MacOS.
 
 Under MacOS 14, it has been successfully compiled using gcc-6.5 shipped with homebrew along with the
 CommandLineTools 11.3.
-:download:`Here <macosx14_bash_profile>` is an example commented bash_profile that lead to the successfull installation.
+:download:`Here <macosx14_bash_profile>` is an example commented bash_profile that lead to the successful installation.
 
 It does *not* compile on Intel's most recent compiler, as it is still lacking
 some C++14 support. Work-arounds are planned, but will have to wait for someone

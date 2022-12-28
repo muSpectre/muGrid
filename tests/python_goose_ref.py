@@ -94,7 +94,7 @@ class ProjectionGooseFFT(object):
         # projection operator                                  [grid of tensors]
         # NB can be vectorized (faster, less readable), see: "elasto-plasticity.py"
         # - support function / look-up list / zero initialize
-        delta  = lambda i,j: np.float(i==j)            # Dirac delta function
+        delta  = lambda i,j: np.array(i == j, dtype=float)            # Dirac delta function
         N = self.nb_grid_pts
         freq   = np.fft.fftfreq(N, 1/N)        # coordinate axis -> freq. axis
         Ghat4  = np.zeros([ndim,ndim,ndim,ndim,*shape]) # zero initialize
@@ -153,7 +153,7 @@ class FiniteStrainProjectionGooseFFT(ProjectionGooseFFT):
 
     def comp_ghat(self, q):
         temp = np.zeros((self.ndim, self.ndim, self.ndim, self.ndim))
-        delta  = lambda i,j: np.float(i==j)            # Dirac delta function
+        delta  = lambda i,j: np.array(i == j, dtype=float)            # Dirac delta function
         if not q.dot(q) == 0:                      # zero freq. -> mean
             for i,j,l,m in itertools.product(range(self.ndim),repeat=4):
                 temp[i, j, l, m] = delta(i,m)*q[j]*q[l]/(q.dot(q))
@@ -207,7 +207,7 @@ class SmallStrainProjectionGooseFFT(ProjectionGooseFFT):
 
     def comp_ghat(self, q):
         temp = np.zeros((self.ndim, self.ndim, self.ndim, self.ndim))
-        delta  = lambda i,j: np.float(i==j)            # Dirac delta function
+        delta  = lambda i,j: np.array(i == j, dtype=float)            # Dirac delta function
         if not q.dot(q) == 0:                      # zero freq. -> mean
             for i,j,l,m in itertools.product(range(self.ndim),repeat=4):
                 temp[i, j, l, m] = -(q[i]*q[j]*q[l]*q[m])/(q.dot(q))**2+\

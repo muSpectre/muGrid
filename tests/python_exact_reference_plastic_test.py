@@ -278,8 +278,9 @@ x = np.zeros([3, Nx, Ny, Nz], dtype='int64')  # position vectors
 q = np.zeros([3, Nx, Ny, Nz], dtype='int64')  # frequency vectors
 
 
-# Dirac delta function
-def delta(i, j): return np.float(i == j)
+def delta(i, j):
+    """Dirac delta function"""
+    return np.array(i == j, dtype=float)
 
 
 # - set "x" as position vector of all grid-points   [grid of vector-components]
