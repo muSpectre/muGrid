@@ -153,6 +153,9 @@ variables:
     IMAGE_NAME: debian_stable
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
 
+.image_macos:
+  image: macos-12-xcode-14
+
 .cache_build:
   variables:
     CCACHE_BASEDIR: ${CI_PROJECT_DIR}/build
@@ -287,6 +290,24 @@ test:testing_meson_gcc:
   needs:
     - job: build:testing_meson_gcc
       artifacts: true
+
+# ------------------------------------------------------------------------------
+#build:macos_meson_clang:
+#  variables:
+#    BUILD_TYPE: release
+#  extends:
+#    - .meson_build
+#    - .cache_build
+#    - .compiler_ccache_clang
+#    - .image_macos
+
+#test:macos_meson_clang:
+#  extends:
+#    - .meson_tests
+#    - .image_macos
+#  needs:
+#    - job: build:macos_meson_clang
+#      artifacts: true
 
 # ------------------------------------------------------------------------------
 build:test_documention:

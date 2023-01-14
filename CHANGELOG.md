@@ -1,6 +1,16 @@
 Change log for µSpectre
 =======================
 
+0.25.2 (14Jan2023)
+------------------
+
+- Fixed macOS build
+
+0.25.1 (28Dec2022)
+------------------
+
+- Same as 0.25.0, changed CI configuration for automatic deployment to PyPI
+
 0.25.0 (28Dec2022)
 ------------------
 
