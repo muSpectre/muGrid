@@ -107,7 +107,8 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
 def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
                          Poisson1, Young2, Poisson2, cell, krylov_solver,
                          strains, stresses, equil_tol=1e-8, gradient=None,
-                         weights=None, args=()):
+                         weights=None, args=(), filter_func=None,
+                         dfilter_dphase=None):
     """
     Function to perform a sensitivity analysis based on the discrete
     adjoint method. The two materials of the problem must both be linear
@@ -129,7 +130,7 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
        np.ndarray(number of pixels). The iteration order of the pixels must be
        column-major.
     phase: np.ndarray(nb_grid_pts) of floats between 0 and 1
-        Describes the material distribution. For each pixel, phase=0 corresponds
+        Phase field function. For each pixel, phase=0 corresponds
         to material 1, phase=1 corresponds to material 2. The iteration order of
         the pixels must be column-major.
     Young1: float
@@ -153,6 +154,13 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
     args: list
         list containing additional parameters for the calculation of the partial
         derivatives. Default is args=()
+    filter_func: callable function
+                 Filter function, calculating the relativ material distribution
+                 from the phase field function. Takes the phase as argument.
+                 Default is None.
+    dfilter_dphase: callable function
+                    Derivative of filter function with respect to the phase.
+                    Takes the phase as argument. Default is None.
 
     Returns
     -------
@@ -160,7 +168,13 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
         Sensitivity at each pixel.
     """
 
-    phase = phase.flatten(order='F')
+    # Filter phase?
+    if filter_func is None:
+        phase_filtered = phase.flatten(order='F')
+    else:
+        phase_filtered = filter_func(phase).flatten(order='F')
+        if dfilter_dphase is None:
+            print('ERROR: If you use a filter function, you must provide its derivative')
 
     # Check the dimension
     dim = len(cell.nb_domain_grid_pts)
@@ -172,7 +186,7 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
     shape = [dim, dim, nb_quad_pts, *nb_grid_pts]
 
     # Adjoint equation G:K:adjoint = -G:f_deriv_strain
-    rhs_list = f_deriv_strains(phase, strains, stresses, cell, args)
+    rhs_list = f_deriv_strains(phase_filtered, strains, stresses, cell, args)
     adjoint_list = []
     for i in range(len(strains)):
         strain = strains[i].reshape(shape, order='F')
@@ -190,8 +204,8 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
     # Sensitivity equation S = dfdrho + dKdrho:F adjoint
     delta_Young = Young2 - Young1
     delta_Poisson = Poisson2 - Poisson1
-    Young = delta_Young*phase + Young1
-    Poisson = delta_Poisson*phase + Poisson1
+    Young = delta_Young * phase_filtered + Young1
+    Poisson = delta_Poisson * phase_filtered + Poisson1
     dstress_dphase_list = calculate_dstress_dphase(cell, strains, Young,
                                                    delta_Young, Poisson,
                                                    delta_Poisson, gradient,
@@ -201,10 +215,20 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
                                         dstress_dphase_list, args)
     S = f_deriv_phase_array.flatten(order='F')
 
-    for i in range(len(strains)):
-        dstress_dphase = dstress_dphase_list[i]
-        adjoint = adjoint_list[i]
-        S += np.sum(adjoint*dstress_dphase, axis=(0, 1, 2)).flatten(order='F')
+    if dfilter_dphase is None:
+        for i in range(len(strains)):
+            dstress_dphase = dstress_dphase_list[i]
+            adjoint = adjoint_list[i]
+            S += np.sum(adjoint*dstress_dphase, axis=(0, 1, 2)).flatten(order='F')
+    else:
+        dfilter_dphase = dfilter_dphase(phase).reshape(nb_grid_pts, order='F')
+        for i in range(len(strains)):
+            dstress_dphase = dstress_dphase_list[i]
+            for j in range(nb_grid_pts[0]):
+                for k in range(nb_grid_pts[1]):
+                    dstress_dphase[:, :, :, j, k] *= dfilter_dphase[j, k]
+            adjoint = adjoint_list[i]
+            S += np.sum(adjoint*dstress_dphase, axis=(0, 1, 2)).flatten(order='F')
 
     return S.reshape(nb_grid_pts, order='F')
 
