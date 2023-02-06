@@ -70,8 +70,8 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
     dstress_dphase: List of np.ndarray(dim**2 * nb_quad_pts * nb_pixels) of floats
         List of the partial derivatives of the stress with respect to the strains.
     """
-    dim = cell.nb_domain_grid_pts.dim
-    nb_grid_pts = [*cell.nb_domain_grid_pts]
+    dim = cell.dim
+    nb_grid_pts = [*cell.nb_subdomain_grid_pts]
     nb_quad_pts = cell.nb_quad_pts
 
     # Derivatives of Poissons ratio and Youngs modulo with respect to the phase
@@ -87,7 +87,7 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
     Poisson_deriv = 0.5 * lame1_deriv / (lame1_deriv+lame2_deriv)
 
     # Helper cell construction
-    helper_cell = µ.Cell(cell.nb_domain_grid_pts, cell.domain_lengths,
+    helper_cell = µ.Cell(cell.nb_subdomain_grid_pts, cell.domain_lengths,
                          cell.formulation, gradient, weights)
     LinMat = µ.material.MaterialLinearElastic4_2d
     helper_material = LinMat.make(helper_cell, "helper_material")
@@ -183,7 +183,7 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
 
     nb_grid_pts = cell.nb_domain_grid_pts
     nb_quad_pts = cell.nb_quad_pts
-    shape = [dim, dim, nb_quad_pts, *nb_grid_pts]
+    shape = [dim, dim, nb_quad_pts, *cell.nb_subdomain_grid_pts]
 
     # Adjoint equation G:K:adjoint = -G:f_deriv_strain
     rhs_list = f_deriv_strains(phase_filtered, strains, stresses, cell, args)
@@ -221,16 +221,16 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
             adjoint = adjoint_list[i]
             S += np.sum(adjoint*dstress_dphase, axis=(0, 1, 2)).flatten(order='F')
     else:
-        dfilter_dphase = dfilter_dphase(phase).reshape(nb_grid_pts, order='F')
+        dfilter_dphase = dfilter_dphase(phase).reshape(cell.nb_subdomain_grid_pts, order='F')
         for i in range(len(strains)):
             dstress_dphase = dstress_dphase_list[i]
-            for j in range(nb_grid_pts[0]):
-                for k in range(nb_grid_pts[1]):
+            for j in range(cell.nb_subdomain_grid_pts[0]):
+                for k in range(cell.nb_subdomain_grid_pts[1]):
                     dstress_dphase[:, :, :, j, k] *= dfilter_dphase[j, k]
             adjoint = adjoint_list[i]
             S += np.sum(adjoint*dstress_dphase, axis=(0, 1, 2)).flatten(order='F')
 
-    return S.reshape(nb_grid_pts, order='F')
+    return S.reshape(cell.nb_subdomain_grid_pts, order='F')
 
 ### ----- Testing the partial derivatives ----- ###
 def partial_derivatives_finite_diff(aim_function, phase_ini, Young1, Poisson1,

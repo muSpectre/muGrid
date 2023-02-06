@@ -160,6 +160,24 @@ namespace muSpectre {
 
   /* ---------------------------------------------------------------------- */
   template <Index_t DimM>
+  void MaterialLinearElastic4<DimM>::set_youngs_modulus_and_poisson_ratio(
+       const size_t & quad_pt_id, const Real & Youngs_modulus,
+       const Real & Poisson_ratio) {
+    auto && lambda_map{this->lambda_field.get_map()};
+    auto && mu_map{this->mu_field.get_map()};
+
+    // compute updated first and second lame constant (lambda and mu)
+    const Real lambda_new =
+        Hooke::compute_lambda(Youngs_modulus, Poisson_ratio);
+    const Real mu_new = Hooke::compute_mu(Youngs_modulus, Poisson_ratio);
+
+    // assign new values to fields
+    lambda_map[quad_pt_id] = lambda_new;
+    mu_map[quad_pt_id] = mu_new;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <Index_t DimM>
   Real
   MaterialLinearElastic4<DimM>::get_youngs_modulus(const size_t & quad_pt_id) {
     auto && lambda_map{this->lambda_field.get_map()};
@@ -169,7 +187,9 @@ namespace muSpectre {
     const Real & lambda = lambda_map[quad_pt_id];
     const Real & mu = mu_map[quad_pt_id];
 
-    return Hooke::compute_young(lambda, mu);
+    auto E = Hooke::compute_young(lambda, mu);
+
+    return E;
   }
 
   /* ---------------------------------------------------------------------- */

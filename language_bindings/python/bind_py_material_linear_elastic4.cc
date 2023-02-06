@@ -106,6 +106,14 @@ void add_material_linear_elastic4_helper(py::module & mod) {
             return mat.set_poisson_ratio(quad_pt_id, Poisson);
           },
           "quad_pt_id"_a, "Poisson"_a)
+    .def(
+          "set_youngs_modulus_and_poisson_ratio",
+          [](Mat_t & mat, const size_t & quad_pt_id, const Real & Young,
+             const Real & Poisson) {
+            return mat.set_youngs_modulus_and_poisson_ratio(quad_pt_id, Young,
+                                                            Poisson);
+          },
+          "quad_pt_id"_a, "Young"_a, "Poisson"_a)
       .def(
           "get_youngs_modulus",
           [](Mat_t & mat, const size_t & quad_pt_id) {

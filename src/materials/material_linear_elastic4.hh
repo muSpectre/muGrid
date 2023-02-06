@@ -180,7 +180,7 @@ namespace muSpectre {
     /**
      * (re)set the Youngs modulus on a quad_point with quad_point_id
      * The internal stored first and second Lame constants are updated due to
-     * the update of the Youngs modulus.
+     * the update of the Youngs modulus. Note: Does not work for void.
      */
     void set_youngs_modulus(const size_t & quad_pt_id,
                             const Real & Youngs_modulus);
@@ -188,22 +188,30 @@ namespace muSpectre {
     /**
      * (re)set the Poisson ratio on a quad_point with quad_point_id
      * The internal stored first and second Lame constants are updated due to
-     * the update of the Poisson's ratio.
+     * the update of the Poisson's ratio. Note: Does not work for void.
      */
     void set_poisson_ratio(const size_t & quad_pt_id,
                            const Real & Poisson_ratio);
 
     /**
+     * (re)set the Youngs modulus and Poisson's ratio on a quad_point
+     *  with quad_point_id
+     */
+    void set_youngs_modulus_and_poisson_ratio(const size_t & quad_pt_id,
+                                              const Real & Youngs_modulus,
+                                              const Real & Poisson_ratio);
+
+    /**
      * get the Youngs modulus on a quad_point with quad_point_id
      * Youngs modulus is computed from the internal stored first and second
-     * lame constant.
+     * lame constant. Note: Returns nan for void.
      */
     Real get_youngs_modulus(const size_t & quad_pt_id);
 
     /**
      * get the Poisson ratio on a quad_point with quad_point_id
      * Poissons ratio is computed from the internal stored first and second
-     * lame constant.
+     * lame constant. Note: Returns nan for void.
      */
     Real get_poisson_ratio(const size_t & quad_pt_id);
 

@@ -165,6 +165,19 @@ class MaterialLinearElastic4_Check(unittest.TestCase):
                                mat.get_youngs_modulus(random_quad_pt_id_3),
                                places=8)
 
+        random_quad_pt_id_4 = np.random.randint(0, nb_pts)
+        new_youngs_modulus = 2.5 * nb_pts
+        new_poisson_ratio = -0.3
+        mat.set_youngs_modulus_and_poisson_ratio(random_quad_pt_id_4,
+                                                 new_youngs_modulus,
+                                                 new_poisson_ratio)
+        self.assertAlmostEqual(new_poisson_ratio,
+                               mat.get_poisson_ratio(random_quad_pt_id_4),
+                               places=8)
+        self.assertAlmostEqual(new_youngs_modulus,
+                               mat.get_youngs_modulus(random_quad_pt_id_4),
+                               places=8)
+
     def test_young_and_poisson_per_quad_point(self):
         nb_grid_pts = [2, 3, 1]
         lengths = nb_grid_pts
