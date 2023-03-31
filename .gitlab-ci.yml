@@ -347,6 +347,7 @@ wheel:linux:
         - cp38-manylinux*
         - cp39-manylinux*
         - cp310-manylinux*
+        - cp311-manylinux*
   script:
     - curl -sSL https://get.docker.com/ | sh
     - python -m pip install cibuildwheel==2.11.3
