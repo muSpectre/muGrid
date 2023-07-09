@@ -77,7 +77,7 @@ namespace muFFT {
     PFFTEngine(const PFFTEngine & other) = delete;
 
     //! Move constructor
-    PFFTEngine(PFFTEngine && other) = default;
+    PFFTEngine(PFFTEngine && other) = delete;
 
     //! Destructor
     virtual ~PFFTEngine() noexcept;

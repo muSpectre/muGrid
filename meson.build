@@ -37,17 +37,13 @@ muspectre_dependencies = [dl, execinfo, fftw3]
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_global_arguments('-Weffc++', language: 'cpp')
 
+mu_with_mpi = false
 mpi = dependency('mpi', language: 'cpp', required: false)
 if mpi.found()
-    mu_with_mpi = true
-    message('muSpectre MPI: *** YES ***')
-    add_global_arguments('-DWITH_MPI', language : ['c', 'cpp'])
-    netcdf = dependency('pnetcdf', required: false)
-    muspectre_dependencies += [mpi, netcdf]
-    fftw3mpi_incdir = include_directories('/usr/include')
     fftw3mpi = cc.find_library(
         'fftw3_mpi',
-        dirs: ['/usr/lib', '/usr/lib/x86_64-linux-gnu'])
+        dirs: ['/usr/lib', '/usr/lib/x86_64-linux-gnu'],
+        required: false)
     if fftw3mpi.found() and cc.has_header('fftw3-mpi.h')
         message('muSpectre FFTW3 MPI: *** YES ***')
         mu_with_fftw3mpi = true
@@ -67,12 +63,21 @@ if mpi.found()
         message('muSpectre PFFT: no')
         mu_with_pfft = false
     endif
-    mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
+    if mu_with_fftw3mpi or mu_with_pfft
+        mu_with_mpi = true  # We found MPI and a parallel FFT library
+        mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
+    endif
+endif
+
+if mu_with_mpi
+    message('muSpectre MPI: *** YES ***')
+    add_global_arguments('-DWITH_MPI', language : ['c', 'cpp'])
+    netcdf = dependency('pnetcdf', required: false)
+    muspectre_dependencies += [mpi, netcdf]
 else
-    mu_with_mpi = false
+    message('muSpectre MPI: no')
     mu_with_fftw3mpi = false
     mu_with_pfft = false
-    message('muSpectre MPI: no')
     netcdf = dependency('netcdf', required: false)
     muspectre_dependencies += [netcdf]
 endif

@@ -33,9 +33,15 @@ RUN apt-get -qq update && apt-get -y -qq install \
     python3-sphinx \
     python3-sphinx-rtd-theme \
     python3-venv \
+    python3-numpy \
+    python3-scipy \
+    python3-meshio \
+    python3-build \
+    twine \
     valgrind \
     gcovr \
     ccache \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
@@ -44,7 +50,7 @@ RUN apt-get -qq update && apt-get -y -qq install \
 RUN  sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen &&     dpkg-reconfigure --frontend=noninteractive locales &&  update-locale LANG=en_US.UTF-8
 ENV LANG C.UTF-8
 
-RUN python3 -m pip install --no-binary numpy --no-binary scipy uvw meshio[all]>=4.3.10 build twine cibuildwheel numpy>=1.20.0 scipy
+RUN python3 -m pip install --break-system-packages uvw cibuildwheel
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 

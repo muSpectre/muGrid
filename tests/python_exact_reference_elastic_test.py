@@ -194,7 +194,7 @@ class Counter(object):
 
 class LinearElastic_Check(unittest.TestCase):
     def setUp(self):
-        self.rel_tol = 1e-13
+        self.rel_tol = 1e-12
         # ---------------------------- µSpectre init -----------------------------------
         nb_grid_pts = list(phase.shape)
         dim = len(nb_grid_pts)

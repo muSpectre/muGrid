@@ -20,6 +20,7 @@ RUN apk add \
     py3-numpy \
     py3-scipy \
     netcdf-dev \
-    hdf5-dev
+    hdf5-dev \
+    jq
 
 RUN python3 -m pip install meshio[all]>=4.3.10 build uvw

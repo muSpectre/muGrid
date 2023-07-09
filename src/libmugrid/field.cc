@@ -67,6 +67,18 @@ namespace muGrid {
   FieldCollection & Field::get_collection() const { return this->collection; }
 
   /* ---------------------------------------------------------------------- */
+  void Field::assert_typeid(const std::type_info & type) const {
+    if (this->get_stored_typeid() != type) {
+        std::stringstream s;
+        s << "Field stores data of type `"
+          << this->get_stored_typeid().name()
+          << "`, which differs from `"
+          << typeid(Int).name() << "`.";
+      throw std::runtime_error(s.str());
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
   Index_t Field::get_current_nb_entries() const {
     return this->current_nb_entries;
   }

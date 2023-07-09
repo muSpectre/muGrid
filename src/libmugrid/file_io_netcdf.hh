@@ -345,7 +345,7 @@ namespace muGrid {
     NetCDFAtt(const NetCDFAtt & other) = default;
 
     //! Move constructor
-    NetCDFAtt(NetCDFAtt && other) = delete;
+    NetCDFAtt(NetCDFAtt && other) = default;
 
     //! Destructor
     virtual ~NetCDFAtt() = default;

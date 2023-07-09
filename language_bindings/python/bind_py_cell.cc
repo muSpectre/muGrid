@@ -178,8 +178,9 @@ void add_cell_helper(py::module & mod) {
               fields.register_real_field(out_name, cell.get_strain_shape(),
                                          muSpectre::QuadPtTag);
             }
-            auto & delta_stress{
-                dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
+            auto & out_field{fields.get_field(out_name)};
+            out_field.assert_typeid(typeid(Real));
+            auto & delta_stress{static_cast<muGrid::RealField &>(out_field)};
             auto delta_strain_array{NumpyT2Proxy(cell, delta_strain)};
             cell.evaluate_projected_directional_stiffness(
                 delta_strain_array.get_field(), delta_stress);
@@ -200,8 +201,9 @@ void add_cell_helper(py::module & mod) {
               fields.register_real_field(out_name, cell.get_strain_shape(),
                                          muSpectre::QuadPtTag);
             }
-            auto & strain_field{
-                dynamic_cast<muGrid::RealField &>(fields.get_field(out_name))};
+            auto & out_field{fields.get_field(out_name)};
+            out_field.assert_typeid(typeid(Real));
+            auto & strain_field{static_cast<muGrid::RealField &>(out_field)};
             strain_field = NumpyT2Proxy(cell, strain).get_field();
             cell.apply_projection(strain_field);
             return numpy_wrap(strain_field);

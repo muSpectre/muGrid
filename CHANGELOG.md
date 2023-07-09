@@ -1,6 +1,17 @@
 Change log for µSpectre
 =======================
 
+0.26.1 (08Jul2023)
+------------------
+
+- macOS wheels
+
+0.26.0 (31Mar2023)
+------------------
+
+- MPI parallelization of sensitivity analysis
+- Wheels for Python 3.11
+
 0.25.2 (14Jan2023)
 ------------------
 

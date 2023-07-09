@@ -12,9 +12,9 @@ variables:
   variables:
     BUILD_SYSTEM_NAME: cmake
   script:
-    - free -h
-    - df -h
-    - grep -c ^processor /proc/cpuinfo
+#    - free -h
+#    - df -h
+#    - grep -c ^processor /proc/cpuinfo
     - mkdir build
     - cd build
     - echo "Build type ${BUILD_TYPE} -- additional flags ${CMAKE_ADDITIONAL_FLAGS}"
@@ -23,7 +23,7 @@ variables:
             -DMUSPECTRE_RUNNING_IN_CI=ON
             ${CMAKE_ADDITIONAL_FLAGS} ..
     - make -k
-    - df -h
+#    - df -h
   artifacts:
     when: on_success
     paths:
@@ -37,15 +37,15 @@ variables:
   variables:
     BUILD_SYSTEM_NAME: meson
   script:
-    - free -h
-    - df -h
-    - grep -c ^processor /proc/cpuinfo
+#    - free -h
+#    - df -h
+#    - grep -c ^processor /proc/cpuinfo
     - echo "Build type ${BUILD_TYPE} -- additional flags ${MESON_ADDITIONAL_FLAGS}"
     - python3 discover_version.py
     - meson setup --buildtype=${BUILD_TYPE} ${MESON_ADDITIONAL_FLAGS} build
     - cd build
     - meson compile
-    - df -h
+#    - df -h
   artifacts:
     when: on_success
     paths:
@@ -63,7 +63,7 @@ variables:
     - source venv/activate
     - pip install build
     - python3 -m build . -s
-    - python3 -m pip install --user dist/*.tar.gz
+    - python3 -m pip install dist/*.tar.gz
   artifacts:
     when: on_success
     paths:
@@ -106,7 +106,12 @@ variables:
     OMPI_ALLOW_RUN_AS_ROOT: 1
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
   script:
+    - SOURCE_DIRECTORY=$(pwd)
     - cd build
+    - ORIGINAL_SOURCE_DIRECTORY=$(cat meson-info/meson-info.json | jq .directories.source -r)
+    - echo "Patching directories from ${ORIGINAL_SOURCE_DIRECTORY} to ${SOURCE_DIRECTORY}..."
+    # We need to patch the directory as it has a randomized component on macOS runners
+    - sed -i'' -e "s,${ORIGINAL_SOURCE_DIRECTORY},${SOURCE_DIRECTORY},g" *.json meson-info/*.json
     - meson test -v --no-rebuild
     - echo "Build type ${BUILD_TYPE}"
     - if [ "${BUILD_TYPE}" = "Coverage" ]; then
@@ -131,6 +136,13 @@ variables:
     CXX: ccache g++
     GCOV_EXECUTABLE: gcov
 
+.compiler_clang:
+  variables:
+    COMPILER_NAME: clang
+    CC: clang
+    CXX: clang++
+    GCOV_EXECUTABLE: llvm-cov gcov
+
 .compiler_ccache_clang:
   variables:
     COMPILER_NAME: ccache-clang
@@ -154,7 +166,16 @@ variables:
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
 
 .image_macos:
-  image: macos-12-xcode-14
+  tags: [ saas-macos-medium-m1 ]
+  image: macos-12-xcode-14 # https://docs.gitlab.com/ee/ci/runners/saas/macos/environment.html
+  before_script:
+    - export PATH="/Users/gitlab/Library/Python/3.9/bin:$PATH"
+    - python3 -m site
+    - python3 -m pip install --upgrade pip
+    - python3 -m pip install meson ninja numpy scipy meshio uvw h5py jq
+#  before_script:
+#    - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+#    - brew install ccache
 
 .cache_build:
   variables:
@@ -172,44 +193,44 @@ variables:
     - ccache --show-stats || true
 
 # ------------------------------------------------------------------------------
-build:stable_cmake_gcc:
-  variables:
-    BUILD_TYPE: Release
-  extends:
-    - .cmake_build
-    - .cache_build
-    - .compiler_ccache_gcc
-    - .image_debian_stable
+#build:stable_cmake_gcc:
+#  variables:
+#    BUILD_TYPE: Release
+#  extends:
+#    - .cmake_build
+#    - .cache_build
+#    - .compiler_ccache_gcc
+#    - .image_debian_stable
 
-test:stable_cmake_gcc:
-  extends:
-    - .cmake_tests
-    - .image_debian_stable
-  needs:
-    - job: build:stable_cmake_gcc
-      artifacts: true
+#test:stable_cmake_gcc:
+#  extends:
+#    - .cmake_tests
+#    - .image_debian_stable
+#  needs:
+#    - job: build:stable_cmake_gcc
+#      artifacts: true
 
 # ------------------------------------------------------------------------------
-build:stable_cmake_split_gcc:
-  variables:
-    BUILD_TYPE: Release
-    CMAKE_ADDITIONAL_FLAGS: -DSPLIT_CELL=ON
-    CACHE_PREFIX: "_split"
-  extends:
-    - .cmake_build
-    - .cache_build
-    - .compiler_ccache_gcc
-    - .image_debian_stable
+#build:stable_cmake_split_gcc:
+#  variables:
+#    BUILD_TYPE: Release
+#    CMAKE_ADDITIONAL_FLAGS: -DSPLIT_CELL=ON
+#    CACHE_PREFIX: "_split"
+#  extends:
+#    - .cmake_build
+#    - .cache_build
+#    - .compiler_ccache_gcc
+#    - .image_debian_stable
 
-test:stable_cmake_split_gcc:
-  variables:
-    BUILD_TYPE: Release
-  extends:
-    - .cmake_tests
-    - .image_debian_stable
-  needs:
-    - job: build:stable_cmake_split_gcc
-      artifacts: true
+#test:stable_cmake_split_gcc:
+#  variables:
+#    BUILD_TYPE: Release
+#  extends:
+#    - .cmake_tests
+#    - .image_debian_stable
+#  needs:
+#    - job: build:stable_cmake_split_gcc
+#      artifacts: true
 
 # ------------------------------------------------------------------------------
 build:alpine_meson_gcc:
@@ -292,22 +313,21 @@ test:testing_meson_gcc:
       artifacts: true
 
 # ------------------------------------------------------------------------------
-#build:macos_meson_clang:
-#  variables:
-#    BUILD_TYPE: release
-#  extends:
-#    - .meson_build
-#    - .cache_build
-#    - .compiler_ccache_clang
-#    - .image_macos
+build:macos_meson_clang:
+  variables:
+    BUILD_TYPE: release
+  extends:
+    - .image_macos
+    - .meson_build
+    - .compiler_clang
 
-#test:macos_meson_clang:
-#  extends:
-#    - .meson_tests
-#    - .image_macos
-#  needs:
-#    - job: build:macos_meson_clang
-#      artifacts: true
+test:macos_meson_clang:
+  extends:
+    - .image_macos
+    - .meson_tests
+  needs:
+    - job: build:macos_meson_clang
+      artifacts: true
 
 # ------------------------------------------------------------------------------
 build:test_documention:
@@ -337,7 +357,6 @@ wheel:linux:
     # See https://github.com/docker-library/docker/pull/166
     DOCKER_TLS_CERTDIR: ""
     # meson-python needs Python 3.7 or larger
-    CIBW_ARCHS: x86_64
     CIBW_BUILD_VERBOSITY: 3
     CIBW_TEST_COMMAND: python {project}/tests/python_binding_tests.py
   parallel:
@@ -348,13 +367,47 @@ wheel:linux:
         - cp39-manylinux*
         - cp310-manylinux*
         - cp311-manylinux*
+        CIBW_ARCHS:
+        - x86_64
+        # - aarch64
   script:
     - curl -sSL https://get.docker.com/ | sh
     - python -m pip install cibuildwheel==2.11.3
-    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir wheelhouse
+    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir manylinux_wheels
   artifacts:
     paths:
-      - wheelhouse/
+      - manylinux_wheels/
+  only:
+    - master
+    - tags
+
+wheel:macos:
+  stage: wheel
+  extends:
+    - .image_macos
+  variables:
+    CIBW_BUILD_VERBOSITY: 3
+    #CIBW_TEST_COMMAND: python {project}/tests/python_binding_tests.py
+    CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=10.15
+  parallel:
+    matrix:
+      - CIBW_BUILD:
+        - cp38-macos*
+        - cp39-macos*
+        - cp310-macos*
+        - cp311-macos*
+        CIBW_ARCHS:
+        - x86_64
+        - arm64
+  script:
+    - python3 -m pip install cibuildwheel==2.11.3
+    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir macos_wheels
+  #script:
+  #  - python3 -m pip install build
+  #  - python3 -m build -w -o macos_wheels .
+  artifacts:
+    paths:
+      - macos_wheels/
   only:
     - master
     - tags
@@ -381,9 +434,11 @@ deploy:pypi:
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:
     - python3 -m build . -s
-    - python3 -m twine upload --verbose --non-interactive --username __token__ --password "$PYPI_PASSWORD" dist/* wheelhouse/*
+    - python3 -m twine upload --verbose --non-interactive --username __token__ --password "$PYPI_PASSWORD" dist/* manylinux_wheels/* macos_wheels/*
   needs:
     - job: wheel:linux
+      artifacts: true
+    - job: wheel:macos
       artifacts: true
   only:
     - tags

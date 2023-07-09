@@ -31,11 +31,15 @@ RUN apt-get -qq update && apt-get -y -qq install \
     python3-sphinx \
     python3-sphinx-rtd-theme \
     python3-venv \
+    python3-meshio \
+    python3-build \
+    twine \
     valgrind \
     gcovr \
     ccache \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # apt-get on one line due to https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 
-RUN python3 -m pip install --no-binary numpy --no-binary scipy uvw meshio[all]>=4.3.10 build twine cibuildwheel
+RUN python3 -m pip install --break-system-packages uvw cibuildwheel

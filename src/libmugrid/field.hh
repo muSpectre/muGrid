@@ -253,6 +253,11 @@ namespace muGrid {
     virtual const std::type_info & get_stored_typeid() const = 0;
 
     /**
+     * assert that the stored type corresponds to the given type id
+     */
+    void assert_typeid(const std::type_info & type) const;
+
+    /**
      * return a pointer to the raw data
      **/
     virtual void * get_void_data_ptr() const = 0;
