@@ -1,6 +1,11 @@
 Change log for µSpectre
 =======================
 
+0.26.2 (10Jul2023)
+------------------
+
+- Fixed deployment procedure
+
 0.26.1 (08Jul2023)
 ------------------
 
