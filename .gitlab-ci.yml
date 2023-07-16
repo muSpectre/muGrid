@@ -108,10 +108,12 @@ variables:
   script:
     - SOURCE_DIRECTORY=$(pwd)
     - cd build
+    - cat meson-info/meson-info.json | jq
     - ORIGINAL_SOURCE_DIRECTORY=$(cat meson-info/meson-info.json | jq .directories.source -r)
     - echo "Patching directories from ${ORIGINAL_SOURCE_DIRECTORY} to ${SOURCE_DIRECTORY}..."
     # We need to patch the directory as it has a randomized component on macOS runners
     - sed -i'' -e "s,${ORIGINAL_SOURCE_DIRECTORY},${SOURCE_DIRECTORY},g" *.json meson-info/*.json
+    - cat meson-info/meson-info.json | jq
     - meson test -v --no-rebuild
     - echo "Build type ${BUILD_TYPE}"
     - if [ "${BUILD_TYPE}" = "Coverage" ]; then
