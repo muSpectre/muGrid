@@ -1,6 +1,11 @@
 Change log for µSpectre
 =======================
 
+0.26.4 (04Oct2023)
+------------------
+
+- Fixing meson-python to 0.13.2 because of a bug in 0.14.0
+
 0.26.3 (16Jul2023)
 ------------------
 
