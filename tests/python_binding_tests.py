@@ -65,7 +65,8 @@ from python_material_evaluator_test import MaterialEvaluator_Check
 from python_stochastic_plasticity_search_test import \
     StochasticPlasticitySearch_Check
 
-from python_sensitivity_analysis_test import SensitivityAnalysis_Check
+from python_sensitivity_analysis_test import SensitivityAnalysis_Check2d
+from python_sensitivity_analysis_test import SensitivityAnalysis_Check3d
 
 from python_projection_tests import *
 

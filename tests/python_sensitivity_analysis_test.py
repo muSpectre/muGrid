@@ -40,9 +40,9 @@ from python_test_imports import µ
 from python_test_imports import muFFT
 import muSpectre.sensitivity_analysis as sa
 
-class SensitivityAnalysis_Check(unittest.TestCase):
+class SensitivityAnalysis_Check2d(unittest.TestCase):
     """
-    Test the sensitivity analysis
+    Test the sensitivity analysis for a 2D problem.
     """
     #########
     # SetUp #
@@ -740,4 +740,220 @@ class SensitivityAnalysis_Check(unittest.TestCase):
         self.assertTrue(np.allclose(S_muSpectre.flatten(order='F'), S_fin_diff))
 
         print()
-        print('Test of sensitivity analysis done.')
+        print('2D - Test of sensitivity analysis done.')
+
+
+class SensitivityAnalysis_Check3d(unittest.TestCase):
+    """
+    Test the sensitivity analysis for a 3D problem.
+    """
+    #########
+    # SetUp #
+    #########
+    def setUp(self):
+        ### ----- Parameters ----- ###
+        # Cell parameters
+        self.nb_grid_pts = [3, 3, 3]
+        self.dim = len(self.nb_grid_pts)
+        self.lengths = [1, 1.2, 0.8]
+        self.formulation = µ.Formulation.finite_strain
+
+        # Material parameters
+        self.Young1 = 10
+        self.Poisson1 = 0.3
+        self.Young2 = 30
+        self.Poisson2 = 0.35
+
+        # Material distribution
+        x = np.linspace(0, self.lengths[0], self.nb_grid_pts[0], endpoint=False)
+        x = x + 0.5 * self.lengths[0]/self.nb_grid_pts[0]
+        self.phase = np.empty(self.nb_grid_pts)
+        for j in range(self.nb_grid_pts[1]):
+            self.phase[:, j] = 0.5*np.sin(2*np.pi/self.lengths[0]*x) + 0.5
+        self.phase = self.phase.flatten(order='F')
+
+        # Solver parameters
+        self.newton_tol       = 1e-6
+        self.cg_tol           = 1e-6 # tolerance for cg algo
+        self.equil_tol        = 1e-6 # tolerance for equilibrium
+        self.maxiter          = 100
+        self.verbose          = µ.Verbosity.Silent
+
+        # Macroscopic strain
+        self.DelFs = [np.zeros((self.dim, self.dim))]
+
+        # Additional parameters for the aim function
+        self.args = ()
+
+        # Discrete Gradient
+        self.gradient, self.weights = µ.linear_finite_elements.gradient_3d_5tet
+
+        ### ----- Aim functions ----- ###
+        # Aim function = 1/Lx/Ly * int(stress_00)
+        def aim_function(phase, strains, stresses, cell, args):
+            stress = stresses[0]
+            f = np.average(stress[0, 0])
+            return f
+        self.aim_function = aim_function
+
+        # Partial derivatives of the aim function
+        def dfdstrain(phase, strains, stress, cell, args):
+            dim = cell.nb_domain_grid_pts.dim
+            shape = [dim, dim, cell.nb_quad_pts, *cell.nb_domain_grid_pts]
+            strain = strains[0].reshape(shape, order='F')
+            stress, tangent = cell.evaluate_stress_tangent(strain)
+            deriv = tangent[0, 0] / cell.nb_pixels / cell.nb_quad_pts
+            return [deriv.flatten(order='F')]
+        self.dfdstrain = dfdstrain
+
+        def dfdphase(phase, strains, stresses, cell, Young, delta_Young,
+                     Poisson, delta_Poisson, dstress_dphase, args):
+            deriv = dstress_dphase[0][0, 0] / cell.nb_pixels
+            deriv = np.average(deriv, axis=0)
+            return deriv.flatten(order='F')
+        self.dfdphase = dfdphase
+
+        ### ----- Equilibrium calculations (fin. diff. gradient) ----- ###
+        # Cell construction
+        self.cell = µ.Cell(self.nb_grid_pts, self.lengths,
+                                    self.formulation, self.gradient,
+                                    self.weights)
+        mat = µ.material.MaterialLinearElastic4_3d.make(self.cell,
+                                                        "material")
+        Young = (self.Young2 - self.Young1) * self.phase + self.Young1
+        Poisson = (self.Poisson2 - self.Poisson1) * self.phase + self.Poisson1
+        for pixel_id, pixel in self.cell.pixels.enumerate():
+            mat.add_pixel(pixel_id, Young[pixel_id], Poisson[pixel_id])
+
+        # Solver
+        self.krylov_solver \
+            = µ.solvers.KrylovSolverCG(self.cell, self.cg_tol,
+                                       self.maxiter, self.verbose)
+
+        # Equilibrium calculations
+        self.strains_list = []
+        self.stresses_list = []
+        self.shape = [self.dim, self.dim, self.cell.nb_quad_pts,
+                               *self.nb_grid_pts]
+        for DelF in self.DelFs:
+            result = µ.solvers.newton_cg(self.cell, DelF,
+                                         self.krylov_solver,
+                                         self.newton_tol, self.equil_tol,
+                                         verbose=self.verbose)
+            strain = result.grad.reshape(self.shape, order='F')
+            self.strains_list.append(strain)
+            stress = self.cell.evaluate_stress(strain).copy()
+            self.stresses_list.append(stress)
+
+    def test_dstress_dphase(self):
+        """
+        Test the calculation of the partial derivative of the stress with
+        respect to the phase.
+        """
+        strains = [self.strains_list[0]]
+        stresses = [self.stresses_list[0]]
+
+        delta_Young = self.Young2 - self.Young1
+        delta_Poisson = self.Poisson2 - self.Poisson1
+        LinMat = µ.material.MaterialLinearElastic4_3d
+
+        ### ----- Analytical calculation ----- ###
+        Young = delta_Young*self.phase.flatten(order='F') + self.Young1
+        Poisson = delta_Poisson*self.phase.flatten(order='F') + self.Poisson1
+        dstress_dphase_ana = sa.calculate_dstress_dphase(self.cell, strains, Young,
+                                                      delta_Young, Poisson,
+                                                         delta_Poisson, self.gradient, self.weights)[0]
+        dstress_dphase_ana = dstress_dphase_ana.reshape((self.dim, self.dim, self.cell.nb_quad_pts,
+                                                 self.cell.nb_pixels), order='F')
+
+        ### ----- Finite difference calculation ----- ###
+        delta_rho = 1e-6
+        # Initial stress
+        stress_ini = stresses[0]
+        for pixel_id in self.cell.pixel_indices:
+            # Construct cell with disturbed material properties
+            helper_cell = µ.Cell(self.nb_grid_pts, self.lengths,
+                                 self.formulation, self.gradient, self.weights)
+            helper_mat = LinMat.make(helper_cell, "helper material")
+            for iter_pixel, pixel in helper_cell.pixels.enumerate():
+                if pixel_id == iter_pixel:
+                    Young_dist = Young[pixel_id] + delta_Young*delta_rho
+                    Poisson_dist = Poisson[pixel_id] + delta_Poisson*delta_rho
+                    helper_mat.add_pixel(iter_pixel, Young_dist, Poisson_dist)
+                else:
+                    helper_mat.add_pixel(iter_pixel, Young[pixel_id],
+                                         Poisson[pixel_id])
+
+            # Disturbed stress
+            stress_dist = helper_cell.evaluate_stress(strains[0])
+            # Partial derivative dstress_dphase
+            dstress_dphase_fd = (stress_dist - stress_ini)/delta_rho
+            dstress_dphase_fd = dstress_dphase_fd.reshape(dstress_dphase_ana.shape,
+                                                          order='F')
+
+            ### ----- Comparison ----- ###
+            self.assertTrue(np.allclose(dstress_dphase_ana[:, :, :, pixel_id],
+                                        dstress_dphase_fd[:, :, :, pixel_id]))
+
+        print('Test dstress_dphase in 3D is done.')
+        print()
+
+    def test_sensitivity_analysis_quad_pts(self):
+        """
+        Test the sensitivity_analysis by comparison with finite differences
+        for several quadrature points.
+        """
+        strains = [self.strains_list[0]]
+        stresses = [self.stresses_list[0]]
+
+        ### ----- Sensitivity analysis with muSpectre ----- ###
+        S_muSpectre \
+            = sa.sensitivity_analysis(self.dfdstrain, self.dfdphase, self.phase,
+                                      self.Young1, self.Poisson1, self.Young2,
+                                      self.Poisson2, self.cell,
+                                      self.krylov_solver, strains,
+                                      stresses, gradient=self.gradient,
+                                      weights=self.weights, args=self.args)
+
+        ### ----- Sensitivity analysis with finite differences ----- ###
+        delta_phase = 1e-6
+        phase = self.phase.flatten(order='F')
+        phase_dist = phase.copy()
+        S_fin_diff = np.empty(S_muSpectre.size)
+
+        # Initial aim function
+        f_ini = self.aim_function(phase, strains, stresses, self.cell,
+                                  self.args)
+
+        for i in range(S_fin_diff.size):
+            # Disturb phase
+            phase_dist[i] += delta_phase
+
+            # Disturbed aim function
+            Young = (self.Young2 - self.Young1)*phase_dist + self.Young1
+            Poisson = (self.Poisson2 - self.Poisson1)*phase_dist + self.Poisson1
+            cell = µ.Cell(self.nb_grid_pts, self.lengths, self.formulation,
+                          self.gradient, self.weights)
+            solver = µ.solvers.KrylovSolverCG(cell, self.cg_tol, self.maxiter,
+                                          self.verbose)
+            mat = µ.material.MaterialLinearElastic4_3d.make(cell, "material")
+            for pixel_id, pixel in cell.pixels.enumerate():
+                mat.add_pixel(pixel_id, Young[pixel_id], Poisson[pixel_id])
+            result = µ.solvers.newton_cg(cell, self.DelFs[0], solver,
+                                         self.newton_tol, self.equil_tol,
+                                         verbose=self.verbose)
+            strain = result.grad.reshape(self.shape, order='F')
+            stress = cell.evaluate_stress(strain)
+            f_dist = self.aim_function(phase_dist, [strain], [stress], cell,
+                                       self.args)
+
+            # Sensitivity at pixel i
+            S_fin_diff[i] = (f_dist - f_ini) / delta_phase
+
+            phase_dist[i] = phase_dist[i] - delta_phase
+
+        ### ----- Comparison ----- ###
+        self.assertTrue(np.allclose(S_muSpectre.flatten(order='F'), S_fin_diff))
+
+        print()
+        print('3D - Test of sensitivity analysis done.')

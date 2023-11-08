@@ -74,6 +74,27 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
     nb_grid_pts = [*cell.nb_subdomain_grid_pts]
     nb_quad_pts = cell.nb_quad_pts
 
+    # Check wether gradient and weights correspond to the cell
+    if gradient is None:
+        if weights is not None:
+            raise ValueError('You cannot provide quadrature point weights if '
+                             'no gradient is specified.')
+        if nb_quad_pts != 1:
+            raise ValueError('You must provide a gradient and weights since '
+                             f'the cell has {nb_quad_pts} quadrature points.')
+    else:
+        if len(gradient) != dim * nb_quad_pts:
+                raise ValueError(f'The cell has {dim} dimensions and {nb_quad_pts} '
+                                 'quadrature points but the gradient has '
+                                 f'{len(gradient)} entries.')
+        if weights is None:
+            if nb_quad_pts != 1:
+                raise ValueError('You must provide quadrature point weights if '
+                                 'you specify more than one quadrature point.')
+        elif len(weights) != nb_quad_pts:
+            raise ValueError(f'The cell has {nb_quad_pts} quadrature points '
+                             f'but {len(weights)} weights have been specified.')
+
     # Derivatives of Poissons ratio and Youngs modulo with respect to the phase
     nu = Poisson
     E = Young
@@ -89,7 +110,13 @@ def calculate_dstress_dphase(cell, strains, Young, delta_Young, Poisson,
     # Helper cell construction
     helper_cell = µ.Cell(cell.nb_subdomain_grid_pts, cell.domain_lengths,
                          cell.formulation, gradient, weights)
-    LinMat = µ.material.MaterialLinearElastic4_2d
+    if dim == 2:
+        LinMat = µ.material.MaterialLinearElastic4_2d
+    elif dim == 3:
+        LinMat = µ.material.MaterialLinearElastic4_3d
+    else:
+        raise ValueError('\n'
+                         'Only 2-dimensional and 3-dimensional problems have been implemented.')
     helper_material = LinMat.make(helper_cell, "helper_material")
     for pixel_id, pixel in helper_cell.pixels.enumerate():
         helper_material.add_pixel(pixel_id, Young_deriv[pixel_id],
@@ -167,24 +194,48 @@ def sensitivity_analysis(f_deriv_strains, f_deriv_phase, phase, Young1,
     S: np.ndarray(nb_grid_pts)
         Sensitivity at each pixel.
     """
-
+    ### ----- Check the arguments ----- ###
     # Filter phase?
     if filter_func is None:
         phase_filtered = phase.flatten(order='F')
     else:
         phase_filtered = filter_func(phase).flatten(order='F')
         if dfilter_dphase is None:
-            print('ERROR: If you use a filter function, you must provide its derivative')
+            raise ValueError('ERROR: If you use a filter function, '
+                             'you must provide its derivative')
 
     # Check the dimension
     dim = len(cell.nb_domain_grid_pts)
-    if dim != 2:
-        raise Exception("The sensitivity analysis is only implemented for 2D.")
+    if dim != 2 and dim != 3:
+        raise Exception('The sensitivity analysis is only implemented for 2D '
+                        'and 3D.')
 
     nb_grid_pts = cell.nb_domain_grid_pts
     nb_quad_pts = cell.nb_quad_pts
     shape = [dim, dim, nb_quad_pts, *cell.nb_subdomain_grid_pts]
 
+    # Check wether gradient and weights correspond to the cell
+    if gradient is None:
+        if weights is not None:
+            raise ValueError('You cannot provide quadrature point weights if '
+                             'no gradient is specified.')
+        if nb_quad_pts != 1:
+            raise ValueError('You must provide a gradient and weights since '
+                             f'the cell has {nb_quad_pts} quadrature points.')
+    else:
+        if len(gradient) != dim * nb_quad_pts:
+                raise ValueError(f'The cell has {dim} dimensions and {nb_quad_pts} '
+                                 'quadrature points but the gradient has '
+                                 f'{len(gradient)} entries.')
+        if weights is None:
+            if nb_quad_pts != 1:
+                raise ValueError('You must provide quadrature point weights if '
+                                 'you specify more than one quadrature point.')
+        elif len(weights) != nb_quad_pts:
+            raise ValueError(f'The cell has {nb_quad_pts} quadrature points '
+                             f'but {len(weights)} weights have been specified.')
+
+    ### ----- Calculate the sensitivity ----- ###
     # Adjoint equation G:K:adjoint = -G:f_deriv_strain
     rhs_list = f_deriv_strains(phase_filtered, strains, stresses, cell, args)
     adjoint_list = []
