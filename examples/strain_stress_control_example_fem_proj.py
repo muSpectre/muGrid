@@ -112,9 +112,10 @@ def compute_func(control, Del0, E0, formulation):
             pk1_matplot =\
                 stress[1, 1, :, :, :].flatten()
 
-            placement, x = \
-                gi.compute_placement(result, domain_lengths,
-                                     nb_domain_grid_pts, gradient)
+            strain = result.grad.reshape(cell.strain.shape, order='F')
+            x, placement = gi.get_complemented_positions('0p', cell, F0=None,
+                                                   periodically_complemented=True,
+                                                   strain_array=strain)
             displ = placement
             tri, triangles = make_triangles(displ)
             triplot = plt.tripcolor(tri,

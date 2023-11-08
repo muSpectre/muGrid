@@ -45,9 +45,9 @@ def vtk_export(fpath, x_n, placement, point_data=None, cell_data=None):
     fpath        -- file name for output path *WITHOUT EXTENSION*
     x_n          -- nodal positions, as computed by
                     gradient_integration.make_grid or
-                    gradient_integration.compute_placement
+                    gradient_integration.get_complemented_positions
     placement    -- nodal deformed placement as computed by
-                    gradient_integration.compute_placement
+                    gradient_integration.get_complemented_positions
     point_data   -- (default None) dictionary of point data. These must have
                     either of the following shapes:
                     a) tuple(x_n.shape[1:])

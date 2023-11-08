@@ -76,9 +76,10 @@ def compute_response(N, lens, max_iter, cg_tol, newton_tol, equil_tol,
     fourier_gradient = [µ.FourierDerivative(2, i) for i in range(2)]
 
     # integration of the deformation gradient field
-    placement_n, x = gi.compute_placement(res[-1], lens,
-                                          N, fourier_gradient,
-                                          formulation=formulation)
+    strain = res[-1].grad.reshape(cell.strain.shape, order='F')
+    x, placement_n = gi.get_complemented_positions('0p', cell, F0=None,
+                                                   periodically_complemented=True,
+                                                   strain_array=strain)
 
     # extracting fields after solution
     history_after = cell.get_globalised_current_real_field(

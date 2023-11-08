@@ -114,6 +114,7 @@ gradients = [fourier_gradient, discrete_gradient, discrete_gradient2]
 stress = {}
 grad = {}
 phase = -np.ones(nb_domain_grid_pts, dtype=int)
+rves = {}
 for i, gradient in enumerate(gradients):
     rve = msp.Cell(nb_domain_grid_pts, domain_lengths,
                    msp.Formulation.finite_strain, *gradient,
@@ -139,6 +140,7 @@ for i, gradient in enumerate(gradients):
         (dim, dim, len(gradient[0])//dim, *rve.nb_subdomain_grid_pts), order='f')
     grad[i] = result.grad.reshape(
         (dim, dim, len(gradient[0])//dim, *rve.nb_subdomain_grid_pts), order='f')
+    rves[i] = rve
 
 
 if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
@@ -148,9 +150,10 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
 
     names = ['Fourier', 'Discrete (1-quad)', 'Discrete (2-quad)']
     for i, gradient in enumerate(gradients):
-        displ, r = msp.gradient_integration.compute_placement(
-            grad[i], domain_lengths, nb_domain_grid_pts, gradient[0],
-            formulation=msp.Formulation.finite_strain)
+        strain = grad[i]
+        r, displ = msp.gradient_integration.get_complemented_positions('0p', rves[i], F0=None,
+                                                                        periodically_complemented=True,
+                                                                        strain_array=grad[i])
         tri = make_triangles(displ)
 
         g = stress[i]
@@ -163,7 +166,6 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
         plt.subplot(3, len(gradients), 1 + i, aspect=1)
         plt.title(names[i])
         print("g[0, 1].shape", g[0, 1].shape)
-        print("tri", tri)
         plt.tripcolor(tri, g[0, 1].reshape(-1))
         plt.colorbar()
         plt.subplot(3, len(gradients), 1 + len(gradients) + i, aspect=1)

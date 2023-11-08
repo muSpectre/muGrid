@@ -101,9 +101,10 @@ def compute_visco_elastic_damage(N, lens, max_iter, cg_tol, newton_tol,
         dim = 2
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         for i, re in enumerate(res):
-            placement_n, x = gi.compute_placement(re, lens,
-                                                  N, fourier_gradient,
-                                                  formulation=formulation)
+            strain = re.grad.reshape(cell.strain.shape, order='F')
+            x, placement_n = gi.get_complemented_positions('0p', cell, F0=None,
+                                                   periodically_complemented=True,
+                                                   strain_array=strain)
             PK1 = re.stress.reshape(cell.stress.shape, order='f')
             F = re.grad.reshape(cell.strain.shape, order='f')
             c_data = {"σ": PK1,
@@ -164,9 +165,10 @@ def compute_visco_elastic(N, lens, max_iter, cg_tol, newton_tol,
         dim = 2
         fourier_gradient = [µ.FourierDerivative(dim, i) for i in range(dim)]
         for i, re in enumerate(res):
-            placement_n, x = gi.compute_placement(re, lens,
-                                                  N, fourier_gradient,
-                                                  formulation=formulation)
+            strain = re.grad.reshape(cell.strain.shape, order='F')
+            x, placement_n = gi.get_complemented_positions('0p', cell, F0=None,
+                                                   periodically_complemented=True,
+                                                   strain_array=strain)
 
             PK1 = re.stress.reshape(cell.stress.shape, order='f')
             F = re.grad.reshape(cell.strain.shape, order='f')

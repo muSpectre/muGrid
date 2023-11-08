@@ -223,7 +223,7 @@ def get_complemented_positions_worker(
 
 
 def get_complemented_positions(quantities, rve, F0=None,
-                               periodically_complemented=False):
+                               periodically_complemented=False, strain_array=None):
     """Takes an RVE (Cell) object and returns the deformed and undeformed nodal
     positions, complemented periodically.
 
@@ -242,22 +242,41 @@ def get_complemented_positions(quantities, rve, F0=None,
              displacement field)
         The placements are displacement plus grid positions including applied
         strain.
-    rve        -- Cell object
-    F0         -- F0 describes an affine deformation of the undeformed grid i.e.
-                  * rectangular grid: F0=np.eye(dim) which is the default case
-                                      and corresponds to the undeformed grid.
-                  * hexagonal grid 2D: with dy = sqrt(3)/2*dx
-                                    F0 = np.array([[ 1, 1/sqrt(3)],
-                                                   [ 0,     1    ]])
+    rve         -- Cell object
+    F0          -- F0 describes an affine deformation of the undeformed grid i.e.
+                   * rectangular grid: F0=np.eye(dim) which is the default case
+                                       and corresponds to the undeformed grid.
+                   * hexagonal grid 2D: with dy = sqrt(3)/2*dx
+                                     F0 = np.array([[ 1, 1/sqrt(3)],
+                                                    [ 0,     1    ]])
     periodically_complemented -- bool, decides whether the output quantities
             are periodically complemented (True) or not (False). The periodic
             complementation is not available in parallel and will raise an
             error if choosen. The default is False.
+    strain_arry -- np.ndarray or None
+                   Strain for which the deformed positions will be calculated.
+                   If None, rve.strain is used.
 
     Returns:
     Tuple build according to the first argument of the function.
     """
-    strain = rve.strain
+    if strain_array is not None:
+        # Assert that strain_array has the correct shape
+        shape = rve.strain.shape
+        message = f'The strain must have the shape {shape}.'
+        message += f' It has the shape {strain_array.shape}.'
+        np.testing.assert_array_equal(strain_array.shape, shape, message)
+
+        # Create muGrid.RealField
+        name = 'tmp_field_strain'
+        if rve.fields.field_exists(name):
+            strain = rve.fields.get_real_field(name)
+        else:
+            strain = rve.fields.register_real_field(name, [rve.dim, rve.dim],
+                                                    sub_division='quad_point')
+        strain.array()[:] = strain_array
+    else:
+        strain = rve.strain
     comm = rve.communicator
     if comm.size == 1:
         mean_strain = np.mean(
@@ -699,7 +718,8 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
     displacement) as a function of a OptimizeResult, domain edge
     lengths, domain discretisation nb_grid_pts, the chosen
     integration order and the continuum mechanics description(small or finite
-    strain description)
+    strain description). WARNING: This function is deprecated. Please use
+    'get_complemented_positions' instead.
 
     Keyword Arguments:
     result      -- OptimiseResult, or just the gradient field from an
@@ -723,6 +743,10 @@ def compute_placement(result, lengths, nb_grid_pts, gradient_op,
                    corresponding original nodal positions
 
     """
+    message = 'ATTENTION: The function compute_placement is deprecated.'
+    message += ' Please use get_complemented_positions instead.'
+    print(message)
+
     lengths = np.array(lengths)
     nb_grid_pts = np.array(nb_grid_pts)
     dim = len(nb_grid_pts)

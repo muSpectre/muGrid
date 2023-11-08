@@ -158,9 +158,10 @@ if matplotlib_found and MPI.COMM_WORLD.Get_size() == 1:
         detF = np.linalg.det(F.T).T
         print(i, np.logical_and(detF < 0, mask).sum())
 
-        displ, r = msp.gradient_integration.compute_placement(
-            res, domain_lengths, nb_domain_grid_pts, gradient,
-            formulation=msp.Formulation.finite_strain)
+        strain = res.grad.reshape(rve.strain.shape, order='F')
+        r, displ = msp.gradient_integration.get_complemented_positions('0p', rve, F0=None,
+                                                                        periodically_complemented=True,
+                                                                        strain_array=strain)
 
         tri = make_triangles(displ)
         # plt.subplot(1, len(result), i+1, aspect=1)
