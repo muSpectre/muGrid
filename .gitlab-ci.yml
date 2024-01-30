@@ -172,17 +172,17 @@ variables:
     IMAGE_NAME: debian_stable
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
 
-.image_macos:
-  tags: [ saas-macos-medium-m1 ]
-  image: macos-12-xcode-14 # https://docs.gitlab.com/ee/ci/runners/saas/macos/environment.html
-  before_script:
-    - export PATH="/Users/gitlab/Library/Python/3.9/bin:$PATH"
-    - python3 -m site
-    - python3 -m pip install --upgrade pip
-    - python3 -m pip install meson ninja numpy scipy meshio uvw h5py jq
+#.image_macos:
+#  tags: [ saas-macos-medium-m1 ]
+#  image: macos-12-xcode-14 # https://docs.gitlab.com/ee/ci/runners/saas/macos/environment.html
 #  before_script:
-#    - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-#    - brew install ccache
+#    - export PATH="/Users/gitlab/Library/Python/3.9/bin:$PATH"
+#    - python3 -m site
+#    - python3 -m pip install --upgrade pip
+#    - python3 -m pip install meson ninja numpy scipy meshio uvw h5py jq
+##  before_script:
+##    - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+##    - brew install ccache
 
 .cache_build:
   variables:
@@ -336,21 +336,21 @@ test:testing_meson_gcc:
       artifacts: true
 
 # ------------------------------------------------------------------------------
-build:macos_meson_clang:
-  variables:
-    BUILD_TYPE: release
-  extends:
-    - .image_macos
-    - .meson_build
-    - .compiler_clang
-
-test:macos_meson_clang:
-  extends:
-    - .image_macos
-    - .meson_tests
-  needs:
-    - job: build:macos_meson_clang
-      artifacts: true
+#build:macos_meson_clang:
+#  variables:
+#    BUILD_TYPE: release
+#  extends:
+#    - .image_macos
+#    - .meson_build
+#    - .compiler_clang
+#
+#test:macos_meson_clang:
+#  extends:
+#    - .image_macos
+#    - .meson_tests
+#  needs:
+#    - job: build:macos_meson_clang
+#      artifacts: true
 
 # ------------------------------------------------------------------------------
 build:test_documention:
@@ -390,6 +390,7 @@ wheel:linux:
         - cp39-manylinux*
         - cp310-manylinux*
         - cp311-manylinux*
+        - cp312-manylinux*
         CIBW_ARCHS:
         - x86_64
         # - aarch64
@@ -404,40 +405,41 @@ wheel:linux:
     - master
     - tags
 
-wheel:macos:
-  stage: wheel
-  extends:
-    - .image_macos
-  variables:
-    CIBW_BUILD_VERBOSITY: 3
-    #CIBW_TEST_COMMAND: python {project}/tests/python_binding_tests.py
-  parallel:
-    matrix:
-      - CIBW_BUILD:
-        - cp38-macos*
-        - cp39-macos*
-        - cp310-macos*
-        - cp311-macos*
-        CIBW_ARCHS:
-        - x86_64
-        - arm64
-        CIBW_ENVIRONMENT_MACOS:
-        - MACOSX_DEPLOYMENT_TARGET=10.15
-        - MACOSX_DEPLOYMENT_TARGET=11.0
-        - MACOSX_DEPLOYMENT_TARGET=12.0
-        - MACOSX_DEPLOYMENT_TARGET=13.0
-  script:
-    - python3 -m pip install cibuildwheel==2.11.3
-    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir macos_wheels
-  #script:
-  #  - python3 -m pip install build
-  #  - python3 -m build -w -o macos_wheels .
-  artifacts:
-    paths:
-      - macos_wheels/
-#  only:
-#    - master
-#    - tags
+#wheel:macos:
+#  stage: wheel
+#  extends:
+#    - .image_macos
+#  variables:
+#    CIBW_BUILD_VERBOSITY: 3
+#    #CIBW_TEST_COMMAND: python {project}/tests/python_binding_tests.py
+#  parallel:
+#    matrix:
+#      - CIBW_BUILD:
+#        - cp38-macos*
+#        - cp39-macos*
+#        - cp310-macos*
+#        - cp311-macos*
+#        - cp312-macos*
+#        CIBW_ARCHS:
+#        - x86_64
+#        - arm64
+#        CIBW_ENVIRONMENT_MACOS:
+#        - MACOSX_DEPLOYMENT_TARGET=10.15
+#        - MACOSX_DEPLOYMENT_TARGET=11.0
+#        - MACOSX_DEPLOYMENT_TARGET=12.0
+#        - MACOSX_DEPLOYMENT_TARGET=13.0
+#  script:
+#    - python3 -m pip install cibuildwheel==2.11.3
+#    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir macos_wheels
+#  #script:
+#  #  - python3 -m pip install build
+#  #  - python3 -m build -w -o macos_wheels .
+#  artifacts:
+#    paths:
+#      - macos_wheels/
+##  only:
+##    - master
+##    - tags
 
 #------------------------------------------------------------------------------
 deploy:pages:
@@ -461,11 +463,11 @@ deploy:pypi:
   image: registry.gitlab.com/muspectre/muspectre:debian_stable
   script:
     - python3 -m build . -s
-    - python3 -m twine upload --verbose --non-interactive --username __token__ --password "$PYPI_PASSWORD" dist/* manylinux_wheels/* macos_wheels/*
+    - python3 -m twine upload --verbose --non-interactive --username __token__ --password "$PYPI_PASSWORD" dist/* manylinux_wheels/* # macos_wheels/*
   needs:
     - job: wheel:linux
       artifacts: true
-    - job: wheel:macos
-      artifacts: true
+  #  - job: wheel:macos
+  #    artifacts: true
   only:
     - tags

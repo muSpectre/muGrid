@@ -1,6 +1,12 @@
 Change log for µSpectre
 =======================
 
+0.27.0 (21Jan2024)
+------------------
+
+- muSpectre: Sensitivity analysis for 3D problems
+- Fixing meson-python to >= 0.15.0
+
 0.26.4 (04Oct2023)
 ------------------
 
