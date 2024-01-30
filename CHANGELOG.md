@@ -1,11 +1,12 @@
 Change log for µSpectre
 =======================
 
-0.27.0 (21Jan2024)
+0.27.0 (30Jan2024)
 ------------------
 
 - muSpectre: Sensitivity analysis for 3D problems
 - Fixing meson-python to >= 0.15.0
+- Updated Eigen3 to v3.4 and pybind11 to v2.11
 
 0.26.4 (04Oct2023)
 ------------------

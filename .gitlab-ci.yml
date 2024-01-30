@@ -396,7 +396,7 @@ wheel:linux:
         # - aarch64
   script:
     - curl -sSL https://get.docker.com/ | sh
-    - python -m pip install cibuildwheel==2.11.3
+    - python -m pip install cibuildwheel==2.16.4
     - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir manylinux_wheels
   artifacts:
     paths:
@@ -429,7 +429,7 @@ wheel:linux:
 #        - MACOSX_DEPLOYMENT_TARGET=12.0
 #        - MACOSX_DEPLOYMENT_TARGET=13.0
 #  script:
-#    - python3 -m pip install cibuildwheel==2.11.3
+#    - python3 -m pip install cibuildwheel==2.16.4
 #    - LD_LIBRARY_PATH=$(python3 -m site --user-site) cibuildwheel --output-dir macos_wheels
 #  #script:
 #  #  - python3 -m pip install build
