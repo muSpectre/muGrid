@@ -9,13 +9,15 @@ mugrid_python_sources = [
     'bind_py_options_dictionary.cc'
 ]
 
+pybind11 = dependency('pybind11', required: true)
+
 mugrid_python = python.extension_module(
     '_muGrid', # Name of the module
     mugrid_python_sources,
     install: true,  # Install it
-    include_directories: [eigen3_incdir, pybind11_incdir, include_directories('../../../src')],
+    include_directories: ['../../src'],
     link_with: mugrid,
-    dependencies: [muspectre_dependencies, python3_dependency]
+    dependencies: [mugrid_dependencies, pybind11]
 )
 
 subdir('muGrid')

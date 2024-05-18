@@ -35,7 +35,7 @@ if mugrid_with_netcdf
     ]
 endif
 
-if mu_with_mpi
+if mpi.found()
     mugrid_sources += [
         'communicator.cc'
     ]
@@ -44,7 +44,6 @@ endif
 mugrid = shared_library(
     'muGrid',
     mugrid_sources,
-    include_directories: eigen3_incdir,
-    dependencies: muspectre_dependencies,
+    dependencies: mugrid_dependencies,
     install: true  # needed, otherwise it is not copied to wheel
 )

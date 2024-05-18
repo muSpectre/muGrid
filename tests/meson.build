@@ -2,9 +2,10 @@
 # C++ unit tests (through Boost's framework)
 #
 
-incdirs = [eigen3_incdir, include_directories('../../src')]
+boost_test = dependency('boost', modules: ['unit_test_framework'],
+                        required: false)
 
-if mu_with_c_tests
+if boost_test.found()
     mugrid_test_sources = [
         'main_test_suite.cc',
         'header_test_ccoord_operations.cc',
@@ -36,12 +37,31 @@ if mu_with_c_tests
 
     main_test_suite = executable('main_test_suite',
         mugrid_test_sources,
-        include_directories: incdirs,
-        link_with: [mugrid, mufft, muspectre],
-        dependencies: [muspectre_dependencies, boost_test])
+        include_directories: include_directories('../../src'),
+        link_with: [mugrid],
+        dependencies: [mugrid_dependencies, boost_test])
 
     test('mugrid_main_test_suite', main_test_suite)
 endif
+
+#
+# Environment for Python tests
+#
+
+envdata = environment()
+python_paths = [
+    # We place the source directories first, because there are no .py files in
+    # the build directory, but it does have an empty muGrid, muFFT, muSpectre
+    # subdirectory that Python will import as a defunct module.
+    join_paths(meson.current_source_dir(), '../language_bindings/libmugrid/python'),
+    join_paths(meson.current_source_dir(), '../language_bindings/libmufft/python'),
+    join_paths(meson.current_source_dir(), '../language_bindings/python'),
+    join_paths(meson.current_build_dir(), '../language_bindings/libmugrid/python'),
+    join_paths(meson.current_build_dir(), '../language_bindings/libmufft/python'),
+    join_paths(meson.current_build_dir(), '../language_bindings/python')
+]
+envdata.append('PYTHONPATH', python_paths)
+envdata.append('MUSPECTRE_TEST_DIR', meson.current_source_dir())
 
 #
 # Python unit tests
@@ -50,7 +70,7 @@ endif
 test('mugrid_python_binding_tests',
     python,
     args: [files('python_binding_tests.py'), '-v', '-f'],
-    depends: [mugrid_python, mufft_python],
+    depends: [mugrid_python],
     env: envdata,
     timeout: test_timeout)
 
@@ -58,8 +78,8 @@ test('mugrid_python_binding_tests',
 # If we have MPI, we also want to run the MPI tests
 #
 
-if mu_with_mpi
-    if mu_with_c_tests
+if mpi.found()
+    if boost_test.found()
         mugrid_mpi_test_sources = [
             'main_test_suite.cc',
             'mpi_test_communicator.cc',
@@ -75,12 +95,14 @@ if mu_with_mpi
         mpi_main_test_suite = executable('mpi_main_test_suite',
             mugrid_mpi_test_sources,
             include_directories: incdirs,
-            link_with: [mugrid, mufft, muspectre],
-            dependencies: [muspectre_dependencies, boost_test])
+            link_with: [mugrid],
+            dependencies: [mugrid_dependencies, boost_test])
     endif
 
+    mpiexec = find_program('mpiexec')
+
     foreach n : mpi_processes
-        if mu_with_c_tests
+        if boost_test.found()
             test('mpi_mugrid_main_test_suite-np_' + n,
                  mpiexec,
                  args: ['-n', n, '--oversubscribe', mpi_main_test_suite],
@@ -91,7 +113,7 @@ if mu_with_mpi
              mpiexec,
              args: ['-n', n, '--oversubscribe', python.path(),
                     files('python_mpi_binding_test.py'), '-v', '-f'],
-               depends: [mugrid_python, mufft_python, muspectre_python],
+               depends: [mugrid_python],
                env: envdata,
                timeout: test_timeout,  # Test can take a long time
                is_parallel: false)  # Don't run any other test in parallel
