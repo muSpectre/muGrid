@@ -44,6 +44,7 @@ jobs:
           python3 -m pip install --upgrade pip pip-tools
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
+              meson ninja-build \
               openmpi-bin \
               libopenmpi-dev \
               libpnetcdf-dev \
@@ -61,9 +62,10 @@ jobs:
               mpi4py==${{ matrix.mpi4py-version }}
           else
             sudo apt-get install -y \
+              meson ninja-build \
               libnetcdf-dev
           fi
-          python3 -m pip install build meson ninja
+          python3 -m pip install build
           python3 -m pip list
 
       - name: Compile with Meson
