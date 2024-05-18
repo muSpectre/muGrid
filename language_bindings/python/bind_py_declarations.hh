@@ -1,26 +1,26 @@
 /**
  * @file   bind_py_declarations.hh
  *
- * @author Till Junge <till.junge@epfl.ch>
+ * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   12 Jan 2018
+ * @date   10 Oct 2019
  *
- * @brief  header for python bindings for the common part of µSpectre
+ * @brief  header for python bindings for the common part of µGrid
  *
  * Copyright © 2018 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -33,22 +33,19 @@
  *
  */
 
-#ifndef LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
-#define LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+#ifndef LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
+#define LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_
 
 #include <pybind11/pybind11.h>
+
 namespace py = pybind11;
 
-void add_common(py::module & mod);
-void add_cell(py::module & mod);
-void add_cell_data(py::module & mod);
-void add_material(py::module & mod);
-void add_solvers(py::module & mod);
-void add_class_solvers(py::module & mod);
-void add_krylov_solvers(py::module & mod);
-void add_derivatives(py::module & mod);
-void add_projections(py::module & mod);
-void add_fem_discretisation(py::module & mod);
-void add_field_collections(py::module & mod);
+void add_common_mugrid(py::module & mod);
+void add_communicator(py::module & mod);
+void add_field_classes(py::module & mod);
+void add_state_field_classes(py::module & mod);
+void add_field_collection_classes(py::module & mod);
+void add_file_io_classes(py::module & mod);
+void add_options_dictionary(py::module & mod);
 
-#endif  // LANGUAGE_BINDINGS_PYTHON_BIND_PY_DECLARATIONS_HH_
+#endif  // LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_

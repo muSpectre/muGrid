@@ -9,18 +9,18 @@
  *
  * Copyright © 2017 Till Junge
  *
- * µSpectre is free software; you can redistribute it and/or
+ * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µSpectre is distributed in the hope that it will be useful, but
+ * µGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µSpectre; see the file COPYING. If not, write to the
+ * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * * Boston, MA 02111-1307, USA.
  *
@@ -32,19 +32,21 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
+#include "grid_common.hh"
 
-#include "libmugrid/tests.hh"
-
-#include <common/muSpectre_common.hh>
 #include <boost/test/unit_test.hpp>
 #include <boost/mpl/list.hpp>
 
-#ifndef TESTS_TESTS_HH_
-#define TESTS_TESTS_HH_
+#include "iostream"
 
-namespace muSpectre {
-  using muGrid::tol;
+#ifndef TESTS_LIBMUGRID_TESTS_HH_
+#define TESTS_LIBMUGRID_TESTS_HH_
+
+namespace muGrid {
+
+  constexpr Real tol = 1e-14 * 100;       // it's in percent
   constexpr Real finite_diff_tol = 1e-7;  // it's in percent
-}  // namespace muSpectre
 
-#endif  // TESTS_TESTS_HH_
+}  // namespace muGrid
+
+#endif  // TESTS_LIBMUGRID_TESTS_HH_

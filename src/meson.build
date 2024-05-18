@@ -1,83 +1,50 @@
-subdir('libmugrid')
-subdir('libmufft')
+version_data = configuration_data()
+version_data.set('GIT_IS_DIRTY', version_dirty)
+version_data.set('GIT_COMMIT_DESCRIBE', version_str)
+version_data.set('GIT_HEAD_SHA1', version_hash)
+version_file = configure_file(
+    input: 'version.cc.skeleton',
+    output: 'version.cc',
+    configuration: version_data
+)
 
-muspectre_sources = [
-    'cell/cell.cc',
-    'cell/cell_data.cc',
-#    'cell/cell_split.cc',
-    'common/version.cc',
-    'common/common.cc',
-    'common/voigt_conversion.cc',
-#    'common/intersection_octree.cc',
-    'materials/material_base.cc',
-    'materials/material_dunant.cc',
-    'materials/material_dunant_t.cc',
-    'materials/material_dunant_max.cc',
-    'materials/material_dunant_tc.cc',
-    'materials/material_linear_anisotropic.cc',
-    'materials/material_linear_orthotropic.cc',
-    'materials/material_linear_diffusion.cc',
-    'materials/material_linear_elastic1.cc',
-    'materials/material_linear_elastic2.cc',
-    'materials/material_linear_elastic3.cc',
-    'materials/material_linear_elastic4.cc',
-    'materials/material_linear_elastic_damage1.cc',
-    'materials/material_linear_elastic_damage2.cc',
-    'materials/material_linear_elastic_generic1.cc',
-    'materials/material_linear_elastic_generic2.cc',
-    'materials/material_mechanics_base.cc',
-    'materials/material_visco_elastic_ss.cc',
-    'materials/material_visco_elastic_damage_ss1.cc',
-    'materials/material_visco_elastic_damage_ss2.cc',
-    'materials/material_neo_hookean_elastic.cc',
-    'materials/material_hyper_elasto_plastic1.cc',
-    'materials/material_hyper_elasto_plastic2.cc',
-    'materials/material_stochastic_plasticity.cc',
-    'materials/material_phase_field_fracture.cc',
-    'materials/material_phase_field_fracture2.cc',
-    'materials/s_t_material_linear_elastic_generic1.cc',
-    'materials/material_hyper_elastic1.cc',
-    'materials/material_hyper_elastic2.cc',
-#    'materials/laminate_homogenisation.cc',
-#    'materials/material_laminate.cc',
-    'projection/projection_base.cc',
-    'projection/projection_default.cc',
-    'projection/projection_gradient.cc',
-    'projection/projection_finite_strain.cc',
-    'projection/projection_small_strain.cc',
-    'projection/projection_approx_Green_operator.cc',
-    'projection/stiffness_operator.cc',
-    'projection/fem_stencil.cc',
-    'projection/discretisation.cc',
-    'projection/fem_library.cc',
-    'projection/discrete_greens_operator.cc',
-    'solver/krylov_solver_base.cc',
-    'solver/krylov_solver_trust_region_features.cc',
-    'solver/krylov_solver_preconditioned_features.cc',
-    'solver/matrix_adaptor.cc',
-    'solver/krylov_solver_cg.cc',
-    'solver/krylov_solver_pcg.cc',
-    'solver/krylov_solver_eigen.cc',
-    'solver/krylov_solver_trust_region_cg.cc',
-    'solver/krylov_solver_trust_region_pcg.cc',
-    'solver/solver_common.cc',
-    'solver/solvers.cc',
-    'solver/solver_base.cc',
-    'solver/solver_single_physics.cc',
-    'solver/solver_single_physics_projection_base.cc',
-    'solver/solver_newton_cg.cc',
-    'solver/solver_trust_region_newton_cg.cc',
-    'solver/solver_fem_trust_region_newton_cg.cc',
-    'solver/solver_fem_trust_region_newton_pcg.cc',
-    'solver/solver_fem_newton_cg.cc',
-    'solver/solver_fem_newton_pcg.cc'
+mugrid_sources = [
+    'exception.cc',
+    'grid_common.cc',
+    'ccoord_operations.cc',
+    'field_collection.cc',
+    'field_collection_global.cc',
+    'field_collection_local.cc',
+    'file_io_base.cc',
+    'field.cc',
+    'field_typed.cc',
+    'field_map.cc',
+    'gradient_operator_default.cc',
+    'physics_domain.cc',
+    'options_dictionary.cc',
+    'raw_memory_operations.cc',
+    'state_field.cc',
+    'state_field_map.cc',
+    'units.cc',
+    version_file
 ]
 
-muspectre = shared_library(
-    'muSpectre',
-    muspectre_sources,
+if mugrid_with_netcdf
+    mugrid_sources += [
+        'file_io_netcdf.cc',
+    ]
+endif
+
+if mu_with_mpi
+    mugrid_sources += [
+        'communicator.cc'
+    ]
+endif
+
+mugrid = shared_library(
+    'muGrid',
+    mugrid_sources,
     include_directories: eigen3_incdir,
-    link_with: [mugrid, mufft],
     dependencies: muspectre_dependencies,
     install: true  # needed, otherwise it is not copied to wheel
 )

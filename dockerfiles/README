@@ -1,3 +1,0 @@
-The dockerfiles in subfolders are used for CI in gitlab.
-
-The dockerfiles docker_debian_* are used by Jenkins (legacy ci on c4science.ch)

@@ -1,11 +1,11 @@
 /**
- * @file   bind_py_module.cc
+ * @file   header_test_ref_array.cc
  *
- * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
+ * @author Till Junge <till.junge@epfl.ch>
  *
- * @date   10 Oct 2019
+ * @date   04 Dec 2018
  *
- * @brief  Python bindings for µGrid
+ * @brief  tests for the RefArray convenience struct
  *
  * Copyright © 2018 Till Junge
  *
@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with µGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * * Boston, MA 02111-1307, USA.
+ * Boston, MA 02111-1307, USA.
  *
  * Additional permission under GNU GPL version 3 section 7
  *
@@ -33,20 +33,22 @@
  *
  */
 
-#include "bind_py_declarations.hh"
+#include "tests.hh"
 
-#include <pybind11/pybind11.h>
+#include "ref_array.hh"
 
-PYBIND11_MODULE(_muGrid, mod) {
-  mod.doc() = "Python bindings to the µGrid library";
+namespace muGrid {
 
-  add_common_mugrid(mod);
-  add_communicator(mod);
-  add_field_classes(mod);
-  add_state_field_classes(mod);
-  add_field_collection_classes(mod);
-  add_options_dictionary(mod);
-#ifdef WITH_NETCDF_IO
-  add_file_io_classes(mod);
-#endif
-}
+  BOOST_AUTO_TEST_SUITE(RefArray_tests);
+
+  BOOST_AUTO_TEST_CASE(two_d_test) {
+    std::array<int, 2> values{2, 3};
+    RefArray<int, 2> refs{values[0], values[1]};
+
+    BOOST_CHECK_EQUAL(values[0], refs[0]);
+    BOOST_CHECK_EQUAL(values[1], refs[1]);
+  }
+
+  BOOST_AUTO_TEST_SUITE_END();
+
+}  // namespace muGrid

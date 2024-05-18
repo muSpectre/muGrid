@@ -1,4 +1,4 @@
-# µSpectre
+# µGrid
 
 Project µSpectre aims at providing an **open-source platform for efficient
 FFT-based continuum mesoscale modelling**. This README contains only a small
@@ -9,13 +9,13 @@ quick start guide. Please refer to the
 
 To install µSpectre, run
 
-    pip install muSpectre
+    pip install muGrid
 
 Note that on most platforms this will install a binary wheel, that was
 compiled with a minimal configuration. To compile for your specific platform
 use
 
-    pip install -v --no-binary muSpectre muSpectre
+    pip install -v --no-binary muGrid muGrid
 
 which will compile the code. Monitor output for the compilation options
 printed on screen. µSpectre will autodetect various options and report
