@@ -15,9 +15,6 @@ version_dirty = version[0]
 version_str = version[1]
 version_hash = version[2]
 
-eigen3 = dependency('eigen3', required: true)
-mugrid_dependencies = [eigen3]
-
 # Those are requirements on *some* systems, hence optional
 #cc = meson.get_compiler('c')
 #dl = cc.find_library('dl', required: false)
@@ -27,6 +24,8 @@ mugrid_dependencies = [eigen3]
 
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_global_arguments('-Weffc++', language: 'cpp')
+
+mugrid_dependencies = []
 
 mpi = dependency('mpi', language: 'cpp', required: false)
 if mpi.found()
@@ -51,6 +50,9 @@ else
     mugrid_with_netcdf = false
     message('muGrid NetCDF I/O: no')
 endif
+
+eigen3 = dependency('eigen3', required: true)
+mugrid_dependencies += [eigen3]
 
 subdir('src')
 subdir('language_bindings')
