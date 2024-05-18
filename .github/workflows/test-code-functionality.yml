@@ -79,7 +79,7 @@ jobs:
         run: |
           source venv/bin/activate
           cd builddir
-          meson test
+          meson test -v
 
       - name: Install extension module
         run: |
