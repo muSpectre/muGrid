@@ -37,6 +37,8 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 import numpy as np
 
+import mpi4py
+
 from python_test_imports import muGrid
 
 from python_communicator_tests import Communicator_Check
