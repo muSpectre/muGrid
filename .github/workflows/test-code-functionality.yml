@@ -39,17 +39,17 @@ jobs:
           python3 -m venv venv
           source venv/bin/activate
           python3 -m pip install --upgrade pip pip-tools
+          # Compute numpy version
+          pip-compile pyproject.toml
+          NUMPY_VERSION=$(grep 'numpy==' requirements.txt)        
+          # Install numpy
+          pip install -v ${NUMPY_VERSION}
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
               ninja-build \
               openmpi-bin \
               libopenmpi-dev \
               libpnetcdf-dev
-            # Compute mpi4py and numpy versions
-            pip-compile pyproject.toml
-            NUMPY_VERSION=$(grep 'numpy==' requirements.txt)        
-            # Install numpy
-            pip install -v ${NUMPY_VERSION}
             # Install mpi4py
             echo "Installing mpi4py==${{ matrix.mpi4py-version }}"
             CC=mpicc python3 -m pip install -v \
