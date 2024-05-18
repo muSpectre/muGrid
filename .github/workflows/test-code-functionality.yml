@@ -1,0 +1,83 @@
+name: Test code functionality
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  schedule:
+    - cron: "0 2 * * 5"  
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    strategy:
+      matrix:
+        mpi: ['no', 'mpi']
+        python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
+        mpi4py-version: [3.1.4]
+        exclude:
+          - mpi: 'mpi'
+            python-version: '3.12'
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up python3 ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qy
+          python3 -m venv venv
+          source venv/bin/activate
+          python3 -m pip install --upgrade pip pip-tools
+          if [ "${{ matrix.mpi }}" == "yes" ]; then
+            sudo apt-get install -y \
+              openmpi-bin \
+              libopenmpi-dev \
+              libpnetcdf-dev \
+              meson \
+              ninja-build
+            # Compute mpi4py and numpy versions
+            pip-compile pyproject.toml
+            NUMPY_VERSION=$(grep 'numpy==' requirements.txt)        
+            # Install numpy
+            pip install -v ${NUMPY_VERSION}
+            # Install mpi4py
+            echo "Installing mpi4py==${{ matrix.mpi4py-version }}"
+            CC=mpicc python3 -m pip install -v \
+              --no-binary mpi4py \
+              mpi4py==${{ matrix.mpi4py-version }}
+          else
+            sudo apt-get install -y \
+              libnetcdf-dev
+          fi
+          python3 -m pip install build
+          python3 -m pip list
+
+      - name: Compile with Meson
+        run: |
+          meson setup builddir
+          cd builddir
+          meson compile
+
+      - name: Run tests
+        run: |
+          cd builddir
+          meson test
+
+      - name: Install extension module
+        run: |
+          source venv/bin/activate
+          python3 -m pip install .
