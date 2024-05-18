@@ -47,7 +47,6 @@
 #include "field_collection.hh"
 #include "state_field.hh"
 
-#include "../libmufft/tests.hh"
 #include "mpi_context.hh"
 
 namespace muGrid {

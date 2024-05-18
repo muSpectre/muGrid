@@ -37,7 +37,6 @@
 
 #include "mpi_context.hh"
 
-#include "../libmufft/tests.hh"
 #include "file_io_base.hh"
 #include "file_io_netcdf.hh"
 

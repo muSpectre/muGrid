@@ -41,8 +41,6 @@
 
 #include "io_mpi_test_file_io.hh"
 
-#include "../libmufft/tests.hh"
-
 #include "file_io_netcdf.hh"
 #include "field_collection_global.hh"
 #include "field_typed.hh"
