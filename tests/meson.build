@@ -2,6 +2,8 @@
 # C++ unit tests (through Boost's framework)
 #
 
+incdirs = include_directories('../../src')
+
 boost_test = dependency('boost', modules: ['unit_test_framework'],
                         required: false)
 
@@ -37,7 +39,7 @@ if boost_test.found()
 
     main_test_suite = executable('main_test_suite',
         mugrid_test_sources,
-        include_directories: include_directories('../../src'),
+        include_directories: incdirs,
         link_with: [mugrid],
         dependencies: [mugrid_dependencies, boost_test])
 
