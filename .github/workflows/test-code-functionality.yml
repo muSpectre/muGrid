@@ -18,12 +18,9 @@ jobs:
 
     strategy:
       matrix:
-        mpi: ['no', 'mpi']
+        mpi: ['no', 'yes']
         python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
         mpi4py-version: [3.1.4]
-        exclude:
-          - mpi: 'mpi'
-            python-version: '3.12'
 
     steps:
       - uses: actions/checkout@v3
@@ -47,9 +44,7 @@ jobs:
               ninja-build \
               openmpi-bin \
               libopenmpi-dev \
-              libpnetcdf-dev \
-              meson \
-              ninja-build
+              libpnetcdf-dev
             # Compute mpi4py and numpy versions
             pip-compile pyproject.toml
             NUMPY_VERSION=$(grep 'numpy==' requirements.txt)        
