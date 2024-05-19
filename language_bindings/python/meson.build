@@ -15,9 +15,7 @@ mugrid_python = python.extension_module(
     '_muGrid', # Name of the module
     mugrid_python_sources,
     install: true,  # Install it
-    include_directories: ['../../src'],
-    link_with: mugrid,
-    dependencies: [mugrid_dependencies, pybind11]
+    dependencies: [mugrid, pybind11]
 )
 
 subdir('muGrid')

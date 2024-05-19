@@ -2,8 +2,6 @@
 # C++ unit tests (through Boost's framework)
 #
 
-incdirs = include_directories('../src')
-
 boost_test = dependency('boost', modules: ['unit_test_framework'],
                         required: false)
 
@@ -39,9 +37,7 @@ if boost_test.found()
 
     main_test_suite = executable('main_test_suite',
         mugrid_test_sources,
-        include_directories: incdirs,
-        link_with: [mugrid],
-        dependencies: [mugrid_dependencies, boost_test])
+        dependencies: [mugrid, boost_test])
 
     test('mugrid_main_test_suite', main_test_suite)
 endif
@@ -96,9 +92,7 @@ if mpi.found()
 
         mpi_main_test_suite = executable('mpi_main_test_suite',
             mugrid_mpi_test_sources,
-            include_directories: incdirs,
-            link_with: [mugrid],
-            dependencies: [mugrid_dependencies, boost_test])
+            dependencies: [mugrid, boost_test])
     endif
 
     mpiexec = find_program('mpiexec', required: false)
