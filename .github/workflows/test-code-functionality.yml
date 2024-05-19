@@ -22,7 +22,7 @@ jobs:
         compiler: ['gcc', 'clang']
         python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
         numpy-version: ['1.26.4']
-        mpi4py-version: ['3.1.4']
+        mpi4py-version: ['3.1.6']
         exclude:
           - mpi: 'yes'
             compiler: 'clang'
