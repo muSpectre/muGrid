@@ -35,7 +35,7 @@ if boost_test.found()
         ]
     endif
 
-    main_test_suite = executable('main_test_suite',
+    main_test_suite = executable('mugrid_main_test_suite',
         mugrid_test_sources,
         dependencies: [mugrid, boost_test])
 
@@ -90,7 +90,7 @@ if mpi.found()
             ]
         endif
 
-        mpi_main_test_suite = executable('mpi_main_test_suite',
+        mpi_main_test_suite = executable('mpi_mugrid_main_test_suite',
             mugrid_mpi_test_sources,
             dependencies: [mugrid, boost_test])
     endif
