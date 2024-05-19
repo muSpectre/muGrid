@@ -20,7 +20,8 @@ jobs:
       matrix:
         mpi: ['no', 'yes']
         python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
-        mpi4py-version: [3.1.4]
+        numpy-version: ['1.26.4']
+        mpi4py-version: ['3.1.4']
 
     steps:
       - uses: actions/checkout@v3
@@ -38,12 +39,9 @@ jobs:
           sudo apt-get update -qy
           python3 -m venv venv
           source venv/bin/activate
-          python3 -m pip install --upgrade pip pip-tools
-          # Compute numpy version
-          pip-compile pyproject.toml
-          NUMPY_VERSION=$(grep 'numpy==' requirements.txt)        
+          python3 -m pip install --upgrade pip
           # Install numpy
-          pip install -v ${NUMPY_VERSION}
+          pip install -v numpy==${{ matrix.numpy-version }}
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
               ninja-build \
