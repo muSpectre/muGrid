@@ -43,8 +43,6 @@ jobs:
           sudo apt-get update -qy
           if [ "${{ matrix.compiler }}" == "clang" ]; then
             sudo apt-get install -y clang
-            export CC=clang
-            export CXX=clang++
           fi
           python3 -m venv venv
           source venv/bin/activate
@@ -74,6 +72,10 @@ jobs:
 
       - name: Compile with Meson
         run: |
+          if [ "${{ matrix.compiler }}" == "clang" ]; then
+            export CC=clang
+            export CXX=clang++
+          fi
           source venv/bin/activate
           meson setup builddir
           cd builddir
