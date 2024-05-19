@@ -97,7 +97,6 @@ def get_version_from_git():
     # Make version PEP 440 compliant
     if dirty:
         version = version.replace('-dirty', '')
-    version = version.replace('-', '.dev', 1)
     version = version.replace('-', '+', 1)
     if dirty:
         version += '-dirty'
@@ -115,9 +114,9 @@ def get_version_from_cc(fn):
     dirty = bool(re.search('constexpr bool git_dirty{(true|false)};',
                            text).group(1))
     version = re.search(
-        r'constexpr char git_describe\[\]{"([A-Za-z0-9_.+-]*)"};', text
+        r'constexpr char git_describe[]{"([A-Za-z0-9_.+-]*)"};', text
     ).group(1)
-    git_hash = re.search('constexpr char git_hash\[\]{"([A-Za-z0-9_.-]*)"};',
+    git_hash = re.search(r'constexpr char git_hash[]{"([A-Za-z0-9_.-]*)"};',
                          text).group(1)
 
     return dirty, version, git_hash
