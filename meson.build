@@ -58,7 +58,8 @@ subdir('src')
 
 mugrid = declare_dependency(
     include_directories: include_directories('src'),
-    link_with: libmugrid
+    link_with: libmugrid,
+    dependencies: mugrid_dependencies
 )
 
 subdir('language_bindings')
