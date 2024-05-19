@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Set up python3 ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -83,7 +83,7 @@ jobs:
           cd builddir
           meson test -v
 
-      - name: Install extension module
+      - name: Test installation of Python extension module
         run: |
           source venv/bin/activate
           python3 -m pip install .
