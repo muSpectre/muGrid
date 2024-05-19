@@ -47,7 +47,10 @@ endif
 #
 
 envdata = environment()
-python_paths = [join_paths(meson.current_build_dir()), '../language_bindings/python']
+python_paths = [
+    join_paths(meson.current_build_dir(), '../language_bindings/python'),
+    join_paths(meson.current_source_dir(), '../language_bindings/python')
+]
 envdata.append('PYTHONPATH', python_paths)
 envdata.append('TESTS_BUILDDIR', meson.current_build_dir())
 
@@ -93,6 +96,7 @@ if mpi.found()
                 test('mpi_mugrid_main_test_suite-np_' + n,
                     mpiexec,
                     args: ['-n', n, '--oversubscribe', mpi_main_test_suite],
+                    env: envdata,
                     is_parallel: false)  # Don't run any other test in parallel
             endif
 
@@ -100,6 +104,7 @@ if mpi.found()
                 mpiexec,
                 args: ['-n', n, '--oversubscribe', python.path(),
                         files('python_mpi_binding_test.py'), '-v', '-f'],
+                env: envdata,
                 depends: [mugrid_python],
                 timeout: test_timeout,  # Test can take a long time
                 is_parallel: false)  # Don't run any other test in parallel

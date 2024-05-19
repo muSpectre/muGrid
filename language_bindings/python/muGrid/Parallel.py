@@ -48,7 +48,7 @@ def Communicator(communicator=None):
 
     Parameters
     ----------
-    communicator: mpi4py or muFFT communicator object
+    communicator: mpi4py or muGrid communicator object
         The bare MPI communicator. (Default: _muGrid.Communicator())
     """
     # If the communicator is None, we return a communicator that contains just
@@ -74,11 +74,11 @@ def Communicator(communicator=None):
         # we assume that the communicator is an mpi4py communicator.
         elif _muGrid.Communicator.has_mpi:
             if not MPI:
-                raise RuntimeError('muFFT was compiled with MPI support but '
+                raise RuntimeError('muGrid was compiled with MPI support but '
                                    'mpi4py could not be loaded.')
             return _muGrid.Communicator(MPI._handleof(communicator))
         else:
-            raise RuntimeError('muFFT was compiled without MPI support.')
+            raise RuntimeError('muGrid was compiled without MPI support.')
     else:
         raise RuntimeError("The communicator does not have a 'Get_size' "
                            "method. muFFT only supports communicators that "
