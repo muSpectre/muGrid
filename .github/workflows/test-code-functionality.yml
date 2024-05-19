@@ -19,9 +19,13 @@ jobs:
     strategy:
       matrix:
         mpi: ['no', 'yes']
+        compiler: ['gcc', 'clang']
         python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
         numpy-version: ['1.26.4']
         mpi4py-version: ['3.1.4']
+        exclude:
+          - mpi: 'yes'
+            compiler: 'clang
 
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +41,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qy
+          if [ "${{ matrix.compiler }}" == "clang" ]; then
+            sudo apt-get install -y clang
+            export CC=clang
+            export CXX=clang++
+          fi
           python3 -m venv venv
           source venv/bin/activate
           python3 -m pip install --upgrade pip
