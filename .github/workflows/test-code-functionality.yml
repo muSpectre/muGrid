@@ -54,6 +54,7 @@ jobs:
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
               ninja-build \
+              libboost-test-dev \
               openmpi-bin \
               libopenmpi-dev \
               libpnetcdf-dev
@@ -65,6 +66,7 @@ jobs:
           else
             sudo apt-get install -y \
               ninja-build \
+              libboost-test-dev \
               libnetcdf-dev
           fi
           python3 -m pip install build meson
