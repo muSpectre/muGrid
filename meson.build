@@ -23,14 +23,14 @@ version_hash = version[2]
 #mugrid_dependencies = [dl, execinfo, fftw3]
 
 # This produces lots of Warning from Eigen3. Disabling for now.
-# add_global_arguments('-Weffc++', language: 'cpp')
+# add_project_arguments('-Weffc++', language: 'cpp')
 
 mugrid_dependencies = []
 
 mpi = dependency('mpi', language: 'cpp', required: false)
 if mpi.found()
     message('muGrid MPI: *** YES ***')
-    add_global_arguments('-DWITH_MPI', language : ['c', 'cpp'])
+    add_project_arguments('-DWITH_MPI', language : ['c', 'cpp'])
     netcdf = dependency('pnetcdf', required: false)
     mugrid_dependencies += [mpi, netcdf]
     mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
@@ -45,7 +45,7 @@ endif
 if netcdf.found()
     mugrid_with_netcdf = true
     message('muGrid NetCDF I/O: *** YES ****')
-    add_global_arguments('-DWITH_NETCDF_IO', language : ['c', 'cpp'])
+    add_project_arguments('-DWITH_NETCDF_IO', language : ['c', 'cpp'])
 else
     mugrid_with_netcdf = false
     message('muGrid NetCDF I/O: no')
