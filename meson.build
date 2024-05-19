@@ -55,6 +55,12 @@ eigen3 = dependency('eigen3', required: true)
 mugrid_dependencies += [eigen3]
 
 subdir('src')
+
+mugrid = declare_dependency(
+    include_directories: include_directories('src'),
+    link_with: libmugrid
+)
+
 subdir('language_bindings')
 
 test_timeout = 300  # timeout in seconds for long running tests
