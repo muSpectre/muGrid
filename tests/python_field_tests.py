@@ -37,7 +37,7 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 import numpy as np
 
-from python_test_imports import muGrid
+import muGrid
 
 
 class FieldCheck(unittest.TestCase):

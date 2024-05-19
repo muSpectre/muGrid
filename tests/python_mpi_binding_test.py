@@ -39,7 +39,7 @@ import numpy as np
 
 import mpi4py
 
-from python_test_imports import muGrid
+import muGrid
 
 from python_communicator_tests import Communicator_Check
 

@@ -36,7 +36,7 @@ Program grant you additional permission to convey the resulting work.
 
 import unittest
 
-from python_test_imports import muGrid
+import muGrid
 
 from python_common_tests import *
 
