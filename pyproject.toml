@@ -3,7 +3,7 @@ requires = ["meson>=1.0.0", "meson-python>=0.15.0", "ninja", "numpy>=1.20.0"]
 build-backend = "mesonpy"
 
 [project]
-name = "muSrid"
+name = "muGrid"
 description = "µGrid is a library for regular grids"
 readme = "README.md"
 license = { file = "LICENSE" }
