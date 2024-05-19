@@ -101,23 +101,25 @@ if mpi.found()
             dependencies: [mugrid_dependencies, boost_test])
     endif
 
-    mpiexec = find_program('mpiexec')
+    mpiexec = find_program('mpiexec', required: false)
 
-    foreach n : mpi_processes
-        if boost_test.found()
-            test('mpi_mugrid_main_test_suite-np_' + n,
-                 mpiexec,
-                 args: ['-n', n, '--oversubscribe', mpi_main_test_suite],
-                 is_parallel: false)  # Don't run any other test in parallel
-        endif
+    if mpiexec.found()
+        foreach n : mpi_processes
+            if boost_test.found()
+                test('mpi_mugrid_main_test_suite-np_' + n,
+                    mpiexec,
+                    args: ['-n', n, '--oversubscribe', mpi_main_test_suite],
+                    is_parallel: false)  # Don't run any other test in parallel
+            endif
 
-        test('mpi_mugrid_python_binding_tests',
-             mpiexec,
-             args: ['-n', n, '--oversubscribe', python.path(),
-                    files('python_mpi_binding_test.py'), '-v', '-f'],
-               depends: [mugrid_python],
-               env: envdata,
-               timeout: test_timeout,  # Test can take a long time
-               is_parallel: false)  # Don't run any other test in parallel
-    endforeach
+            test('mpi_mugrid_python_binding_tests',
+                mpiexec,
+                args: ['-n', n, '--oversubscribe', python.path(),
+                        files('python_mpi_binding_test.py'), '-v', '-f'],
+                depends: [mugrid_python],
+                env: envdata,
+                timeout: test_timeout,  # Test can take a long time
+                is_parallel: false)  # Don't run any other test in parallel
+        endforeach
+    endif
 endif
