@@ -21,8 +21,8 @@ jobs:
         mpi: ['no', 'yes']
         compiler: ['gcc', 'clang']
         python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
-        numpy-version: ['1.26.4']
-        mpi4py-version: ['3.1.6']
+        numpy-version: ['<2.0.0']
+        mpi4py-version: ['==3.1.6']
         exclude:
           - mpi: 'yes'
             compiler: 'clang'
@@ -50,7 +50,7 @@ jobs:
           source venv/bin/activate
           python3 -m pip install --upgrade pip
           # Install numpy
-          pip install -v numpy==${{ matrix.numpy-version }}
+          pip install -v numpy${{ matrix.numpy-version }}
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
               ninja-build \
@@ -58,10 +58,10 @@ jobs:
               libopenmpi-dev \
               libpnetcdf-dev
             # Install mpi4py
-            echo "Installing mpi4py==${{ matrix.mpi4py-version }}"
+            echo "Installing mpi4py${{ matrix.mpi4py-version }}"
             CC=mpicc python3 -m pip install -v \
               --no-binary mpi4py \
-              mpi4py==${{ matrix.mpi4py-version }}
+              mpi4py${{ matrix.mpi4py-version }}
           else
             sudo apt-get install -y \
               ninja-build \
