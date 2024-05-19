@@ -47,3 +47,9 @@ libmugrid = shared_library(
     dependencies: mugrid_dependencies,
     install: true  # needed, otherwise it is not copied to wheel
 )
+
+mugrid = declare_dependency(
+    include_directories: include_directories('.'),
+    link_with: libmugrid,
+    dependencies: mugrid_dependencies
+)
