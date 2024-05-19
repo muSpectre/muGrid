@@ -42,7 +42,7 @@
 #include <mpi.h>
 #endif
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 #include "grid_common.hh"
 

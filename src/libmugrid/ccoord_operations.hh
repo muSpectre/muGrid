@@ -37,7 +37,7 @@
 #include <numeric>
 #include <utility>
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 #include "exception.hh"
 #include "grid_common.hh"

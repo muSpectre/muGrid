@@ -35,7 +35,7 @@
 
 #include <iostream>
 
-#include "ccoord_operations.hh"
+#include "libmugrid/ccoord_operations.hh"
 #include "test_goodies.hh"
 #include "tests.hh"
 

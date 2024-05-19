@@ -34,8 +34,8 @@
  */
 
 #include "tests.hh"
-#include "field_collection_global.hh"
-#include "mapped_state_field.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/mapped_state_field.hh"
 
 namespace muGrid {
 

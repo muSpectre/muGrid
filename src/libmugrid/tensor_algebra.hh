@@ -41,8 +41,8 @@
 #include "T4_map_proxy.hh"
 #include "eigen_tools.hh"
 
-#include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
+#include "Eigen/Dense"
+#include "unsupported/Eigen/CXX11/Tensor"
 
 #include <type_traits>
 

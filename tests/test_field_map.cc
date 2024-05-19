@@ -37,7 +37,7 @@
 
 #include "field_test_fixtures.hh"
 
-#include "iterators.hh"
+#include "libmugrid/iterators.hh"
 
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(field_maps);

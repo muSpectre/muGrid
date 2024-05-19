@@ -39,8 +39,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "ccoord_operations.hh"
-#include "units.hh"
+#include "libmugrid/ccoord_operations.hh"
+#include "libmugrid/units.hh"
 
 using muGrid::DynCcoord;
 using muGrid::Index_t;

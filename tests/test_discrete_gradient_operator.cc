@@ -38,9 +38,9 @@
 #include "test_goodies.hh"
 #include "test_discrete_gradient_operator.hh"
 
-#include "gradient_operator_default.hh"
-#include "field_collection_global.hh"
-#include "mapped_field.hh"
+#include "libmugrid/gradient_operator_default.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/mapped_field.hh"
 
 #include <boost/mpl/list.hpp>
 

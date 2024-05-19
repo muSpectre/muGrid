@@ -33,8 +33,8 @@
  *
  */
 
-#include "grid_common.hh"
-#include "gradient_operator_default.hh"
+#include "libmugrid/grid_common.hh"
+#include "libmugrid/gradient_operator_default.hh"
 
 #ifndef TESTS_LIBMUGRID_TEST_DISCRETE_GRADIENT_OPERATOR_HH_
 #define TESTS_LIBMUGRID_TEST_DISCRETE_GRADIENT_OPERATOR_HH_

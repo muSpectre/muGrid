@@ -42,8 +42,8 @@
 #include "field_typed.hh"
 #include "field_collection_global.hh"
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "pybind11/pybind11.h"
+#include "pybind11/numpy.h"
 
 #include <algorithm>
 #include <limits>

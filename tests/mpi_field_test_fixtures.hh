@@ -40,13 +40,13 @@
 #include "tests.hh"
 #include "mpi_context.hh"
 
-#include "field_typed.hh"
-#include "field_collection_global.hh"
-#include "field_map.hh"
-#include "field_map_static.hh"
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/field_map.hh"
+#include "libmugrid/field_map_static.hh"
 
-#include "grid_common.hh"
-#include "communicator.hh"
+#include "libmugrid/grid_common.hh"
+#include "libmugrid/communicator.hh"
 
 namespace muGrid {
   struct MpiFieldMapFixture {

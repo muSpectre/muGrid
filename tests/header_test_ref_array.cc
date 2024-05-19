@@ -35,7 +35,7 @@
 
 #include "tests.hh"
 
-#include "ref_array.hh"
+#include "libmugrid/ref_array.hh"
 
 namespace muGrid {
 

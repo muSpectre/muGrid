@@ -38,8 +38,8 @@
 
 #include "eigen_tools.hh"
 
-#include <Eigen/Dense>
-#include <Eigen/src/Core/util/Constants.h>
+#include "Eigen/Dense"
+#include "Eigen/src/Core/util/Constants.h"
 
 #include <type_traits>
 

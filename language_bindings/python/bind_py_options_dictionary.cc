@@ -32,7 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-#include "options_dictionary.hh"
+#include "libmugrid/options_dictionary.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>

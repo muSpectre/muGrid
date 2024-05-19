@@ -38,11 +38,11 @@
 #define TESTS_LIBMUGRID_FIELD_TEST_FIXTURES_HH_
 
 #include "tests.hh"
-#include "field_typed.hh"
-#include "field_collection_global.hh"
-#include "field_collection_local.hh"
-#include "field_map.hh"
-#include "field_map_static.hh"
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/field_collection_local.hh"
+#include "libmugrid/field_map.hh"
+#include "libmugrid/field_map_static.hh"
 
 namespace muGrid {
   struct BaseFixture {

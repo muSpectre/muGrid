@@ -38,7 +38,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "communicator.hh"
+#include "libmugrid/communicator.hh"
 
 namespace muGrid {
 #ifdef WITH_MPI

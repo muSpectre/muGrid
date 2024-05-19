@@ -39,11 +39,11 @@
 #include "tests.hh"
 #include "mpi_context.hh"
 
-#include "field_collection_local.hh"
-#include "field_collection_global.hh"
-#include "field_map_static.hh"
+#include "libmugrid/field_collection_local.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/field_map_static.hh"
 
-#include "communicator.hh"
+#include "libmugrid/communicator.hh"
 
 namespace muGrid {
   struct FileIOFixture {

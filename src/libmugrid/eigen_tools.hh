@@ -38,8 +38,8 @@
 
 #include "grid_common.hh"
 
-#include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
+#include "Eigen/Dense"
+#include "unsupported/Eigen/CXX11/Tensor"
 
 #include <type_traits>
 #include <utility>

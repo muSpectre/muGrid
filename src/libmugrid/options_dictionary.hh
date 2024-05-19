@@ -35,7 +35,7 @@
 
 #include "grid_common.hh"
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 #include <map>
 #include <string>

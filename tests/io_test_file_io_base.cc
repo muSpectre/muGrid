@@ -37,8 +37,8 @@
 
 #include "mpi_context.hh"
 
-#include "file_io_base.hh"
-#include "file_io_netcdf.hh"
+#include "libmugrid/file_io_base.hh"
+#include "libmugrid/file_io_netcdf.hh"
 
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(file_io_base);

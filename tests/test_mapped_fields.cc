@@ -36,9 +36,9 @@
 #include "tests.hh"
 #include "field_test_fixtures.hh"
 
-#include "field_collection_global.hh"
-#include "field_collection_local.hh"
-#include "mapped_field.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/field_collection_local.hh"
+#include "libmugrid/mapped_field.hh"
 
 namespace muGrid {
 

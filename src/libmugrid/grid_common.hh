@@ -36,7 +36,7 @@
 #include "exception.hh"
 #include "iterators.hh"
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 #include <array>
 #include <cmath>

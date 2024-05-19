@@ -37,7 +37,7 @@
 
 #include "gradient_operator_base.hh"
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 #include <vector>
 

@@ -36,7 +36,7 @@
 #include "mpi_context.hh"
 #include "tests.hh"
 
-#include "communicator.hh"
+#include "libmugrid/communicator.hh"
 
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(mpi_communicator_test);

@@ -34,11 +34,11 @@
  */
 
 #include "tests.hh"
-#include "state_field_map.hh"
-#include "state_field.hh"
-#include "field_typed.hh"
-#include "field_collection_local.hh"
-#include "state_field_map_static.hh"
+#include "libmugrid/state_field_map.hh"
+#include "libmugrid/state_field.hh"
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_collection_local.hh"
+#include "libmugrid/state_field_map_static.hh"
 
 #include <boost/mpl/list.hpp>
 

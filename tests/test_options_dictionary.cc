@@ -36,7 +36,7 @@
 #include "tests.hh"
 #include "test_goodies.hh"
 
-#include "options_dictionary.hh"
+#include "libmugrid/options_dictionary.hh"
 
 namespace muGrid {
 

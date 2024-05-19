@@ -39,7 +39,7 @@
 #include "field.hh"
 #include "grid_common.hh"
 
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 #include <vector>
 #include <memory>

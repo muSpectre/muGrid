@@ -39,13 +39,13 @@
 
 #include "io_test_file_io.hh"
 
-#include "file_io_netcdf.hh"
-#include "file_io_base.hh"
-#include "field_collection_global.hh"
-#include "field_typed.hh"
-#include "field_map_static.hh"
-#include "field_collection.hh"
-#include "state_field.hh"
+#include "libmugrid/file_io_netcdf.hh"
+#include "libmugrid/file_io_base.hh"
+#include "libmugrid/field_collection_global.hh"
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_map_static.hh"
+#include "libmugrid/field_collection.hh"
+#include "libmugrid/state_field.hh"
 
 #include "mpi_context.hh"
 

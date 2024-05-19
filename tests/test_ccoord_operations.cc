@@ -33,8 +33,8 @@
  *
  */
 
-#include "ccoord_operations.hh"
-#include "iterators.hh"
+#include "libmugrid/ccoord_operations.hh"
+#include "libmugrid/iterators.hh"
 
 #include "test_goodies.hh"
 #include "tests.hh"

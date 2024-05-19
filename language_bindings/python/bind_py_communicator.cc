@@ -35,7 +35,7 @@
 
 #include "bind_py_declarations.hh"
 
-#include "communicator.hh"
+#include "libmugrid/communicator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
