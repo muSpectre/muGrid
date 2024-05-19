@@ -1010,7 +1010,7 @@ namespace muGrid {
     // NC_ENOTATT)
     for (int g_att_num = 0; g_att_num < MAX_NB_GLOBAL_ATTRIBUTES; g_att_num++) {
       // find attribute name
-      char name[MAX_LEN_GLOBAL_ATTRIBUTE_NAME];
+      char name[MAX_LEN_GLOBAL_ATTRIBUTE_NAME+1];
       int status_1{
           ncmu_inq_attname(this->netcdf_id, NC_GLOBAL, g_att_num, &name[0])};
       if (status_1 == NC_ENOTATT) {

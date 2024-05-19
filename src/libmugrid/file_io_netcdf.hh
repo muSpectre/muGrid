@@ -1198,12 +1198,12 @@ namespace muGrid {
     constexpr static int MAX_NB_ATTRIBUTES{
         10};  // maximum number of allowed attributes per variable
     constexpr static int MAX_LEN_ATTRIBUTE_NAME{
-        20};  // maximum length of an attribute name
+        NC_MAX_NAME};  // maximum length of an attribute name
     constexpr static int MAX_NB_GLOBAL_ATTRIBUTES{
         30};  // maximum number of allowed global attributes per FileIONetCDF
               // object
     constexpr static int MAX_LEN_GLOBAL_ATTRIBUTE_NAME{
-        25};  // maximum length of an global attribute name
+        NC_MAX_NAME};  // maximum length of an global attribute name
 
     enum class NetCDFMode { UndefinedMode, DefineMode, DataMode };
     //! Default constructor
