@@ -51,6 +51,17 @@ using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
 
+void add_version(py::module & mod) {
+  auto version{mod.def_submodule("version")};
+  
+  version.doc() = "version information";
+
+  version.def("info", &muGrid::version::info)
+      .def("hash", &muGrid::version::hash)
+      .def("description", &muGrid::version::description)
+      .def("is_dirty", &muGrid::version::is_dirty);
+}
+
 void add_enums(py::module & mod) {
   py::enum_<muGrid::StorageOrder>(mod, "StorageOrder")
       .value("ColMajor", muGrid::StorageOrder::ColMajor)
@@ -185,6 +196,8 @@ void add_unit(py::module & mod) {
 }
 
 void add_common_mugrid(py::module & mod) {
+  add_version(mod);
+
   add_enums(mod);
 
   add_dyn_ccoord_helper<threeD, Index_t>(mod, "DynCcoord");
