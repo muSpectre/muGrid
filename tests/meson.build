@@ -2,7 +2,7 @@
 # C++ unit tests (through Boost's framework)
 #
 
-incdirs = include_directories('../../src')
+incdirs = include_directories('../src')
 
 boost_test = dependency('boost', modules: ['unit_test_framework'],
                         required: false)
