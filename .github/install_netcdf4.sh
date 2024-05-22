@@ -1,6 +1,7 @@
 if [ -z "$HOMEBREW_REPOSITORY" ]; then
     INSTALL_PREFIX=/usr/local
 else
+    brew install pkg-config
     INSTALL_PREFIX=$HOMEBREW_REPOSITORY
     export PKG_CONFIG_PATH
 fi
