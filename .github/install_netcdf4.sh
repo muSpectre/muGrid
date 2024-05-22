@@ -1,11 +1,12 @@
-printenv
 if [ -z "$HOMEBREW_REPOSITORY" ]; then
     INSTALL_PREFIX=/usr/local
 else
     brew install pkg-config
     INSTALL_PREFIX=$HOMEBREW_REPOSITORY
+    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOMEBREW_REPOSITORY/lib/pkgconfig
+    export PKG_CONFIG_PATH
 fi
-echo "INSTALL_PREFIX=$INSTALL_PREFIX"
+printenv
 curl -L https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.7.tar.xz | tar -Jx
 cd libxml2-2.12.7
 ./configure --without-python --prefix=$INSTALL_PREFIX
