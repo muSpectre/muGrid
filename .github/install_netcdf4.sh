@@ -7,6 +7,6 @@ make install
 cd ..
 curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/netcdf-c-4.9.2.tar.gz | tar -zx
 cd netcdf-c-4.9.2
-./configure --disable-hdf5 --disable-byterange --disable-shared --with-pic --prefix=$HOME/.local
+PATH=$PATH:$HOME/.local/bin ./configure --disable-hdf5 --disable-byterange --disable-shared --with-pic --prefix=$HOME/.local
 make
 make install
