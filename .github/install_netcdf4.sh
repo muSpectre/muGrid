@@ -2,6 +2,7 @@ printenv
 if [ -z "$HOMEBREW_REPOSITORY" ]; then
     INSTALL_PREFIX=/usr/local
 else
+    brew install pkg-config
     INSTALL_PREFIX=$HOMEBREW_REPOSITORY
 fi
 echo "INSTALL_PREFIX=$INSTALL_PREFIX"
