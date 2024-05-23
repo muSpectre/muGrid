@@ -44,11 +44,7 @@ read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 if os.environ.get('READTHEDOCS', None) is not None:
     print("${READTHEDOCS} = " + os.environ.get('READTHEDOCS', None))
 
-if read_the_docs_build:
-    muspectre_path = "."
-else:
-    muspectre_path = "@CMAKE_CURRENT_BINARY_DIR@"
-    os.makedirs("@CMAKE_CURRENT_BINARY_DIR@/_static", exist_ok=True)
+muspectre_path = "."
 
 print("muspectre_path = '{}'".format(muspectre_path))
 subprocess.call('ls; pwd', shell=True)

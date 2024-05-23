@@ -102,6 +102,16 @@ void add_typed_field(py::module & mod, std::string name) {
             return muGrid::numpy_wrap(self, it);
           },
           "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
+      .def_property_readonly(
+	  "sa",
+          [](TypedFieldBase<T> & self) {
+            return muGrid::numpy_wrap(self, muGrid::IterUnit::SubPt);
+          })
+    .def_property_readonly(
+	  "pa",
+          [](TypedFieldBase<T> & self) {
+            return muGrid::numpy_wrap(self, muGrid::IterUnit::Pixel);
+          })			   
       .def(
           "get_pixel_map",
           [](TypedFieldBase<T> & field, const Index_t & nb_rows) {
