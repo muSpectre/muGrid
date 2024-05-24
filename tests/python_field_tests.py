@@ -43,26 +43,45 @@ import muGrid
 class FieldCheck(unittest.TestCase):
     def setUp(self):
         self.nb_grid_pts = (10, 11, 21)
+        self.values = np.random.rand(*self.nb_grid_pts)
 
     def test_buffer_size_one_quad_pt(self):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
         fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
+
         # Single component
         f = fc.register_real_field("test-field", 1)
         self.assertEqual(f.array(muGrid.Pixel).shape,
                          self.nb_grid_pts)
+
         # Four components
         f2 = fc.register_real_field("test-field2", 4)
         self.assertEqual(f2.array(muGrid.Pixel).shape,
                          (4,) + self.nb_grid_pts)
+
         # Check that we get those fields back
         self.assertEqual(fc.get_field('test-field'), f)
         self.assertEqual(fc.get_field('test-field2'), f2)
+
         # Check strides
         self.assertEqual(f.stride(muGrid.Pixel), 1)
         self.assertEqual(f2.stride(muGrid.Pixel), 4)
         self.assertEqual(f.stride(muGrid.SubPt), 1)
         self.assertEqual(f2.stride(muGrid.SubPt), 4)
+
+        # Check subpoint-shaped convenience access
+        self.assertEqual(f.s.shape, self.nb_grid_pts)
+        with self.assertRaises(RuntimeError):
+            f.s = np.zeros([3] + list(self.nb_grid_pts))
+        f.s = self.values
+        np.testing.assert_allclose(f.s, self.values)
+
+        # Check pixel-shaped convenience access
+        self.assertEqual(f.p.shape, self.nb_grid_pts)
+        with self.assertRaises(RuntimeError):
+            f.p = np.zeros([3] + list(self.nb_grid_pts))
+        f.p = self.values
+        np.testing.assert_allclose(f.p, self.values)
 
     def test_buffer_size_four_quad_pt(self):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})

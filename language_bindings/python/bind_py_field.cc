@@ -42,23 +42,25 @@
 #include "libmugrid/field_collection_global.hh"
 #include "libmugrid/mapped_field.hh"
 #include "libmugrid/numpy_tools.hh"
+#include "libmugrid/raw_memory_operations.hh"
 
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 
 #include <sstream>
-#include <stdexcept>
 
 using muGrid::Field;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
 using muGrid::Index_t;
 using muGrid::RuntimeError;
+using muGrid::Shape_t;
 using muGrid::TypedField;
 using muGrid::TypedFieldBase;
 using muGrid::WrappedField;
+using muGrid::operator<<;
+using muGrid::raw_mem_ops::strided_copy;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -83,6 +85,26 @@ void add_field(py::module & mod) {
       .def_property_readonly("sub_division", &Field::get_sub_division_tag);
 }
 
+template <class T, muGrid::IterUnit iter_unit>
+decltype(auto) array_getter(TypedFieldBase<T> & self) {
+  return muGrid::numpy_wrap(self, iter_unit);
+}
+
+template <class T, muGrid::IterUnit iter_unit>
+void array_setter(TypedFieldBase<T> & self, py::array_t<T> array) {
+  const Shape_t array_shape(array.shape(), array.shape() + array.ndim());
+  const Shape_t array_strides(array.strides(), array.strides() + array.ndim());
+  if (array_shape != self.get_shape(iter_unit)) {
+    std::stringstream error{};
+    error << "Dimension mismatch: The shape " << array_shape
+          << " is not equal to the field shape " << self.get_shape(iter_unit)
+          << ".";
+    throw RuntimeError{error.str()};
+  }
+  strided_copy(self.get_shape(iter_unit), array_strides,
+               self.get_strides(iter_unit), array.data(), self.data());
+}
+
 template <class T>
 void add_typed_field(py::module & mod, std::string name) {
   py::class_<TypedFieldBase<T>, Field>(mod, (name + "Base").c_str(),
@@ -102,16 +124,12 @@ void add_typed_field(py::module & mod, std::string name) {
             return muGrid::numpy_wrap(self, it);
           },
           "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
-      .def_property_readonly(
-	  "sa",
-          [](TypedFieldBase<T> & self) {
-            return muGrid::numpy_wrap(self, muGrid::IterUnit::SubPt);
-          })
-    .def_property_readonly(
-	  "pa",
-          [](TypedFieldBase<T> & self) {
-            return muGrid::numpy_wrap(self, muGrid::IterUnit::Pixel);
-          })			   
+      .def_property("s", array_getter<T, muGrid::IterUnit::SubPt>,
+                    array_setter<T, muGrid::IterUnit::SubPt>,
+                    py::keep_alive<0, 1>())
+      .def_property("p", array_getter<T, muGrid::IterUnit::Pixel>,
+                    array_setter<T, muGrid::IterUnit::Pixel>,
+                    py::keep_alive<0, 1>())
       .def(
           "get_pixel_map",
           [](TypedFieldBase<T> & field, const Index_t & nb_rows) {

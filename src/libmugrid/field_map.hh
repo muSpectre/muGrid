@@ -184,7 +184,6 @@ namespace muGrid {
       return *this;
     }
 
-
     //! Subtraction-assign a matrix-like value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
     std::enable_if_t<IsMutableField, FieldMap> &
@@ -236,7 +235,6 @@ namespace muGrid {
       }
       return *this;
     }
-
 
     //! Subtraction-assign a scalar value to every entry
     template <bool IsMutableField = Mutability == Mapping::Mut>
@@ -343,9 +341,9 @@ namespace muGrid {
     //! mapped field. Needed for query at initialisations
     const Field_t & field;
     const IterUnit iteration;  //!< type of map iteration
-    const Index_t stride;         //!< precomputed stride
-    const Index_t nb_rows;        //!< number of rows of the iterate
-    const Index_t nb_cols;        //!< number of columns fo the iterate
+    const Index_t stride;      //!< precomputed stride
+    const Index_t nb_rows;     //!< number of rows of the iterate
+    const Index_t nb_cols;     //!< number of columns fo the iterate
 
     /**
      * Pointer to mapped data; is also unknown at construction and set in the

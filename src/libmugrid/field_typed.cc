@@ -39,7 +39,6 @@
 #include "field_typed.hh"
 #include "field_collection.hh"
 #include "field_map.hh"
-#include "field_map_static.hh"
 #include "raw_memory_operations.hh"
 #include "tensor_algebra.hh"
 
