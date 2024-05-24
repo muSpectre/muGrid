@@ -29,13 +29,11 @@ mugrid_dependencies = []
 
 mpi = dependency('mpi', language: 'cpp', required: false)
 if mpi.found()
-    message('muGrid MPI: *** YES ***')
     add_project_arguments('-DWITH_MPI', language : ['c', 'cpp'])
     netcdf = dependency('pnetcdf', required: false)
     mugrid_dependencies += [mpi, netcdf]
     mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
 else
-    message('muGrid MPI: no')
     mu_with_fftw3mpi = false
     mu_with_pfft = false
     netcdf = dependency('netcdf', required: false)
@@ -44,15 +42,20 @@ endif
 
 if netcdf.found()
     mugrid_with_netcdf = true
-    message('muGrid NetCDF I/O: *** YES ****')
     add_project_arguments('-DWITH_NETCDF_IO', language : ['c', 'cpp'])
 else
     mugrid_with_netcdf = false
-    message('muGrid NetCDF I/O: no')
 endif
 
 eigen3 = dependency('eigen3', required: true)
 mugrid_dependencies += [eigen3]
+
+message('  --------------------')
+message('  muGrid configuration')
+message('    MPI            : ' + (mpi.found() ? '*** YES ***' : 'no'))
+message('    Unidata NetCDF : ' + (not mpi.found() and netcdf.found() ? '*** YES ***' : 'no'))
+message('    Parallel NetCDF: ' + (mpi.found() and netcdf.found() ? '*** YES ***' : 'no'))
+message('  --------------------')
 
 subdir('src')
 subdir('language_bindings')
