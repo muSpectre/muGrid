@@ -44,6 +44,8 @@ class FieldCheck(unittest.TestCase):
     def setUp(self):
         self.nb_grid_pts = (10, 11, 21)
         self.values = np.random.rand(*self.nb_grid_pts)
+        self.nb_grid_pts2 = (4,) + self.nb_grid_pts
+        self.values2 = np.random.rand(*((4,) + self.nb_grid_pts))
 
     def test_buffer_size_one_quad_pt(self):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
@@ -51,13 +53,11 @@ class FieldCheck(unittest.TestCase):
 
         # Single component
         f = fc.register_real_field("test-field", 1)
-        self.assertEqual(f.array(muGrid.Pixel).shape,
-                         self.nb_grid_pts)
+        self.assertEqual(f.array(muGrid.Pixel).shape, self.nb_grid_pts)
 
         # Four components
         f2 = fc.register_real_field("test-field2", 4)
-        self.assertEqual(f2.array(muGrid.Pixel).shape,
-                         (4,) + self.nb_grid_pts)
+        self.assertEqual(f2.array(muGrid.Pixel).shape, self.nb_grid_pts2)
 
         # Check that we get those fields back
         self.assertEqual(fc.get_field('test-field'), f)
@@ -72,16 +72,27 @@ class FieldCheck(unittest.TestCase):
         # Check subpoint-shaped convenience access
         self.assertEqual(f.s.shape, self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
-            f.s = np.zeros([3] + list(self.nb_grid_pts))
+            f.s = np.zeros((3,) + self.nb_grid_pts)
         f.s = self.values
         np.testing.assert_allclose(f.s, self.values)
+
+        self.assertEqual(f2.s.shape, (4, 1) + self.nb_grid_pts)
+        with self.assertRaises(RuntimeError):
+            # This has shape (4, 1, 10, 11, 21) and should fail
+            f2.s = self.values2
 
         # Check pixel-shaped convenience access
         self.assertEqual(f.p.shape, self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
-            f.p = np.zeros([3] + list(self.nb_grid_pts))
+            f.p = np.zeros((3,) + self.nb_grid_pts)
         f.p = self.values
         np.testing.assert_allclose(f.p, self.values)
+
+        self.assertEqual(f2.p.shape, self.nb_grid_pts2)
+        with self.assertRaises(RuntimeError):
+            f2.p = np.zeros((3,) + self.nb_grid_pts)
+        f2.p = self.values2
+        np.testing.assert_allclose(f2.p, self.values2)
 
     def test_buffer_size_four_quad_pt(self):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
