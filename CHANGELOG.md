@@ -1,10 +1,21 @@
 Change log for µSpectre
 =======================
 
-0.90.0 (not yet released)
+0.91.0 (not yet released)
 -------------------------
 
-- Split code into three repositories: muGrid, muFFT and 
+- Added attributes `p` and `s` for convenience access to pixel-order and
+  subpt-order numpy arrays
+
+0.90.1 (23May2024)
+------------------
+
+- Fixed wheels and source deployment to PyPI
+
+0.90.0 (21May2024)
+------------------
+
+- Split code into separate repositories: muGrid and muFFT 
 
 0.27.0 (30Jan2024)
 ------------------
