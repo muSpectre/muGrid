@@ -93,7 +93,6 @@ decltype(auto) array_getter(TypedFieldBase<T> & self) {
 template <class T, muGrid::IterUnit iter_unit>
 void array_setter(TypedFieldBase<T> & self, py::array_t<T> array) {
   const Shape_t array_shape(array.shape(), array.shape() + array.ndim());
-  const Shape_t array_strides(array.strides(), array.strides() + array.ndim());
   if (array_shape != self.get_shape(iter_unit)) {
     std::stringstream error{};
     error << "Dimension mismatch: The shape " << array_shape
@@ -101,6 +100,10 @@ void array_setter(TypedFieldBase<T> & self, py::array_t<T> array) {
           << ".";
     throw RuntimeError{error.str()};
   }
+  Shape_t array_strides(array.strides(), array.strides() + array.ndim());
+  // numpy arrays have stride in bytes
+  for (auto && s : array_strides)  s /= sizeof(T);
+  std::cout << self.get_shape(iter_unit) << " " << array_strides << " " << self.get_strides(iter_unit) << std::endl;
   strided_copy(self.get_shape(iter_unit), array_strides,
                self.get_strides(iter_unit), array.data(), self.data());
 }
