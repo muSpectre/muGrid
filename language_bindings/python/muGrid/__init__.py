@@ -34,9 +34,17 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import numpy as np
+try:
+    from mpi4py import MPI
+except ModuleNotFoundError:
+    MPI = None
 
 import _muGrid
+
+has_mpi = _muGrid.Communicator.has_mpi
+if has_mpi and MPI is None:
+    raise RuntimeError("MPI support is enabled for muGrid but mpi4py is not available.")
+
 from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder, SubPt, DynCcoord, DynRcoord, IterUnit,
                      Verbosity, GlobalFieldCollection, LocalFieldCollection, Unit, Dictionary)
 
@@ -47,7 +55,5 @@ except ImportError:
     pass
 
 from .Parallel import Communicator
-
-has_mpi = _muGrid.Communicator.has_mpi
 
 __version__ = _muGrid.version.description()
