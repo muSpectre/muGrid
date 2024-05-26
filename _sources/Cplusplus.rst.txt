@@ -1,42 +1,6 @@
 C++ Bindings
 ############
 
-The *µ*\Grid library handles field quantities, i.e. scalar, vectors or tensors,
-that vary in space. It supports only a uniform discretization of space. In the
-language of *µ*\Grid, we call the discrete coordinates **pixels**. Each pixel
-can be subdivided into logical elements, for example into a number of
-support points for numerical quadrature. These subdivisions are called
-**sub-points**. Note that while *µ*\Grid understands the physical location of
-each *pixel*, the *sub-points* are logical subdivisions and not associated
-with any position within the pixel. Each *sub-point* carries the field quantity,
-which can be a scalar, vector or any type of tensor. The field quantity is
-called the **component**.
-
-Each *µ*\Grid field has a representation in a multidimensional array. This
-representation is used when accessing a field with Python via `numpy <https://numpy.org/>`_
-or when writing the field to a file. The default representation has the shape
-
-.. code-block:: Python
-
-    (components, sub-points, pixels)
-
-As a concrete example, a second-rank tensor (for example the deformation
-gradient) living on two quadrature points in three dimensions with a spatial
-discretization of 11 x 12 x 13 grid points would have the following shape:
-
-.. code-block:: Python
-
-    (3, 3, 2, 11, 12, 13)
-
-Note that the components are omitted if there is only a single component (i.e.
-a scalar value), but the sub-points are always included even if there is only
-a single sub-point. The default storage order of that representation is
-column-major.
-
-Throughout the code, we call the field quantities **entries**. For example,
-`nb_pixels` refers to the number of pixels while `nb_sub_pts` refers to the
-number of sub-points per pixel. `nb_entries` is then the product of the two.
-
 Common Type Aliases
 *******************
 

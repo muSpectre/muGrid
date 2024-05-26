@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Getting Started" href="GettingStarted.html" /><link rel="prev" title="µGrid, MPI-parallel regular grids" href="index.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="C++ Bindings" href="Cplusplus.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>Summary - µGrid 0.90.1-18-gaa9d561 documentation</title>
+        <title>Python Bindings - µGrid 0.90.1-18-gaa9d561 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -192,7 +192,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -215,9 +215,9 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
-<li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Python Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
@@ -241,7 +241,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/Summary.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/Python.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -255,17 +255,126 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="summary">
-<span id="id1"></span><h1>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h1>
-<p><em>µ</em>Grid is a part of the project <em>µ</em>Spectre, which provides an open-source platform for efficient FFT-based continuum mesoscale modelling. Its development is funded by the <a class="reference external" href="https://snf.ch">Swiss National Science Foundation</a> within an Ambizione Project and by the <a class="reference external" href="https://erc.europa.eu">European Research Council</a> within <a class="reference external" href="https://cordis.europa.eu/project/id/757343">Starting Grant 757343</a>.</p>
-<p><em>µ</em>Grid is a C++ library for structured grid data and algorithms. It is designed to be used in combination with <em>µ</em>Spectre, but can also be used as a standalone library. The library provides a set of classes for Cartesian structured grid data and differentiation algorithms. The library is designed to be efficient and scalable, and to be used in combination with modern C++ features, such as template metaprogramming and parallelism.</p>
-<p><em>µ</em>Grid has language bindings for Python, which expose the grid through <a class="reference external" href="https://numpy.org/">numpy</a> arrays.</p>
+          <section id="python-bindings">
+<h1>Python Bindings<a class="headerlink" href="#python-bindings" title="Link to this heading">¶</a></h1>
+<section id="fields">
+<h2>Fields<a class="headerlink" href="#fields" title="Link to this heading">¶</a></h2>
+<p>The <em>µ</em>Grid library handles field quantities, i.e. scalar, vectors or tensors,
+that vary in space. It supports only a uniform discretization of space. In the
+language of <em>µ</em>Grid, we call the discrete coordinates <strong>pixels</strong>. Each pixel
+is associated with a physical position in space. <em>µ</em>Grid supports fields in
+two and three dimensional Cartesian grids. Note that a common name for a pixel
+in three dimensions is a <strong>voxel</strong>, but we refer to it as a pixel throughout
+this documentation.</p>
+<p>Each pixel
+can be subdivided into logical elements, for example into a number of
+support points for numerical quadrature. These subdivisions are called
+<strong>sub-points</strong>. Note that while <em>µ</em>Grid understands the physical location of
+each <em>pixel</em>, the <em>sub-points</em> are logical subdivisions and not associated
+with any position within the pixel. Each <em>sub-point</em> carries the field quantity,
+which can be a scalar, vector or any type of tensor. The field quantity is
+called the <strong>component</strong>.</p>
+</section>
+<section id="multidimensional-arrays">
+<h2>Multidimensional arrays<a class="headerlink" href="#multidimensional-arrays" title="Link to this heading">¶</a></h2>
+<p>Each <em>µ</em>Grid field has a representation in a multidimensional array. This
+representation is used when accessing a field with Python via <a class="reference external" href="https://numpy.org/">numpy</a>
+or when writing the field to a file. The default representation has the shape</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">sub</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>As a concrete example, a second-rank tensor (for example the deformation
+gradient) living on two quadrature points in three dimensions with a spatial
+discretization of 11 x 12 grid points would have the following shape:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that the components are omitted if there is only a single component (i.e.
+a scalar value), but the sub-points are always included even if there is only
+a single sub-point.</p>
+<p>Throughout the code, we call the field quantities <strong>entries</strong>. For example,
+<cite>nb_pixels</cite> refers to the number of pixels while <cite>nb_sub_pts</cite> refers to the
+number of sub-points per pixel. <cite>nb_entries</cite> is then the product of the two.</p>
+<p>The above field has another multidimensional array representation that folds
+the sub-point into the last dimension of the components. For the above example,
+this means a multidimensional array of shape:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Depending on the numerical use case, it can be useful to work with either
+representation.</p>
+</section>
+<section id="field-collections">
+<h2>Field collections<a class="headerlink" href="#field-collections" title="Link to this heading">¶</a></h2>
+<p>In <em>µ</em>Grid, fields are grouped into field collections. A field collection knows
+about the spatial discretization of the fields, but each field can differ in number of
+sub-points and components.</p>
+<p>There are two kinds of field collections:</p>
+<ul class="simple">
+<li><p>A <strong>global</strong> collection that groups fields that have values at all pixels.</p></li>
+<li><p>A <strong>local</strong> collection that groups fields that have values only at a subset of pixels.
+An example would be the elastic constants of a material that only exists at
+certain locations in the domain.</p></li>
+</ul>
+<p>A global field collection can be initialized as follows:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">muGrid</span> <span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;element&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">})</span>
+<span class="n">fc</span><span class="o">.</span><span class="n">initialise</span><span class="p">([</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">],</span> <span class="p">[</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The first argument is the spatial dimension, the second argument defines sub-points.
+A field that is defined on <cite>element</cite> has two sub-points that in the example that we
+will follow through now are two (finite) elements that are the triangles that constitute
+half of a pixel each. The <cite>initialise</cite> method defines
+the spatial discretization of the domain, taking the number of pixels as the first
+argument.</p>
+<p>We can now register a new field in the collection:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">register_real_field</span><span class="p">(</span><span class="s1">&#39;displacement&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;element&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that a field can only be registered once in a collection and needs to have a unique
+name. We can query the field by name:</p>
+</section>
+<section id="working-with-fields">
+<h2>Working with fields<a class="headerlink" href="#working-with-fields" title="Link to this heading">¶</a></h2>
+<p>The multidimensional array representation of a field is accessible via the
+<cite>array</cite> method.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">IterUnit</span><span class="o">.</span><span class="n">SubPt</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>yields the multidimensional array with the explicit sub-point dimension.
+The pixel-representation can be obtained by</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">IterUnit</span><span class="o">.</span><span class="n">Pixel</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Because those operations are used to frequently, there are shortcuts:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span>  <span class="c1"># sub-point representation</span>
+<span class="n">displacement_field</span><span class="o">.</span><span class="n">p</span>  <span class="c1"># pixel representation</span>
+</pre></div>
+</div>
+<p>The entries of the field occur as the first indices in the multidimensional
+because a numerical code is typically vectorized of the spatial domain, i.e.
+we carry out the same operation on each pixel but not on each component.
+This means for the above displacement field, we can simply get the components
+of the field from</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ux</span><span class="p">,</span> <span class="n">uy</span><span class="p">,</span> <span class="n">uz</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span>
+</pre></div>
+</div>
+<p>Each of the variable <cite>ux</cite>, <cite>uy</cite>, and <cite>uz</cite> is a three-dimensional array with shape
+<cite>(2, 11, 12)</cite>. <em>numpy</em>’s
+<a class="reference external" href="https://numpy.org/doc/stable/user/basics.broadcasting.html">broadcasting rules</a>
+make it simple to vectorize over pixels,
+for example normalizing the displacement field could look like:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">ux</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uy</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uz</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 
         </article>
@@ -273,23 +382,23 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="GettingStarted.html">
+          <a class="next-page" href="Cplusplus.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Getting Started</div>
+                <div class="title">C++ Bindings</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="index.html">
+          <a class="prev-page" href="GettingStarted.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Home</div>
+                <div class="title">Getting Started</div>
                 
               </div>
             </a>
@@ -311,8 +420,30 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Python Bindings</a><ul>
+<li><a class="reference internal" href="#fields">Fields</a></li>
+<li><a class="reference internal" href="#multidimensional-arrays">Multidimensional arrays</a></li>
+<li><a class="reference internal" href="#field-collections">Field collections</a></li>
+<li><a class="reference internal" href="#working-with-fields">Working with fields</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>

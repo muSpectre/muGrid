@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Coding Convention" href="CodingConvention.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Coding Convention" href="CodingConvention.html" /><link rel="prev" title="Python Bindings" href="Python.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>C++ Bindings - µGrid 0.90.1-17-g9d2ef7f documentation</title>
+        <title>C++ Bindings - µGrid 0.90.1-18-gaa9d561 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-17-g9d2ef7f
+      <a href="index.html"><div class="brand">µGrid 0.90.1-18-gaa9d561
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-17-g9d2ef7f
+  <span class="sidebar-brand-text">µGrid 0.90.1-18-gaa9d561
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -217,6 +217,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">C++ Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
@@ -262,35 +263,6 @@
         <article role="main" id="furo-main-content">
           <section id="c-bindings">
 <h1>C++ Bindings<a class="headerlink" href="#c-bindings" title="Link to this heading">¶</a></h1>
-<p>The <em>µ</em>Grid library handles field quantities, i.e. scalar, vectors or tensors,
-that vary in space. It supports only a uniform discretization of space. In the
-language of <em>µ</em>Grid, we call the discrete coordinates <strong>pixels</strong>. Each pixel
-can be subdivided into logical elements, for example into a number of
-support points for numerical quadrature. These subdivisions are called
-<strong>sub-points</strong>. Note that while <em>µ</em>Grid understands the physical location of
-each <em>pixel</em>, the <em>sub-points</em> are logical subdivisions and not associated
-with any position within the pixel. Each <em>sub-point</em> carries the field quantity,
-which can be a scalar, vector or any type of tensor. The field quantity is
-called the <strong>component</strong>.</p>
-<p>Each <em>µ</em>Grid field has a representation in a multidimensional array. This
-representation is used when accessing a field with Python via <a class="reference external" href="https://numpy.org/">numpy</a>
-or when writing the field to a file. The default representation has the shape</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">sub</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>As a concrete example, a second-rank tensor (for example the deformation
-gradient) living on two quadrature points in three dimensions with a spatial
-discretization of 11 x 12 x 13 grid points would have the following shape:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Note that the components are omitted if there is only a single component (i.e.
-a scalar value), but the sub-points are always included even if there is only
-a single sub-point. The default storage order of that representation is
-column-major.</p>
-<p>Throughout the code, we call the field quantities <strong>entries</strong>. For example,
-<cite>nb_pixels</cite> refers to the number of pixels while <cite>nb_sub_pts</cite> refers to the
-number of sub-points per pixel. <cite>nb_entries</cite> is then the product of the two.</p>
 <section id="common-type-aliases">
 <h2>Common Type Aliases<a class="headerlink" href="#common-type-aliases" title="Link to this heading">¶</a></h2>
 <p>As the lowest-level component of <em>µ</em>Spectre, <em>µ</em>Grid defines all commonly
@@ -575,14 +547,14 @@ drastically reducing boilerplate code.</p>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="GettingStarted.html">
+          <a class="prev-page" href="Python.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Getting Started</div>
+                <div class="title">Python Bindings</div>
                 
               </div>
             </a>
@@ -649,7 +621,7 @@ drastically reducing boilerplate code.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=dec62c6d"></script>
+</div><script src="_static/documentation_options.js?v=d102ad20"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
