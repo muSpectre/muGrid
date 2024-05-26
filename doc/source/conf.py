@@ -65,7 +65,7 @@ git_tag = subprocess.Popen(["git", "describe", "--tags"], stdout=subprocess.PIPE
 git_tag = git_tag.decode("ascii")
 
 breathe_projects = {
-    "libmugrid": "doxygenxml"
+    "libmugrid": "../xml"
 }
 breathe_default_project = "libmugrid"
 

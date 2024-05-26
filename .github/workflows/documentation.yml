@@ -35,6 +35,7 @@ jobs:
         run: |
           source ../venv/bin/activate
           cd doc
+          doxygen
           make html
           cd ..
 
