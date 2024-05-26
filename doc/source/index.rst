@@ -10,6 +10,7 @@
 
    Summary
    GettingStarted
+   Python
    Cplusplus
    CodingConvention
    CplusplusAPI
