@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# µSpectre documentation build configuration file, created by
+# µGrid documentation build configuration file, created by
 # sphinx-quickstart on Thu Feb  1 12:01:24 2018.
 #
 # This file is execfile()d with the current directory set to its
@@ -19,6 +19,7 @@
 #
 import os
 import subprocess
+
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -44,14 +45,14 @@ read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 if os.environ.get('READTHEDOCS', None) is not None:
     print("${READTHEDOCS} = " + os.environ.get('READTHEDOCS', None))
 
-muspectre_path = "."
+mugrid_path = "."
 
-print("muspectre_path = '{}'".format(muspectre_path))
+print("mugrid_path = '{}'".format(mugrid_path))
 subprocess.call('ls; pwd', shell=True)
-subprocess.call("cd {} && doxygen".format(muspectre_path), shell=True)
+subprocess.call("cd {} && doxygen".format(mugrid_path), shell=True)
 
-breathe_projects = {"µSpectre": os.path.join(muspectre_path, "doxygenxml")}
-breathe_default_project = "µSpectre"
+breathe_projects = {"µGrid": os.path.join(mugrid_path, "doxygenxml")}
+breathe_default_project = "µGrid"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -66,7 +67,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'µSpectre'
+project = 'µGrid'
 copyright = '2018, Till Junge'
 author = 'Till Junge'
 
@@ -84,19 +85,18 @@ release = 'v0.1 α'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ["CmakeLists.txt"]
+exclude_patterns = []
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
-
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -132,12 +132,10 @@ html_sidebars = {
     ]
 }
 
-
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Spectredoc'
-
+htmlhelp_basename = 'Griddoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -165,20 +163,18 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'Spectre.tex', 'µSpectre Documentation',
+    (master_doc, 'Grid.tex', 'µGrid Documentation',
      'Till Junge', 'manual'),
 ]
-
 
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'spectre', 'µSpectre Documentation',
+    (master_doc, 'grid', 'µGrid Documentation',
      [author], 1)
 ]
-
 
 # -- Options for Texinfo output -------------------------------------------
 
@@ -186,12 +182,10 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Spectre', 'µSpectre Documentation',
-     author, 'Spectre', 'One line description of project.',
+    (master_doc, 'Grid', 'µGrid Documentation',
+     author, 'Grid', 'MPI-parallel regular grids',
      'Miscellaneous'),
 ]
-
-
 
 # -- Options for Epub output ----------------------------------------------
 
@@ -213,9 +207,7 @@ epub_copyright = copyright
 # A list of files that should not be packed into the epub file.
 epub_exclude_files = ['search.html']
 
-
-
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {'python': ('https://docs.python.org/', None)}
 primary_domain = 'cpp'
 highlight_language = 'cpp'

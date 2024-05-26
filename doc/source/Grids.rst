@@ -4,11 +4,11 @@
    :caption: Contents:
 
 
-.. _mugrid:
+.. _concept:
 
 
-*µ*\Grid
-########
+Grids
+#####
 
 The *µ*\Grid library handles field quantities, i.e. scalar, vectors or tensors,
 that vary in space. It supports only a uniform discretization of space. In the
@@ -22,8 +22,8 @@ which can be a scalar, vector or any type of tensor. The field quantity is
 called the **component**.
 
 Each *µ*\Grid field has a representation in a multidimensional array. This
-representation is used when accessing a field with Python via *numpy* or when
-writing the field to a file. The default representation has the shape
+representation is used when accessing a field with Python via `numpy <https://numpy.org/>`_
+or when writing the field to a file. The default representation has the shape
 
 .. code-block:: Python
 
@@ -48,7 +48,11 @@ number of sub-points per pixel. `nb_entries` is then the product of the two.
 
 Common Type Aliases
 %%%%%%%%%%%%%%%%%%%
-As the lowest-level component of *µ*\Spectre, *µ*\Grid defines all the commonly used type aliases and data structures used throuhgout the project. The most common aliases are described below, but it is worth having a look at the file `grid_common.hh <https://gitlab.com/muspectre/muspectre/blob/master/src/libmugrid/grid_common.hh>`_ for the details.
+As the lowest-level component of *µ*\Spectre, *µ*\Grid defines all commonly
+used type aliases and data structures used throuhgout the project. The most
+common aliases are described below, but it is worth having a look at the file
+`grid_common.hh <https://github.com/muSpectre/muGrid/blob/main/src/libmugrid/grid_common.hh>`_
+for details.
 
 All mathematical calculations should use these types.
 
@@ -185,7 +189,7 @@ The following is a code example from the standard :ref:`Cell<muSpectre::CellBase
      return this->get_strain().eigenvec();
    }
 
-The return value of :cpp:function:`Cell::get_strain_vector()<muSpectre::CellBase::get_strain_vector>` is an :cpp:class:`Eigen::Map` onto a matrix of shape 1×N.
+The return value of :cpp:func:`Cell::get_strain_vector()<muSpectre::CellBase::get_strain_vector>` is an :cpp:class:`Eigen::Map` onto a matrix of shape 1×N.
 
 If you wish to handle field data on a per-pixel/voxel basis, the mechanism for
 that is the field map and is described in :ref:`field_map`.
@@ -324,7 +328,7 @@ The following is a code example from the standard :ref:`Cell<muSpectre::CellBase
      return this->get_strain().eigenvec();
    }
 
-The return value of :cpp:function:`Cell::get_strain_vector()<muSpectre::CellBase::get_strain_vector>` is an :cpp:class:`Eigen::Map` onto a matrix of shape 1×N.
+The return value of :cpp:func:`Cell::get_strain_vector()<muSpectre::CellBase::get_strain_vector>` is an :cpp:class:`Eigen::Map` onto a matrix of shape 1×N.
 
 If you wish to handle field data on a per-pixel/voxel basis, the mechanism for
 that is the field map and is described in :ref:`field_map`.

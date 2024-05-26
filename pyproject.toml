@@ -4,7 +4,7 @@ build-backend = "mesonpy"
 
 [project]
 name = "muGrid"
-description = "µGrid is a library for regular grids"
+description = "MPI-parallel regular grids"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [

@@ -1,8 +1,7 @@
-\PROJECT_NAME           = muSpectre
+PROJECT_NAME           = muGrid
 ## this is for read the docs, which builds in-place
-INPUT                  = ../../../src
+INPUT                  = ../../src
 ## this overwrites the INPUT path for local builds
-@INCLUDE               = input_def
 RECURSIVE              = YES
 
 EXTRACT_ALL            = No
@@ -15,7 +14,6 @@ GENERATE_XML           = YES
 ## this is for read the docs, which builds in-place
 XML_OUTPUT             = doxygenxml
 ## this overwrites the XML_OUTPUT path for local builds
-@INCLUDE               =  xml_output_def
 XML_PROGRAMLISTING     = YES
 
 ALIASES                = "rst=\verbatim embed:rst"
