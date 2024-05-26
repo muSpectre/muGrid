@@ -98,6 +98,7 @@ Note that a field can only be registered once in a collection and needs to have 
 name. We can query the field by name:
 
 .. code-block:: Python
+
     displacement_field = fc.get_real_field('displacement')
 
 Working with fields
