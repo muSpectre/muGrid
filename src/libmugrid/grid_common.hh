@@ -53,17 +53,39 @@
 namespace muGrid {
 
   /**
-   * Eigen uses signed integers for static dimensions. For consistency, µGrid
-   * uses them througout the code. Needs to represent -1 for Eigen
+   * \defgroup Scalars Scalar types
+   * @{
+   */
+
+  /**
+   * @typedef Dim_t
+   * @brief A type alias for signed integers used for static dimensions.
+   *
+   * This type alias is used to represent signed integers for static dimensions
+   * in the µGrid codebase. It is used for consistency throughout the code. It
+   * is also capable of representing -1, which is a requirement for Eigen.
    */
   using Dim_t = int;
 
   /**
-   * Large arrays (e.g., 65536 × 65536) have more indices that can be counted
-   * with Dim_t (it overflows). For consistency with Eigen, we use Eigen::Index
-   * for size-related values.
+   * @typedef Index_t
+   * @brief A type alias for Eigen::Index used for size-related values.
+   *
+   * This type alias is used to represent size-related values in the µGrid
+   * codebase. It is used for consistency with Eigen and to handle large arrays
+   * that have more indices than can be counted with Dim_t. For example, arrays
+   * with dimensions 65536 × 65536 would overflow Dim_t, so Index_t is used
+   * instead.
    */
   using Index_t = Eigen::Index;
+
+  using Uint = unsigned int;  //!< type to use in math for unsigned integers
+  using Int = int;            //!< type to use in math for signed integers
+  using Real = double;        //!< type to use in math for real numbers
+  using Complex =
+      std::complex<Real>;  //!< type to use in math for complex numbers
+
+  /**@}*/
 
   constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
   constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
@@ -80,29 +102,47 @@ namespace muGrid {
   constexpr Index_t EightQuadPts{8};  //!< constant for 8 quadrature point/pixel
   constexpr Index_t OneNode{1};       //!< constant for 1 node per pixel
 
-  using Uint = unsigned int;  //!< type to use in math for unsigned integers
-  using Int = int;            //!< type to use in math for signed integers
-  using Real = double;        //!< type to use in math for real numbers
-  using Complex =
-      std::complex<Real>;  //!< type to use in math for complex numbers
-
   /**
-   * Dual use enum. Used in `Field`s to specify whether data is stored relative
-   * to pixels, quadrature points, or nodal points. Uised in `FieldMap`s  to
-   * specify whether to iterate over pixels, quadrature points, or nodal points
+   * @enum IterUnit
+   * @brief An enumeration class for iteration units.
+   *
+   * This enumeration class is used in two contexts within the µGrid codebase.
+   * Firstly, it is used in `Field`s to specify the relative storage of data
+   * with respect to pixels, quadrature points, or nodal points.
+   * Secondly, it is used in `FieldMap`s to specify the unit of iteration,
+   * whether it be over pixels, quadrature points, or nodal points.
+   *
+   * @var Pixel Represents degrees of freedom (dofs) relative to a pixel/voxel,
+   * with no subdivision.
+   * @var SubPt Represents dofs relative to sub-points (e.g. quadrature points).
    */
   enum class IterUnit {
     Pixel,  //!< dofs relative to a pixel/voxel, no subdivision
     SubPt   //!< dofs relative to sub-points (e.g. quadrature points)
   };
 
-  enum class Stencil_t {
-    Triangle,  //!<  isosceles right triangle, linear
-    Rectangle  //!< bilinear Rectangle
-  };
-
   /**
-   * Specify the storage order of the components portion of the field
+   * @enum StorageOrder
+   * @brief An enumeration class for storage orders of field components.
+   *
+   * This enumeration class defines six types of storage orders: ColMajor,
+   * ArrayOfStructures, RowMajor, StructurOfArrays, Unknown, and Automatic.
+   * These storage orders can be used to determine the order in which field
+   * components are stored in memory.
+   *
+   * @var ColMajor Represents a column-major storage order. In this order, the
+   * first index changes fastest, and the last index changes slowest.
+   * @var ArrayOfStructures Represents an array of structures storage order. In
+   * this order, components are consecutive in memory. It is equivalent to
+   * ColMajor.
+   * @var RowMajor Represents a row-major storage order. In this order, the last
+   * index changes fastest, and the first index changes slowest.
+   * @var StructurOfArrays Represents a structure of arrays storage order. In
+   * this order, pixels are consecutive in memory. It is equivalent to RowMajor.
+   * @var Unknown Represents an unknown storage order. It is used only for
+   * `WrappedField`.
+   * @var Automatic Represents an automatic storage order. In this order, the
+   * storage order is inherited from `FieldCollection`.
    */
   enum class StorageOrder {
     ColMajor,  //!< column-major storage order (first index is fast)
@@ -129,21 +169,49 @@ namespace muGrid {
                             const StorageOrder & storage_order);
 
   /**
-   * Maps can give constant or mutable access to the mapped field through their
-   * iterators or access operators.
+   * @enum Mapping
+   * @brief An enumeration class for mapping types.
+   *
+   * This enumeration class defines two types of mappings: Const and Mut. These
+   * mappings can be used to determine the type of access (constant or mutable)
+   * to the mapped field through their iterators or access operators.
+   *
+   * @var Const Represents a constant mapping. It is used when the mapped field
+   * should not be modified.
+   * @var Mut Represents a mutable mapping. It is used when the mapped field can
+   * be modified.
    */
   enum class Mapping { Const, Mut };
 
-  //! \addtogroup Coordinates Coordinate types
-  //@{
   /**
-   * Cell coordinates, i.e. up to three integer numbers with fixed dimension
+   * \defgroup Coordinates Coordinate types
+   * @{
+   */
+
+  /**
+   * @typedef Ccoord_t
+   * @brief A type alias for cell coordinates.
+   *
+   * This type alias represents cell coordinates, which are up to three integer
+   * numbers with a fixed dimension. The dimension is determined by the template
+   * parameter Dim. The coordinates are stored in a std::array of type Index_t.
+   *
+   * @tparam Dim The dimension of the cell coordinates. It should be between 1
+   * and 3.
    */
   template <size_t Dim>
   using Ccoord_t = std::array<Index_t, Dim>;
   /**
-   * Real space coordinates, i.e. up to three floating point numbers with fixed
-   * dimension
+   * @typedef Rcoord_t
+   * @brief A type alias for real space coordinates.
+   *
+   * This type alias represents real space coordinates, which are up to three
+   * floating point numbers with a fixed dimension. The dimension is determined
+   * by the template parameter Dim. The coordinates are stored in a std::array
+   * of type Real.
+   *
+   * @tparam Dim The dimension of the real space coordinates. It should be
+   * between 1 and 3.
    */
   template <size_t Dim>
   using Rcoord_t = std::array<Real, Dim>;
@@ -172,20 +240,46 @@ namespace muGrid {
     }
 
    public:
-    //! iterator type
+    /**
+     * @typedef iterator
+     * @brief A type alias for an iterator over the elements of a std::array.
+     *
+     * This type alias is used to create an iterator that can traverse the
+     * elements of a std::array. The std::array is templated on type T and has a
+     * maximum size of MaxDim. The iterator can be used to access and modify the
+     * elements of the std::array.
+     */
     using iterator = typename std::array<T, MaxDim>::iterator;
-    //! constant iterator type
+
+    /**
+     * @typedef const_iterator
+     * @brief A type alias for a constant iterator over the elements of a
+     * std::array.
+     *
+     * This type alias is used to create a constant iterator that can traverse
+     * the elements of a std::array. The std::array is templated on type T and
+     * has a maximum size of MaxDim. The constant iterator can be used to access
+     * the elements of the std::array, but cannot modify them.
+     */
     using const_iterator = typename std::array<T, MaxDim>::const_iterator;
 
     //! default constructor
     DynCcoord() : dim{}, long_array{} {};
 
     /**
-     * constructor from an initialiser list for compound initialisation.
+     * @brief Constructs a DynCcoord object from an initializer list.
      *
-     * @param init_list The length of the initialiser list becomes the spatial
-     * dimension of the coordinate, therefore the list must have a length
-     * between 1 and MaxDim
+     * This constructor creates a DynCcoord object using an initializer list.
+     * The length of the initializer list determines the spatial dimension of
+     * the coordinate. The initializer list must have a length between 1 and
+     * MaxDim.
+     *
+     * @param init_list Initializer list used to set the values of the DynCcoord
+     * object. The length of the list becomes the spatial dimension of the
+     * coordinate.
+     * @throws RuntimeError If the length of the initializer list is greater
+     * than MaxDim, a RuntimeError is thrown with a message indicating the
+     * maximum dimension and the provided dimension.
      */
     DynCcoord(std::initializer_list<T> init_list)
         : dim(init_list.size()), long_array{} {
@@ -200,14 +294,18 @@ namespace muGrid {
     }
 
     /**
-     * Constructor only setting the dimension. WARNING: This constructor *needs*
-     * regular (round) braces '()', using curly braces '{}' results in the
-     * initialiser list constructor being called and creating a DynCcoord with
-     * spatial dimension 1
-     * @param dim spatial dimension. Needs to be between 1 and MaxDim
+     * @brief Constructs a DynCcoord object with a specified dimension.
+     *
+     * This constructor creates a DynCcoord object with a specified dimension.
+     * The dimension must be between 1 and MaxDim. Note: This constructor
+     * requires regular (round) braces '()'. Using curly braces '{}' will result
+     * in the initializer list constructor being called and creating a DynCcoord
+     * with spatial dimension 1.
+     *
+     * @param dim The spatial dimension of the DynCcoord object. It needs to be
+     * between 1 and MaxDim.
      */
     explicit DynCcoord(Dim_t dim) : dim{dim}, long_array{} {}
-
     //! Constructor from a statically sized coord
     template <size_t Dim>
     explicit DynCcoord(const std::array<T, Dim> & ccoord)
@@ -216,6 +314,19 @@ namespace muGrid {
                     "Assigned Ccoord has more than MaxDim dimensions.");
     }
 
+    /**
+     * @brief Constructs a DynCcoord object from a std::vector.
+     *
+     * This constructor creates a DynCcoord object using a std::vector. The size
+     * of the std::vector determines the spatial dimension of the coordinate.
+     * The std::vector must have a size between 1 and MaxDim.
+     *
+     * @param ccoord std::vector used to set the values of the DynCcoord object.
+     * The size of the vector becomes the spatial dimension of the coordinate.
+     * @throws RuntimeError If the size of the std::vector is greater than
+     * MaxDim, a RuntimeError is thrown with a message indicating the maximum
+     * dimension and the provided dimension.
+     */
     explicit DynCcoord(const std::vector<T> & ccoord)
         : dim{Dim_t(ccoord.size())}, long_array{} {
       if (this->dim > Dim_t(MaxDim)) {
@@ -387,7 +498,23 @@ namespace muGrid {
     std::array<T, MaxDim> long_array;
   };
 
-  //! addition of two DynCcoords
+  /**
+   * @brief Overloads the addition operator for two DynCcoord objects.
+   *
+   * This function overloads the addition operator to perform element-wise
+   * addition of two DynCcoord objects. The DynCcoord objects must have the same
+   * dimension, otherwise a RuntimeError is thrown. The result is a new
+   * DynCcoord object with the same dimension as the input objects, where each
+   * element is the sum of the corresponding elements in the input objects.
+   *
+   * @tparam MaxDim The maximum dimension of the DynCcoord objects.
+   * @tparam T The type of the elements in the DynCcoord objects.
+   * @param A The first DynCcoord object.
+   * @param B The second DynCcoord object.
+   * @return A new DynCcoord object that is the result of the element-wise
+   * addition of A and B.
+   * @throws RuntimeError If the dimensions of A and B do not match.
+   */
   template <size_t MaxDim, typename T>
   DynCcoord<MaxDim, T> operator+(const DynCcoord<MaxDim, T> & A,
                                  const DynCcoord<MaxDim, T> & B) {
@@ -403,7 +530,24 @@ namespace muGrid {
     return result;
   }
 
-  //! subtraction of two DynCcoords
+  /**
+   * @brief Overloads the subtraction operator for two DynCcoord objects.
+   *
+   * This function overloads the subtraction operator to perform element-wise
+   * subtraction of two DynCcoord objects. The DynCcoord objects must have the
+   * same dimension, otherwise a RuntimeError is thrown. The result is a new
+   * DynCcoord object with the same dimension as the input objects, where each
+   * element is the difference of the corresponding elements in the input
+   * objects.
+   *
+   * @tparam MaxDim The maximum dimension of the DynCcoord objects.
+   * @tparam T The type of the elements in the DynCcoord objects.
+   * @param A The first DynCcoord object.
+   * @param B The second DynCcoord object.
+   * @return A new DynCcoord object that is the result of the element-wise
+   * subtraction of A and B.
+   * @throws RuntimeError If the dimensions of A and B do not match.
+   */
   template <size_t MaxDim, typename T>
   DynCcoord<MaxDim, T> operator-(const DynCcoord<MaxDim, T> & A,
                                  const DynCcoord<MaxDim, T> & B) {
@@ -424,11 +568,14 @@ namespace muGrid {
    * during runtime) dimension
    */
   using DynCcoord_t = DynCcoord<threeD>;
+
   /**
    * Real space coordinates, i.e. up to three floating point numbers with
    * dynamic (determined during runtime) dimension
    */
   using DynRcoord_t = DynCcoord<threeD, Real>;
+
+  /**@}*/
 
   /**
    * Enum class for verbose-flag
@@ -572,15 +719,47 @@ namespace muGrid {
   namespace version {
 
     /**
-     * returns a formatted text that can be printed to stdout or to output
-     * files. It contains the git commit hash and repository url used to compile
-     * µGrid and whether the current state was dirty or not.
+     * @brief Returns a formatted text that can be printed to stdout or to
+     * output files.
+     *
+     * This function generates a string that contains the git commit hash and
+     * repository url used to compile µGrid. It also indicates whether the
+     * current state was dirty or not.
+     *
+     * @return A formatted string containing the git commit hash, repository url
+     * and the state of the repository.
      */
     std::string info();
-    const char * hash();
-    const char * description();
-    bool is_dirty();
 
+    /**
+     * @brief Returns the git commit hash.
+     *
+     * This function retrieves the git commit hash used to compile µGrid.
+     *
+     * @return A constant character pointer representing the git commit hash.
+     */
+    const char * hash();
+
+    /**
+     * @brief Returns the repository description.
+     *
+     * This function retrieves the repository description used to compile µGrid.
+     *
+     * @return A constant character pointer representing the repository
+     * description.
+     */
+    const char * description();
+
+    /**
+     * @brief Checks if the current state was dirty.
+     *
+     * This function checks if the current state of the repository used to
+     * compile µGrid was dirty or not.
+     *
+     * @return A boolean value indicating if the state was dirty (true) or not
+     * (false).
+     */
+    bool is_dirty();
   }  // namespace version
 
 }  // namespace muGrid
