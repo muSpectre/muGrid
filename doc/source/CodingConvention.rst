@@ -1,10 +1,5 @@
-
 Coding Convention
 ~~~~~~~~~~~~~~~~~
-
-.. contents::
-   :local:
-
 
 Objectives of the Convention
 ****************************

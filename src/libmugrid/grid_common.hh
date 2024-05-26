@@ -216,6 +216,8 @@ namespace muGrid {
   template <size_t Dim>
   using Rcoord_t = std::array<Real, Dim>;
 
+  /**@}*/
+
   /**
    * Class to represent integer (cell-) coordinates or real-valued coordinates.
    * This class can dynamically accept any spatial-dimension between 1 and
@@ -574,8 +576,6 @@ namespace muGrid {
    * dynamic (determined during runtime) dimension
    */
   using DynRcoord_t = DynCcoord<threeD, Real>;
-
-  /**@}*/
 
   /**
    * Enum class for verbose-flag

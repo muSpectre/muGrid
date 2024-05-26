@@ -1,5 +1,4 @@
 
-
 .. image:: ../logo_flat.png
 
 *µ*\Grid, MPI-parallel regular grids
@@ -11,9 +10,9 @@
 
    Summary
    GettingStarted
-   Concepts
+   Cplusplus
    CodingConvention
-   Reference
+   CplusplusAPI
 
 *µ*\Grid is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License as
