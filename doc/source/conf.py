@@ -83,8 +83,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'µGrid'
-copyright = '2018, Till Junge'
-author = 'Till Junge'
+copyright = '2017-2022 Till Junge, 2018-2024 Lars Pastewka'
+author = 'Till Junge, Lars Pastewka'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
