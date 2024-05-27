@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Coding Convention" href="CodingConvention.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>C++ API Reference - µGrid 0.90.1-21-g425c761 documentation</title>
+        <title>C++ API Reference - µGrid 0.90.1-22-g39f6774 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-21-g425c761
+      <a href="index.html"><div class="brand">µGrid 0.90.1-22-g39f6774
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-21-g425c761
+  <span class="sidebar-brand-text">µGrid 0.90.1-22-g39f6774
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -3056,73 +3056,97 @@
 <span id="_CPPv3N6muGrid9FileFrameE"></span><span id="_CPPv2N6muGrid9FileFrameE"></span><span id="muGrid::FileFrame"></span><span class="target" id="classmuGrid_1_1FileFrame"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FileFrame</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrameE" title="Link to this definition">¶</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;<a class="reference internal" href="#file__io__base_8hh"><span class="std std-ref">file_io_base.hh</span></a>&gt;</em></div>
-<p>Virtual base class for Frame classes. </p>
+<p>A virtual base class for Frame classes. </p>
+<p>This class provides a common interface for file frame operations. It provides a set of constructors and assignment operators (both copy and move are deleted). It also provides a virtual destructor and methods for reading and writing frames.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This class cannot be instantiated directly (default constructor is deleted). </p>
+</div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame9FileFrameEv">
 <span id="_CPPv3N6muGrid9FileFrame9FileFrameEv"></span><span id="_CPPv2N6muGrid9FileFrame9FileFrameEv"></span><span id="muGrid::FileFrame::FileFrame"></span><span class="target" id="classmuGrid_1_1FileFrame_1ac1dc75340eade2e44f506f9748212716"></span><span class="sig-name descname"><span class="n"><span class="pre">FileFrame</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame9FileFrameEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor. </p>
+<dd><p>Default constructor is deleted to prevent direct instantiation of this class. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame9FileFrameER10FileIOBase7Index_t">
 <span id="_CPPv3N6muGrid9FileFrame9FileFrameER10FileIOBase7Index_t"></span><span id="_CPPv2N6muGrid9FileFrame9FileFrameER10FileIOBase7Index_t"></span><span id="muGrid::FileFrame::FileFrame__FileIOBaseR.Index_t"></span><span class="target" id="classmuGrid_1_1FileFrame_1a306ed30b22d53f112c0b2edab4863541"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FileFrame</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">parent</span></span>, <a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">frame</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame9FileFrameER10FileIOBase7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Constructor with the <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object and the required frame number </p>
+<dd><p>Constructor with the <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object and the required frame number. </p>
+<p>This constructor initializes a <a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> object with the given <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object and frame number.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> – The <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object. </p></li>
+<li><p><strong>frame</strong> – The frame number. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame9FileFrameERK9FileFrame">
 <span id="_CPPv3N6muGrid9FileFrame9FileFrameERK9FileFrame"></span><span id="_CPPv2N6muGrid9FileFrame9FileFrameERK9FileFrame"></span><span id="muGrid::FileFrame::FileFrame__FileFrameCR"></span><span class="target" id="classmuGrid_1_1FileFrame_1a6653c5040d74de5085675d2fdb6356bc"></span><span class="sig-name descname"><span class="n"><span class="pre">FileFrame</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrame9FileFrameERK9FileFrame" title="muGrid::FileFrame::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame9FileFrameERK9FileFrame" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy constructor. </p>
+<dd><p>Copy constructor is deleted to prevent copying of <a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame9FileFrameERR9FileFrame">
 <span id="_CPPv3N6muGrid9FileFrame9FileFrameERR9FileFrame"></span><span id="_CPPv2N6muGrid9FileFrame9FileFrameERR9FileFrame"></span><span id="muGrid::FileFrame::FileFrame__FileFrameRR"></span><span class="target" id="classmuGrid_1_1FileFrame_1a571f7ed7580545ddaa47593ba907e076"></span><span class="sig-name descname"><span class="n"><span class="pre">FileFrame</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrame9FileFrameERR9FileFrame" title="muGrid::FileFrame::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame9FileFrameERR9FileFrame" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move constructor. </p>
+<dd><p>Move constructor is deleted to prevent moving of <a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrameD0Ev">
 <span id="_CPPv3N6muGrid9FileFrameD0Ev"></span><span id="_CPPv2N6muGrid9FileFrameD0Ev"></span><span id="muGrid::FileFrame::~FileFrame"></span><span class="target" id="classmuGrid_1_1FileFrame_1a97964027cb3fc27a2391107d04c5366f"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~FileFrame</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrameD0Ev" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Destructor. </p>
+<dd><p>Virtual destructor. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrameaSERK9FileFrame">
 <span id="_CPPv3N6muGrid9FileFrameaSERK9FileFrame"></span><span id="_CPPv2N6muGrid9FileFrameaSERK9FileFrame"></span><span id="muGrid::FileFrame::assign-operator__FileFrameCR"></span><span class="target" id="classmuGrid_1_1FileFrame_1a500bd408e5b17533540f0910ce06e313"></span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrameaSERK9FileFrame" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy assignment operator. </p>
+<dd><p>Copy assignment operator is deleted to prevent copying of <a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrameaSERR9FileFrame">
 <span id="_CPPv3N6muGrid9FileFrameaSERR9FileFrame"></span><span id="_CPPv2N6muGrid9FileFrameaSERR9FileFrame"></span><span id="muGrid::FileFrame::assign-operator__FileFrameRR"></span><span class="target" id="classmuGrid_1_1FileFrame_1a60425de1c552f03c3df62b0436e0fd2e"></span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrameaSERR9FileFrame" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move assignment operator. </p>
+<dd><p>Move assignment operator is deleted to prevent moving of <a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid9FileFrame4readERKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3NK6muGrid9FileFrame4readERKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2NK6muGrid9FileFrame4readERKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileFrame::read__std::vector:ss:CRC"></span><span class="target" id="classmuGrid_1_1FileFrame_1a74ab6ac1151341c05234f9fd1b99881e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid9FileFrame4readERKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>read the fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> from the current frame </p>
+<dd><p>Read the fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> from the current frame. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>field_names</strong> – The names of the fields to read. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid9FileFrame4readEv">
 <span id="_CPPv3NK6muGrid9FileFrame4readEv"></span><span id="_CPPv2NK6muGrid9FileFrame4readEv"></span><span id="muGrid::FileFrame::readC"></span><span class="target" id="classmuGrid_1_1FileFrame_1a8143eb9ceb18bd64889e8403ce487abf"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid9FileFrame4readEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>read all fields of the registered field collection(s) from the current frame </p>
+<dd><p>Read all fields of the registered field collection(s) from the current frame. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid9FileFrame5writeERKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3NK6muGrid9FileFrame5writeERKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2NK6muGrid9FileFrame5writeERKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileFrame::write__std::vector:ss:CRC"></span><span class="target" id="classmuGrid_1_1FileFrame_1a78a75a22bcc86d2fd7c2fe0cb8d77fd4"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid9FileFrame5writeERKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write contents of all fields within the field collection with the names ‘field_names’ to the file </p>
+<dd><p>Write the contents of all fields within the field collection with the names ‘field_names’ to the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>field_names</strong> – The names of the fields to write. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid9FileFrame5writeEv">
 <span id="_CPPv3NK6muGrid9FileFrame5writeEv"></span><span id="_CPPv2NK6muGrid9FileFrame5writeEv"></span><span id="muGrid::FileFrame::writeC"></span><span class="target" id="classmuGrid_1_1FileFrame_1a26fd4b1ccab6a58a414d59baec0cb515"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid9FileFrame5writeEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write contents of all fields within the field collection with the names ‘field_names’ to the file </p>
+<dd><p>Write the contents of all fields within the field collection to the file. </p>
 </dd></dl>
 
 </div>
@@ -3131,12 +3155,14 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame6parentE">
 <span id="_CPPv3N6muGrid9FileFrame6parentE"></span><span id="_CPPv2N6muGrid9FileFrame6parentE"></span><span id="muGrid::FileFrame::parent__FileIOBaseR"></span><span class="target" id="classmuGrid_1_1FileFrame_1acaab1af0de3f117ce1b6888d0c0e3736"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">parent</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame6parentE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame5frameE">
 <span id="_CPPv3N6muGrid9FileFrame5frameE"></span><span id="_CPPv2N6muGrid9FileFrame5frameE"></span><span id="muGrid::FileFrame::frame__Index_t"></span><span class="target" id="classmuGrid_1_1FileFrame_1a364e37a6a76f2510b1115b6499b21e50"></span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">frame</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame5frameE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The frame number. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -3146,14 +3172,21 @@
 <span id="_CPPv3N6muGrid10FileIOBaseE"></span><span id="_CPPv2N6muGrid10FileIOBaseE"></span><span id="muGrid::FileIOBase"></span><span class="target" id="classmuGrid_1_1FileIOBase"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FileIOBase</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBaseE" title="Link to this definition">¶</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;<a class="reference internal" href="#file__io__base_8hh"><span class="std std-ref">file_io_base.hh</span></a>&gt;</em></div>
-<p>Virtual base class for FileIO classes. </p>
+<p>A virtual base class for FileIO classes. </p>
+<p>This class provides a common interface for file input/output operations. It defines an enumeration for open modes (Read, Write, Append) and provides a set of constructors and assignment operators (both copy and move are deleted). It also provides a virtual destructor and a random access operator.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This class cannot be instantiated directly (default constructor is deleted). </p>
+</div>
 <p>Subclassed by <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">muGrid::FileIONetCDF</span></a></p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
 <dl class="cpp enum-class">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8OpenModeE">
 <span id="_CPPv3N6muGrid10FileIOBase8OpenModeE"></span><span id="_CPPv2N6muGrid10FileIOBase8OpenModeE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4dcc5a9400b93fd431d72e418be74c17"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpenMode</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8OpenModeE" title="Link to this definition">¶</a><br /></dt>
-<dd><p><em>Values:</em></p>
+<dd><p>Enumeration for file open modes. </p>
+<p>This enumeration defines the possible modes for opening a file: Read, Write, and Append. </p>
+<p><em>Values:</em></p>
 <dl class="cpp enumerator">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8OpenMode4ReadE">
 <span id="_CPPv3N6muGrid10FileIOBase8OpenMode4ReadE"></span><span id="_CPPv2N6muGrid10FileIOBase8OpenMode4ReadE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4dcc5a9400b93fd431d72e418be74c17a7a1a5f3e79fdc91edf2f5ead9d66abb4"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Read</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8OpenMode4ReadE" title="Link to this definition">¶</a><br /></dt>
@@ -3177,115 +3210,195 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase10FileIOBaseEv">
 <span id="_CPPv3N6muGrid10FileIOBase10FileIOBaseEv"></span><span id="_CPPv2N6muGrid10FileIOBase10FileIOBaseEv"></span><span id="muGrid::FileIOBase::FileIOBase"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a6bc587f0fc3f9201819d032ba8807b39"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIOBase</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor. </p>
+<dd><p>Default constructor is deleted to prevent direct instantiation of this class. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase10FileIOBaseERKNSt6stringERK8OpenMode12Communicator">
 <span id="_CPPv3N6muGrid10FileIOBase10FileIOBaseERKNSt6stringERK8OpenMode12Communicator"></span><span id="_CPPv2N6muGrid10FileIOBase10FileIOBaseERKNSt6stringERK8OpenMode12Communicator"></span><span id="muGrid::FileIOBase::FileIOBase__ssCR.OpenModeCR.Communicator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1ab626adc58595230bf9d838317c77bf7f"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIOBase</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">file_name</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenModeE" title="muGrid::FileIOBase::OpenMode"><span class="n"><span class="pre">OpenMode</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">open_mode</span></span>, <a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE" title="muGrid::Communicator"><span class="n"><span class="pre">Communicator</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">comm</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE" title="muGrid::Communicator"><span class="n"><span class="pre">Communicator</span></span></a><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseERKNSt6stringERK8OpenMode12Communicator" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Constructor with the domain’s number of grid points in each direciton, the number of components to transform, and the communicator </p>
+<dd><p>Constructor with file name, open mode, and communicator. </p>
+<p>This constructor initializes a <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object with the given file name, open mode, and communicator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_name</strong> – The name of the file to be opened. </p></li>
+<li><p><strong>open_mode</strong> – The mode to open the file in (Read, Write, or Append). </p></li>
+<li><p><strong>comm</strong> – The communicator to be used for parallel I/O operations (default is a default-constructed <a class="reference internal" href="#classmuGrid_1_1Communicator"><span class="std std-ref">Communicator</span></a> object). </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase10FileIOBaseERK10FileIOBase">
 <span id="_CPPv3N6muGrid10FileIOBase10FileIOBaseERK10FileIOBase"></span><span id="_CPPv2N6muGrid10FileIOBase10FileIOBaseERK10FileIOBase"></span><span id="muGrid::FileIOBase::FileIOBase__FileIOBaseCR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1abe125cf4c9870214a79b9ae6cc8e4fc0"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIOBase</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseERK10FileIOBase" title="muGrid::FileIOBase::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseERK10FileIOBase" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy constructor. </p>
+<dd><p>Copy constructor is deleted to prevent copying of <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase10FileIOBaseERR10FileIOBase">
 <span id="_CPPv3N6muGrid10FileIOBase10FileIOBaseERR10FileIOBase"></span><span id="_CPPv2N6muGrid10FileIOBase10FileIOBaseERR10FileIOBase"></span><span id="muGrid::FileIOBase::FileIOBase__FileIOBaseRR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a2d9f451c491a3f17ebd554ab5718cddd"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIOBase</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseERR10FileIOBase" title="muGrid::FileIOBase::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseERR10FileIOBase" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move constructor. </p>
+<dd><p>Move constructor is deleted to prevent moving of <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBaseD0Ev">
 <span id="_CPPv3N6muGrid10FileIOBaseD0Ev"></span><span id="_CPPv2N6muGrid10FileIOBaseD0Ev"></span><span id="muGrid::FileIOBase::~FileIOBase"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4b6dadebe17ec4d1b94c2e41c4e68ef9"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~FileIOBase</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBaseD0Ev" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Destructor. </p>
+<dd><p>Virtual destructor. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBaseaSERK10FileIOBase">
 <span id="_CPPv3N6muGrid10FileIOBaseaSERK10FileIOBase"></span><span id="_CPPv2N6muGrid10FileIOBaseaSERK10FileIOBase"></span><span id="muGrid::FileIOBase::assign-operator__FileIOBaseCR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a10fb0ec7c9eded9bc2a581fb6ee5e1c6"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBaseaSERK10FileIOBase" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy assignment operator. </p>
+<dd><p>Copy assignment operator is deleted to prevent copying of <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBaseaSERR10FileIOBase">
 <span id="_CPPv3N6muGrid10FileIOBaseaSERR10FileIOBase"></span><span id="_CPPv2N6muGrid10FileIOBaseaSERR10FileIOBase"></span><span id="muGrid::FileIOBase::assign-operator__FileIOBaseRR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1ae092e42627c1c1f5b9f2a4765996522d"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBaseaSERR10FileIOBase" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move assignment operator. </p>
+<dd><p>Move assignment operator is deleted to prevent moving of <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBaseixERK7Index_t">
 <span id="_CPPv3N6muGrid10FileIOBaseixERK7Index_t"></span><span id="_CPPv2N6muGrid10FileIOBaseixERK7Index_t"></span><span id="muGrid::FileIOBase::subscript-operator__Index_tCR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1af324293f348a31b849ffcee18f1cc27b"></span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">[]</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame_index</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBaseixERK7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Random access operator, the frame must exists for this operation to succeed </p>
+<dd><p>Random access operator. </p>
+<p>This operator provides access to a specific frame in the file. The frame must exist for this operation to succeed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frame_index</strong> – The index of the frame to access. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> The requested frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid10FileIOBase25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid10FileIOBase25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIOBase::register_field_collection__muGrid::FieldCollectionR.std::vector:ss:.std::vector:ss:"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a5df183eaea9794609e669eac5cb79b12"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">register_field_collection</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollectionE" title="muGrid::FieldCollection"><span class="n"><span class="pre">FieldCollection</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">fc</span></span>, <a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">field_names</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><a class="reference internal" href="#_CPPv4N6muGrid19REGISTER_ALL_FIELDSE" title="muGrid::REGISTER_ALL_FIELDS"><span class="n"><span class="pre">REGISTER_ALL_FIELDS</span></span></a><span class="p"><span class="pre">}</span></span>, <a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">state_field_unique_prefixes</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><a class="reference internal" href="#_CPPv4N6muGrid25REGISTER_ALL_STATE_FIELDSE" title="muGrid::REGISTER_ALL_STATE_FIELDS"><span class="n"><span class="pre">REGISTER_ALL_STATE_FIELDS</span></span></a><span class="p"><span class="pre">}</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>tell the I/O object about the field collections we want to dump to this file before the file is opened. If no field names are given all fields of the given field collection are registered (default) </p>
+<dd><p>Register a field collection to be dumped to the file. </p>
+<p>This function should be called before the file is opened. If no field names are given, all fields of the given field collection are registered by default.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fc</strong> – The field collection to be registered. </p></li>
+<li><p><strong>field_names</strong> – The names of the fields to be registered. Default is all fields. </p></li>
+<li><p><strong>state_field_unique_prefixes</strong> – The unique prefixes of the state fields to be registered. Default is all state fields. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase5closeEv">
 <span id="_CPPv3N6muGrid10FileIOBase5closeEv"></span><span id="_CPPv2N6muGrid10FileIOBase5closeEv"></span><span id="muGrid::FileIOBase::close"></span><span class="target" id="classmuGrid_1_1FileIOBase_1ae537fb3daa41d8815a83c45cde35ac5b"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">close</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase5closeEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>close file </p>
+<dd><p>Close the file. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase4readERK7Index_tRKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid10FileIOBase4readERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid10FileIOBase4readERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIOBase::read__Index_tCR.std::vector:ss:CR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a380373687c6ace14883c3e8b28843c31"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase4readERK7Index_tRKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>read the fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> frame from file </p>
+<dd><p>Read the fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> from a specific frame in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frame</strong> – The frame to read from. </p></li>
+<li><p><strong>field_names</strong> – The names of the fields to read. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase4readERK7Index_t">
 <span id="_CPPv3N6muGrid10FileIOBase4readERK7Index_t"></span><span id="_CPPv2N6muGrid10FileIOBase4readERK7Index_t"></span><span id="muGrid::FileIOBase::read__Index_tCR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a7f5bc62b6aa7151585cdc705bd911b2e"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase4readERK7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>read all registered fields in frame from file </p>
+<dd><p>Read all registered fields from a specific frame in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frame</strong> – The frame to read from. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase5writeERK7Index_tRKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid10FileIOBase5writeERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid10FileIOBase5writeERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIOBase::write__Index_tCR.std::vector:ss:CR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1ac036b020f43ed76ac879736f0725302a"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase5writeERK7Index_tRKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write contents of all fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> within the field collection to the file </p>
+<dd><p>Write the contents of all fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> within the field collection to a specific frame in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frame</strong> – The frame to write to. </p></li>
+<li><p><strong>field_names</strong> – The names of the fields to write. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase5writeERK7Index_t">
 <span id="_CPPv3N6muGrid10FileIOBase5writeERK7Index_t"></span><span id="_CPPv2N6muGrid10FileIOBase5writeERK7Index_t"></span><span id="muGrid::FileIOBase::write__Index_tCR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1ad2adfa2a39dc4166f3c69cf27b955178"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase5writeERK7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write contents of all fields within the field collection to the file </p>
+<dd><p>Write the contents of all fields within the field collection to a specific frame in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frame</strong> – The frame to write to. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase12append_frameEv">
 <span id="_CPPv3N6muGrid10FileIOBase12append_frameEv"></span><span id="_CPPv2N6muGrid10FileIOBase12append_frameEv"></span><span id="muGrid::FileIOBase::append_frame"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a10c350190b528d944858df208adbee34"></span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">append_frame</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase12append_frameEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>yield an empty file frame at the end of the file </p>
+<dd><p>Yield an empty file frame at the end of the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#classmuGrid_1_1FileFrame"><span class="std std-ref">FileFrame</span></a> The empty file frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase16get_communicatorEv">
 <span id="_CPPv3N6muGrid10FileIOBase16get_communicatorEv"></span><span id="_CPPv2N6muGrid10FileIOBase16get_communicatorEv"></span><span id="muGrid::FileIOBase::get_communicator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a698dc74792ec76c613c691c5cfb4881d"></span><a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE" title="muGrid::Communicator"><span class="n"><span class="pre">Communicator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">get_communicator</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase16get_communicatorEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>return the communicator object </p>
+<dd><p>Get the communicator object. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#classmuGrid_1_1Communicator"><span class="std std-ref">Communicator</span></a>&amp; The communicator object. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase5beginEv">
 <span id="_CPPv3N6muGrid10FileIOBase5beginEv"></span><span id="_CPPv2N6muGrid10FileIOBase5beginEv"></span><span id="muGrid::FileIOBase::begin"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a0ffed40a555775419c7bd2353ea83184"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">begin</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase5beginEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>Get an iterator pointing to the first frame in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>iterator An iterator pointing to the first frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase3endEv">
 <span id="_CPPv3N6muGrid10FileIOBase3endEv"></span><span id="_CPPv2N6muGrid10FileIOBase3endEv"></span><span id="muGrid::FileIOBase::end"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a0a583d6310548f912c548deb832c9571"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">end</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase3endEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>Get an iterator pointing one past the last frame in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>iterator An iterator pointing one past the last frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid10FileIOBase4sizeEv">
 <span id="_CPPv3NK6muGrid10FileIOBase4sizeEv"></span><span id="_CPPv2NK6muGrid10FileIOBase4sizeEv"></span><span id="muGrid::FileIOBase::sizeC"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a8a43edc21794b7bc1389e18b506d0c09"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">size</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid10FileIOBase4sizeEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>Get the number of frames in the file. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>size_t The number of frames. </p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -3294,19 +3407,40 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase4openEv">
 <span id="_CPPv3N6muGrid10FileIOBase4openEv"></span><span id="_CPPv2N6muGrid10FileIOBase4openEv"></span><span id="muGrid::FileIOBase::open"></span><span class="target" id="classmuGrid_1_1FileIOBase_1af0eeadd2d7cc446721addabccddf27e4"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">open</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase4openEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>open file for read/write This function should be called by the constructor at instantiation. </p>
+<dd><p>Open the file for read/write operations. </p>
+<p>This function should be called by the constructor at instantiation. It is a pure virtual function and must be implemented by derived classes. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase32register_field_collection_globalERN6muGrid21GlobalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid10FileIOBase32register_field_collection_globalERN6muGrid21GlobalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid10FileIOBase32register_field_collection_globalERN6muGrid21GlobalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIOBase::register_field_collection_global__muGrid::GlobalFieldCollectionR.std::vector:ss:CR.std::vector:ss:CR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a908c0ce941c94ce1c7226e74fcfd6392"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">register_field_collection_global</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid21GlobalFieldCollectionE" title="muGrid::GlobalFieldCollection"><span class="n"><span class="pre">GlobalFieldCollection</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">fc_global</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">state_field_unique_prefixes</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase32register_field_collection_globalERN6muGrid21GlobalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>register global field collection </p>
+<dd><p>Register a global field collection to be dumped to the file. </p>
+<p>This function should be called before the file is opened. If no field names are given, all fields of the given field collection are registered by default.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fc_global</strong> – The global field collection to be registered. </p></li>
+<li><p><strong>field_names</strong> – The names of the fields to be registered. Default is all fields. </p></li>
+<li><p><strong>state_field_unique_prefixes</strong> – The unique prefixes of the state fields to be registered. Default is all state fields. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase31register_field_collection_localERN6muGrid20LocalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid10FileIOBase31register_field_collection_localERN6muGrid20LocalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid10FileIOBase31register_field_collection_localERN6muGrid20LocalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIOBase::register_field_collection_local__muGrid::LocalFieldCollectionR.std::vector:ss:CR.std::vector:ss:CR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4c2d03822b8491649eab8362d0e7bd29"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">register_field_collection_local</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid20LocalFieldCollectionE" title="muGrid::LocalFieldCollection"><span class="n"><span class="pre">LocalFieldCollection</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">fc_local</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">state_field_unique_prefixes</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase31register_field_collection_localERN6muGrid20LocalFieldCollectionERKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>register local field collection </p>
+<dd><p>Register a local field collection to be dumped to the file. </p>
+<p>This function should be called before the file is opened. If no field names are given, all fields of the given field collection are registered by default.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fc_local</strong> – The local field collection to be registered. </p></li>
+<li><p><strong>field_names</strong> – The names of the fields to be registered. Default is all fields. </p></li>
+<li><p><strong>state_field_unique_prefixes</strong> – The unique prefixes of the state fields to be registered. Default is all state fields. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -3315,22 +3449,26 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase9file_nameE">
 <span id="_CPPv3N6muGrid10FileIOBase9file_nameE"></span><span id="_CPPv2N6muGrid10FileIOBase9file_nameE"></span><span id="muGrid::FileIOBase::file_name__ssC"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a08b29a206cc71113e406e58a96485325"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">file_name</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase9file_nameE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The name of the file to be opened. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase9open_modeE">
 <span id="_CPPv3N6muGrid10FileIOBase9open_modeE"></span><span id="_CPPv2N6muGrid10FileIOBase9open_modeE"></span><span id="muGrid::FileIOBase::open_mode__OpenModeC"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a7df8a1bfc01ffa3abd917f83a9e008fd"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenModeE" title="muGrid::FileIOBase::OpenMode"><span class="n"><span class="pre">OpenMode</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">open_mode</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase9open_modeE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The mode to open the file in (Read, Write, or Append). </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase4commE">
 <span id="_CPPv3N6muGrid10FileIOBase4commE"></span><span id="_CPPv2N6muGrid10FileIOBase4commE"></span><span id="muGrid::FileIOBase::comm__Communicator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a0855cf040f3a69fbc709037a6702321d"></span><a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE" title="muGrid::Communicator"><span class="n"><span class="pre">Communicator</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">comm</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase4commE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The communicator to be used for parallel I/O operations. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase9nb_framesE">
 <span id="_CPPv3N6muGrid10FileIOBase9nb_framesE"></span><span id="_CPPv2N6muGrid10FileIOBase9nb_framesE"></span><span id="muGrid::FileIOBase::nb_frames__Index_t"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a910d22c8d081070493c4f6d15e9e7cf2"></span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">nb_frames</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase9nb_framesE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The number of frames in the file. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -5063,36 +5201,44 @@
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iteratorE">
 <span id="_CPPv3N6muGrid10FileIOBase8iteratorE"></span><span id="_CPPv2N6muGrid10FileIOBase8iteratorE"></span><span id="muGrid::FileIOBase::iterator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">iterator</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="Link to this definition">¶</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><div class="docutils container">
+<em>#include &lt;<a class="reference internal" href="#file__io__base_8hh"><span class="std std-ref">file_io_base.hh</span></a>&gt;</em></div>
+<p>A class for iterating over the frames in the file. </p>
+<p>This class provides a common interface for file frame iteration operations. It provides a set of constructors and assignment operators (both copy and move are deleted). It also provides a destructor and methods for dereferencing and incrementing.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This class cannot be instantiated directly (default constructor is deleted). </p>
+</div>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator10value_typeE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator10value_typeE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator10value_typeE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a395ddfbe1573cad54e1f2cfb0a1292d3"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">value_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid9FileFrameE" title="muGrid::FileFrame"><span class="n"><span class="pre">FileFrame</span></span></a><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator10value_typeE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl </p>
+<dd><p>STL type aliases for iterator conformance. </p>
 </dd></dl>
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator16const_value_typeE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator16const_value_typeE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator16const_value_typeE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a2d161c27f7fc17a90aa76d4d82a754a7"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">const_value_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator10value_typeE" title="muGrid::FileIOBase::iterator::value_type"><span class="n"><span class="pre">value_type</span></span></a><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator16const_value_typeE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>STL conformance. </p>
 </dd></dl>
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator7pointerE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator7pointerE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator7pointerE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a4449558cce9b08dbc5ef02b3cb245ad4"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">pointer</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator10value_typeE" title="muGrid::FileIOBase::iterator::value_type"><span class="n"><span class="pre">value_type</span></span></a><span class="p"><span class="pre">*</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator7pointerE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>STL conformance. </p>
 </dd></dl>
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator15difference_typeE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator15difference_typeE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator15difference_typeE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a7dade96062a8c0c473499bb73b6a867e"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">difference_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ptrdiff_t</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator15difference_typeE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>STL conformance. </p>
 </dd></dl>
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator17iterator_categoryE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator17iterator_categoryE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator17iterator_categoryE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1aab897544c77fd86c598bdf0276d2e07d"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">iterator_category</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">forward_iterator_tag</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator17iterator_categoryE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>stl conformance </p>
+<dd><p>STL conformance. </p>
 </dd></dl>
 
 </div>
@@ -5101,13 +5247,22 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator8iteratorEv">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator8iteratorEv"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator8iteratorEv"></span><span id="muGrid::FileIOBase::iterator::iterator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a7ef0e6f29bf8844599cd794306b43ebf"></span><span class="sig-name descname"><span class="n"><span class="pre">iterator</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor. </p>
+<dd><p>Default constructor is deleted to prevent direct instantiation of this class. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator8iteratorER10FileIOBase7Index_t">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator8iteratorER10FileIOBase7Index_t"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator8iteratorER10FileIOBase7Index_t"></span><span id="muGrid::FileIOBase::iterator::iterator__FileIOBaseR.Index_t"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1aada22c6a800894a3de1f2f1d77d86b89"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">iterator</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">parent</span></span>, <a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">frame_index</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorER10FileIOBase7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>constructor </p>
+<dd><p>Constructor with the <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object and the required frame index. </p>
+<p>This constructor initializes an iterator object with the given <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object and frame index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> – The <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object. </p></li>
+<li><p><strong>frame_index</strong> – The frame index. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
@@ -5131,36 +5286,68 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iteratoraSERK8iterator">
 <span id="_CPPv3N6muGrid10FileIOBase8iteratoraSERK8iterator"></span><span id="_CPPv2N6muGrid10FileIOBase8iteratoraSERK8iterator"></span><span id="muGrid::FileIOBase::iterator::assign-operator__iteratorCR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a5ffd66d1174a1492cef4ad2b0399d33f"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iteratoraSERK8iterator" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy assignment operator. </p>
+<dd><p>Copy assignment operator is deleted to prevent copying of iterator objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iteratoraSERR8iterator">
 <span id="_CPPv3N6muGrid10FileIOBase8iteratoraSERR8iterator"></span><span id="_CPPv2N6muGrid10FileIOBase8iteratoraSERR8iterator"></span><span id="muGrid::FileIOBase::iterator::assign-operator__iteratorRR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a1e07237099c13b53cdac9d4766efd1ac"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iteratoraSERR8iterator" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move assignment operator. </p>
+<dd><p>Move assignment operator is deleted to prevent moving of iterator objects. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid10FileIOBase8iteratormlEv">
 <span id="_CPPv3NK6muGrid10FileIOBase8iteratormlEv"></span><span id="_CPPv2NK6muGrid10FileIOBase8iteratormlEv"></span><span id="muGrid::FileIOBase::iterator::mul-operatorC"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1aab18495a9a0ae1fa639d15f680adc70f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator16const_value_typeE" title="muGrid::FileIOBase::iterator::const_value_type"><span class="n"><span class="pre">const_value_type</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">*</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid10FileIOBase8iteratormlEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>dereferencing </p>
+<dd><p>Dereferencing operator. </p>
+<p>This operator provides access to a specific frame in the file. The frame must exist for this operation to succeed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>const_value_type The requested frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iteratorppEv">
 <span id="_CPPv3N6muGrid10FileIOBase8iteratorppEv"></span><span id="_CPPv2N6muGrid10FileIOBase8iteratorppEv"></span><span id="muGrid::FileIOBase::iterator::inc-operator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a243a16781678f22d7470c14f0d09b722"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">++</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iteratorppEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>pre-increment </p>
+<dd><p>Pre-increment operator. </p>
+<p>This operator increments the frame index by one.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>iterator&amp; A reference to the incremented iterator. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid10FileIOBase8iteratoreqERK8iterator">
 <span id="_CPPv3NK6muGrid10FileIOBase8iteratoreqERK8iterator"></span><span id="_CPPv2NK6muGrid10FileIOBase8iteratoreqERK8iterator"></span><span id="muGrid::FileIOBase::iterator::eq-operator__iteratorCRC"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a119f5144471ac2bae79257f4614e182b"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">==</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid10FileIOBase8iteratoreqERK8iterator" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Equality comparison operator. </p>
+<p>This operator checks if the frame index of the current iterator is equal to that of the other iterator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The other iterator to compare with. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool True if the frame indices are equal, false otherwise. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid10FileIOBase8iteratorneERK8iterator">
 <span id="_CPPv3NK6muGrid10FileIOBase8iteratorneERK8iterator"></span><span id="_CPPv2NK6muGrid10FileIOBase8iteratorneERK8iterator"></span><span id="muGrid::FileIOBase::iterator::neq-operator__iteratorCRC"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a8227983f87402df8ca933f5e9a2adcb2"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">!=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE" title="muGrid::FileIOBase::iterator"><span class="n"><span class="pre">iterator</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid10FileIOBase8iteratorneERK8iterator" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Inequality comparison operator. </p>
+<p>This operator checks if the frame index of the current iterator is not equal to that of the other iterator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The other iterator to compare with. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool True if the frame indices are not equal, false otherwise. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -5168,12 +5355,14 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator6parentE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator6parentE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator6parentE"></span><span id="muGrid::FileIOBase::iterator::parent__FileIOBaseR"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1ad49c31c1c6b497a3f21ddfa62d96894e"></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">parent</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator6parentE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> object. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator11frame_indexE">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator11frame_indexE"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator11frame_indexE"></span><span id="muGrid::FileIOBase::iterator::frame_index__Index_t"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a4a7c889132f590852452760e15705cce"></span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">frame_index</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator11frame_indexE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The frame index. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -17831,7 +18020,7 @@ Copyright © 2020 Till Junge<dl class="simple">
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=50be051a"></script>
+</div><script src="_static/documentation_options.js?v=2508a9a1"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
