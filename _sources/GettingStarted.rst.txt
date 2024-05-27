@@ -72,11 +72,11 @@ Navigate to the build folder and run:
 Getting help and reporting bugs
 *******************************
 
-*µ*\Grid is under active development and the documentation is
- may be spotty. If you run into trouble,
- please contact us by opening an `issue
- <https://github.com/muSpectre/muGrid/issues>`_ and someone will answer as
- soon as possible. You can also check the API :ref:`reference`.
+*µ*\Grid is under active development and the documentation
+may be spotty. If you run into trouble,
+please contact us by opening an `issue
+<https://github.com/muSpectre/muGrid/issues>`_ and someone will answer as
+soon as possible. You can also check the API :ref:`reference`.
 
 Contribute
 **********
