@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Coding Convention" href="CodingConvention.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>C++ API Reference - µGrid 0.90.1-20-g733a107 documentation</title>
+        <title>C++ API Reference - µGrid 0.90.1-21-g425c761 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-20-g733a107
+      <a href="index.html"><div class="brand">µGrid 0.90.1-21-g425c761
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-20-g733a107
+  <span class="sidebar-brand-text">µGrid 0.90.1-21-g425c761
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -1590,23 +1590,48 @@
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4I0EN6muGrid22ExceptionWithTracebackE">
 <span id="_CPPv3I0EN6muGrid22ExceptionWithTracebackE"></span><span id="_CPPv2I0EN6muGrid22ExceptionWithTracebackE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmuGrid_1_1ExceptionWithTraceback"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ExceptionWithTraceback</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN6muGrid22ExceptionWithTracebackE" title="muGrid::ExceptionWithTraceback::T"><span class="n"><span class="pre">T</span></span></a><a class="headerlink" href="#_CPPv4I0EN6muGrid22ExceptionWithTracebackE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Subclassed by <a class="reference internal" href="#classmuGrid_1_1DictionaryError"><span class="std std-ref">muGrid::DictionaryError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FieldCollectionError"><span class="std std-ref">muGrid::FieldCollectionError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FieldError"><span class="std std-ref">muGrid::FieldError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FieldMapError"><span class="std std-ref">muGrid::FieldMapError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FileIOError"><span class="std std-ref">muGrid::FileIOError</span></a>, <a class="reference internal" href="#classmuGrid_1_1NumpyError"><span class="std std-ref">muGrid::NumpyError</span></a>, <a class="reference internal" href="#classmuGrid_1_1UnitError"><span class="std std-ref">muGrid::UnitError</span></a></p>
+<dd><div class="docutils container">
+<em>#include &lt;<a class="reference internal" href="#exception_8hh"><span class="std std-ref">exception.hh</span></a>&gt;</em></div>
+<p>A template class that extends the exception class provided as a template parameter. </p>
+<p>This class is used to add traceback information to exceptions. It captures the stack trace at the point of exception creation. The traceback information is then included in the exception message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T</strong> – The exception class to extend. This should be a type derived from std::exception. </p>
+</dd>
+</dl>
+<p>Subclassed by <a class="reference internal" href="#classmuGrid_1_1DictionaryError"><span class="std std-ref">muGrid::DictionaryError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FieldCollectionError"><span class="std std-ref">muGrid::FieldCollectionError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FieldError"><span class="std std-ref">muGrid::FieldError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FieldMapError"><span class="std std-ref">muGrid::FieldMapError</span></a>, <a class="reference internal" href="#classmuGrid_1_1FileIOError"><span class="std std-ref">muGrid::FileIOError</span></a>, <a class="reference internal" href="#classmuGrid_1_1NumpyError"><span class="std std-ref">muGrid::NumpyError</span></a>, <a class="reference internal" href="#classmuGrid_1_1UnitError"><span class="std std-ref">muGrid::UnitError</span></a></p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid22ExceptionWithTraceback22ExceptionWithTracebackERKNSt6stringE">
 <span id="_CPPv3N6muGrid22ExceptionWithTraceback22ExceptionWithTracebackERKNSt6stringE"></span><span id="_CPPv2N6muGrid22ExceptionWithTraceback22ExceptionWithTracebackERKNSt6stringE"></span><span id="muGrid::ExceptionWithTraceback::ExceptionWithTraceback__ssCR"></span><span class="target" id="classmuGrid_1_1ExceptionWithTraceback_1a4764e2fcfe1e004917ed00c708ccb556"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ExceptionWithTraceback</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">message</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid22ExceptionWithTraceback22ExceptionWithTracebackERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Construct a new <a class="reference internal" href="#classmuGrid_1_1ExceptionWithTraceback"><span class="std std-ref">ExceptionWithTraceback</span></a> object. </p>
+<p>This constructor initializes the base exception with the provided message, captures the current stack trace, and prepares the full exception message including the traceback information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> – The message for the base exception. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid22ExceptionWithTracebackD0Ev">
 <span id="_CPPv3N6muGrid22ExceptionWithTracebackD0Ev"></span><span id="_CPPv2N6muGrid22ExceptionWithTracebackD0Ev"></span><span id="muGrid::ExceptionWithTraceback::~ExceptionWithTraceback"></span><span class="target" id="classmuGrid_1_1ExceptionWithTraceback_1aecadc4015be6eabadfb4655af575a546"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~ExceptionWithTraceback</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6muGrid22ExceptionWithTracebackD0Ev" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Destroy the <a class="reference internal" href="#classmuGrid_1_1ExceptionWithTraceback"><span class="std std-ref">ExceptionWithTraceback</span></a> object. </p>
+<p>This is a no-throw destructor, as required for exceptions. </p>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid22ExceptionWithTraceback4whatEv">
 <span id="_CPPv3NK6muGrid22ExceptionWithTraceback4whatEv"></span><span id="_CPPv2NK6muGrid22ExceptionWithTraceback4whatEv"></span><span id="muGrid::ExceptionWithTraceback::whatC"></span><span class="target" id="classmuGrid_1_1ExceptionWithTraceback_1a77f155affe2188ec3d3571f107d5edcf"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">what</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK6muGrid22ExceptionWithTraceback4whatEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Get the exception message. </p>
+<p>This function returns the full exception message, including the traceback information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>const char* The exception message. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -1614,12 +1639,14 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid22ExceptionWithTraceback9tracebackE">
 <span id="_CPPv3N6muGrid22ExceptionWithTraceback9tracebackE"></span><span id="_CPPv2N6muGrid22ExceptionWithTraceback9tracebackE"></span><span id="muGrid::ExceptionWithTraceback::traceback__Traceback"></span><span class="target" id="classmuGrid_1_1ExceptionWithTraceback_1a05d0d1113d953b214f1a5f30aa8d537a"></span><a class="reference internal" href="#_CPPv4N6muGrid9TracebackE" title="muGrid::Traceback"><span class="n"><span class="pre">Traceback</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">traceback</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid22ExceptionWithTraceback9tracebackE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The captured stack trace. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid22ExceptionWithTraceback6bufferE">
 <span id="_CPPv3N6muGrid22ExceptionWithTraceback6bufferE"></span><span id="_CPPv2N6muGrid22ExceptionWithTraceback6bufferE"></span><span id="muGrid::ExceptionWithTraceback::buffer__ss"></span><span class="target" id="classmuGrid_1_1ExceptionWithTraceback_1a961a66b63a6096d3f9de14fd591d9c6b"></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">buffer</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid22ExceptionWithTraceback6bufferE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The full exception message, including the traceback information. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -4557,7 +4584,20 @@
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratorE">
 <span id="_CPPv3N6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratorE"></span><span id="_CPPv2N6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratorE"></span><span id="muGrid::CcoordOps::DynamicPixels::Enumerator::iterator"></span><span class="target" id="classmuGrid_1_1CcoordOps_1_1DynamicPixels_1_1Enumerator_1_1iterator"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">iterator</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOpsE" title="muGrid::CcoordOps"><span class="n"><span class="pre">CcoordOps</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixelsE" title="muGrid::CcoordOps::DynamicPixels"><span class="n"><span class="pre">DynamicPixels</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorE" title="muGrid::CcoordOps::DynamicPixels::iterator"><span class="n"><span class="pre">iterator</span></span></a><a class="headerlink" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratorE" title="Link to this definition">¶</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><div class="docutils container">
+<em>#include &lt;<a class="reference internal" href="#ccoord__operations_8hh"><span class="std std-ref">ccoord_operations.hh</span></a>&gt;</em></div>
+<p>A derived class from <a class="reference internal" href="#classmuGrid_1_1CcoordOps_1_1DynamicPixels_1_1iterator"><span class="std std-ref">DynamicPixels::iterator</span></a>, used for iterating over <a class="reference internal" href="#classmuGrid_1_1CcoordOps_1_1Pixels"><span class="std std-ref">Pixels</span></a>. </p>
+<p>This class is a final class, meaning it cannot be further derived from. It provides a custom implementation of the dereference operator (*).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The using Parent::Parent; statement is a C++11 feature called “Inheriting Constructors” which means that this derived class will have the same constructors as the base class. </p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>Parent</strong> – Alias for the base class <a class="reference internal" href="#classmuGrid_1_1CcoordOps_1_1DynamicPixels_1_1iterator"><span class="std std-ref">DynamicPixels::iterator</span></a>.</p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iterator6ParentE">
@@ -4570,7 +4610,14 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratormlEv">
 <span id="_CPPv3NK6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratormlEv"></span><span id="_CPPv2NK6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratormlEv"></span><span id="muGrid::CcoordOps::DynamicPixels::Enumerator::iterator::mul-operatorC"></span><span class="target" id="classmuGrid_1_1CcoordOps_1_1DynamicPixels_1_1Enumerator_1_1iterator_1a8ed6668a2be06157ab1e8895826153e8"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iterator6ParentE" title="muGrid::CcoordOps::DynamicPixels::Enumerator::iterator::Parent"><span class="n"><span class="pre">Parent</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">value_type</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">*</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratormlEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Overloaded dereference operator (*). </p>
+<p>This function returns a tuple containing the index of the pixel and the pixel’s coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>std::tuple&lt;Index_t, Parent::value_type&gt; A tuple containing the index of the pixel and the pixel’s coordinates. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -9831,22 +9878,42 @@
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9TracebackE">
 <span id="_CPPv3N6muGrid9TracebackE"></span><span id="_CPPv2N6muGrid9TracebackE"></span><span id="muGrid::Traceback"></span><span class="target" id="classmuGrid_1_1Traceback"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Traceback</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid9TracebackE" title="Link to this definition">¶</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><div class="docutils container">
+<em>#include &lt;<a class="reference internal" href="#exception_8hh"><span class="std std-ref">exception.hh</span></a>&gt;</em></div>
+<p>A class that captures and manages a stack traceback. </p>
+<p>This class is used to capture the stack traceback at the point of exception creation. It provides methods to get the stack traceback and to print it. </p>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9Traceback9TracebackEi">
 <span id="_CPPv3N6muGrid9Traceback9TracebackEi"></span><span id="_CPPv2N6muGrid9Traceback9TracebackEi"></span><span id="muGrid::Traceback::Traceback__i"></span><span class="target" id="classmuGrid_1_1Traceback_1a699537e3ee990c0333b7017ff8a9d018"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Traceback</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">discard_entries</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid9Traceback9TracebackEi" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Construct a new <a class="reference internal" href="#classmuGrid_1_1Traceback"><span class="std std-ref">Traceback</span></a> object. </p>
+<p>This constructor captures the current stack traceback, discarding the topmost entries as specified.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>discard_entries</strong> – The number of topmost entries to discard from the captured stack traceback. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9TracebackD0Ev">
 <span id="_CPPv3N6muGrid9TracebackD0Ev"></span><span id="_CPPv2N6muGrid9TracebackD0Ev"></span><span id="muGrid::Traceback::~Traceback"></span><span class="target" id="classmuGrid_1_1Traceback_1a9ad5e96ae7b3ba0fdb2558278219008a"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~Traceback</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid9TracebackD0Ev" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Destroy the <a class="reference internal" href="#classmuGrid_1_1Traceback"><span class="std std-ref">Traceback</span></a> object. </p>
+<p>This is a virtual destructor, allowing this class to be used as a base class. </p>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid9Traceback9get_stackEv">
 <span id="_CPPv3NK6muGrid9Traceback9get_stackEv"></span><span id="_CPPv2NK6muGrid9Traceback9get_stackEv"></span><span id="muGrid::Traceback::get_stackC"></span><span class="target" id="classmuGrid_1_1Traceback_1a5ff509661bd1dbfef4d175377670b3b8"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid14TracebackEntryE" title="muGrid::TracebackEntry"><span class="n"><span class="pre">TracebackEntry</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">get_stack</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid9Traceback9get_stackEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Get the stack traceback. </p>
+<p>This function returns a reference to the vector of traceback entries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>const std::vector&lt;TracebackEntry&gt;&amp; The stack traceback. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -9854,7 +9921,9 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9Traceback5stackE">
 <span id="_CPPv3N6muGrid9Traceback5stackE"></span><span id="_CPPv2N6muGrid9Traceback5stackE"></span><span id="muGrid::Traceback::stack__std::vector:TracebackEntry:"></span><span class="target" id="classmuGrid_1_1Traceback_1a2a359deb669c78c9ff000668a1a74307"></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid14TracebackEntryE" title="muGrid::TracebackEntry"><span class="n"><span class="pre">TracebackEntry</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stack</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid9Traceback5stackE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The captured stack traceback. </p>
+<p>This vector contains the entries of the captured stack traceback. </p>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -9862,7 +9931,20 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9TracebacklsERNSt7ostreamERK9Traceback">
 <span id="_CPPv3N6muGrid9TracebacklsERNSt7ostreamERK9Traceback"></span><span id="_CPPv2N6muGrid9TracebacklsERNSt7ostreamERK9Traceback"></span><span id="muGrid::Traceback::lshift-operator__osR.TracebackCR"></span><span class="target" id="classmuGrid_1_1Traceback_1a553450e9cf8e8fa2b10a32ab57ea8b69"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">friend</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ostream</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">&lt;&lt;</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ostream</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">os</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid9TracebackE" title="muGrid::Traceback"><span class="n"><span class="pre">Traceback</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">self</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid9TracebacklsERNSt7ostreamERK9Traceback" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Output the stack traceback. </p>
+<p>This function outputs the stack traceback to the provided output stream. The traceback is output in reverse order (most recent entry last), and stops at the first entry that could not be resolved to a function name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>os</strong> – The output stream to output the traceback to. </p></li>
+<li><p><strong>self</strong> – The <a class="reference internal" href="#classmuGrid_1_1Traceback"><span class="std std-ref">Traceback</span></a> object to output the traceback of. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>std::ostream&amp; The output stream. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -9872,53 +9954,112 @@
 <span id="_CPPv3N6muGrid14TracebackEntryE"></span><span id="_CPPv2N6muGrid14TracebackEntryE"></span><span id="muGrid::TracebackEntry"></span><span class="target" id="classmuGrid_1_1TracebackEntry"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TracebackEntry</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntryE" title="Link to this definition">¶</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;<a class="reference internal" href="#exception_8hh"><span class="std std-ref">exception.hh</span></a>&gt;</em></div>
-<p>An entry from the stack traceback. </p>
+<p>A class that represents an entry from the stack traceback. </p>
+<p>This class is used to manage individual entries in a stack traceback. It provides methods to get the symbol, name, and file associated with the entry, and to check if the entry has been successfully resolved to a function/method name. </p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry14TracebackEntryEPvRKNSt6stringE">
 <span id="_CPPv3N6muGrid14TracebackEntry14TracebackEntryEPvRKNSt6stringE"></span><span id="_CPPv2N6muGrid14TracebackEntry14TracebackEntryEPvRKNSt6stringE"></span><span id="muGrid::TracebackEntry::TracebackEntry__voidP.ssCR"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1af9eeb7070cba5afe1ed0f674c89205a5"></span><span class="sig-name descname"><span class="n"><span class="pre">TracebackEntry</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">address</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">symbol</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry14TracebackEntryEPvRKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Construct a new <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object with a given address and symbol. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>address</strong> – The address of the stack frame. </p></li>
+<li><p><strong>symbol</strong> – The symbol associated with the stack frame. </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry14TracebackEntryEPvPKc">
 <span id="_CPPv3N6muGrid14TracebackEntry14TracebackEntryEPvPKc"></span><span id="_CPPv2N6muGrid14TracebackEntry14TracebackEntryEPvPKc"></span><span id="muGrid::TracebackEntry::TracebackEntry__voidP.cCP"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1ae7883f8821400974fcd584939fecb31f"></span><span class="sig-name descname"><span class="n"><span class="pre">TracebackEntry</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">address</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">symbol</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry14TracebackEntryEPvPKc" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Construct a new <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object with a given address and symbol. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>address</strong> – The address of the stack frame. </p></li>
+<li><p><strong>symbol</strong> – The symbol associated with the stack frame. </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry14TracebackEntryERK14TracebackEntry">
 <span id="_CPPv3N6muGrid14TracebackEntry14TracebackEntryERK14TracebackEntry"></span><span id="_CPPv2N6muGrid14TracebackEntry14TracebackEntryERK14TracebackEntry"></span><span id="muGrid::TracebackEntry::TracebackEntry__TracebackEntryCR"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1ab7a361bec36791e22b37c7c0f6dfd949"></span><span class="sig-name descname"><span class="n"><span class="pre">TracebackEntry</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid14TracebackEntry14TracebackEntryERK14TracebackEntry" title="muGrid::TracebackEntry::TracebackEntry"><span class="n"><span class="pre">TracebackEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry14TracebackEntryERK14TracebackEntry" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Copy constructor for the <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> class. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object to copy from. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntryD0Ev">
 <span id="_CPPv3N6muGrid14TracebackEntryD0Ev"></span><span id="_CPPv2N6muGrid14TracebackEntryD0Ev"></span><span id="muGrid::TracebackEntry::~TracebackEntry"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a98a9b676150f1db2ac0bdd6c37f6a80f"></span><span class="sig-name descname"><span class="n"><span class="pre">~TracebackEntry</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntryD0Ev" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Destroy the <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object. </p>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntryaSERK14TracebackEntry">
 <span id="_CPPv3N6muGrid14TracebackEntryaSERK14TracebackEntry"></span><span id="_CPPv2N6muGrid14TracebackEntryaSERK14TracebackEntry"></span><span id="muGrid::TracebackEntry::assign-operator__TracebackEntryCR"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1ae08aabff0e4eb16bfbfe1de60be20ebf"></span><a class="reference internal" href="#_CPPv4N6muGrid14TracebackEntryE" title="muGrid::TracebackEntry"><span class="n"><span class="pre">TracebackEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid14TracebackEntryE" title="muGrid::TracebackEntry"><span class="n"><span class="pre">TracebackEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntryaSERK14TracebackEntry" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Assignment operator for the <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> class. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object to assign from. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a>&amp; A reference to the assigned object. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid14TracebackEntry10get_symbolEv">
 <span id="_CPPv3NK6muGrid14TracebackEntry10get_symbolEv"></span><span id="_CPPv2NK6muGrid14TracebackEntry10get_symbolEv"></span><span id="muGrid::TracebackEntry::get_symbolC"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a3835e83cb814263a89ac1b3476d9aba1"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">get_symbol</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid14TracebackEntry10get_symbolEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Get the symbol associated with the stack frame. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>const std::string&amp; The symbol associated with the stack frame. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid14TracebackEntry8get_nameEv">
 <span id="_CPPv3NK6muGrid14TracebackEntry8get_nameEv"></span><span id="_CPPv2NK6muGrid14TracebackEntry8get_nameEv"></span><span id="muGrid::TracebackEntry::get_nameC"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a50de94e3e1cf94d19f35b5c8fe6fa254"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">get_name</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid14TracebackEntry8get_nameEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Get the name associated with the stack frame. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>const std::string&amp; The name associated with the stack frame. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid14TracebackEntry8get_fileEv">
 <span id="_CPPv3NK6muGrid14TracebackEntry8get_fileEv"></span><span id="_CPPv2NK6muGrid14TracebackEntry8get_fileEv"></span><span id="muGrid::TracebackEntry::get_fileC"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a33675c03e2876a4325013c5ef1adbeb8"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">get_file</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid14TracebackEntry8get_fileEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Get the file associated with the stack frame. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>const std::string&amp; The file associated with the stack frame. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid14TracebackEntry11is_resolvedEv">
 <span id="_CPPv3NK6muGrid14TracebackEntry11is_resolvedEv"></span><span id="_CPPv2NK6muGrid14TracebackEntry11is_resolvedEv"></span><span id="muGrid::TracebackEntry::is_resolvedC"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a01596c4047db44528bace1ad9457e60f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">is_resolved</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid14TracebackEntry11is_resolvedEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Check if the stack frame has been successfully resolved to a function/method name. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool True if the stack frame has been successfully resolved, false otherwise. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -9926,7 +10067,9 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry22discover_name_and_fileEv">
 <span id="_CPPv3N6muGrid14TracebackEntry22discover_name_and_fileEv"></span><span id="_CPPv2N6muGrid14TracebackEntry22discover_name_and_fileEv"></span><span id="muGrid::TracebackEntry::discover_name_and_file"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a90868a921ea6a53b4181e016802da4fe"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">discover_name_and_file</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry22discover_name_and_fileEv" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Discover the name and file associated with the stack frame. </p>
+<p>This function attempts to resolve the stack frame to a function/method name and file. It demangles the function name if necessary. </p>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -9934,27 +10077,32 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry7addressE">
 <span id="_CPPv3N6muGrid14TracebackEntry7addressE"></span><span id="_CPPv2N6muGrid14TracebackEntry7addressE"></span><span id="muGrid::TracebackEntry::address__voidP"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1ace787ffbbb0ed23aa0bcfb7a5f695ab6"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">address</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry7addressE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The address of the stack frame. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry6symbolE">
 <span id="_CPPv3N6muGrid14TracebackEntry6symbolE"></span><span id="_CPPv2N6muGrid14TracebackEntry6symbolE"></span><span id="muGrid::TracebackEntry::symbol__ss"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a89b858c764d3dfd0106a9ff7462e2926"></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">symbol</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry6symbolE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The symbol associated with the stack frame. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry4nameE">
 <span id="_CPPv3N6muGrid14TracebackEntry4nameE"></span><span id="_CPPv2N6muGrid14TracebackEntry4nameE"></span><span id="muGrid::TracebackEntry::name__ss"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a3d4107ba7734469fc699ec9904f26c0c"></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">name</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry4nameE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The name associated with the stack frame. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry4fileE">
 <span id="_CPPv3N6muGrid14TracebackEntry4fileE"></span><span id="_CPPv2N6muGrid14TracebackEntry4fileE"></span><span id="muGrid::TracebackEntry::file__ss"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a83e15533ef5e6edb000844efe7f17f05"></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">file</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry4fileE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>The file associated with the stack frame. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntry8resolvedE">
 <span id="_CPPv3N6muGrid14TracebackEntry8resolvedE"></span><span id="_CPPv2N6muGrid14TracebackEntry8resolvedE"></span><span id="muGrid::TracebackEntry::resolved__b"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a42510e3bac6c19c2e17c5a6e1f6f4819"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">resolved</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntry8resolvedE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>True if the stack frame has been successfully resolved to a function/method name, false otherwise. </p>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -9962,7 +10110,21 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid14TracebackEntrylsERNSt7ostreamERK14TracebackEntry">
 <span id="_CPPv3N6muGrid14TracebackEntrylsERNSt7ostreamERK14TracebackEntry"></span><span id="_CPPv2N6muGrid14TracebackEntrylsERNSt7ostreamERK14TracebackEntry"></span><span id="muGrid::TracebackEntry::lshift-operator__osR.TracebackEntryCR"></span><span class="target" id="classmuGrid_1_1TracebackEntry_1a4a1d59ecdd433a6532c0ae068cb5f8c4"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">friend</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ostream</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">&lt;&lt;</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ostream</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">os</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid14TracebackEntryE" title="muGrid::TracebackEntry"><span class="n"><span class="pre">TracebackEntry</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">self</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid14TracebackEntrylsERNSt7ostreamERK14TracebackEntry" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Output the <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object. </p>
+<p>This function outputs the <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object to the provided output stream. If the stack frame has been successfully resolved, it outputs the file and name associated with the stack frame. Otherwise, it outputs a message indicating that the stack frame could not be resolved to a function/method name.</p>
+<p>The output is formatted like Python stack tracebacks, because its primary purpose is to be displayed in conjunction with a Python exception.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>os</strong> – The output stream to output the <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object to. </p></li>
+<li><p><strong>self</strong> – The <a class="reference internal" href="#classmuGrid_1_1TracebackEntry"><span class="std std-ref">TracebackEntry</span></a> object to output. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>std::ostream&amp; The output stream. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -11628,8 +11790,10 @@
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12RuntimeErrorE">
-<span id="_CPPv3N6muGrid12RuntimeErrorE"></span><span id="_CPPv2N6muGrid12RuntimeErrorE"></span><span class="target" id="exception_8hh_1a479e79cd735604449f892ff198f6b5fc"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RuntimeError</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN6muGrid22ExceptionWithTracebackE" title="muGrid::ExceptionWithTraceback"><span class="n"><span class="pre">ExceptionWithTraceback</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime_error</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N6muGrid12RuntimeErrorE" title="Link to this definition">¶</a><br /></dt>
-<dd></dd></dl>
+<span id="_CPPv3N6muGrid12RuntimeErrorE"></span><span id="_CPPv2N6muGrid12RuntimeErrorE"></span><span id="muGrid::RuntimeError"></span><span class="target" id="exception_8hh_1a6af675e0a0619e0baa4afeec714a654b"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0EN6muGrid22ExceptionWithTracebackE" title="muGrid::ExceptionWithTraceback"><span class="n"><span class="pre">ExceptionWithTraceback</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime_error</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RuntimeError</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid12RuntimeErrorE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A type alias for <a class="reference internal" href="#classmuGrid_1_1ExceptionWithTraceback"><span class="std std-ref">ExceptionWithTraceback</span></a> specialized with std::runtime_error. </p>
+<p>This type is used to throw exceptions that include a stack trace, for runtime errors. </p>
+</dd></dl>
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4I0_7Mapping_8IterUnitEN6muGrid13EigenFieldMapE">
@@ -17667,7 +17831,7 @@ Copyright © 2020 Till Junge<dl class="simple">
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=23bad395"></script>
+</div><script src="_static/documentation_options.js?v=50be051a"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
