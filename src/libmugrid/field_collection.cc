@@ -162,6 +162,106 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  TypedField<Real> & FieldCollection::real_field(
+      const std::string & unique_name, const Index_t & nb_components,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Real>(unique_name, nb_components,
+                                             sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Real> & FieldCollection::real_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Real>(unique_name, components_shape,
+                                             sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Complex> & FieldCollection::complex_field(
+      const std::string & unique_name, const Index_t & nb_components,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Complex>(unique_name, nb_components,
+                                                sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Complex> & FieldCollection::complex_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Complex>(unique_name, components_shape,
+                                                sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Int> & FieldCollection::int_field(
+      const std::string & unique_name, const Index_t & nb_components,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Int>(unique_name, nb_components,
+                                            sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Int> & FieldCollection::int_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Int>(unique_name, components_shape,
+                                            sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Uint> & FieldCollection::uint_field(
+      const std::string & unique_name, const Index_t & nb_components,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Uint>(unique_name, nb_components,
+                                             sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedField<Uint> & FieldCollection::uint_field(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit) {
+    return this->register_field_helper<Uint>(unique_name, components_shape,
+                                             sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedStateField<Real> & FieldCollection::real_state_field(
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_components, const std::string & sub_division_tag,
+      const Unit & unit) {
+    return this->register_state_field_helper<Real>(
+        unique_name, nb_memory, nb_components, sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedStateField<Complex> & FieldCollection::complex_state_field(
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_components, const std::string & sub_division_tag,
+      const Unit & unit) {
+    return this->register_state_field_helper<Complex>(
+        unique_name, nb_memory, nb_components, sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedStateField<Int> & FieldCollection::int_state_field(
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_components, const std::string & sub_division_tag,
+      const Unit & unit) {
+    return this->register_state_field_helper<Int>(
+        unique_name, nb_memory, nb_components, sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  TypedStateField<Uint> & FieldCollection::uint_state_field(
+      const std::string & unique_name, const Index_t & nb_memory,
+      const Index_t & nb_components, const std::string & sub_division_tag,
+      const Unit & unit) {
+    return this->register_state_field_helper<Uint>(
+        unique_name, nb_memory, nb_components, sub_division_tag, unit, true);
+  }
+
+  /* ---------------------------------------------------------------------- */
   bool FieldCollection::field_exists(const std::string & unique_name) const {
     return this->fields.find(unique_name) != this->fields.end();
   }
@@ -219,8 +319,8 @@ namespace muGrid {
     if (nb_sub_pts_per_pixel < 1) {
       std::stringstream error{};
       error << "The number of '" << tag
-            << "' points per pixel must be positive. "
-            << "You chose " << nb_sub_pts_per_pixel;
+            << "' points per pixel must be positive. " << "You chose "
+            << nb_sub_pts_per_pixel;
       throw FieldCollectionError(error.str());
     }
     this->nb_sub_pts[tag] = nb_sub_pts_per_pixel;
@@ -314,8 +414,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  auto FieldCollection::pop_field(const std::string & unique_name)
-      -> Field_ptr {
+  auto
+  FieldCollection::pop_field(const std::string & unique_name) -> Field_ptr {
     if (not this->field_exists(unique_name)) {
       std::stringstream err_stream{};
       err_stream << "The field '" << unique_name << "' does not exist";

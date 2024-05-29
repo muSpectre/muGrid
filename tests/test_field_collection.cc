@@ -140,6 +140,11 @@ namespace muGrid {
     BOOST_CHECK_THROW(
         Fix::fc.register_real_field(right_name, 24, this->sub_division_tag()),
         FieldCollectionError);
+    BOOST_CHECK_NO_THROW(
+        Fix::fc.real_field(right_name, 24, this->sub_division_tag()));
+    BOOST_CHECK_THROW(
+        Fix::fc.real_field(right_name, 25, this->sub_division_tag()),
+        FieldCollectionError);
   }
 
   // the following test only tests members of the FieldCollection base class,
@@ -304,11 +309,10 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(multi_field_test, F, mult_collections, F) {
     // possible maptypes for Real T4 fields
 
-    using T_TFM1_t = T4FieldMap<Real, Mapping::Const, F::SpatialDimension,
-                                IterUnit::SubPt>;
-    using T_TFM2_t =
-        T2FieldMap<Real, Mapping::Const, ipow(F::SpatialDimension, 2),
-                   IterUnit::SubPt>;
+    using T_TFM1_t =
+        T4FieldMap<Real, Mapping::Const, F::SpatialDimension, IterUnit::SubPt>;
+    using T_TFM2_t = T2FieldMap<Real, Mapping::Const,
+                                ipow(F::SpatialDimension, 2), IterUnit::SubPt>;
     using T4_Map_t =
         MatrixFieldMap<Real, Mapping::Mut, ipow(F::SpatialDimension, 4),
                        F::NbSubPts, IterUnit::Pixel>;

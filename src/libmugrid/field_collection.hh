@@ -221,6 +221,7 @@ namespace muGrid {
                    const Shape_t & components_shape,
                    const std::string & sub_division_tag = PixelTag,
                    const Unit & unit = Unit::unitless());
+
     /**
      * place a new real-valued field  in the responsibility of this collection
      * (Note, because fields have protected constructors, users can't create
@@ -438,6 +439,240 @@ namespace muGrid {
                               const Index_t & nb_components,
                               const std::string & sub_division_tag = PixelTag,
                               const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    template <typename T>
+    TypedField<T> & field(const std::string & unique_name,
+                          const Shape_t & components_shape,
+                          const std::string & sub_division_tag = PixelTag,
+                          const Unit & unit = Unit::unitless()) {
+      static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                    "You can only register fields templated with one of the "
+                    "numeric types Real, Complex, Int, or Uint");
+      return this->register_field_helper<T>(unique_name, components_shape,
+                                            sub_division_tag, unit, true);
+    }
+
+    /**
+     * place a new real-valued field  in the responsibility of this collection
+     * (Note, because fields have protected constructors, users can't create
+     * them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     */
+    TypedField<Real> &
+    real_field(const std::string & unique_name, const Index_t & nb_components,
+               const std::string & sub_division_tag = PixelTag,
+               const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Real> &
+    real_field(const std::string & unique_name,
+               const Shape_t & components_shape,
+               const std::string & sub_division_tag = PixelTag,
+               const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new complex-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     */
+    TypedField<Complex> &
+    complex_field(const std::string & unique_name,
+                  const Index_t & nb_components,
+                  const std::string & sub_division_tag = PixelTag,
+                  const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Complex> &
+    complex_field(const std::string & unique_name,
+                  const Shape_t & components_shape,
+                  const std::string & sub_division_tag = PixelTag,
+                  const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new integer-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     */
+    TypedField<Int> & int_field(const std::string & unique_name,
+                                const Index_t & nb_components,
+                                const std::string & sub_division_tag = PixelTag,
+                                const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Int> & int_field(const std::string & unique_name,
+                                const Shape_t & components_shape,
+                                const std::string & sub_division_tag = PixelTag,
+                                const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new unsigned integer-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     */
+    TypedField<Uint> &
+    uint_field(const std::string & unique_name, const Index_t & nb_components,
+               const std::string & sub_division_tag = PixelTag,
+               const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new field in the responsibility of this collection (Note, because
+     * fields have protected constructors, users can't create them
+     * @param unique_name unique identifier for this field
+     * @param components_shape number of components to store per quadrature
+     * point
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     * @param storage_oder in-memory storage order of the components
+     */
+    TypedField<Uint> &
+    uint_field(const std::string & unique_name,
+               const Shape_t & components_shape,
+               const std::string & sub_division_tag = PixelTag,
+               const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new state field in the responsibility of this collection (Note,
+     * because state fields have protected constructors, users can't create them
+     */
+    template <typename T>
+    TypedStateField<T> &
+    state_field(const std::string & unique_prefix, const Index_t & nb_memory,
+                const Index_t & nb_components,
+                const std::string & sub_division_tag = PixelTag,
+                const Unit & unit = Unit::unitless()) {
+      static_assert(
+          std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+          "You can only register state fields templated with one of the "
+          "numeric types Real, Complex, Int, or UInt");
+      return this->register_state_field_helper<T>(unique_prefix, nb_memory,
+                                                  nb_components,
+                                                  sub_division_tag, unit, true);
+    }
+
+    /**
+     * place a new real-valued state field in the responsibility of this
+     * collection (Note, because state fields have protected constructors, users
+     * can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per
+     * quadrature point
+     */
+    TypedStateField<Real> &
+    real_state_field(const std::string & unique_prefix,
+                     const Index_t & nb_memory, const Index_t & nb_components,
+                     const std::string & sub_division_tag = PixelTag,
+                     const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new complex-valued state field in the responsibility of this
+     * collection (Note, because state fields have protected constructors, users
+     * can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per
+     * quadrature point
+     */
+    TypedStateField<Complex> &
+    complex_state_field(const std::string & unique_prefix,
+                        const Index_t & nb_memory,
+                        const Index_t & nb_components,
+                        const std::string & sub_division_tag = PixelTag,
+                        const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new integer-valued state field in the responsibility of this
+     * collection (Note, because state fields have protected constructors, users
+     * can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per
+     * quadrature point
+     */
+    TypedStateField<Int> &
+    int_state_field(const std::string & unique_prefix,
+                    const Index_t & nb_memory, const Index_t & nb_components,
+                    const std::string & sub_division_tag = PixelTag,
+                    const Unit & unit = Unit::unitless());
+
+    /**
+     * place a new unsigned integer-valued state field in the responsibility of
+     * this collection (Note, because state fields have protected constructors,
+     * users can't create them
+     *
+     * @param unique_prefix unique idendifier for this state field
+     * @param nb_memory number of previous values of this field to store
+     * @param nb_components number of scalar components to store per
+     * quadrature point
+     */
+    TypedStateField<Uint> &
+    uint_state_field(const std::string & unique_prefix,
+                     const Index_t & nb_memory, const Index_t & nb_components,
+                     const std::string & sub_division_tag = PixelTag,
+                     const Unit & unit = Unit::unitless());
 
     //! check whether a field of name 'unique_name' has already been
     //! registered
