@@ -105,7 +105,6 @@ namespace muGrid {
 
     class IndexIterable;
     //! convenience alias
-    using QuadPtIndexIterable = IndexIterable;
     class PixelIndexIterable;
 
    protected:
