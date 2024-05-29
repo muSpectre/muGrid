@@ -298,9 +298,13 @@ namespace muGrid {
               "by re-registering it.");
         }
         if (field.get_nb_components() != nb_components) {
-          throw FieldCollectionError(
-              "You can't change the number of components of a state field "
-              "by re-registering it.");
+          std::stringstream error{};
+          error << "You can't change the number of components of a field "
+                << "by re-registering it. Field '" << unique_prefix << "' has "
+                << field.get_nb_components()
+                << " components and you are trying to register it with "
+                << nb_components << " components.";
+          throw FieldCollectionError(error.str());
         }
         if (field.get_sub_division_tag() != sub_division_tag) {
           throw FieldCollectionError(

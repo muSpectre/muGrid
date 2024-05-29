@@ -140,8 +140,7 @@ namespace muGrid {
     BOOST_CHECK_THROW(
         Fix::fc.register_real_field(right_name, 24, this->sub_division_tag()),
         FieldCollectionError);
-    BOOST_CHECK_NO_THROW(
-        Fix::fc.real_field(right_name, 24, this->sub_division_tag()));
+    Fix::fc.real_field(right_name, 1, this->sub_division_tag());
     BOOST_CHECK_THROW(
         Fix::fc.real_field(right_name, 25, this->sub_division_tag()),
         FieldCollectionError);
