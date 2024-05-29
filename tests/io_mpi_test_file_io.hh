@@ -53,12 +53,10 @@ namespace muGrid {
                                  this->nb_subdomain_grid_pts[1]},
           subdomain_locations{0, this->comm.rank() *
                                      this->nb_subdomain_grid_pts[1]},
-          global_fc{this->spatial_dimension, this->nb_domain_grid_pts,
-                    this->nb_subdomain_grid_pts, this->subdomain_locations,
-                    this->nb_sub_pts},
-          nb_sub_pts_local{{this->quad, 3}}, local_fc{this->spatial_dimension,
-                                                      "local_FC",
-                                                      this->nb_sub_pts_local},
+          global_fc{this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
+                    this->subdomain_locations, this->nb_sub_pts},
+          nb_sub_pts_local{{this->quad, 3}},
+          local_fc{this->spatial_dimension, "local_FC", this->nb_sub_pts_local},
           names{"T4_test_field", "T2_test_field", "T1_int_field"},
           t4_field{this->global_fc.register_real_field(
               names[0], muGrid::ipow(this->spatial_dimension, 4), this->quad)},

@@ -82,8 +82,7 @@ namespace muGrid {
     // rank is rank of the gradient
     using Disp_t = Eigen::Matrix<Real, ipow(Fixture::Dim, Rank - 1), 1>;
     using Pos_t = Eigen::Matrix<Real, Fixture::Dim, 1>;
-    GlobalFieldCollection collection{Fixture::Dim, nb_grid_points,
-                                     nb_grid_points};
+    GlobalFieldCollection collection{nb_grid_points, nb_grid_points};
 
     MappedMatrixField<Real, Mapping::Mut, Disp_t::RowsAtCompileTime,
                       Disp_t::ColsAtCompileTime, IterUnit::Pixel>
@@ -170,7 +169,7 @@ namespace muGrid {
                                    Fix) {
     const DynCcoord_t nb_subdomain_grid_pts{
         Fix::Dim == twoD ? DynCcoord_t{2, 2} : DynCcoord_t{2, 2, 2}};
-    GlobalFieldCollection collection{Fix::Dim, nb_subdomain_grid_pts,
+    GlobalFieldCollection collection{nb_subdomain_grid_pts,
                                      nb_subdomain_grid_pts};
     const std::string nodal_pt_tag{"nodal_pt"};
     const std::string quad_pt_tag{"quad_pt"};

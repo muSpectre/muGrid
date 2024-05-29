@@ -46,7 +46,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const const DynCcoord_t & nb_domain_grid_pts,
+      const DynCcoord_t & nb_domain_grid_pts,
       const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations, const SubPtMap_t & nb_sub_pts,
       StorageOrder storage_order)

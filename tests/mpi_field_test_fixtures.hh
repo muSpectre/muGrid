@@ -75,7 +75,7 @@ namespace muGrid {
                                  : this->nb_subdomain_grid_pts[2]},
           subdomain_locations{
               0, 0, this->comm.rank() * this->nb_subdomain_grid_pts[2]},
-          fc{this->spatial_dimension, this->nb_domain_grid_pts,
+          fc{this->nb_domain_grid_pts,
              this->comm.rank() + 1 == this->comm.size() and
                      this->comm.size() > 1
                  ? this->nb_subdomain_grid_pts_empty
@@ -113,9 +113,8 @@ namespace muGrid {
                                  this->nb_subdomain_grid_pts[2]},
           subdomain_locations{
               0, 0, this->comm.rank() * this->nb_subdomain_grid_pts[2]},
-          fc{this->spatial_dimension, this->nb_domain_grid_pts,
-             this->nb_subdomain_grid_pts, this->subdomain_locations,
-             this->nb_sub_pts},
+          fc{this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
+             this->subdomain_locations, this->nb_sub_pts},
           pixel_field{this->fc.register_real_field("pixel_field", NbComponent,
                                                    PixelTag)},
           quad_pt_field{this->fc.register_real_field("quad_pt_field",

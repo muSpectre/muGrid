@@ -65,9 +65,9 @@ namespace muGrid {
     const DynCcoord_t & nb_domain_grid_pts{3, 3};
     const DynCcoord_t & nb_subdomain_grid_pts{3, 3};
     const DynCcoord_t & subdomain_locations{0, 0};
-    muGrid::GlobalFieldCollection global_fc(
-        spatial_dimension, nb_domain_grid_pts, nb_subdomain_grid_pts,
-        subdomain_locations, nb_sub_pts);
+    muGrid::GlobalFieldCollection global_fc(nb_domain_grid_pts,
+                                            nb_subdomain_grid_pts,
+                                            subdomain_locations, nb_sub_pts);
 
     muGrid::LocalFieldCollection local_fc(spatial_dimension, "local_FC",
                                           nb_sub_pts);
@@ -407,8 +407,8 @@ namespace muGrid {
             glob_sf_name, glob_nb_mem, nb_components, sub_division)};
 
     TypedStateField<int> & loc_state_field{
-        this->local_fc.register_state_field<int>(
-            loc_sf_name, loc_nb_mem, nb_components, sub_division)};
+        this->local_fc.register_state_field<int>(loc_sf_name, loc_nb_mem,
+                                                 nb_components, sub_division)};
 
     for (int i = 1; i <= glob_nb_mem + 1; i++) {
       // fill values into the global state field
@@ -621,8 +621,7 @@ namespace muGrid {
     global_att_names_ref.push_back(global_att_2_name);
     const std::vector<std::string> global_att_names{
         file_io_netcdf_w.read_global_attribute_names()};
-    BOOST_CHECK_EQUAL(global_att_names.size(),
-                      global_att_names_ref.size());
+    BOOST_CHECK_EQUAL(global_att_names.size(), global_att_names_ref.size());
     for (size_t i{0}; i < global_att_names.size(); i++) {
       BOOST_CHECK_EQUAL(global_att_names[i], global_att_names_ref[i]);
     }
@@ -646,8 +645,7 @@ namespace muGrid {
     global_att_names_ref.push_back(global_att_2_name);
     const std::vector<std::string> global_att_names{
         file_io_netcdf_r.read_global_attribute_names()};
-    BOOST_CHECK_EQUAL(global_att_names.size(),
-                      global_att_names_ref.size());
+    BOOST_CHECK_EQUAL(global_att_names.size(), global_att_names_ref.size());
     for (size_t i{0}; i < global_att_names.size(); i++) {
       BOOST_CHECK_EQUAL(global_att_names[i], global_att_names_ref[i]);
     }
@@ -667,8 +665,7 @@ namespace muGrid {
     global_att_names_ref.push_back(global_att_2_name);
     const std::vector<std::string> global_att_names{
         file_io_netcdf_r.read_global_attribute_names()};
-    BOOST_CHECK_EQUAL(global_att_names.size(),
-                      global_att_names_ref.size());
+    BOOST_CHECK_EQUAL(global_att_names.size(), global_att_names_ref.size());
     for (size_t i{0}; i < global_att_names.size(); i++) {
       BOOST_CHECK_EQUAL(global_att_names[i], global_att_names_ref[i]);
     }

@@ -299,11 +299,11 @@ namespace muGrid {
           0, comm_2.rank() * nb_subdomain_grid_pts_2[1]};
       const DynCcoord_t & subdomain_locations_1{0, 0};
       muGrid::GlobalFieldCollection global_fc_2(
-          spatial_dimension, nb_domain_grid_pts, nb_subdomain_grid_pts_2,
-          subdomain_locations_2, nb_sub_pts);
+          nb_domain_grid_pts, nb_subdomain_grid_pts_2, subdomain_locations_2,
+          nb_sub_pts);
       muGrid::GlobalFieldCollection global_fc_1(
-          spatial_dimension, nb_domain_grid_pts, nb_subdomain_grid_pts_1,
-          subdomain_locations_1, nb_sub_pts);
+          nb_domain_grid_pts, nb_subdomain_grid_pts_1, subdomain_locations_1,
+          nb_sub_pts);
       muGrid::TypedField<Real> & t2_field_2{global_fc_2.register_real_field(
           "T2_test_field", muGrid::ipow(spatial_dimension, 2))};
       muGrid::T2FieldMap<Real, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
@@ -339,8 +339,8 @@ namespace muGrid {
         local_fc_1.initialise();
       }
 
-      muGrid::TypedField<int> & t1_field_2
-          {local_fc_2.register_field<muGrid::Int>(
+      muGrid::TypedField<int> & t1_field_2{
+          local_fc_2.register_field<muGrid::Int>(
               "T1_int_field", muGrid::ipow(spatial_dimension, 1), quad)};
       muGrid::T1FieldMap<int, Mapping::Mut, Dim, muGrid::IterUnit::SubPt>
           t1_field_map_2{t1_field_2};
