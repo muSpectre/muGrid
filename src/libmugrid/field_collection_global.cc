@@ -39,19 +39,18 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const Index_t & spatial_dimension,
-      const SubPtMap_t & nb_sub_pts,
+      const Index_t & spatial_dimension, const SubPtMap_t & nb_sub_pts,
       StorageOrder storage_order)
       : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
                storage_order} {}
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      const Index_t & spatial_dimension, const DynCcoord_t & nb_domain_grid_pts,
+      const const DynCcoord_t & nb_domain_grid_pts,
       const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations, const SubPtMap_t & nb_sub_pts,
       StorageOrder storage_order)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
+      : Parent{ValidityDomain::Global, nb_domain_grid_pts.get_dim(), nb_sub_pts,
                storage_order} {
     this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
                      subdomain_locations);
@@ -59,12 +58,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      Index_t spatial_dimension, const DynCcoord_t & nb_domain_grid_pts,
+      const DynCcoord_t & nb_domain_grid_pts,
       const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations,
       const DynCcoord_t & pixels_strides, const SubPtMap_t & nb_sub_pts,
       StorageOrder storage_order)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
+      : Parent{ValidityDomain::Global, nb_domain_grid_pts.get_dim(), nb_sub_pts,
                storage_order} {
     this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
                      subdomain_locations, pixels_strides);
@@ -72,14 +71,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   GlobalFieldCollection::GlobalFieldCollection(
-      Index_t spatial_dimension,
       const DynCcoord_t & nb_domain_grid_pts,
       const DynCcoord_t & nb_subdomain_grid_pts,
       const DynCcoord_t & subdomain_locations,
-      StorageOrder pixels_storage_order,
-      const SubPtMap_t & nb_sub_pts,
+      StorageOrder pixels_storage_order, const SubPtMap_t & nb_sub_pts,
       StorageOrder storage_order)
-      : Parent{ValidityDomain::Global, spatial_dimension, nb_sub_pts,
+      : Parent{ValidityDomain::Global, nb_domain_grid_pts.get_dim(), nb_sub_pts,
                storage_order} {
     this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
                      subdomain_locations, pixels_storage_order);
@@ -93,10 +90,8 @@ namespace muGrid {
                                     const DynCcoord_t & pixels_strides) {
     // sanity check 1
     auto nb_domain_grid_pts_total{
-        std::accumulate(nb_domain_grid_pts.begin(),
-                        nb_domain_grid_pts.end(),
-                        static_cast<Index_t>(1),
-                        std::multiplies<Index_t>())};
+        std::accumulate(nb_domain_grid_pts.begin(), nb_domain_grid_pts.end(),
+                        static_cast<Index_t>(1), std::multiplies<Index_t>())};
     if (nb_domain_grid_pts_total <= 0) {
       std::stringstream s;
       s << "Invalid nb_domain_grid_pts " << nb_domain_grid_pts << " ("
@@ -105,15 +100,16 @@ namespace muGrid {
       throw FieldCollectionError(s.str());
     }
     // sanity check 2 - the subdomain may be empty!
-    auto nb_subdomain_grid_pts_total{
-        std::accumulate(nb_domain_grid_pts.begin(),
-                        nb_domain_grid_pts.end(),
-                        static_cast<Index_t>(1),
-                        std::multiplies<Index_t>())};
+    auto _nb_subdomain_grid_pts{nb_subdomain_grid_pts.get_dim() == 0
+                                    ? nb_domain_grid_pts
+                                    : nb_subdomain_grid_pts};
+    auto nb_subdomain_grid_pts_total{std::accumulate(
+        _nb_subdomain_grid_pts.begin(), _nb_subdomain_grid_pts.end(),
+        static_cast<Index_t>(1), std::multiplies<Index_t>())};
     if (nb_subdomain_grid_pts_total < 0) {
       std::stringstream s;
-      s << "Invalid nb_subdomain_grid_pts " << nb_subdomain_grid_pts << " ("
-        << nb_subdomain_grid_pts << " total grid points) passed during "
+      s << "Invalid nb_subdomain_grid_pts " << _nb_subdomain_grid_pts << " ("
+        << nb_subdomain_grid_pts_total << " total grid points) passed during "
         << "initialisation.";
       throw FieldCollectionError(s.str());
     }
@@ -123,12 +119,11 @@ namespace muGrid {
     }
 
     this->nb_domain_grid_pts = nb_domain_grid_pts;
-    this->pixels = CcoordOps::DynamicPixels(nb_subdomain_grid_pts,
-                                            subdomain_locations,
-                                            pixels_strides);
-    this->nb_pixels = CcoordOps::get_size(nb_subdomain_grid_pts);
-    this->nb_buffer_pixels = CcoordOps::get_buffer_size(nb_subdomain_grid_pts,
-                                                        pixels_strides);
+    this->pixels = CcoordOps::DynamicPixels(
+        _nb_subdomain_grid_pts, subdomain_locations, pixels_strides);
+    this->nb_pixels = CcoordOps::get_size(_nb_subdomain_grid_pts);
+    this->nb_buffer_pixels =
+        CcoordOps::get_buffer_size(_nb_subdomain_grid_pts, pixels_strides);
     this->allocate_fields();
     this->pixel_indices.resize(this->nb_pixels);
     for (int i{0}; i < this->nb_pixels; ++i) {
@@ -148,11 +143,14 @@ namespace muGrid {
     if (pixels_storage_order == StorageOrder::Automatic) {
       pixels_storage_order = this->get_storage_order();
     }
+    auto _nb_subdomain_grid_pts{nb_subdomain_grid_pts.get_dim() == 0
+                                    ? nb_domain_grid_pts
+                                    : nb_subdomain_grid_pts};
     this->initialise(
-        nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
+        nb_domain_grid_pts, _nb_subdomain_grid_pts, subdomain_locations,
         pixels_storage_order == StorageOrder::ColMajor
-             ? CcoordOps::get_col_major_strides(nb_subdomain_grid_pts)
-             : CcoordOps::get_row_major_strides(nb_subdomain_grid_pts));
+            ? CcoordOps::get_col_major_strides(_nb_subdomain_grid_pts)
+            : CcoordOps::get_row_major_strides(_nb_subdomain_grid_pts));
   }
 
   /* ---------------------------------------------------------------------- */

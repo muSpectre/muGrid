@@ -304,25 +304,24 @@ void add_global_field_collection(py::module & mod) {
                     StorageOrder>(),
            "spatial_dimension"_a, "sub_pts"_a,
            "storage_order"_a = StorageOrder::ColMajor)
-      .def(py::init<const Index_t &, const DynCcoord_t &, const DynCcoord_t &,
+      .def(py::init<const DynCcoord_t &, const DynCcoord_t &,
                     const DynCcoord_t &, const FieldCollection::SubPtMap_t &,
                     StorageOrder>(),
-           "spatial_dimension"_a, "nb_domain_grid_pts"_a,
-           "nb_subdomain_grid_pts"_a, "subdomain_locations"_a, "sub_pts"_a,
+           "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = DynCcoord_t{},
+           "subdomain_locations"_a = DynCcoord_t{},
+           "sub_pts"_a = FieldCollection::SubPtMap_t{},
            "storage_order"_a = StorageOrder::ColMajor)
-      .def(py::init<const Index_t &, const DynCcoord_t &, const DynCcoord_t &,
+      .def(py::init<const DynCcoord_t &, const DynCcoord_t &,
                     const DynCcoord_t &, const DynCcoord_t &,
                     const FieldCollection::SubPtMap_t &, StorageOrder>(),
-           "spatial_dimension"_a, "nb_domain_grid_pts"_a,
-           "nb_subdomain_grid_pts"_a, "subdomain_locations"_a,
-           "pixels_strides"_a, "sub_pts"_a,
+           "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
+           "subdomain_locations"_a, "pixels_strides"_a, "sub_pts"_a,
            "storage_order"_a = StorageOrder::ColMajor)
-      .def(py::init<const Index_t &, const DynCcoord_t &, const DynCcoord_t &,
+      .def(py::init<const DynCcoord_t &, const DynCcoord_t &,
                     const DynCcoord_t &, StorageOrder,
                     const FieldCollection::SubPtMap_t &, StorageOrder>(),
-           "spatial_dimension"_a, "nb_domain_grid_pts"_a,
-           "nb_subdomain_grid_pts"_a, "subdomain_locations"_a,
-           "pixels_storage_order"_a, "sub_pts"_a,
+           "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
+           "subdomain_locations"_a, "pixels_storage_order"_a, "sub_pts"_a,
            "storage_order"_a = StorageOrder::ColMajor)
       .def("initialise",
            (void(GlobalFieldCollection::*)(  // NOLINT
@@ -336,7 +335,7 @@ void add_global_field_collection(py::module & mod) {
                const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &,
                StorageOrder)) &
                GlobalFieldCollection::initialise,
-           "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
+           "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = DynCcoord_t{},
            "subdomain_locations"_a = DynCcoord_t{},
            "pixels_storage_order"_a = StorageOrder::Automatic)
       .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels);

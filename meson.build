@@ -63,3 +63,4 @@ subdir('language_bindings')
 test_timeout = 300  # timeout in seconds for long running tests
 
 subdir('tests')
+subdir('examples')

@@ -69,17 +69,14 @@ namespace muGrid {
 
     /**
      * Constructor with initialization
-     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
-     * or Unknown
      * @param nb_subdomain_grid_pts number of grid points on the current MPI
      * process (subdomain)
      * @param subdomain_locations location of the current subdomain within the
      * global grid
      * @param nb_sub_pts number of quadrature points per pixel/voxel
      */
-    GlobalFieldCollection(const Index_t & spatial_dimension,
-                          const DynCcoord_t & nb_domain_grid_pts,
-                          const DynCcoord_t & nb_subdomain_grid_pts,
+    GlobalFieldCollection(const DynCcoord_t & nb_domain_grid_pts,
+                          const DynCcoord_t & nb_subdomain_grid_pts = {},
                           const DynCcoord_t & subdomain_locations = {},
                           const SubPtMap_t & nb_sub_pts = {},
                           StorageOrder storage_order =
@@ -87,8 +84,6 @@ namespace muGrid {
 
     /**
      * Constructor with initialisation
-     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
-     * or Unknown
      * @param nb_subdomain_grid_pts number of grid points on the current MPI
      * process (subdomain)
      * @param subdomain_locations location of the current subdomain within the
@@ -105,8 +100,7 @@ namespace muGrid {
      *                    Important: The pixels or subpoints have their own
      *                    storage order that is not affected by this setting.
      */
-    GlobalFieldCollection(Index_t spatial_dimension,
-                          const DynCcoord_t & nb_domain_grid_pts,
+    GlobalFieldCollection(const DynCcoord_t & nb_domain_grid_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
                           const DynCcoord_t & pixels_strides,
@@ -116,8 +110,6 @@ namespace muGrid {
 
     /**
      * Constructor with initialisation
-     * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
-     * or Unknown
      * @param nb_subdomain_grid_pts number of grid points on the current MPI
      * process (subdomain)
      * @param subdomain_locations location of the current subdomain within the
@@ -134,8 +126,7 @@ namespace muGrid {
      *                    Important: The pixels or subpoints have their own
      *                    storage order that is not affected by this setting.
      */
-    GlobalFieldCollection(Index_t spatial_dimension,
-                          const DynCcoord_t & nb_domain_grid_pts,
+    GlobalFieldCollection(const DynCcoord_t & nb_domain_grid_pts,
                           const DynCcoord_t & nb_subdomain_grid_pts,
                           const DynCcoord_t & subdomain_locations,
                           StorageOrder pixels_storage_order,
@@ -210,7 +201,7 @@ namespace muGrid {
      * upon construction.
      */
     void initialise(const DynCcoord_t & nb_domain_grid_pts,
-                    const DynCcoord_t & nb_subdomain_grid_pts,
+                    const DynCcoord_t & nb_subdomain_grid_pts = {},
                     const DynCcoord_t & subdomain_locations = {},
                     StorageOrder pixels_storage_order =
                         StorageOrder::Automatic);
@@ -222,7 +213,7 @@ namespace muGrid {
      */
     template <size_t Dim>
     void initialise(const Ccoord_t<Dim> & nb_domain_grid_pts,
-                    const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                    const Ccoord_t<Dim> & nb_subdomain_grid_pts = {},
                     const Ccoord_t<Dim> & subdomain_locations = {},
                     StorageOrder pixels_storage_order =
                         StorageOrder::Automatic) {

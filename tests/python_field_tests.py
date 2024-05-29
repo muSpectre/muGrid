@@ -137,14 +137,13 @@ class FieldCheck(unittest.TestCase):
 
     def test_col_major(self):
         dims = (3, 4)
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts),
-                                          self.nb_grid_pts, self.nb_grid_pts,
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, self.nb_grid_pts,
                                           (0,) * len(self.nb_grid_pts),
                                           {})
         f = fc.register_real_field("test-field", dims)
         a = np.array(f)
         self.assertTrue(a.flags.f_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + [1,] + list(self.nb_grid_pts)))
+        self.assertEqual(a.shape, tuple(list(dims) + [1, ] + list(self.nb_grid_pts)))
         strides = np.append([1], np.cumprod(dims))
         strides = np.append(strides, strides[-1])
         strides = np.append(strides,
@@ -157,13 +156,12 @@ class FieldCheck(unittest.TestCase):
         # things.
         dims = (3, 4)
         fc = muGrid.GlobalFieldCollection(
-            len(self.nb_grid_pts), self.nb_grid_pts, self.nb_grid_pts,
-            [0] * len(self.nb_grid_pts),
+            self.nb_grid_pts, self.nb_grid_pts, [0] * len(self.nb_grid_pts),
             muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.RowMajor)
         f = fc.register_real_field("test-field", dims)
         a = np.array(f)
         self.assertTrue(a.flags.c_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + [1,] + list(self.nb_grid_pts)))
+        self.assertEqual(a.shape, tuple(list(dims) + [1, ] + list(self.nb_grid_pts)))
         strides = np.append([1], np.cumprod(self.nb_grid_pts[::-1]))
         strides = np.append(strides, strides[-1])
         strides = np.append(strides, strides[-1] * np.cumprod(dims[::-1]))
@@ -181,6 +179,7 @@ class FieldCheck(unittest.TestCase):
         field_array[:] = 5  # assigne value 5 to pixel 1
 
         self.assertEqual(fc.get_name(), lfc_name)
+
 
 if __name__ == "__main__":
     unittest.main()
