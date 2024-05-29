@@ -98,13 +98,25 @@ namespace muGrid {
     //! Move assignment operator
     StateField & operator=(StateField && other) = delete;
 
-    /**
-     * returns number of old states that are stored
-     */
+    //! return number of old states that are stored
     const Index_t & get_nb_memory() const;
+
+    //! return the number of components stored per sub-point point
+    const Index_t & get_nb_components() const;
+
+    //! returns a const ref to the field's pixel sub-division type
+    const std::string & get_sub_division_tag() const;
+
+    //! returns the physical unit of the values stored in the field
+    const Unit & get_physical_unit() const;
 
     //! return type_id of stored type
     virtual const std::type_info & get_stored_typeid() const = 0;
+
+    /**
+     * assert that the stored type corresponds to the given type id
+     */
+    void assert_typeid(const std::type_info & type) const;
 
     /**
      * cycle the fields (current becomes old, old becomes older,
@@ -265,6 +277,67 @@ namespace muGrid {
   using IntStateField = TypedStateField<Int>;
   //! Alias for unsigned integer-valued state fields
   using Uintfield = TypedStateField<Uint>;
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedStateField<T> & FieldCollection::register_state_field_helper(
+      const std::string & unique_prefix, const Index_t & nb_memory,
+      const Index_t & nb_components, const std::string & sub_division_tag,
+      const Unit & unit, bool allow_existing) {
+    static_assert(
+        std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+        "You can only register state fields templated with one of the "
+        "numeric types Real, Complex, Int, or UInt");
+    if (this->state_field_exists(unique_prefix)) {
+      if (allow_existing) {
+        auto & field{*this->state_fields[unique_prefix]};
+        field.assert_typeid(typeid(T));
+        if (field.get_nb_memory() != nb_memory) {
+          throw FieldCollectionError(
+              "You can't change the number of memory steps of a state field "
+              "by re-registering it.");
+        }
+        if (field.get_nb_components() != nb_components) {
+          throw FieldCollectionError(
+              "You can't change the number of components of a state field "
+              "by re-registering it.");
+        }
+        if (field.get_sub_division_tag() != sub_division_tag) {
+          throw FieldCollectionError(
+              "You can't change the sub-division tag of a state field "
+              "by re-registering it.");
+        }
+        if (field.get_physical_unit() != unit) {
+          throw FieldCollectionError(
+              "You can't change the physical unit of a state field "
+              "by re-registering it.");
+        }
+        return static_cast<TypedStateField<T> &>(field);
+      } else {
+        std::stringstream error{};
+        error << "A StateField of name '" << unique_prefix
+              << "' is already registered in this field collection. "
+              << "Currently registered state fields: ";
+        std::string prelude{""};
+        for (const auto & name_field_pair : this->state_fields) {
+          error << prelude << '\'' << name_field_pair.first << '\'';
+          prelude = ", ";
+        }
+        throw FieldCollectionError(error.str());
+      }
+    }
+
+    //! If you get a compiler warning about narrowing conversion on the
+    //! following line, please check whether you are creating a TypedField
+    //! with the number of components specified in 'int' rather than 'size_t'.
+    TypedStateField<T> * raw_ptr{
+        new TypedStateField<T>{unique_prefix, *this, nb_memory, nb_components,
+                               sub_division_tag, unit}};
+    TypedStateField<T> & retref{*raw_ptr};
+    StateField_ptr field{raw_ptr};
+    this->state_fields[unique_prefix] = std::move(field);
+    return retref;
+  }
 
 }  // namespace muGrid
 

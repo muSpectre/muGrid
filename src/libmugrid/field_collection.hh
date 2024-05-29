@@ -129,10 +129,10 @@ namespace muGrid {
      *                    Important: The pixels or subpoints have their own
      *                    storage order that is not affected by this setting.
      */
-    FieldCollection(ValidityDomain domain, const Index_t & spatial_dimension,
-                    const SubPtMap_t & nb_sub_pts,
-                    StorageOrder storage_order =
-                        StorageOrder::ArrayOfStructures);
+    FieldCollection(
+        ValidityDomain domain, const Index_t & spatial_dimension,
+        const SubPtMap_t & nb_sub_pts,
+        StorageOrder storage_order = StorageOrder::ArrayOfStructures);
 
    public:
     //! Default constructor
@@ -195,8 +195,8 @@ namespace muGrid {
       static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                     "You can only register fields templated with one of the "
                     "numeric types Real, Complex, Int, or Uint");
-      return this->register_field_helper<T>(
-          unique_name, components_shape, sub_division_tag, unit);
+      return this->register_field_helper<T>(unique_name, components_shape,
+                                            sub_division_tag, unit);
     }
 
     /**
@@ -254,17 +254,17 @@ namespace muGrid {
                         const std::string & sub_division_tag = PixelTag,
                         const Unit & unit = Unit::unitless());
 
-      /**
-       * place a new complex-valued field  in the responsibility of this
-       * collection (Note, because fields have protected constructors, users can't
-       * create them
-       * @param unique_name unique identifier for this field
-       * @param nb_components number of components to be stored per sub-point
-       * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
-       * field)
-       * @param sub_division_tag unique identifier of the subdivision scheme
-       * @param unit phyiscal unit of this field
-       */
+    /**
+     * place a new complex-valued field  in the responsibility of this
+     * collection (Note, because fields have protected constructors, users can't
+     * create them
+     * @param unique_name unique identifier for this field
+     * @param nb_components number of components to be stored per sub-point
+     * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
+     * field)
+     * @param sub_division_tag unique identifier of the subdivision scheme
+     * @param unit phyiscal unit of this field
+     */
     TypedField<Complex> &
     register_complex_field(const std::string & unique_name,
                            const Index_t & nb_components,
@@ -587,21 +587,23 @@ namespace muGrid {
     TypedField<T> & register_field_helper(const std::string & unique_name,
                                           const Index_t & nb_components,
                                           const std::string & sub_division_tag,
-                                          const Unit & unit);
+                                          const Unit & unit,
+                                          bool allow_existing = false);
 
     //! internal worker function called by register_<T>_field
     template <typename T>
     TypedField<T> & register_field_helper(const std::string & unique_name,
                                           const Shape_t & components_shape,
                                           const std::string & sub_division_tag,
-                                          const Unit & unit);
+                                          const Unit & unit,
+                                          bool allow_existing = false);
 
     //! internal worker function called by register_<T>_state_field
     template <typename T>
     TypedStateField<T> & register_state_field_helper(
         const std::string & unique_prefix, const Index_t & nb_memory,
         const Index_t & nb_components, const std::string & sub_division_tag,
-        const Unit & unit);
+        const Unit & unit, bool allow_existing = false);
 
    protected:
     /**
@@ -824,111 +826,6 @@ namespace muGrid {
     //! iterator of slow moving index
     PixelIndexIterator_t pixel_index_iterator;
   };
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & FieldCollection::register_field_helper(
-      const std::string & unique_name, const Index_t & nb_components,
-      const std::string & sub_division_tag, const Unit & unit) {
-    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                  "You can only register fields templated with one of the "
-                  "numeric types Real, Complex, Int, or UInt");
-    if (this->field_exists(unique_name)) {
-      std::stringstream error{};
-      error << "A Field of name '" << unique_name
-            << "' is already registered in this field collection. "
-            << "Currently registered fields: ";
-      std::string prelude{""};
-      for (const auto & name_field_pair : this->fields) {
-        error << prelude << '\'' << name_field_pair.first << '\'';
-        prelude = ", ";
-      }
-      throw FieldCollectionError(error.str());
-    }
-
-    //! If you get a compiler warning about narrowing conversion on the
-    //! following line, please check whether you are creating a TypedField with
-    //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T> * raw_ptr{new TypedField<T>{unique_name, *this, nb_components,
-                                              sub_division_tag, unit}};
-    TypedField<T> & retref{*raw_ptr};
-    Field_ptr field{raw_ptr};
-    if (this->initialised) {
-      retref.resize();
-    }
-    this->fields[unique_name] = std::move(field);
-    return retref;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & FieldCollection::register_field_helper(
-      const std::string & unique_name, const Shape_t & components_shape,
-      const std::string & sub_division_tag, const Unit & unit) {
-    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                  "You can only register fields templated with one of the "
-                  "numeric types Real, Complex, Int, or UInt");
-    if (this->field_exists(unique_name)) {
-      std::stringstream error{};
-      error << "A Field of name '" << unique_name
-            << "' is already registered in this field collection. "
-            << "Currently registered fields: ";
-      std::string prelude{""};
-      for (const auto & name_field_pair : this->fields) {
-        error << prelude << '\'' << name_field_pair.first << '\'';
-        prelude = ", ";
-      }
-      throw FieldCollectionError(error.str());
-    }
-
-    //! If you get a compiler warning about narrowing conversion on the
-    //! following line, please check whether you are creating a TypedField with
-    //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T> * raw_ptr{new TypedField<T>{
-        unique_name, *this, components_shape, sub_division_tag, unit}};
-    TypedField<T> & retref{*raw_ptr};
-    Field_ptr field{raw_ptr};
-    if (this->initialised) {
-      retref.resize();
-    }
-    this->fields[unique_name] = std::move(field);
-    return retref;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedStateField<T> & FieldCollection::register_state_field_helper(
-      const std::string & unique_prefix, const Index_t & nb_memory,
-      const Index_t & nb_components, const std::string & sub_division_tag,
-      const Unit & unit) {
-    static_assert(
-        std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-        "You can only register state fields templated with one of the "
-        "numeric types Real, Complex, Int, or UInt");
-    if (this->state_field_exists(unique_prefix)) {
-      std::stringstream error{};
-      error << "A StateField of name '" << unique_prefix
-            << "' is already registered in this field collection. "
-            << "Currently registered state fields: ";
-      std::string prelude{""};
-      for (const auto & name_field_pair : this->state_fields) {
-        error << prelude << '\'' << name_field_pair.first << '\'';
-        prelude = ", ";
-      }
-      throw FieldCollectionError(error.str());
-    }
-
-    //! If you get a compiler warning about narrowing conversion on the
-    //! following line, please check whether you are creating a TypedField
-    //! with the number of components specified in 'int' rather than 'size_t'.
-    TypedStateField<T> * raw_ptr{
-        new TypedStateField<T>{unique_prefix, *this, nb_memory, nb_components,
-                               sub_division_tag, unit}};
-    TypedStateField<T> & retref{*raw_ptr};
-    StateField_ptr field{raw_ptr};
-    this->state_fields[unique_prefix] = std::move(field);
-    return retref;
-  }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>

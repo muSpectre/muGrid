@@ -50,9 +50,8 @@ namespace muGrid {
                          const std::string & sub_division_tag,
                          const Unit & unit)
       : prefix{unique_prefix}, collection{collection}, nb_memory{nb_memory},
-        nb_components{nb_components},
-        sub_division_tag{sub_division_tag}, unit{unit},
-        nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)} {
+        nb_components{nb_components}, sub_division_tag{sub_division_tag},
+        unit{unit}, nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)} {
     if (nb_memory < 1) {
       throw FieldError("State fields must have a memory size of at least 1.");
     }
@@ -66,6 +65,29 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const Index_t & StateField::get_nb_memory() const { return this->nb_memory; }
+
+  /* ---------------------------------------------------------------------- */
+  const Index_t & StateField::get_nb_components() const {
+    return this->nb_components;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const std::string & StateField::get_sub_division_tag() const {
+    return this->sub_division_tag;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const Unit & StateField::get_physical_unit() const { return this->unit; }
+
+  /* ---------------------------------------------------------------------- */
+  void StateField::assert_typeid(const std::type_info & type) const {
+    if (this->get_stored_typeid() != type) {
+      std::stringstream s;
+      s << "Field stores data of type `" << this->get_stored_typeid().name()
+        << "`, which differs from `" << typeid(Int).name() << "`.";
+      throw std::runtime_error(s.str());
+    }
+  }
 
   /* ---------------------------------------------------------------------- */
   void StateField::cycle() {
@@ -88,9 +110,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  FieldCollection & StateField::get_collection() {
-    return this->collection;
-  }
+  FieldCollection & StateField::get_collection() { return this->collection; }
 
   /* ---------------------------------------------------------------------- */
   const std::string & StateField::get_unique_prefix() const {
@@ -103,9 +123,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  RefVector<Field> & StateField::set_fields() {
-    return this->fields;
-  }
+  RefVector<Field> & StateField::set_fields() { return this->fields; }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>

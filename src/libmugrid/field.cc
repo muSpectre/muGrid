@@ -44,8 +44,8 @@ namespace muGrid {
                const Index_t & nb_components,
                const std::string & sub_division_tag, const Unit & unit)
       : name{unique_name}, collection{collection}, nb_components{nb_components},
-        components_shape{nb_components}, nb_sub_pts{collection.get_nb_sub_pts(
-                                             sub_division_tag)},
+        components_shape{nb_components},
+        nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)},
         sub_division_tag{sub_division_tag}, unit{unit} {}
 
   /* ---------------------------------------------------------------------- */
@@ -69,11 +69,9 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void Field::assert_typeid(const std::type_info & type) const {
     if (this->get_stored_typeid() != type) {
-        std::stringstream s;
-        s << "Field stores data of type `"
-          << this->get_stored_typeid().name()
-          << "`, which differs from `"
-          << typeid(Int).name() << "`.";
+      std::stringstream s;
+      s << "Field stores data of type `" << this->get_stored_typeid().name()
+        << "`, which differs from `" << typeid(Int).name() << "`.";
       throw std::runtime_error(s.str());
     }
   }

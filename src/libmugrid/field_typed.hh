@@ -37,6 +37,7 @@
 #define SRC_LIBMUGRID_FIELD_TYPED_HH_
 
 #include "field.hh"
+#include "field_collection.hh"
 #include "grid_common.hh"
 
 #include "Eigen/Dense"
@@ -558,6 +559,119 @@ namespace muGrid {
   using UintField = TypedField<Uint>;
   //! Alias for unsigned integer-valued fields
   using IndexField = TypedField<Index_t>;
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedField<T> & FieldCollection::register_field_helper(
+      const std::string & unique_name, const Index_t & nb_components,
+      const std::string & sub_division_tag, const Unit & unit,
+      bool allow_existing) {
+    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                  "You can only register fields templated with one of the "
+                  "numeric types Real, Complex, Int, or UInt");
+    if (this->field_exists(unique_name)) {
+      if (allow_existing) {
+        auto & field{*this->fields[unique_name]};
+        field.assert_typeid(typeid(T));
+        if (field.get_nb_components() != nb_components) {
+          throw FieldCollectionError(
+              "You can't change the number of components of a field "
+              "by re-registering it.");
+        }
+        if (field.get_sub_division_tag() != sub_division_tag) {
+          throw FieldCollectionError(
+              "You can't change the sub-division tag of a field "
+              "by re-registering it.");
+        }
+        if (field.get_physical_unit() != unit) {
+          throw FieldCollectionError(
+              "You can't change the physical unit of a field "
+              "by re-registering it.");
+        }
+        return static_cast<TypedField<T> &>(field);
+      } else {
+        std::stringstream error{};
+        error << "A Field of name '" << unique_name
+              << "' is already registered in this field collection. "
+              << "Currently registered fields: ";
+        std::string prelude{""};
+        for (const auto & name_field_pair : this->fields) {
+          error << prelude << '\'' << name_field_pair.first << '\'';
+          prelude = ", ";
+        }
+        throw FieldCollectionError(error.str());
+      }
+    }
+
+    //! If you get a compiler warning about narrowing conversion on the
+    //! following line, please check whether you are creating a TypedField with
+    //! the number of components specified in 'int' rather than 'size_t'.
+    TypedField<T> * raw_ptr{new TypedField<T>{unique_name, *this, nb_components,
+                                              sub_division_tag, unit}};
+    TypedField<T> & retref{*raw_ptr};
+    Field_ptr field{raw_ptr};
+    if (this->initialised) {
+      retref.resize();
+    }
+    this->fields[unique_name] = std::move(field);
+    return retref;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  TypedField<T> & FieldCollection::register_field_helper(
+      const std::string & unique_name, const Shape_t & components_shape,
+      const std::string & sub_division_tag, const Unit & unit,
+      bool allow_existing) {
+    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                  "You can only register fields templated with one of the "
+                  "numeric types Real, Complex, Int, or UInt");
+    if (this->field_exists(unique_name)) {
+      if (allow_existing) {
+        auto & field{*this->fields[unique_name]};
+        field.assert_typeid(typeid(T));
+        if (field.get_components_shape() != components_shape) {
+          throw FieldCollectionError(
+              "You can't change the shape of a field by re-registering it.");
+        }
+        if (field.get_sub_division_tag() != sub_division_tag) {
+          throw FieldCollectionError(
+              "You can't change the sub-division tag of a field "
+              "by re-registering it.");
+        }
+        if (field.get_physical_unit() != unit) {
+          throw FieldCollectionError(
+              "You can't change the physical unit of a field "
+              "by re-registering it.");
+        }
+        return static_cast<TypedField<T> &>(field);
+      } else {
+        std::stringstream error{};
+        error << "A Field of name '" << unique_name
+              << "' is already registered in this field collection. "
+              << "Currently registered fields: ";
+        std::string prelude{""};
+        for (const auto & name_field_pair : this->fields) {
+          error << prelude << '\'' << name_field_pair.first << '\'';
+          prelude = ", ";
+        }
+        throw FieldCollectionError(error.str());
+      }
+    }
+
+    //! If you get a compiler warning about narrowing conversion on the
+    //! following line, please check whether you are creating a TypedField with
+    //! the number of components specified in 'int' rather than 'size_t'.
+    TypedField<T> * raw_ptr{new TypedField<T>{
+        unique_name, *this, components_shape, sub_division_tag, unit}};
+    TypedField<T> & retref{*raw_ptr};
+    Field_ptr field{raw_ptr};
+    if (this->initialised) {
+      retref.resize();
+    }
+    this->fields[unique_name] = std::move(field);
+    return retref;
+  }
 
 }  // namespace muGrid
 
