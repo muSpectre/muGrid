@@ -1,8 +1,29 @@
 Getting Started
 ~~~~~~~~~~~~~~~
 
-Obtaining *µ*\Grid
+Python quick start
 ******************
+
+To install µGrid's Python bindings, run
+
+    pip install muGrid
+
+Note that on most platforms this will install a binary wheel that was
+compiled with a minimal configuration. To compile for your specific platform
+use
+
+    pip install -v --no-binary muGrid muGrid
+
+which will compile the code. µGrid will autodetect
+[MPI](https://www.mpi-forum.org/).
+For I/O, it will try to use
+[Unidata NetCDF](https://www.unidata.ucar.edu/software/netcdf/)
+for serial builds and
+[PnetCDF](https://parallel-netcdf.github.io/) for MPI-parallel builds.
+Monitor output to see which of these options were automatically detected.
+
+Obtaining *µ*\Grid's source code
+********************************
 
 *µ*\Grid is hosted on a git repository on `GitHub <https://github.com/>`_. To clone it, run
 
@@ -20,9 +41,10 @@ The latter option requires you to have a user account on `GitHub`_.
 
 Building *µ*\Grid
 *****************
+
 *µ*\Grid uses `Meson <https://mesonbuild.com/>`_ (0.42.0 or higher) as its build system.
 
-The current (and possibly incomplete list of) dependencies are
+The current (and possibly incomplete list of) dependencies are:
 
 - `Meson <https://mesonbuild.com/>`_
 - `git <https://git-scm.com/>`_
