@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Python Bindings" href="Python.html" /><link rel="prev" title="Summary" href="Summary.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>Getting Started - µGrid 0.90.1-28-g1c624a1 documentation</title>
+        <title>Getting Started - µGrid 0.90.1-29-gd2446df documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-28-g1c624a1
+      <a href="index.html"><div class="brand">µGrid 0.90.1-29-gd2446df
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-28-g1c624a1
+  <span class="sidebar-brand-text">µGrid 0.90.1-29-gd2446df
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -263,8 +263,28 @@
         <article role="main" id="furo-main-content">
           <section id="getting-started">
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h1>
-<section id="obtaining-grid">
-<h2>Obtaining <em>µ</em>Grid<a class="headerlink" href="#obtaining-grid" title="Link to this heading">¶</a></h2>
+<section id="python-quick-start">
+<h2>Python quick start<a class="headerlink" href="#python-quick-start" title="Link to this heading">¶</a></h2>
+<p>To install µGrid’s Python bindings, run</p>
+<blockquote>
+<div><p>pip install muGrid</p>
+</div></blockquote>
+<p>Note that on most platforms this will install a binary wheel that was
+compiled with a minimal configuration. To compile for your specific platform
+use</p>
+<blockquote>
+<div><p>pip install -v –no-binary muGrid muGrid</p>
+</div></blockquote>
+<p>which will compile the code. µGrid will autodetect
+[MPI](<a class="reference external" href="https://www.mpi-forum.org/">https://www.mpi-forum.org/</a>).
+For I/O, it will try to use
+[Unidata NetCDF](<a class="reference external" href="https://www.unidata.ucar.edu/software/netcdf/">https://www.unidata.ucar.edu/software/netcdf/</a>)
+for serial builds and
+[PnetCDF](<a class="reference external" href="https://parallel-netcdf.github.io/">https://parallel-netcdf.github.io/</a>) for MPI-parallel builds.
+Monitor output to see which of these options were automatically detected.</p>
+</section>
+<section id="obtaining-grid-s-source-code">
+<h2>Obtaining <em>µ</em>Grid’s source code<a class="headerlink" href="#obtaining-grid-s-source-code" title="Link to this heading">¶</a></h2>
 <p><em>µ</em>Grid is hosted on a git repository on <a class="reference external" href="https://github.com/">GitHub</a>. To clone it, run</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/muSpectre/muGrid.git
 </pre></div>
@@ -278,7 +298,7 @@
 <section id="building-grid">
 <h2>Building <em>µ</em>Grid<a class="headerlink" href="#building-grid" title="Link to this heading">¶</a></h2>
 <p><em>µ</em>Grid uses <a class="reference external" href="https://mesonbuild.com/">Meson</a> (0.42.0 or higher) as its build system.</p>
-<p>The current (and possibly incomplete list of) dependencies are</p>
+<p>The current (and possibly incomplete list of) dependencies are:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://mesonbuild.com/">Meson</a></p></li>
 <li><p><a class="reference external" href="https://git-scm.com/">git</a></p></li>
@@ -388,7 +408,8 @@ be documented and have unit tests. Please submit merge requests for review.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Getting Started</a><ul>
-<li><a class="reference internal" href="#obtaining-grid">Obtaining <em>µ</em>Grid</a></li>
+<li><a class="reference internal" href="#python-quick-start">Python quick start</a></li>
+<li><a class="reference internal" href="#obtaining-grid-s-source-code">Obtaining <em>µ</em>Grid’s source code</a></li>
 <li><a class="reference internal" href="#building-grid">Building <em>µ</em>Grid</a></li>
 <li><a class="reference internal" href="#getting-help-and-reporting-bugs">Getting help and reporting bugs</a></li>
 <li><a class="reference internal" href="#contribute">Contribute</a></li>
@@ -403,7 +424,7 @@ be documented and have unit tests. Please submit merge requests for review.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=8ea0ab70"></script>
+</div><script src="_static/documentation_options.js?v=84098f84"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
