@@ -6,13 +6,17 @@ Python quick start
 
 To install µGrid's Python bindings, run
 
-    pip install muGrid
+.. code-block:: sh
+
+    $ pip install muGrid
 
 Note that on most platforms this will install a binary wheel that was
 compiled with a minimal configuration. To compile for your specific platform
 use
 
-    pip install -v --no-binary muGrid muGrid
+.. code-block:: sh
+
+    $ pip install -v --no-binary muGrid muGrid
 
 which will compile the code. µGrid will autodetect
 [MPI](https://www.mpi-forum.org/).
