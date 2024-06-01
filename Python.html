@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="C++ Bindings" href="Cplusplus.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>Python Bindings - µGrid 0.90.1-39-g476ba84 documentation</title>
+        <title>Python Bindings - µGrid 0.90.1-41-g02e5bc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-39-g476ba84
+      <a href="index.html"><div class="brand">µGrid 0.90.1-41-g02e5bc1
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-39-g476ba84
+  <span class="sidebar-brand-text">µGrid 0.90.1-41-g02e5bc1
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -461,6 +461,58 @@ field components are stored next to each other in memory.</p>
 <em>µ</em>Grid uses <a class="reference external" href="https://www.unidata.ucar.edu/software/netcdf/">Unidata NetCDF</a> when build
 with just serial capabilities and <a class="reference external" href="https://parallel-netcdf.github.io/">PnetCDF</a> when build
 with MPI enabled.</p>
+<p>I/O is handled by the <cite>FileIONetCDF</cite> class. The following example shows how to write all fields
+from a field collection to disk:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">muGrid</span> <span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">FileIONetCDF</span><span class="p">,</span> <span class="n">OpenMode</span>
+
+<span class="c1"># Two dimensional grid</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;element&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+
+<span class="c1"># Get a tensor-field (for example to represent the strain)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span>
+    <span class="s1">&#39;strain&#39;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
+    <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># shape of components</span>
+    <span class="s1">&#39;element&#39;</span>  <span class="c1"># sub-point type</span>
+<span class="p">)</span>
+
+<span class="c1"># Fill the field with random numbers</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+
+<span class="c1"># Initialize a file I/O object</span>
+<span class="n">file</span> <span class="o">=</span> <span class="n">FileIONetCDF</span><span class="p">(</span><span class="s1">&#39;example.nc&#39;</span><span class="p">,</span> <span class="n">OpenMode</span><span class="o">.</span><span class="n">Overwrite</span><span class="p">)</span>
+<span class="n">file</span><span class="o">.</span><span class="n">register_field_collection</span><span class="p">(</span><span class="n">fc</span><span class="p">)</span>  <span class="c1"># Register the field collection with the file</span>
+<span class="n">file</span><span class="o">.</span><span class="n">append_frame</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>  <span class="c1"># Write all fields of the field collection to the file</span>
+</pre></div>
+</div>
+<p>The file has the following structure (output of <cite>ncdump -h</cite>):</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">netcdf</span><span class="w"> </span><span class="n">example</span><span class="w"> </span><span class="p">{</span>
+<span class="nl">dimensions</span><span class="p">:</span>
+<span class="w">        </span><span class="n">frame</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UNLIMITED</span><span class="w"> </span><span class="p">;</span><span class="w"> </span><span class="c1">// (1 currently)</span>
+<span class="w">        </span><span class="n">tensor_dim__strain</span><span class="mi">-0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">;</span>
+<span class="w">        </span><span class="n">tensor_dim__strain</span><span class="mi">-1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">;</span>
+<span class="w">        </span><span class="n">subpt__element</span><span class="mi">-5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="p">;</span>
+<span class="w">        </span><span class="n">nx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">11</span><span class="w"> </span><span class="p">;</span>
+<span class="w">        </span><span class="n">ny</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span><span class="w"> </span><span class="p">;</span>
+<span class="w">        </span><span class="n">nz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">13</span><span class="w"> </span><span class="p">;</span>
+<span class="nl">variables</span><span class="p">:</span>
+<span class="w">        </span><span class="kt">double</span><span class="w"> </span><span class="nf">strain</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span><span class="w"> </span><span class="n">tensor_dim__strain</span><span class="mi">-0</span><span class="p">,</span><span class="w"> </span><span class="n">tensor_dim__strain</span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="n">subpt__element</span><span class="mi">-5</span><span class="p">,</span><span class="w"> </span><span class="n">nx</span><span class="p">,</span><span class="w"> </span><span class="n">ny</span><span class="p">,</span><span class="w"> </span><span class="n">nz</span><span class="p">)</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="nl">strain</span><span class="p">:</span><span class="n">unit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;no unit provided&quot;</span><span class="w"> </span><span class="p">;</span>
+
+<span class="c1">// global attributes:</span>
+<span class="w">                </span><span class="o">:</span><span class="n">creation_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;01-06-2024 (d-m-Y)&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">creation_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;23:02:06 (H:M:S)&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">last_modified_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;01-06-2024 (d-m-Y)&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">last_modified_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;23:02:06 (H:M:S)&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">muGrid_version_info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;µGrid version: 0.90.1+40-g5bc73b30</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                        </span><span class="s">&quot;&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">muGrid_git_hash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;5bc73b305881ef837ce6598568d41eb3d0307c41&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">muGrid_description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;0.90.1+40-g5bc73b30&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="w">                </span><span class="o">:</span><span class="n">muGrid_git_branch_is_dirty</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;false&quot;</span><span class="w"> </span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
 </section>
 </section>
 
@@ -538,7 +590,7 @@ with MPI enabled.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=699bb022"></script>
+</div><script src="_static/documentation_options.js?v=b8c6a37f"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>

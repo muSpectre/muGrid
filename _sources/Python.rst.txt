@@ -178,3 +178,38 @@ Fields can be written to disk in the `NetCDF <https://en.wikipedia.org/wiki/NetC
 *µ*\Grid uses `Unidata NetCDF <https://www.unidata.ucar.edu/software/netcdf/>`_ when build
 with just serial capabilities and `PnetCDF <https://parallel-netcdf.github.io/>`_ when build
 with MPI enabled.
+
+I/O is handled by the `FileIONetCDF` class. The following example shows how to write all fields
+from a field collection to disk:
+
+.. literalinclude:: ../../examples/io.py
+    :language: python
+
+The file has the following structure (output of `ncdump -h`):
+
+.. code-block::
+
+    netcdf example {
+    dimensions:
+            frame = UNLIMITED ; // (1 currently)
+            tensor_dim__strain-0 = 3 ;
+            tensor_dim__strain-1 = 3 ;
+            subpt__element-5 = 5 ;
+            nx = 11 ;
+            ny = 12 ;
+            nz = 13 ;
+    variables:
+            double strain(frame, tensor_dim__strain-0, tensor_dim__strain-1, subpt__element-5, nx, ny, nz) ;
+                    strain:unit = "no unit provided" ;
+
+    // global attributes:
+                    :creation_date = "01-06-2024 (d-m-Y)" ;
+                    :creation_time = "23:02:06 (H:M:S)" ;
+                    :last_modified_date = "01-06-2024 (d-m-Y)" ;
+                    :last_modified_time = "23:02:06 (H:M:S)" ;
+                    :muGrid_version_info = "µGrid version: 0.90.1+40-g5bc73b30\n",
+                            "" ;
+                    :muGrid_git_hash = "5bc73b305881ef837ce6598568d41eb3d0307c41" ;
+                    :muGrid_description = "0.90.1+40-g5bc73b30" ;
+                    :muGrid_git_branch_is_dirty = "false" ;
+    }
