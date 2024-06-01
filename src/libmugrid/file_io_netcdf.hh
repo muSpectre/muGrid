@@ -134,19 +134,19 @@ namespace muGrid {
                   "Unsupported integer storage size");
     return NC_UINT64;
   }
-  template<>
-  constexpr  nc_type netcdf_signed_type<1>() {
+  template <>
+  constexpr nc_type netcdf_signed_type<1>() {
     return NC_BYTE;
   }
-  template<>
+  template <>
   constexpr nc_type netcdf_signed_type<2>() {
     return NC_SHORT;
   }
-  template<>
-  constexpr  nc_type netcdf_signed_type<4>() {
+  template <>
+  constexpr nc_type netcdf_signed_type<4>() {
     return NC_INT;
   }
-  template<>
+  template <>
   constexpr nc_type netcdf_signed_type<8>() {
     return NC_INT64;
   }
@@ -157,19 +157,19 @@ namespace muGrid {
                   "Unsupported unsigned integer storage size");
     return NC_UINT64;
   }
-  template<>
+  template <>
   constexpr nc_type netcdf_unsigned_type<1>() {
     return NC_UBYTE;
   }
-  template<>
+  template <>
   constexpr nc_type netcdf_unsigned_type<2>() {
     return NC_USHORT;
   }
-  template<>
+  template <>
   constexpr nc_type netcdf_unsigned_type<4>() {
     return NC_UINT;
   }
-  template<>
+  template <>
   constexpr nc_type netcdf_unsigned_type<8>() {
     return NC_UINT64;
   }
@@ -289,8 +289,7 @@ namespace muGrid {
         size{};  //!< Length of dimension; that is, number of values for this
                  //!< dimension as an index to variables that use it. 0 is
                  //!< reserved for the unlimited dimension, NC_UNLIMITED.
-    std::string
-        name;  //!< Dimension name. Must be a legal netCDF identifier.
+    std::string name;  //!< Dimension name. Must be a legal netCDF identifier.
     bool initialised{
         false};  //!< bool to check the initialisation status of a dimension
                  //!< only true if size was correct initialised.
@@ -777,9 +776,9 @@ namespace muGrid {
 
    protected:
     std::string name;  // Variable name. Must be a legal netCDF identifier.
-    nc_type data_type{NC_NAT};  // One of the predefined netCDF external data
-                                // types. NAT = Not A Type.
-    IOSize_t ndims{};           // Number of dimensions of the variable.
+    nc_type data_type{NC_NAT};     // One of the predefined netCDF external data
+                                   // types. NAT = Not A Type.
+    IOSize_t ndims{};              // Number of dimensions of the variable.
     int id{DEFAULT_NETCDFVAR_ID};  // location to store the returned NetCDF
                                    // variable ID. Variable IDs starting at 0.
     std::vector<std::shared_ptr<NetCDFDim>> netcdf_dims{
@@ -843,9 +842,8 @@ namespace muGrid {
     //! A vector of IOSize_t values specifying the index in the variable
     //! where the first of the data values will be written. This function gives
     //! the start for distributed local fields written with ncmu_put_varn_all
-    std::vector<IOSize_t>
-    get_start_local(const Index_t & frame,
-                    muGrid::Field & local_pixels) const;
+    std::vector<IOSize_t> get_start_local(const Index_t & frame,
+                                          muGrid::Field & local_pixels) const;
 
     // A vector of Size_t integers that specifies the sampling interval
     // along each dimension of the netCDF variable.
@@ -929,9 +927,8 @@ namespace muGrid {
     //! A vector of IOSize_t values specifying the index in the variable
     //! where the first of the data values will be written. This function gives
     //! the start for distributed local fields written with ncmu_put_varn_all
-    std::vector<IOSize_t>
-    get_start_local(const Index_t & frame,
-                    muGrid::Field & local_pixels) const;
+    std::vector<IOSize_t> get_start_local(const Index_t & frame,
+                                          muGrid::Field & local_pixels) const;
 
     // A vector of Size_t integers that specifies the sampling interval
     // along each dimension of the netCDF variable.
@@ -1191,7 +1188,15 @@ namespace muGrid {
   };
 
   /**
-   * FileIO class for NetCDF files.
+   * @class FileIONetCDF
+   * @brief A class for handling NetCDF files in the µGrid codebase.
+   *
+   * This class inherits from the FileIOBase class and provides specific
+   * functionality for handling NetCDF files. NetCDF (Network Common Data
+   * Format) is a self-describing, machine-independent data format that support
+   * the creation, access, and sharing of array-oriented scientific data.
+   *
+   * @extends FileIOBase
    */
   class FileIONetCDF : public FileIOBase {
    public:
@@ -1210,73 +1215,200 @@ namespace muGrid {
     FileIONetCDF() = delete;
 
     /**
-     * Constructor with the domain's number of grid points in each direciton,
-     * the number of components to transform, and the communicator
+     * @brief Constructs a new FileIONetCDF object.
+     *
+     * This constructor creates a new FileIONetCDF object with the specified
+     * file name, open mode, and communicator. The FileIONetCDF class is used
+     * for handling NetCDF files in the µGrid codebase.
+     *
+     * @param file_name The name of the file to be handled. This should be a
+     * valid file path.
+     * @param open_mode The mode in which the file should be opened. This should
+     * be a valid mode from the FileIOBase::OpenMode enumeration.
+     * @param comm The communicator to be used for parallel I/O operations. If
+     * not provided, a default Communicator object is used.
      */
     FileIONetCDF(const std::string & file_name,
                  const FileIOBase::OpenMode & open_mode,
                  Communicator comm = Communicator());
 
-    //! Copy constructor
+    /**
+     * @brief Copy constructor (deleted)
+     *
+     * This copy constructor is deleted to prevent copying of FileIONetCDF
+     * objects.
+     *
+     * @param other The other FileIONetCDF object to be copied.
+     */
     FileIONetCDF(const FileIONetCDF & other) = delete;
 
-    //! Move constructor
+    /**
+     * @brief Move constructor (deleted)
+     *
+     * This move constructor is deleted to prevent moving of FileIONetCDF
+     * objects.
+     *
+     * @param other The other FileIONetCDF object to be moved.
+     */
     FileIONetCDF(FileIONetCDF && other) = delete;
 
-    //! Destructor
+    /**
+     * @brief Destructor
+     *
+     * This is the destructor for the FileIONetCDF class. It is responsible for
+     * freeing any resources that the object may have acquired during its
+     * lifetime.
+     */
     virtual ~FileIONetCDF();
 
-    //! Copy assignment operator
+    /**
+     * @brief Copy assignment operator (deleted)
+     *
+     * This copy assignment operator is deleted to prevent copying of
+     * FileIONetCDF objects.
+     *
+     * @param other The other FileIONetCDF object to be copied.
+     * @return A reference to the current object.
+     */
     FileIONetCDF & operator=(const FileIONetCDF & other) = delete;
 
-    //! Move assignment operator
+    /**
+     * @brief Move assignment operator (deleted)
+     *
+     * This move assignment operator is deleted to prevent moving of
+     * FileIONetCDF objects.
+     *
+     * @param other The other FileIONetCDF object to be moved.
+     * @return A reference to the current object.
+     */
     FileIONetCDF & operator=(FileIONetCDF && other) = delete;
 
-    //! Tell the I/O object about the field collections we want to dump to this
-    //! file before the file is opened
-    //! @parameter field_names -- name of fields from the field collection that
-    //! schould be saved in the NetCDF file. This parameter should be used if
-    //! not all fields from the field collection will be written to the file
-    //! (default case).
+    /**
+     * @brief Registers the field collections that should be written to the
+     * file.
+     *
+     * This function should be called before the file is opened. It allows the
+     * user to specify which fields from the field collection should be saved in
+     * the NetCDF file.
+     *
+     * @param fc The field collection to be registered.
+     * @param field_names A vector of names of fields from the field collection
+     * that should be saved in the NetCDF file. This parameter should be used if
+     * not all fields from the field collection will be written to the file
+     * (default case).
+     * @param state_field_unique_prefixes A vector of unique prefixes for state
+     * fields.
+     */
     void register_field_collection(
         muGrid::FieldCollection & fc,
         std::vector<std::string> field_names = {REGISTER_ALL_FIELDS},
         std::vector<std::string> state_field_unique_prefixes = {
             REGISTER_ALL_STATE_FIELDS}) final;
 
-    //! close file
+    /**
+     * @brief Closes the file.
+     *
+     * This function is used to close the NetCDF file after all operations are
+     * done.
+     */
     void close() final;
 
-    //! read the fields identified by `field_names` frame from file
+    /**
+     * @brief Reads the specified fields from the file.
+     *
+     * This function reads the fields identified by `field_names` from the
+     * specified frame in the file.
+     *
+     * @param frame The frame from which to read the fields.
+     * @param field_names A vector of names of fields to be read from the file.
+     */
     void read(const Index_t & frame,
               const std::vector<std::string> & field_names) final;
 
-    //! read the fields in frame from file
+    /**
+     * @brief Reads all fields from the specified frame in the file.
+     *
+     * This function reads all fields from the specified frame in the file.
+     *
+     * @param frame The frame from which to read the fields.
+     */
     void read(const Index_t & frame) final;
 
-    //! write contents of all fields within the field collection with the name
-    //! in field_names to the frame in file
+    /**
+     * @brief Writes the specified fields to the file.
+     *
+     * This function writes the contents of all fields within the field
+     * collection with the name in `field_names` to the specified frame in the
+     * file.
+     *
+     * @param frame The frame to which to write the fields.
+     * @param field_names A vector of names of fields to be written to the file.
+     */
     void write(const Index_t & frame,
                const std::vector<std::string> & field_names) final;
 
-    //! write contents of all fields within the field collection to the file
+    /**
+     * @brief Writes all fields to the file.
+     *
+     * This function writes the contents of all fields within the field
+     * collection to the specified frame in the file.
+     *
+     * @param frame The frame to which to write the fields.
+     */
     void write(const Index_t & frame) final;
 
-    //! checks if the frame is valid and computes the corresponding positive
-    //! frame value for a negative frame value. Examples:
-    //! a) nb_frames = 5; frame_in = -3; frame_out = 2
-    //! b) nb_frames = 5; frame_in = 3; frame_out = 3
-    //! c) nb_frames = 5; frame_in = 7; Error
-    //! d) nb_frames = 5; frame_in = -6; Error
+    /**
+     * @brief Checks if the frame is valid and computes the corresponding
+     * positive frame value for a negative frame value.
+     *
+     * This function checks if the frame is valid and computes the corresponding
+     * positive frame value for a negative frame value. For example, if the
+     * total number of frames is 5:
+     * - If the input frame is -3, the output frame is 2.
+     * - If the input frame is 3, the output frame is 3.
+     * - If the input frame is 7 or -6, an error is thrown.
+     *
+     * @param frame The frame to be checked and converted. This can be a
+     * positive or negative integer.
+     * @return The corresponding positive frame value for the input frame.
+     * @throws FileIOError If the input frame is not valid (i.e., it is greater
+     * than the total number of frames or less than the negative of the total
+     * number of frames).
+     */
     Index_t handle_frame(Index_t frame) const;
-    //! static version of handle_frame
+
+    /**
+     * @brief Checks if the frame is valid and computes the corresponding
+     * positive frame value for a negative frame value (static version).
+     *
+     * This is a static version of the handle_frame function. It performs the
+     * same operation but takes an additional parameter for the total number of
+     * frames.
+     *
+     * @param frame The frame to be checked and converted. This can be a
+     * positive or negative integer.
+     * @param tot_nb_frames The total number of frames.
+     * @return The corresponding positive frame value for the input frame.
+     * @throws FileIOError If the input frame is not valid (i.e., it is greater
+     * than the total number of frames or less than the negative of the total
+     * number of frames).
+     */
     static Index_t handle_frame(Index_t frame, Index_t tot_nb_frames);
 
-    //! register a NetCDFGlobalAtt to the global_attributes of FileIONetCDF.
-    //! This function can only be used in open_mode =
-    //! FileIOBase::OpenMode::Write and before write() was called the first time
-    //! otherwise there is the danger of having time expensive NetCDF header
-    //! expansions, which is the reason why this is prevented.
+    /**
+     * @brief Registers a global attribute to the NetCDF file.
+     *
+     * This function can only be used in open_mode = FileIOBase::OpenMode::Write
+     * and before write() was called the first time. Otherwise, there is the
+     * danger of having time expensive NetCDF header expansions, which is the
+     * reason why this is prevented.
+     *
+     * @tparam T The type of the value to be written as a global attribute.
+     * @param att_name The name of the attribute.
+     * @param value The value of the attribute.
+     * @throws FileIOError If the global attributes are already defined or if
+     * the open mode is not Write.
+     */
     template <class T>
     void write_global_attribute(const std::string & att_name, T value) {
       if (this->global_attributes_defined) {
@@ -1295,20 +1427,48 @@ namespace muGrid {
       this->global_attributes.add_attribute(att_name, value);
     }
 
-    //! get a NetCDfGlobalAtt from the FileIONetCDF object by its name
+    /**
+     * @brief Retrieves a global attribute from the NetCDF file by its name.
+     *
+     * This function is used to fetch a global attribute from the NetCDF file.
+     * The attribute is identified by its name.
+     *
+     * @param att_name The name of the attribute.
+     * @return A constant reference to the NetCDFGlobalAtt object representing
+     * the global attribute.
+     */
     const NetCDFGlobalAtt &
     read_global_attribute(const std::string & att_name) const;
 
-    //! get a const std::vector<std::string> with the names of all current
-    //! global attributes
+    /**
+     * @brief Retrieves the names of all current global attributes in the NetCDF
+     * file.
+     *
+     * This function is used to fetch the names of all global attributes present
+     * in the NetCDF file.
+     *
+     * @return A constant vector of strings containing the names of all current
+     * global attributes.
+     */
     const std::vector<std::string> read_global_attribute_names() const;
 
-    //! update the value/s or name of an exisiting (already written to the
-    //! NetCDF file) global attribute. This is only allowed if the changes do
-    //! not lead to an increas of the size of the global attribute and the
-    //! data_type of the attribute is not changed. This function can only be
-    //! used in open_mode = FileIOBase::OpenMode::Write or
-    //! FileIOBase::OpenMode::Append.
+    /**
+     * @brief Updates the value or name of an existing global attribute in the
+     * NetCDF file.
+     *
+     * This function can only be used in open_mode = FileIOBase::OpenMode::Write
+     * or FileIOBase::OpenMode::Append. The changes are only allowed if they do
+     * not lead to an increase in the size of the global attribute and the
+     * data_type of the attribute is not changed.
+     *
+     * @tparam T The type of the new value for the global attribute.
+     * @param old_att_name The current name of the attribute.
+     * @param new_att_name The new name for the attribute.
+     * @param new_att_value The new value for the attribute.
+     * @throws FileIOError If the function is called in a mode other than Write
+     * or Append, or if the attribute was not previously written to the NetCDF
+     * file.
+     */
     template <class T>
     void update_global_attribute(const std::string & old_att_name,
                                  const std::string & new_att_name,
@@ -1441,8 +1601,7 @@ namespace muGrid {
     //!                computed by ncmu_inq().
     //! @ unlimdimid : the NetCDF dimension ID of the unlimited dimension, i.e.
     //!                computed by ncmu_inq().
-    void register_netcdf_dimension_ids(std::uint64_t ndims,
-                                       Index_t unlimdimid);
+    void register_netcdf_dimension_ids(std::uint64_t ndims, Index_t unlimdimid);
 
     //! inquiry and register the variable ids of the NetCDF file (to read or
     //! append a file)
@@ -1488,12 +1647,11 @@ namespace muGrid {
     //! stes the flag netcdf_file_changed to true if it is not already true
     void netcdf_file_changes();
 
-
     int netcdf_id{-1};  // the netcdf ID, -1 is an invalid value
     NetCDFMode netcdf_mode{
-        NetCDFMode::UndefinedMode};  // save the modus of the NetCDF file e.g.
-                                     // after ncmu_create it is in define_mode,
-                                     // thus netcdf_mode = DefineMode.
+        NetCDFMode::UndefinedMode};   // save the modus of the NetCDF file e.g.
+                                      // after ncmu_create it is in define_mode,
+                                      // thus netcdf_mode = DefineMode.
     bool netcdf_file_changed{false};  // is set to true if FileIONetCDF changes
                                       // something in the NetCDF file
     bool global_attributes_defined{
