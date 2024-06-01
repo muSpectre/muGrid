@@ -14,9 +14,17 @@ envdata.append('TESTS_BUILDDIR', meson.current_build_dir())
 # Python unit tests
 #
 
-test('serial',
-     python,
-     args: [files('field_collection.py')],
-     env: envdata,
-     depends: [mugrid_python],
-     timeout: test_timeout)
+examples = [
+    'components.py',
+    'field_collection.py',
+    'sub_points.py'
+]
+
+foreach example : examples
+    test('examples',
+         python,
+         args : [files(example)],
+         env : envdata,
+         depends : [mugrid_python],
+         timeout : test_timeout)
+endforeach
