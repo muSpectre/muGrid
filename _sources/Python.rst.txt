@@ -73,36 +73,57 @@ There are two kinds of field collections:
   An example would be the elastic constants of a material that only exists at
   certain locations in the domain.
 
-A global field collection can be initialized as follows:
+The following example shows how to initialize a field collection and create scalar fields:
 
-.. code-block:: Python
+.. literalinclude:: ../../examples/python/field_collection.py
+    :language: python
 
-    from muGrid import GlobalFieldCollection
-    fc = GlobalFieldCollection(3, {'element': 2})
-    fc.initialise([11, 12, 13], [11, 12, 13], [0, 0, 0])
+The first argument to the constructor of `FieldCollection` is the spatial dimension.
+Fields are then registered with the field accessor methods of the field collection,
+e.g. `real_field` in the example above. Fields are _named_, and the name needs to be
+unique. Accessing a field of the same name yield the same field object.
 
-The first argument is the spatial dimension, the second argument defines sub-points.
-A field that is defined on `element` has two sub-points that in the example that we
-will follow through now are two (finite) elements that are the triangles that constitute
-half of a pixel each. The `initialise` method defines
-the spatial discretization of the domain, taking the number of pixels as the first
-argument.
+Note the `FieldCollection` additionally has register method, e.g. `register_real_field`.
+The different to `real_field` is that the explicit registration of the field fails if
+it already exists, while the accessor method `real_field` registers it if it does not exist
+but returns the existing field if it does.
 
-We can now register a new field in the collection:
+Components
+**********
 
-.. code-block:: Python
+In the above example, we registered a scalar field, which has one component. Vector or
+tensor-valued field can be defined by specifying either simply a number of components or
+the shape of the components explicitly. The following example shows how to create a
+tensor-valued field that contains 2 x 2 matrices:
 
-    displacement_field = fc.register_real_field('displacement', 3, 'element')
+.. literalinclude:: ../../examples/python/components.py
+    :language: python
 
-Note that a field can only be registered once in a collection and needs to have a unique
-name. We can query the field by name:
+Sub-points
+**********
 
-.. code-block:: Python
+A pixel can be subdivided into multiple sub-points, each of which holds a value (scalar,
+vector or tensor) of the field. Examples for sub-points are elements or quadrature points
+in a the finite element method.
 
-    displacement_field = fc.get_real_field('displacement')
+Sub-points are named, e.g. common names would be `element` for subdivision into elements or
+`quad` for quadrature points. The name of the subdivision must be specified when the field
+is created.
 
-Working with fields
-*******************
+The following example initializes a three-dimension grid with
+a sub-division of each pixel into five elements:
+
+.. literalinclude:: ../../examples/python/sub_points.py
+    :language: python
+
+The examples demonstrates two ways of accessing the field. The convenience accessor `p` (that
+we also used in the above examples) and the new accessor `s`. Both yield a numpy array that is
+a view on the underlying data, but with different shapes. The `s` accessor has the shape
+`(components, sub-points, pixels)` and exposes the sub-points explicitly. The `p` accessor folds
+the sub-points into the last dimension of the components.
+
+numpy views
+***********
 
 The multidimensional array representation of a field is accessible via the
 `array` method.
@@ -118,7 +139,8 @@ The pixel-representation can be obtained by
 
     a = displacement_field.array(muGrid.IterUnit.Pixel)
 
-Because those operations are used to frequently, there are shortcuts:
+Because those operations are used to frequently, there are shortcuts already
+introduced in the examples above:
 
 .. code-block:: Python
 

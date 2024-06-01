@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="C++ Bindings" href="Cplusplus.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>Python Bindings - µGrid 0.90.1-31-ga4b1288 documentation</title>
+        <title>Python Bindings - µGrid 0.90.1-33-g21e225f documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-31-ga4b1288
+      <a href="index.html"><div class="brand">µGrid 0.90.1-33-g21e225f
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-31-ga4b1288
+  <span class="sidebar-brand-text">µGrid 0.90.1-33-g21e225f
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -322,30 +322,41 @@ sub-points and components.</p>
 An example would be the elastic constants of a material that only exists at
 certain locations in the domain.</p></li>
 </ul>
-<p>A global field collection can be initialized as follows:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">muGrid</span> <span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;element&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">})</span>
-<span class="n">fc</span><span class="o">.</span><span class="n">initialise</span><span class="p">([</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">],</span> <span class="p">[</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
-</pre></div>
-</div>
-<p>The first argument is the spatial dimension, the second argument defines sub-points.
-A field that is defined on <cite>element</cite> has two sub-points that in the example that we
-will follow through now are two (finite) elements that are the triangles that constitute
-half of a pixel each. The <cite>initialise</cite> method defines
-the spatial discretization of the domain, taking the number of pixels as the first
-argument.</p>
-<p>We can now register a new field in the collection:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">register_real_field</span><span class="p">(</span><span class="s1">&#39;displacement&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;element&#39;</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Note that a field can only be registered once in a collection and needs to have a unique
-name. We can query the field by name:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">get_real_field</span><span class="p">(</span><span class="s1">&#39;displacement&#39;</span><span class="p">)</span>
-</pre></div>
-</div>
+<p>The following example shows how to initialize a field collection and create scalar fields:</p>
+<p>The first argument to the constructor of <cite>FieldCollection</cite> is the spatial dimension.
+Fields are then registered with the field accessor methods of the field collection,
+e.g. <cite>real_field</cite> in the example above. Fields are _named_, and the name needs to be
+unique. Accessing a field of the same name yield the same field object.</p>
+<p>Note the <cite>FieldCollection</cite> additionally has register method, e.g. <cite>register_real_field</cite>.
+The different to <cite>real_field</cite> is that the explicit registration of the field fails if
+it already exists, while the accessor method <cite>real_field</cite> registers it if it does not exist
+but returns the existing field if it does.</p>
 </section>
-<section id="working-with-fields">
-<h2>Working with fields<a class="headerlink" href="#working-with-fields" title="Link to this heading">¶</a></h2>
+<section id="components">
+<h2>Components<a class="headerlink" href="#components" title="Link to this heading">¶</a></h2>
+<p>In the above example, we registered a scalar field, which has one component. Vector or
+tensor-valued field can be defined by specifying either simply a number of components or
+the shape of the components explicitly. The following example shows how to create a
+tensor-valued field that contains 2 x 2 matrices:</p>
+</section>
+<section id="sub-points">
+<h2>Sub-points<a class="headerlink" href="#sub-points" title="Link to this heading">¶</a></h2>
+<p>A pixel can be subdivided into multiple sub-points, each of which holds a value (scalar,
+vector or tensor) of the field. Examples for sub-points are elements or quadrature points
+in a the finite element method.</p>
+<p>Sub-points are named, e.g. common names would be <cite>element</cite> for subdivision into elements or
+<cite>quad</cite> for quadrature points. The name of the subdivision must be specified when the field
+is created.</p>
+<p>The following example initializes a three-dimension grid with
+a sub-division of each pixel into five elements:</p>
+<p>The examples demonstrates two ways of accessing the field. The convenience accessor <cite>p</cite> (that
+we also used in the above examples) and the new accessor <cite>s</cite>. Both yield a numpy array that is
+a view on the underlying data, but with different shapes. The <cite>s</cite> accessor has the shape
+<cite>(components, sub-points, pixels)</cite> and exposes the sub-points explicitly. The <cite>p</cite> accessor folds
+the sub-points into the last dimension of the components.</p>
+</section>
+<section id="numpy-views">
+<h2>numpy views<a class="headerlink" href="#numpy-views" title="Link to this heading">¶</a></h2>
 <p>The multidimensional array representation of a field is accessible via the
 <cite>array</cite> method.</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">IterUnit</span><span class="o">.</span><span class="n">SubPt</span><span class="p">)</span>
@@ -356,7 +367,8 @@ The pixel-representation can be obtained by</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">IterUnit</span><span class="o">.</span><span class="n">Pixel</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Because those operations are used to frequently, there are shortcuts:</p>
+<p>Because those operations are used to frequently, there are shortcuts already
+introduced in the examples above:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span>  <span class="c1"># sub-point representation</span>
 <span class="n">displacement_field</span><span class="o">.</span><span class="n">p</span>  <span class="c1"># pixel representation</span>
 </pre></div>
@@ -439,7 +451,9 @@ for example normalizing the displacement field could look like:</p>
 <li><a class="reference internal" href="#fields">Fields</a></li>
 <li><a class="reference internal" href="#multidimensional-arrays">Multidimensional arrays</a></li>
 <li><a class="reference internal" href="#field-collections">Field collections</a></li>
-<li><a class="reference internal" href="#working-with-fields">Working with fields</a></li>
+<li><a class="reference internal" href="#components">Components</a></li>
+<li><a class="reference internal" href="#sub-points">Sub-points</a></li>
+<li><a class="reference internal" href="#numpy-views">numpy views</a></li>
 </ul>
 </li>
 </ul>
@@ -451,7 +465,7 @@ for example normalizing the displacement field could look like:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=2fcbee70"></script>
+</div><script src="_static/documentation_options.js?v=92ed90fd"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
