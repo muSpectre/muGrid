@@ -189,30 +189,6 @@ The file has the following structure (output of `ncdump -h`):
 
 .. code-block::
 
-    netcdf fields {
-    dimensions:
-        x = 11 ;
-        y = 12 ;
-        z = 2 ;
-        sub_points = 3 ;
-        components = 3 ;
-    variables:
-        double displacement_x(x, y, z, sub_points) ;
-        double displacement_y(x, y, z, sub_points) ;
-        double displacement_z(x, y, z, sub_points) ;
-        double velocity_x(x, y, z, sub_points) ;
-        double velocity_y(x, y, z, sub_points) ;
-        double velocity_z(x, y, z, sub_points) ;
-        double stress_xx(x, y, z, sub_points) ;
-        double stress_xy(x, y, z, sub_points) ;
-        double stress_xz(x, y, z, sub_points) ;
-        double stress_yx(x, y, z, sub_points) ;
-        double stress_yy(x, y, z, sub_points) ;
-        double stress_yz(x, y, z, sub_points) ;
-        double stress_zx(x, y, z, sub_points) ;
-        double stress_zy(x, y, z, sub_points) ;
-        double stress_zz(x, y, z, sub_points) ;
-    }
     netcdf example {
     dimensions:
             frame = UNLIMITED ; // (1 currently)
@@ -228,13 +204,12 @@ The file has the following structure (output of `ncdump -h`):
 
     // global attributes:
                     :creation_date = "01-06-2024 (d-m-Y)" ;
-                    :creation_time = "22:56:17 (H:M:S)" ;
+                    :creation_time = "23:02:06 (H:M:S)" ;
                     :last_modified_date = "01-06-2024 (d-m-Y)" ;
-                    :last_modified_time = "22:56:17 (H:M:S)" ;
-                    :muGrid_version_info = "µGrid version: 0.90.1+35-g0291f390-dirty\n",
-                            "WARNING: state is dirty, you will not be able to recover the state of the µGrid sources used to compile me from this info!\n",
+                    :last_modified_time = "23:02:06 (H:M:S)" ;
+                    :muGrid_version_info = "µGrid version: 0.90.1+40-g5bc73b30\n",
                             "" ;
-                    :muGrid_git_hash = "0291f39070589ad5c238685532fbbb0494469ec1" ;
-                    :muGrid_description = "0.90.1+35-g0291f390-dirty" ;
-                    :muGrid_git_branch_is_dirty = "true" ;
+                    :muGrid_git_hash = "5bc73b305881ef837ce6598568d41eb3d0307c41" ;
+                    :muGrid_description = "0.90.1+40-g5bc73b30" ;
+                    :muGrid_git_branch_is_dirty = "false" ;
     }
