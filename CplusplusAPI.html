@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Coding Convention" href="CodingConvention.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>C++ API Reference - µGrid 0.90.1-37-gabeab4d documentation</title>
+        <title>C++ API Reference - µGrid 0.90.1-38-ge9b80ab documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-37-gabeab4d
+      <a href="index.html"><div class="brand">µGrid 0.90.1-38-ge9b80ab
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-37-gabeab4d
+  <span class="sidebar-brand-text">µGrid 0.90.1-38-ge9b80ab
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -3936,7 +3936,7 @@
 <dt class="sig sig-object cpp" id="_CPPv4I0EN6muGrid12FileIONetCDF22write_global_attributeEvRKNSt6stringE1T">
 <span id="_CPPv3I0EN6muGrid12FileIONetCDF22write_global_attributeERKNSt6stringE1T"></span><span id="_CPPv2I0EN6muGrid12FileIONetCDF22write_global_attributeERKNSt6stringE1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmuGrid_1_1FileIONetCDF_1a643dc616355094999cf85d1871552f5d"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write_global_attribute</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">att_name</span></span>, <a class="reference internal" href="#_CPPv4I0EN6muGrid12FileIONetCDF22write_global_attributeEvRKNSt6stringE1T" title="muGrid::FileIONetCDF::write_global_attribute::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN6muGrid12FileIONetCDF22write_global_attributeEvRKNSt6stringE1T" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Registers a global attribute to the NetCDF file. </p>
-<p>This function can only be used in open_mode = FileIOBase::OpenMode::Write and before <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">write()</span></a> was called the first time. Otherwise, there is the danger of having time expensive NetCDF header expansions, which is the reason why this is prevented.</p>
+<p>This function can only be used in open_mode = FileIOBase::OpenMode::Write or FileIOBase::OpenMode::Overwrite and before <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">write()</span></a> was called the first time. Otherwise, there is the danger of having time expensive NetCDF header expansions, which is the reason why this is prevented.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>T</strong> – The type of the value to be written as a global attribute. </p>
@@ -3984,7 +3984,7 @@
 <dt class="sig sig-object cpp" id="_CPPv4I0EN6muGrid12FileIONetCDF23update_global_attributeEvRKNSt6stringERKNSt6stringE1T">
 <span id="_CPPv3I0EN6muGrid12FileIONetCDF23update_global_attributeERKNSt6stringERKNSt6stringE1T"></span><span id="_CPPv2I0EN6muGrid12FileIONetCDF23update_global_attributeERKNSt6stringERKNSt6stringE1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmuGrid_1_1FileIONetCDF_1a29de728ffedc483b5d4cad9908eb25be"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">update_global_attribute</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">old_att_name</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">new_att_name</span></span>, <a class="reference internal" href="#_CPPv4I0EN6muGrid12FileIONetCDF23update_global_attributeEvRKNSt6stringERKNSt6stringE1T" title="muGrid::FileIONetCDF::update_global_attribute::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">new_att_value</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN6muGrid12FileIONetCDF23update_global_attributeEvRKNSt6stringERKNSt6stringE1T" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Updates the value or name of an existing global attribute in the NetCDF file. </p>
-<p>This function can only be used in open_mode = FileIOBase::OpenMode::Write or FileIOBase::OpenMode::Append. The changes are only allowed if they do not lead to an increase in the size of the global attribute and the data_type of the attribute is not changed.</p>
+<p>This function can only be used in open_mode = FileIOBase::OpenMode::Write, FileIOBase::OpenMode::Overwrite or FileIOBase::OpenMode::Append. The changes are only allowed if they do not lead to an increase in the size of the global attribute and the data_type of the attribute is not changed.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>T</strong> – The type of the new value for the global attribute. </p>
@@ -4134,7 +4134,7 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF24define_global_attributesEv">
 <span id="_CPPv3N6muGrid12FileIONetCDF24define_global_attributesEv"></span><span id="_CPPv2N6muGrid12FileIONetCDF24define_global_attributesEv"></span><span id="muGrid::FileIONetCDF::define_global_attributes"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1abca4813715680515f0a5448996ede0fb"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">define_global_attributes</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF24define_global_attributesEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write NetCDFGlobalAtts from global_attributes (which are not already written) this function is only called if the file was open in FileIOBase::OpenMode::Write. Then it is only called twice, once in <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1aaaced2be9fb1a79772afb3149eb85dc3"><span class="std std-ref">FileIONetCDF::open()</span></a> and once in <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">FileIONetCDF::write()</span></a> or <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a7b17d2c56ef431613ff0764f6f57904e"><span class="std std-ref">FileIONetCDF::close()</span></a> if <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">write()</span></a> was not called before close. </p>
+<dd><p>write NetCDFGlobalAtts from global_attributes (which are not already written) this function is only called if the file was open in FileIOBase::OpenMode::Write or FileIOBase::OpenMode::Overwrite. Then it is only called twice, once in <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1aaaced2be9fb1a79772afb3149eb85dc3"><span class="std std-ref">FileIONetCDF::open()</span></a> and once in <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">FileIONetCDF::write()</span></a> or <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a7b17d2c56ef431613ff0764f6f57904e"><span class="std std-ref">FileIONetCDF::close()</span></a> if <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">write()</span></a> was not called before close. </p>
 </dd></dl>
 
 <dl class="cpp function">
@@ -18438,7 +18438,7 @@ Copyright © 2020 Till Junge<dl class="simple">
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=2cb3e6fa"></script>
+</div><script src="_static/documentation_options.js?v=c794eab1"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
