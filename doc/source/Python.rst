@@ -178,3 +178,63 @@ Fields can be written to disk in the `NetCDF <https://en.wikipedia.org/wiki/NetC
 *µ*\Grid uses `Unidata NetCDF <https://www.unidata.ucar.edu/software/netcdf/>`_ when build
 with just serial capabilities and `PnetCDF <https://parallel-netcdf.github.io/>`_ when build
 with MPI enabled.
+
+I/O is handled by the `FileIONetCDF` class. The following example shows how to write all fields
+from a field collection to disk:
+
+.. literalinclude:: ../../examples/io.py
+    :language: python
+
+The file has the following structure (output of `ncdump -h`):
+
+.. code-block::
+
+    netcdf fields {
+    dimensions:
+        x = 11 ;
+        y = 12 ;
+        z = 2 ;
+        sub_points = 3 ;
+        components = 3 ;
+    variables:
+        double displacement_x(x, y, z, sub_points) ;
+        double displacement_y(x, y, z, sub_points) ;
+        double displacement_z(x, y, z, sub_points) ;
+        double velocity_x(x, y, z, sub_points) ;
+        double velocity_y(x, y, z, sub_points) ;
+        double velocity_z(x, y, z, sub_points) ;
+        double stress_xx(x, y, z, sub_points) ;
+        double stress_xy(x, y, z, sub_points) ;
+        double stress_xz(x, y, z, sub_points) ;
+        double stress_yx(x, y, z, sub_points) ;
+        double stress_yy(x, y, z, sub_points) ;
+        double stress_yz(x, y, z, sub_points) ;
+        double stress_zx(x, y, z, sub_points) ;
+        double stress_zy(x, y, z, sub_points) ;
+        double stress_zz(x, y, z, sub_points) ;
+    }
+    netcdf example {
+    dimensions:
+            frame = UNLIMITED ; // (1 currently)
+            tensor_dim__strain-0 = 3 ;
+            tensor_dim__strain-1 = 3 ;
+            subpt__element-5 = 5 ;
+            nx = 11 ;
+            ny = 12 ;
+            nz = 13 ;
+    variables:
+            double strain(frame, tensor_dim__strain-0, tensor_dim__strain-1, subpt__element-5, nx, ny, nz) ;
+                    strain:unit = "no unit provided" ;
+
+    // global attributes:
+                    :creation_date = "01-06-2024 (d-m-Y)" ;
+                    :creation_time = "22:56:17 (H:M:S)" ;
+                    :last_modified_date = "01-06-2024 (d-m-Y)" ;
+                    :last_modified_time = "22:56:17 (H:M:S)" ;
+                    :muGrid_version_info = "µGrid version: 0.90.1+35-g0291f390-dirty\n",
+                            "WARNING: state is dirty, you will not be able to recover the state of the µGrid sources used to compile me from this info!\n",
+                            "" ;
+                    :muGrid_git_hash = "0291f39070589ad5c238685532fbbb0494469ec1" ;
+                    :muGrid_description = "0.90.1+35-g0291f390-dirty" ;
+                    :muGrid_git_branch_is_dirty = "true" ;
+    }
