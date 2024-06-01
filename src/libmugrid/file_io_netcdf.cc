@@ -47,8 +47,8 @@ namespace muGrid {
   FileIONetCDF::FileIONetCDF(const std::string & file_name,
                              const FileIOBase::OpenMode & open_mode,
                              Communicator comm)
-    : FileIOBase(file_name, open_mode, comm), global_attributes(), dimensions(),
-        variables(), nb_sub_pts{{this->pixel, 1}},
+      : FileIOBase(file_name, open_mode, comm), global_attributes(),
+        dimensions(), variables(), nb_sub_pts{{this->pixel, 1}},
         GFC_local_pixels(muGrid::Unknown, nb_sub_pts) {
     this->open();
   }
@@ -121,7 +121,8 @@ namespace muGrid {
       this->netcdf_mode = NetCDFMode::DefineMode;
     }
 
-    if (this->open_mode == FileIOBase::OpenMode::Write) {
+    if (this->open_mode == FileIOBase::OpenMode::Write ||
+        this->open_mode == FileIOBase::OpenMode::Overwrite) {
       // define dimensions, variables and attributes if in write mode
       define_netcdf_dimensions(this->dimensions);
       define_netcdf_variables(this->variables);
@@ -133,7 +134,7 @@ namespace muGrid {
         throw FileIOError(ncmu_strerror(status));
       }
       this->netcdf_mode =
-          NetCDFMode::DataMode;  // leave DefineMode -> enter DataMode
+          NetCDFMode::DataMode;     // leave DefineMode -> enter DataMode
       this->netcdf_file_changes();  // update flag for bookkeeping
 
     } else if (this->open_mode == FileIOBase::OpenMode::Read or
@@ -176,9 +177,13 @@ namespace muGrid {
     MPI_Info info{MPI_INFO_NULL};
 #endif  // WITH_MPI
 
-    if (this->open_mode == FileIOBase::OpenMode::Write) {
+    if (this->open_mode == FileIOBase::OpenMode::Write ||
+        this->open_mode == FileIOBase::OpenMode::Overwrite) {
       // write/create a new NetCDF file if it does not already exist.
-      int cmode{NC_NOCLOBBER | NC_64BIT_DATA};
+      int cmode{NC_64BIT_DATA};
+      if (this->open_mode == FileIOBase::OpenMode::Write) {
+        cmode |= NC_NOCLOBBER;
+      }
 #ifdef WITH_MPI
       err = ncmu_create(this->comm.get_mpi_comm(), (this->file_name).c_str(),
                         cmode, info, &this->netcdf_id);
@@ -201,7 +206,6 @@ namespace muGrid {
       std::string dim_name{"frame"};
       IOSize_t dim_size{NC_UNLIMITED};
       this->dimensions.add_dim(dim_name, dim_size);
-
 
       // non user GLOBAL attributes, meta data stored as global attributes
       // add creation and last modified data and times
@@ -254,15 +258,15 @@ namespace muGrid {
       }
 
       // register all global attributes
-      register_netcdf_global_attribute_names();  // there is no unique ID for
-                                                 // global attributes
+      register_netcdf_global_attribute_names();   // there is no unique ID for
+                                                  // global attributes
       register_netcdf_global_attribute_values();  // It is necessary to already
                                                   // read in the values because
                                                   // they might be asked by the
                                                   // user through:
-                                                  // FileIONetCDF::read_global_attributes() //NOLINT
-                                                  // immediately after the file
-                                                  // was open.
+                                                  // FileIONetCDF::read_global_attributes()
+                                                  // //NOLINT immediately after
+                                                  // the file was open.
     }
 
     if (err != NC_NOERR) {
@@ -277,10 +281,10 @@ namespace muGrid {
     // wise better, because it prevents double writing on the same variable
 #ifndef WITH_MPI
     // From:
-    // https://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html#ga610e6fadb14a51f294b322a1b8ac1bec //NOLINT
-    // Caution: The use of this feature may not be available (or even needed) in
-    // future releases. Programmers are cautioned against heavy reliance upon
-    // this feature.
+    // https://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html#ga610e6fadb14a51f294b322a1b8ac1bec
+    // //NOLINT Caution: The use of this feature may not be available (or even
+    // needed) in future releases. Programmers are cautioned against heavy
+    // reliance upon this feature.
     nc_set_fill(this->netcdf_id, NC_NOFILL, nullptr);
 #endif  // not WITH_MPI
   }
@@ -351,7 +355,8 @@ namespace muGrid {
           muGrid::FieldCollection::ValidityDomain::Local) {
         const std::string & local_field_name{var.get_local_field_name()};
 
-        if (this->open_mode == FileIOBase::OpenMode::Write) {
+        if (this->open_mode == FileIOBase::OpenMode::Write ||
+            this->open_mode == FileIOBase::OpenMode::Overwrite) {
           if (std::find(written_local_pixel_fields.begin(),
                         written_local_pixel_fields.end(),
                         local_field_name) == written_local_pixel_fields.end()) {
@@ -483,8 +488,7 @@ namespace muGrid {
                        // the field "field_names"
 
       // register frame as first dimension
-      field_dims.push_back(dimensions.find_dim(
-          "frame", NC_UNLIMITED));
+      field_dims.push_back(dimensions.find_dim("frame", NC_UNLIMITED));
       // register history_index as second dim
       field_dims.push_back(dimensions.add_dim(
           "history_index__" + std::to_string(state_field.get_nb_memory() + 1),
@@ -597,8 +601,7 @@ namespace muGrid {
                        // the field "field_names"
 
       // register frame as first dimension
-      field_dims.push_back(dimensions.find_dim(
-          "frame", NC_UNLIMITED));
+      field_dims.push_back(dimensions.find_dim("frame", NC_UNLIMITED));
       // register history_index as second dim
       field_dims.push_back(dimensions.add_dim(
           "history_index__" + std::to_string(state_field.get_nb_memory() + 1),
@@ -694,14 +697,13 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   std::string FileIONetCDF::register_lfc_to_gfc_local_pixels(
       muGrid::LocalFieldCollection & fc_local) {
-    std::string field_name{
-        fc_local.get_name()};
+    std::string field_name{fc_local.get_name()};
     if (initialised_GFC_local_pixels) {
       const std::string pixel{"pixel"};
       const Dim_t Dim{oneD};
       muGrid::TypedField<muGrid::Index_t> & local_pixels{
-          GFC_local_pixels.template register_field<muGrid::Index_t>(
-              field_name, 1, pixel)};
+          GFC_local_pixels.template register_field<muGrid::Index_t>(field_name,
+                                                                    1, pixel)};
       // fill the global fc with the default value -1
       local_pixels.eigen_vec().setConstant(GFC_LOCAL_PIXELS_DEFAULT_VALUE);
 
@@ -709,7 +711,8 @@ namespace muGrid {
                          muGrid::IterUnit::Pixel>
           local_pixels_map{local_pixels};
 
-      if (this->open_mode == FileIOBase::OpenMode::Write) {
+      if (this->open_mode == FileIOBase::OpenMode::Write ||
+          this->open_mode == FileIOBase::OpenMode::Overwrite) {
         const std::vector<Index_t> & pixel_ids_on_proc{
             fc_local.get_pixel_ids()};
         IOSize_t num{static_cast<IOSize_t>(
@@ -722,9 +725,9 @@ namespace muGrid {
           std::uint64_t offset{local_offset + local_pixel_number_n};
           // netcdf offers only int or long long int but not long int
           muGrid::Index_t offset_lli{static_cast<muGrid::Index_t>(offset)};
-          Eigen::Map<
-              Eigen::Matrix<muGrid::Index_t, 1, 1>, 0,
-              Eigen::Stride<0, 0>> fill_value(&offset_lli);
+          Eigen::Map<Eigen::Matrix<muGrid::Index_t, 1, 1>, 0,
+                     Eigen::Stride<0, 0>>
+              fill_value(&offset_lli);
           local_pixels_map[local_pixel_id] = fill_value;
         }
       }
@@ -739,8 +742,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void
-  FileIONetCDF::define_netcdf_dimensions(NetCDFDimensions & dimensions) {
+  void FileIONetCDF::define_netcdf_dimensions(NetCDFDimensions & dimensions) {
     /* define dimensions: from name and length (collective) */
     for (auto & netcdf_dim : dimensions.get_dim_vector()) {
       // define a dimension only if it was not already defined (thus dim_id
@@ -938,10 +940,12 @@ namespace muGrid {
     }
 
     // file has to be opened in write mode
-    if (this->open_mode != FileIOBase::OpenMode::Write) {
+    if (this->open_mode != FileIOBase::OpenMode::Write &&
+        this->open_mode != FileIOBase::OpenMode::Overwrite) {
       throw FileIOError(
           "The definition of a global NetCDF attribute 'NetCDFGlobalAtt' is "
-          "only possible for a file opened in 'FileIOBase::OpenMode::Write' to "
+          "only possible for a file opened in 'FileIOBase::OpenMode::Write' or "
+          "'FileIOBase::OpenMode::Overwrite' to "
           "prevent costly extensions of the file header.");
     }
 
@@ -978,7 +982,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::define_global_attributes_save_call() {
-    if (this->open_mode == FileIOBase::OpenMode::Write and
+    if ((this->open_mode == FileIOBase::OpenMode::Write ||
+         this->open_mode == FileIOBase::OpenMode::Overwrite) &&
         not(this->global_attributes_defined)) {
       if (this->netcdf_mode == NetCDFMode::DataMode) {
         // enter NetCDFMode::DefineMode to add attributes
@@ -1010,7 +1015,7 @@ namespace muGrid {
     // NC_ENOTATT)
     for (int g_att_num = 0; g_att_num < MAX_NB_GLOBAL_ATTRIBUTES; g_att_num++) {
       // find attribute name
-      char name[MAX_LEN_GLOBAL_ATTRIBUTE_NAME+1];
+      char name[MAX_LEN_GLOBAL_ATTRIBUTE_NAME + 1];
       int status_1{
           ncmu_inq_attname(this->netcdf_id, NC_GLOBAL, g_att_num, &name[0])};
       if (status_1 == NC_ENOTATT) {
@@ -1040,8 +1045,7 @@ namespace muGrid {
       // create a void * to a location with enough space to store the
       // returned value
       void * value{g_att->reserve_value_space()};
-      int status{
-          ncmu_get_att(this->netcdf_id, NC_GLOBAL, name.c_str(), value)};
+      int status{ncmu_get_att(this->netcdf_id, NC_GLOBAL, name.c_str(), value)};
       if (status != NC_NOERR) {
         throw FileIOError(ncmu_strerror(status));
       }
@@ -1084,7 +1088,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::update_global_attribute_last_modified_save_call() {
-    if (this->open_mode == FileIONetCDF::OpenMode::Write or
+    if (this->open_mode == FileIONetCDF::OpenMode::Write ||
+        this->open_mode == FileIONetCDF::OpenMode::Overwrite ||
         this->open_mode == FileIONetCDF::OpenMode::Append) {
       if (this->netcdf_file_changed) {
         if (this->netcdf_mode == NetCDFMode::DefineMode) {
@@ -1132,7 +1137,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::netcdf_file_changes() {
     if (not this->netcdf_file_changed) {
-      if (this->open_mode == FileIONetCDF::OpenMode::Write or
+      if (this->open_mode == FileIONetCDF::OpenMode::Write ||
+          this->open_mode == FileIONetCDF::OpenMode::Overwrite ||
           this->open_mode == FileIONetCDF::OpenMode::Append) {
         this->netcdf_file_changed = true;
       }
@@ -1162,7 +1168,7 @@ namespace muGrid {
     auto & nb_grid_pts{
         dynamic_cast<muGrid::GlobalFieldCollection &>(field.get_collection())
             .get_nb_domain_grid_pts()};                     // x, y, z
-    auto & nb_subpt{field.get_nb_sub_pts()};               // s
+    auto & nb_subpt{field.get_nb_sub_pts()};                // s
     Shape_t component_shape{field.get_components_shape()};  // tensor dims
     auto & nb_dof_per_subpt{field.get_nb_components()};     // (n)
     std::vector<std::string> grid_names{"nx", "ny", "nz"};
@@ -1263,9 +1269,8 @@ namespace muGrid {
       if (state_field_name.size() != 0) {
         field_name = state_field_name;
       }
-      field_dims.push_back(
-          this->add_dim(NetCDFDim::compute_dim_name("pts", field_name),
-                        nb_pts_glob));
+      field_dims.push_back(this->add_dim(
+          NetCDFDim::compute_dim_name("pts", field_name), nb_pts_glob));
     }
   }
 
@@ -1363,7 +1368,7 @@ namespace muGrid {
     if (base_name == "tensor_dim") {
       // get the suffix after the last "-" pattern
       auto const pos{this->name.find_last_of("-")};
-      tensor_dim_index = std::stoi(this->name.substr(pos+1));
+      tensor_dim_index = std::stoi(this->name.substr(pos + 1));
     } else {
       FileIOError("The function 'NetCDFDim::compute_tensor_dim_index()' "
                   "is only valid to call on NetCDFDims with base name "
@@ -1410,14 +1415,14 @@ namespace muGrid {
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
                        const std::vector<char> & value)
       : att_name{att_name}, data_type{MU_NC_CHAR},
-        nelems{static_cast<IOSize_t>(value.size())},
-        value_c{value}, name_initialised{true}, value_initialised{true} {}
+        nelems{static_cast<IOSize_t>(value.size())}, value_c{value},
+        name_initialised{true}, value_initialised{true} {}
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name, const std::string & value)
       : att_name{att_name}, data_type{MU_NC_CHAR},
-        nelems{static_cast<IOSize_t>(value.size())},
-        value_c{}, name_initialised{true}, value_initialised{false} {
+        nelems{static_cast<IOSize_t>(value.size())}, value_c{},
+        name_initialised{true}, value_initialised{false} {
     char * tmp_char{const_cast<char *>(value.c_str())};
     this->register_value(reinterpret_cast<void *>(tmp_char));
   }
@@ -1426,29 +1431,29 @@ namespace muGrid {
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
                        const std::vector<muGrid::Int> & value)
       : att_name{att_name}, data_type{MU_NC_INT},
-        nelems{static_cast<IOSize_t>(value.size())},
-        value_i{value}, name_initialised{true}, value_initialised{true} {};
+        nelems{static_cast<IOSize_t>(value.size())}, value_i{value},
+        name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
                        const std::vector<muGrid::Uint> & value)
       : att_name{att_name}, data_type{MU_NC_UINT},
-        nelems{static_cast<IOSize_t>(value.size())},
-        value_ui{value}, name_initialised{true}, value_initialised{true} {};
+        nelems{static_cast<IOSize_t>(value.size())}, value_ui{value},
+        name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
                        const std::vector<muGrid::Index_t> & value)
       : att_name{att_name}, data_type{MU_NC_INDEX_T},
-        nelems{static_cast<IOSize_t>(value.size())},
-        value_l{value}, name_initialised{true}, value_initialised{true} {};
+        nelems{static_cast<IOSize_t>(value.size())}, value_l{value},
+        name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
                        const std::vector<muGrid::Real> & value)
       : att_name{att_name}, data_type{MU_NC_REAL},
-        nelems{static_cast<IOSize_t>(value.size())},
-        value_d{value}, name_initialised{true}, value_initialised{true} {};
+        nelems{static_cast<IOSize_t>(value.size())}, value_d{value},
+        name_initialised{true}, value_initialised{true} {};
 
   /* ---------------------------------------------------------------------- */
   NetCDFAtt::NetCDFAtt(const std::string & att_name,
@@ -1503,9 +1508,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  IOSize_t NetCDFAtt::get_name_size() const {
-    return this->att_name.size();
-  }
+  IOSize_t NetCDFAtt::get_name_size() const { return this->att_name.size(); }
 
   /* ---------------------------------------------------------------------- */
   const void * NetCDFAtt::get_value() const {
@@ -1770,29 +1773,29 @@ namespace muGrid {
     }
     case MU_NC_INT: {
       muGrid::Int * comp_value{reinterpret_cast<muGrid::Int *>(value)};
-      std::vector<muGrid::Int> comp_value_i(
-          comp_value, comp_value + this->nelems);
+      std::vector<muGrid::Int> comp_value_i(comp_value,
+                                            comp_value + this->nelems);
       equal = (this->value_i == comp_value_i);
       break;
     }
     case MU_NC_UINT: {
       muGrid::Uint * comp_value{reinterpret_cast<muGrid::Uint *>(value)};
-      std::vector<muGrid::Uint> comp_value_ui(
-          comp_value, comp_value + this->nelems);
+      std::vector<muGrid::Uint> comp_value_ui(comp_value,
+                                              comp_value + this->nelems);
       equal = (this->value_ui == comp_value_ui);
       break;
     }
     case MU_NC_INDEX_T: {
       muGrid::Index_t * comp_value{reinterpret_cast<muGrid::Index_t *>(value)};
-      std::vector<muGrid::Index_t> comp_value_l(
-          comp_value, comp_value + this->nelems);
+      std::vector<muGrid::Index_t> comp_value_l(comp_value,
+                                                comp_value + this->nelems);
       equal = (this->value_l == comp_value_l);
       break;
     }
     case MU_NC_REAL: {
       muGrid::Real * comp_value{reinterpret_cast<muGrid::Real *>(value)};
-      std::vector<muGrid::Real> comp_value_d(
-          comp_value, comp_value + this->nelems);
+      std::vector<muGrid::Real> comp_value_d(comp_value,
+                                             comp_value + this->nelems);
       equal = (this->value_d == comp_value_d);
       break;
     }
@@ -2355,8 +2358,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void NetCDFVarBase::register_attribute(const std::string & att_name,
-                                     const nc_type & att_data_type,
-                                     const IOSize_t & att_nelems) {
+                                         const nc_type & att_data_type,
+                                         const IOSize_t & att_nelems) {
     // register a attribute only if it is not already registered
     std::vector<std::string> att_names{this->get_netcdf_attribute_names()};
     if (std::find(att_names.begin(), att_names.end(), att_name) ==
@@ -2377,8 +2380,7 @@ namespace muGrid {
     std::ostream & tmp(stream);
     tmp << unit;
     std::string att_val_string{stream.str()};
-    std::vector<char> att_val(att_val_string.begin(),
-                              att_val_string.end());
+    std::vector<char> att_val(att_val_string.begin(), att_val_string.end());
 
     add_attribute(att_name, att_val);
   }
@@ -2392,8 +2394,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void *
-  NetCDFVarBase::increment_buf_ptr(
+  void * NetCDFVarBase::increment_buf_ptr(
       void * buf_ptr, const IOSize_t & increment_nb_elements) const {
     void * incremented_buf_ptr{nullptr};
     switch (this->data_type) {
@@ -2643,7 +2644,7 @@ namespace muGrid {
        **/
 #ifdef WITH_MPI
       ncmu_begin_indep_data(netcdf_id);
-#endif  // WITH_MPI
+#endif                                    // WITH_MPI
       IOSize_t ndims{this->get_ndims()};  // number of dimensions
       std::vector<IOSize_t> starts_vec{this->get_start_local(
           frame, GFC_local_pixels.get_field(this->get_local_field_name()))};
@@ -2767,10 +2768,9 @@ namespace muGrid {
       } else if (base_name == "tensor_dim") {
         start = 0;
       } else {
-        throw FileIOError(
-            "I can not find a start offset for the dimension '" +
-            dim->get_name() + "' with base_name '" + base_name +
-            "'. Probably this case is not implemented.");
+        throw FileIOError("I can not find a start offset for the dimension '" +
+                          dim->get_name() + "' with base_name '" + base_name +
+                          "'. Probably this case is not implemented.");
       }
 
       starts.push_back(start);
@@ -2791,8 +2791,8 @@ namespace muGrid {
 
     std::vector<IOSize_t>
         starts{};  // intermediate storage container for starts
-    muGrid::T1FieldMap<
-        muGrid::Index_t, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
+    muGrid::T1FieldMap<muGrid::Index_t, Mapping::Mut, 1,
+                       muGrid::IterUnit::Pixel>
         local_pixels_map{local_pixels};
 
     for (auto & val : local_pixels_map) {
@@ -3040,8 +3040,8 @@ namespace muGrid {
 
     std::vector<IOSize_t>
         starts{};  // intermediate storage container for starts
-    muGrid::T1FieldMap<
-        muGrid::Index_t, Mapping::Mut, 1, muGrid::IterUnit::Pixel>
+    muGrid::T1FieldMap<muGrid::Index_t, Mapping::Mut, 1,
+                       muGrid::IterUnit::Pixel>
         local_pixels_map{local_pixels};
 
     for (auto & val : local_pixels_map) {
@@ -3213,8 +3213,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  NetCDFVariables & NetCDFVariables::
-  operator+=(std::shared_ptr<NetCDFVarBase> & rhs) {
+  NetCDFVariables &
+  NetCDFVariables::operator+=(std::shared_ptr<NetCDFVarBase> & rhs) {
     this->var_vector.push_back(rhs);
     return *this;
   }
@@ -3228,9 +3228,8 @@ namespace muGrid {
     nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
     IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
 
-    this->var_vector.push_back(
-        std::make_shared<NetCDFVarField>(var_name, var_data_type, var_ndims,
-                                         var_dims, var_field, hidden));
+    this->var_vector.push_back(std::make_shared<NetCDFVarField>(
+        var_name, var_data_type, var_ndims, var_dims, var_field, hidden));
 
     return *this->var_vector.back();
   }

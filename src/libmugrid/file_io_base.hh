@@ -103,13 +103,23 @@ namespace muGrid {
      * @enum OpenMode
      * @brief Enumeration for file open modes.
      *
-     * This enumeration defines the possible modes for opening a file: Read,
-     * Write, and Append.
+     * This enumeration defines the possible modes for opening a file:
+     * - Read: File is opened for reading only. This mode is used when the data
+     * in the file is only needed for input and will not be modified.
+     * - Write: File is opened for writing only. This mode is used when new data
+     * is to be written to a file. If the file already exists, this mode will
+     * fail to prevent accidental data loss.
+     * - Overwrite: File is opened for writing only. This mode is used when new
+     * data is to be written to a file. If the file already exists, it will be
+     * overwritten. Use this mode with caution to prevent accidental data loss.
+     * - Append: File is opened for writing only. This mode is used when new
+     * data is to be added to the end of a file. If the file already exists, the
+     * new data will be added at the end, preserving the existing data.
      */
-    enum class OpenMode { Read, Write, Append };
+    enum class OpenMode { Read, Write, Overwrite, Append };
 
     //! Default constructor is deleted to prevent direct instantiation of this
-    //! class.
+    //! class without parameters.
     FileIOBase() = delete;
 
     /**
@@ -336,7 +346,7 @@ namespace muGrid {
    public:
     /**
      * @brief Default constructor is deleted to prevent direct instantiation of
-     * this class.
+     * this class without parameters.
      */
     FileFrame() = delete;
 
@@ -444,7 +454,7 @@ namespace muGrid {
 
     /**
      * @brief Default constructor is deleted to prevent direct instantiation of
-     * this class.
+     * this class without parameters.
      */
     iterator() = delete;
 

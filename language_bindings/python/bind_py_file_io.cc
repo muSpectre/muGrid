@@ -118,15 +118,19 @@ class PyFileIOBase : public FileIOBase {
 
 void add_file_io_base(py::module & mod) {
   py::class_<FileIOBase, PyFileIOBase> file_io_base(mod, "FileIOBase");
+
+  py::enum_<FileIOBase::OpenMode>(file_io_base, "OpenMode")
+      .value("Read", FileIOBase::OpenMode::Read)
+      .value("Write", FileIOBase::OpenMode::Write)
+      .value("Overwrite", FileIOBase::OpenMode::Overwrite)
+      .value("Append", FileIOBase::OpenMode::Append)
+      .export_values();
+
   file_io_base
       .def(py::init<const std::string &, const FileIOBase::OpenMode &,
                     Communicator>(),
-           "file_name"_a, "open_mode"_a,
-#ifdef WITH_MPI
-           "communicator"_a)
-#else
+           "file_name"_a, "open_mode"_a = FileIOBase::OpenMode::Read,
            "communicator"_a = Communicator())
-#endif
       .def("__getitem__", &FileIOBase::operator[], "frame_index"_a)
       .def("__len__", &FileIOBase::size)
       .def("__iter__",
@@ -136,28 +140,24 @@ void add_file_io_base(py::module & mod) {
       .def("append_frame", &FileIOBase::append_frame,
            py::return_value_policy::reference_internal)
       .def("get_communicator", &FileIOBase::get_communicator);
-
-  py::enum_<FileIOBase::OpenMode>(file_io_base, "OpenMode")
-      .value("Read", FileIOBase::OpenMode::Read)
-      .value("Write", FileIOBase::OpenMode::Write)
-      .value("Append", FileIOBase::OpenMode::Append)
-      .export_values();
 }
 
 void add_file_frame(py::module & mod) {
   py::class_<FileFrame> file_frame(mod, "FileFrame");
   file_frame.def(py::init<FileIOBase &, Index_t>(), "parent"_a, "frame"_a)
-      .def("read",
-           [](FileFrame & frame, const std::vector<std::string> & field_names) {
-             return frame.read(field_names);
-           },
-           "field_names"_a)
+      .def(
+          "read",
+          [](FileFrame & frame, const std::vector<std::string> & field_names) {
+            return frame.read(field_names);
+          },
+          "field_names"_a)
       .def("read", [](FileFrame & frame) { return frame.read(); })
-      .def("write",
-           [](FileFrame & frame, const std::vector<std::string> & field_names) {
-             return frame.write(field_names);
-           },
-           "field_names"_a)
+      .def(
+          "write",
+          [](FileFrame & frame, const std::vector<std::string> & field_names) {
+            return frame.write(field_names);
+          },
+          "field_names"_a)
       .def("write", [](FileFrame & frame) { return frame.write(); });
 }
 
@@ -167,12 +167,8 @@ void add_file_io_netcdf(py::module & mod) {
   file_io
       .def(py::init<const std::string &, const FileIOBase::OpenMode &,
                     Communicator>(),
-           "file_name"_a, "open_mode"_a,
-#ifdef WITH_MPI
-           "communicator"_a)
-#else
+           "file_name"_a, "open_mode"_a = FileIOBase::OpenMode::Read,
            "communicator"_a = Communicator())
-#endif
       .def("close", &FileIONetCDF::close)
       .def("register_field_collection",
            &FileIONetCDF::register_field_collection, "field_collection"_a,

@@ -47,6 +47,7 @@ if has_mpi and MPI is None:
 
 from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder, SubPt, DynCcoord, DynRcoord, IterUnit,
                      Verbosity, GlobalFieldCollection, LocalFieldCollection, Unit, Dictionary)
+OpenMode = _muGrid.FileIOBase.OpenMode
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 try:

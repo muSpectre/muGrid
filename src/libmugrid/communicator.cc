@@ -33,22 +33,17 @@
  *
  */
 
-#include <sstream>
-
-#include "exception.hh"
-
 #include "communicator.hh"
 
 namespace muGrid {
 
   Communicator::Communicator(MPI_Comm comm) : comm{comm} {}
 
-  Communicator::Communicator(const Communicator & other)
-      : comm(other.comm) {}
+  Communicator::Communicator(const Communicator & other) : comm(other.comm) {}
 
   Communicator::~Communicator() {}
 
-  Communicator & Communicator::operator=(const Communicator &other) {
+  Communicator & Communicator::operator=(const Communicator & other) {
     this->comm = other.comm;
     return *this;
   }

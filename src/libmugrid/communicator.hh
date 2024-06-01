@@ -113,7 +113,7 @@ namespace muGrid {
   //! lightweight abstraction for the MPI communicator object
   class Communicator {
    public:
-    explicit Communicator(MPI_Comm comm = MPI_COMM_NULL);
+    explicit Communicator(MPI_Comm comm = MPI_COMM_SELF);
     Communicator(const Communicator & other);
     ~Communicator();
 
