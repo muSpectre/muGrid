@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="C++ Bindings" href="Cplusplus.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>Python Bindings - µGrid 0.90.1-33-g21e225f documentation</title>
+        <title>Python Bindings - µGrid 0.90.1-34-gfab89d9 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-33-g21e225f
+      <a href="index.html"><div class="brand">µGrid 0.90.1-34-gfab89d9
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-33-g21e225f
+  <span class="sidebar-brand-text">µGrid 0.90.1-34-gfab89d9
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -323,14 +323,42 @@ An example would be the elastic constants of a material that only exists at
 certain locations in the domain.</p></li>
 </ul>
 <p>The following example shows how to initialize a field collection and create scalar fields:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">muGrid</span> <span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+
+<span class="c1"># Two dimensional grid</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Get a scalar (real-valued) field</span>
+<span class="c1"># This call creates a new field if it does not exist.</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s1">&#39;my-real-valued-field&#39;</span><span class="p">)</span>
+
+<span class="c1"># Check the registered fields</span>
+<span class="k">assert</span> <span class="n">fc</span><span class="o">.</span><span class="n">field_names</span> <span class="o">==</span> <span class="p">[</span><span class="s1">&#39;my-real-valued-field&#39;</span><span class="p">]</span>
+
+<span class="c1"># Fill the field with random numbers</span>
+<span class="n">field</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Set a specific value</span>
+<span class="n">field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mi">42</span>
+
+<span class="c1"># Get the field, but now into a different variable</span>
+<span class="n">field2</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s1">&#39;my-real-valued-field&#39;</span><span class="p">)</span>
+
+<span class="c1"># Check that the value is the same</span>
+<span class="k">assert</span> <span class="n">field2</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
+</pre></div>
+</div>
 <p>The first argument to the constructor of <cite>FieldCollection</cite> is the spatial dimension.
 Fields are then registered with the field accessor methods of the field collection,
-e.g. <cite>real_field</cite> in the example above. Fields are _named_, and the name needs to be
+e.g. <cite>real_field</cite> in the example above. Fields are <em>named</em>, and the name needs to be
 unique. Accessing a field of the same name yield the same field object.</p>
-<p>Note the <cite>FieldCollection</cite> additionally has register method, e.g. <cite>register_real_field</cite>.
-The different to <cite>real_field</cite> is that the explicit registration of the field fails if
+<p>Note the <cite>FieldCollection</cite> additionally has register methods, e.g. <cite>register_real_field</cite>.
+The different to <cite>real_field</cite> method is that the explicit registration of the field fails if
 it already exists, while the accessor method <cite>real_field</cite> registers it if it does not exist
-but returns the existing field if it does.</p>
+but returns the existing field if it does. You can also query a field with <cite>get_field</cite>,
+which will raise an exception if the field does not exist.</p>
 </section>
 <section id="components">
 <h2>Components<a class="headerlink" href="#components" title="Link to this heading">¶</a></h2>
@@ -338,6 +366,20 @@ but returns the existing field if it does.</p>
 tensor-valued field can be defined by specifying either simply a number of components or
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">muGrid</span> <span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+
+<span class="c1"># Two dimensional grid</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Get a tensor-field (for example to represent the strain)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s1">&#39;strain&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="c1"># Fill the field with random numbers</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+</pre></div>
+</div>
 </section>
 <section id="sub-points">
 <h2>Sub-points<a class="headerlink" href="#sub-points" title="Link to this heading">¶</a></h2>
@@ -349,7 +391,28 @@ in a the finite element method.</p>
 is created.</p>
 <p>The following example initializes a three-dimension grid with
 a sub-division of each pixel into five elements:</p>
-<p>The examples demonstrates two ways of accessing the field. The convenience accessor <cite>p</cite> (that
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">muGrid</span> <span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+
+<span class="c1"># Two dimensional grid</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;element&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+
+<span class="c1"># Get a tensor-field (for example to represent the strain)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span>
+    <span class="s1">&#39;strain&#39;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
+    <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># shape of components</span>
+    <span class="s1">&#39;element&#39;</span>  <span class="c1"># sub-point type</span>
+<span class="p">)</span>
+
+<span class="c1"># Fill the field with random numbers</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+
+<span class="c1"># Note that the covenience accessor `p` yields the same field but a different shape</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span> <span class="o">*</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>The example demonstrates two ways of accessing the field. The convenience accessor <cite>p</cite> (that
 we also used in the above examples) and the new accessor <cite>s</cite>. Both yield a numpy array that is
 a view on the underlying data, but with different shapes. The <cite>s</cite> accessor has the shape
 <cite>(components, sub-points, pixels)</cite> and exposes the sub-points explicitly. The <cite>p</cite> accessor folds
@@ -389,6 +452,8 @@ for example normalizing the displacement field could look like:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">ux</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uy</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uz</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>Note that the default storage order of the field is column-major, which means the
+field components are stored next to each other in memory.</p>
 </section>
 </section>
 
@@ -465,7 +530,7 @@ for example normalizing the displacement field could look like:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=92ed90fd"></script>
+</div><script src="_static/documentation_options.js?v=79437ee1"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>

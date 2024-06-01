@@ -75,18 +75,19 @@ There are two kinds of field collections:
 
 The following example shows how to initialize a field collection and create scalar fields:
 
-.. literalinclude:: ../../examples/python/field_collection.py
+.. literalinclude:: ../../examples/field_collection.py
     :language: python
 
 The first argument to the constructor of `FieldCollection` is the spatial dimension.
 Fields are then registered with the field accessor methods of the field collection,
-e.g. `real_field` in the example above. Fields are _named_, and the name needs to be
+e.g. `real_field` in the example above. Fields are *named*, and the name needs to be
 unique. Accessing a field of the same name yield the same field object.
 
-Note the `FieldCollection` additionally has register method, e.g. `register_real_field`.
-The different to `real_field` is that the explicit registration of the field fails if
+Note the `FieldCollection` additionally has register methods, e.g. `register_real_field`.
+The different to `real_field` method is that the explicit registration of the field fails if
 it already exists, while the accessor method `real_field` registers it if it does not exist
-but returns the existing field if it does.
+but returns the existing field if it does. You can also query a field with `get_field`,
+which will raise an exception if the field does not exist.
 
 Components
 **********
@@ -96,7 +97,7 @@ tensor-valued field can be defined by specifying either simply a number of compo
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:
 
-.. literalinclude:: ../../examples/python/components.py
+.. literalinclude:: ../../examples/components.py
     :language: python
 
 Sub-points
@@ -113,10 +114,10 @@ is created.
 The following example initializes a three-dimension grid with
 a sub-division of each pixel into five elements:
 
-.. literalinclude:: ../../examples/python/sub_points.py
+.. literalinclude:: ../../examples/sub_points.py
     :language: python
 
-The examples demonstrates two ways of accessing the field. The convenience accessor `p` (that
+The example demonstrates two ways of accessing the field. The convenience accessor `p` (that
 we also used in the above examples) and the new accessor `s`. Both yield a numpy array that is
 a view on the underlying data, but with different shapes. The `s` accessor has the shape
 `(components, sub-points, pixels)` and exposes the sub-points explicitly. The `p` accessor folds
@@ -166,3 +167,6 @@ for example normalizing the displacement field could look like:
 .. code-block:: Python
 
     displacement_field.s /= np.sqrt(ux**2 + uy**2 + uz**2)
+
+Note that the default storage order of the field is column-major, which means the
+field components are stored next to each other in memory.
