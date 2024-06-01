@@ -17,5 +17,5 @@ strain.s = np.random.rand(*((3, 3, 5) + nb_grid_pts))
 
 # Initialize a file I/O object
 file = FileIONetCDF('example.nc', OpenMode.Overwrite)
-file.register_field_collection(fc)
+file.register_field_collection(fc)  # Register the field collection with the file
 file.append_frame().write()  # Write all fields of the field collection to the file
