@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Coding Convention" href="CodingConvention.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>C++ API Reference - µGrid 0.90.1-34-gfab89d9 documentation</title>
+        <title>C++ API Reference - µGrid 0.90.1-37-gabeab4d documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-34-gfab89d9
+      <a href="index.html"><div class="brand">µGrid 0.90.1-37-gabeab4d
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-34-gfab89d9
+  <span class="sidebar-brand-text">µGrid 0.90.1-37-gabeab4d
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -3276,7 +3276,7 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid9FileFrame9FileFrameEv">
 <span id="_CPPv3N6muGrid9FileFrame9FileFrameEv"></span><span id="_CPPv2N6muGrid9FileFrame9FileFrameEv"></span><span id="muGrid::FileFrame::FileFrame"></span><span class="target" id="classmuGrid_1_1FileFrame_1ac1dc75340eade2e44f506f9748212716"></span><span class="sig-name descname"><span class="n"><span class="pre">FileFrame</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid9FileFrame9FileFrameEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor is deleted to prevent direct instantiation of this class. </p>
+<dd><p>Default constructor is deleted to prevent direct instantiation of this class without parameters. </p>
 </dd></dl>
 
 <dl class="cpp function">
@@ -3394,7 +3394,13 @@
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8OpenModeE">
 <span id="_CPPv3N6muGrid10FileIOBase8OpenModeE"></span><span id="_CPPv2N6muGrid10FileIOBase8OpenModeE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4dcc5a9400b93fd431d72e418be74c17"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OpenMode</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8OpenModeE" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Enumeration for file open modes. </p>
-<p>This enumeration defines the possible modes for opening a file: Read, Write, and Append. </p>
+<p>This enumeration defines the possible modes for opening a file:<ul class="simple">
+<li><p>Read: File is opened for reading only. This mode is used when the data in the file is only needed for input and will not be modified.</p></li>
+<li><p>Write: File is opened for writing only. This mode is used when new data is to be written to a file. If the file already exists, this mode will fail to prevent accidental data loss.</p></li>
+<li><p>Overwrite: File is opened for writing only. This mode is used when new data is to be written to a file. If the file already exists, it will be overwritten. Use this mode with caution to prevent accidental data loss.</p></li>
+<li><p>Append: File is opened for writing only. This mode is used when new data is to be added to the end of a file. If the file already exists, the new data will be added at the end, preserving the existing data. </p></li>
+</ul>
+</p>
 <p><em>Values:</em></p>
 <dl class="cpp enumerator">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8OpenMode4ReadE">
@@ -3404,6 +3410,11 @@
 <dl class="cpp enumerator">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8OpenMode5WriteE">
 <span id="_CPPv3N6muGrid10FileIOBase8OpenMode5WriteE"></span><span id="_CPPv2N6muGrid10FileIOBase8OpenMode5WriteE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4dcc5a9400b93fd431d72e418be74c17a1129c0e4d43f2d121652a7302712cff6"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Write</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8OpenMode5WriteE" title="Link to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8OpenMode9OverwriteE">
+<span id="_CPPv3N6muGrid10FileIOBase8OpenMode9OverwriteE"></span><span id="_CPPv2N6muGrid10FileIOBase8OpenMode9OverwriteE"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a4dcc5a9400b93fd431d72e418be74c17ada364eb37e143f6b2b5559aa03f5913a"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Overwrite</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8OpenMode9OverwriteE" title="Link to this definition">¶</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="cpp enumerator">
@@ -3419,7 +3430,7 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase10FileIOBaseEv">
 <span id="_CPPv3N6muGrid10FileIOBase10FileIOBaseEv"></span><span id="_CPPv2N6muGrid10FileIOBase10FileIOBaseEv"></span><span id="muGrid::FileIOBase::FileIOBase"></span><span class="target" id="classmuGrid_1_1FileIOBase_1a6bc587f0fc3f9201819d032ba8807b39"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIOBase</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase10FileIOBaseEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor is deleted to prevent direct instantiation of this class. </p>
+<dd><p>Default constructor is deleted to prevent direct instantiation of this class without parameters. </p>
 </dd></dl>
 
 <dl class="cpp function">
@@ -3710,7 +3721,8 @@
 <span id="_CPPv3N6muGrid12FileIONetCDFE"></span><span id="_CPPv2N6muGrid12FileIONetCDFE"></span><span id="muGrid::FileIONetCDF"></span><span class="target" id="classmuGrid_1_1FileIONetCDF"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FileIONetCDF</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDFE" title="Link to this definition">¶</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;<a class="reference internal" href="#file__io__netcdf_8hh"><span class="std std-ref">file_io_netcdf.hh</span></a>&gt;</em></div>
-<p>FileIO class for NetCDF files. </p>
+<p>A class for handling NetCDF files in the µGrid codebase. </p>
+<p>This class inherits from the <a class="reference internal" href="#classmuGrid_1_1FileIOBase"><span class="std std-ref">FileIOBase</span></a> class and provides specific functionality for handling NetCDF files. NetCDF (Network Common Data Format) is a self-describing, machine-independent data format that support the creation, access, and sharing of array-oriented scientific data. </p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
 <dl class="cpp enum-class">
@@ -3746,103 +3758,248 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERKNSt6stringERKN10FileIOBase8OpenModeE12Communicator">
 <span id="_CPPv3N6muGrid12FileIONetCDF12FileIONetCDFERKNSt6stringERKN10FileIOBase8OpenModeE12Communicator"></span><span id="_CPPv2N6muGrid12FileIONetCDF12FileIONetCDFERKNSt6stringERKN10FileIOBase8OpenModeE12Communicator"></span><span id="muGrid::FileIONetCDF::FileIONetCDF__ssCR.FileIOBase::OpenModeCR.Communicator"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a7ff0d28e75987b3867596de7a400eda4"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIONetCDF</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">file_name</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBaseE" title="muGrid::FileIOBase"><span class="n"><span class="pre">FileIOBase</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenModeE" title="muGrid::FileIOBase::OpenMode"><span class="n"><span class="pre">OpenMode</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">open_mode</span></span>, <a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE" title="muGrid::Communicator"><span class="n"><span class="pre">Communicator</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">comm</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE" title="muGrid::Communicator"><span class="n"><span class="pre">Communicator</span></span></a><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERKNSt6stringERKN10FileIOBase8OpenModeE12Communicator" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Constructor with the domain’s number of grid points in each direciton, the number of components to transform, and the communicator </p>
+<dd><p>Constructs a new <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object. </p>
+<p>This constructor creates a new <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object with the specified file name, open mode, and communicator. The <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> class is used for handling NetCDF files in the µGrid codebase.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_name</strong> – The name of the file to be handled. This should be a valid file path. </p></li>
+<li><p><strong>open_mode</strong> – The mode in which the file should be opened. This should be a valid mode from the <a class="reference internal" href="#classmuGrid_1_1FileIOBase_1a4dcc5a9400b93fd431d72e418be74c17"><span class="std std-ref">FileIOBase::OpenMode</span></a> enumeration. </p></li>
+<li><p><strong>comm</strong> – The communicator to be used for parallel I/O operations. If not provided, a default <a class="reference internal" href="#classmuGrid_1_1Communicator"><span class="std std-ref">Communicator</span></a> object is used. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERK12FileIONetCDF">
 <span id="_CPPv3N6muGrid12FileIONetCDF12FileIONetCDFERK12FileIONetCDF"></span><span id="_CPPv2N6muGrid12FileIONetCDF12FileIONetCDFERK12FileIONetCDF"></span><span id="muGrid::FileIONetCDF::FileIONetCDF__FileIONetCDFCR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1ae20b7fa0159c3644077790761d258164"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIONetCDF</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERK12FileIONetCDF" title="muGrid::FileIONetCDF::FileIONetCDF"><span class="n"><span class="pre">FileIONetCDF</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERK12FileIONetCDF" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy constructor. </p>
+<dd><p>Copy constructor (deleted) </p>
+<p>This copy constructor is deleted to prevent copying of <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The other <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object to be copied. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERR12FileIONetCDF">
 <span id="_CPPv3N6muGrid12FileIONetCDF12FileIONetCDFERR12FileIONetCDF"></span><span id="_CPPv2N6muGrid12FileIONetCDF12FileIONetCDFERR12FileIONetCDF"></span><span id="muGrid::FileIONetCDF::FileIONetCDF__FileIONetCDFRR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a7b4fe4cfbe20b9806007312b3793551a"></span><span class="sig-name descname"><span class="n"><span class="pre">FileIONetCDF</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERR12FileIONetCDF" title="muGrid::FileIONetCDF::FileIONetCDF"><span class="n"><span class="pre">FileIONetCDF</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF12FileIONetCDFERR12FileIONetCDF" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move constructor. </p>
+<dd><p>Move constructor (deleted) </p>
+<p>This move constructor is deleted to prevent moving of <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The other <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object to be moved. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDFD0Ev">
 <span id="_CPPv3N6muGrid12FileIONetCDFD0Ev"></span><span id="_CPPv2N6muGrid12FileIONetCDFD0Ev"></span><span id="muGrid::FileIONetCDF::~FileIONetCDF"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a9f544004dd92606fafac6290a792956e"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~FileIONetCDF</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDFD0Ev" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Destructor. </p>
+<p>This is the destructor for the <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> class. It is responsible for freeing any resources that the object may have acquired during its lifetime. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDFaSERK12FileIONetCDF">
 <span id="_CPPv3N6muGrid12FileIONetCDFaSERK12FileIONetCDF"></span><span id="_CPPv2N6muGrid12FileIONetCDFaSERK12FileIONetCDF"></span><span id="muGrid::FileIONetCDF::assign-operator__FileIONetCDFCR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a77b7b5ab8f3ce53ca955b5ce703ae5e6"></span><a class="reference internal" href="#_CPPv4N6muGrid12FileIONetCDFE" title="muGrid::FileIONetCDF"><span class="n"><span class="pre">FileIONetCDF</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid12FileIONetCDFE" title="muGrid::FileIONetCDF"><span class="n"><span class="pre">FileIONetCDF</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDFaSERK12FileIONetCDF" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy assignment operator. </p>
+<dd><p>Copy assignment operator (deleted) </p>
+<p>This copy assignment operator is deleted to prevent copying of <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The other <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object to be copied. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A reference to the current object. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDFaSERR12FileIONetCDF">
 <span id="_CPPv3N6muGrid12FileIONetCDFaSERR12FileIONetCDF"></span><span id="_CPPv2N6muGrid12FileIONetCDFaSERR12FileIONetCDF"></span><span id="muGrid::FileIONetCDF::assign-operator__FileIONetCDFRR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1aef83de185a3e648c7753057442ed9c81"></span><a class="reference internal" href="#_CPPv4N6muGrid12FileIONetCDFE" title="muGrid::FileIONetCDF"><span class="n"><span class="pre">FileIONetCDF</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid12FileIONetCDFE" title="muGrid::FileIONetCDF"><span class="n"><span class="pre">FileIONetCDF</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDFaSERR12FileIONetCDF" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Move assignment operator. </p>
+<dd><p>Move assignment operator (deleted) </p>
+<p>This move assignment operator is deleted to prevent moving of <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – The other <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object to be moved. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A reference to the current object. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid12FileIONetCDF25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid12FileIONetCDF25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIONetCDF::register_field_collection__muGrid::FieldCollectionR.std::vector:ss:.std::vector:ss:"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1aed3a36fe572517eb572f618a86d40a46"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">register_field_collection</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollectionE" title="muGrid::FieldCollection"><span class="n"><span class="pre">FieldCollection</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">fc</span></span>, <a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">field_names</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><a class="reference internal" href="#_CPPv4N6muGrid19REGISTER_ALL_FIELDSE" title="muGrid::REGISTER_ALL_FIELDS"><span class="n"><span class="pre">REGISTER_ALL_FIELDS</span></span></a><span class="p"><span class="pre">}</span></span>, <a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">state_field_unique_prefixes</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><a class="reference internal" href="#_CPPv4N6muGrid25REGISTER_ALL_STATE_FIELDSE" title="muGrid::REGISTER_ALL_STATE_FIELDS"><span class="n"><span class="pre">REGISTER_ALL_STATE_FIELDS</span></span></a><span class="p"><span class="pre">}</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">final</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF25register_field_collectionERN6muGrid15FieldCollectionENSt6vectorINSt6stringEEENSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Tell the I/O object about the field collections we want to dump to this file before the file is opened &#64;parameter field_names &amp;#8212; name of fields from the field collection that schould be saved in the NetCDF file. This parameter should be used if not all fields from the field collection will be written to the file (default case). </p>
+<dd><p>Registers the field collections that should be written to the file. </p>
+<p>This function should be called before the file is opened. It allows the user to specify which fields from the field collection should be saved in the NetCDF file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fc</strong> – The field collection to be registered. </p></li>
+<li><p><strong>field_names</strong> – A vector of names of fields from the field collection that should be saved in the NetCDF file. This parameter should be used if not all fields from the field collection will be written to the file (default case). </p></li>
+<li><p><strong>state_field_unique_prefixes</strong> – A vector of unique prefixes for state fields. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF5closeEv">
 <span id="_CPPv3N6muGrid12FileIONetCDF5closeEv"></span><span id="_CPPv2N6muGrid12FileIONetCDF5closeEv"></span><span id="muGrid::FileIONetCDF::close"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a7b17d2c56ef431613ff0764f6f57904e"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">close</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">final</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF5closeEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>close file </p>
+<dd><p>Closes the file. </p>
+<p>This function is used to close the NetCDF file after all operations are done. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF4readERK7Index_tRKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid12FileIONetCDF4readERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid12FileIONetCDF4readERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIONetCDF::read__Index_tCR.std::vector:ss:CR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a3f58fdee1361a41f587affef3ff336fd"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">final</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF4readERK7Index_tRKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>read the fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> frame from file </p>
+<dd><p>Reads the specified fields from the file. </p>
+<p>This function reads the fields identified by <code class="docutils literal notranslate"><span class="pre">field_names</span></code> from the specified frame in the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frame</strong> – The frame from which to read the fields. </p></li>
+<li><p><strong>field_names</strong> – A vector of names of fields to be read from the file. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF4readERK7Index_t">
 <span id="_CPPv3N6muGrid12FileIONetCDF4readERK7Index_t"></span><span id="_CPPv2N6muGrid12FileIONetCDF4readERK7Index_t"></span><span id="muGrid::FileIONetCDF::read__Index_tCR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a4a1879e4c155c6934f0e0e905fe9b8a2"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">final</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF4readERK7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>read the fields in frame from file </p>
+<dd><p>Reads all fields from the specified frame in the file. </p>
+<p>This function reads all fields from the specified frame in the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frame</strong> – The frame from which to read the fields. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF5writeERK7Index_tRKNSt6vectorINSt6stringEEE">
 <span id="_CPPv3N6muGrid12FileIONetCDF5writeERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N6muGrid12FileIONetCDF5writeERK7Index_tRKNSt6vectorINSt6stringEEE"></span><span id="muGrid::FileIONetCDF::write__Index_tCR.std::vector:ss:CR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">field_names</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">final</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF5writeERK7Index_tRKNSt6vectorINSt6stringEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write contents of all fields within the field collection with the name in field_names to the frame in file </p>
+<dd><p>Writes the specified fields to the file. </p>
+<p>This function writes the contents of all fields within the field collection with the name in <code class="docutils literal notranslate"><span class="pre">field_names</span></code> to the specified frame in the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frame</strong> – The frame to which to write the fields. </p></li>
+<li><p><strong>field_names</strong> – A vector of names of fields to be written to the file. </p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF5writeERK7Index_t">
 <span id="_CPPv3N6muGrid12FileIONetCDF5writeERK7Index_t"></span><span id="_CPPv2N6muGrid12FileIONetCDF5writeERK7Index_t"></span><span id="muGrid::FileIONetCDF::write__Index_tCR"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a97dc258afd134214f7dead9817f38b01"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">frame</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">final</span></span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF5writeERK7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>write contents of all fields within the field collection to the file </p>
+<dd><p>Writes all fields to the file. </p>
+<p>This function writes the contents of all fields within the field collection to the specified frame in the file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frame</strong> – The frame to which to write the fields. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid12FileIONetCDF12handle_frameE7Index_t">
 <span id="_CPPv3NK6muGrid12FileIONetCDF12handle_frameE7Index_t"></span><span id="_CPPv2NK6muGrid12FileIONetCDF12handle_frameE7Index_t"></span><span id="muGrid::FileIONetCDF::handle_frame__Index_tC"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a50f197f123c83849b3581f74a98cd559"></span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">handle_frame</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">frame</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid12FileIONetCDF12handle_frameE7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>checks if the frame is valid and computes the corresponding positive frame value for a negative frame value. Examples: a) nb_frames = 5; frame_in = -3; frame_out = 2 b) nb_frames = 5; frame_in = 3; frame_out = 3 c) nb_frames = 5; frame_in = 7; Error d) nb_frames = 5; frame_in = -6; Error </p>
+<dd><p>Checks if the frame is valid and computes the corresponding positive frame value for a negative frame value. </p>
+<p>This function checks if the frame is valid and computes the corresponding positive frame value for a negative frame value. For example, if the total number of frames is 5:<ul class="simple">
+<li><p>If the input frame is -3, the output frame is 2.</p></li>
+<li><p>If the input frame is 3, the output frame is 3.</p></li>
+<li><p>If the input frame is 7 or -6, an error is thrown.</p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frame</strong> – The frame to be checked and converted. This can be a positive or negative integer. </p>
+</dd>
+<dt class="field-even">Throws<span class="colon">:</span></dt>
+<dd class="field-even"><p><span><span class="cpp-expr sig sig-inline cpp"><a class="reference internal" href="#_CPPv4N6muGrid11FileIOErrorE" title="muGrid::FileIOError"><span class="n">FileIOError</span></a></span></span> – If the input frame is not valid (i.e., it is greater than the total number of frames or less than the negative of the total number of frames). </p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The corresponding positive frame value for the input frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I0EN6muGrid12FileIONetCDF22write_global_attributeEvRKNSt6stringE1T">
 <span id="_CPPv3I0EN6muGrid12FileIONetCDF22write_global_attributeERKNSt6stringE1T"></span><span id="_CPPv2I0EN6muGrid12FileIONetCDF22write_global_attributeERKNSt6stringE1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmuGrid_1_1FileIONetCDF_1a643dc616355094999cf85d1871552f5d"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">write_global_attribute</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">att_name</span></span>, <a class="reference internal" href="#_CPPv4I0EN6muGrid12FileIONetCDF22write_global_attributeEvRKNSt6stringE1T" title="muGrid::FileIONetCDF::write_global_attribute::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN6muGrid12FileIONetCDF22write_global_attributeEvRKNSt6stringE1T" title="Link to this definition">¶</a><br /></dt>
-<dd><p>register a <a class="reference internal" href="#classmuGrid_1_1NetCDFGlobalAtt"><span class="std std-ref">NetCDFGlobalAtt</span></a> to the global_attributes of <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a>. This function can only be used in open_mode = FileIOBase::OpenMode::Write and before <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">write()</span></a> was called the first time otherwise there is the danger of having time expensive NetCDF header expansions, which is the reason why this is prevented. </p>
+<dd><p>Registers a global attribute to the NetCDF file. </p>
+<p>This function can only be used in open_mode = FileIOBase::OpenMode::Write and before <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF_1a139ce9e4a991f2cfd719a3bb2d5df7ac"><span class="std std-ref">write()</span></a> was called the first time. Otherwise, there is the danger of having time expensive NetCDF header expansions, which is the reason why this is prevented.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T</strong> – The type of the value to be written as a global attribute. </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>att_name</strong> – The name of the attribute. </p></li>
+<li><p><strong>value</strong> – The value of the attribute. </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span><span class="cpp-expr sig sig-inline cpp"><a class="reference internal" href="#_CPPv4N6muGrid11FileIOErrorE" title="muGrid::FileIOError"><span class="n">FileIOError</span></a></span></span> – If the global attributes are already defined or if the open mode is not Write. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid12FileIONetCDF21read_global_attributeERKNSt6stringE">
 <span id="_CPPv3NK6muGrid12FileIONetCDF21read_global_attributeERKNSt6stringE"></span><span id="_CPPv2NK6muGrid12FileIONetCDF21read_global_attributeERKNSt6stringE"></span><span id="muGrid::FileIONetCDF::read_global_attribute__ssCRC"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a5ca8e71d0828aba14ccdcb7c659958f3"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid15NetCDFGlobalAttE" title="muGrid::NetCDFGlobalAtt"><span class="n"><span class="pre">NetCDFGlobalAtt</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">read_global_attribute</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">att_name</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid12FileIONetCDF21read_global_attributeERKNSt6stringE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>get a NetCDfGlobalAtt from the <a class="reference internal" href="#classmuGrid_1_1FileIONetCDF"><span class="std std-ref">FileIONetCDF</span></a> object by its name </p>
+<dd><p>Retrieves a global attribute from the NetCDF file by its name. </p>
+<p>This function is used to fetch a global attribute from the NetCDF file. The attribute is identified by its name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>att_name</strong> – The name of the attribute. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A constant reference to the <a class="reference internal" href="#classmuGrid_1_1NetCDFGlobalAtt"><span class="std std-ref">NetCDFGlobalAtt</span></a> object representing the global attribute. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid12FileIONetCDF27read_global_attribute_namesEv">
 <span id="_CPPv3NK6muGrid12FileIONetCDF27read_global_attribute_namesEv"></span><span id="_CPPv2NK6muGrid12FileIONetCDF27read_global_attribute_namesEv"></span><span id="muGrid::FileIONetCDF::read_global_attribute_namesC"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a16c9cb0ca6b71569e1b5ba76275af97b"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">read_global_attribute_names</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6muGrid12FileIONetCDF27read_global_attribute_namesEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>get a const std::vector&lt;std::string&gt; with the names of all current global attributes </p>
+<dd><p>Retrieves the names of all current global attributes in the NetCDF file. </p>
+<p>This function is used to fetch the names of all global attributes present in the NetCDF file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A constant vector of strings containing the names of all current global attributes. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I0EN6muGrid12FileIONetCDF23update_global_attributeEvRKNSt6stringERKNSt6stringE1T">
 <span id="_CPPv3I0EN6muGrid12FileIONetCDF23update_global_attributeERKNSt6stringERKNSt6stringE1T"></span><span id="_CPPv2I0EN6muGrid12FileIONetCDF23update_global_attributeERKNSt6stringERKNSt6stringE1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classmuGrid_1_1FileIONetCDF_1a29de728ffedc483b5d4cad9908eb25be"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">update_global_attribute</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">old_att_name</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">new_att_name</span></span>, <a class="reference internal" href="#_CPPv4I0EN6muGrid12FileIONetCDF23update_global_attributeEvRKNSt6stringERKNSt6stringE1T" title="muGrid::FileIONetCDF::update_global_attribute::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">new_att_value</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0EN6muGrid12FileIONetCDF23update_global_attributeEvRKNSt6stringERKNSt6stringE1T" title="Link to this definition">¶</a><br /></dt>
-<dd><p>update the value/s or name of an exisiting (already written to the NetCDF file) global attribute. This is only allowed if the changes do not lead to an increas of the size of the global attribute and the data_type of the attribute is not changed. This function can only be used in open_mode = FileIOBase::OpenMode::Write or FileIOBase::OpenMode::Append. </p>
+<dd><p>Updates the value or name of an existing global attribute in the NetCDF file. </p>
+<p>This function can only be used in open_mode = FileIOBase::OpenMode::Write or FileIOBase::OpenMode::Append. The changes are only allowed if they do not lead to an increase in the size of the global attribute and the data_type of the attribute is not changed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>T</strong> – The type of the new value for the global attribute. </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>old_att_name</strong> – The current name of the attribute. </p></li>
+<li><p><strong>new_att_name</strong> – The new name for the attribute. </p></li>
+<li><p><strong>new_att_value</strong> – The new value for the attribute. </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span><span class="cpp-expr sig sig-inline cpp"><a class="reference internal" href="#_CPPv4N6muGrid11FileIOErrorE" title="muGrid::FileIOError"><span class="n">FileIOError</span></a></span></span> – If the function is called in a mode other than Write or Append, or if the attribute was not previously written to the NetCDF file. </p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -3851,7 +4008,22 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid12FileIONetCDF12handle_frameE7Index_t7Index_t">
 <span id="_CPPv3N6muGrid12FileIONetCDF12handle_frameE7Index_t7Index_t"></span><span id="_CPPv2N6muGrid12FileIONetCDF12handle_frameE7Index_t7Index_t"></span><span id="muGrid::FileIONetCDF::handle_frame__Index_t.Index_t"></span><span class="target" id="classmuGrid_1_1FileIONetCDF_1a1fd78adfb7d58ad5d586c8dc7ef58c16"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">handle_frame</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">frame</span></span>, <a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">tot_nb_frames</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid12FileIONetCDF12handle_frameE7Index_t7Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>static version of handle_frame </p>
+<dd><p>Checks if the frame is valid and computes the corresponding positive frame value for a negative frame value (static version). </p>
+<p>This is a static version of the handle_frame function. It performs the same operation but takes an additional parameter for the total number of frames.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frame</strong> – The frame to be checked and converted. This can be a positive or negative integer. </p></li>
+<li><p><strong>tot_nb_frames</strong> – The total number of frames. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Throws<span class="colon">:</span></dt>
+<dd class="field-even"><p><span><span class="cpp-expr sig sig-inline cpp"><a class="reference internal" href="#_CPPv4N6muGrid11FileIOErrorE" title="muGrid::FileIOError"><span class="n">FileIOError</span></a></span></span> – If the input frame is not valid (i.e., it is greater than the total number of frames or less than the negative of the total number of frames). </p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The corresponding positive frame value for the input frame. </p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -5453,7 +5625,7 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid10FileIOBase8iterator8iteratorEv">
 <span id="_CPPv3N6muGrid10FileIOBase8iterator8iteratorEv"></span><span id="_CPPv2N6muGrid10FileIOBase8iterator8iteratorEv"></span><span id="muGrid::FileIOBase::iterator::iterator"></span><span class="target" id="classmuGrid_1_1FileIOBase_1_1iterator_1a7ef0e6f29bf8844599cd794306b43ebf"></span><span class="sig-name descname"><span class="n"><span class="pre">iterator</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor is deleted to prevent direct instantiation of this class. </p>
+<dd><p>Default constructor is deleted to prevent direct instantiation of this class without parameters. </p>
 </dd></dl>
 
 <dl class="cpp function">
@@ -14264,10 +14436,6 @@ Copyright © 2017 Till Junge<dl class="simple">
 <dt class="sig sig-object cpp">
 <span class="target" id="communicator_8cc"></span><em><span class="pre">file</span></em> <span class="sig-name descname"><span class="pre">communicator.cc</span></span></dt>
 <dd><div class="docutils container">
-<em>#include &lt;sstream&gt;</em></div>
-<div class="docutils container">
-<em>#include “<a class="reference internal" href="#exception_8hh"><span class="std std-ref">exception.hh</span></a>”</em></div>
-<div class="docutils container">
 <em>#include “<a class="reference internal" href="#communicator_8hh"><span class="std std-ref">communicator.hh</span></a>”</em></div>
 <p>implementation for mpi abstraction layer </p>
 <p>
@@ -16571,6 +16739,7 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenModeE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::OpenMode</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenMode4ReadE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::OpenMode::Read</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenMode5WriteE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::OpenMode::Write</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenMode9OverwriteE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::OpenMode::Overwrite</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8OpenMode6AppendE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::OpenMode::Append</span></code></a></li>
 </ul>
 </li>
@@ -18269,7 +18438,7 @@ Copyright © 2020 Till Junge<dl class="simple">
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=79437ee1"></script>
+</div><script src="_static/documentation_options.js?v=2cb3e6fa"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>

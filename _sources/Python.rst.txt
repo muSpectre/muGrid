@@ -170,3 +170,11 @@ for example normalizing the displacement field could look like:
 
 Note that the default storage order of the field is column-major, which means the
 field components are stored next to each other in memory.
+
+I/O
+***
+
+Fields can be written to disk in the `NetCDF <https://en.wikipedia.org/wiki/NetCDF>`_ format.
+*µ*\Grid uses `Unidata NetCDF <https://www.unidata.ucar.edu/software/netcdf/>`_ when build
+with just serial capabilities and `PnetCDF <https://parallel-netcdf.github.io/>`_ when build
+with MPI enabled.

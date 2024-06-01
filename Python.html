@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="C++ Bindings" href="Cplusplus.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
 
     <!-- Generated with Sphinx 7.3.7 and Furo 2024.05.06 -->
-        <title>Python Bindings - µGrid 0.90.1-34-gfab89d9 documentation</title>
+        <title>Python Bindings - µGrid 0.90.1-37-gabeab4d documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=387cc868" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
@@ -179,7 +179,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.90.1-34-gfab89d9
+      <a href="index.html"><div class="brand">µGrid 0.90.1-37-gabeab4d
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -204,7 +204,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.90.1-34-gfab89d9
+  <span class="sidebar-brand-text">µGrid 0.90.1-37-gabeab4d
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -455,6 +455,13 @@ for example normalizing the displacement field could look like:</p>
 <p>Note that the default storage order of the field is column-major, which means the
 field components are stored next to each other in memory.</p>
 </section>
+<section id="i-o">
+<h2>I/O<a class="headerlink" href="#i-o" title="Link to this heading">¶</a></h2>
+<p>Fields can be written to disk in the <a class="reference external" href="https://en.wikipedia.org/wiki/NetCDF">NetCDF</a> format.
+<em>µ</em>Grid uses <a class="reference external" href="https://www.unidata.ucar.edu/software/netcdf/">Unidata NetCDF</a> when build
+with just serial capabilities and <a class="reference external" href="https://parallel-netcdf.github.io/">PnetCDF</a> when build
+with MPI enabled.</p>
+</section>
 </section>
 
         </article>
@@ -519,6 +526,7 @@ field components are stored next to each other in memory.</p>
 <li><a class="reference internal" href="#components">Components</a></li>
 <li><a class="reference internal" href="#sub-points">Sub-points</a></li>
 <li><a class="reference internal" href="#numpy-views">numpy views</a></li>
+<li><a class="reference internal" href="#i-o">I/O</a></li>
 </ul>
 </li>
 </ul>
@@ -530,7 +538,7 @@ field components are stored next to each other in memory.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=79437ee1"></script>
+</div><script src="_static/documentation_options.js?v=2cb3e6fa"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=4e2eecee"></script>
