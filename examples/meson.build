@@ -16,7 +16,7 @@ envdata.append('TESTS_BUILDDIR', meson.current_build_dir())
 
 test('serial',
      python,
-     args: [files('serial.py')],
+     args: [files('field_collection.py')],
      env: envdata,
      depends: [mugrid_python],
      timeout: test_timeout)
