@@ -1399,9 +1399,9 @@ namespace muGrid {
      * @brief Registers a global attribute to the NetCDF file.
      *
      * This function can only be used in open_mode = FileIOBase::OpenMode::Write
-     * and before write() was called the first time. Otherwise, there is the
-     * danger of having time expensive NetCDF header expansions, which is the
-     * reason why this is prevented.
+     * or FileIOBase::OpenMode::Overwrite and before write() was called the
+     * first time. Otherwise, there is the danger of having time expensive
+     * NetCDF header expansions, which is the reason why this is prevented.
      *
      * @tparam T The type of the value to be written as a global attribute.
      * @param att_name The name of the attribute.
@@ -1419,10 +1419,12 @@ namespace muGrid {
             "there was data written to the NetCDF file. Therefore, please "
             "write all global attributes before you write data to your file.");
       }
-      if (this->open_mode != FileIOBase::OpenMode::Write) {
+      if (this->open_mode != FileIOBase::OpenMode::Write &&
+          this->open_mode != FileIOBase::OpenMode::Overwrite) {
         throw FileIOError(
             "It is only possible to write global attributes when the "
-            "FileIONetCDF object was open with 'FileIOBase::OpenMode::Write'.");
+            "FileIONetCDF object was open with 'FileIOBase::OpenMode::Write' "
+            "or 'FileIOBase::OpenMode::Overwrite.");
       }
       this->global_attributes.add_attribute(att_name, value);
     }
@@ -1456,10 +1458,11 @@ namespace muGrid {
      * @brief Updates the value or name of an existing global attribute in the
      * NetCDF file.
      *
-     * This function can only be used in open_mode = FileIOBase::OpenMode::Write
-     * or FileIOBase::OpenMode::Append. The changes are only allowed if they do
-     * not lead to an increase in the size of the global attribute and the
-     * data_type of the attribute is not changed.
+     * This function can only be used in open_mode =
+     * FileIOBase::OpenMode::Write, FileIOBase::OpenMode::Overwrite or
+     * FileIOBase::OpenMode::Append. The changes are only allowed if they do not
+     * lead to an increase in the size of the global attribute and the data_type
+     * of the attribute is not changed.
      *
      * @tparam T The type of the new value for the global attribute.
      * @param old_att_name The current name of the attribute.
@@ -1474,11 +1477,13 @@ namespace muGrid {
                                  const std::string & new_att_name,
                                  T new_att_value) {
       // calling this function is only allowed in write or append mode
-      if (this->open_mode != FileIOBase::OpenMode::Write and
+      if (this->open_mode != FileIOBase::OpenMode::Write &&
+          this->open_mode != FileIOBase::OpenMode::Overwrite &&
           this->open_mode != FileIOBase::OpenMode::Append) {
         throw FileIOError(
             "It is only possible to update global attributes when the "
-            "FileIONetCDF object was open in 'FileIOBase::OpenMode::Write' or "
+            "FileIONetCDF object was open in 'FileIOBase::OpenMode::Write', "
+            "'FileIOBase::OpenMode::Overwrite' or "
             "'FileIOBase::OpenMode::Append'.");
       }
 
@@ -1499,14 +1504,16 @@ namespace muGrid {
 
       // check if the old NetCDFGlobalAtt was already written
       if (not old_netcdf_global_attribute->is_already_written_to_file()) {
-        if (this->open_mode == FileIOBase::OpenMode::Write) {
+        if (this->open_mode == FileIOBase::OpenMode::Write ||
+            this->open_mode == FileIOBase::OpenMode::Overwrite) {
           throw FileIOError(
               "You can only update a global attribute if it was already "
               "written to the NetCDF file. It seems like the the global "
               "attribute '" +
               old_att_name +
               "' was not written to the NetCDF file up to now. In "
-              "FileIOBase::OpenMode::Write the global attributes are written "
+              "FileIOBase::OpenMode::Write and FileIOBase::OpenMode::Overwrite "
+              "the global attributes are written "
               "during the first call of 'FileIONetCDF::write()' or when you "
               "close the file with 'FileIONetCDF::close()'.");
         } else if (this->open_mode == FileIOBase::OpenMode::Append) {
@@ -1619,9 +1626,10 @@ namespace muGrid {
 
     //! write NetCDFGlobalAtts from global_attributes (which are not already
     //! written) this function is only called if the file was open in
-    //! FileIOBase::OpenMode::Write. Then it is only called twice, once in
-    //! FileIONetCDF::open() and once in FileIONetCDF::write() or
-    //! FileIONetCDF::close() if write() was not called before close.
+    //! FileIOBase::OpenMode::Write or FileIOBase::OpenMode::Overwrite. Then it
+    //! is only called twice, once in FileIONetCDF::open() and once in
+    //! FileIONetCDF::write() or FileIONetCDF::close() if write() was not called
+    //! before close.
     void define_global_attributes();
 
     //! call define global attributes and check all requiremnts and bring the
