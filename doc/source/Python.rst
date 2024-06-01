@@ -4,10 +4,10 @@ Python Bindings
 Fields
 ******
 
-The *µ*\Grid library handles field quantities, i.e. scalar, vectors or tensors,
+The µGrid library handles field quantities, i.e. scalar, vectors or tensors,
 that vary in space. It supports only a uniform discretization of space. In the
-language of *µ*\Grid, we call the discrete coordinates **pixels**. Each pixel
-is associated with a physical position in space. *µ*\Grid supports fields in
+language of µGrid, we call the discrete coordinates **pixels**. Each pixel
+is associated with a physical position in space. µGrid supports fields in
 two and three dimensional Cartesian grids. Note that a common name for a pixel
 in three dimensions is a **voxel**, but we refer to it as a pixel throughout
 this documentation.
@@ -15,7 +15,7 @@ this documentation.
 Each pixel
 can be subdivided into logical elements, for example into a number of
 support points for numerical quadrature. These subdivisions are called
-**sub-points**. Note that while *µ*\Grid understands the physical location of
+**sub-points**. Note that while µGrid understands the physical location of
 each *pixel*, the *sub-points* are logical subdivisions and not associated
 with any position within the pixel. Each *sub-point* carries the field quantity,
 which can be a scalar, vector or any type of tensor. The field quantity is
@@ -24,7 +24,7 @@ called the **component**.
 Multidimensional arrays
 ***********************
 
-Each *µ*\Grid field has a representation in a multidimensional array. This
+Each µGrid field has a representation in a multidimensional array. This
 representation is used when accessing a field with Python via `numpy <https://numpy.org/>`_
 or when writing the field to a file. The default representation has the shape
 
@@ -62,7 +62,7 @@ representation.
 Field collections
 *****************
 
-In *µ*\Grid, fields are grouped into field collections. A field collection knows
+In µGrid, fields are grouped into field collections. A field collection knows
 about the spatial discretization of the fields, but each field can differ in number of
 sub-points and components.
 
@@ -175,7 +175,7 @@ I/O
 ***
 
 Fields can be written to disk in the `NetCDF <https://en.wikipedia.org/wiki/NetCDF>`_ format.
-*µ*\Grid uses `Unidata NetCDF <https://www.unidata.ucar.edu/software/netcdf/>`_ when build
+µGrid uses `Unidata NetCDF <https://www.unidata.ucar.edu/software/netcdf/>`_ when build
 with just serial capabilities and `PnetCDF <https://parallel-netcdf.github.io/>`_ when build
 with MPI enabled.
 
