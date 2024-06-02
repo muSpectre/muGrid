@@ -30,7 +30,7 @@ test = [
 ]
 
 [project.urls]
-documentation = "https://muspectre.gitlab.io/muspectre/index.html"
+documentation = "https://muspectre.github.io/muGrid/"
 repository = "https://github.com/muSpectre/muGrid"
 changelog = "https://github.com/muSpectre/muGrid/blob/main/CHANGELOG.md"
 
