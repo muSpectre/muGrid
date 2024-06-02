@@ -1,6 +1,12 @@
 Change log for µSpectre
 =======================
 
+0.91.1 (02June2024)
+-------------------
+
+- BUG: Updated `NumpyProxy` to reflect that a global field collection no
+  longer required number of spatial dimensions as first argument
+
 0.91.0 (01June2024)
 -------------------
 
