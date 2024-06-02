@@ -34,8 +34,6 @@ if mpi.found()
     mugrid_dependencies += [mpi, netcdf]
     mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
 else
-    mu_with_fftw3mpi = false
-    mu_with_pfft = false
     netcdf = dependency('netcdf', required: false)
     mugrid_dependencies += [netcdf]
 endif
