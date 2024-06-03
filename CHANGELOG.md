@@ -1,6 +1,11 @@
 Change log for µSpectre
 =======================
 
+0.91.2 (not yet released)
+-------------------------
+
+- BUG: Don't import OpenMode if NetCDF is not available
+
 0.91.1 (02June2024)
 -------------------
 
