@@ -49,12 +49,38 @@ from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder, S
                      Verbosity, GlobalFieldCollection, LocalFieldCollection, Unit, Dictionary)
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
-try:
-    from _muGrid import FileIONetCDF
-    OpenMode = FileIONetCDF.OpenMode
-except ImportError:
-    pass
+if hasattr(_muGrid, 'FileIONetCDF'):
+    OpenMode = _muGrid.FileIONetCDF.OpenMode
+def FileIONetCDF(file_name, open_mode=OpenMode.Read, communicator=None):
+    """
+    This function is used to open a NetCDF file with a specified mode and
+    communicator.
 
+    NetCDF (Network Common Data Form) is a set of software libraries
+    and machine-independent data formats that support the creation, access,
+    and sharing of array-oriented scientific data.
+
+    Parameters
+    ----------
+    file_name : str
+        The name of the NetCDF file to be opened. This should include the full
+        path if the file is not in the current working directory.
+    open_mode : OpenMode, optional
+        The mode in which the file is to be opened. This should be a value from
+        the OpenMode enumeration (Read, Write, Overwrite or Append).
+        (Default: OpenMode.Read)
+    communicator : Communicator, optional
+        The MPI communicator to be used for parallel I/O. If this is not
+        provided, the file I/O operations will be serial. (Default: None)
+
+    Returns
+    -------
+    file : FileIONetCDF
+         Returns a FileIONetCDF object which represents the opened file. This object
+         can be used to read data from or write data to the file, depending on the
+         open mode.
+    """
+    return _muGrid.FileIONetCDF(file_name, open_mode, Communicator(communicator))
 from .Parallel import Communicator
 
 __version__ = _muGrid.version.description()

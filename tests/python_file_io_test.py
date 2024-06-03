@@ -58,7 +58,7 @@ class FileIOTest(unittest.TestCase):
         self.file_sf_name = "python_binding_io_state-field-tests.nc"
         self.file_ga_name = "python_binding_io_global-attributes-tests.nc"
         if MPI:
-            self.comm = muGrid.Communicator(MPI.COMM_WORLD)
+            self.comm = MPI.COMM_WORLD
         else:
             self.comm = muGrid.Communicator()
 
@@ -80,8 +80,7 @@ class FileIOTest(unittest.TestCase):
         if os.path.exists(self.file_f_name):
             os.remove(self.file_f_name)
 
-        file_io_object = muGrid.FileIONetCDF(
-            self.file_f_name, muGrid.FileIONetCDF.OpenMode.Write, self.comm)
+        file_io_object = muGrid.FileIONetCDF(self.file_f_name, muGrid.OpenMode.Write, self.comm)
 
         glob_field_name = "global-test-field"
         loc_field_name = "local-test-field"
@@ -144,8 +143,7 @@ class FileIOTest(unittest.TestCase):
         file_io_object.close()
 
         # ## append frame 2 to the already written netcdf file
-        file_io_object = muGrid.FileIONetCDF(
-            self.file_f_name, muGrid.FileIONetCDF.OpenMode.Append, self.comm)
+        file_io_object = muGrid.FileIONetCDF(self.file_f_name, muGrid.OpenMode.Append, self.comm)
         file_io_object.register_field_collection(self.fc_glob)
         file_io_object.register_field_collection(self.fc_loc)
         a_glob[:] = 1234
@@ -161,8 +159,7 @@ class FileIOTest(unittest.TestCase):
         if os.path.exists(self.file_sf_name):
             os.remove(self.file_sf_name)
 
-        file_io_object = muGrid.FileIONetCDF(
-            self.file_sf_name, muGrid.FileIONetCDF.OpenMode.Write, self.comm)
+        file_io_object = muGrid.FileIONetCDF(self.file_sf_name, muGrid.OpenMode.Write, self.comm)
 
         glob_prefix = "global-state-field"
         loc_prefix = "local-state-field"
@@ -232,8 +229,7 @@ class FileIOTest(unittest.TestCase):
         file_io_object.close()
 
         # ## append frame 2 to the already written netcdf file
-        file_io_object = muGrid.FileIONetCDF(
-            self.file_sf_name, muGrid.FileIONetCDF.OpenMode.Append, self.comm)
+        file_io_object = muGrid.FileIONetCDF(self.file_sf_name, muGrid.OpenMode.Append, self.comm)
         file_io_object.register_field_collection(self.fc_glob)
         file_io_object.register_field_collection(self.fc_loc)
         a_glob[:] = 1234
@@ -250,8 +246,7 @@ class FileIOTest(unittest.TestCase):
         if os.path.exists(self.file_ga_name):
             os.remove(self.file_ga_name)
 
-        file_io_object_w = muGrid.FileIONetCDF(
-            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Write, self.comm)
+        file_io_object_w = muGrid.FileIONetCDF(self.file_ga_name, muGrid.OpenMode.Write, self.comm)
 
         global_att_1_name = "global_att_str"
         global_att_1_value = "123abc"
@@ -301,8 +296,7 @@ class FileIOTest(unittest.TestCase):
                                       global_att_5_value])
 
         # --- read global attribute --- #
-        file_io_object_r = muGrid.FileIONetCDF(
-            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Read, self.comm)
+        file_io_object_r = muGrid.FileIONetCDF(self.file_ga_name, muGrid.OpenMode.Read, self.comm)
 
         with self.assertRaises(RuntimeError) as cm:
             file_io_object_r.write_global_attribute(global_att_1_name,
@@ -339,8 +333,7 @@ class FileIOTest(unittest.TestCase):
             self.assertTrue(global_att_dic[k] == global_att_ref_dic[k])
 
         # --- change global attribute in append mode --- #
-        file_io_object_a = muGrid.FileIONetCDF(
-            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Append, self.comm)
+        file_io_object_a = muGrid.FileIONetCDF(self.file_ga_name, muGrid.OpenMode.Append, self.comm)
 
         old_name = global_att_1_name  # this is a str attribute
         old_value = file_io_object_a.read_global_attribute(old_name)
@@ -379,8 +372,7 @@ class FileIOTest(unittest.TestCase):
         file_io_object_a.close()  # now the last modified time should be updated
 
         # check if the global att and the last_modified_time were updated
-        file_io_object_r2 = muGrid.FileIONetCDF(
-            self.file_ga_name, muGrid.FileIONetCDF.OpenMode.Read, self.comm)
+        file_io_object_r2 = muGrid.FileIONetCDF(self.file_ga_name, muGrid.OpenMode.Read, self.comm)
 
         with self.assertRaises(RuntimeError) as cm:
             file_io_object_r2.read_global_attribute(old_name)
