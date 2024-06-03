@@ -69,8 +69,7 @@ namespace muGrid {
     template <typename T, int flags = py::array::forcecast>
     inline std::tuple<StorageOrder, DynCcoord_t, Shape_t>
     detect_storage_order(const DynCcoord_t & nb_subdomain_grid_pts,
-                         const Shape_t & components_shape,
-                         Index_t nb_sub_pts,
+                         const Shape_t & components_shape, Index_t nb_sub_pts,
                          py::array_t<T, flags> & array) {
       auto & dim{nb_subdomain_grid_pts.get_dim()};
       if (static_cast<py::ssize_t>(dim + components_shape.size()) !=
@@ -105,10 +104,9 @@ namespace muGrid {
         strides.push_back(0);
       }
       for (int i = 0; i < dim; ++i) {
-        pixels_strides.push_back(
-            array.strides(array.ndim() - dim + i));
-        strides.push_back(
-            array.strides(array.ndim() - dim + i) / array.itemsize());
+        pixels_strides.push_back(array.strides(array.ndim() - dim + i));
+        strides.push_back(array.strides(array.ndim() - dim + i) /
+                          array.itemsize());
       }
 
       // Determine the storage order of the whole buffer. We first check the
@@ -119,14 +117,14 @@ namespace muGrid {
         fc_storage_order = StorageOrder::Unknown;
         const auto c{std::minmax_element(components_strides.begin(),
                                          components_strides.end())};
-        const auto p{std::minmax_element(pixels_strides.begin(),
-                                         pixels_strides.end())};
+        const auto p{
+            std::minmax_element(pixels_strides.begin(), pixels_strides.end())};
         if (*c.first > *p.second) {
           // this may be row-major, but we need to check that buffer is
           // contiguous
-          if (*c.first == nb_subdomain_grid_pts[
-                              p.second - pixels_strides.begin()] *
-                              (*p.second)) {
+          if (*c.first ==
+              nb_subdomain_grid_pts[p.second - pixels_strides.begin()] *
+                  (*p.second)) {
             fc_storage_order = StorageOrder::RowMajor;
           }
         } else {
@@ -178,8 +176,8 @@ namespace muGrid {
 
       // the pixels generally support arbitrary strides, but we must normalize
       // to the smallest entry
-      Index_t smallest_stride{*std::min_element(pixels_strides.begin(),
-                                                pixels_strides.end())};
+      Index_t smallest_stride{
+          *std::min_element(pixels_strides.begin(), pixels_strides.end())};
       if (smallest_stride > 0) {
         for (auto && s : pixels_strides) {
           s /= smallest_stride;
@@ -263,13 +261,12 @@ namespace muGrid {
                DynCcoord_t subdomain_locations, Index_t nb_dof_per_pixel,
                py::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
-        : collection{}, field{}
-    {
+        : collection{}, field{} {
       // Sanity check 1: Are the sizes of array and field equal?
-      Index_t size{std::accumulate(
-                       nb_subdomain_grid_pts.begin(),
-                       nb_subdomain_grid_pts.end(), 1,
-                       std::multiplies<Index_t>())*nb_dof_per_pixel};
+      Index_t size{std::accumulate(nb_subdomain_grid_pts.begin(),
+                                   nb_subdomain_grid_pts.end(), 1,
+                                   std::multiplies<Index_t>()) *
+                   nb_dof_per_pixel};
       if (size != array.size()) {
         std::stringstream s;
         s << "The numpy array has a size of " << array.size() << ", but the "
@@ -328,16 +325,14 @@ namespace muGrid {
       FieldCollection::SubPtMap_t map{};
       map["proxy_subpt"] = 1;
       this->collection = std::make_unique<Collection_t>(
-          static_cast<Index_t>(nb_subdomain_grid_pts.get_dim()),
           nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
           pixels_strides, map, fc_storage_order);
       // Note: The pointer should be obtained from array.template mutable_data()
       // but this has a guard if the array is not writeable. We need a constant
       // WrappedField to clean up this code.
       this->field = std::make_unique<WrappedField<T>>(
-          "proxy_field", *collection, components_shape,
-          array.size(), static_cast<T *>(array.request().ptr),
-          "proxy_subpt", unit, strides);
+          "proxy_field", *collection, components_shape, array.size(),
+          static_cast<T *>(array.request().ptr), "proxy_subpt", unit, strides);
     }
 
     /**
@@ -363,24 +358,22 @@ namespace muGrid {
       Shape_t sub_pt_shape{components_shape};
       if (static_cast<py::ssize_t>(dim + components_shape.size() + 1) ==
           array.ndim()) {
-        shape_matches =
-            std::equal(nb_subdomain_grid_pts.begin(),
-                       nb_subdomain_grid_pts.end(),
-                       array.shape() + array.ndim() - dim) &&
-            nb_sub_pts == array.shape(components_shape.size()) &&
-            std::equal(components_shape.begin(), components_shape.end(),
-                       array.shape());
+        shape_matches = std::equal(nb_subdomain_grid_pts.begin(),
+                                   nb_subdomain_grid_pts.end(),
+                                   array.shape() + array.ndim() - dim) &&
+                        nb_sub_pts == array.shape(components_shape.size()) &&
+                        std::equal(components_shape.begin(),
+                                   components_shape.end(), array.shape());
         sub_pt_shape.push_back(nb_sub_pts);
       } else if (static_cast<py::ssize_t>(dim + components_shape.size()) ==
                  array.ndim()) {
         // For a field with a single quad point, we can omit that dimension.
-        shape_matches =
-            std::equal(nb_subdomain_grid_pts.begin(),
-                       nb_subdomain_grid_pts.end(),
-                       array.shape() + array.ndim() - dim) &&
-            nb_sub_pts == 1 &&
-            std::equal(components_shape.begin(), components_shape.end(),
-                       array.shape());
+        shape_matches = std::equal(nb_subdomain_grid_pts.begin(),
+                                   nb_subdomain_grid_pts.end(),
+                                   array.shape() + array.ndim() - dim) &&
+                        nb_sub_pts == 1 &&
+                        std::equal(components_shape.begin(),
+                                   components_shape.end(), array.shape());
       }
       if (!shape_matches) {
         std::stringstream s;
@@ -401,16 +394,15 @@ namespace muGrid {
       FieldCollection::SubPtMap_t map{};
       map["proxy_subpt"] = nb_sub_pts;
       this->collection = std::make_unique<Collection_t>(
-          static_cast<Index_t>(nb_subdomain_grid_pts.get_dim()),
           nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
           pixels_strides, map, fc_storage_order);
       // Note: The pointer should be obtained from array.template mutable_data()
       // but this has a guard if the array is not writeable. We need a constant
       // WrappedField to clean up this code.
       this->field = std::make_unique<WrappedField<T>>(
-          "proxy_field", *collection, components_shape,
-          array.size(), static_cast<T *>(array.request().ptr),
-          "proxy_subpt", unit, sub_pt_iter_strides);
+          "proxy_field", *collection, components_shape, array.size(),
+          static_cast<T *>(array.request().ptr), "proxy_subpt", unit,
+          sub_pt_iter_strides);
     }
 
     /**
@@ -426,9 +418,7 @@ namespace muGrid {
       return this->field->get_components_shape();
     }
 
-    Shape_t get_sub_pt_shape() const {
-      return this->field->get_sub_pt_shape();
-    }
+    Shape_t get_sub_pt_shape() const { return this->field->get_sub_pt_shape(); }
 
    protected:
     std::unique_ptr<Collection_t> collection;
@@ -442,8 +432,8 @@ namespace muGrid {
              IterUnit iter_type = IterUnit::SubPt) {
     Shape_t shape{field.get_shape(iter_type)};
     Shape_t strides{field.get_strides(iter_type, sizeof(T))};
-    return py::array_t<T, py::array::f_style>(
-        shape, strides, field.data(), py::capsule([]() {}));
+    return py::array_t<T, py::array::f_style>(shape, strides, field.data(),
+                                              py::capsule([]() {}));
   }
 
   /* Turn any type that can be enumerated into a tuple */

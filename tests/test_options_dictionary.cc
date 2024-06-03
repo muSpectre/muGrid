@@ -63,7 +63,7 @@ namespace muGrid {
     Dictionary dict_mat{"direction", mat_val};
 
     BOOST_CHECK_THROW(dict_int.get_int(), std::runtime_error);
-    auto && check_val{dict_int["count"].get_int()};
+    auto check_val{dict_int["count"].get_int()};
     BOOST_CHECK_EQUAL(int_val, check_val);
     BOOST_CHECK_THROW(dict_real["intensity"].get_int(), std::runtime_error);
     BOOST_CHECK_THROW(dict_mat["direction"].get_int(), std::runtime_error);
