@@ -16,15 +16,22 @@ use
 
 .. code-block:: sh
 
-    $ pip install -v --no-binary muGrid muGrid
+    $ pip install -v --force-reinstall --no-cache --no-binary muGrid muGrid
 
 which will compile the code. µGrid will autodetect
-[MPI](https://www.mpi-forum.org/).
+`MPI <https://www.mpi-forum.org/>`_.
 For I/O, it will try to use
-[Unidata NetCDF](https://www.unidata.ucar.edu/software/netcdf/)
+`Unidata NetCDF <https://www.unidata.ucar.edu/software/netcdf/>`_
 for serial builds and
-[PnetCDF](https://parallel-netcdf.github.io/) for MPI-parallel builds.
+`PnetCDF <https://parallel-netcdf.github.io/>`_ for MPI-parallel builds.
 Monitor output to see which of these options were automatically detected.
+You should see something like::
+
+    Message:   --------------------
+    Message:   muGrid configuration
+    Message:     MPI            : *** YES ***
+    Message:     Parallel NetCDF: *** YES ***
+    Message:   --------------------
 
 Obtaining *µ*\Grid's source code
 ********************************
