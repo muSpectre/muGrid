@@ -1,8 +1,8 @@
 Change log for µSpectre
 =======================
 
-0.91.2 (not yet released)
--------------------------
+0.91.2 (04June2024)
+-------------------
 
 - ENH: Added wrapper that allows passing an `mpi4py` communicator to `FileIONetCDF`
 - BUG: Don't import OpenMode if NetCDF is not available
