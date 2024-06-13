@@ -135,6 +135,9 @@ class FieldCheck(unittest.TestCase):
         arr1[0, 0, 2, 1, 0] = 10  # f-contiguous
         self.assertEqual(arr2[0, 2, 1, 0], 10)  # f-contiguous
 
+        f2 = fc.register_real_field("test-field-2", 3, 'quad')
+        self.assertTrue(f.p.data != f2.p.data)
+
     def test_col_major(self):
         dims = (3, 4)
         fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, self.nb_grid_pts,
