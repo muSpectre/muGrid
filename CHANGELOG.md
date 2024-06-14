@@ -1,6 +1,11 @@
 Change log for µSpectre
 =======================
 
+0.91.3 (14June2024)
+-------------------
+
+- BUILD: Require at least eigen3 3.4.0
+
 0.91.2 (04June2024)
 -------------------
 
