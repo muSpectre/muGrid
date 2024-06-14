@@ -45,7 +45,7 @@ else
     mugrid_with_netcdf = false
 endif
 
-eigen3 = dependency('eigen3', required : true)
+eigen3 = dependency('eigen3', version : '>=3.4.0', required : true)
 mugrid_dependencies += [eigen3]
 
 message('  --------------------')
