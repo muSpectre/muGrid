@@ -1,6 +1,11 @@
 Change log for µSpectre
 =======================
 
+0.92.2 (14June2024)
+-------------------
+
+- BUILD: (Re)added dl and execinfo as requirements
+
 0.92.1 (14June2024)
 -------------------
 
