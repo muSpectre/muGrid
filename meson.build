@@ -16,11 +16,11 @@ version_str = version[1]
 version_hash = version[2]
 
 # Those are requirements on *some* systems, hence optional
-#cc = meson.get_compiler('c')
-#dl = cc.find_library('dl', required: false)
-#execinfo = cc.find_library('execinfo', required: false)
+cc = meson.get_compiler('c')
+dl = cc.find_library('dl', required: false)
+execinfo = cc.find_library('execinfo', required: false)
 
-#mugrid_dependencies = [dl, execinfo, fftw3]
+mugrid_dependencies = [dl, execinfo]
 
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_project_arguments('-Weffc++', language: 'cpp')
