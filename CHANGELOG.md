@@ -1,12 +1,12 @@
 Change log for µSpectre
 =======================
 
-0.91.3 (14June2024)
+0.92.1 (14June2024)
 -------------------
 
 - BUILD: Require at least eigen3 3.4.0
 
-0.91.2 (04June2024)
+0.92.0 (04June2024)
 -------------------
 
 - ENH: Added wrapper that allows passing an `mpi4py` communicator to `FileIONetCDF`
