@@ -15,7 +15,7 @@ version_dirty = version[0]
 version_str = version[1]
 version_hash = version[2]
 
-# Those are requirements on *some* systems, hence optional
+# Those are requirements on *some older* systems, hence optional
 cc = meson.get_compiler('c')
 dl = cc.find_library('dl', required: false)
 execinfo = cc.find_library('execinfo', required: false)
@@ -24,8 +24,6 @@ mugrid_dependencies = [dl, execinfo]
 
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_project_arguments('-Weffc++', language: 'cpp')
-
-mugrid_dependencies = []
 
 mpi = dependency('mpi', language : 'cpp', required : false)
 if mpi.found()
