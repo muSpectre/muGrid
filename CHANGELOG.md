@@ -1,6 +1,11 @@
 Change log for µSpectre
 =======================
 
+0.92.3 (15June2024)
+-------------------
+
+- BUILD: Don't override dependencies after dl and execinfo are detected
+
 0.92.2 (14June2024)
 -------------------
 
