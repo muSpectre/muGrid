@@ -436,6 +436,22 @@ namespace muGrid {
                                               py::capsule([]() {}));
   }
 
+  /* Copy a column-major field into a numpy array */
+  template <typename T>
+  py::array_t<T, py::array::f_style>
+  numpy_copy(const TypedFieldBase<T> & field,
+             IterUnit iter_type = IterUnit::SubPt) {
+    const Shape_t shape{field.get_shape(iter_type)};
+    py::array_t<T> array(shape);
+    Shape_t array_strides(array.strides(), array.strides() + array.ndim());
+    // numpy arrays have stride in bytes
+    for (auto && s : array_strides)
+      s /= sizeof(T);
+    strided_copy(shape, field.get_strides(iter_type), array_strides, field.data(),
+                 array.mutable_data());
+    return std::move(array);
+  }
+
   /* Turn any type that can be enumerated into a tuple */
   template <typename T>
   py::tuple to_tuple(T a) {
