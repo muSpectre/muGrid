@@ -1,6 +1,12 @@
 Change log for µSpectre
 =======================
 
+0.92.4 (30June2024)
+-------------------
+
+- MAINT: Added utility function for copying (rather than wrapping) field into
+  a numpy ndarray
+
 0.92.3 (15June2024)
 -------------------
 
