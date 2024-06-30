@@ -41,6 +41,7 @@
 
 #include "field_typed.hh"
 #include "field_collection_global.hh"
+#include "raw_memory_operations.hh"
 
 #include "pybind11/pybind11.h"
 #include "pybind11/numpy.h"
@@ -447,8 +448,9 @@ namespace muGrid {
     // numpy arrays have stride in bytes
     for (auto && s : array_strides)
       s /= sizeof(T);
-    strided_copy(shape, field.get_strides(iter_type), array_strides, field.data(),
-                 array.mutable_data());
+    muGrid::raw_mem_ops::strided_copy(shape, field.get_strides(iter_type),
+                                      array_strides, field.data(),
+                                      array.mutable_data());
     return std::move(array);
   }
 
