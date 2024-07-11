@@ -1,5 +1,10 @@
-Change log for µSpectre
-=======================
+Change log for µGrid
+====================
+
+0.92.5 (11Jul2024)
+------------------
+
+- BUG: Handle installation without NetCDF
 
 0.92.4 (30June2024)
 -------------------
