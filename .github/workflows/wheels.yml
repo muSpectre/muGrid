@@ -29,6 +29,11 @@ jobs:
       IS_32_BIT: ${{ matrix.buildplat[2] == 'x86' }}
 
     steps:
+      - if: matrix.buildplat[2] == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+          
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
