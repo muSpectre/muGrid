@@ -43,64 +43,118 @@
 namespace muGrid {
 
   /**
-   * Base class defining the interface for gradient and divergence operations
-   * (in the integral, finite-element sense
+   * @class GradientOperatorBase
+   * @brief Base class for gradient and divergence operations.
+   *
+   * This class defines the interface for performing gradient and divergence
+   * operations in the context of finite element analysis. It provides the
+   * foundational structure for implementing these operations on various types
+   * of fields and supports both nodal and quadrature point evaluations.
+   *
+   * @details The class is designed to be inherited by specific implementations
+   * that define the actual computational logic for gradient and divergence
+   * operations. It includes constructors, a destructor, and assignment
+   * operators to manage object lifecycle and ensure proper resource management.
    */
   class GradientOperatorBase {
    public:
-    //! Default constructor
+    /**
+     * @brief Default constructor.
+     *
+     * Initializes a new instance of the GradientOperatorBase class. This
+     * constructor is defaulted, indicating that it performs no special
+     * actions other than initializing the object.
+     */
     GradientOperatorBase() = default;
 
-    //! Copy constructor
+    /**
+     * @brief Copy constructor (deleted).
+     *
+     * Disables the copy construction of GradientOperatorBase instances.
+     * This ensures that a GradientOperatorBase object cannot be copied,
+     * enforcing unique ownership of its resources.
+     */
     GradientOperatorBase(const GradientOperatorBase & other) = delete;
 
-    //! Move constructor
+    /**
+     * @brief Move constructor.
+     *
+     * Enables the move semantics for GradientOperatorBase instances. This
+     * allows the efficient transfer of resources from one object to another
+     * without copying.
+     */
     GradientOperatorBase(GradientOperatorBase && other) = default;
 
-    //! Destructor
+    /**
+     * @brief Virtual destructor.
+     *
+     * Ensures that derived classes can be properly cleaned up through pointers
+     * to the base class. This destructor is defaulted.
+     */
     virtual ~GradientOperatorBase() = default;
 
-    //! Copy assignment operator
+    /**
+     * @brief Copy assignment operator (deleted).
+     *
+     * Disables the copy assignment of GradientOperatorBase instances.
+     * This prevents the accidental or intentional copying of an instance,
+     * enforcing unique ownership of its resources.
+     */
     GradientOperatorBase &
     operator=(const GradientOperatorBase & other) = delete;
 
-    //! Move assignment operator
+    /**
+     * @brief Move assignment operator.
+     *
+     * Enables the move assignment of GradientOperatorBase instances, allowing
+     * resources to be transferred between objects without copying.
+     */
     GradientOperatorBase & operator=(GradientOperatorBase && other) = default;
 
     /**
-     * Evaluates the gradient of nodal_field into quadrature_point_field
+     * @brief Applies the gradient operation.
      *
-     * @param nodal_field input field of which to take gradient. Defined on
-     * nodal points
-     * @param quadrature_point_field output field to write gradient into.
-     * Defined on quadrature points
+     * This method evaluates the gradient of a field defined at nodal points and
+     * writes the result into a field defined at quadrature points.
+     *
+     * @param nodal_field The input field from which the gradient is computed.
+     *                    Defined on nodal points.
+     * @param quadrature_point_field The output field where the gradient is
+     *                               written. Defined on quadrature points.
      */
     virtual void
     apply_gradient(const TypedFieldBase<Real> & nodal_field,
                    TypedFieldBase<Real> & quadrature_point_field) const = 0;
 
     /**
-     * Evaluates the gradient of nodal_field and adds it to
-     * quadrature_point_field
+     * @brief Applies the gradient operation with increment.
      *
-     * @param nodal_field input field of which to take gradient. Defined on
-     * nodal points
-     * @param quadrature_point_field output field to increment by the gradient
-     * field. Defined on quadrature points
+     * Evaluates the gradient of a field defined at nodal points and adds the
+     * result to a field defined at quadrature points.
+     *
+     * @param nodal_field The input field from which the gradient is computed.
+     *                    Defined on nodal points.
+     * @param alpha A scaling factor applied to the gradient before adding it to
+     *              the quadrature_point_field.
+     * @param quadrature_point_field The field to which the scaled gradient is
+     *                               added. Defined on quadrature points.
      */
     virtual void apply_gradient_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const = 0;
 
     /**
-     * Evaluates the discretised divergence of quadrature_point_field into
-     * nodal_field,  weights corrensponds to Gaussian quadrature weights. If
-     * weights are omitted, this returns some scaled version of discretised
-     * divergence.
-     * @param quadrature_point_field input field of which to take
-     * the divergence. Defined on quadrature points.
-     * @param nodal_field ouput field into which divergence is written
-     * @param weights Gaussian quadrature weigths
+     * @brief Applies the discretised divergence operation.
+     *
+     * Evaluates the discretised divergence of a field defined at quadrature
+     * points and writes the result into a field defined at nodal points.
+     *
+     * @param quadrature_point_field The input field from which the divergence
+     * is computed. Defined on quadrature points.
+     * @param nodal_field The output field where the divergence is written.
+     *                    Defined on nodal points.
+     * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
+     *                version of the discretised divergence is returned.
      */
     virtual void
     apply_transpose(const TypedFieldBase<Real> & quadrature_point_field,
@@ -108,14 +162,19 @@ namespace muGrid {
                     const std::vector<Real> & weights = {}) const = 0;
 
     /**
-     * Evaluates the discretised divergence of quadrature_point_field and adds
-     * the result to nodal_field,  weights corrensponds to Gaussian quadrature
-     * weights. If weights are omitted, this returns some scaled version of
-     * discretised divergence.
-     * @param quadrature_point_field input field of which to take
-     * the divergence. Defined on quadrature points.
-     * @param nodal_field ouput field to be incremented by theh divergence
-     * @param weights Gaussian quadrature weigths
+     * @brief Applies the discretised divergence operation with increment.
+     *
+     * Evaluates the discretised divergence of a field defined at quadrature
+     * points and adds the result to a field defined at nodal points.
+     *
+     * @param quadrature_point_field The input field from which the divergence
+     * is computed. Defined on quadrature points.
+     * @param alpha A scaling factor applied to the divergence before adding it
+     * to the nodal_field.
+     * @param nodal_field The field to which the scaled divergence is added.
+     *                    Defined on nodal points.
+     * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
+     *                version of the discretised divergence is returned.
      */
     virtual void apply_transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
@@ -123,20 +182,31 @@ namespace muGrid {
         const std::vector<Real> & weights = {}) const = 0;
 
     /**
-     * returns the number of quadrature points are associated with any
-     * pixel/voxel (i.e., the sum of the number of quadrature points associated
-     * with each element belonging to any pixel/voxel.
+     * @brief Returns the number of quadrature points per pixel/voxel.
+     *
+     * Calculates the total number of quadrature points associated with each
+     * pixel/voxel, summing the quadrature points of all elements belonging to
+     * the pixel/voxel.
+     *
+     * @return The total number of quadrature points per pixel/voxel.
      */
     virtual Index_t get_nb_pixel_quad_pts() const = 0;
+
     /**
-     * returns the number of nodal points associated with any pixel/voxel.
-     * (Every node belonging to at least one of the elements belonging to any
-     * pixel/voxel, without recounting nodes that appear multiple times)
+     * @brief Returns the number of nodal points per pixel/voxel.
+     *
+     * Calculates the total number of nodal points associated with each
+     * pixel/voxel, without recounting nodes that appear in multiple elements.
+     *
+     * @return The total number of nodal points per pixel/voxel.
      */
     virtual Index_t get_nb_pixel_nodal_pts() const = 0;
 
     /**
-     * return the spatial dimension of this gradient operator
+     * @brief Returns the spatial dimension of the gradient operator.
+     *
+     * @return The spatial dimensionality of the operations performed by this
+     *         gradient operator.
      */
     virtual Index_t get_spatial_dim() const = 0;
 

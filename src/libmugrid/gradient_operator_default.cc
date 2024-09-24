@@ -82,7 +82,8 @@ namespace muGrid {
       const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
       const Index_t & nb_pixelnodal_pts,
       const std::vector<std::vector<Eigen::MatrixXd>> & shape_fn_gradients,
-      const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> nodal_pts)
+      const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &
+          nodal_pts)
       : Parent{}, spatial_dim{spatial_dim}, nb_quad_pts{nb_quad_pts},
         nb_elements{nb_elements}, nb_elemnodal_pts{nb_elemnodal_pts},
         nb_pixelnodal_pts{nb_pixelnodal_pts},

@@ -46,32 +46,49 @@
 
 namespace muGrid {
 
+  /**
+   * @class GradientOperatorDefault
+   * @brief Implements gradient operations based on shape function gradients.
+   *
+   * This class extends GradientOperatorBase to provide specific implementations
+   * for gradient and divergence operations based on the shape function
+   * gradients for each quadrature point. It is designed to work with fields
+   * defined on nodal points and quadrature points, facilitating the evaluation
+   * of gradients and the discretised divergence.
+   *
+   * @note This class cannot be instantiated directly and does not support copy
+   *       construction or copy assignment.
+   */
   class GradientOperatorDefault : public GradientOperatorBase {
    public:
     using Parent = GradientOperatorBase;
-    //! Default constructor
+
+    //! Default constructor is deleted to prevent instantiation.
     GradientOperatorDefault() = delete;
 
     /**
-     * constructor
+     * @brief Constructs a GradientOperatorDefault object.
      *
-     * @param spatial_dimension spatial dimension of the stencil
-     * @param nb_quad_pts number of quadrature points per element
-     * @param nb_elements number of elements per pixel
-     * @param nb_elemenodal_pts number of nodal points per element
-     * @param nb_pixelnodal_pts number of nodal points per pixelo
-     * @param shape_fn_gradients per quadrature point and element, one matrix
-     * of shape function gradients (evaluated on the quadrature point)
-     * @param nodal_pts nodal point indices composed of nodal point index
-     * within a pixel and pixel coordinate offset. E.g. the second nodal point
-     * in pixel (i+1, j) gets (1, (1, 0))
+     * Initializes the gradient operator with the provided spatial dimensions,
+     * number of quadrature points, elements, nodal points, and shape function
+     * gradients.
+     *
+     * @param spatial_dim Spatial dimension of the stencil.
+     * @param nb_quad_pts Number of quadrature points per element.
+     * @param nb_elements Number of elements per pixel.
+     * @param nb_elemnodal_pts Number of nodal points per element.
+     * @param nb_pixelnodal_pts Number of nodal points per pixel.
+     * @param shape_fn_gradients Shape function gradients for each quadrature
+     *        point and element.
+     * @param nodal_pts Nodal point indices composed of nodal point index within
+     *        a pixel and pixel coordinate offset.
      */
     GradientOperatorDefault(
         const Index_t & spatial_dim, const Index_t & nb_quad_pts,
         const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
         const Index_t & nb_pixelnodal_pts,
         const std::vector<std::vector<Eigen::MatrixXd>> & shape_fn_gradients,
-        const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>>
+        const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &
             nodal_pts);
 
     //! Copy constructor
