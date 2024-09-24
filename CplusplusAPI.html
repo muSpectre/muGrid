@@ -5,10 +5,10 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Coding Convention" href="CodingConvention.html" />
 
-    <!-- Generated with Sphinx 7.3.7 and Furo 2024.07.18 -->
-        <title>C++ API Reference - µGrid 0.92.5-5-g9291851 documentation</title>
+    <!-- Generated with Sphinx 8.0.2 and Furo 2024.08.06 -->
+        <title>C++ API Reference - µGrid 0.92.5-9-g94283fd documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=613ab9ff" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
     
     
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.92.5-5-g9291851
+      <a href="index.html"><div class="brand">µGrid 0.92.5-9-g94283fd
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -191,7 +191,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.92.5-5-g9291851
+  <span class="sidebar-brand-text">µGrid 0.92.5-9-g94283fd
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -4502,7 +4502,9 @@
 <span id="_CPPv3N6muGrid20GradientOperatorBaseE"></span><span id="_CPPv2N6muGrid20GradientOperatorBaseE"></span><span id="muGrid::GradientOperatorBase"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorBase</span></span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBaseE" title="Link to this definition">¶</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;<a class="reference internal" href="#gradient__operator__base_8hh"><span class="std std-ref">gradient_operator_base.hh</span></a>&gt;</em></div>
-<p>Base class defining the interface for gradient and divergence operations (in the integral, finite-element sense </p>
+<p>Base class for gradient and divergence operations. </p>
+<p>This class defines the interface for performing gradient and divergence operations in the context of finite element analysis. It provides the foundational structure for implementing these operations on various types of fields and supports both nodal and quadrature point evaluations.</p>
+<p>The class is designed to be inherited by specific implementations that define the actual computational logic for gradient and divergence operations. It includes constructors, a destructor, and assignment operators to manage object lifecycle and ensure proper resource management. </p>
 <p>Subclassed by <a class="reference internal" href="#classmuGrid_1_1GradientOperatorDefault"><span class="std std-ref">muGrid::GradientOperatorDefault</span></a></p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
@@ -4510,47 +4512,54 @@
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseEv">
 <span id="_CPPv3N6muGrid20GradientOperatorBase20GradientOperatorBaseEv"></span><span id="_CPPv2N6muGrid20GradientOperatorBase20GradientOperatorBaseEv"></span><span id="muGrid::GradientOperatorBase::GradientOperatorBase"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1ab37ebd2a714ad2b8da1c1f13e19a90fd"></span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorBase</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseEv" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Default constructor. </p>
+<p>Initializes a new instance of the <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> class. This constructor is defaulted, indicating that it performs no special actions other than initializing the object. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseERK20GradientOperatorBase">
 <span id="_CPPv3N6muGrid20GradientOperatorBase20GradientOperatorBaseERK20GradientOperatorBase"></span><span id="_CPPv2N6muGrid20GradientOperatorBase20GradientOperatorBaseERK20GradientOperatorBase"></span><span id="muGrid::GradientOperatorBase::GradientOperatorBase__GradientOperatorBaseCR"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a1f82067624d1a335666c6883df5c1a0c"></span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorBase</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseERK20GradientOperatorBase" title="muGrid::GradientOperatorBase::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseERK20GradientOperatorBase" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy constructor. </p>
+<dd><p>Copy constructor (deleted). </p>
+<p>Disables the copy construction of <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> instances. This ensures that a <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> object cannot be copied, enforcing unique ownership of its resources. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseERR20GradientOperatorBase">
 <span id="_CPPv3N6muGrid20GradientOperatorBase20GradientOperatorBaseERR20GradientOperatorBase"></span><span id="_CPPv2N6muGrid20GradientOperatorBase20GradientOperatorBaseERR20GradientOperatorBase"></span><span id="muGrid::GradientOperatorBase::GradientOperatorBase__GradientOperatorBaseRR"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1acecb609bd216475ff003daded6b62417"></span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorBase</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseERR20GradientOperatorBase" title="muGrid::GradientOperatorBase::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBase20GradientOperatorBaseERR20GradientOperatorBase" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Move constructor. </p>
+<p>Enables the move semantics for <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> instances. This allows the efficient transfer of resources from one object to another without copying. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid20GradientOperatorBaseD0Ev">
 <span id="_CPPv3N6muGrid20GradientOperatorBaseD0Ev"></span><span id="_CPPv2N6muGrid20GradientOperatorBaseD0Ev"></span><span id="muGrid::GradientOperatorBase::~GradientOperatorBase"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1af0d9234eb1cde99f131ed970bb84f75f"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~GradientOperatorBase</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBaseD0Ev" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Destructor. </p>
+<dd><p>Virtual destructor. </p>
+<p>Ensures that derived classes can be properly cleaned up through pointers to the base class. This destructor is defaulted. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid20GradientOperatorBaseaSERK20GradientOperatorBase">
 <span id="_CPPv3N6muGrid20GradientOperatorBaseaSERK20GradientOperatorBase"></span><span id="_CPPv2N6muGrid20GradientOperatorBaseaSERK20GradientOperatorBase"></span><span id="muGrid::GradientOperatorBase::assign-operator__GradientOperatorBaseCR"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a638adb7f35de987028a276fcb10598f8"></span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBaseE" title="muGrid::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBaseE" title="muGrid::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBaseaSERK20GradientOperatorBase" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Copy assignment operator. </p>
+<dd><p>Copy assignment operator (deleted). </p>
+<p>Disables the copy assignment of <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> instances. This prevents the accidental or intentional copying of an instance, enforcing unique ownership of its resources. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid20GradientOperatorBaseaSERR20GradientOperatorBase">
 <span id="_CPPv3N6muGrid20GradientOperatorBaseaSERR20GradientOperatorBase"></span><span id="_CPPv2N6muGrid20GradientOperatorBaseaSERR20GradientOperatorBase"></span><span id="muGrid::GradientOperatorBase::assign-operator__GradientOperatorBaseRR"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1ae663940fb690fd60783d8db33ef434c2"></span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBaseE" title="muGrid::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBaseE" title="muGrid::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N6muGrid20GradientOperatorBaseaSERR20GradientOperatorBase" title="Link to this definition">¶</a><br /></dt>
 <dd><p>Move assignment operator. </p>
+<p>Enables the move assignment of <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> instances, allowing resources to be transferred between objects without copying. </p>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase14apply_gradientERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealE">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase14apply_gradientERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealE"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase14apply_gradientERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealE"></span><span id="muGrid::GradientOperatorBase::apply_gradient__TypedFieldBase:Real:CR.TypedFieldBase:Real:RC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a3450091ba8c596ba6642b865749c72ef"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">apply_gradient</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nodal_field</span></span>, <span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">quadrature_point_field</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase14apply_gradientERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Evaluates the gradient of nodal_field into quadrature_point_field</p>
+<dd><p>Applies the gradient operation. </p>
+<p>This method evaluates the gradient of a field defined at nodal points and writes the result into a field defined at quadrature points.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>nodal_field</strong> – input field of which to take gradient. Defined on nodal points </p></li>
-<li><p><strong>quadrature_point_field</strong> – output field to write gradient into. Defined on quadrature points </p></li>
+<li><p><strong>nodal_field</strong> – The input field from which the gradient is computed. Defined on nodal points. </p></li>
+<li><p><strong>quadrature_point_field</strong> – The output field where the gradient is written. Defined on quadrature points. </p></li>
 </ul>
 </dd>
 </dl>
@@ -4559,12 +4568,14 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase24apply_gradient_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealE">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase24apply_gradient_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealE"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase24apply_gradient_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealE"></span><span id="muGrid::GradientOperatorBase::apply_gradient_increment__TypedFieldBase:Real:CR.RealCR.TypedFieldBase:Real:RC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1ab17437362f6da184f5136a9b52a80598"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">apply_gradient_increment</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nodal_field</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">alpha</span></span>, <span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">quadrature_point_field</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase24apply_gradient_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Evaluates the gradient of nodal_field and adds it to quadrature_point_field</p>
+<dd><p>Applies the gradient operation with increment. </p>
+<p>Evaluates the gradient of a field defined at nodal points and adds the result to a field defined at quadrature points.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>nodal_field</strong> – input field of which to take gradient. Defined on nodal points </p></li>
-<li><p><strong>quadrature_point_field</strong> – output field to increment by the gradient field. Defined on quadrature points </p></li>
+<li><p><strong>nodal_field</strong> – The input field from which the gradient is computed. Defined on nodal points. </p></li>
+<li><p><strong>alpha</strong> – A scaling factor applied to the gradient before adding it to the quadrature_point_field. </p></li>
+<li><p><strong>quadrature_point_field</strong> – The field to which the scaled gradient is added. Defined on quadrature points. </p></li>
 </ul>
 </dd>
 </dl>
@@ -4573,13 +4584,14 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase15apply_transposeERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealERKNSt6vectorI4RealEE">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase15apply_transposeERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealERKNSt6vectorI4RealEE"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase15apply_transposeERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealERKNSt6vectorI4RealEE"></span><span id="muGrid::GradientOperatorBase::apply_transpose__TypedFieldBase:Real:CR.TypedFieldBase:Real:R.std::vector:Real:CRC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a2d9742b18e822e2c17dea1930f967721"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">apply_transpose</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">quadrature_point_field</span></span>, <span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nodal_field</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">weights</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase15apply_transposeERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealERKNSt6vectorI4RealEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Evaluates the discretised divergence of quadrature_point_field into nodal_field, weights corrensponds to Gaussian quadrature weights. If weights are omitted, this returns some scaled version of discretised divergence. </p>
+<dd><p>Applies the discretised divergence operation. </p>
+<p>Evaluates the discretised divergence of a field defined at quadrature points and writes the result into a field defined at nodal points.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>quadrature_point_field</strong> – input field of which to take the divergence. Defined on quadrature points. </p></li>
-<li><p><strong>nodal_field</strong> – ouput field into which divergence is written </p></li>
-<li><p><strong>weights</strong> – Gaussian quadrature weigths </p></li>
+<li><p><strong>quadrature_point_field</strong> – The input field from which the divergence is computed. Defined on quadrature points. </p></li>
+<li><p><strong>nodal_field</strong> – The output field where the divergence is written. Defined on nodal points. </p></li>
+<li><p><strong>weights</strong> – Optional Gaussian quadrature weights. If omitted, a scaled version of the discretised divergence is returned. </p></li>
 </ul>
 </dd>
 </dl>
@@ -4588,13 +4600,15 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase25apply_transpose_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealERKNSt6vectorI4RealEE">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase25apply_transpose_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealERKNSt6vectorI4RealEE"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase25apply_transpose_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealERKNSt6vectorI4RealEE"></span><span id="muGrid::GradientOperatorBase::apply_transpose_increment__TypedFieldBase:Real:CR.RealCR.TypedFieldBase:Real:R.std::vector:Real:CRC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a464be1a893164e0d29f22e4b404c8d2e"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">apply_transpose_increment</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">quadrature_point_field</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">alpha</span></span>, <span class="n"><span class="pre">TypedFieldBase</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nodal_field</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6muGrid4RealE" title="muGrid::Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">weights</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase25apply_transpose_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealERKNSt6vectorI4RealEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Evaluates the discretised divergence of quadrature_point_field and adds the result to nodal_field, weights corrensponds to Gaussian quadrature weights. If weights are omitted, this returns some scaled version of discretised divergence. </p>
+<dd><p>Applies the discretised divergence operation with increment. </p>
+<p>Evaluates the discretised divergence of a field defined at quadrature points and adds the result to a field defined at nodal points.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>quadrature_point_field</strong> – input field of which to take the divergence. Defined on quadrature points. </p></li>
-<li><p><strong>nodal_field</strong> – ouput field to be incremented by theh divergence </p></li>
-<li><p><strong>weights</strong> – Gaussian quadrature weigths </p></li>
+<li><p><strong>quadrature_point_field</strong> – The input field from which the divergence is computed. Defined on quadrature points. </p></li>
+<li><p><strong>alpha</strong> – A scaling factor applied to the divergence before adding it to the nodal_field. </p></li>
+<li><p><strong>nodal_field</strong> – The field to which the scaled divergence is added. Defined on nodal points. </p></li>
+<li><p><strong>weights</strong> – Optional Gaussian quadrature weights. If omitted, a scaled version of the discretised divergence is returned. </p></li>
 </ul>
 </dd>
 </dl>
@@ -4603,19 +4617,36 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase21get_nb_pixel_quad_ptsEv">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase21get_nb_pixel_quad_ptsEv"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase21get_nb_pixel_quad_ptsEv"></span><span id="muGrid::GradientOperatorBase::get_nb_pixel_quad_ptsC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a9906ec04a24e51e92994ad217658d6ef"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_nb_pixel_quad_pts</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase21get_nb_pixel_quad_ptsEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>returns the number of quadrature points are associated with any pixel/voxel (i.e., the sum of the number of quadrature points associated with each element belonging to any pixel/voxel. </p>
+<dd><p>Returns the number of quadrature points per pixel/voxel. </p>
+<p>Calculates the total number of quadrature points associated with each pixel/voxel, summing the quadrature points of all elements belonging to the pixel/voxel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The total number of quadrature points per pixel/voxel. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase22get_nb_pixel_nodal_ptsEv">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase22get_nb_pixel_nodal_ptsEv"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase22get_nb_pixel_nodal_ptsEv"></span><span id="muGrid::GradientOperatorBase::get_nb_pixel_nodal_ptsC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a5fb45760ecccda381840e717e037a613"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_nb_pixel_nodal_pts</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase22get_nb_pixel_nodal_ptsEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>returns the number of nodal points associated with any pixel/voxel. (Every node belonging to at least one of the elements belonging to any pixel/voxel, without recounting nodes that appear multiple times) </p>
+<dd><p>Returns the number of nodal points per pixel/voxel. </p>
+<p>Calculates the total number of nodal points associated with each pixel/voxel, without recounting nodes that appear in multiple elements.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The total number of nodal points per pixel/voxel. </p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6muGrid20GradientOperatorBase15get_spatial_dimEv">
 <span id="_CPPv3NK6muGrid20GradientOperatorBase15get_spatial_dimEv"></span><span id="_CPPv2NK6muGrid20GradientOperatorBase15get_spatial_dimEv"></span><span id="muGrid::GradientOperatorBase::get_spatial_dimC"></span><span class="target" id="classmuGrid_1_1GradientOperatorBase_1a6fca2a03beddc92261ebc895c96422e9"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_spatial_dim</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK6muGrid20GradientOperatorBase15get_spatial_dimEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>return the spatial dimension of this gradient operator </p>
+<dd><p>Returns the spatial dimension of the gradient operator. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The spatial dimensionality of the operations performed by this gradient operator. </p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -4624,7 +4655,15 @@
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid23GradientOperatorDefaultE">
 <span id="_CPPv3N6muGrid23GradientOperatorDefaultE"></span><span id="_CPPv2N6muGrid23GradientOperatorDefaultE"></span><span id="muGrid::GradientOperatorDefault"></span><span class="target" id="classmuGrid_1_1GradientOperatorDefault"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorDefault</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv46muGrid" title="muGrid"><span class="n"><span class="pre">muGrid</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6muGrid20GradientOperatorBaseE" title="muGrid::GradientOperatorBase"><span class="n"><span class="pre">GradientOperatorBase</span></span></a><a class="headerlink" href="#_CPPv4N6muGrid23GradientOperatorDefaultE" title="Link to this definition">¶</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><div class="docutils container">
+<em>#include &lt;<a class="reference internal" href="#gradient__operator__default_8hh"><span class="std std-ref">gradient_operator_default.hh</span></a>&gt;</em></div>
+<p>Implements gradient operations based on shape function gradients. </p>
+<p>This class extends <a class="reference internal" href="#classmuGrid_1_1GradientOperatorBase"><span class="std std-ref">GradientOperatorBase</span></a> to provide specific implementations for gradient and divergence operations based on the shape function gradients for each quadrature point. It is designed to work with fields defined on nodal points and quadrature points, facilitating the evaluation of gradients and the discretised divergence.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This class cannot be instantiated directly and does not support copy construction or copy assignment. </p>
+</div>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid23GradientOperatorDefault6ParentE">
@@ -4637,23 +4676,24 @@
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultEv">
 <span id="_CPPv3N6muGrid23GradientOperatorDefault23GradientOperatorDefaultEv"></span><span id="_CPPv2N6muGrid23GradientOperatorDefault23GradientOperatorDefaultEv"></span><span id="muGrid::GradientOperatorDefault::GradientOperatorDefault"></span><span class="target" id="classmuGrid_1_1GradientOperatorDefault_1ae9db13d9fe89100b3caa632928acf5f8"></span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorDefault</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultEv" title="Link to this definition">¶</a><br /></dt>
-<dd><p>Default constructor. </p>
+<dd><p>Default constructor is deleted to prevent instantiation. </p>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEEKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE">
-<span id="_CPPv3N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEEKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE"></span><span id="_CPPv2N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEEKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE"></span><span id="muGrid::GradientOperatorDefault::GradientOperatorDefault__Index_tCR.Index_tCR.Index_tCR.Index_tCR.Index_tCR.std::vector:std::vector:Eigen::MatrixXd::CR.std::vector:std::tuple:Eigen::VectorXi.Eigen::MatrixXi::C"></span><span class="target" id="classmuGrid_1_1GradientOperatorDefault_1af388a6bfb268ca32b37d5e1f6efc61ba"></span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorDefault</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">spatial_dim</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_quad_pts</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_elements</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_elemnodal_pts</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_pixelnodal_pts</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">shape_fn_gradients</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXi</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXi</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">nodal_pts</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEEKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE" title="Link to this definition">¶</a><br /></dt>
-<dd><p>constructor</p>
+<dt class="sig sig-object cpp" id="_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEERKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE">
+<span id="_CPPv3N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEERKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE"></span><span id="_CPPv2N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEERKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE"></span><span id="muGrid::GradientOperatorDefault::GradientOperatorDefault__Index_tCR.Index_tCR.Index_tCR.Index_tCR.Index_tCR.std::vector:std::vector:Eigen::MatrixXd::CR.std::vector:std::tuple:Eigen::VectorXi.Eigen::MatrixXi::CR"></span><span class="target" id="classmuGrid_1_1GradientOperatorDefault_1ad5f35e29ecd141cf0c3f7405b251e41b"></span><span class="sig-name descname"><span class="n"><span class="pre">GradientOperatorDefault</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">spatial_dim</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_quad_pts</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_elements</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_elemnodal_pts</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6muGrid7Index_tE" title="muGrid::Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nb_pixelnodal_pts</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">shape_fn_gradients</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXi</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXi</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">nodal_pts</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEERKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Constructs a <a class="reference internal" href="#classmuGrid_1_1GradientOperatorDefault"><span class="std std-ref">GradientOperatorDefault</span></a> object. </p>
+<p>Initializes the gradient operator with the provided spatial dimensions, number of quadrature points, elements, nodal points, and shape function gradients.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>spatial_dimension</strong> – spatial dimension of the stencil </p></li>
-<li><p><strong>nb_quad_pts</strong> – number of quadrature points per element </p></li>
-<li><p><strong>nb_elements</strong> – number of elements per pixel </p></li>
-<li><p><strong>nb_elemenodal_pts</strong> – number of nodal points per element </p></li>
-<li><p><strong>nb_pixelnodal_pts</strong> – number of nodal points per pixelo </p></li>
-<li><p><strong>shape_fn_gradients</strong> – per quadrature point and element, one matrix of shape function gradients (evaluated on the quadrature point) </p></li>
-<li><p><strong>nodal_pts</strong> – nodal point indices composed of nodal point index within a pixel and pixel coordinate offset. E.g. the second nodal point in pixel (i+1, j) gets (1, (1, 0)) </p></li>
+<li><p><strong>spatial_dim</strong> – Spatial dimension of the stencil. </p></li>
+<li><p><strong>nb_quad_pts</strong> – Number of quadrature points per element. </p></li>
+<li><p><strong>nb_elements</strong> – Number of elements per pixel. </p></li>
+<li><p><strong>nb_elemnodal_pts</strong> – Number of nodal points per element. </p></li>
+<li><p><strong>nb_pixelnodal_pts</strong> – Number of nodal points per pixel. </p></li>
+<li><p><strong>shape_fn_gradients</strong> – Shape function gradients for each quadrature point and element. </p></li>
+<li><p><strong>nodal_pts</strong> – Nodal point indices composed of nodal point index within a pixel and pixel coordinate offset. </p></li>
 </ul>
 </dd>
 </dl>
@@ -16206,17 +16246,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4NK6muGrid11raw_mem_ops18CartesianContainer3endEv"><code class="docutils literal notranslate"><span class="pre">CartesianContainer::end()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer5shapeE"><code class="docutils literal notranslate"><span class="pre">CartesianContainer::shape</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer10axes_orderE"><code class="docutils literal notranslate"><span class="pre">CartesianContainer::axes_order</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator8iteratorERK18CartesianContainerRK6size_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid11raw_mem_ops18CartesianContainer8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid11raw_mem_ops18CartesianContainer8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator9containerE"><code class="docutils literal notranslate"><span class="pre">iterator::container</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator5indexE"><code class="docutils literal notranslate"><span class="pre">iterator::index</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator7counterE"><code class="docutils literal notranslate"><span class="pre">iterator::counter</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid12CommunicatorE"><code class="docutils literal notranslate"><span class="pre">Communicator</span></code></a><ul>
@@ -16315,46 +16344,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels7stridesE"><code class="docutils literal notranslate"><span class="pre">DynamicPixels::strides</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10axes_orderE"><code class="docutils literal notranslate"><span class="pre">DynamicPixels::axes_order</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10contiguousE"><code class="docutils literal notranslate"><span class="pre">DynamicPixels::contiguous</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratorE"><code class="docutils literal notranslate"><span class="pre">Enumerator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorERK13DynamicPixels"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorERK10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorERR10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratorD0Ev"><code class="docutils literal notranslate"><span class="pre">Enumerator::~Enumerator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratoraSERK10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratoraSERR10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator5beginEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::begin()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator3endEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::end()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator4sizeEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::size()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator6pixelsE"><code class="docutils literal notranslate"><span class="pre">Enumerator::pixels</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iterator6ParentE"><code class="docutils literal notranslate"><span class="pre">iterator::Parent</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::value_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator16const_value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::const_value_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator7pointerE"><code class="docutils literal notranslate"><span class="pre">iterator::pointer</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator15difference_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::difference_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator17iterator_categoryE"><code class="docutils literal notranslate"><span class="pre">iterator::iterator_category</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorERK13DynamicPixels6size_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorEv"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratoraSERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratoraSERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator6pixelsE"><code class="docutils literal notranslate"><span class="pre">iterator::pixels</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator5indexE"><code class="docutils literal notranslate"><span class="pre">iterator::index</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4I_6size_t0EN6muGrid9DynCcoordE"><code class="docutils literal notranslate"><span class="pre">DynCcoord</span></code></a><ul>
@@ -16415,6 +16404,20 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid8internal8EigenMap6strideEv"><code class="docutils literal notranslate"><span class="pre">EigenMap::stride()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8internal8EigenMap5shapeEv"><code class="docutils literal notranslate"><span class="pre">EigenMap::shape()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8internal8EigenMap5NbRowEv"><code class="docutils literal notranslate"><span class="pre">EigenMap::NbRow()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratorE"><code class="docutils literal notranslate"><span class="pre">Enumerator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorERK13DynamicPixels"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorERK10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator10EnumeratorERR10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::Enumerator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratorD0Ev"><code class="docutils literal notranslate"><span class="pre">Enumerator::~Enumerator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratoraSERK10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10EnumeratoraSERR10Enumerator"><code class="docutils literal notranslate"><span class="pre">Enumerator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator5beginEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::begin()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator3endEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::end()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator4sizeEv"><code class="docutils literal notranslate"><span class="pre">Enumerator::size()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator6pixelsE"><code class="docutils literal notranslate"><span class="pre">Enumerator::pixels</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4I0EN6muGrid22ExceptionWithTracebackE"><code class="docutils literal notranslate"><span class="pre">ExceptionWithTraceback</span></code></a><ul>
@@ -16573,54 +16576,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13storage_orderE"><code class="docutils literal notranslate"><span class="pre">FieldCollection::storage_order</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection11initialisedE"><code class="docutils literal notranslate"><span class="pre">FieldCollection::initialised</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13pixel_indicesE"><code class="docutils literal notranslate"><span class="pre">FieldCollection::pixel_indices</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableE"><code class="docutils literal notranslate"><span class="pre">IndexIterable</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERK13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERR13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableD0Ev"><code class="docutils literal notranslate"><span class="pre">IndexIterable::~IndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableaSERK13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableaSERR13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable5beginEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::begin()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable3endEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::end()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable4sizeEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::size()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERK15FieldCollectionRKNSt6stringERK7Index_t"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERK15FieldCollectionRK7Index_t"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable10collectionE"><code class="docutils literal notranslate"><span class="pre">IndexIterable::collection</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable14iteration_typeE"><code class="docutils literal notranslate"><span class="pre">IndexIterable::iteration_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable6strideE"><code class="docutils literal notranslate"><span class="pre">IndexIterable::stride</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator20PixelIndexIterator_tE"><code class="docutils literal notranslate"><span class="pre">iterator::PixelIndexIterator_t</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorEv"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorERK20PixelIndexIterator_tRK6size_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator6strideE"><code class="docutils literal notranslate"><span class="pre">iterator::stride</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator6offsetE"><code class="docutils literal notranslate"><span class="pre">iterator::offset</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator20pixel_index_iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator::pixel_index_iterator</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableE"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable8iteratorE"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::iterator</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableERK18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableERR18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableD0Ev"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::~PixelIndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableaSERK18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableaSERR18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection18PixelIndexIterable5beginEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::begin()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection18PixelIndexIterable3endEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::end()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection18PixelIndexIterable4sizeEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::size()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableERK15FieldCollection"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable10collectionE"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::collection</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid20FieldCollectionErrorE"><code class="docutils literal notranslate"><span class="pre">FieldCollectionError</span></code></a><ul>
@@ -16686,26 +16641,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8data_ptrE"><code class="docutils literal notranslate"><span class="pre">FieldMap::data_ptr</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap14is_initialisedE"><code class="docutils literal notranslate"><span class="pre">FieldMap::is_initialised</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8callbackE"><code class="docutils literal notranslate"><span class="pre">FieldMap::callback</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4I_7MappingEN6muGrid8FieldMap8IteratorE"><code class="docutils literal notranslate"><span class="pre">Iterator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator10FieldMap_tE"><code class="docutils literal notranslate"><span class="pre">Iterator::FieldMap_t</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">Iterator::value_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator11cvalue_typeE"><code class="docutils literal notranslate"><span class="pre">Iterator::cvalue_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorEv"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorER10FieldMap_tb"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorERR8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">Iterator::~Iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratoraSERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratoraSERR8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratorppEv"><code class="docutils literal notranslate"><span class="pre">Iterator::operator++()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratormlEv"><code class="docutils literal notranslate"><span class="pre">Iterator::operator*()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid8FieldMap8IteratormlEv"><code class="docutils literal notranslate"><span class="pre">Iterator::operator*()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid8FieldMap8IteratoreqERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator==()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid8FieldMap8IteratorneERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator!=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator3mapE"><code class="docutils literal notranslate"><span class="pre">Iterator::map</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator5indexE"><code class="docutils literal notranslate"><span class="pre">Iterator::index</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13FieldMapErrorE"><code class="docutils literal notranslate"><span class="pre">FieldMapError</span></code></a><ul>
@@ -16763,27 +16698,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase9open_modeE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::open_mode</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase4commE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::comm</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase9nb_framesE"><code class="docutils literal notranslate"><span class="pre">FileIOBase::nb_frames</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::value_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator16const_value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::const_value_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator7pointerE"><code class="docutils literal notranslate"><span class="pre">iterator::pointer</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator15difference_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::difference_type</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator17iterator_categoryE"><code class="docutils literal notranslate"><span class="pre">iterator::iterator_category</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorEv"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorER10FileIOBase7Index_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratoraSERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratoraSERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid10FileIOBase8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid10FileIOBase8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4NK6muGrid10FileIOBase8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator6parentE"><code class="docutils literal notranslate"><span class="pre">iterator::parent</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator11frame_indexE"><code class="docutils literal notranslate"><span class="pre">iterator::frame_index</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid11FileIOErrorE"><code class="docutils literal notranslate"><span class="pre">FileIOError</span></code></a><ul>
@@ -16916,7 +16830,7 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefaultE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault6ParentE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::Parent</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultEv"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::GradientOperatorDefault()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEEKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::GradientOperatorDefault()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEERKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::GradientOperatorDefault()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERK23GradientOperatorDefault"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::GradientOperatorDefault()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault23GradientOperatorDefaultERR23GradientOperatorDefault"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::GradientOperatorDefault()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefaultD0Ev"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::~GradientOperatorDefault()</span></code></a></li>
@@ -16940,6 +16854,23 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault17nb_pixelnodal_ptsE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::nb_pixelnodal_pts</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault30nb_possible_nodal_contributionE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::nb_possible_nodal_contribution</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid23GradientOperatorDefault27nb_grad_component_per_pixelE"><code class="docutils literal notranslate"><span class="pre">GradientOperatorDefault::nb_grad_component_per_pixel</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableE"><code class="docutils literal notranslate"><span class="pre">IndexIterable</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERK13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERR13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableD0Ev"><code class="docutils literal notranslate"><span class="pre">IndexIterable::~IndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableaSERK13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterableaSERR13IndexIterable"><code class="docutils literal notranslate"><span class="pre">IndexIterable::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable5beginEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::begin()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable3endEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::end()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable4sizeEv"><code class="docutils literal notranslate"><span class="pre">IndexIterable::size()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERK15FieldCollectionRKNSt6stringERK7Index_t"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable13IndexIterableERK15FieldCollectionRK7Index_t"><code class="docutils literal notranslate"><span class="pre">IndexIterable::IndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable10collectionE"><code class="docutils literal notranslate"><span class="pre">IndexIterable::collection</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable14iteration_typeE"><code class="docutils literal notranslate"><span class="pre">IndexIterable::iteration_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable6strideE"><code class="docutils literal notranslate"><span class="pre">IndexIterable::stride</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4I0EN6muGrid10EigenCheck8is_fixedE"><code class="docutils literal notranslate"><span class="pre">is_fixed</span></code></a><ul>
@@ -16975,6 +16906,32 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid7Tensors9is_tensor5valueE"><code class="docutils literal notranslate"><span class="pre">is_tensor::value</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels10Enumerator8iterator6ParentE"><code class="docutils literal notranslate"><span class="pre">iterator::Parent</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels10Enumerator8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::value_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator16const_value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::const_value_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator7pointerE"><code class="docutils literal notranslate"><span class="pre">iterator::pointer</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator15difference_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::difference_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator17iterator_categoryE"><code class="docutils literal notranslate"><span class="pre">iterator::iterator_category</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorERK13DynamicPixels6size_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorEv"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator8iteratorERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratoraSERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratoraSERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps13DynamicPixels8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator6pixelsE"><code class="docutils literal notranslate"><span class="pre">iterator::pixels</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps13DynamicPixels8iterator5indexE"><code class="docutils literal notranslate"><span class="pre">iterator::index</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels8iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::value_type</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels8iterator16const_value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::const_value_type</span></code></a></li>
@@ -16990,6 +16947,74 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4NK6muGrid9CcoordOps6Pixels8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels8iterator6pixelsE"><code class="docutils literal notranslate"><span class="pre">iterator::pixels</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels8iterator5indexE"><code class="docutils literal notranslate"><span class="pre">iterator::index</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator20PixelIndexIterator_tE"><code class="docutils literal notranslate"><span class="pre">iterator::PixelIndexIterator_t</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorEv"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorERK20PixelIndexIterator_tRK6size_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator8iteratorERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection13IndexIterable8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator6strideE"><code class="docutils literal notranslate"><span class="pre">iterator::stride</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator6offsetE"><code class="docutils literal notranslate"><span class="pre">iterator::offset</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection13IndexIterable8iterator20pixel_index_iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator::pixel_index_iterator</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4I_7MappingEN6muGrid8FieldMap8IteratorE"><code class="docutils literal notranslate"><span class="pre">Iterator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator10FieldMap_tE"><code class="docutils literal notranslate"><span class="pre">Iterator::FieldMap_t</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">Iterator::value_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator11cvalue_typeE"><code class="docutils literal notranslate"><span class="pre">Iterator::cvalue_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorEv"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorER10FieldMap_tb"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator8IteratorERR8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::Iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">Iterator::~Iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratoraSERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratoraSERR8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratorppEv"><code class="docutils literal notranslate"><span class="pre">Iterator::operator++()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8IteratormlEv"><code class="docutils literal notranslate"><span class="pre">Iterator::operator*()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid8FieldMap8IteratormlEv"><code class="docutils literal notranslate"><span class="pre">Iterator::operator*()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid8FieldMap8IteratoreqERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator==()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid8FieldMap8IteratorneERK8Iterator"><code class="docutils literal notranslate"><span class="pre">Iterator::operator!=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator3mapE"><code class="docutils literal notranslate"><span class="pre">Iterator::map</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid8FieldMap8Iterator5indexE"><code class="docutils literal notranslate"><span class="pre">Iterator::index</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator10value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::value_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator16const_value_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::const_value_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator7pointerE"><code class="docutils literal notranslate"><span class="pre">iterator::pointer</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator15difference_typeE"><code class="docutils literal notranslate"><span class="pre">iterator::difference_type</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator17iterator_categoryE"><code class="docutils literal notranslate"><span class="pre">iterator::iterator_category</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorEv"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorER10FileIOBase7Index_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator8iteratorERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratoraSERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratoraSERR8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid10FileIOBase8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid10FileIOBase8iteratoreqERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator==()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid10FileIOBase8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator6parentE"><code class="docutils literal notranslate"><span class="pre">iterator::parent</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10FileIOBase8iterator11frame_indexE"><code class="docutils literal notranslate"><span class="pre">iterator::frame_index</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator8iteratorERK18CartesianContainerRK6size_t"><code class="docutils literal notranslate"><span class="pre">iterator::iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iteratorD0Ev"><code class="docutils literal notranslate"><span class="pre">iterator::~iterator()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iteratorppEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator++()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid11raw_mem_ops18CartesianContainer8iteratormlEv"><code class="docutils literal notranslate"><span class="pre">iterator::operator*()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid11raw_mem_ops18CartesianContainer8iteratorneERK8iterator"><code class="docutils literal notranslate"><span class="pre">iterator::operator!=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator9containerE"><code class="docutils literal notranslate"><span class="pre">iterator::container</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator5indexE"><code class="docutils literal notranslate"><span class="pre">iterator::index</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops18CartesianContainer8iterator7counterE"><code class="docutils literal notranslate"><span class="pre">iterator::counter</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9RefVector8iteratorE"><code class="docutils literal notranslate"><span class="pre">iterator</span></code></a><ul>
@@ -17441,6 +17466,21 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid13PhysicsDomainlsERNSt7ostreamERK13PhysicsDomain"><code class="docutils literal notranslate"><span class="pre">PhysicsDomain::operator&lt;&lt;()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableE"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable8iteratorE"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::iterator</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableERK18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableERR18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableD0Ev"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::~PixelIndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableaSERK18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableaSERR18PixelIndexIterable"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::operator=()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection18PixelIndexIterable5beginEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::begin()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection18PixelIndexIterable3endEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::end()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4NK6muGrid15FieldCollection18PixelIndexIterable4sizeEv"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::size()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable18PixelIndexIterableERK15FieldCollection"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::PixelIndexIterable()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid15FieldCollection18PixelIndexIterable10collectionE"><code class="docutils literal notranslate"><span class="pre">PixelIndexIterable::collection</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4I_6size_tEN6muGrid9CcoordOps6PixelsE"><code class="docutils literal notranslate"><span class="pre">Pixels</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels6ParentE"><code class="docutils literal notranslate"><span class="pre">Pixels::Parent</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps6Pixels6CcoordE"><code class="docutils literal notranslate"><span class="pre">Pixels::Ccoord</span></code></a></li>
@@ -17545,18 +17585,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4NK6muGrid12RuntimeValue14get_value_typeEv"><code class="docutils literal notranslate"><span class="pre">RuntimeValue::get_value_type()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue10value_typeE"><code class="docutils literal notranslate"><span class="pre">RuntimeValue::value_type</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7variantE"><code class="docutils literal notranslate"><span class="pre">RuntimeValue::variant</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7VariantE"><code class="docutils literal notranslate"><span class="pre">Variant</span></code></a><ul>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK3Int"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK4Real"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERKN5Eigen3RefIKN5Eigen8MatrixXdEEE"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK5Map_t"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7VariantD0Ev"><code class="docutils literal notranslate"><span class="pre">Variant::~Variant()</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant10dictionaryE"><code class="docutils literal notranslate"><span class="pre">Variant::dictionary</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant13integer_valueE"><code class="docutils literal notranslate"><span class="pre">Variant::integer_value</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant10real_valueE"><code class="docutils literal notranslate"><span class="pre">Variant::real_value</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant12matrix_valueE"><code class="docutils literal notranslate"><span class="pre">Variant::matrix_value</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4I0EN6muGrid8internal9ScalarMapE"><code class="docutils literal notranslate"><span class="pre">ScalarMap</span></code></a><ul>
@@ -17654,6 +17682,8 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap7nb_rowsE"><code class="docutils literal notranslate"><span class="pre">StateFieldMap::nb_rows</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap4mapsE"><code class="docutils literal notranslate"><span class="pre">StateFieldMap::maps</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap5cmapsE"><code class="docutils literal notranslate"><span class="pre">StateFieldMap::cmaps</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4I_7MappingEN6muGrid13StateFieldMap12StateWrapperE"><code class="docutils literal notranslate"><span class="pre">StateWrapper</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap12StateWrapper15StateFieldMap_tE"><code class="docutils literal notranslate"><span class="pre">StateWrapper::StateFieldMap_t</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap12StateWrapper12CurrentVal_tE"><code class="docutils literal notranslate"><span class="pre">StateWrapper::CurrentVal_t</span></code></a></li>
@@ -17664,8 +17694,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4NK6muGrid13StateFieldMap12StateWrapper3oldE6size_t"><code class="docutils literal notranslate"><span class="pre">StateWrapper::old()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap12StateWrapper11current_valE"><code class="docutils literal notranslate"><span class="pre">StateWrapper::current_val</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid13StateFieldMap12StateWrapper8old_valsE"><code class="docutils literal notranslate"><span class="pre">StateWrapper::old_vals</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4I0_7Mapping0_8IterUnitEN6muGrid14StaticFieldMapE"><code class="docutils literal notranslate"><span class="pre">StaticFieldMap</span></code></a><ul>
@@ -17743,6 +17771,8 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap10make_cmapsEv"><code class="docutils literal notranslate"><span class="pre">StaticStateFieldMap::make_cmaps()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap11static_mapsE"><code class="docutils literal notranslate"><span class="pre">StaticStateFieldMap::static_maps</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap12static_cmapsE"><code class="docutils literal notranslate"><span class="pre">StaticStateFieldMap::static_cmaps</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4I_7MappingEN6muGrid19StaticStateFieldMap18StaticStateWrapperE"><code class="docutils literal notranslate"><span class="pre">StaticStateWrapper</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap18StaticStateWrapper21StaticStateFieldMap_tE"><code class="docutils literal notranslate"><span class="pre">StaticStateWrapper::StaticStateFieldMap_t</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap18StaticStateWrapper12CurrentVal_tE"><code class="docutils literal notranslate"><span class="pre">StaticStateWrapper::CurrentVal_t</span></code></a></li>
@@ -17758,8 +17788,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4I_Dp6size_tEN6muGrid19StaticStateFieldMap18StaticStateWrapper22old_vals_helper_staticENSt5arrayI12OldStorage_t8NbMemoryEER21StaticStateFieldMap_t6size_tNSt14index_sequenceIDp10NbStepsAgoEE"><code class="docutils literal notranslate"><span class="pre">StaticStateWrapper::old_vals_helper_static()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap18StaticStateWrapper11current_valE"><code class="docutils literal notranslate"><span class="pre">StaticStateWrapper::current_val</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid19StaticStateFieldMap18StaticStateWrapper8old_valsE"><code class="docutils literal notranslate"><span class="pre">StaticStateWrapper::old_vals</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4I_5Dim_t_5Dim_tEN6muGrid8log_comp7SummandE"><code class="docutils literal notranslate"><span class="pre">Summand</span></code></a><ul>
@@ -18008,6 +18036,18 @@ Copyright © 2020 Till Junge<dl class="simple">
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10ValueErrorE"><code class="docutils literal notranslate"><span class="pre">ValueError</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7VariantE"><code class="docutils literal notranslate"><span class="pre">Variant</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK3Int"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK4Real"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERKN5Eigen3RefIKN5Eigen8MatrixXdEEE"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK5Map_t"><code class="docutils literal notranslate"><span class="pre">Variant::Variant()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7VariantD0Ev"><code class="docutils literal notranslate"><span class="pre">Variant::~Variant()</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant10dictionaryE"><code class="docutils literal notranslate"><span class="pre">Variant::dictionary</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant13integer_valueE"><code class="docutils literal notranslate"><span class="pre">Variant::integer_value</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant10real_valueE"><code class="docutils literal notranslate"><span class="pre">Variant::real_value</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4N6muGrid12RuntimeValue7Variant12matrix_valueE"><code class="docutils literal notranslate"><span class="pre">Variant::matrix_value</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4I0EN6muGrid12WrappedFieldE"><code class="docutils literal notranslate"><span class="pre">WrappedField</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid12WrappedField6ParentE"><code class="docutils literal notranslate"><span class="pre">WrappedField::Parent</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid12WrappedField10EigenRep_tE"><code class="docutils literal notranslate"><span class="pre">WrappedField::EigenRep_t</span></code></a></li>
@@ -18061,20 +18101,20 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4I0EN6akantu9enumerateEDcRR9Container6size_t"><code class="docutils literal notranslate"><span class="pre">akantu::enumerate()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I0DpEN6akantu8enum_zipEDcRR9ContainerDpRR10Containers6size_t"><code class="docutils literal notranslate"><span class="pre">akantu::enum_zip()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00EN6akantu8enum_zipEDcRR10Container0RR10Container16size_t"><code class="docutils literal notranslate"><span class="pre">akantu::enum_zip()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N6akantu10containersE"><code class="docutils literal notranslate"><span class="pre">containers</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6akantu9iteratorsE"><code class="docutils literal notranslate"><span class="pre">iterators</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6akantu5tupleE"><code class="docutils literal notranslate"><span class="pre">tuple</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4I0EN6akantu5tuple13are_not_equalEbRR5TupleRR5Tuple"><code class="docutils literal notranslate"><span class="pre">tuple::are_not_equal()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00EN6akantu5tuple8foreach_EvRR1FRR5Tuple"><code class="docutils literal notranslate"><span class="pre">tuple::foreach_()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00EN6akantu5tuple9transformEDcRR1FRR5Tuple"><code class="docutils literal notranslate"><span class="pre">tuple::transform()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N6akantu5tuple7detailsE"><code class="docutils literal notranslate"><span class="pre">details</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4IDpEN6akantu5tuple7details19make_tuple_no_decayEDcDpRR2Ts"><code class="docutils literal notranslate"><span class="pre">details::make_tuple_no_decay()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00_Dp6size_tEN6akantu5tuple7details12foreach_implEvRR1FRR5TupleRRNSt14index_sequenceIDp2IsEE"><code class="docutils literal notranslate"><span class="pre">details::foreach_impl()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00_Dp6size_tEN6akantu5tuple7details14transform_implEDcRR1FRR5TupleRRNSt14index_sequenceIDp2IsEE"><code class="docutils literal notranslate"><span class="pre">details::transform_impl()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv46muGrid"><code class="docutils literal notranslate"><span class="pre">muGrid</span></code></a><ul>
@@ -18244,6 +18284,8 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid8PixelTagE"><code class="docutils literal notranslate"><span class="pre">muGrid::PixelTag</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid2piE"><code class="docutils literal notranslate"><span class="pre">muGrid::pi</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid7UnknownE"><code class="docutils literal notranslate"><span class="pre">muGrid::Unknown</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOpsE"><code class="docutils literal notranslate"><span class="pre">CcoordOps</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps9get_indexERK11DynCcoord_tRK11DynCcoord_tRK11DynCcoord_t"><code class="docutils literal notranslate"><span class="pre">CcoordOps::get_index()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps20compute_pixel_volumeERK11DynCcoord_tRK11DynRcoord_t"><code class="docutils literal notranslate"><span class="pre">CcoordOps::compute_pixel_volume()</span></code></a></li>
@@ -18282,6 +18324,8 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4I_6size_tEN6muGrid9CcoordOps8get_sizeE6size_tRK8Ccoord_tI3DimE"><code class="docutils literal notranslate"><span class="pre">CcoordOps::get_size()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I_6size_tEN6muGrid9CcoordOps8get_sizeE6size_tRK9DynCcoordI6MaxDimE"><code class="docutils literal notranslate"><span class="pre">CcoordOps::get_size()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I_6size_tEN6muGrid9CcoordOps15get_buffer_sizeE6size_tRK8Ccoord_tI3dimERK8Ccoord_tI3dimE"><code class="docutils literal notranslate"><span class="pre">CcoordOps::get_buffer_size()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid9CcoordOps8internalE"><code class="docutils literal notranslate"><span class="pre">internal</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4I0EN6muGrid9CcoordOps8internal3retE1T1T6size_t"><code class="docutils literal notranslate"><span class="pre">internal::ret()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I_5Dim_t0_Dp6size_tEN6muGrid9CcoordOps8internal8cube_funENSt5arrayI1T3DimEE1TNSt14index_sequenceIDp1IEE"><code class="docutils literal notranslate"><span class="pre">internal::cube_fun()</span></code></a></li>
@@ -18292,13 +18336,9 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4I_5Dim_t_Dp6size_tEN6muGrid9CcoordOps8internal25compute_row_major_stridesE8Ccoord_tI3DimERK8Ccoord_tI3DimENSt14index_sequenceIDp1IEE"><code class="docutils literal notranslate"><span class="pre">internal::compute_row_major_strides()</span></code></a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li><a class="reference internal" href="#_CPPv4N6muGrid10EigenCheckE"><code class="docutils literal notranslate"><span class="pre">EigenCheck</span></code></a><ul>
+<li><a class="reference internal" href="#_CPPv4N6muGrid10EigenCheckE"><code class="docutils literal notranslate"><span class="pre">EigenCheck</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid10EigenCheck8internalE"><code class="docutils literal notranslate"><span class="pre">internal</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4I_5Dim_t_5Dim_t_5Dim_tEN6muGrid10EigenCheck8internal8get_rankE5Dim_tv"><code class="docutils literal notranslate"><span class="pre">internal::get_rank()</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8internalE"><code class="docutils literal notranslate"><span class="pre">internal</span></code></a><ul>
@@ -18332,14 +18372,14 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4I_5Dim_tEN6muGrid8Matrices6IasymmE7Tens4_tI3dimEv"><code class="docutils literal notranslate"><span class="pre">Matrices::Iasymm()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I_5Dim_t00EN6muGrid8Matrices3dotEDcRKN5Eigen10MatrixBaseI2T1EERKN5Eigen10MatrixBaseI2T2EE"><code class="docutils literal notranslate"><span class="pre">Matrices::dot()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I_5Dim_t00EN6muGrid8Matrices4ddotEDcRKN5Eigen10MatrixBaseI2T1EERKN5Eigen10MatrixBaseI2T2EE"><code class="docutils literal notranslate"><span class="pre">Matrices::ddot()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8Matrices13AxisTransformE"><code class="docutils literal notranslate"><span class="pre">AxisTransform</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4I00EN6muGrid8Matrices13AxisTransform12push_forwardEDcRKN5Eigen10MatrixBaseI4T_inEERKN5Eigen10MatrixBaseI2T2EE"><code class="docutils literal notranslate"><span class="pre">AxisTransform::push_forward()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00EN6muGrid8Matrices13AxisTransform9pull_backEDcRKN5Eigen10MatrixBaseI4T_inEERKN5Eigen10MatrixBaseI2T2EE"><code class="docutils literal notranslate"><span class="pre">AxisTransform::pull_back()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid8Matrices8internalE"><code class="docutils literal notranslate"><span class="pre">internal</span></code></a></li>
-</ul>
-</li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_opsE"><code class="docutils literal notranslate"><span class="pre">raw_mem_ops</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops4prodERK7Shape_t"><code class="docutils literal notranslate"><span class="pre">raw_mem_ops::prod()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4N6muGrid11raw_mem_ops12linear_indexERK7Shape_tRK7Shape_t"><code class="docutils literal notranslate"><span class="pre">raw_mem_ops::linear_index()</span></code></a></li>
@@ -18363,12 +18403,12 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4N6muGrid7version8is_dirtyEv"><code class="docutils literal notranslate"><span class="pre">version::is_dirty()</span></code></a></li>
 </ul>
 </li>
-</ul>
-</li>
 <li><a class="reference internal" href="#_CPPv4St"><code class="docutils literal notranslate"><span class="pre">std</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv415std_replacement"><code class="docutils literal notranslate"><span class="pre">std_replacement</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4I0DpEN15std_replacement6invokeEDTclN6detail6INVOKEEclNSt7forwardI1FEE1fEspclNSt7forwardI8ArgTypesEE4argsEEERR1FDpRR8ArgTypes"><code class="docutils literal notranslate"><span class="pre">std_replacement::invoke()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00EN15std_replacement5applyEDcRR1FRR5Tuple"><code class="docutils literal notranslate"><span class="pre">std_replacement::apply()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#_CPPv4N15std_replacement6detailE"><code class="docutils literal notranslate"><span class="pre">detail</span></code></a><ul>
 <li><a class="reference internal" href="#_CPPv4I000DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXaaNSt11is_functionI1TE5valueENSt10is_base_ofI4BaseNSt7decay_tI7DerivedEEE5valueEEDTcldsclNSt7forwardI7DerivedEE3refE3pmfspclNSt7forwardI4ArgsEE4argsEEEEEM4Base1TRR7DerivedDpRR4Args"><code class="docutils literal notranslate"><span class="pre">detail::INVOKE()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I000DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXaaNSt11is_functionI1TE5valueEN20is_reference_wrapperINSt7decay_tI7RefWrapEEE5valueEEDTcldscldt3ref3getE3pmfspclNSt7forwardI4ArgsEE4argsEEEEEM4Base1TRR7RefWrapDpRR4Args"><code class="docutils literal notranslate"><span class="pre">detail::INVOKE()</span></code></a></li>
@@ -18378,8 +18418,6 @@ Copyright © 2020 Till Junge<dl class="simple">
 <li><a class="reference internal" href="#_CPPv4I000EN15std_replacement6detail6INVOKEENSt11enable_if_tIXaantNSt11is_functionI1TE5valueEaantN20is_reference_wrapperINSt7decay_tI7PointerEEE5valueEntNSt10is_base_ofI4BaseNSt7decay_tI7PointerEEE5valueEEDTdsdeclNSt7forwardI7PointerEE3ptrE3pmdEEEM4Base1TRR7Pointer"><code class="docutils literal notranslate"><span class="pre">detail::INVOKE()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I0DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXntNSt17is_member_pointerINSt7decay_tI1FEEE5valueEEDTclclNSt7forwardI1FEE1fEspclNSt7forwardI4ArgsEE4argsEEEEERR1FDpRR4Args"><code class="docutils literal notranslate"><span class="pre">detail::INVOKE()</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv4I00_DpNSt6size_tEEN15std_replacement6detail10apply_implEDcRR1FRR5TupleNSt14index_sequenceIDp1IEE"><code class="docutils literal notranslate"><span class="pre">detail::apply_impl()</span></code></a></li>
-</ul>
-</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#_CPPv49MAX_DEPTH"><code class="docutils literal notranslate"><span class="pre">MAX_DEPTH</span></code></a></li>
@@ -18433,7 +18471,7 @@ Copyright © 2020 Till Junge<dl class="simple">
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=d3961413"></script>
+</div><script src="_static/documentation_options.js?v=4c90b692"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=5fa4622c"></script>
