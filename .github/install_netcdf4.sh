@@ -1,5 +1,10 @@
 echo "uname -a is:"
 uname -a
+echo "============"
+
+echo "Environment variables are:"
+printenv
+echo "=========================="
 
 # The variable HOMEBREW_REPOSITORY appears to be only present on ARM Macs, not Intel Macs
 # HOMEBREW_NO_AUTO_UPDATE is present on both
