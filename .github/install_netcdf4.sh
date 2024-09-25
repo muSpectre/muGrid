@@ -3,10 +3,11 @@ if [ -z "$HOMEBREW_REPOSITORY" ]; then
 else
     brew install pkg-config
     INSTALL_PREFIX=$HOMEBREW_REPOSITORY
-    export PKG_CONFIG_PATH=$HOMEBREW_REPOSITORY/opt/libxml2/lib/pkgconfig:$PKG_CONFIG_PATH
+    # libxml2 pkg-config file is not in the default path on Intel Macs
+    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$HOMEBREW_REPOSITORY/opt/libxml2/lib/pkgconfig:$PKG_CONFIG_PATH
 fi
 printenv
-curl -L https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.7.tar.xz | tar -Jx
+curl -L https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.9.tar.xz | tar -Jx
 cd libxml2-2.12.7
 ./configure --without-lzma --without-python --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
