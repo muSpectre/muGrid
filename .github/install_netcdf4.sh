@@ -28,7 +28,7 @@ echo "PKG_CONFIG_PATH is ${PKG_CONFIG_PATH}"
 XML2="libxml2-2.12.9"
 curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
 cd ${XML2}
-./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --without-lzma --without-python --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
+cmake -DLIBXML2_WITH_LZMA=OFF -DLIBXML2_WITH_PYTHON=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX .
 make
 make install
 cd ..
@@ -36,6 +36,6 @@ cd ..
 NETCDF=netcdf-c-4.9.2
 curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
 cd ${NETCDF}
-./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
+cmake -DENABLE_HDF5=OFF -DENABLE_CDF5=OFF -DENABLE_BYTERANGE=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX .
 make
 make install
