@@ -27,6 +27,7 @@ jobs:
 
     env:
       IS_32_BIT: ${{ matrix.buildplat[2] == 'x86' }}
+      MACOSX_DEPLOYMENT_TARGET: "${{ matrix.buildplat[0] == 'macos-12' && '12' || '14' }}"
 
     steps:
       - if: matrix.buildplat[2] == 'aarch64'
