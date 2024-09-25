@@ -6,7 +6,7 @@ else
     brew install pkg-config
     INSTALL_PREFIX=$(which brew | sed 's,/bin/brew,,')
     # libxml2 pkg-config file is not in the default path on Intel Macs
-    export PKG_CONFIG_PATH
+    export PKG_CONFIG_PATH=PKG_CONFIG_PATH:$INSTALL_PREFIX/lib/pkgconfig
 fi
 printenv
 
