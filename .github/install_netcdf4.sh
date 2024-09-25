@@ -23,9 +23,6 @@ make
 make install
 cd ..
 
-echo "xml2-config --cflags is:"
-xml2-config --cflags
-
 NETCDF=netcdf-c-4.9.2
 curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
 cd ${NETCDF}
