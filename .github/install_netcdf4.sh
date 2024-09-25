@@ -9,6 +9,9 @@ else
     export PKG_CONFIG_PATH
 fi
 printenv
+
+echo "Installing into prefix ${INSTALL_PREFIX}..."
+
 XML2="libxml2-2.12.9"
 curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
 cd ${XML2}
