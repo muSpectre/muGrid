@@ -1,10 +1,12 @@
-if [ -z "$HOMEBREW_REPOSITORY" ]; then
+# The variable HOMEBREW_REPOSITORY appears to be only present on ARM Macs, not Intel Macs
+# HOMEBREW_NO_AUTO_UPDATE is present on both
+if [ -z "$HOMEBREW_NO_AUTO_UPDATE" ]; then
     INSTALL_PREFIX=/usr/local
 else
     brew install pkg-config
-    INSTALL_PREFIX=$HOMEBREW_REPOSITORY
+    INSTALL_PREFIX=$(which brew | sed 's,/bin/brew,,')
     # libxml2 pkg-config file is not in the default path on Intel Macs
-    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$HOMEBREW_REPOSITORY/opt/libxml2/lib/pkgconfig:$PKG_CONFIG_PATH
+    export PKG_CONFIG_PATH
 fi
 printenv
 curl -L https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.9.tar.xz | tar -Jx
