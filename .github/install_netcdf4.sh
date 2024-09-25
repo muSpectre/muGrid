@@ -21,9 +21,6 @@ make
 make install
 cd ..
 
-echo "Listing contents of PKG_CONFIG_PATH..."
-ls $INSTALL_PREFIX/lib/pkgconfig
-
 NETCDF=netcdf-c-4.9.2
 curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
 cd ${NETCDF}
