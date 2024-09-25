@@ -3,7 +3,7 @@ if [ -z "$HOMEBREW_REPOSITORY" ]; then
 else
     brew install pkg-config
     INSTALL_PREFIX=$HOMEBREW_REPOSITORY
-    export PKG_CONFIG_PATH
+    export PKG_CONFIG_PATH=$HOMEBREW_REPOSITORY/opt/libxml2/lib/pkgconfig:$PKG_CONFIG_PATH
 fi
 printenv
 curl -L https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.7.tar.xz | tar -Jx
