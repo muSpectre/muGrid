@@ -8,7 +8,7 @@ else
     # libxml2 pkg-config file is not in the default path on Intel Macs
 fi
 
-export PKG_CONFIG_PATH=PKG_CONFIG_PATH:${INSTALL_PREFIX}/lib/pkgconfig
+export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_PREFIX}/lib/pkgconfig
 
 echo "Installing into prefix ${INSTALL_PREFIX}..."
 echo "PKG_CONFIG_PATH is ${PKG_CONFIG_PATH}"
