@@ -6,11 +6,12 @@ else
     brew install pkg-config
     INSTALL_PREFIX=$(which brew | sed 's,/bin/brew,,')
     # libxml2 pkg-config file is not in the default path on Intel Macs
-    export PKG_CONFIG_PATH=PKG_CONFIG_PATH:$INSTALL_PREFIX/lib/pkgconfig
 fi
-printenv
+
+export PKG_CONFIG_PATH=PKG_CONFIG_PATH:${INSTALL_PREFIX}/lib/pkgconfig
 
 echo "Installing into prefix ${INSTALL_PREFIX}..."
+echo "PKG_CONFIG_PATH is ${PKG_CONFIG_PATH}"
 
 XML2="libxml2-2.12.9"
 curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
@@ -19,6 +20,10 @@ cd ${XML2}
 make
 make install
 cd ..
+
+echo "Listing contents of PKG_CONFIG_PATH..."
+ls $INSTALL_PREFIX/lib/pkgconfig
+
 NETCDF=netcdf-c-4.9.2
 curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
 cd ${NETCDF}
