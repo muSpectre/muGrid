@@ -33,7 +33,7 @@ make
 make install
 cd ..
 
-NETCDF=netcdf-c-4.9.2
+NETCDF="netcdf-c-4.9.2"
 curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
 cd ${NETCDF}
 ./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
