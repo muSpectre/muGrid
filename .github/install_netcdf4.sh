@@ -9,14 +9,16 @@ else
     export PKG_CONFIG_PATH
 fi
 printenv
-curl -L https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.9.tar.xz | tar -Jx
-cd libxml2-2.12.7
+XML2="libxml2-2.12.9"
+curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
+cd ${XML2}
 ./configure --without-lzma --without-python --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
 make install
 cd ..
-curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/netcdf-c-4.9.2.tar.gz | tar -zx
-cd netcdf-c-4.9.2
+NETCDF=netcdf-c-4.9.2
+curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
+cd ${NETCDF}
 ./configure --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
 make install
