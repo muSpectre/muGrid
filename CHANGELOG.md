@@ -1,6 +1,12 @@
 Change log for µGrid
 ====================
 
+0.93.0 (15Oct2024)
+------------------
+
+- API: Always return full component shape, do not cut components with one
+  degree of freedom
+
 0.92.6 (25Sept2024)
 -------------------
 

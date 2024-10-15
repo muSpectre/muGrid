@@ -2598,8 +2598,7 @@ namespace muGrid {
         // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
         // storage order... I have to fix this for at least C storage order or
         // better an arbitrary case
-        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
-                                    std::multiplies<IOSize_t>());
+        nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
 #ifdef WITH_MPI
@@ -2684,8 +2683,7 @@ namespace muGrid {
         // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
         // storage order... I have to fix this for at least C storage order or
         // better an arbitrary case
-        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
-                                    std::multiplies<IOSize_t>());
+        nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
 #ifdef WITH_MPI

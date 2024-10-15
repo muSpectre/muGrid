@@ -53,26 +53,39 @@ class FieldCheck(unittest.TestCase):
         fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
         fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
 
+        # Scalar
+        fs = fc.register_real_field("test-field-scalar", ())
+        self.assertEqual(fs.array(muGrid.Pixel).shape, self.nb_grid_pts)
+
         # Single component
         f = fc.register_real_field("test-field", 1)
-        self.assertEqual(f.array(muGrid.Pixel).shape, self.nb_grid_pts)
+        self.assertEqual(f.array(muGrid.Pixel).shape, (1,) + self.nb_grid_pts)
 
         # Four components
         f2 = fc.register_real_field("test-field2", 4)
         self.assertEqual(f2.array(muGrid.Pixel).shape, nb_grid_pts2)
 
         # Check that we get those fields back
+        self.assertEqual(fc.get_field('test-field-scalar'), fs)
         self.assertEqual(fc.get_field('test-field'), f)
         self.assertEqual(fc.get_field('test-field2'), f2)
 
         # Check strides
+        self.assertEqual(fs.stride(muGrid.Pixel), 1)
         self.assertEqual(f.stride(muGrid.Pixel), 1)
         self.assertEqual(f2.stride(muGrid.Pixel), 4)
+        self.assertEqual(fs.stride(muGrid.SubPt), 1)
         self.assertEqual(f.stride(muGrid.SubPt), 1)
         self.assertEqual(f2.stride(muGrid.SubPt), 4)
 
         # Check subpoint-shaped convenience access
-        self.assertEqual(f.s.shape, self.nb_grid_pts)
+        self.assertEqual(fs.s.shape, (1,) + self.nb_grid_pts)
+        with self.assertRaises(RuntimeError):
+            fs.s = np.zeros((1,) + self.nb_grid_pts)
+        fs.s = values
+        np.testing.assert_allclose(fs.s, values)
+
+        self.assertEqual(f.s.shape, (1, 1) + self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
             f.s = np.zeros((3,) + self.nb_grid_pts)
         f.s = values
@@ -84,6 +97,18 @@ class FieldCheck(unittest.TestCase):
             f2.s = values2
 
         # Check pixel-shaped convenience access
+        self.assertEqual(fs.p.shape, self.nb_grid_pts)
+        with self.assertRaises(RuntimeError):
+            fs.p = np.zeros((3,) + self.nb_grid_pts)
+        fs.p = values
+        np.testing.assert_allclose(fs.p, values)
+
+        self.assertEqual(f.p.shape, (1,) + self.nb_grid_pts)
+        with self.assertRaises(RuntimeError):
+            f.p = np.zeros((3, 1) + self.nb_grid_pts)
+        f.p = values
+        np.testing.assert_allclose(f.p, values)
+
         self.assertEqual(f.p.shape, self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
             f.p = np.zeros((3,) + self.nb_grid_pts)

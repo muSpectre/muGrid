@@ -88,9 +88,7 @@ namespace muGrid {
       // the storage order intrinsically supported by muGrid.
       Shape_t strides{};
 
-      auto nb_components{std::accumulate(components_shape.begin(),
-                                         components_shape.end(), 1,
-                                         std::multiplies<Index_t>())};
+      auto nb_components{get_nb_from_shape(components_shape)};
 
       Shape_t components_strides{};
       DynCcoord_t pixels_strides{};
@@ -264,10 +262,7 @@ namespace muGrid {
                const Unit & unit = Unit::unitless())
         : collection{}, field{} {
       // Sanity check 1: Are the sizes of array and field equal?
-      Index_t size{std::accumulate(nb_subdomain_grid_pts.begin(),
-                                   nb_subdomain_grid_pts.end(), 1,
-                                   std::multiplies<Index_t>()) *
-                   nb_dof_per_pixel};
+      Index_t size{get_nb_from_shape(nb_subdomain_grid_pts) * nb_dof_per_pixel};
       if (size != array.size()) {
         std::stringstream s;
         s << "The numpy array has a size of " << array.size() << ", but the "

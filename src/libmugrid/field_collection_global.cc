@@ -89,9 +89,7 @@ namespace muGrid {
                                     const DynCcoord_t & subdomain_locations,
                                     const DynCcoord_t & pixels_strides) {
     // sanity check 1
-    auto nb_domain_grid_pts_total{
-        std::accumulate(nb_domain_grid_pts.begin(), nb_domain_grid_pts.end(),
-                        static_cast<Index_t>(1), std::multiplies<Index_t>())};
+    auto nb_domain_grid_pts_total{get_nb_from_shape(nb_domain_grid_pts)};
     if (nb_domain_grid_pts_total <= 0) {
       std::stringstream s;
       s << "Invalid nb_domain_grid_pts " << nb_domain_grid_pts << " ("
@@ -103,9 +101,7 @@ namespace muGrid {
     auto _nb_subdomain_grid_pts{nb_subdomain_grid_pts.get_dim() == 0
                                     ? nb_domain_grid_pts
                                     : nb_subdomain_grid_pts};
-    auto nb_subdomain_grid_pts_total{std::accumulate(
-        _nb_subdomain_grid_pts.begin(), _nb_subdomain_grid_pts.end(),
-        static_cast<Index_t>(1), std::multiplies<Index_t>())};
+    auto nb_subdomain_grid_pts_total{get_nb_from_shape(_nb_subdomain_grid_pts)};
     if (nb_subdomain_grid_pts_total < 0) {
       std::stringstream s;
       s << "Invalid nb_subdomain_grid_pts " << _nb_subdomain_grid_pts << " ("
