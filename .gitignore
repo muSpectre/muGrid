@@ -5,8 +5,18 @@
 /build*
 /cmake-build-*
 
+/doc/build
+/doc/source/doxygenxml
+/doc/source/html
+
+/venv
+
 *.pyc
 
 .vscode
 .idea
 .ccls-cache
+
+/subprojects/packagecache/*
+/subprojects/eigen-*/*
+/subprojects/pybind11-*/*
