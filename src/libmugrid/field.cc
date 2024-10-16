@@ -165,7 +165,13 @@ namespace muGrid {
       shape.push_back(n);
     }
     if (iter_type == IterUnit::Pixel) {
-      shape[shape.size() - 1] *= this->get_nb_sub_pts();
+      if (this->get_nb_sub_pts() > 1) {
+        if (shape.size() == 0) {
+          shape.push_back(this->get_nb_sub_pts());
+        } else {
+          shape[shape.size() - 1] *= this->get_nb_sub_pts();
+        }
+      }
     } else {
       shape.push_back(this->get_nb_sub_pts());
     }
