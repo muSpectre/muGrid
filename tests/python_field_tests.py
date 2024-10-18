@@ -54,7 +54,7 @@ class FieldCheck(unittest.TestCase):
         fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
 
         # Scalar
-        fs = fc.register_real_field("test-field-scalar", ())
+        fs = fc.register_real_field("test-field-scalar")
         self.assertEqual(fs.array(muGrid.Pixel).shape, self.nb_grid_pts)
 
         # Single component
@@ -81,15 +81,15 @@ class FieldCheck(unittest.TestCase):
         # Check subpoint-shaped convenience access
         self.assertEqual(fs.s.shape, (1,) + self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
-            fs.s = np.zeros((1,) + self.nb_grid_pts)
-        fs.s = values
-        np.testing.assert_allclose(fs.s, values)
+            fs.s = np.zeros(self.nb_grid_pts)
+        fs.s = values.reshape((1,) + self.nb_grid_pts)
+        np.testing.assert_allclose(fs.s, values.reshape((1,) + self.nb_grid_pts))
 
         self.assertEqual(f.s.shape, (1, 1) + self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
             f.s = np.zeros((3,) + self.nb_grid_pts)
-        f.s = values
-        np.testing.assert_allclose(f.s, values)
+        f.s = values.reshape((1, 1) + self.nb_grid_pts)
+        np.testing.assert_allclose(f.s, values.reshape((1, 1) + self.nb_grid_pts))
 
         self.assertEqual(f2.s.shape, (4, 1) + self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
@@ -106,14 +106,8 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(f.p.shape, (1,) + self.nb_grid_pts)
         with self.assertRaises(RuntimeError):
             f.p = np.zeros((3, 1) + self.nb_grid_pts)
-        f.p = values
-        np.testing.assert_allclose(f.p, values)
-
-        self.assertEqual(f.p.shape, self.nb_grid_pts)
-        with self.assertRaises(RuntimeError):
-            f.p = np.zeros((3,) + self.nb_grid_pts)
-        f.p = values
-        np.testing.assert_allclose(f.p, values)
+        f.p = values.reshape((1,) + self.nb_grid_pts)
+        np.testing.assert_allclose(f.p, values.reshape((1,) + self.nb_grid_pts))
 
         self.assertEqual(f2.p.shape, nb_grid_pts2)
         with self.assertRaises(RuntimeError):

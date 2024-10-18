@@ -2471,6 +2471,7 @@ namespace muGrid {
              << "\nThis is probably a Bug so please inform the programmers.";
       err_ss << err_os.rdbuf();
       err = err_ss.str();
+      std::cout << err << std::endl;
       throw FileIOError(err);
     }
   }
@@ -2858,7 +2859,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   std::vector<IODiff_t> NetCDFVarField::get_nc_imap_global() const {
-    // construc imap from field strides
+    // construct imap from field strides
     IterUnit iter_type{muGrid::IterUnit::SubPt};
     if (this->get_field().get_nb_components() == 1) {
       iter_type = muGrid::IterUnit::Pixel;

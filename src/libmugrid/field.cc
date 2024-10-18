@@ -254,9 +254,6 @@ namespace muGrid {
   Shape_t Field::get_strides(const IterUnit & iter_type,
                              Index_t element_size) const {
     Shape_t strides{this->get_sub_pt_strides(iter_type, element_size)};
-    if (this->get_nb_dof_per_pixel() <= 1) {
-      strides.clear();
-    }
     if (this->get_storage_order() == StorageOrder::ColMajor) {
       for (auto && n : this->get_pixels_strides(element_size)) {
         strides.push_back(n * this->get_nb_dof_per_pixel());
