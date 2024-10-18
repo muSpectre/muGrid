@@ -2471,7 +2471,6 @@ namespace muGrid {
              << "\nThis is probably a Bug so please inform the programmers.";
       err_ss << err_os.rdbuf();
       err = err_ss.str();
-      std::cout << err << std::endl;
       throw FileIOError(err);
     }
   }
