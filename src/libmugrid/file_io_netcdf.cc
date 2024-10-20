@@ -1176,22 +1176,21 @@ namespace muGrid {
     // add the field dims in the correct order as you want to have in the NetCDF
     // file (frame, tensor_dim__field-1, tensor_dim__filed-2, ... , subpt, nx,
     // ny, nz) the frame was already added before
-    if (nb_dof_per_subpt > 1) {
-      // for state fields the field name is corrected by using the state field
-      // name
-      std::string field_name{field.get_name()};
-      if (state_field_name.size() != 0) {
-        field_name = state_field_name;
-      }
-      int tensor_dim{-1};
-      for (auto && tensor_dim_size : component_shape) {
-        tensor_dim++;
-        std::string field_name_tensor_dim =
-            field_name + "-" + std::to_string(tensor_dim);
-        field_dims.push_back(this->add_dim(
-            NetCDFDim::compute_dim_name("tensor_dim", field_name_tensor_dim),
-            tensor_dim_size));
-      }
+
+    // for state fields the field name is corrected by using the state field
+    // name
+    std::string field_name{field.get_name()};
+    if (state_field_name.size() != 0) {
+      field_name = state_field_name;
+    }
+    int tensor_dim{-1};
+    for (auto && tensor_dim_size : component_shape) {
+      tensor_dim++;
+      std::string field_name_tensor_dim =
+          field_name + "-" + std::to_string(tensor_dim);
+      field_dims.push_back(this->add_dim(
+          NetCDFDim::compute_dim_name("tensor_dim", field_name_tensor_dim),
+          tensor_dim_size));
     }
 
     if (nb_subpt != 1 or nb_dof_per_subpt != 1) {
@@ -1239,23 +1238,23 @@ namespace muGrid {
     // add the field dims in the correct order as you want to have in the NetCDF
     // file (frame, tensor_dim__field-1, tensor_dim__filed-2, ... , subpt, pts)
     // the frame was already added before
-    if (nb_dof_per_subpt > 1) {
-      // for state fields the field name is corrected by using the state field
-      // name
-      std::string field_name{field.get_name()};
-      if (state_field_name.size() != 0) {
-        field_name = state_field_name;
-      }
-      int tensor_dim{-1};
-      for (auto && tensor_dim_size : component_shape) {
-        tensor_dim++;
-        std::string field_name_tensor_dim =
-            field_name + "-" + std::to_string(tensor_dim);
-        field_dims.push_back(this->add_dim(
-            NetCDFDim::compute_dim_name("tensor_dim", field_name_tensor_dim),
-            tensor_dim_size));
-      }
+
+    // for state fields the field name is corrected by using the state field
+    // name
+    std::string field_name{field.get_name()};
+    if (state_field_name.size() != 0) {
+      field_name = state_field_name;
     }
+    int tensor_dim{-1};
+    for (auto && tensor_dim_size : component_shape) {
+      tensor_dim++;
+      std::string field_name_tensor_dim =
+          field_name + "-" + std::to_string(tensor_dim);
+      field_dims.push_back(this->add_dim(
+          NetCDFDim::compute_dim_name("tensor_dim", field_name_tensor_dim),
+          tensor_dim_size));
+    }
+
     if (nb_subpt != 1 or nb_dof_per_subpt != 1) {
       std::string suffix{field.get_sub_division_tag() + "-" +
                          std::to_string(nb_subpt)};
@@ -2598,8 +2597,7 @@ namespace muGrid {
         // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
         // storage order... I have to fix this for at least C storage order or
         // better an arbitrary case
-        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
-                                    std::multiplies<IOSize_t>());
+        nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
 #ifdef WITH_MPI
@@ -2684,8 +2682,7 @@ namespace muGrid {
         // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
         // storage order... I have to fix this for at least C storage order or
         // better an arbitrary case
-        nb_points = std::accumulate(counts.begin(), counts.end(), 1,
-                                    std::multiplies<IOSize_t>());
+        nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
 #ifdef WITH_MPI
@@ -2860,7 +2857,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   std::vector<IODiff_t> NetCDFVarField::get_nc_imap_global() const {
-    // construc imap from field strides
+    // construct imap from field strides
     IterUnit iter_type{muGrid::IterUnit::SubPt};
     if (this->get_field().get_nb_components() == 1) {
       iter_type = muGrid::IterUnit::Pixel;

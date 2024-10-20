@@ -72,7 +72,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_real_field(unique_name, nb_components,
                                                   sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -85,7 +85,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_real_field(unique_name, components_shape,
                                                   sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -97,7 +97,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_complex_field(unique_name, nb_components,
                                                      sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -110,7 +110,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_complex_field(
                 unique_name, components_shape, sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -122,7 +122,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_uint_field(unique_name, nb_components,
                                                   sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -135,7 +135,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_uint_field(unique_name, components_shape,
                                                   sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -147,7 +147,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_int_field(unique_name, nb_components,
                                                  sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -160,7 +160,7 @@ void add_field_collection(py::module & mod) {
             return collection.register_int_field(unique_name, components_shape,
                                                  sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -174,7 +174,7 @@ void add_field_collection(py::module & mod) {
                 unique_prefix, nb_memory, nb_components, sub_division_tag,
                 unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -188,7 +188,7 @@ void add_field_collection(py::module & mod) {
                 unique_prefix, nb_memory, nb_components, sub_division_tag,
                 unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -202,7 +202,7 @@ void add_field_collection(py::module & mod) {
                                                        nb_components,
                                                        sub_division_tag, unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -228,7 +228,7 @@ void add_field_collection(py::module & mod) {
             return collection.real_field(unique_name, nb_components,
                                          sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -241,7 +241,7 @@ void add_field_collection(py::module & mod) {
             return collection.real_field(unique_name, components_shape,
                                          sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -253,7 +253,7 @@ void add_field_collection(py::module & mod) {
             return collection.complex_field(unique_name, nb_components,
                                             sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -266,7 +266,7 @@ void add_field_collection(py::module & mod) {
             return collection.complex_field(unique_name, components_shape,
                                             sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -278,7 +278,7 @@ void add_field_collection(py::module & mod) {
             return collection.uint_field(unique_name, nb_components,
                                          sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -291,7 +291,7 @@ void add_field_collection(py::module & mod) {
             return collection.uint_field(unique_name, components_shape,
                                          sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -303,7 +303,7 @@ void add_field_collection(py::module & mod) {
             return collection.int_field(unique_name, nb_components,
                                         sub_division, unit);
           },
-          "unique_name"_a, "nb_components"_a = 1,
+          "unique_name"_a, "nb_components"_a,
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -316,7 +316,7 @@ void add_field_collection(py::module & mod) {
             return collection.int_field(unique_name, components_shape,
                                         sub_division, unit);
           },
-          "unique_name"_a, "components_shape"_a,
+          "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
           "sub_division"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -330,7 +330,7 @@ void add_field_collection(py::module & mod) {
                                                nb_components, sub_division_tag,
                                                unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -344,7 +344,7 @@ void add_field_collection(py::module & mod) {
                                                   nb_components,
                                                   sub_division_tag, unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -358,7 +358,7 @@ void add_field_collection(py::module & mod) {
                                               nb_components, sub_division_tag,
                                               unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)
@@ -372,7 +372,7 @@ void add_field_collection(py::module & mod) {
                                                nb_components, sub_division_tag,
                                                unit);
           },
-          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+          "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
           "sub_division_tag"_a = muGrid::PixelTag,
           "unit"_a = muGrid::Unit::unitless(),
           py::return_value_policy::reference_internal)

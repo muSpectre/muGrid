@@ -53,9 +53,8 @@ namespace muGrid {
                const Shape_t & components_shape,
                const std::string & sub_division_tag, const Unit & unit)
       : name{unique_name}, collection{collection},
-        nb_components{std::accumulate(components_shape.begin(),
-                                      components_shape.end(), 1,
-                                      std::multiplies<Index_t>())},
+        // An empty tuple is a scalar field
+        nb_components{get_nb_from_shape(components_shape)},
         components_shape{components_shape},
         nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)},
         sub_division_tag{sub_division_tag}, unit{unit} {}
@@ -125,9 +124,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void Field::reshape(const Shape_t & new_components_shape) {
-    if (std::accumulate(new_components_shape.begin(),
-                        new_components_shape.end(), 1,
-                        std::multiplies<Index_t>()) != this->nb_components) {
+    if (get_nb_from_shape(new_components_shape) != this->nb_components) {
       std::stringstream message{};
       message << "This field was set up for " << this->get_nb_components()
               << " components. Setting the component shape to "
@@ -136,19 +133,14 @@ namespace muGrid {
       throw FieldError(message.str());
     }
     this->components_shape = new_components_shape;
-    this->nb_components = std::accumulate(this->components_shape.begin(),
-                                          this->components_shape.end(), 1,
-                                          std::multiplies<Index_t>());
+    this->nb_components = get_nb_from_shape(this->components_shape);
   }
 
   /* ---------------------------------------------------------------------- */
   void Field::reshape(const Shape_t & new_components_shape,
                       const std::string & sub_div_tag) {
     auto new_nb_sub_pts{collection.get_nb_sub_pts(sub_div_tag)};
-    if (std::accumulate(new_components_shape.begin(),
-                        new_components_shape.end(), 1,
-                        std::multiplies<Index_t>()) *
-            new_nb_sub_pts !=
+    if (get_nb_from_shape(new_components_shape) * new_nb_sub_pts !=
         this->get_nb_dof_per_pixel()) {
       std::stringstream message{};
       message << "This field was set up for " << this->get_nb_components()
@@ -161,9 +153,7 @@ namespace muGrid {
       throw FieldError(message.str());
     }
     this->components_shape = new_components_shape;
-    this->nb_components = std::accumulate(this->components_shape.begin(),
-                                          this->components_shape.end(), 1,
-                                          std::multiplies<Index_t>());
+    this->nb_components = get_nb_from_shape(this->components_shape);
     this->nb_sub_pts = new_nb_sub_pts;
     this->sub_division_tag = sub_div_tag;
   }
@@ -175,7 +165,13 @@ namespace muGrid {
       shape.push_back(n);
     }
     if (iter_type == IterUnit::Pixel) {
-      shape[shape.size() - 1] *= this->get_nb_sub_pts();
+      if (this->get_nb_sub_pts() > 1) {
+        if (shape.size() == 0) {
+          shape.push_back(this->get_nb_sub_pts());
+        } else {
+          shape[shape.size() - 1] *= this->get_nb_sub_pts();
+        }
+      }
     } else {
       shape.push_back(this->get_nb_sub_pts());
     }
@@ -191,10 +187,8 @@ namespace muGrid {
   Shape_t Field::get_shape(const IterUnit & iter_type) const {
     Shape_t shape;
 
-    if (this->get_nb_dof_per_pixel() > 1) {
-      for (auto && n : this->get_sub_pt_shape(iter_type)) {
-        shape.push_back(n);
-      }
+    for (auto && n : this->get_sub_pt_shape(iter_type)) {
+      shape.push_back(n);
     }
     for (auto && n : this->get_pixels_shape()) {
       shape.push_back(n);
@@ -260,9 +254,6 @@ namespace muGrid {
   Shape_t Field::get_strides(const IterUnit & iter_type,
                              Index_t element_size) const {
     Shape_t strides{this->get_sub_pt_strides(iter_type, element_size)};
-    if (this->get_nb_dof_per_pixel() <= 1) {
-      strides.clear();
-    }
     if (this->get_storage_order() == StorageOrder::ColMajor) {
       for (auto && n : this->get_pixels_strides(element_size)) {
         strides.push_back(n * this->get_nb_dof_per_pixel());

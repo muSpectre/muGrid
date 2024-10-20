@@ -46,6 +46,7 @@
 #include <algorithm>
 #include <vector>
 #include <cstdint>
+#include <numeric>
 
 #ifndef SRC_LIBMUGRID_GRID_COMMON_HH_
 #define SRC_LIBMUGRID_GRID_COMMON_HH_
@@ -182,6 +183,13 @@ namespace muGrid {
    * be modified.
    */
   enum class Mapping { Const, Mut };
+
+  template <typename T>
+  Index_t get_nb_from_shape(const T & shape) {
+    return shape.size() > 0 ? std::accumulate(shape.begin(), shape.end(), 1,
+                                              std::multiplies<Index_t>())
+                            : 1;
+  }
 
   /**
    * \defgroup Coordinates Coordinate types

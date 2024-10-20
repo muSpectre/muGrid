@@ -105,8 +105,8 @@ namespace muGrid {
      * @param storage_oder in-memory storage order of the components
      */
     Field(const std::string & unique_name, FieldCollection & collection,
-          const Shape_t & components_shape,
-          const std::string & sub_div_tag, const Unit & unit);
+          const Shape_t & components_shape, const std::string & sub_div_tag,
+          const Unit & unit);
 
    public:
     //! Default constructor
@@ -154,8 +154,8 @@ namespace muGrid {
     /**
      * returns the number of entries held by this field. This corresponds to
      * nb_pixels × nb_sub_pts, (I.e., a scalar field and a vector field sharing
-     * the the same collection and subdivision tag have the same number of entries, even though the
-     * vector field has more scalar values.)
+     * the the same collection and subdivision tag have the same number of
+     * entries, even though the vector field has more scalar values.)
      */
     Index_t get_nb_entries() const;
 
