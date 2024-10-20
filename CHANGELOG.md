@@ -1,11 +1,13 @@
 Change log for µGrid
 ====================
 
-0.93.0 (15Oct2024)
+0.93.0 (20Oct2024)
 ------------------
 
 - API: Always return full component shape, do not cut components with one
   degree of freedom
+- API: Scalar fields are now explicitly supporting by passing an empty tuple
+  as the component shape
 
 0.92.6 (25Sept2024)
 -------------------
