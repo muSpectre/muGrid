@@ -260,7 +260,7 @@ namespace muGrid {
                DynCcoord_t subdomain_locations, Index_t nb_dof_per_pixel,
                py::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
-        : collection{}, field{} {
+        : collection{}, field{}, iter_type{IterUnit::Pixel} {
       // Sanity check 1: Are the sizes of array and field equal?
       Index_t size{get_nb_from_shape(nb_subdomain_grid_pts) * nb_dof_per_pixel};
       if (size != array.size()) {
@@ -347,7 +347,7 @@ namespace muGrid {
                DynCcoord_t subdomain_locations, Index_t nb_sub_pts,
                Shape_t components_shape, py::array_t<T, flags> & array,
                const Unit & unit = Unit::unitless())
-        : collection{}, field{} {
+        : collection{}, field{}, iter_type{IterUnit::SubPt} {
       // Sanity check: Do the array dimensions agree and shapes agree?
       Index_t dim{nb_subdomain_grid_pts.get_dim()};
       bool shape_matches{false};
@@ -370,12 +370,14 @@ namespace muGrid {
                         nb_sub_pts == 1 &&
                         std::equal(components_shape.begin(),
                                    components_shape.end(), array.shape());
+        // Make sure we return a numpy field with identical shape
+        this->iter_type = IterUnit::Pixel;
       }
       if (!shape_matches) {
         std::stringstream s;
         s << "The numpy array has shape " << array.request().shape << ", but "
           << "the muGrid field reports a grid of " << nb_subdomain_grid_pts
-          << " pixels with " << nb_sub_pts << " quadrature "
+          << " pixels with " << nb_sub_pts << " sub-"
           << (nb_sub_pts == 1 ? "point" : "points") << " holding a quantity of "
           << "shape " << components_shape << ".";
         throw NumpyError(s.str());
@@ -416,9 +418,12 @@ namespace muGrid {
 
     Shape_t get_sub_pt_shape() const { return this->field->get_sub_pt_shape(); }
 
+    IterUnit get_iter_type() const { return this->iter_type; }
+
    protected:
     std::unique_ptr<Collection_t> collection;
     std::unique_ptr<WrappedField<T>> field;
+    IterUnit iter_type;  // IterUnit that will give input shape
   };
 
   /* Wrap a column-major field into a numpy array, without copying the data */

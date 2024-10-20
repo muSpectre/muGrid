@@ -1,6 +1,12 @@
 Change log for µGrid
 ====================
 
+0.93.1 (20Oct2024)
+------------------
+
+- ENH: `NumpyProxy` now determine the iter type that is required for returning
+  a numpy array with exactly the same shape as the input array
+
 0.93.0 (20Oct2024)
 ------------------
 
