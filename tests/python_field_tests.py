@@ -50,20 +50,28 @@ class FieldCheck(unittest.TestCase):
         nb_grid_pts2 = (4,) + self.nb_grid_pts
         values2 = np.random.rand(*nb_grid_pts2)
 
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts))
-        fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
 
         # Scalar
         fs = fc.register_real_field("test-field-scalar")
         self.assertEqual(fs.array(muGrid.Pixel).shape, self.nb_grid_pts)
+        self.assertEqual(fs.array(muGrid.SubPt).shape, (1,) + self.nb_grid_pts)
+        self.assertEqual(fs.p.shape, self.nb_grid_pts)
+        self.assertEqual(fs.s.shape, (1,) + self.nb_grid_pts)
 
         # Single component
         f = fc.register_real_field("test-field", 1)
         self.assertEqual(f.array(muGrid.Pixel).shape, (1,) + self.nb_grid_pts)
+        self.assertEqual(f.array(muGrid.SubPt).shape, (1, 1) + self.nb_grid_pts)
+        self.assertEqual(f.p.shape, (1,) + self.nb_grid_pts)
+        self.assertEqual(f.s.shape, (1, 1) + self.nb_grid_pts)
 
         # Four components
         f2 = fc.register_real_field("test-field2", 4)
         self.assertEqual(f2.array(muGrid.Pixel).shape, nb_grid_pts2)
+        self.assertEqual(f2.array(muGrid.SubPt).shape, (4, 1) + self.nb_grid_pts)
+        self.assertEqual(f2.p.shape, nb_grid_pts2)
+        self.assertEqual(f2.s.shape, (4, 1) + self.nb_grid_pts)
 
         # Check that we get those fields back
         self.assertEqual(fc.get_field('test-field-scalar'), fs)
@@ -116,8 +124,7 @@ class FieldCheck(unittest.TestCase):
         np.testing.assert_allclose(f2.p, values2)
 
     def test_buffer_size_four_quad_pt(self):
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
-        fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, sub_pts={'quad': 4})
         # Single component
         f = fc.register_real_field("test-field", 1, 'quad')
         self.assertEqual(f.array(muGrid.Pixel).shape,
