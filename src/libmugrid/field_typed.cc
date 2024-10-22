@@ -559,6 +559,15 @@ namespace muGrid {
         size{size}, strides{strides} {
     this->current_nb_entries = size / this->nb_components;
 
+    if (this->get_shape(IterUnit::SubPt).size() !=
+        this->get_strides(IterUnit::SubPt).size()) {
+      std::stringstream error{};
+      error
+          << "Size mismatch: the strides " << this->get_strides(IterUnit::SubPt)
+          << " provided to this wrapped field are incompatible with the shape "
+          << this->get_shape(IterUnit::SubPt) << ".";
+      throw FieldError(error.str());
+    }
     if (static_cast<Index_t>(size) !=
         this->nb_components * this->current_nb_entries) {
       std::stringstream error{};
@@ -596,6 +605,15 @@ namespace muGrid {
         size{size}, strides{strides} {
     this->current_nb_entries = size / this->nb_components;
 
+    if (this->get_shape(IterUnit::SubPt).size() !=
+        this->get_strides(IterUnit::SubPt).size()) {
+      std::stringstream error{};
+      error
+          << "Size mismatch: the strides " << this->get_strides(IterUnit::SubPt)
+          << " provided to this wrapped field are incompatible with the shape "
+          << this->get_shape(IterUnit::SubPt) << ".";
+      throw FieldError(error.str());
+    }
     if (static_cast<Index_t>(size) !=
         this->nb_components * this->current_nb_entries) {
       std::stringstream error{};
