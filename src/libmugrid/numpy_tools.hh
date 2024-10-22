@@ -88,17 +88,13 @@ namespace muGrid {
       // the storage order intrinsically supported by muGrid.
       Shape_t strides{};
 
-      auto nb_components{get_nb_from_shape(components_shape)};
-
       Shape_t components_strides{};
       DynCcoord_t pixels_strides{};
       for (size_t i = 0; i < components_shape.size(); ++i) {
         components_strides.push_back(array.strides(i));
-        if (nb_components > 1) {
-          strides.push_back(array.strides(i) / array.itemsize());
-        }
+        strides.push_back(array.strides(i) / array.itemsize());
       }
-      if (nb_components > 1 and !components_shape.empty() and nb_sub_pts == 1) {
+      if (!components_shape.empty() and nb_sub_pts == 1) {
         // Insert a token stride for the single sub-point
         strides.push_back(0);
       }
