@@ -1,6 +1,11 @@
 Change log for µGrid
 ====================
 
+0.93.2 (not yet released)
+-------------------------
+
+- MAINT: Idiot-check strides when constructing a wrapped field
+
 0.93.1 (20Oct2024)
 ------------------
 
