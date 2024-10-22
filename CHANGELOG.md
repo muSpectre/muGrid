@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-0.93.2 (not yet released)
--------------------------
+0.93.2 (22Oct24)
+----------------
  
 - BUG: Fixed strides in `detect_storage_order` for arrays with single
   components (but non-empty shapes)
