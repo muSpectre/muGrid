@@ -138,8 +138,10 @@ namespace muGrid {
         // smallest entry
         Index_t smallest_stride{*std::min_element(components_strides.begin(),
                                                   components_strides.end())};
-        for (auto && s : components_strides) {
-          s /= smallest_stride;
+        if (smallest_stride > 0) {
+          for (auto && s : components_strides) {
+            s /= smallest_stride;
+          }
         }
 
         // determine order of the sub-points
