@@ -1,6 +1,11 @@
 Change log for µGrid
 ====================
 
+0.93.3 (11Nov24)
+----------------
+
+- BUG: Don't divide by smallest stride if it is zero
+
 0.93.2 (22Oct24)
 ----------------
  
