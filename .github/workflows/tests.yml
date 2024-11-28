@@ -20,7 +20,7 @@ jobs:
       matrix:
         mpi: ['no', 'yes']
         compiler: ['gcc', 'clang']
-        python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12']
+        python-version: ['3.8', '3.9', '3.10', '3.11' , '3.12', '3.13']
         numpy-version: ['<2.0.0']
         mpi4py-version: ['==3.1.6']
         exclude:
