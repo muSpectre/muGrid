@@ -34,7 +34,7 @@
  *
  */
 
-#include "gradient_operator_default.hh"
+#include "convolution_operator_default.hh"
 #include "field_collection_global.hh"
 #include "field_map.hh"
 #include "ccoord_operations.hh"
@@ -77,7 +77,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  GradientOperatorDefault::GradientOperatorDefault(
+  ConvolutionOperatorDefault::ConvolutionOperatorDefault(
       const Index_t & spatial_dim, const Index_t & nb_quad_pts,
       const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
       const Index_t & nb_pixelnodal_pts,
@@ -95,6 +95,7 @@ namespace muGrid {
                                     this->nb_elements} {
     this->pixel_gradient.resize(nb_grad_component_per_pixel,
                                 nb_possible_nodal_contribution);
+    std::cout << "A" << std::endl;
     Index_t counter{0};
     for (Index_t e{0}; e < this->nb_elements; ++e) {
       auto & nodal_indices{std::get<0>(nodal_pts.at(e))};  // n of (n,(i,j,k))
@@ -128,6 +129,8 @@ namespace muGrid {
         throw RuntimeError{err_msg.str()};
       }
 
+      std::cout << "B" << std::endl;
+
       auto && permutation_matrix{permutation(nodal_indices, nodal_pix_coords,
                                              this->nb_pixelnodal_pts)};
       for (Index_t q{0}; q < this->nb_quad_pts; ++q) {
@@ -151,16 +154,21 @@ namespace muGrid {
           throw RuntimeError{err_msg.str()};
         }
 
+        std::cout << "BB" << std::endl;
+
         auto && gradient_block{this->pixel_gradient.block(
             this->spatial_dim * counter++, 0, this->spatial_dim,
             nb_possible_nodal_contribution)};
         gradient_block.noalias() = grad * permutation_matrix;
       }
     }
+
+    std::cout << "C" << std::endl;
+
   }
 
   /* ---------------------------------------------------------------------- */
-  void GradientOperatorDefault::apply_gradient(
+  void ConvolutionOperatorDefault::apply_gradient(
       const TypedFieldBase<Real> & nodal_field,
       TypedFieldBase<Real> & quadrature_point_field) const {
     quadrature_point_field.set_zero();
@@ -168,7 +176,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void GradientOperatorDefault::apply_gradient_increment(
+  void ConvolutionOperatorDefault::apply_gradient_increment(
       const TypedFieldBase<Real> & nodal_field, const Real & alpha,
       TypedFieldBase<Real> & quadrature_point_field) const {
     if (not quadrature_point_field.is_global()) {
@@ -243,7 +251,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void GradientOperatorDefault::apply_transpose(
+  void ConvolutionOperatorDefault::apply_transpose(
       const TypedFieldBase<Real> & quadrature_point_field,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
@@ -254,11 +262,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void GradientOperatorDefault::apply_transpose_increment(
+  void ConvolutionOperatorDefault::apply_transpose_increment(
       const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
-    auto && nb_pixel_quad_pts{this->get_nb_pixel_quad_pts()};
+    auto && nb_pixel_quad_pts{this->get_nb_quad_pts()};
     std::vector<Real> use_weights{};
     bool default_weights{weights.size() == 0};
     if (default_weights) {
@@ -339,32 +347,34 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Eigen::MatrixXd & GradientOperatorDefault::get_pixel_gradient() const {
+  const Eigen::MatrixXd &
+  ConvolutionOperatorDefault::get_pixel_gradient() const {
     return this->pixel_gradient;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t GradientOperatorDefault::get_nb_pixel_quad_pts() const {
+  Index_t ConvolutionOperatorDefault::get_nb_quad_pts() const {
     return this->nb_quad_pts * this->nb_elements;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t GradientOperatorDefault::get_nb_pixel_nodal_pts() const {
+  Index_t ConvolutionOperatorDefault::get_nb_nodal_pts() const {
     return this->nb_pixelnodal_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t GradientOperatorDefault::get_spatial_dim() const {
+  Index_t ConvolutionOperatorDefault::get_spatial_dim() const {
     return this->spatial_dim;
   }
 
   /* ---------------------------------------------------------------------- */
-  const Index_t & GradientOperatorDefault::get_nb_quad_pts_per_element() const {
+  const Index_t &
+  ConvolutionOperatorDefault::get_nb_quad_pts_per_element() const {
     return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  const Index_t & GradientOperatorDefault::get_nb_elements() const {
+  const Index_t & ConvolutionOperatorDefault::get_nb_elements() const {
     return this->nb_elements;
   }
 

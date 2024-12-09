@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file   python_mpi_binding_test.py
+@file   python_mpi_binding_tests.py
 
 @author Richard Leute <richard.leute@imtek.uni-freiburg.de>
 
