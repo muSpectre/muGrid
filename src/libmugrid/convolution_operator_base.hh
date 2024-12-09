@@ -43,7 +43,7 @@
 namespace muGrid {
 
   /**
-   * @class GradientOperatorBase
+   * @class ConvolutionOperatorBase
    * @brief Base class for gradient and divergence operations.
    *
    * This class defines the interface for performing gradient and divergence
@@ -56,34 +56,34 @@ namespace muGrid {
    * operations. It includes constructors, a destructor, and assignment
    * operators to manage object lifecycle and ensure proper resource management.
    */
-  class GradientOperatorBase {
+  class ConvolutionOperatorBase {
    public:
     /**
      * @brief Default constructor.
      *
-     * Initializes a new instance of the GradientOperatorBase class. This
+     * Initializes a new instance of the ConvolutionOperatorBase class. This
      * constructor is defaulted, indicating that it performs no special
      * actions other than initializing the object.
      */
-    GradientOperatorBase() = default;
+    ConvolutionOperatorBase() = default;
 
     /**
      * @brief Copy constructor (deleted).
      *
-     * Disables the copy construction of GradientOperatorBase instances.
-     * This ensures that a GradientOperatorBase object cannot be copied,
+     * Disables the copy construction of ConvolutionOperatorBase instances.
+     * This ensures that a ConvolutionOperatorBase object cannot be copied,
      * enforcing unique ownership of its resources.
      */
-    GradientOperatorBase(const GradientOperatorBase & other) = delete;
+    ConvolutionOperatorBase(const ConvolutionOperatorBase & other) = delete;
 
     /**
      * @brief Move constructor.
      *
-     * Enables the move semantics for GradientOperatorBase instances. This
+     * Enables the move semantics for ConvolutionOperatorBase instances. This
      * allows the efficient transfer of resources from one object to another
      * without copying.
      */
-    GradientOperatorBase(GradientOperatorBase && other) = default;
+    ConvolutionOperatorBase(ConvolutionOperatorBase && other) = default;
 
     /**
      * @brief Virtual destructor.
@@ -91,25 +91,25 @@ namespace muGrid {
      * Ensures that derived classes can be properly cleaned up through pointers
      * to the base class. This destructor is defaulted.
      */
-    virtual ~GradientOperatorBase() = default;
+    virtual ~ConvolutionOperatorBase() = default;
 
     /**
      * @brief Copy assignment operator (deleted).
      *
-     * Disables the copy assignment of GradientOperatorBase instances.
+     * Disables the copy assignment of ConvolutionOperatorBase instances.
      * This prevents the accidental or intentional copying of an instance,
      * enforcing unique ownership of its resources.
      */
-    GradientOperatorBase &
-    operator=(const GradientOperatorBase & other) = delete;
+    ConvolutionOperatorBase &
+    operator=(const ConvolutionOperatorBase & other) = delete;
 
     /**
      * @brief Move assignment operator.
      *
-     * Enables the move assignment of GradientOperatorBase instances, allowing
+     * Enables the move assignment of ConvolutionOperatorBase instances, allowing
      * resources to be transferred between objects without copying.
      */
-    GradientOperatorBase & operator=(GradientOperatorBase && other) = default;
+    ConvolutionOperatorBase & operator=(ConvolutionOperatorBase && other) = default;
 
     /**
      * @brief Applies the gradient operation.
@@ -190,7 +190,7 @@ namespace muGrid {
      *
      * @return The total number of quadrature points per pixel/voxel.
      */
-    virtual Index_t get_nb_pixel_quad_pts() const = 0;
+    virtual Index_t get_nb_quad_pts() const = 0;
 
     /**
      * @brief Returns the number of nodal points per pixel/voxel.
@@ -200,7 +200,7 @@ namespace muGrid {
      *
      * @return The total number of nodal points per pixel/voxel.
      */
-    virtual Index_t get_nb_pixel_nodal_pts() const = 0;
+    virtual Index_t get_nb_nodal_pts() const = 0;
 
     /**
      * @brief Returns the spatial dimension of the gradient operator.

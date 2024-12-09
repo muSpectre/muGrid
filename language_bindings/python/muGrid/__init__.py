@@ -46,8 +46,8 @@ if has_mpi and MPI is None:
     raise RuntimeError("MPI support is enabled for muGrid but mpi4py is not available.")
 
 from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder, SubPt, DynCcoord, DynRcoord, IterUnit,
-                     Verbosity, GlobalFieldCollection, LocalFieldCollection, Unit, Dictionary, GradientOperatorBase, 
-                     GradientOperatorDefault)
+                     Verbosity, GlobalFieldCollection, LocalFieldCollection, Unit, Dictionary, ConvolutionOperatorBase,
+                     ConvolutionOperatorDefault)
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 if hasattr(_muGrid, 'FileIONetCDF'):

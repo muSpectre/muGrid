@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@file     python_file_io_test.py
+@file     python_file_io_tests.py
 
 @author  Richard Leute <richard.leute@imtek.uni-freiburg.de>
 

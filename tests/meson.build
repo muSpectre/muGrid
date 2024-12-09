@@ -103,7 +103,7 @@ if mpi.found()
             test('mpi_mugrid_python_binding_tests',
                 mpiexec,
                 args: ['-n', n, '--oversubscribe', python.full_path(),
-                        files('python_mpi_binding_test.py'), '-v', '-f'],
+                        files('python_mpi_binding_tests.py'), '-v', '-f'],
                 env: envdata,
                 depends: [mugrid_python],
                 timeout: test_timeout,  # Test can take a long time

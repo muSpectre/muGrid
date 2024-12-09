@@ -2,10 +2,10 @@ mugrid_python_sources = [
     'bind_py_module.cc',
     'bind_py_common_mugrid.cc',
     'bind_py_communicator.cc',
+    'bind_py_convolution_operator.cc',
     'bind_py_field.cc',
     'bind_py_state_field.cc',
     'bind_py_field_collection.cc',
-    'bind_py_gradient.cc',
     'bind_py_file_io.cc',
     'bind_py_options_dictionary.cc',
     'bind_py_testing.cc'

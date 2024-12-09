@@ -40,7 +40,7 @@ import numpy as np
 import muGrid
 
 
-class GradientOperatorCheck(unittest.TestCase):
+class ConvolutionOperatorCheck(unittest.TestCase):
 
     def test_constructor(self):
         n_dim = 2
@@ -63,7 +63,7 @@ class GradientOperatorCheck(unittest.TestCase):
                                                      [0,1],
                                                      [1,0]], dtype=int)),
         ]
-        d_op = muGrid.GradientOperatorDefault(n_dim, n_quad_of_elem, n_elem_of_pixel, 
+        d_op = muGrid.ConvolutionOperatorDefault(n_dim, n_quad_of_elem, n_elem_of_pixel, 
                                               n_node_of_elem, n_node_of_pixel,
                                               shape_fn_grad, elem_nodal_coord)
 

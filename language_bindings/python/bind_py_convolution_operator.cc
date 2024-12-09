@@ -35,8 +35,8 @@
 
 #include "libmugrid/grid_common.hh"
 #include "libmugrid/field_typed.hh"
-#include "libmugrid/gradient_operator_base.hh"
-#include "libmugrid/gradient_operator_default.hh"
+#include "libmugrid/convolution_operator_base.hh"
+#include "libmugrid/convolution_operator_default.hh"
 #include "libmugrid/numpy_tools.hh"
 
 #include <pybind11/pybind11.h>
@@ -45,8 +45,8 @@
 
 #include <sstream>
 
-using muGrid::GradientOperatorBase;
-using muGrid::GradientOperatorDefault;
+using muGrid::ConvolutionOperatorBase;
+using muGrid::ConvolutionOperatorDefault;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Index_t;
@@ -56,10 +56,10 @@ namespace py = pybind11;
 
 
 // A helper class that bounces calls to virtual methods back to Python 
-class PyGradientOperator : public GradientOperatorBase {
+class PyConvolutionOperator : public ConvolutionOperatorBase {
 public:
   // Inherit the constructors 
-  using GradientOperatorBase::GradientOperatorBase;
+  using ConvolutionOperatorBase::ConvolutionOperatorBase;
 
   // Trampoline (one for each virtual function) 
 
@@ -67,7 +67,7 @@ public:
                       TypedFieldBase<Real> & quadrature_point_field) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
-      GradientOperatorBase,
+      ConvolutionOperatorBase,
       apply_gradient,
       nodal_field, quadrature_point_field
     );
@@ -78,7 +78,7 @@ public:
         TypedFieldBase<Real> & quadrature_point_field) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
-      GradientOperatorBase,
+      ConvolutionOperatorBase,
       apply_gradient_increment,
       nodal_field, alpha, quadrature_point_field
     );
@@ -90,7 +90,7 @@ public:
                   const std::vector<Real> & weights = {}) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
-      GradientOperatorBase,
+      ConvolutionOperatorBase,
       apply_transpose,
       quadrature_point_field, nodal_field, weights
     );
@@ -102,32 +102,32 @@ public:
       const std::vector<Real> & weights = {}) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
-      GradientOperatorBase,
+      ConvolutionOperatorBase,
       apply_transpose,
       quadrature_point_field, alpha, nodal_field, weights
     );
   }
 
-  Index_t get_nb_pixel_quad_pts() const override {
+  Index_t get_nb_quad_pts() const override {
     PYBIND11_OVERRIDE_PURE(
       Index_t,
-      GradientOperatorBase,
-      get_nb_pixel_quad_pts,
+      ConvolutionOperatorBase,
+      get_nb_quad_pts,
     );
   }
 
-  Index_t get_nb_pixel_nodal_pts() const override {
+  Index_t get_nb_nodal_pts() const override {
     PYBIND11_OVERRIDE_PURE(
       Index_t,
-      GradientOperatorBase,
-      get_nb_pixel_nodal_pts,
+      ConvolutionOperatorBase,
+      get_nb_nodal_pts,
     );
   }
 
   Index_t get_spatial_dim() const override {
     PYBIND11_OVERRIDE_PURE(
       Index_t,
-      GradientOperatorBase,
+      ConvolutionOperatorBase,
       get_spatial_dim,
     );
   }
@@ -136,34 +136,34 @@ public:
 
 // Bind class GraidentOperatorBase 
 void add_gradient_operator_base(py::module & mod) {
-  py::class_<GradientOperatorBase, PyGradientOperator>(mod, "GradientOperatorBase")
+  py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
     .def(py::init<>())
-    .def("apply_gradient", &GradientOperatorBase::apply_gradient,
+    .def("apply_gradient", &ConvolutionOperatorBase::apply_gradient,
          "nodal_field"_a, "quadrature_point_field"_a)
-    .def("get_nb_pixel_quad_pts", &GradientOperatorBase::get_nb_pixel_quad_pts)
-    .def("get_nb_pixel_nodal_pts", &GradientOperatorBase::get_nb_pixel_nodal_pts)
-    .def("get_spatial_dim", &GradientOperatorBase::get_spatial_dim)
+    .def("get_nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
+    .def("get_nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
+    .def("get_spatial_dim", &ConvolutionOperatorBase::get_spatial_dim)
     ;
 }
 
 
-// Bind class GraidentOperatorDefault 
+// Bind class ConvolutionOperatorDefault
 void add_gradient_operator_default(py::module & mod) {
-  py::class_<GradientOperatorDefault, GradientOperatorBase>(mod, "GradientOperatorDefault")
+  py::class_<ConvolutionOperatorDefault, ConvolutionOperatorBase>(mod, "ConvolutionOperatorDefault")
     .def(py::init<const Index_t &, const Index_t &, 
          const Index_t &, const Index_t &, const Index_t &,
          const std::vector<std::vector<Eigen::MatrixXd>> &,
          const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &>(),
          "spatial_dim"_a, "nb_quad_pts"_a, "nb_elements"_a, "nb_elemnodal_pts"_a,
          "nb_pixelnodal_pts"_a, "shape_fn_gradients"_a, "nodal_pts"_a)
-    .def("apply_gradient", &GradientOperatorDefault::apply_gradient,
+    .def("apply_gradient", &ConvolutionOperatorDefault::apply_gradient,
       "nodal_field"_a, "quadrature_point_field"_a)
-    .def_property_readonly("pixel_gradient", &GradientOperatorDefault::get_pixel_gradient)
-    .def_property_readonly("spatial_dim", &GradientOperatorDefault::get_spatial_dim)
-    .def_property_readonly("nb_quad_pts", &GradientOperatorDefault::get_nb_quad_pts_per_element)
-    .def_property_readonly("nb_elements", &GradientOperatorDefault::get_nb_elements)
-    //  .def_property_readonly("nb_elemnodal_pts", &GradientOperatorDefault::???)
-    .def_property_readonly("nb_pixelnodal_pts", &GradientOperatorDefault::get_nb_pixel_nodal_pts)
+    .def_property_readonly("pixel_gradient", &ConvolutionOperatorDefault::get_pixel_gradient)
+    .def_property_readonly("spatial_dim", &ConvolutionOperatorDefault::get_spatial_dim)
+    .def_property_readonly("nb_quad_pts", &ConvolutionOperatorDefault::get_nb_quad_pts_per_element)
+    .def_property_readonly("nb_elements", &ConvolutionOperatorDefault::get_nb_elements)
+    //  .def_property_readonly("nb_elemnodal_pts", &ConvolutionOperatorDefault::???)
+    .def_property_readonly("nb_pixelnodal_pts", &ConvolutionOperatorDefault::get_nb_nodal_pts)
     ;
 }
 
