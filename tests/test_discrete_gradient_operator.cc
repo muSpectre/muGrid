@@ -126,7 +126,7 @@ namespace muGrid {
       auto & quad_pt_field{collection.register_real_field(
           "quad_pt_field", ipow(Fix::Dim, grad_rank), quad_pt_tag)};
 
-      Fix::d_operator.apply_gradient(dynamic_cast<TypedFieldBase<Real> &>(
+      Fix::d_operator.apply(dynamic_cast<TypedFieldBase<Real> &>(
                                          collection.get_field("nodal_field")),
                                      quad_pt_field);
       auto && quad_pt_map{quad_pt_field.get_pixel_map()};
@@ -197,9 +197,9 @@ namespace muGrid {
       v.eigen_vec().setRandom();
 
       // check than (B·u, B·v) == (BᵀB·u, v) for any u, v
-      this->d_operator.apply_gradient(u, Bu);
-      this->d_operator.apply_gradient(v, Bv);
-      this->d_operator.apply_transpose(Bu, BTBu);
+      this->d_operator.apply(u, Bu);
+      this->d_operator.apply(v, Bv);
+      this->d_operator.transpose(Bu, BTBu);
 
       auto bubv{Bu.eigen_vec().dot(Bv.eigen_vec())};
       auto btbuv{BTBu.eigen_vec().dot(v.eigen_vec())};
