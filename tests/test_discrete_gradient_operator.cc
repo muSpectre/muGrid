@@ -54,12 +54,12 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(constructor_test, Fix, DOperatorFixtures,
                                    Fix) {
     Real error{testGoodies::rel_error(Fix::get_full_pixel_B(),
-                                      Fix::d_operator.get_pixel_gradient())};
+                                      Fix::d_operator.get_pixel_operator())};
 
     BOOST_CHECK_EQUAL(error, 0);
     if (error != 0) {
       std::cout << "Full B received:" << std::endl
-                << Fix::d_operator.get_pixel_gradient() << std::endl;
+                << Fix::d_operator.get_pixel_operator() << std::endl;
       std::cout << "Full B expected: " << std::endl
                 << Fix::get_full_pixel_B() << std::endl;
     }
