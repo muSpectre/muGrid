@@ -94,10 +94,10 @@ namespace muGrid {
                                        this->nb_pixelnodal_pts},
         // TODO(junge): Check with Martin whether this can be true. Why does it
         // not depend on rank?
-        nb_grad_component_per_pixel{this->spatial_dim * this->nb_quad_pts} {
+        nb_grad_component_per_pixel{this->spatial_dim * this->nb_quad_pts * nb_elements} {
     this->pixel_operator.resize(nb_grad_component_per_pixel,
                                 nb_possible_nodal_contribution);
-    std::cout << "A" << std::endl;
+
     Index_t counter{0};
     for (Index_t e{0}; e < nb_elements; ++e) {
       auto & nodal_indices{std::get<0>(nodal_pts.at(e))};  // n of (n,(i,j,k))
@@ -131,8 +131,6 @@ namespace muGrid {
         throw RuntimeError{err_msg.str()};
       }
 
-      std::cout << "B" << std::endl;
-
       auto && permutation_matrix{permutation(nodal_indices, nodal_pix_coords,
                                              this->nb_pixelnodal_pts)};
       for (Index_t q{0}; q < this->nb_quad_pts; ++q) {
@@ -156,8 +154,6 @@ namespace muGrid {
           throw RuntimeError{err_msg.str()};
         }
 
-        std::cout << "BB" << std::endl;
-
         auto && gradient_block{this->pixel_operator.block(
             this->spatial_dim * counter++, 0, this->spatial_dim,
             nb_possible_nodal_contribution)};
@@ -166,7 +162,7 @@ namespace muGrid {
       }
     }
 
-    std::cout << "C" << std::endl;
+    std::cout << "End of constructor" << std::endl;
 
   }
 
