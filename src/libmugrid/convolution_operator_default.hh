@@ -35,7 +35,7 @@
  *
  */
 
-#include "gradient_operator_base.hh"
+#include "convolution_operator_base.hh"
 
 #include "Eigen/Dense"
 
@@ -47,10 +47,10 @@
 namespace muGrid {
 
   /**
-   * @class GradientOperatorDefault
+   * @class ConvolutionOperatorDefault
    * @brief Implements gradient operations based on shape function gradients.
    *
-   * This class extends GradientOperatorBase to provide specific implementations
+   * This class extends ConvolutionOperatorBase to provide specific implementations
    * for gradient and divergence operations based on the shape function
    * gradients for each quadrature point. It is designed to work with fields
    * defined on nodal points and quadrature points, facilitating the evaluation
@@ -59,15 +59,15 @@ namespace muGrid {
    * @note This class cannot be instantiated directly and does not support copy
    *       construction or copy assignment.
    */
-  class GradientOperatorDefault : public GradientOperatorBase {
+  class ConvolutionOperatorDefault : public ConvolutionOperatorBase {
    public:
-    using Parent = GradientOperatorBase;
+    using Parent = ConvolutionOperatorBase;
 
     //! Default constructor is deleted to prevent instantiation.
-    GradientOperatorDefault() = delete;
+    ConvolutionOperatorDefault() = delete;
 
     /**
-     * @brief Constructs a GradientOperatorDefault object.
+     * @brief Constructs a ConvolutionOperatorDefault object.
      *
      * Initializes the gradient operator with the provided spatial dimensions,
      * number of quadrature points, elements, nodal points, and shape function
@@ -83,7 +83,7 @@ namespace muGrid {
      * @param nodal_pts Nodal point indices composed of nodal point index within
      *        a pixel and pixel coordinate offset.
      */
-    GradientOperatorDefault(
+    ConvolutionOperatorDefault(
         const Index_t & spatial_dim, const Index_t & nb_quad_pts,
         const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
         const Index_t & nb_pixelnodal_pts,
@@ -91,22 +91,38 @@ namespace muGrid {
         const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &
             nodal_pts);
 
+    /**
+     * @brief Constructs a ConvolutionOperatorDefault object.
+     *
+     * Initializes the gradient operator with the provided pixel operator,
+     * spatial dimensions, number of quadrature points, nodal points.
+     *
+     * @param pixel_operator The pixel-wise operator.
+     * @param spatial_dim Spatial dimension of the pixel.
+     * @param nb_quad_pts Number of quadrature points per element.
+     * @param nb_pixelnodal_pts Number of nodal points per pixel.
+     */
+    ConvolutionOperatorDefault(
+      const Eigen::MatrixXd & pixel_operator,
+      const Index_t & spatial_dim,
+      const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts);
+
     //! Copy constructor
-    GradientOperatorDefault(const GradientOperatorDefault & other) = delete;
+    ConvolutionOperatorDefault(const ConvolutionOperatorDefault & other) = delete;
 
     //! Move constructor
-    GradientOperatorDefault(GradientOperatorDefault && other) = default;
+    ConvolutionOperatorDefault(ConvolutionOperatorDefault && other) = default;
 
     //! Destructor
-    virtual ~GradientOperatorDefault() = default;
+    virtual ~ConvolutionOperatorDefault() = default;
 
     //! Copy assignment operator
-    GradientOperatorDefault &
-    operator=(const GradientOperatorDefault & other) = delete;
+    ConvolutionOperatorDefault &
+    operator=(const ConvolutionOperatorDefault & other) = delete;
 
     //! Move assignment operator
-    GradientOperatorDefault &
-    operator=(GradientOperatorDefault && other) = default;
+    ConvolutionOperatorDefault &
+    operator=(ConvolutionOperatorDefault && other) = default;
 
     /**
      * Evaluates the gradient of nodal_field into quadrature_point_field
@@ -117,7 +133,7 @@ namespace muGrid {
      * Defined on quadrature points
      */
     void
-    apply_gradient(const TypedFieldBase<Real> & nodal_field,
+    apply(const TypedFieldBase<Real> & nodal_field,
                    TypedFieldBase<Real> & quadrature_point_field) const final;
 
     /**
@@ -129,7 +145,7 @@ namespace muGrid {
      * @param quadrature_point_field output field to increment by the gradient
      * field. Defined on quadrature points
      */
-    void apply_gradient_increment(
+    void apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const override;
 
@@ -143,7 +159,7 @@ namespace muGrid {
      * @param nodal_field ouput field into which divergence is written
      * @param weights Gaussian quadrature weigths
      */
-    void apply_transpose(const TypedFieldBase<Real> & quadrature_point_field,
+    void transpose(const TypedFieldBase<Real> & quadrature_point_field,
                          TypedFieldBase<Real> & nodal_field,
                          const std::vector<Real> & weights = {}) const final;
 
@@ -157,7 +173,7 @@ namespace muGrid {
      * @param nodal_field ouput field to be incremented by theh divergence
      * @param weights Gaussian quadrature weigths
      */
-    void apply_transpose_increment(
+    void transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights = {}) const final;
@@ -166,51 +182,37 @@ namespace muGrid {
      * Return the gradient matrix linking the nodal degrees of freedom to their
      * quadrature-point derivatives.
      */
-    const Eigen::MatrixXd & get_pixel_gradient() const;
+    const Eigen::MatrixXd & get_pixel_operator() const;
 
     /**
      * returns the number of quadrature points are associated with any
      * pixel/voxel (i.e., the sum of the number of quadrature points associated
      * with each element belonging to any pixel/voxel.
      */
-    Index_t get_nb_pixel_quad_pts() const final;
+    Index_t get_nb_quad_pts() const final;
     /**
      * returns the number of nodal points associated with any pixel/voxel.
      * (Every node belonging to at least one of the elements belonging to any
      * pixel/voxel, without recounting nodes that appear multiple times)
      */
-    Index_t get_nb_pixel_nodal_pts() const final;
+    Index_t get_nb_nodal_pts() const final;
     /**
      * return the spatial dimension of this gradient operator
      */
     Index_t get_spatial_dim() const final;
-
-    /**
-     * return the number of quadrature points per element
-     */
-    const Index_t & get_nb_quad_pts_per_element() const;
-
-    /**
-     * return the number of elements per pixel
-     */
-    const Index_t & get_nb_elements() const;
 
    protected:
     /**
      * matrix linking the nodal degrees of freedom to their quadrature-point
      * derivatives.
      */
-    Eigen::MatrixXd pixel_gradient{};
+    Eigen::MatrixXd pixel_operator{};
     Index_t spatial_dim;
     /**
      * number of quadrature points per element (e.g.. 4 for linear
      * quadrilateral)
      */
     Index_t nb_quad_pts;
-    //! number of elements per pixel
-    Index_t nb_elements;
-    //! number of nodal points per element (e.g., 3 for triangles)
-    Index_t nb_elemnodal_pts;
     //! number of nodal points per pixel
     Index_t nb_pixelnodal_pts;
     /**
