@@ -91,6 +91,22 @@ namespace muGrid {
         const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &
             nodal_pts);
 
+    /**
+     * @brief Constructs a ConvolutionOperatorDefault object.
+     *
+     * Initializes the gradient operator with the provided pixel operator,
+     * spatial dimensions, number of quadrature points, nodal points.
+     *
+     * @param pixel_operator The pixel-wise operator.
+     * @param spatial_dim Spatial dimension of the pixel.
+     * @param nb_quad_pts Number of quadrature points per element.
+     * @param nb_pixelnodal_pts Number of nodal points per pixel.
+     */
+    ConvolutionOperatorDefault(
+      const Eigen::MatrixXd & pixel_operator,
+      const Index_t & spatial_dim,
+      const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts);
+
     //! Copy constructor
     ConvolutionOperatorDefault(const ConvolutionOperatorDefault & other) = delete;
 
@@ -117,7 +133,7 @@ namespace muGrid {
      * Defined on quadrature points
      */
     void
-    apply_gradient(const TypedFieldBase<Real> & nodal_field,
+    apply(const TypedFieldBase<Real> & nodal_field,
                    TypedFieldBase<Real> & quadrature_point_field) const final;
 
     /**
@@ -129,7 +145,7 @@ namespace muGrid {
      * @param quadrature_point_field output field to increment by the gradient
      * field. Defined on quadrature points
      */
-    void apply_gradient_increment(
+    void apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const override;
 
@@ -143,7 +159,7 @@ namespace muGrid {
      * @param nodal_field ouput field into which divergence is written
      * @param weights Gaussian quadrature weigths
      */
-    void apply_transpose(const TypedFieldBase<Real> & quadrature_point_field,
+    void transpose(const TypedFieldBase<Real> & quadrature_point_field,
                          TypedFieldBase<Real> & nodal_field,
                          const std::vector<Real> & weights = {}) const final;
 
@@ -157,7 +173,7 @@ namespace muGrid {
      * @param nodal_field ouput field to be incremented by theh divergence
      * @param weights Gaussian quadrature weigths
      */
-    void apply_transpose_increment(
+    void transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights = {}) const final;
@@ -166,7 +182,7 @@ namespace muGrid {
      * Return the gradient matrix linking the nodal degrees of freedom to their
      * quadrature-point derivatives.
      */
-    const Eigen::MatrixXd & get_pixel_gradient() const;
+    const Eigen::MatrixXd & get_pixel_operator() const;
 
     /**
      * returns the number of quadrature points are associated with any
@@ -185,32 +201,18 @@ namespace muGrid {
      */
     Index_t get_spatial_dim() const final;
 
-    /**
-     * return the number of quadrature points per element
-     */
-    const Index_t & get_nb_quad_pts_per_element() const;
-
-    /**
-     * return the number of elements per pixel
-     */
-    const Index_t & get_nb_elements() const;
-
    protected:
     /**
      * matrix linking the nodal degrees of freedom to their quadrature-point
      * derivatives.
      */
-    Eigen::MatrixXd pixel_gradient{};
+    Eigen::MatrixXd pixel_operator{};
     Index_t spatial_dim;
     /**
      * number of quadrature points per element (e.g.. 4 for linear
      * quadrilateral)
      */
     Index_t nb_quad_pts;
-    //! number of elements per pixel
-    Index_t nb_elements;
-    //! number of nodal points per element (e.g., 3 for triangles)
-    Index_t nb_elemnodal_pts;
     //! number of nodal points per pixel
     Index_t nb_pixelnodal_pts;
     /**

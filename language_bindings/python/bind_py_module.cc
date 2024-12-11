@@ -45,7 +45,7 @@ PYBIND11_MODULE(_muGrid, mod) {
   add_field_classes(mod);
   add_state_field_classes(mod);
   add_field_collection_classes(mod);
-  add_gradient_classes(mod);
+  add_convolution_operator_classes(mod);
   add_options_dictionary(mod);
   add_testing(mod);
 #ifdef WITH_NETCDF_IO

@@ -41,37 +41,50 @@ import muGrid
 
 
 class ConvolutionOperatorCheck(unittest.TestCase):
+    _rng = np.random.default_rng()
 
-    def test_constructor(self):
+    def test_gradient(self):
+        # Create a 2D grid
+        nx = 3  # number of pixels in x axis
+        ny = 4  # number of pixels in y axis
+        n_quad = 2  # number of quadrature points in one pixel
+        fc = muGrid.GlobalFieldCollection((nx, ny), sub_pts={'quad': n_quad})
+
+        # Fill the node with random values (scalar)
+        nodal = fc.real_field('nodal-value')
+        nodal.p = self._rng.random((nx, ny))
+
+        # Create a quadrature field to hold values
         n_dim = 2
-        n_quad_of_elem = 1
-        n_elem_of_pixel = 2
-        n_node_of_elem = 3
-        n_node_of_pixel = 4
+        quad = fc.real_field('quad-grad', n_dim, 'quad')
+        n_nodal_pixel = 1
 
-        qx = 0.1  # 1 / dx
-        qy = 0.2  # 1 / dy
-        shape_fn_grad_elem = np.array([[-qx, qx, .0],
-                                       [-qy, .0, qy]], dtype=float)
-        shape_fn_grad = [[shape_fn_grad_elem], [shape_fn_grad_elem]]
-
-        elem_nodal_coord = [
-            (np.array([0,1,2], dtype=int), np.array([[0,0],
-                                                     [1,0],
-                                                     [0,1]], dtype=int)),
-            (np.array([3,2,1], dtype=int), np.array([[1,1],
-                                                     [0,1],
-                                                     [1,0]], dtype=int)),
-        ]
-        d_op = muGrid.ConvolutionOperatorDefault(n_dim, n_quad_of_elem, n_elem_of_pixel, 
-                                              n_node_of_elem, n_node_of_pixel,
-                                              shape_fn_grad, elem_nodal_coord)
-
+        # Create the pixel-wise gradient operator
+        qx = 1 / nx
+        qy = 1 / ny
         pixel_gradient = np.array([[-qx, qx, .0, .0],
                                    [-qy, .0, .0, qy],
                                    [ .0, .0, qx,-qx],
                                    [ .0,-qy, qy, .0]], dtype=float)
-        self.assertEqual(d_op.pixel_gradient, pixel_gradient)
+        d_op = muGrid.ConvolutionOperatorDefault(pixel_gradient, n_dim, n_quad, n_nodal_pixel)
+
+        # Apply the graident operator
+        d_op.apply(nodal, quad)
+
+        # Create a pack of nodal values, each with a different offset
+        # NOTE:
+        # - np.roll create copies. But it is okay for testing.
+        # - the shift is the negation of the offset
+        offset_00 = nodal.p
+        offset_10 = np.roll(nodal.p, (-1,0), axis=(0,1))
+        offset_01 = np.roll(nodal.p, (0,-1), axis=(0,1))
+        offset_11 = np.roll(nodal.p, (-1,-1), axis=(0,1))
+        offset_nodes = np.stack((offset_00, offset_10, offset_01, offset_11), axis=0)
+        # Compute the reference value
+        grad_ref = np.einsum("rn,nxy->rxy", pixel_gradient, offset_nodes)
+
+        # Check
+        np.testing.assert_allclose(quad.p, grad_ref)
 
 
 if __name__ == '__main__':

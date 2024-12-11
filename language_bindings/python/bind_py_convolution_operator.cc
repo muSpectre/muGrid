@@ -63,47 +63,47 @@ public:
 
   // Trampoline (one for each virtual function) 
 
-  void apply_gradient(const TypedFieldBase<Real> & nodal_field,
+  void apply(const TypedFieldBase<Real> & nodal_field,
                       TypedFieldBase<Real> & quadrature_point_field) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
       ConvolutionOperatorBase,
-      apply_gradient,
+      apply,
       nodal_field, quadrature_point_field
     );
   }
 
-  void apply_gradient_increment(
+  void apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
       ConvolutionOperatorBase,
-      apply_gradient_increment,
+      apply_increment,
       nodal_field, alpha, quadrature_point_field
     );
   }
 
   void 
-  apply_transpose(const TypedFieldBase<Real> & quadrature_point_field,
+  transpose(const TypedFieldBase<Real> & quadrature_point_field,
                   TypedFieldBase<Real> & nodal_field,
                   const std::vector<Real> & weights = {}) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
       ConvolutionOperatorBase,
-      apply_transpose,
+      transpose,
       quadrature_point_field, nodal_field, weights
     );
   }
 
-  void apply_transpose_increment(
+  void transpose_increment(
       const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights = {}) const override {
     PYBIND11_OVERRIDE_PURE(
       void,
       ConvolutionOperatorBase,
-      apply_transpose,
+      transpose,
       quadrature_point_field, alpha, nodal_field, weights
     );
   }
@@ -135,11 +135,10 @@ public:
 
 
 // Bind class GraidentOperatorBase 
-void add_gradient_operator_base(py::module & mod) {
+void add_convolution_operator_base(py::module & mod) {
   py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
     .def(py::init<>())
-    .def("apply_gradient", &ConvolutionOperatorBase::apply_gradient,
-         "nodal_field"_a, "quadrature_point_field"_a)
+    .def("apply", &ConvolutionOperatorBase::apply, "nodal_field"_a, "quadrature_point_field"_a)
     .def("get_nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
     .def("get_nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
     .def("get_spatial_dim", &ConvolutionOperatorBase::get_spatial_dim)
@@ -148,27 +147,20 @@ void add_gradient_operator_base(py::module & mod) {
 
 
 // Bind class ConvolutionOperatorDefault
-void add_gradient_operator_default(py::module & mod) {
+void add_convolution_operator_default(py::module & mod) {
   py::class_<ConvolutionOperatorDefault, ConvolutionOperatorBase>(mod, "ConvolutionOperatorDefault")
-    .def(py::init<const Index_t &, const Index_t &, 
-         const Index_t &, const Index_t &, const Index_t &,
-         const std::vector<std::vector<Eigen::MatrixXd>> &,
-         const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &>(),
-         "spatial_dim"_a, "nb_quad_pts"_a, "nb_elements"_a, "nb_elemnodal_pts"_a,
-         "nb_pixelnodal_pts"_a, "shape_fn_gradients"_a, "nodal_pts"_a)
-    .def("apply_gradient", &ConvolutionOperatorDefault::apply_gradient,
-      "nodal_field"_a, "quadrature_point_field"_a)
-    .def_property_readonly("pixel_gradient", &ConvolutionOperatorDefault::get_pixel_gradient)
+    .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Index_t &, const Index_t &, const Index_t &>(),
+      "pixel_operator"_a, "spatial_dim"_a, "nb_quad_pts"_a, "nb_pixelnodal_pts"_a)
+    .def("apply", &ConvolutionOperatorDefault::apply, "nodal_field"_a, "quadrature_point_field"_a)
+    .def_property_readonly("pixel_operator", &ConvolutionOperatorDefault::get_pixel_operator)
     .def_property_readonly("spatial_dim", &ConvolutionOperatorDefault::get_spatial_dim)
-    .def_property_readonly("nb_quad_pts", &ConvolutionOperatorDefault::get_nb_quad_pts_per_element)
-    .def_property_readonly("nb_elements", &ConvolutionOperatorDefault::get_nb_elements)
-    //  .def_property_readonly("nb_elemnodal_pts", &ConvolutionOperatorDefault::???)
-    .def_property_readonly("nb_pixelnodal_pts", &ConvolutionOperatorDefault::get_nb_nodal_pts)
+    .def_property_readonly("nb_quad_pts", &ConvolutionOperatorDefault::get_nb_quad_pts)
+    .def_property_readonly("nb_nodal_pts", &ConvolutionOperatorDefault::get_nb_nodal_pts)
     ;
 }
 
 
-void add_gradient_classes(py::module & mod) {
-  add_gradient_operator_base(mod);
-  add_gradient_operator_default(mod);
+void add_convolution_operator_classes(py::module & mod) {
+  add_convolution_operator_base(mod);
+  add_convolution_operator_default(mod);
 }

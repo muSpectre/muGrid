@@ -123,7 +123,7 @@ namespace muGrid {
      *                               written. Defined on quadrature points.
      */
     virtual void
-    apply_gradient(const TypedFieldBase<Real> & nodal_field,
+    apply(const TypedFieldBase<Real> & nodal_field,
                    TypedFieldBase<Real> & quadrature_point_field) const = 0;
 
     /**
@@ -139,7 +139,7 @@ namespace muGrid {
      * @param quadrature_point_field The field to which the scaled gradient is
      *                               added. Defined on quadrature points.
      */
-    virtual void apply_gradient_increment(
+    virtual void apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const = 0;
 
@@ -157,7 +157,7 @@ namespace muGrid {
      *                version of the discretised divergence is returned.
      */
     virtual void
-    apply_transpose(const TypedFieldBase<Real> & quadrature_point_field,
+    transpose(const TypedFieldBase<Real> & quadrature_point_field,
                     TypedFieldBase<Real> & nodal_field,
                     const std::vector<Real> & weights = {}) const = 0;
 
@@ -176,7 +176,7 @@ namespace muGrid {
      * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
      *                version of the discretised divergence is returned.
      */
-    virtual void apply_transpose_increment(
+    virtual void transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights = {}) const = 0;

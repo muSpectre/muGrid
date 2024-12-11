@@ -923,7 +923,7 @@ namespace muGrid {
       //! return index for a ccoord
       Index_t get_index(const Ccoord & ccoord) const {
         return muGrid::CcoordOps::get_index(this->get_nb_grid_pts(),
-                                            this->get_location(), ccoord);
+                                            this->get_subdomain_locations(), ccoord);
       }
 
       //! return coordinates of the i-th pixel

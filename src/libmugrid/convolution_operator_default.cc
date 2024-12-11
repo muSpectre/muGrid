@@ -45,6 +45,10 @@
 
 namespace muGrid {
 
+  /* In right multiplication (B = A * permutation), it maps the i-th column 
+   * of matrix A to the j-th column of matrix B, with (i, j) the indices 
+   * of ones entered in the permutation matrix.
+   */
   Eigen::MatrixXd permutation(const Eigen::VectorXi & nodal_indices,
                               const Eigen::MatrixXi & pixel_offsets,
                               const Index_t & nb_pixelnodes) {
@@ -85,36 +89,34 @@ namespace muGrid {
       const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &
           nodal_pts)
       : Parent{}, spatial_dim{spatial_dim}, nb_quad_pts{nb_quad_pts},
-        nb_elements{nb_elements}, nb_elemnodal_pts{nb_elemnodal_pts},
         nb_pixelnodal_pts{nb_pixelnodal_pts},
         nb_possible_nodal_contribution{ipow(2, this->spatial_dim) *
                                        this->nb_pixelnodal_pts},
         // TODO(junge): Check with Martin whether this can be true. Why does it
         // not depend on rank?
-        nb_grad_component_per_pixel{this->spatial_dim * this->nb_quad_pts *
-                                    this->nb_elements} {
-    this->pixel_gradient.resize(nb_grad_component_per_pixel,
+        nb_grad_component_per_pixel{this->spatial_dim * this->nb_quad_pts} {
+    this->pixel_operator.resize(nb_grad_component_per_pixel,
                                 nb_possible_nodal_contribution);
     std::cout << "A" << std::endl;
     Index_t counter{0};
-    for (Index_t e{0}; e < this->nb_elements; ++e) {
+    for (Index_t e{0}; e < nb_elements; ++e) {
       auto & nodal_indices{std::get<0>(nodal_pts.at(e))};  // n of (n,(i,j,k))
       auto & nodal_pix_coords{
           std::get<1>(nodal_pts.at(e))};  // (i,j,k) of (n,(i,j,k))
 
-      if (nodal_indices.rows() != this->nb_elemnodal_pts) {
+      if (nodal_indices.rows() != nb_elemnodal_pts) {
         std::stringstream err_msg{};
         err_msg << "Size mismatch: Expected a vector with "
-                << this->nb_elemnodal_pts
+                << nb_elemnodal_pts
                 << " entries (number of nodes per element). but received a "
                    "vector of size "
                 << nodal_indices.rows();
         throw RuntimeError{err_msg.str()};
       }
-      if (nodal_pix_coords.rows() != this->nb_elemnodal_pts) {
+      if (nodal_pix_coords.rows() != nb_elemnodal_pts) {
         std::stringstream err_msg{};
         err_msg << "Size mismatch: Expected a vector with "
-                << this->nb_elemnodal_pts
+                << nb_elemnodal_pts
                 << " entries (number of nodes per element). but received a "
                    "vector of size "
                 << nodal_pix_coords.rows();
@@ -144,10 +146,10 @@ namespace muGrid {
                   << grad.rows();
           throw RuntimeError{err_msg.str()};
         }
-        if (grad.cols() != this->nb_elemnodal_pts) {
+        if (grad.cols() != nb_elemnodal_pts) {
           std::stringstream err_msg{};
           err_msg << "Size mismatch: Expected a vector with "
-                  << this->nb_elemnodal_pts
+                  << nb_elemnodal_pts
                   << " entries (spatial dimension). but received a "
                      "vector of size "
                   << grad.cols();
@@ -156,9 +158,10 @@ namespace muGrid {
 
         std::cout << "BB" << std::endl;
 
-        auto && gradient_block{this->pixel_gradient.block(
+        auto && gradient_block{this->pixel_operator.block(
             this->spatial_dim * counter++, 0, this->spatial_dim,
             nb_possible_nodal_contribution)};
+        // Compose B matrix from shape function gradients.
         gradient_block.noalias() = grad * permutation_matrix;
       }
     }
@@ -168,15 +171,46 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply_gradient(
+  ConvolutionOperatorDefault::ConvolutionOperatorDefault(
+      const Eigen::MatrixXd & pixel_operator,
+      const Index_t & spatial_dim,
+      const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts)
+    : Parent{}, pixel_operator{pixel_operator}, spatial_dim{spatial_dim},
+        nb_quad_pts{nb_quad_pts}, nb_pixelnodal_pts{nb_pixelnodal_pts},
+        nb_possible_nodal_contribution{ipow(2, this->spatial_dim) *
+                                       this->nb_pixelnodal_pts},
+        nb_grad_component_per_pixel{this->spatial_dim * this->nb_quad_pts} {
+      // Check the dimension of the pixel operator
+      if (pixel_operator.cols() != nb_possible_nodal_contribution) {
+        std::stringstream err_msg{};
+        err_msg << "Size mismatch: Expected a vector with "
+                << nb_possible_nodal_contribution
+                << " entries (number of nodes per element). but received a "
+                   "vector of size "
+                << pixel_operator.cols();
+        throw RuntimeError{err_msg.str()};
+      }
+      if (pixel_operator.rows() != nb_grad_component_per_pixel) {
+        std::stringstream err_msg{};
+        err_msg << "Size mismatch: Expected a vector with "
+                << nb_grad_component_per_pixel
+                << " entries (number of nodes per element). but received a "
+                   "vector of size "
+                << pixel_operator.rows();
+        throw RuntimeError{err_msg.str()};
+      }
+    }
+
+  /* ---------------------------------------------------------------------- */
+  void ConvolutionOperatorDefault::apply(
       const TypedFieldBase<Real> & nodal_field,
       TypedFieldBase<Real> & quadrature_point_field) const {
     quadrature_point_field.set_zero();
-    this->apply_gradient_increment(nodal_field, 1., quadrature_point_field);
+    this->apply_increment(nodal_field, 1., quadrature_point_field);
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply_gradient_increment(
+  void ConvolutionOperatorDefault::apply_increment(
       const TypedFieldBase<Real> & nodal_field, const Real & alpha,
       TypedFieldBase<Real> & quadrature_point_field) const {
     if (not quadrature_point_field.is_global()) {
@@ -223,7 +257,9 @@ namespace muGrid {
     auto & pixels{collection.get_pixels()};
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
+    // Offsets of nodes connected by a pixel
     CcoordOps::DynamicPixels offsets{CcoordOps::get_cube(this->spatial_dim, 2)};
+    // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {
       auto && id{std::get<0>(id_base_ccoord)};
       auto && base_ccoord{std::get<1>(id_base_ccoord)};
@@ -231,6 +267,7 @@ namespace muGrid {
       // get the quadrature point value relative to this pixel
       auto && grad_val{quad_map[id]};  // [ u_x[q1], u_y[q1], u_x[q2], u_y[q2]]
 
+      // For each node connected to the current pixel...
       for (auto && tup : akantu::enumerate(offsets)) {
         auto && index{std::get<0>(tup)};
         auto && offset{std::get<1>(tup)};
@@ -239,7 +276,7 @@ namespace muGrid {
         // get the right chunk of B: This chunk represents the contribution of
         // the nodal point values in this current offset pixel to the the
         // gradients of the base pixel
-        auto && B_block{this->pixel_gradient.block(
+        auto && B_block{this->pixel_operator.block(
             0, index * this->nb_pixelnodal_pts,
             this->nb_grad_component_per_pixel, this->nb_pixelnodal_pts)};
         // get the nodal values relative to B-chunk
@@ -251,18 +288,18 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply_transpose(
+  void ConvolutionOperatorDefault::transpose(
       const TypedFieldBase<Real> & quadrature_point_field,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
     // set nodal field to zero
     nodal_field.set_zero();
-    this->apply_transpose_increment(quadrature_point_field, 1., nodal_field,
+    this->transpose_increment(quadrature_point_field, 1., nodal_field,
                                     weights);
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply_transpose_increment(
+  void ConvolutionOperatorDefault::transpose_increment(
       const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
@@ -334,7 +371,7 @@ namespace muGrid {
         // get the right chunk of B: This chunk represents the contribution of
         // the gradients of the base pixel to the
         // in this current offset pixel nodal point values
-        auto && B_block{this->pixel_gradient.block(
+        auto && B_block{this->pixel_operator.block(
             0, index * this->nb_pixelnodal_pts,
             this->nb_grad_component_per_pixel, this->nb_pixelnodal_pts)};
 
@@ -348,13 +385,13 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const Eigen::MatrixXd &
-  ConvolutionOperatorDefault::get_pixel_gradient() const {
-    return this->pixel_gradient;
+  ConvolutionOperatorDefault::get_pixel_operator() const {
+    return this->pixel_operator;
   }
 
   /* ---------------------------------------------------------------------- */
   Index_t ConvolutionOperatorDefault::get_nb_quad_pts() const {
-    return this->nb_quad_pts * this->nb_elements;
+    return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -365,17 +402,6 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   Index_t ConvolutionOperatorDefault::get_spatial_dim() const {
     return this->spatial_dim;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  const Index_t &
-  ConvolutionOperatorDefault::get_nb_quad_pts_per_element() const {
-    return this->nb_quad_pts;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  const Index_t & ConvolutionOperatorDefault::get_nb_elements() const {
-    return this->nb_elements;
   }
 
 }  // namespace muGrid
