@@ -34,57 +34,76 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import functools
+
 import unittest
 import numpy as np
 
 import muGrid
 
 
+verbose = True
+
+
 class ConvolutionOperatorCheck(unittest.TestCase):
-    _rng = np.random.default_rng()
 
-    def test_gradient(self):
+    def template_test_apply_in_2D_field(self, n_component: int):
         # Create a 2D grid
-        nx = 3  # number of pixels in x axis
-        ny = 4  # number of pixels in y axis
-        n_quad = 2  # number of quadrature points in one pixel
-        fc = muGrid.GlobalFieldCollection((nx, ny), sub_pts={'quad': n_quad})
-
-        # Fill the node with random values (scalar)
-        nodal = fc.real_field('nodal-value')
-        nodal.p = self._rng.random((nx, ny))
-
-        # Create a quadrature field to hold values
         n_dim = 2
-        quad = fc.real_field('quad-grad', n_dim, 'quad')
-        n_nodal_pixel = 1
+        nx = 3        # number of pixels in x axis
+        ny = 3        # number of pixels in y axis
+        n_sub_pt = 2  # number of sub-points (e.g. quadrature) in one pixel
+        fc = muGrid.GlobalFieldCollection((nx, ny), sub_pts={'quad': n_sub_pt})
+
+        # Fill the node with some scalar values
+        nodal = fc.real_field('nodal-value', n_component)
+        nodal.p = np.arange(n_component * nx * ny).reshape(n_component, nx, ny)
+        if verbose:
+            print(f"\nnodal: shape={nodal.shape}, value=\n{nodal.p}")
 
         # Create the pixel-wise gradient operator
-        qx = 1 / nx
-        qy = 1 / ny
-        pixel_gradient = np.array([[-qx, qx, .0, .0],
-                                   [-qy, .0, .0, qy],
-                                   [ .0, .0, qx,-qx],
-                                   [ .0,-qy, qy, .0]], dtype=float)
-        d_op = muGrid.ConvolutionOperatorDefault(pixel_gradient, n_dim, n_quad, n_nodal_pixel)
+        d = 10
+        # Set values such that the eventual values at different sub-points are different,
+        # though they are not necessarily gradients.
+        pixel_gradient = np.array([[d, .0, .0, .0],
+                                   [.0, .0, d, .0],
+                                   [.0, d, .0, .0],
+                                   [.0, .0, .0, d]], dtype=float)
+        n_nodal_pixel = 1
+        d_op = muGrid.ConvolutionOperatorDefault(pixel_gradient, n_dim, n_sub_pt, n_nodal_pixel)
+
+        # Create a quadrature field to hold derivatives
+        quad = fc.real_field('quad-grad', n_dim*n_component, 'quad')
 
         # Apply the graident operator
         d_op.apply(nodal, quad)
+        grad_get_s = quad.s.reshape(n_dim, n_component, n_sub_pt, nx, ny)
+        grad_get_p = quad.p.reshape(n_sub_pt, n_dim, n_component, nx, ny)
 
         # Create a pack of nodal values, each with a different offset
-        # NOTE:
-        # - np.roll create copies. But it is okay for testing.
-        # - the shift is the negation of the offset
         offset_00 = nodal.p
-        offset_10 = np.roll(nodal.p, (-1,0), axis=(0,1))
-        offset_01 = np.roll(nodal.p, (0,-1), axis=(0,1))
-        offset_11 = np.roll(nodal.p, (-1,-1), axis=(0,1))
+        offset_10 = np.roll(nodal.p, (-1,0), axis=(-2,-1))
+        offset_01 = np.roll(nodal.p, (0,-1), axis=(-2,-1))
+        offset_11 = np.roll(nodal.p, (-1,-1), axis=(-2,-1))
+        # NOTE: The oder of offset must keep the same as impelemented in lib
         offset_nodes = np.stack((offset_00, offset_10, offset_01, offset_11), axis=0)
+        n_offset = np.size(offset_nodes, axis=0)
+
         # Compute the reference value
-        grad_ref = np.einsum("rn,nxy->rxy", pixel_gradient, offset_nodes)
+        pixel_gradient = pixel_gradient.reshape(n_sub_pt, n_dim, n_offset)
+        if verbose:
+            print(f"\nideal operator: shape={pixel_gradient.shape}, value=\n{pixel_gradient}")
+
+        grad_ref_s = np.einsum("sdo,ocxy->dcsxy", pixel_gradient, offset_nodes)
+        grad_ref_p = np.einsum("sdo,ocxy->sdcxy", pixel_gradient, offset_nodes)
 
         # Check
-        np.testing.assert_allclose(quad.p, grad_ref)
+        np.testing.assert_allclose(grad_get_s, grad_ref_s)
+        np.testing.assert_allclose(grad_get_p, grad_ref_p)
+
+
+    test_apply_2D_field_scalar = functools.partialmethod(template_test_apply_in_2D_field, n_component = 1)
+    test_apply_2D_field_3D_vector = functools.partialmethod(template_test_apply_in_2D_field, n_component = 3)
 
 
 if __name__ == '__main__':
