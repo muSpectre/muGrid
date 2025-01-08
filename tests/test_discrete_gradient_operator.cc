@@ -38,7 +38,7 @@
 #include "test_goodies.hh"
 #include "test_discrete_gradient_operator.hh"
 
-#include "libmugrid/convolution_operator_default.hh"
+#include "libmugrid/gradient_operator.hh"
 #include "libmugrid/field_collection_global.hh"
 #include "libmugrid/mapped_field.hh"
 

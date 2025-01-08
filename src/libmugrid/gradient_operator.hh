@@ -47,7 +47,7 @@
 namespace muGrid {
 
   /**
-   * @class ConvolutionOperatorDefault
+   * @class GradientOperator
    * @brief Implements gradient operations based on shape function gradients.
    *
    * This class extends ConvolutionOperatorBase to provide specific implementations
@@ -59,15 +59,15 @@ namespace muGrid {
    * @note This class cannot be instantiated directly and does not support copy
    *       construction or copy assignment.
    */
-  class ConvolutionOperatorDefault : public ConvolutionOperatorBase {
+  class GradientOperator : public ConvolutionOperatorBase {
    public:
     using Parent = ConvolutionOperatorBase;
 
     //! Default constructor is deleted to prevent instantiation.
-    ConvolutionOperatorDefault() = delete;
+    GradientOperator() = delete;
 
     /**
-     * @brief Constructs a ConvolutionOperatorDefault object.
+     * @brief Constructs a GradientOperator object.
      *
      * Initializes the gradient operator with the provided spatial dimensions,
      * number of quadrature points, elements, nodal points, and shape function
@@ -83,7 +83,7 @@ namespace muGrid {
      * @param nodal_pts Nodal point indices composed of nodal point index within
      *        a pixel and pixel coordinate offset.
      */
-    ConvolutionOperatorDefault(
+    GradientOperator(
         const Index_t & spatial_dim, const Index_t & nb_quad_pts,
         const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
         const Index_t & nb_pixelnodal_pts,
@@ -92,37 +92,37 @@ namespace muGrid {
             nodal_pts);
 
     /**
-     * @brief Constructs a ConvolutionOperatorDefault object.
+     * @brief Constructs a GradientOperator object.
      *
      * Initializes the gradient operator with the provided pixel operator,
      * spatial dimensions, number of quadrature points, nodal points.
      *
      * @param pixel_operator The pixel-wise operator.
      * @param spatial_dim Spatial dimension of the pixel.
-     * @param nb_quad_pts Number of quadrature points per element.
+     * @param nb_quad_pts Number of quadrature points per pixel.
      * @param nb_pixelnodal_pts Number of nodal points per pixel.
      */
-    ConvolutionOperatorDefault(
-      const Eigen::MatrixXd & pixel_operator,
-      const Index_t & spatial_dim,
-      const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts);
+    GradientOperator(
+        const Eigen::MatrixXd & pixel_operator,
+        const Index_t & spatial_dim,
+        const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts);
 
     //! Copy constructor
-    ConvolutionOperatorDefault(const ConvolutionOperatorDefault & other) = delete;
+    GradientOperator(const GradientOperator & other) = delete;
 
     //! Move constructor
-    ConvolutionOperatorDefault(ConvolutionOperatorDefault && other) = default;
+    GradientOperator(GradientOperator && other) = default;
 
     //! Destructor
-    virtual ~ConvolutionOperatorDefault() = default;
+    virtual ~GradientOperator() = default;
 
     //! Copy assignment operator
-    ConvolutionOperatorDefault &
-    operator=(const ConvolutionOperatorDefault & other) = delete;
+    GradientOperator &
+    operator=(const GradientOperator & other) = delete;
 
     //! Move assignment operator
-    ConvolutionOperatorDefault &
-    operator=(ConvolutionOperatorDefault && other) = default;
+    GradientOperator &
+    operator=(GradientOperator && other) = default;
 
     /**
      * Evaluates the gradient of nodal_field into quadrature_point_field
