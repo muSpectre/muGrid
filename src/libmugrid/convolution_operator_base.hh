@@ -37,8 +37,8 @@
 #include "grid_common.hh"
 #include "field_typed.hh"
 
-#ifndef SRC_LIBMUGRID_GRADIENT_OPERATOR_BASE_HH_
-#define SRC_LIBMUGRID_GRADIENT_OPERATOR_BASE_HH_
+#ifndef SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
+#define SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
 
 namespace muGrid {
 
@@ -215,4 +215,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_GRADIENT_OPERATOR_BASE_HH_
+#endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
