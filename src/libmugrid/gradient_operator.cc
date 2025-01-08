@@ -199,14 +199,6 @@ namespace muGrid {
     }
 
   /* ---------------------------------------------------------------------- */
-  GradientOperator::GradientOperator(
-    const Eigen::MatrixXd & pixel_operator,
-    const Index_t & spatial_dim,
-    const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts)
-  : Parent{}, pixel_operator{pixel_operator}, spatial_dim{spatial_dim},
-      nb_quad_pts{nb_quad_pts}, nb_pixelnodal_pts{nb_pixelnodal_pts} {}
-
-  /* ---------------------------------------------------------------------- */
   void GradientOperator::apply(
       const TypedFieldBase<Real> & nodal_field,
       TypedFieldBase<Real> & quadrature_point_field) const {

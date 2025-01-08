@@ -41,8 +41,8 @@
 
 #include <vector>
 
-#ifndef SRC_LIBMUGRID_GRADIENT_OPERATOR_DEFAULT_HH_
-#define SRC_LIBMUGRID_GRADIENT_OPERATOR_DEFAULT_HH_
+#ifndef SRC_LIBMUGRID_GRADIENT_OPERATOR_HH_
+#define SRC_LIBMUGRID_GRADIENT_OPERATOR_HH_
 
 namespace muGrid {
 
@@ -228,4 +228,4 @@ namespace muGrid {
   };
 
 }  // namespace muGrid
-#endif  // SRC_LIBMUGRID_GRADIENT_OPERATOR_DEFAULT_HH_
+#endif  // SRC_LIBMUGRID_GRADIENT_OPERATOR_HH_

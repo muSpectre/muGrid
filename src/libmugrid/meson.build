@@ -13,6 +13,7 @@ mugrid_sources = [
     'grid_common.cc',
     'ccoord_operations.cc',
     'convolution_operator_default.cc',
+    'gradient_operator.cc',
     'field_collection.cc',
     'field_collection_global.cc',
     'field_collection_local.cc',
