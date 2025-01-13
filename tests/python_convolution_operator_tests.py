@@ -48,38 +48,38 @@ verbose = True
 class ConvolutionOperatorCheck(unittest.TestCase):
 
     def template_test_apply_in_2D_field(self, n_component: int):
-        # Create a 2D grid
-        n_dim = 2
-        nx = 3        # number of pixels in x axis
-        ny = 3        # number of pixels in y axis
-        n_sub_pt = 2  # number of sub-points (e.g. quadrature) in one pixel
-        fc = muGrid.GlobalFieldCollection((nx, ny), sub_pts={'quad': n_sub_pt})
-
-        # Fill the node with some scalar values
-        nodal = fc.real_field('nodal-value', n_component)
-        nodal.p = np.arange(n_component * nx * ny).reshape(n_component, nx, ny)
-        if verbose:
-            print(f"\nnodal: shape={nodal.shape}, value=\n{nodal.p}")
-
-        # Create the pixel-wise gradient operator
-        d = 10
-        # Set values such that the eventual values at different sub-points are different,
-        # though they are not necessarily gradients.
-        pixel_gradient = np.array([[d, .0, .0, .0],
-                                   [.0, .0, d, .0],
-                                   [.0, d, .0, .0],
-                                   [.0, .0, .0, d]], dtype=float)
+        # Create a pixel-wise operator
+        pixel_map = np.array([[1e1, .0, .0, .0],
+                              [-1e1, .0, .0, .0],
+                              [.0, 1e2, .0, .0],
+                              [.0, -1e2, .0, .0],
+                              [.0, .0, 1e3, .0],
+                              [.0, .0, -1e3, .0],
+                              [.0, .0, .0, 1e4],
+                              [.0, .0, .0, -1e4]], dtype=float, order='F')
         n_nodal_pixel = 1
-        d_op = muGrid.ConvolutionOperatorDefault(pixel_gradient, n_dim, n_sub_pt, n_nodal_pixel)
+        n_operators = 2
+        n_quad = 4
+        assert n_operators * n_quad == pixel_map.shape[0]
+        d_op = muGrid.ConvolutionOperatorDefault(pixel_map, (2, 2), n_component, n_nodal_pixel, n_quad, n_operators)
 
-        # Create a quadrature field to hold derivatives
-        quad = fc.real_field('quad-grad', n_dim*n_component, 'quad')
+        # Create a 2D grid
+        nx = 3      # number of pixels in x axis
+        ny = 3      # number of pixels in y axis
+        fc = muGrid.GlobalFieldCollection((nx, ny), sub_pts={'quad': n_quad})
+
+        # A nodal field with some sequence as values
+        nodal = fc.real_field('nodal-value', n_component)
+        values = 1 + np.arange(n_component * nx * ny)
+        nodal.p = values.reshape(n_component, nx, ny, order='F')
+
+        # Create a quadrature field to store the result
+        quad = fc.real_field('quad-grad', (n_component, n_operators), 'quad')
 
         # Apply the graident operator
         d_op.apply(nodal, quad)
-        grad_get_s = quad.s.reshape(n_dim, n_component, n_sub_pt, nx, ny)
-        grad_get_p = quad.p.reshape(n_sub_pt, n_dim, n_component, nx, ny)
 
+        # Compute the reference value
         # Create a pack of nodal values, each with a different offset
         offset_00 = nodal.p
         offset_10 = np.roll(nodal.p, (-1,0), axis=(-2,-1))
@@ -87,19 +87,31 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         offset_11 = np.roll(nodal.p, (-1,-1), axis=(-2,-1))
         # NOTE: The oder of offset must keep the same as impelemented in lib
         offset_nodes = np.stack((offset_00, offset_10, offset_01, offset_11), axis=0)
-        n_offset = np.size(offset_nodes, axis=0)
 
-        # Compute the reference value
-        pixel_gradient = pixel_gradient.reshape(n_sub_pt, n_dim, n_offset)
+        grad_ref_p = np.einsum("do,ocxy->cdxy", pixel_map, offset_nodes)
+        # explicitly split (n_operators * n_quad) into two axes
+        grad_ref_s = grad_ref_p.reshape(n_component, n_operators, n_quad, nx, ny, order='F')
+
+        # Print something
         if verbose:
-            print(f"\nideal operator: shape={pixel_gradient.shape}, value=\n{pixel_gradient}")
-
-        grad_ref_s = np.einsum("sdo,ocxy->dcsxy", pixel_gradient, offset_nodes)
-        grad_ref_p = np.einsum("sdo,ocxy->sdcxy", pixel_gradient, offset_nodes)
+            print(f"\n"
+                  f"NumPy array={values.ravel(order='F')}\n"
+                  f"n_component={n_component}, n_operators={n_operators}, n_quad={n_quad}\n"
+                  f"Operator=\n{d_op.pixel_operator}\n"
+                  f"\n"
+                  f"Nodal field, shape={nodal.shape}\n"
+                  f"value@(0,0)=\n{nodal.p[...,0,0]}\n"
+                  f"value@(1,0)=\n{nodal.p[...,1,0]}\n"
+                  f"value@(0,1)=\n{nodal.p[...,0,1]}\n"
+                  f"value@(1,1)=\n{nodal.p[...,1,1]}\n"
+                  f"\n"
+                  f"Quadrature field, shape={quad.s.shape}\n"
+                  f"value@(0,0)=\n{quad.p[...,0,0]}\n"
+                  f"with the first quadrature=\n{quad.s[...,0,0,0]}\n")
 
         # Check
-        np.testing.assert_allclose(grad_get_s, grad_ref_s)
-        np.testing.assert_allclose(grad_get_p, grad_ref_p)
+        np.testing.assert_allclose(quad.s, grad_ref_s)
+        np.testing.assert_allclose(quad.p, grad_ref_p)
 
 
     test_apply_2D_field_scalar = functools.partialmethod(template_test_apply_in_2D_field, n_component = 1)

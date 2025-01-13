@@ -50,6 +50,7 @@ using muGrid::ConvolutionOperatorDefault;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Index_t;
+using muGrid::Shape_t;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -149,8 +150,10 @@ void add_convolution_operator_base(py::module & mod) {
 // Bind class ConvolutionOperatorDefault
 void add_convolution_operator_default(py::module & mod) {
   py::class_<ConvolutionOperatorDefault, ConvolutionOperatorBase>(mod, "ConvolutionOperatorDefault")
-    .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Index_t &, const Index_t &, const Index_t &>(),
-      "pixel_operator"_a, "spatial_dim"_a, "nb_quad_pts"_a, "nb_pixelnodal_pts"_a)
+    .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &, const Index_t &, 
+        const Index_t &, const Index_t &, const Index_t &>(),
+        "pixel_operator"_a, "conv_pts_shape"_a, "nb_field_comps"_a, "nb_pixelnodal_pts"_a,
+        "nb_quad_pts"_a, "nb_operators"_a)
     .def("apply", &ConvolutionOperatorDefault::apply, "nodal_field"_a, "quadrature_point_field"_a)
     .def_property_readonly("pixel_operator", &ConvolutionOperatorDefault::get_pixel_operator)
     .def_property_readonly("spatial_dim", &ConvolutionOperatorDefault::get_spatial_dim)
