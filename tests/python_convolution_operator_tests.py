@@ -74,7 +74,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         nodal.p = values.reshape(n_component, nx, ny, order='F')
 
         # Create a quadrature field to store the result
-        quad = fc.real_field('quad-grad', (n_component, n_operators), 'quad')
+        quad = fc.real_field('quad-grad', (n_operators, n_component), 'quad')
 
         # Apply the graident operator
         d_op.apply(nodal, quad)
@@ -88,9 +88,9 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         # NOTE: The oder of offset must keep the same as impelemented in lib
         offset_nodes = np.stack((offset_00, offset_10, offset_01, offset_11), axis=0)
 
-        grad_ref_p = np.einsum("do,ocxy->cdxy", pixel_map, offset_nodes)
-        # explicitly split (n_operators * n_quad) into two axes
-        grad_ref_s = grad_ref_p.reshape(n_component, n_operators, n_quad, nx, ny, order='F')
+        pixel_map = pixel_map.reshape(n_operators, n_quad, -1, order='F')
+        grad_ref_s = np.einsum("dqo,ocxy->dcqxy", pixel_map, offset_nodes, order='F')
+        grad_ref_p = grad_ref_s.reshape(n_operators, n_component*n_quad, nx, ny, order='F').squeeze()
 
         # Print something
         if verbose:

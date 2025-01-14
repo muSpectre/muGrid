@@ -131,13 +131,10 @@ namespace muGrid {
       throw RuntimeError{err_msg.str()};
     }
 
-    // nodal field is always represented as a column vector
-    auto nodal_map{nodal_field.get_pixel_map(nb_nodal_component)};
-    /*
-     * quad field has dim column vectors: each row represents the gradient of
-     * one component of the nodal field in each direction
-     */
-    auto quad_map{quadrature_point_field.get_pixel_map(nb_nodal_component)};
+    // interprate nodal field to have shape nb_field_comps x nb_pixelnodal_pts
+    auto nodal_map{nodal_field.get_pixel_map(this->nb_field_comps)};
+    // interparte quad field to have shape nb_operators x (nb_field_comps * nb_quad_pts) 
+    auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
 
     auto & collection{dynamic_cast<GlobalFieldCollection &>(
         quadrature_point_field.get_collection())};
@@ -158,21 +155,28 @@ namespace muGrid {
 
       // For each node involved in the convolution of the current pixel...
       for (auto && tup : akantu::enumerate(conv_space)) {
+        // get the nodal values
         auto && index{std::get<0>(tup)};
         auto && offset{std::get<1>(tup)};
         // FIXME(yizhen): in parallel, it doesn't work
         auto && ccoord{(base_ccoord + offset) % nb_subdomain_grid_pts};
+        // transpose to make the shape compatible for multiplication
+        auto && nodal_vals{nodal_map[pixels.get_index(ccoord)].transpose()};
 
-        // get the right chunk of B: This chunk represents the contribution of
-        // the nodal point values in this current offset pixel to the the
-        // gradients of the base pixel
-        auto && B_block{this->pixel_operator.block(
-            0, index * this->nb_pixelnodal_pts,
-            this->nb_quad_pts*this->nb_operators, this->nb_pixelnodal_pts)};
-        // get the nodal values relative to B-chunk
-        auto && nodal_vals{nodal_map[pixels.get_index(ccoord)]};
-
-        value += alpha * nodal_vals * B_block.transpose();
+        // For each quadrature point in the current pixel...
+        for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; idx_quad++) {
+          // get the chunk that corresponding to this quadrature point
+          auto && quad_vals{value.block(
+              0, idx_quad * this->nb_field_comps,
+              this->nb_operators, this->nb_field_comps)};
+          // get the chunk that represents the contribution of this node to
+          // this quadrature point
+          auto && B_block{this->pixel_operator.block(
+              idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
+              this->nb_operators, this->nb_pixelnodal_pts)};
+          // compute
+          quad_vals += alpha * B_block * nodal_vals;
+        }
       }
     }
   }
