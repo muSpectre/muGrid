@@ -141,9 +141,8 @@ namespace muGrid {
     auto & pixels{collection.get_pixels()};
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
-    // FIXME(yizhen): create offset space according to nb_conv_pts.
     // relative coordinates of the nodal points inside the convolution space
-    CcoordOps::DynamicPixels conv_space{CcoordOps::get_cube(this->spatial_dim, 2)};
+    CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};
 
     // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {
