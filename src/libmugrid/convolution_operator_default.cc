@@ -131,9 +131,11 @@ namespace muGrid {
       throw RuntimeError{err_msg.str()};
     }
 
-    // interprate nodal field to have shape nb_field_comps x nb_pixelnodal_pts
+    // get nodal field map, where the values at one location is interpreted 
+    // as a matrix with [nb_field_comps] rows
     auto nodal_map{nodal_field.get_pixel_map(this->nb_field_comps)};
-    // interparte quad field to have shape nb_operators x (nb_field_comps * nb_quad_pts) 
+    // get quadrature point field map, where the values at one location is 
+    // interpreted as a matrix with [nb_operators] rows
     auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
 
     auto & collection{dynamic_cast<GlobalFieldCollection &>(
@@ -150,7 +152,10 @@ namespace muGrid {
       auto && base_ccoord{std::get<1>(id_base_ccoord)};
 
       // get the quadrature point value relative to this pixel
-      auto && value{quad_map[id]};  // [ u_x[q1], u_y[q1], u_x[q2], u_y[q2]]
+      auto && value{quad_map[id]};
+      // Expected arrangement:
+      // [op1|u_x[q1], op1|u_y[q1], op1|u_x[q2], op1|u_y[q2]]
+      // [op2|u_x[q1], op2|u_y[q1], op2|u_x[q2], op2|u_y[q2]]
 
       // For each node involved in the convolution of the current pixel...
       for (auto && tup : akantu::enumerate(conv_space)) {
@@ -163,7 +168,7 @@ namespace muGrid {
         auto && nodal_vals{nodal_map[pixels.get_index(ccoord)].transpose()};
 
         // For each quadrature point in the current pixel...
-        for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; idx_quad++) {
+        for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; ++idx_quad) {
           // get the chunk that corresponding to this quadrature point
           auto && quad_vals{value.block(
               0, idx_quad * this->nb_field_comps,
