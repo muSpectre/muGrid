@@ -12,7 +12,7 @@ mugrid_sources = [
     'exception.cc',
     'grid_common.cc',
     'ccoord_operations.cc',
-    'convolution_operator_default.cc',
+    'convolution_operator.cc',
     'gradient_operator.cc',
     'field_collection.cc',
     'field_collection_global.cc',

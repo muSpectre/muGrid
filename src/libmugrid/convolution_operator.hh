@@ -47,7 +47,7 @@
 namespace muGrid {
 
   /**
-   * @class ConvolutionOperatorDefault
+   * @class ConvolutionOperator
    * @brief Implements convolution operations that can be applied pixel-wise to
    * the field.
    *
@@ -60,15 +60,15 @@ namespace muGrid {
    * @note This class cannot be instantiated directly and does not support copy
    *       construction or copy assignment.
    */
-  class ConvolutionOperatorDefault : public ConvolutionOperatorBase {
+  class ConvolutionOperator : public ConvolutionOperatorBase {
    public:
     using Parent = ConvolutionOperatorBase;
 
     //! Default constructor is deleted to prevent instantiation.
-    ConvolutionOperatorDefault() = delete;
+    ConvolutionOperator() = delete;
 
     /**
-     * @brief Constructs a ConvolutionOperatorDefault object. It initializes
+     * @brief Constructs a ConvolutionOperator object. It initializes
      * the convolution operator with the provided pixel-wise operator, 
      * and necessary information to indicate its shape.
      *
@@ -79,27 +79,27 @@ namespace muGrid {
      * @param nb_quad_pts Number of quadrature points per pixel.
      * @param nb_operators Number of operators.
      */
-    ConvolutionOperatorDefault(
+    ConvolutionOperator(
         const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
         const Index_t & nb_field_comps, const Index_t & nb_pixelnodal_pts,
         const Index_t & nb_quad_pts, const Index_t & nb_operators);
 
     //! Copy constructor
-    ConvolutionOperatorDefault(const ConvolutionOperatorDefault & other) = delete;
+    ConvolutionOperator(const ConvolutionOperator & other) = delete;
 
     //! Move constructor
-    ConvolutionOperatorDefault(ConvolutionOperatorDefault && other) = default;
+    ConvolutionOperator(ConvolutionOperator && other) = default;
 
     //! Destructor
-    virtual ~ConvolutionOperatorDefault() = default;
+    virtual ~ConvolutionOperator() = default;
 
     //! Copy assignment operator
-    ConvolutionOperatorDefault &
-    operator=(const ConvolutionOperatorDefault & other) = delete;
+    ConvolutionOperator &
+    operator=(const ConvolutionOperator & other) = delete;
 
     //! Move assignment operator
-    ConvolutionOperatorDefault &
-    operator=(ConvolutionOperatorDefault && other) = default;
+    ConvolutionOperator &
+    operator=(ConvolutionOperator && other) = default;
 
     /**
      * Evaluates the gradient of nodal_field into quadrature_point_field

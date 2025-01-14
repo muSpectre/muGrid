@@ -34,7 +34,7 @@
  *
  */
 
-#include "convolution_operator_default.hh"
+#include "convolution_operator.hh"
 #include "grid_common.hh"
 #include "field_collection_global.hh"
 #include "field_map.hh"
@@ -47,7 +47,7 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  ConvolutionOperatorDefault::ConvolutionOperatorDefault(
+  ConvolutionOperator::ConvolutionOperator(
       const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
       const Index_t & nb_field_comps, const Index_t & nb_pixelnodal_pts,
       const Index_t & nb_quad_pts, const Index_t & nb_operators)
@@ -78,7 +78,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply(
+  void ConvolutionOperator::apply(
       const TypedFieldBase<Real> & nodal_field,
       TypedFieldBase<Real> & quadrature_point_field) const {
     quadrature_point_field.set_zero();
@@ -86,7 +86,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply_increment(
+  void ConvolutionOperator::apply_increment(
       const TypedFieldBase<Real> & nodal_field, const Real & alpha,
       TypedFieldBase<Real> & quadrature_point_field) const {
     if (not quadrature_point_field.is_global()) {
@@ -186,7 +186,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::transpose(
+  void ConvolutionOperator::transpose(
       const TypedFieldBase<Real> & quadrature_point_field,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
@@ -197,7 +197,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::transpose_increment(
+  void ConvolutionOperator::transpose_increment(
       const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
@@ -283,22 +283,22 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const Eigen::MatrixXd &
-  ConvolutionOperatorDefault::get_pixel_operator() const {
+  ConvolutionOperator::get_pixel_operator() const {
     return this->pixel_operator;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperatorDefault::get_nb_quad_pts() const {
+  Index_t ConvolutionOperator::get_nb_quad_pts() const {
     return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperatorDefault::get_nb_nodal_pts() const {
+  Index_t ConvolutionOperator::get_nb_nodal_pts() const {
     return this->nb_pixelnodal_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperatorDefault::get_spatial_dim() const {
+  Index_t ConvolutionOperator::get_spatial_dim() const {
     return this->spatial_dim;
   }
 

@@ -36,7 +36,7 @@
 #include "libmugrid/grid_common.hh"
 #include "libmugrid/field_typed.hh"
 #include "libmugrid/convolution_operator_base.hh"
-#include "libmugrid/convolution_operator_default.hh"
+#include "libmugrid/convolution_operator.hh"
 #include "libmugrid/numpy_tools.hh"
 
 #include <pybind11/pybind11.h>
@@ -46,7 +46,7 @@
 #include <sstream>
 
 using muGrid::ConvolutionOperatorBase;
-using muGrid::ConvolutionOperatorDefault;
+using muGrid::ConvolutionOperator;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Index_t;
@@ -147,18 +147,18 @@ void add_convolution_operator_base(py::module & mod) {
 }
 
 
-// Bind class ConvolutionOperatorDefault
+// Bind class ConvolutionOperator
 void add_convolution_operator_default(py::module & mod) {
-  py::class_<ConvolutionOperatorDefault, ConvolutionOperatorBase>(mod, "ConvolutionOperatorDefault")
+  py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
     .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &, const Index_t &, 
         const Index_t &, const Index_t &, const Index_t &>(),
         "pixel_operator"_a, "conv_pts_shape"_a, "nb_field_comps"_a, "nb_pixelnodal_pts"_a,
         "nb_quad_pts"_a, "nb_operators"_a)
-    .def("apply", &ConvolutionOperatorDefault::apply, "nodal_field"_a, "quadrature_point_field"_a)
-    .def_property_readonly("pixel_operator", &ConvolutionOperatorDefault::get_pixel_operator)
-    .def_property_readonly("spatial_dim", &ConvolutionOperatorDefault::get_spatial_dim)
-    .def_property_readonly("nb_quad_pts", &ConvolutionOperatorDefault::get_nb_quad_pts)
-    .def_property_readonly("nb_nodal_pts", &ConvolutionOperatorDefault::get_nb_nodal_pts)
+    .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
+    .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
+    .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
+    .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
+    .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)
     ;
 }
 
