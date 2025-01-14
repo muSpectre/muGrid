@@ -42,80 +42,74 @@ import numpy as np
 import muGrid
 
 
-verbose = True
-
-
 class ConvolutionOperatorCheck(unittest.TestCase):
 
-    def template_test_apply_in_2D_field(self, n_component: int):
-        # Create a pixel-wise operator
-        pixel_map = np.array([[1e1, .0, .0, .0],
-                              [-1e1, .0, .0, .0],
-                              [.0, 1e2, .0, .0],
-                              [.0, -1e2, .0, .0],
-                              [.0, .0, 1e3, .0],
-                              [.0, .0, -1e3, .0],
-                              [.0, .0, .0, 1e4],
-                              [.0, .0, .0, -1e4]], dtype=float, order='F')
-        n_nodal_pixel = 1
-        n_operators = 2
-        n_quad = 4
-        assert n_operators * n_quad == pixel_map.shape[0]
-        d_op = muGrid.ConvolutionOperatorDefault(pixel_map, (2, 2), n_component, n_nodal_pixel, n_quad, n_operators)
+    def template_test_apply_in_2D_field(self, nb_field_compos: int):
+        # Parameters
+        nb_x_pts = 5           # number of pixels in x axis
+        nb_y_pts = 4           # number of pixels in y axis
+        nb_operators = 3       # number of operators
+        nb_quad_pts = 2        # number of quadrature points
+        nb_nodalpixel_pts = 1  # number of nodal pixel points
 
-        # Create a 2D grid
-        nx = 3      # number of pixels in x axis
-        ny = 3      # number of pixels in y axis
-        fc = muGrid.GlobalFieldCollection((nx, ny), sub_pts={'quad': n_quad})
+        # Create the operator
+        conv_pts_shape = (2, 3)
+        conv_kern0 = np.array([[1, 0, 0],
+                               [0, 0, 0]], dtype=float)
+        conv_kern1 = np.array([[0, 1, 0],
+                               [0, 0, 0]], dtype=float)
+        conv_kern2 = np.array([[0, 0, 1],
+                               [0, 0, 0]], dtype=float)
+        conv_kern3 = np.array([[0, 0, 0],
+                               [1, 0, 0]], dtype=float)
+        conv_kern4 = np.array([[0, 0, 0],
+                               [0, 1, 0]], dtype=float)
+        conv_kern5 = np.array([[0, 0, 0],
+                               [0, 0, 1]], dtype=float)
+        pixel_map = np.vstack([
+            conv_kern0.ravel(order='F'),
+            conv_kern1.ravel(order='F'),
+            conv_kern2.ravel(order='F'),
+            conv_kern3.ravel(order='F'),
+            conv_kern4.ravel(order='F'),
+            conv_kern5.ravel(order='F')])
+        d_op = muGrid.ConvolutionOperatorDefault(
+            pixel_map, conv_pts_shape, nb_field_compos, nb_nodalpixel_pts, nb_quad_pts, nb_operators)
+
+        # Create the grid
+        fc = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={'quad': nb_quad_pts})
 
         # A nodal field with some sequence as values
-        nodal = fc.real_field('nodal-value', n_component)
-        values = 1 + np.arange(n_component * nx * ny)
-        nodal.p = values.reshape(n_component, nx, ny, order='F')
+        nodal = fc.real_field('nodal-value', nb_field_compos)
+        nodal_vals = 1 + np.arange(nb_field_compos * nb_x_pts * nb_y_pts)
+        nodal.p = nodal_vals.reshape(nb_field_compos, nb_x_pts, nb_y_pts)
 
         # Create a quadrature field to store the result
-        quad = fc.real_field('quad-grad', (n_operators, n_component), 'quad')
+        quad = fc.real_field('quad-grad', (nb_operators, nb_field_compos), 'quad')
 
         # Apply the graident operator
         d_op.apply(nodal, quad)
-
+    
         # Compute the reference value
         # Create a pack of nodal values, each with a different offset
         offset_00 = nodal.p
         offset_10 = np.roll(nodal.p, (-1,0), axis=(-2,-1))
         offset_01 = np.roll(nodal.p, (0,-1), axis=(-2,-1))
         offset_11 = np.roll(nodal.p, (-1,-1), axis=(-2,-1))
-        # NOTE: The oder of offset must keep the same as impelemented in lib
-        offset_nodes = np.stack((offset_00, offset_10, offset_01, offset_11), axis=0)
+        offset_02 = np.roll(nodal.p, (0,-2), axis=(-2,-1))
+        offset_12 = np.roll(nodal.p, (-1,-2), axis=(-2,-1))
+        # NOTE: the offset-ed array must be ordered in column major, as that follows the implementation
+        offset_nodes = np.stack((offset_00, offset_10, offset_01, offset_11, offset_02, offset_12), axis=0)
 
-        pixel_map = pixel_map.reshape(n_operators, n_quad, -1, order='F')
-        grad_ref_s = np.einsum("dqo,ocxy->dcqxy", pixel_map, offset_nodes, order='F')
-        grad_ref_p = grad_ref_s.reshape(n_operators, n_component*n_quad, nx, ny, order='F').squeeze()
-
-        # Print something
-        if verbose:
-            print(f"\n"
-                  f"NumPy array={values.ravel(order='F')}\n"
-                  f"n_component={n_component}, n_operators={n_operators}, n_quad={n_quad}\n"
-                  f"Operator=\n{d_op.pixel_operator}\n"
-                  f"\n"
-                  f"Nodal field, shape={nodal.shape}\n"
-                  f"value@(0,0)=\n{nodal.p[...,0,0]}\n"
-                  f"value@(1,0)=\n{nodal.p[...,1,0]}\n"
-                  f"value@(0,1)=\n{nodal.p[...,0,1]}\n"
-                  f"value@(1,1)=\n{nodal.p[...,1,1]}\n"
-                  f"\n"
-                  f"Quadrature field, shape={quad.s.shape}\n"
-                  f"value@(0,0)=\n{quad.p[...,0,0]}\n"
-                  f"with the first quadrature=\n{quad.s[...,0,0,0]}\n")
+        pixel_map = pixel_map.reshape(nb_operators, nb_quad_pts, -1, order='F')
+        grad_ref_s = np.einsum("dqo,ocxy->dcqxy", pixel_map, offset_nodes)
 
         # Check
         np.testing.assert_allclose(quad.s, grad_ref_s)
-        np.testing.assert_allclose(quad.p, grad_ref_p)
 
-
-    test_apply_2D_field_scalar = functools.partialmethod(template_test_apply_in_2D_field, n_component = 1)
-    test_apply_2D_field_3D_vector = functools.partialmethod(template_test_apply_in_2D_field, n_component = 3)
+    # Test cases of a scalar field & a vector field
+    test_apply_2D_field_scalar = functools.partialmethod(template_test_apply_in_2D_field, nb_field_compos = 1)
+    test_apply_2D_field_3D_vector = functools.partialmethod(template_test_apply_in_2D_field, nb_field_compos = 3)
 
 
 if __name__ == '__main__':
