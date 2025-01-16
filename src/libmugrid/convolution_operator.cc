@@ -284,7 +284,7 @@ namespace muGrid {
               idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
               this->nb_operators, this->nb_pixelnodal_pts).transpose()};
           // compute
-          nodal_vals += alpha * quad_weights[idx_quad] * B_block_T * value;
+          nodal_vals += alpha * quad_weights[idx_quad] * B_block_T * quad_vals;
         }
       }
     }
