@@ -157,7 +157,7 @@ namespace muGrid {
       // [op1|u_x[q1], op1|u_y[q1], op1|u_x[q2], op1|u_y[q2]]
       // [op2|u_x[q1], op2|u_y[q1], op2|u_x[q2], op2|u_y[q2]]
 
-      // For each node involved in the convolution of the current pixel...
+      // For each convolution points involved in the current pixel...
       for (auto && tup : akantu::enumerate(conv_space)) {
         // get the nodal values
         auto && index{std::get<0>(tup)};
@@ -201,13 +201,6 @@ namespace muGrid {
       const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
-    auto && nb_pixel_quad_pts{this->get_nb_quad_pts()};
-    std::vector<Real> use_weights{};
-    bool default_weights{weights.size() == 0};
-    if (default_weights) {
-      use_weights.resize(nb_pixel_quad_pts, 1.);
-    }
-    const auto & quad_weights{default_weights ? use_weights : weights};
     // check quadrature point field type == global
     if (not quadrature_point_field.is_global()) {
       std::stringstream err_msg{};
@@ -240,43 +233,59 @@ namespace muGrid {
       throw RuntimeError{err_msg.str()};
     }
 
-    auto nodal_map{nodal_field.get_pixel_map(nb_nodal_component)};
-    auto quad_map{quadrature_point_field.get_pixel_map(nb_nodal_component)};
+    // get nodal field map, where the values at one location is interpreted 
+    // as a matrix with [nb_field_comps] rows
+    auto nodal_map{nodal_field.get_pixel_map(this->nb_field_comps)};
+    // get quadrature point field map, where the values at one location is 
+    // interpreted as a matrix with [nb_operators] rows
+    auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
+
+    // preprocess weights
+    bool use_default_weights{weights.size() == 0};
+    std::vector<Real> default_weights{};
+    if (use_default_weights) {
+      default_weights.resize(this->nb_quad_pts, 1.);
+    }
+    const auto & quad_weights{use_default_weights ? default_weights : weights};
 
     auto & collection{dynamic_cast<GlobalFieldCollection &>(
         quadrature_point_field.get_collection())};
     auto & pixels{collection.get_pixels()};
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
-    // pixel index offsets for whole stencil of [ij,i+j,ij+,i+j+] in 2D  ...
-    CcoordOps::DynamicPixels conv_space{CcoordOps::get_cube(this->spatial_dim, 2)};
+    // pixel offsets of the points inside the convolution space
+    CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};
 
-    // loop over pixels
+    // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {
-      auto && id{std::get<0>(id_base_ccoord)};  // linear index of pixel
-      auto && base_ccoord{
-          std::get<1>(id_base_ccoord)};  // ijk spatial coords of pixel
+      auto && id{std::get<0>(id_base_ccoord)};
+      auto && base_ccoord{std::get<1>(id_base_ccoord)};
 
       // get the quadrature point value relative to this pixel
-      auto && value{quad_map[id] * quad_weights[id % nb_pixel_quad_pts]};
+      auto && value{quad_map[id]};
 
-      // loop over convolution points
+      // For each convolution points involved in the current pixel...
       for (auto && tup : akantu::enumerate(conv_space)) {
+        // get the nodal values relative to B-chunk
         auto && index{std::get<0>(tup)};
         auto && offset{std::get<1>(tup)};
         auto && ccoord{(base_ccoord + offset) % nb_subdomain_grid_pts};
-
-        // get the right chunk of B: This chunk represents the contribution of
-        // the gradients of the base pixel to the
-        // in this current offset pixel nodal point values
-        auto && B_block{this->pixel_operator.block(
-            0, index * this->nb_pixelnodal_pts,
-            this->nb_field_comps, this->nb_pixelnodal_pts)};
-
-        // get the nodal values relative to B-chunk
         auto && nodal_vals{nodal_map[pixels.get_index(ccoord)]};
 
-        nodal_vals += alpha * value * B_block;
+        // For each quadrature point
+        for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; ++idx_quad) {
+          // get the chunk that corresponding to this quadrature point
+          auto && quad_vals{value.block(
+              0, idx_quad * this->nb_field_comps,
+              this->nb_operators, this->nb_field_comps)};
+          // get the chunk that represents the contribution of this node to
+          // this quadrature point; and transpose it.
+          auto && B_block_T{this->pixel_operator.block(
+              idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
+              this->nb_operators, this->nb_pixelnodal_pts).transpose()};
+          // compute
+          nodal_vals += alpha * quad_weights[idx_quad] * B_block_T * value;
+        }
       }
     }
   }
