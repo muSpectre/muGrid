@@ -34,7 +34,7 @@
  */
 
 #include "libmugrid/grid_common.hh"
-#include "libmugrid/convolution_operator_default.hh"
+#include "libmugrid/gradient_operator.hh"
 
 #ifndef TESTS_LIBMUGRID_TEST_DISCRETE_GRADIENT_OPERATOR_HH_
 #define TESTS_LIBMUGRID_TEST_DISCRETE_GRADIENT_OPERATOR_HH_
@@ -151,7 +151,7 @@ namespace muGrid {
 
       return ret_val;
     }
-    ConvolutionOperatorDefault d_operator;
+    GradientOperator d_operator;
   };
 
   struct FixtureBilinearQuadrilat : public FixtureBase<twoD> {
@@ -285,7 +285,7 @@ namespace muGrid {
 
       return ret_val;
     }
-    ConvolutionOperatorDefault d_operator;
+    GradientOperator d_operator;
   };
 
   constexpr Index_t FixtureTriangularStraight::NbElements;

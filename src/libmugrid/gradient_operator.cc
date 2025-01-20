@@ -34,7 +34,7 @@
  *
  */
 
-#include "convolution_operator_default.hh"
+#include "gradient_operator.hh"
 #include "field_collection_global.hh"
 #include "field_map.hh"
 #include "ccoord_operations.hh"
@@ -81,7 +81,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  ConvolutionOperatorDefault::ConvolutionOperatorDefault(
+  GradientOperator::GradientOperator(
       const Index_t & spatial_dim, const Index_t & nb_quad_pts,
       const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
       const Index_t & nb_pixelnodal_pts,
@@ -94,6 +94,7 @@ namespace muGrid {
                                        this->nb_pixelnodal_pts},
         // TODO(junge): Check with Martin whether this can be true. Why does it
         // not depend on rank?
+        // TODO: use nb_component * nb_elements or even make it multiD
         nb_grad_component_per_pixel{this->spatial_dim * this->nb_quad_pts * nb_elements} {
     this->pixel_operator.resize(nb_grad_component_per_pixel,
                                 nb_possible_nodal_contribution);
@@ -167,7 +168,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  ConvolutionOperatorDefault::ConvolutionOperatorDefault(
+  GradientOperator::GradientOperator(
       const Eigen::MatrixXd & pixel_operator,
       const Index_t & spatial_dim,
       const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts)
@@ -181,8 +182,8 @@ namespace muGrid {
         std::stringstream err_msg{};
         err_msg << "Size mismatch: Expected a vector with "
                 << nb_possible_nodal_contribution
-                << " entries (number of nodes per element). but received a "
-                   "vector of size "
+                << " entries (number of nodal contribution per pixel). but "
+                   "received a vector of size "
                 << pixel_operator.cols();
         throw RuntimeError{err_msg.str()};
       }
@@ -190,15 +191,15 @@ namespace muGrid {
         std::stringstream err_msg{};
         err_msg << "Size mismatch: Expected a vector with "
                 << nb_grad_component_per_pixel
-                << " entries (number of nodes per element). but received a "
-                   "vector of size "
+                << " entries (number of components per pixel). but "
+                   "received a vector of size "
                 << pixel_operator.rows();
         throw RuntimeError{err_msg.str()};
       }
     }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply(
+  void GradientOperator::apply(
       const TypedFieldBase<Real> & nodal_field,
       TypedFieldBase<Real> & quadrature_point_field) const {
     quadrature_point_field.set_zero();
@@ -206,7 +207,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::apply_increment(
+  void GradientOperator::apply_increment(
       const TypedFieldBase<Real> & nodal_field, const Real & alpha,
       TypedFieldBase<Real> & quadrature_point_field) const {
     if (not quadrature_point_field.is_global()) {
@@ -284,7 +285,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::transpose(
+  void GradientOperator::transpose(
       const TypedFieldBase<Real> & quadrature_point_field,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
@@ -295,7 +296,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void ConvolutionOperatorDefault::transpose_increment(
+  void GradientOperator::transpose_increment(
       const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
       TypedFieldBase<Real> & nodal_field,
       const std::vector<Real> & weights) const {
@@ -381,22 +382,22 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const Eigen::MatrixXd &
-  ConvolutionOperatorDefault::get_pixel_operator() const {
+  GradientOperator::get_pixel_operator() const {
     return this->pixel_operator;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperatorDefault::get_nb_quad_pts() const {
+  Index_t GradientOperator::get_nb_quad_pts() const {
     return this->nb_quad_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperatorDefault::get_nb_nodal_pts() const {
+  Index_t GradientOperator::get_nb_nodal_pts() const {
     return this->nb_pixelnodal_pts;
   }
 
   /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperatorDefault::get_spatial_dim() const {
+  Index_t GradientOperator::get_spatial_dim() const {
     return this->spatial_dim;
   }
 

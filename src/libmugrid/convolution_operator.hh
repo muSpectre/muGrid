@@ -41,14 +41,15 @@
 
 #include <vector>
 
-#ifndef SRC_LIBMUGRID_GRADIENT_OPERATOR_DEFAULT_HH_
-#define SRC_LIBMUGRID_GRADIENT_OPERATOR_DEFAULT_HH_
+#ifndef SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
+#define SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
 
 namespace muGrid {
 
   /**
-   * @class ConvolutionOperatorDefault
-   * @brief Implements gradient operations based on shape function gradients.
+   * @class ConvolutionOperator
+   * @brief Implements convolution operations that can be applied pixel-wise to
+   * the field.
    *
    * This class extends ConvolutionOperatorBase to provide specific implementations
    * for gradient and divergence operations based on the shape function
@@ -59,70 +60,46 @@ namespace muGrid {
    * @note This class cannot be instantiated directly and does not support copy
    *       construction or copy assignment.
    */
-  class ConvolutionOperatorDefault : public ConvolutionOperatorBase {
+  class ConvolutionOperator : public ConvolutionOperatorBase {
    public:
     using Parent = ConvolutionOperatorBase;
 
     //! Default constructor is deleted to prevent instantiation.
-    ConvolutionOperatorDefault() = delete;
+    ConvolutionOperator() = delete;
 
     /**
-     * @brief Constructs a ConvolutionOperatorDefault object.
+     * @brief Constructs a ConvolutionOperator object. It initializes
+     * the convolution operator with the provided pixel-wise operator, 
+     * and necessary information to indicate its shape.
      *
-     * Initializes the gradient operator with the provided spatial dimensions,
-     * number of quadrature points, elements, nodal points, and shape function
-     * gradients.
-     *
-     * @param spatial_dim Spatial dimension of the stencil.
-     * @param nb_quad_pts Number of quadrature points per element.
-     * @param nb_elements Number of elements per pixel.
-     * @param nb_elemnodal_pts Number of nodal points per element.
-     * @param nb_pixelnodal_pts Number of nodal points per pixel.
-     * @param shape_fn_gradients Shape function gradients for each quadrature
-     *        point and element.
-     * @param nodal_pts Nodal point indices composed of nodal point index within
-     *        a pixel and pixel coordinate offset.
+     * @param pixel_operator The pixel-wise operator raveled as a matrix.
+     * @param conv_pts_shape Shape of convolution points.
+     * @param nb_field_comps Number of components.
+     * @param nb_pixelnodal_pts Number of pixel nodal points.
+     * @param nb_quad_pts Number of quadrature points per pixel.
+     * @param nb_operators Number of operators.
      */
-    ConvolutionOperatorDefault(
-        const Index_t & spatial_dim, const Index_t & nb_quad_pts,
-        const Index_t & nb_elements, const Index_t & nb_elemnodal_pts,
-        const Index_t & nb_pixelnodal_pts,
-        const std::vector<std::vector<Eigen::MatrixXd>> & shape_fn_gradients,
-        const std::vector<std::tuple<Eigen::VectorXi, Eigen::MatrixXi>> &
-            nodal_pts);
-
-    /**
-     * @brief Constructs a ConvolutionOperatorDefault object.
-     *
-     * Initializes the gradient operator with the provided pixel operator,
-     * spatial dimensions, number of quadrature points, nodal points.
-     *
-     * @param pixel_operator The pixel-wise operator.
-     * @param spatial_dim Spatial dimension of the pixel.
-     * @param nb_quad_pts Number of quadrature points per element.
-     * @param nb_pixelnodal_pts Number of nodal points per pixel.
-     */
-    ConvolutionOperatorDefault(
-      const Eigen::MatrixXd & pixel_operator,
-      const Index_t & spatial_dim,
-      const Index_t & nb_quad_pts, const Index_t & nb_pixelnodal_pts);
+    ConvolutionOperator(
+        const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
+        const Index_t & nb_field_comps, const Index_t & nb_pixelnodal_pts,
+        const Index_t & nb_quad_pts, const Index_t & nb_operators);
 
     //! Copy constructor
-    ConvolutionOperatorDefault(const ConvolutionOperatorDefault & other) = delete;
+    ConvolutionOperator(const ConvolutionOperator & other) = delete;
 
     //! Move constructor
-    ConvolutionOperatorDefault(ConvolutionOperatorDefault && other) = default;
+    ConvolutionOperator(ConvolutionOperator && other) = default;
 
     //! Destructor
-    virtual ~ConvolutionOperatorDefault() = default;
+    virtual ~ConvolutionOperator() = default;
 
     //! Copy assignment operator
-    ConvolutionOperatorDefault &
-    operator=(const ConvolutionOperatorDefault & other) = delete;
+    ConvolutionOperator &
+    operator=(const ConvolutionOperator & other) = delete;
 
     //! Move assignment operator
-    ConvolutionOperatorDefault &
-    operator=(ConvolutionOperatorDefault && other) = default;
+    ConvolutionOperator &
+    operator=(ConvolutionOperator && other) = default;
 
     /**
      * Evaluates the gradient of nodal_field into quadrature_point_field
@@ -179,8 +156,8 @@ namespace muGrid {
         const std::vector<Real> & weights = {}) const final;
 
     /**
-     * Return the gradient matrix linking the nodal degrees of freedom to their
-     * quadrature-point derivatives.
+     * Return the operator matrix linking the nodal degrees of freedom to their
+     * quadrature-point values.
      */
     const Eigen::MatrixXd & get_pixel_operator() const;
 
@@ -190,12 +167,14 @@ namespace muGrid {
      * with each element belonging to any pixel/voxel.
      */
     Index_t get_nb_quad_pts() const final;
+
     /**
      * returns the number of nodal points associated with any pixel/voxel.
      * (Every node belonging to at least one of the elements belonging to any
      * pixel/voxel, without recounting nodes that appear multiple times)
      */
     Index_t get_nb_nodal_pts() const final;
+
     /**
      * return the spatial dimension of this gradient operator
      */
@@ -204,28 +183,40 @@ namespace muGrid {
    protected:
     /**
      * matrix linking the nodal degrees of freedom to their quadrature-point
-     * derivatives.
+     * values.
      */
     Eigen::MatrixXd pixel_operator{};
-    Index_t spatial_dim;
     /**
-     * number of quadrature points per element (e.g.. 4 for linear
+     * number of convolution points, i.e., number of nodal points that is 
+     * invovled in the convolution of one pixel.
+     */
+    Shape_t conv_pts_shape;
+    /** 
+     * number of components of the field quantity. (e.g. 1 for scalar field.)
+     */
+    Index_t nb_field_comps;
+    /**
+     * number of pixel nodal points. When the grid gets complicated,
+     * it shall be divided into sub-grids, where each of them is a 
+     * regular grid. Hence the name "pixel nodal".
+     */
+    Index_t nb_pixelnodal_pts;
+    /**
+     * number of quadrature points per pixel (e.g.. 4 for linear
      * quadrilateral)
      */
     Index_t nb_quad_pts;
-    //! number of nodal points per pixel
-    Index_t nb_pixelnodal_pts;
     /**
-     * number of nodal points that could possibly have an influnce on gradient
-     * values in this pixel. This corresponds to the number of nodal points per
-     * pixel  for this pixel plus the upper neighbour plus the right neighbour
-     * plus the frontal neighbour for a three-dimensional problem.
+     * number of nodal points that is invovled in the convolution of this pixel.
      */
-    Index_t nb_possible_nodal_contribution;
-    // TODO(junge): Check with Martin whether this can be true. Why does it not
-    // depend on rank?
-    Index_t nb_grad_component_per_pixel;
+    Index_t nb_operators;
+    /**
+     * the spatial dimension & number of the nodal points involved in the
+     * convolution of one pixel.
+     */
+    Index_t spatial_dim;
+    Index_t nb_conv_pts;
   };
 
 }  // namespace muGrid
-#endif  // SRC_LIBMUGRID_GRADIENT_OPERATOR_DEFAULT_HH_
+#endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
