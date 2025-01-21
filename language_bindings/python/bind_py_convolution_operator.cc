@@ -150,11 +150,13 @@ void add_convolution_operator_base(py::module & mod) {
 // Bind class ConvolutionOperator
 void add_convolution_operator_default(py::module & mod) {
   py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
-    .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &, const Index_t &, 
+    .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &,
         const Index_t &, const Index_t &, const Index_t &>(),
-        "pixel_operator"_a, "conv_pts_shape"_a, "nb_field_comps"_a, "nb_pixelnodal_pts"_a,
+        "pixel_operator"_a, "conv_pts_shape"_a, "nb_pixelnodal_pts"_a,
         "nb_quad_pts"_a, "nb_operators"_a)
     .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
+    .def("transpose", &ConvolutionOperator::transpose, "quadrature_point_field"_a, 
+        "nodal_field"_a, "weights"_a=std::vector<Real>{})
     .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
     .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
     .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)

@@ -74,7 +74,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
             conv_kern4.ravel(order='F'),
             conv_kern5.ravel(order='F')])
         d_op = muGrid.ConvolutionOperator(
-            pixel_map, conv_pts_shape, nb_field_compos, nb_nodalpixel_pts, nb_quad_pts, nb_operators)
+            pixel_map, conv_pts_shape, nb_nodalpixel_pts, nb_quad_pts, nb_operators)
 
         # Create the grid
         fc = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={'quad': nb_quad_pts})

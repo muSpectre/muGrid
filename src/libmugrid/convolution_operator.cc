@@ -49,10 +49,10 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   ConvolutionOperator::ConvolutionOperator(
       const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
-      const Index_t & nb_field_comps, const Index_t & nb_pixelnodal_pts,
+      const Index_t & nb_pixelnodal_pts,
       const Index_t & nb_quad_pts, const Index_t & nb_operators)
       : Parent{}, pixel_operator{pixel_operator}, conv_pts_shape{conv_pts_shape},
-          nb_field_comps{nb_field_comps}, nb_pixelnodal_pts{nb_pixelnodal_pts},
+          nb_pixelnodal_pts{nb_pixelnodal_pts},
           nb_quad_pts{nb_quad_pts}, nb_operators{nb_operators},
           spatial_dim{static_cast<Index_t>(conv_pts_shape.size())},
           nb_conv_pts{get_nb_from_shape(conv_pts_shape)} {
@@ -105,35 +105,24 @@ namespace muGrid {
     // number of components in the field we'd like to apply the convolution
     Index_t nb_nodal_component{nodal_field.get_nb_components()};
 
-    // check number of components
-    if (nb_nodal_component != this->nb_field_comps) {
+    // number of components in the field where we'd like to write the result
+    Index_t nb_quad_component{quadrature_point_field.get_nb_components()};
+
+    // check if they match
+    if (nb_quad_component != this->nb_operators * nb_nodal_component) {
       std::stringstream err_msg{};
       err_msg << "Size mismatch: Expected a field with "
-              << nb_field_comps
-              << " components but received a field with "
-              << nb_nodal_component
+              << this->nb_operators * nb_nodal_component
+              << " components (number of operators * number of components "
+                "in the nodal field) but received a field with "
+              << nb_quad_component
               << " components.";
       throw RuntimeError{err_msg.str()};
     }
 
-    // number of components in the field where we'd like to write the result
-    Index_t nb_quad_component{quadrature_point_field.get_nb_components()};
-
-    // check number of components
-    if (nb_quad_component != this->nb_operators * this->nb_field_comps) {
-      std::stringstream err_msg{};
-      err_msg << "Size mismatch: Expected a field with "
-              << this->nb_operators * this->nb_field_comps
-              << " components but received a field with "
-              << nb_quad_component
-              << " components."
-              << this->nb_operators << " " << this->nb_field_comps;
-      throw RuntimeError{err_msg.str()};
-    }
-
     // get nodal field map, where the values at one location is interpreted 
-    // as a matrix with [nb_field_comps] rows
-    auto nodal_map{nodal_field.get_pixel_map(this->nb_field_comps)};
+    // as a matrix with [nb_nodal_component] rows
+    auto nodal_map{nodal_field.get_pixel_map(nb_nodal_component)};
     // get quadrature point field map, where the values at one location is 
     // interpreted as a matrix with [nb_operators] rows
     auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
@@ -171,8 +160,8 @@ namespace muGrid {
         for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; ++idx_quad) {
           // get the chunk that corresponding to this quadrature point
           auto && quad_vals{value.block(
-              0, idx_quad * this->nb_field_comps,
-              this->nb_operators, this->nb_field_comps)};
+              0, idx_quad * nb_nodal_component,
+              this->nb_operators, nb_nodal_component)};
           // get the chunk that represents the contribution of this node to
           // this quadrature point
           auto && B_block{this->pixel_operator.block(
@@ -224,18 +213,18 @@ namespace muGrid {
 
     if (nb_quad_component != this->nb_operators * nb_nodal_component) {
       std::stringstream err_msg{};
-      err_msg << "Size mismatch: Expected a vector with "
+      err_msg << "Size mismatch: Expected a field with "
               << this->nb_operators * nb_nodal_component
-              << " entries (number of gradient components in single quad "
-                 "point), but received a "
-                 "vector of size "
-              << nb_quad_component;
+              << " components (number of operators * number of components "
+                "in the nodal field) but received a field with "
+              << nb_quad_component
+              << " components.";
       throw RuntimeError{err_msg.str()};
     }
 
     // get nodal field map, where the values at one location is interpreted 
     // as a matrix with [nb_field_comps] rows
-    auto nodal_map{nodal_field.get_pixel_map(this->nb_field_comps)};
+    auto nodal_map{nodal_field.get_pixel_map(nb_nodal_component)};
     // get quadrature point field map, where the values at one location is 
     // interpreted as a matrix with [nb_operators] rows
     auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
@@ -276,8 +265,8 @@ namespace muGrid {
         for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; ++idx_quad) {
           // get the chunk that corresponding to this quadrature point
           auto && quad_vals{value.block(
-              0, idx_quad * this->nb_field_comps,
-              this->nb_operators, this->nb_field_comps)};
+              0, idx_quad * nb_nodal_component,
+              this->nb_operators, nb_nodal_component)};
           // get the chunk that represents the contribution of this node to
           // this quadrature point; and transpose it.
           auto && B_block_T{this->pixel_operator.block(
