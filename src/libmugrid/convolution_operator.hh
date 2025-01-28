@@ -74,14 +74,13 @@ namespace muGrid {
      *
      * @param pixel_operator The pixel-wise operator raveled as a matrix.
      * @param conv_pts_shape Shape of convolution points.
-     * @param nb_field_comps Number of components.
      * @param nb_pixelnodal_pts Number of pixel nodal points.
      * @param nb_quad_pts Number of quadrature points per pixel.
      * @param nb_operators Number of operators.
      */
     ConvolutionOperator(
         const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
-        const Index_t & nb_field_comps, const Index_t & nb_pixelnodal_pts,
+        const Index_t & nb_pixelnodal_pts,
         const Index_t & nb_quad_pts, const Index_t & nb_operators);
 
     //! Copy constructor
@@ -191,10 +190,6 @@ namespace muGrid {
      * invovled in the convolution of one pixel.
      */
     Shape_t conv_pts_shape;
-    /** 
-     * number of components of the field quantity. (e.g. 1 for scalar field.)
-     */
-    Index_t nb_field_comps;
     /**
      * number of pixel nodal points. When the grid gets complicated,
      * it shall be divided into sub-grids, where each of them is a 
