@@ -253,6 +253,11 @@ namespace muGrid {
     virtual const std::type_info & get_stored_typeid() const = 0;
 
     /**
+     * return the size of the elementary field entry in bytes
+     */
+    virtual const std::size_t get_element_size_in_bytes() const = 0;
+
+    /**
      * assert that the stored type corresponds to the given type id
      */
     void assert_typeid(const std::type_info & type) const;

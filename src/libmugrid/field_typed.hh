@@ -164,6 +164,9 @@ namespace muGrid {
     //! return type of the stored data
     const std::type_info & get_stored_typeid() const final { return typeid(T); }
 
+    //! return the size of the elementary field entry in bytes
+    const std::size_t get_element_size_in_bytes() const final { return sizeof(T); }
+
     //! return a vector map onto the underlying data
     Eigen_map eigen_mat();
     //! return a const vector map onto the underlying data

@@ -151,6 +151,12 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
+  const std::size_t TypedStateField<T>::get_element_size_in_bytes() const {
+    return sizeof(T);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
   TypedField<T> & TypedStateField<T>::current() {
     /*
      * note: this is a downcast, and should usially be done safely with
