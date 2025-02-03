@@ -390,6 +390,60 @@ namespace muGrid {
       return retval;
     }
 
+    //! element-wise addition
+    template <typename T2>
+    DynCcoord<MaxDim, decltype(T{} + T2{})>
+    operator+(const DynCcoord<MaxDim, T2> & other) const {
+      if (this->get_dim() != other.get_dim()) {
+        std::stringstream error{};
+        error << "you are trying to divide a " << this->get_dim()
+              << "-dimensional coord by a " << other.get_dim()
+              << "-dimensional coord element-wise.";
+        throw RuntimeError(error.str());
+      }
+      DynCcoord<MaxDim, decltype(T{} + T2{})> retval(this->get_dim());
+      for (Dim_t i{0}; i < this->get_dim(); ++i) {
+        retval[i] = this->operator[](i) + other[i];
+      }
+      return retval;
+    }
+
+    //! element-wise subtraction
+    template <typename T2>
+    DynCcoord<MaxDim, decltype(T{} - T2{})>
+    operator-(const DynCcoord<MaxDim, T2> & other) const {
+      if (this->get_dim() != other.get_dim()) {
+        std::stringstream error{};
+        error << "you are trying to divide a " << this->get_dim()
+              << "-dimensional coord by a " << other.get_dim()
+              << "-dimensional coord element-wise.";
+        throw RuntimeError(error.str());
+      }
+      DynCcoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
+      for (Dim_t i{0}; i < this->get_dim(); ++i) {
+        retval[i] = this->operator[](i) - other[i];
+      }
+      return retval;
+    }
+
+    //! element-wise multiplication
+    template <typename T2>
+    DynCcoord<MaxDim, decltype(T{} * T2{})>
+    operator*(const DynCcoord<MaxDim, T2> & other) const {
+      if (this->get_dim() != other.get_dim()) {
+        std::stringstream error{};
+        error << "you are trying to divide a " << this->get_dim()
+              << "-dimensional coord by a " << other.get_dim()
+              << "-dimensional coord element-wise.";
+        throw RuntimeError(error.str());
+      }
+      DynCcoord<MaxDim, decltype(T{} * T2{})> retval(this->get_dim());
+      for (Dim_t i{0}; i < this->get_dim(); ++i) {
+        retval[i] = this->operator[](i) * other[i];
+      }
+      return retval;
+    }
+
     //! element-wise division
     template <typename T2>
     DynCcoord<MaxDim, decltype(T{} / T2{})>
