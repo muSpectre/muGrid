@@ -36,7 +36,11 @@
 #include "mpi_context.hh"
 #include "tests.hh"
 
+#include "libmugrid/field_typed.hh"
+#include "libmugrid/field_map.hh"
+#include "libmugrid/ccoord_operations.hh"
 #include "libmugrid/communicator.hh"
+#include "libmugrid/cartesian_decomposition.hh"
 
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(mpi_communicator_test);
@@ -121,8 +125,8 @@ namespace muGrid {
     Int nb_cols_init{0};
 
     // --- full processors ---
-    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>
-        send_mat(nb_rows, nb_cols);
+    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> send_mat(nb_rows,
+                                                                 nb_cols);
 
     for (int col{0}; col < nb_cols; ++col) {
       send_mat.col(col) = send_mat.col(col).Ones(nb_rows, 1) * (rank + col);
@@ -239,8 +243,7 @@ namespace muGrid {
       send_col_vec(col) = rank + col;
     }
 
-    auto res_col_vec{
-        comm.template gather<Real>(send_col_vec)};
+    auto res_col_vec{comm.template gather<Real>(send_col_vec)};
 
     counter = 0;
     int offset{0};
@@ -251,6 +254,57 @@ namespace muGrid {
       }
       offset += counter;
       counter = 0;  // reset counter
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(cartesian_decompose_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const DynCcoord_t & nb_domain_grid_pts{4, 4};
+    const DynCcoord_t & nb_ghosts_left{1, 1};
+    const DynCcoord_t & nb_ghosts_right{1, 1};
+
+    std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}, {4, 1}};
+    for (auto & nb_subdivisions : nb_subdivisions_to_test) {
+      CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
+                                         nb_subdivisions, nb_ghosts_left,
+                                         nb_ghosts_right};
+      auto & subdomain_locations{cart_decomp.get_subdomain_locations()};
+      auto & nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
+
+      auto & collection{cart_decomp.get_collection()};
+      const Index_t nb_components{1};
+      auto & field{collection.real_field("test_field", nb_components)};
+      auto && field_map{field.get_sub_pt_map(Unknown)};
+
+      // Fill the field with some values
+      CcoordOps::DynamicPixels pixels{nb_subdomain_grid_pts};
+      for (auto && pixel_id_coords : pixels.enumerate()) {
+        auto && id{std::get<0>(pixel_id_coords)};
+        auto && local_coords{std::get<1>(pixel_id_coords)};
+        auto && global_coords{subdomain_locations + local_coords};
+        auto && field_value{global_coords[0] +
+                            global_coords[1] * nb_domain_grid_pts[0]};
+        field_map[id] << field_value;
+      }
+
+      // Communicate the ghost cells
+      cart_decomp.communicate_ghosts();
+
+      // Check the values at the ghost cells are still the same
+      for (auto && pixel_id_coords : pixels.enumerate()) {
+        auto && id(std::get<0>(pixel_id_coords));
+        auto && local_coords{std::get<1>(pixel_id_coords)};
+        if (local_coords[0] < nb_ghosts_left[0] ||
+            local_coords[0] >= nb_domain_grid_pts[0] + nb_ghosts_left[0] ||
+            local_coords[1] < nb_ghosts_left[1] ||
+            local_coords[1] >= nb_domain_grid_pts[1] + nb_ghosts_left[1]) {
+          auto && global_coords{subdomain_locations + local_coords};
+          auto && ref_value{global_coords[0] +
+                            global_coords[1] * nb_domain_grid_pts[0]};
+          BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0), ref_value);
+        }
+      }
     }
   }
 
