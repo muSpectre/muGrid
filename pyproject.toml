@@ -16,6 +16,7 @@ authors = [
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
+    "Programming Language :: C++",
     "Programming Language :: Python"
 ]
 requires-python = ">=3.8.0"
