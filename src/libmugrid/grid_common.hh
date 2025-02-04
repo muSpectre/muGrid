@@ -314,8 +314,12 @@ namespace muGrid {
      *
      * @param dim The spatial dimension of the DynCcoord object. It needs to be
      * between 1 and MaxDim.
+     * @param value The value to fill the DynCcoord object with. (optional)
      */
-    explicit DynCcoord(Dim_t dim) : dim{dim}, long_array{} {}
+    explicit DynCcoord(Dim_t dim, const T value = T{}) : dim{dim}, long_array{} {
+      std::fill(this->long_array.begin(), this->long_array.end(), value);
+    }
+
     //! Constructor from a statically sized coord
     template <size_t Dim>
     explicit DynCcoord(const std::array<T, Dim> & ccoord)
