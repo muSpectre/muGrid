@@ -11,14 +11,15 @@ authors = [
     { name = "Ali Falsafi", email = "ali.falsafi@epfl.ch" },
     { name = "Till Junge", email = "till.junge@altermail.ch" },
     { name = "Richard Leute", email = "richard.leute@imtek.uni-freiburg.de" },
-    { name = "Lars Pastewka", email = "lars.pastewka@imtek.uni-freiburg.de" }
+    { name = "Lars Pastewka", email = "lars.pastewka@imtek.uni-freiburg.de" },
+    { name = "Yizhen Wang", email = "yizhen.wang@imtek.uni-freiburg.de" }
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python"
 ]
 requires-python = ">=3.8.0"
-dynamic = [ "version" ]
+dynamic = ["version"]
 dependencies = [
     "numpy"
 ]
