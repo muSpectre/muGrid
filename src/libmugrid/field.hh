@@ -254,7 +254,7 @@ namespace muGrid {
      * return the type information of the stored scalar (for compatibility
      * checking)
      */
-    virtual const std::type_info get_typeid() const = 0;
+    virtual const std::type_info & get_typeid() const = 0;
 
 #ifdef WITH_MPI
     /**

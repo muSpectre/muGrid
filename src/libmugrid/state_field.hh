@@ -115,7 +115,7 @@ namespace muGrid {
     const Unit & get_physical_unit() const;
 
     //! return type_id of stored type
-    virtual const std::type_info get_typeid() const = 0;
+    virtual const std::type_info & get_typeid() const = 0;
 
     //! return the size of the elementary field entry in bytes
     virtual const std::size_t get_element_size_in_bytes() const = 0;
@@ -253,7 +253,7 @@ namespace muGrid {
     TypedStateField & operator=(TypedStateField && other) = delete;
 
     //! return type_id of stored type
-    const std::type_info get_typeid() const final;
+    const std::type_info & get_typeid() const final;
 
 #ifdef WITH_MPI
     //! return the MPI representation of the stored type

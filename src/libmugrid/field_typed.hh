@@ -167,7 +167,7 @@ namespace muGrid {
     TypedFieldBase & operator-=(const TypedFieldBase & other);
 
     //! return type of the stored data
-    const std::type_info get_typeid() const final { return typeid(T); }
+    const std::type_info & get_typeid() const final { return typeid(T); }
 
 #ifdef WITH_MPI
     //! return the MPI representation of the stored type

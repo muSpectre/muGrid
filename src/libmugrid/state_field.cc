@@ -150,7 +150,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  const std::type_info TypedStateField<T>::get_typeid() const {
+  const std::type_info & TypedStateField<T>::get_typeid() const {
     return typeid(T);
   }
 
