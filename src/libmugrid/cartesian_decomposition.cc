@@ -1,8 +1,11 @@
+#include <iterator>
+
 #ifdef WITH_MPI
 #include <mpi.h>
 #endif
 
 #include "grid_common.hh"
+#include "field.hh"
 #include "field_collection_global.hh"
 #include "cartesian_communicator.hh"
 #include "cartesian_decomposition.hh"
@@ -64,10 +67,10 @@ namespace muGrid {
         nb_subdomain_grid_pts - this->nb_ghosts_right - this->nb_ghosts_left};
 
     // Get spatial dimensions
-    int spatial_dims{nb_grid_pts.size()};
+    int spatial_dims{nb_subdomain_grid_pts.size()};
 
     // Get field
-    auto field{(this->collection)->get_field(field_name)};
+    auto & field{this->collection->get_field(field_name)};
 
     // Get shape
     auto shape{field.get_shape(IterUnit::SubPt)};
@@ -93,8 +96,9 @@ namespace muGrid {
 
       // Stride for sending slices at the border
       auto sendrecv_strides{strides};
-      sendrecv_strides.erase(std::advance(
-          strides.begin(), strides.size() - spatial_dims + direction));
+      auto it{sendrecv_strides.begin()};
+      std::advance(it, sendrecv_strides.size() - spatial_dims + direction);
+      sendrecv_strides.erase(it);
 
       // Offset of send and receive buffers
       auto strides_in_direction{

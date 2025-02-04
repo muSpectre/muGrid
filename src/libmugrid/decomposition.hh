@@ -14,7 +14,7 @@ namespace muGrid {
       virtual ~Decomposition();
 
       //! fill the ghost buffers with the values from the neighboring processes.
-      virtual void communicate_ghosts() const = 0;
+      virtual void communicate_ghosts(std::string field_name) const = 0;
   };
 
 } // namespace muGrid
