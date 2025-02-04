@@ -78,9 +78,12 @@ namespace muGrid {
     // Get strides (in unit: elements)
     auto strides{field.get_strides(IterUnit::SubPt)};
 
-    // Get element size (only useful for pointer arithmetic in finding the right
-    // offset, but in the MPI routine, it uses elements as the unit.)
+    // Get element size (only useful for pointer arithmetic in finding the
+    // right offset, but in the MPI routine, it uses elements as the unit.)
     auto element_size{field.get_element_size_in_bytes()};
+
+    // Get the begin address of the field data
+    auto * begin_addr{static_cast<char *>(field.get_void_data_ptr())};
 
     // Blocklength (number of elements at one location)
     Index_t blocklength{strides[strides.size() - spatial_dims]};
@@ -114,12 +117,11 @@ namespace muGrid {
         Index_t recv_offset{strides_in_direction * ghost_layer};
 
         // send to right, receive from left
-        this->comm.sendrecv_right<field.get_stored_typeid()>(
+        this->comm.sendrecv_right(
             direction, count, blocklength, strides_in_direction,
-            static_cast<void *>(static_cast<char *>(field.get_void_data_ptr()) +
-                                send_offset * element_size),
-            static_cast<void *>(static_cast<char *>(field.get_void_data_ptr()) +
-                                recv_offset * element_size));
+            field.get_mpi_type(),
+            static_cast<void *>(begin_addr + send_offset * element_size),
+            static_cast<void *>(begin_addr + recv_offset * element_size));
       }
 
       // Sending things to the LEFT
@@ -131,12 +133,11 @@ namespace muGrid {
         Index_t recv_offset{strides_in_direction * recv_layer};
 
         // send to left, receive from right
-        this->comm.sendrecv_left<field.get_stored_typeid()>(
+        this->comm.sendrecv_left(
             direction, count, blocklength, strides_in_direction,
-            static_cast<void *>(static_cast<char *>(field.get_void_data_ptr()) +
-                                send_offset * element_size),
-            static_cast<void *>(static_cast<char *>(field.get_void_data_ptr()) +
-                                recv_offset * element_size));
+            field.get_mpi_type(),
+            static_cast<void *>(begin_addr + send_offset * element_size),
+            static_cast<void *>(begin_addr + recv_offset * element_size));
       }
     }
   }

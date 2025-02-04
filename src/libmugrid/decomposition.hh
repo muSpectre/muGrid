@@ -11,7 +11,7 @@ namespace muGrid {
   class Decomposition {
     public:
       Decomposition() {} 
-      virtual ~Decomposition();
+      virtual ~Decomposition() {}
 
       //! fill the ghost buffers with the values from the neighboring processes.
       virtual void communicate_ghosts(std::string field_name) const = 0;

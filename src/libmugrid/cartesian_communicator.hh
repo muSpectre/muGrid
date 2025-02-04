@@ -24,7 +24,7 @@ namespace muGrid {
     explicit CartesianCommunicator(const Parent_t & parent,
                                    const DynCcoord_t & nb_subdivisions);
 
-    CartesianCommunicator(const CartesianCommunicator & other);
+    CartesianCommunicator() = delete;
 
     virtual ~CartesianCommunicator() {}
 
@@ -34,29 +34,15 @@ namespace muGrid {
 
     const DynCcoord_t & get_coordinates() const;
 
-    template <typename T>
     void sendrecv_right(const int direction, const int count,
                         const int blocklength, const int strides,
-                        void * send_offset, void * recv_offset) {
-      MPI_Datatype new_type;
-      MPI_Type_vector(count, blocklength, strides, mpi_type<T>(), &new_type);
-      MPI_Status status;
-      MPI_Sendrecv(send_offset, count, new_type, right_dest_ranks[direction], 0,
-                   recv_offset, count, new_type, right_src_ranks[direction], 0,
-                   this->comm, &status);
-    }
+                        MPI_Datatype old_type, void * send_offset,
+                        void * recv_offset) const;
 
-    template <typename T>
     void sendrecv_left(const int direction, const int count,
-                        const int blocklength, const int strides,
-                        void * send_offset, void * recv_offset) {
-      MPI_Datatype new_type;
-      MPI_Type_vector(count, blocklength, strides, mpi_type<T>(), &new_type);
-      MPI_Status status;
-      MPI_Sendrecv(send_offset, count, new_type, left_dest_ranks[direction], 0,
-                   recv_offset, count, new_type, left_src_ranks[direction], 0,
-                   this->comm, &status);
-    }
+                       const int blocklength, const int strides,
+                       MPI_Datatype old_type, void * send_offset,
+                       void * recv_offset) const;
 
    protected:
     Parent_t parent;

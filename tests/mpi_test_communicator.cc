@@ -274,7 +274,8 @@ namespace muGrid {
 
       auto & collection{cart_decomp.get_collection()};
       const Index_t nb_components{1};
-      auto & field{collection.real_field("test_field", nb_components)};
+      const std::string field_name{"test_field"};
+      auto & field{collection.real_field(field_name, nb_components)};
       auto && field_map{field.get_sub_pt_map(Unknown)};
 
       // Fill the field with some values
@@ -289,7 +290,7 @@ namespace muGrid {
       }
 
       // Communicate the ghost cells
-      cart_decomp.communicate_ghosts();
+      cart_decomp.communicate_ghosts(field_name);
 
       // Check the values at the ghost cells are still the same
       for (auto && pixel_id_coords : pixels.enumerate()) {

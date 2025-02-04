@@ -22,10 +22,10 @@ namespace muGrid {
 
     CartesianDecomposition() = delete;
 
-    ~CartesianDecomposition();
+    virtual ~CartesianDecomposition() {}
 
     //! fill the ghost buffers with the values from the neighboring processes.
-    virtual void communicate_ghosts(std::string field_name) const;
+    void communicate_ghosts(std::string field_name) const;
 
     //! get the field collection
     GlobalFieldCollection & get_collection() const;
