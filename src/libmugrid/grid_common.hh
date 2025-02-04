@@ -391,13 +391,28 @@ namespace muGrid {
     }
 
     //! element-wise addition
+    DynCcoord & operator+=(const DynCcoord & other) {
+      if (this->get_dim() != other.get_dim()) {
+        std::stringstream error{};
+        error << "you are trying to add a " << this->get_dim()
+              << "-dimensional coord to a " << other.get_dim()
+              << "-dimensional coord element-wise.";
+        throw RuntimeError(error.str());
+      }
+      for (auto && tup : akantu::zip(*this, other)) {
+        std::get<0>(tup) += std::get<1>(tup);
+      }
+      return *this;
+    }
+
+    //! element-wise addition
     template <typename T2>
     DynCcoord<MaxDim, decltype(T{} + T2{})>
     operator+(const DynCcoord<MaxDim, T2> & other) const {
       if (this->get_dim() != other.get_dim()) {
         std::stringstream error{};
-        error << "you are trying to divide a " << this->get_dim()
-              << "-dimensional coord by a " << other.get_dim()
+        error << "you are trying to add a " << this->get_dim()
+              << "-dimensional coord to a " << other.get_dim()
               << "-dimensional coord element-wise.";
         throw RuntimeError(error.str());
       }
@@ -409,13 +424,28 @@ namespace muGrid {
     }
 
     //! element-wise subtraction
+    DynCcoord & operator-=(const DynCcoord & other) {
+      if (this->get_dim() != other.get_dim()) {
+        std::stringstream error{};
+        error << "you are trying to subtract a " << this->get_dim()
+              << "-dimensional coord from a " << other.get_dim()
+              << "-dimensional coord element-wise.";
+        throw RuntimeError(error.str());
+      }
+      for (auto && tup : akantu::zip(*this, other)) {
+        std::get<0>(tup) -= std::get<1>(tup);
+      }
+      return *this;
+    }
+
+    //! element-wise subtraction
     template <typename T2>
     DynCcoord<MaxDim, decltype(T{} - T2{})>
     operator-(const DynCcoord<MaxDim, T2> & other) const {
       if (this->get_dim() != other.get_dim()) {
         std::stringstream error{};
-        error << "you are trying to divide a " << this->get_dim()
-              << "-dimensional coord by a " << other.get_dim()
+        error << "you are trying to subtract a " << this->get_dim()
+              << "-dimensional coord from a " << other.get_dim()
               << "-dimensional coord element-wise.";
         throw RuntimeError(error.str());
       }
@@ -432,7 +462,7 @@ namespace muGrid {
     operator*(const DynCcoord<MaxDim, T2> & other) const {
       if (this->get_dim() != other.get_dim()) {
         std::stringstream error{};
-        error << "you are trying to divide a " << this->get_dim()
+        error << "you are trying to multiply a " << this->get_dim()
               << "-dimensional coord by a " << other.get_dim()
               << "-dimensional coord element-wise.";
         throw RuntimeError(error.str());
@@ -462,6 +492,21 @@ namespace muGrid {
       return retval;
     }
 
+    //! modulo assignment operator (mostly for periodic boundaries stuff)
+    DynCcoord & operator%=(const DynCcoord & other) {
+      for (auto && tup : akantu::zip(*this, other)) {
+        std::get<0>(tup) %= std::get<1>(tup);
+      }
+      return *this;
+    }
+
+    //! modulo operator (mostly for periodic boundaries stuff)
+    DynCcoord operator%(const DynCcoord & other) const {
+      DynCcoord ret_val{*this};
+      ret_val %= other;
+      return ret_val;
+    }
+
     //! access operator
     T & operator[](const size_t & index) { return this->long_array[index]; }
 
@@ -477,21 +522,6 @@ namespace muGrid {
       }
       this->long_array[this->dim] = value;
       this->dim++;
-    }
-
-    //! modulo assignment operator (mostly for periodic boundaries stuff)
-    DynCcoord & operator%=(const DynCcoord & other) {
-      for (auto && tup : akantu::zip(*this, other)) {
-        std::get<0>(tup) %= std::get<1>(tup);
-      }
-      return *this;
-    }
-
-    //! modulo operator (mostly for periodic boundaries stuff)
-    DynCcoord operator%(const DynCcoord & other) const {
-      DynCcoord ret_val{*this};
-      ret_val %= other;
-      return ret_val;
     }
 
     //! conversion operator
@@ -561,71 +591,6 @@ namespace muGrid {
     //! storage for coordinate components
     std::array<T, MaxDim> long_array;
   };
-
-  /**
-   * @brief Overloads the addition operator for two DynCcoord objects.
-   *
-   * This function overloads the addition operator to perform element-wise
-   * addition of two DynCcoord objects. The DynCcoord objects must have the same
-   * dimension, otherwise a RuntimeError is thrown. The result is a new
-   * DynCcoord object with the same dimension as the input objects, where each
-   * element is the sum of the corresponding elements in the input objects.
-   *
-   * @tparam MaxDim The maximum dimension of the DynCcoord objects.
-   * @tparam T The type of the elements in the DynCcoord objects.
-   * @param A The first DynCcoord object.
-   * @param B The second DynCcoord object.
-   * @return A new DynCcoord object that is the result of the element-wise
-   * addition of A and B.
-   * @throws RuntimeError If the dimensions of A and B do not match.
-   */
-  template <size_t MaxDim, typename T>
-  DynCcoord<MaxDim, T> operator+(const DynCcoord<MaxDim, T> & A,
-                                 const DynCcoord<MaxDim, T> & B) {
-    if (A.get_dim() != B.get_dim()) {
-      throw RuntimeError("Dimension mismatch");
-    }
-    // this needs to be parens, *not* curly braces
-    DynCcoord<MaxDim, T> result(A.get_dim());
-    assert(result.get_dim() == A.get_dim());
-    for (Dim_t dim{0}; dim < A.get_dim(); ++dim) {
-      result[dim] = A[dim] + B[dim];
-    }
-    return result;
-  }
-
-  /**
-   * @brief Overloads the subtraction operator for two DynCcoord objects.
-   *
-   * This function overloads the subtraction operator to perform element-wise
-   * subtraction of two DynCcoord objects. The DynCcoord objects must have the
-   * same dimension, otherwise a RuntimeError is thrown. The result is a new
-   * DynCcoord object with the same dimension as the input objects, where each
-   * element is the difference of the corresponding elements in the input
-   * objects.
-   *
-   * @tparam MaxDim The maximum dimension of the DynCcoord objects.
-   * @tparam T The type of the elements in the DynCcoord objects.
-   * @param A The first DynCcoord object.
-   * @param B The second DynCcoord object.
-   * @return A new DynCcoord object that is the result of the element-wise
-   * subtraction of A and B.
-   * @throws RuntimeError If the dimensions of A and B do not match.
-   */
-  template <size_t MaxDim, typename T>
-  DynCcoord<MaxDim, T> operator-(const DynCcoord<MaxDim, T> & A,
-                                 const DynCcoord<MaxDim, T> & B) {
-    if (A.get_dim() != B.get_dim()) {
-      throw RuntimeError("Dimension mismatch");
-    }
-    // this needs to be parens, *not* curly braces
-    DynCcoord<MaxDim, T> result(A.get_dim());
-    assert(result.get_dim() == A.get_dim());
-    for (Dim_t i{0}; i < A.get_dim(); ++i) {
-      result[i] = A[i] - B[i];
-    }
-    return result;
-  }
 
   /**
    * Cell coordinates, i.e. up to three integer numbers with dynamic (determined
