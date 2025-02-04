@@ -45,6 +45,11 @@
 #include <vector>
 #include <memory>
 
+#ifdef WITH_MPI
+#include "mpi.h"
+#include "communicator.hh"
+#endif
+
 namespace muGrid {
 
   //! forward declaration
@@ -162,10 +167,17 @@ namespace muGrid {
     TypedFieldBase & operator-=(const TypedFieldBase & other);
 
     //! return type of the stored data
-    const std::type_info & get_stored_typeid() const final { return typeid(T); }
+    const std::type_info get_typeid() const final { return typeid(T); }
+
+#ifdef WITH_MPI
+    //! return the MPI representation of the stored type
+    const MPI_Datatype get_mpi_type() const final { return mpi_type<T>(); }
+#endif
 
     //! return the size of the elementary field entry in bytes
-    const std::size_t get_element_size_in_bytes() const final { return sizeof(T); }
+    const std::size_t get_element_size_in_bytes() const final {
+      return sizeof(T);
+    }
 
     //! return a vector map onto the underlying data
     Eigen_map eigen_mat();

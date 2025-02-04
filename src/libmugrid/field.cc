@@ -67,9 +67,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void Field::assert_typeid(const std::type_info & type) const {
-    if (this->get_stored_typeid() != type) {
+    if (this->get_typeid() != type) {
       std::stringstream s;
-      s << "Field stores data of type `" << this->get_stored_typeid().name()
+      s << "Field stores data of type `" << this->get_typeid().name()
         << "`, which differs from `" << typeid(Int).name() << "`.";
       throw std::runtime_error(s.str());
     }

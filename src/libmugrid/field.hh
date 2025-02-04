@@ -40,6 +40,10 @@
 #include "grid_common.hh"
 #include "units.hh"
 
+#ifdef WITH_MPI
+#include "mpi.h"
+#endif
+
 #include <string>
 #include <typeinfo>
 
@@ -250,7 +254,14 @@ namespace muGrid {
      * return the type information of the stored scalar (for compatibility
      * checking)
      */
-    virtual const std::type_info & get_stored_typeid() const = 0;
+    virtual const std::type_info get_typeid() const = 0;
+
+#ifdef WITH_MPI
+    /**
+     * return the MPI representation of the stored type
+     */
+    virtual const MPI_Datatype get_mpi_type() const = 0;
+#endif
 
     /**
      * return the size of the elementary field entry in bytes
