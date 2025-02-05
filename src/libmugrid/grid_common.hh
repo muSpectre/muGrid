@@ -500,6 +500,9 @@ namespace muGrid {
     DynCcoord & operator%=(const DynCcoord & other) {
       for (auto && tup : akantu::zip(*this, other)) {
         std::get<0>(tup) %= std::get<1>(tup);
+        if (std::get<0>(tup) < 0) {
+          std::get<0>(tup) += std::get<1>(tup);
+        } 
       }
       return *this;
     }
