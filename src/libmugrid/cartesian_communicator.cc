@@ -57,11 +57,11 @@ namespace muGrid {
       void * recv_offset) const {
     MPI_Datatype new_type;
     MPI_Type_vector(count, blocklength, strides, old_type, &new_type);
+    MPI_Type_commit(&new_type);
     MPI_Status status;
-    MPI_Sendrecv(send_offset, count, new_type,
-                 this->right_dest_ranks[direction], 0, recv_offset, count,
-                 new_type, this->right_src_ranks[direction], 0, this->comm,
-                 &status);
+    MPI_Sendrecv(send_offset, 1, new_type, this->right_dest_ranks[direction], 0,
+                 recv_offset, 1, new_type, this->right_src_ranks[direction], 0,
+                 this->comm, &status);
   }
 
   void CartesianCommunicator::sendrecv_left(
@@ -70,10 +70,11 @@ namespace muGrid {
       void * recv_offset) const {
     MPI_Datatype new_type;
     MPI_Type_vector(count, blocklength, strides, old_type, &new_type);
+    MPI_Type_commit(&new_type);
     MPI_Status status;
-    MPI_Sendrecv(send_offset, count, new_type, this->left_dest_ranks[direction],
-                 0, recv_offset, count, new_type,
-                 this->left_src_ranks[direction], 0, this->comm, &status);
+    MPI_Sendrecv(send_offset, 1, new_type, this->left_dest_ranks[direction], 0,
+                 recv_offset, 1, new_type, this->left_src_ranks[direction], 0,
+                 this->comm, &status);
   }
 
   const DynCcoord_t & CartesianCommunicator::get_nb_subdivisions() const {
