@@ -266,16 +266,13 @@ namespace muGrid {
 
     // Create some reference values
     Eigen::MatrixXd ref_values(4, 4);
-    ref_values << 0., 1., 2., 3.,
-                  4., 5., 6., 7.,
-                  8., 9., 10., 11.,
-                  12., 13., 14., 15.;
+    ref_values << 1., 5., 9., 13.,
+                  2., 6., 10., 14.,
+                  3., 7., 11., 15.,
+                  4., 8., 12., 16.;
 
-    // std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}, {4, 1}};
-    std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}};
+    std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}, {4, 1}};
     for (auto & nb_subdivisions : nb_subdivisions_to_test) {
-      std::cout << "nb_subdivisions: " << nb_subdivisions[0] << " "
-                << nb_subdivisions[1] << std::endl;
       CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                          nb_subdivisions, nb_ghosts_left,
                                          nb_ghosts_right};
@@ -288,62 +285,38 @@ namespace muGrid {
       auto & field{collection.real_field(field_name, nb_components)};
       auto && field_map{field.get_sub_pt_map(Unknown)};
 
-
       // Fill the non-ghost cells of the field with some values
       CcoordOps::DynamicPixels pixels{nb_subdomain_grid_pts};
       for (auto && pixel_id_coords : pixels.enumerate()) {
         auto && id{std::get<0>(pixel_id_coords)};
         auto && local_coords{std::get<1>(pixel_id_coords)};
         if (local_coords[0] >= nb_ghosts_left[0] &&
-            local_coords[0] < nb_domain_grid_pts[0] - nb_ghosts_left[0] &&
+            local_coords[0] < nb_subdomain_grid_pts[0] - nb_ghosts_right[0] &&
             local_coords[1] >= nb_ghosts_left[1] &&
-            local_coords[1] < nb_domain_grid_pts[1] - nb_ghosts_left[1]) {
+            local_coords[1] < nb_subdomain_grid_pts[1] - nb_ghosts_right[1]) {
           auto && global_coords{(subdomain_locations + local_coords) %
                                 nb_domain_grid_pts};
-          auto && field_value{ref_values.coeff(global_coords[0],
-                                               global_coords[1])};
+          auto && field_value{
+              ref_values.coeff(global_coords[0], global_coords[1])};
           field_map[id] << field_value;
-          // Debugging
-          if (comm.rank() == 0) {
-            std::cout << "id: " << id << std::endl;
-            std::cout << "subdomain_locations: " << subdomain_locations
-                      << std::endl;
-            std::cout << "local_coords: " << local_coords << std::endl;
-            std::cout << "global_coords: " << global_coords << std::endl;
-            std::cout << " field_value: " << field_value << std::endl;
-          }
         }
       }
 
       // Communicate the ghost cells
       cart_decomp.communicate_ghosts(field_name);
-      if (comm.rank() == 0) {
-        std::cout << "after communicate_ghosts" << std::endl;
-      }
 
       // Check the values at the ghost cells are still the same
       for (auto && pixel_id_coords : pixels.enumerate()) {
         auto && id(std::get<0>(pixel_id_coords));
         auto && local_coords{std::get<1>(pixel_id_coords)};
         if (local_coords[0] < nb_ghosts_left[0] ||
-            local_coords[0] >= nb_domain_grid_pts[0] + nb_ghosts_left[0] ||
+            local_coords[0] >= nb_subdomain_grid_pts[0] - nb_ghosts_right[0] ||
             local_coords[1] < nb_ghosts_left[1] ||
-            local_coords[1] >= nb_domain_grid_pts[1] + nb_ghosts_left[1]) {
+            local_coords[1] >= nb_subdomain_grid_pts[1] - nb_ghosts_right[1]) {
           auto && global_coords{(subdomain_locations + local_coords) %
                                 nb_domain_grid_pts};
-          auto && ref_val{ref_values.coeff(global_coords[0],
-                                           global_coords[1])};
+          auto && ref_val{ref_values.coeff(global_coords[0], global_coords[1])};
           BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0), ref_val);
-          // Debugging
-          if (comm.rank() == 0) {
-            std::cout << "id: " << id << std::endl;
-            std::cout << "subdomain_locations: " << subdomain_locations
-                      << std::endl;
-            std::cout << "local_coords: " << local_coords << std::endl;
-            std::cout << "global_coords: " << global_coords << std::endl;
-            std::cout << " field_value: " << field_map[id].coeffRef(0, 0)
-                      << std::endl;
-          }
         }
       }
     }

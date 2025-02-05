@@ -63,8 +63,6 @@ namespace muGrid {
   CartesianDecomposition::communicate_ghosts(std::string field_name) const {
     // Get shape of the fields on this processor
     auto nb_subdomain_grid_pts{this->get_nb_subdomain_grid_pts()};
-    auto nb_subdomain_grid_pts_without_ghosts{
-        nb_subdomain_grid_pts - this->nb_ghosts_right - this->nb_ghosts_left};
 
     // Get spatial dimensions
     int spatial_dims{nb_subdomain_grid_pts.size()};
@@ -72,72 +70,78 @@ namespace muGrid {
     // Get field
     auto & field{this->collection->get_field(field_name)};
 
-    // Get shape
-    auto shape{field.get_shape(IterUnit::SubPt)};
-
     // Get strides (in unit: elements)
     auto strides{field.get_strides(IterUnit::SubPt)};
 
-    // Get element size (only useful for pointer arithmetic in finding the
-    // right offset, but in the MPI routine, it uses elements as the unit.)
-    auto element_size{field.get_element_size_in_bytes()};
+    // Blocklength (number of elements at one location)
+    auto blocklength{strides[strides.size() - spatial_dims - 1]};
 
-    // Get the begin address of the field data
+    // Create an MPI type for field data at one location
+    MPI_Datatype block_mpi_t;
+    MPI_Type_contiguous(blocklength, field.get_mpi_type(), &block_mpi_t);
+    MPI_Type_commit(&block_mpi_t);
+
+    // Get the begin address of the field data (cast into char * for pointer
+    // arithemtic)
     auto * begin_addr{static_cast<char *>(field.get_void_data_ptr())};
 
-    // Blocklength (number of elements at one location)
-    Index_t blocklength{strides[strides.size() - spatial_dims]};
+    // Get element size (only useful for pointer arithmetic in finding the
+    // correct offset)
+    auto element_size{static_cast<Index_t>(field.get_element_size_in_bytes())};
 
     // For each direction...
     for (int direction{0}; direction < spatial_dims; ++direction) {
-      // Number of blocks in ghost buffer
-      Index_t count{1};
-      for (int i{0}; i < spatial_dims; ++i) {
-        if (i != direction)
-          count *= nb_subdomain_grid_pts[i];
+
+      // Create an MPI type for data at a slice of locations
+      MPI_Datatype buffer_mpi_t{block_mpi_t};
+      for (int other_direction{0}; other_direction < spatial_dims;
+           ++other_direction) {
+        if (other_direction == direction)
+          continue;
+        // FIXME(Yizhen): this stride doesn't work for 3d?
+        auto stride_in_other_direction{
+            strides[strides.size() - spatial_dims + other_direction]};
+        MPI_Type_vector(nb_subdomain_grid_pts[other_direction], 1,
+                        stride_in_other_direction / blocklength, buffer_mpi_t,
+                        &buffer_mpi_t);
+        MPI_Type_commit(&buffer_mpi_t);
       }
 
-      // Stride for sending slices at the border
-      auto sendrecv_strides{strides};
-      auto it{sendrecv_strides.begin()};
-      std::advance(it, sendrecv_strides.size() - spatial_dims + direction);
-      sendrecv_strides.erase(it);
-
-      // Offset of send and receive buffers
-      auto strides_in_direction{
-          strides[strides.size() - spatial_dims + direction]};
+      // Stride in ghost buffer in units of bytes
+      auto stride_in_direction{
+          element_size * strides[strides.size() - spatial_dims + direction]};
 
       // Sending things to the RIGHT
       // When sending right, we need the size of the ghost layer on the left
       for (int ghost_layer{0}; ghost_layer < this->nb_ghosts_left[direction];
            ++ghost_layer) {
-        Index_t send_layer{ghost_layer +
-                           nb_subdomain_grid_pts_without_ghosts[direction]};
-        Index_t send_offset{strides_in_direction * send_layer};
-        Index_t recv_offset{strides_in_direction * ghost_layer};
+        // Offset of send and receive buffers
+        Index_t send_layer{nb_subdomain_grid_pts[direction] -
+                           nb_ghosts_right[direction] -
+                           nb_ghosts_left[direction] + ghost_layer};
+        Index_t send_offset{stride_in_direction * send_layer};
+        Index_t recv_offset{stride_in_direction * ghost_layer};
 
         // send to right, receive from left
         this->comm.sendrecv_right(
-            direction, count, blocklength, strides_in_direction,
-            field.get_mpi_type(),
-            static_cast<void *>(begin_addr + send_offset * element_size),
-            static_cast<void *>(begin_addr + recv_offset * element_size));
+            direction, static_cast<void *>(begin_addr + send_offset),
+            static_cast<void *>(begin_addr + recv_offset), buffer_mpi_t);
       }
 
       // Sending things to the LEFT
       for (int ghost_layer{0}; ghost_layer < this->nb_ghosts_right[direction];
            ++ghost_layer) {
-        Index_t send_offset{strides_in_direction * ghost_layer};
-        Index_t recv_layer{ghost_layer +
-                           nb_subdomain_grid_pts_without_ghosts[direction]};
-        Index_t recv_offset{strides_in_direction * recv_layer};
+        // Offset of send and receive buffers
+        Index_t send_offset{stride_in_direction *
+                            (nb_ghosts_left[direction] + ghost_layer)};
+        Index_t recv_layer{nb_subdomain_grid_pts[direction] -
+                           nb_ghosts_right[direction] + ghost_layer};
+        Index_t recv_offset{stride_in_direction * recv_layer};
 
         // send to left, receive from right
         this->comm.sendrecv_left(
-            direction, count, blocklength, strides_in_direction,
-            field.get_mpi_type(),
-            static_cast<void *>(begin_addr + send_offset * element_size),
-            static_cast<void *>(begin_addr + recv_offset * element_size));
+            direction, static_cast<void *>(begin_addr + send_offset),
+            static_cast<void *>(begin_addr + recv_offset), buffer_mpi_t);
       }
     }
   }

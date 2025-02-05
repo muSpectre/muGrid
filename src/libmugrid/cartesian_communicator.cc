@@ -13,16 +13,14 @@ namespace muGrid {
       : Parent_t{parent.get_mpi_comm()}, parent{parent},
         nb_subdivisions{nb_subdivisions},
         coordinates(nb_subdivisions.size(), -1),
-        right_dest_ranks(nb_subdivisions.size(), MPI_PROC_NULL),
-        right_src_ranks(nb_subdivisions.size(), MPI_PROC_NULL),
-        left_dest_ranks(nb_subdivisions.size(), MPI_PROC_NULL),
-        left_src_ranks(nb_subdivisions.size(), MPI_PROC_NULL) {
+        right_ranks(nb_subdivisions.size(), MPI_PROC_NULL),
+        left_ranks(nb_subdivisions.size(), MPI_PROC_NULL) {
     // the spatial dimension of the topology
     const int spatial_dim{static_cast<int>(nb_subdivisions.size())};
     // the domain is periodic in all directions
     std::vector<int> is_periodic(spatial_dim, true);
     // reordering is allowed
-    const bool reoder_is_allowed{true};
+    const bool reoder_is_allowed{false};
 
     // create the new communicator with cartesian topology
     std::vector<int> narr(spatial_dim);
@@ -36,12 +34,8 @@ namespace muGrid {
 
     // get the ranks of the neighbors
     for (auto direction{0}; direction < spatial_dim; ++direction) {
-      MPI_Cart_shift(this->comm, direction, 1,
-                     &this->right_src_ranks[direction],
-                     &this->right_dest_ranks[direction]);
-      MPI_Cart_shift(this->comm, direction, -1,
-                     &this->left_src_ranks[direction],
-                     &this->left_dest_ranks[direction]);
+      MPI_Cart_shift(this->comm, direction, 1, &this->left_ranks[direction],
+                     &this->right_ranks[direction]);
     }
   }
 
@@ -51,29 +45,21 @@ namespace muGrid {
     return *this;
   }
 
-  void CartesianCommunicator::sendrecv_right(
-      const int direction, const int count, const int blocklength,
-      const int strides, MPI_Datatype old_type, void * send_offset,
-      void * recv_offset) const {
-    MPI_Datatype new_type;
-    MPI_Type_vector(count, blocklength, strides, old_type, &new_type);
-    MPI_Type_commit(&new_type);
+  void CartesianCommunicator::sendrecv_right(int direction, void * send_offset,
+                                             void * recv_offset,
+                                             MPI_Datatype mpi_t) const {
     MPI_Status status;
-    MPI_Sendrecv(send_offset, 1, new_type, this->right_dest_ranks[direction], 0,
-                 recv_offset, 1, new_type, this->right_src_ranks[direction], 0,
+    MPI_Sendrecv(send_offset, 1, mpi_t, this->right_ranks[direction], 0,
+                 recv_offset, 1, mpi_t, this->left_ranks[direction], 0,
                  this->comm, &status);
   }
 
-  void CartesianCommunicator::sendrecv_left(
-      const int direction, const int count, const int blocklength,
-      const int strides, MPI_Datatype old_type, void * send_offset,
-      void * recv_offset) const {
-    MPI_Datatype new_type;
-    MPI_Type_vector(count, blocklength, strides, old_type, &new_type);
-    MPI_Type_commit(&new_type);
+  void CartesianCommunicator::sendrecv_left(int direction, void * send_offset,
+                                            void * recv_offset,
+                                            MPI_Datatype mpi_t) const {
     MPI_Status status;
-    MPI_Sendrecv(send_offset, 1, new_type, this->left_dest_ranks[direction], 0,
-                 recv_offset, 1, new_type, this->left_src_ranks[direction], 0,
+    MPI_Sendrecv(send_offset, 1, mpi_t, this->left_ranks[direction], 0,
+                 recv_offset, 1, mpi_t, this->right_ranks[direction], 0,
                  this->comm, &status);
   }
 

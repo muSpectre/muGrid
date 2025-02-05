@@ -34,24 +34,20 @@ namespace muGrid {
 
     const DynCcoord_t & get_coordinates() const;
 
-    void sendrecv_right(const int direction, const int count,
-                        const int blocklength, const int strides,
-                        MPI_Datatype old_type, void * send_offset,
-                        void * recv_offset) const;
+    //! send to right; receive from left
+    void sendrecv_right(int direction, void * send_offset, void * recv_offset,
+                        MPI_Datatype mpi_t) const;
 
-    void sendrecv_left(const int direction, const int count,
-                       const int blocklength, const int strides,
-                       MPI_Datatype old_type, void * send_offset,
-                       void * recv_offset) const;
+    //! send to left; receive from right
+    void sendrecv_left(int direction, void * send_offset, void * recv_offset,
+                       MPI_Datatype mpi_t) const;
 
    protected:
     Parent_t parent;
     DynCcoord_t nb_subdivisions;
     DynCcoord_t coordinates;
-    std::vector<int> right_dest_ranks;
-    std::vector<int> right_src_ranks;
-    std::vector<int> left_dest_ranks;
-    std::vector<int> left_src_ranks;
+    std::vector<int> right_ranks;
+    std::vector<int> left_ranks;
   };
 
 #endif  // WITH_MPI
