@@ -86,14 +86,6 @@ namespace muGrid {
     // Get strides (in unit: elements)
     auto strides{field.get_strides(IterUnit::SubPt)};
 
-    // Blocklength (number of elements at one location)
-    auto blocklength{strides[strides.size() - spatial_dims - 1]};
-
-    // Create an MPI type for field data at one location
-    MPI_Datatype block_mpi_t;
-    MPI_Type_contiguous(blocklength, field.get_mpi_type(), &block_mpi_t);
-    MPI_Type_commit(&block_mpi_t);
-
     // Get the begin address of the field data (cast into char * for pointer
     // arithemtic)
     auto * begin_addr{static_cast<char *>(field.get_void_data_ptr())};
@@ -102,92 +94,70 @@ namespace muGrid {
     // correct offset)
     auto element_size{static_cast<Index_t>(field.get_element_size_in_bytes())};
 
-    // Sending things to the RIGHT
     // For each direction...
     for (int direction{0}; direction < spatial_dims; ++direction) {
-      // When sending right, we need the ghost buffer on left to receive
-
-      // Figuring the memory layout of the ghost buffer...
-      // All dimensions faster than ghost are contiguous in memory
-      auto nb_contiguous{this->nb_ghosts_left[direction]};
-      auto stride_between_contiguous{nb_subdomain_grid_pts[direction]};
-      for (int faster_dim{0}; faster_dim < direction; ++faster_dim) {
-        nb_contiguous *= nb_subdomain_grid_pts[faster_dim];
-        stride_between_contiguous *= nb_subdomain_grid_pts[faster_dim];
-      }
-      // All dimensions slower than ghost are not, hence strided
-      Index_t nb_strided{1};
-      for (int slower_dim{direction + 1}; slower_dim < spatial_dims;
-           ++slower_dim) {
-        nb_strided *= nb_subdomain_grid_pts[slower_dim];
-      }
-
-      // Create an MPI type for the ghost buffer
-      MPI_Datatype buffer_mpi_t;
-      MPI_Type_vector(nb_strided, nb_contiguous, stride_between_contiguous,
-                      block_mpi_t, &buffer_mpi_t);
-      MPI_Type_commit(&buffer_mpi_t);
-
-      // Stride between layers of the ghost buffer (unit: bytes!), used in
-      // pointer arithmetic
+      // Stride in the send/recv direction
       auto stride_in_direction{
-          element_size * strides[strides.size() - spatial_dims + direction]};
+          strides[strides.size() - spatial_dims + direction]};
+      // Stride inside the ghost buffer
+      auto stride_between_contiguous{stride_in_direction *
+                                     nb_subdomain_grid_pts[direction]};
+      // Number of strides inside the ghost buffer
+      auto nb_strided{strides[strides.size() - 1] *
+                      nb_subdomain_grid_pts[spatial_dims - 1] /
+                      stride_between_contiguous};
+
+      // Sending things to the RIGHT
+
+      // When sending right, we need the ghost buffer on left to receive
+      auto nb_contiguous_l{stride_in_direction *
+                           this->nb_ghosts_left[direction]};
+
+      // Create an MPI type for the ghost buffer left
+      MPI_Datatype buffer_l_mpi_t;
+      MPI_Type_vector(nb_strided, nb_contiguous_l, stride_between_contiguous,
+                      field.get_mpi_type(), &buffer_l_mpi_t);
+      MPI_Type_commit(&buffer_l_mpi_t);
 
       // Offset of send and receive buffers
-      Index_t send_layer{nb_subdomain_grid_pts[direction] -
-                         nb_ghosts_right[direction] -
-                         nb_ghosts_left[direction]};
-      Index_t recv_layer{0};
+      Index_t send_offset_r{nb_subdomain_grid_pts[direction] -
+                            nb_ghosts_right[direction] -
+                            nb_ghosts_left[direction]};
+      Index_t recv_offset_r{0};
 
       // Send to right, receive from left
       this->comm.sendrecv_right(
           direction, 1,
-          static_cast<void *>(begin_addr + stride_in_direction * send_layer),
-          static_cast<void *>(begin_addr + stride_in_direction * recv_layer),
-          buffer_mpi_t);
-    }
+          static_cast<void *>(begin_addr + element_size * stride_in_direction *
+                                               send_offset_r),
+          static_cast<void *>(begin_addr + element_size * stride_in_direction *
+                                               recv_offset_r),
+          buffer_l_mpi_t);
 
-    // Sending things to the LEFT
-    // For each direction...
-    for (int direction{0}; direction < spatial_dims; ++direction) {
-      // When sending to left, we need the ghost buffer on right to recevie
+      // Sending things to the LEFT
 
-      // Figuring the memory layout of the ghost buffer...
-      // All dimensions faster than ghost are contiguous in memory
-      auto nb_contiguous{this->nb_ghosts_right[direction]};
-      auto stride_between_contiguous{nb_subdomain_grid_pts[direction]};
-      for (int faster_dim{0}; faster_dim < direction; ++faster_dim) {
-        nb_contiguous *= nb_subdomain_grid_pts[faster_dim];
-        stride_between_contiguous *= nb_subdomain_grid_pts[faster_dim];
-      }
-      // All dimensions slower than ghost are not, hence strided
-      Index_t nb_strided{1};
-      for (int slower_dim{direction + 1}; slower_dim < spatial_dims;
-           ++slower_dim) {
-        nb_strided *= nb_subdomain_grid_pts[slower_dim];
-      }
+      // When sending right, we need the ghost buffer on left to receive
+      auto nb_contiguous_r{stride_in_direction *
+                           this->nb_ghosts_right[direction]};
 
-      // Create an MPI type for the ghost buffer
-      MPI_Datatype buffer_mpi_t;
-      MPI_Type_vector(nb_strided, nb_contiguous, stride_between_contiguous,
-                      block_mpi_t, &buffer_mpi_t);
-      MPI_Type_commit(&buffer_mpi_t);
-
-      // Stride between layers of the ghost buffer (unit: bytes!), used in
-      // pointer arithmetic
-      auto stride_in_direction{
-          element_size * strides[strides.size() - spatial_dims + direction]};
+      // Create an MPI type for the ghost buffer right
+      MPI_Datatype buffer_r_mpi_t;
+      MPI_Type_vector(nb_strided, nb_contiguous_r, stride_between_contiguous,
+                      field.get_mpi_type(), &buffer_r_mpi_t);
+      MPI_Type_commit(&buffer_r_mpi_t);
 
       // Offset of send and receive buffers
-      Index_t send_layer{nb_ghosts_left[direction]};
-      Index_t recv_layer{nb_subdomain_grid_pts[direction] -
-                         nb_ghosts_right[direction]};
+      Index_t send_offset_l{nb_ghosts_left[direction]};
+      Index_t recv_offset_l{nb_subdomain_grid_pts[direction] -
+                            nb_ghosts_right[direction]};
       // Send to left, receive from right
       this->comm.sendrecv_left(
           direction, 1,
-          static_cast<void *>(begin_addr + stride_in_direction * send_layer),
-          static_cast<void *>(begin_addr + stride_in_direction * recv_layer),
-          buffer_mpi_t);
+          static_cast<void *>(begin_addr + element_size * stride_in_direction *
+                                               send_offset_l),
+          static_cast<void *>(begin_addr + element_size * stride_in_direction *
+                                               recv_offset_l),
+          buffer_r_mpi_t);
     }
   }
 
