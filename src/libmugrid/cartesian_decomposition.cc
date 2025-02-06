@@ -20,9 +20,13 @@ namespace muGrid {
       : Parent_t{}, nb_ghosts_left{nb_ghosts_left},
         nb_ghosts_right{nb_ghosts_right},
         comm{CartesianCommunicator(comm, nb_subdivisions)} {
-    // get spatial dimensions
+    // Get spatial dimensions
     auto spatial_dims{nb_domain_grid_pts.size()};
-    // check spatial dimensions are matching
+    // Check spatial dimensions are matching
+    if (nb_subdivisions.size() != spatial_dims) {
+      throw RuntimeError("The spatial dimension of the subdivisions is "
+                         "not compatible with the decomposition.");
+    }
     if (nb_ghosts_left.size() != spatial_dims) {
       throw RuntimeError("The spatial dimension of the left ghost buffer is "
                          "not compatible with the decomposition.");
@@ -32,7 +36,7 @@ namespace muGrid {
                          "not compatible with the decomposition.");
     }
 
-    // compute bare domain decomposition without ghosts
+    // Compute bare domain decomposition without ghosts
     // FIXME(Lars): This is a suboptimal decomposition. We actually want each
     // the number of grid point per MPI process to vary by 1 in each direction
     // at most.
@@ -101,19 +105,23 @@ namespace muGrid {
     // Sending things to the RIGHT
     // For each direction...
     for (int direction{0}; direction < spatial_dims; ++direction) {
-      // Figure out the memory layout
-      // When sending right, we need the size of the ghost layer on the left
+      // When sending right, we need the ghost buffer on left to receive
+
+      // Figuring the memory layout of the ghost buffer...
+      // All dimensions faster than ghost are contiguous in memory
       auto nb_contiguous{this->nb_ghosts_left[direction]};
       auto stride_between_contiguous{nb_subdomain_grid_pts[direction]};
-      for (int faster_axis{0}; faster_axis < direction; ++faster_axis) {
-        nb_contiguous *= nb_subdomain_grid_pts[faster_axis];
-        stride_between_contiguous *= nb_subdomain_grid_pts[faster_axis];
+      for (int faster_dim{0}; faster_dim < direction; ++faster_dim) {
+        nb_contiguous *= nb_subdomain_grid_pts[faster_dim];
+        stride_between_contiguous *= nb_subdomain_grid_pts[faster_dim];
       }
+      // All dimensions slower than ghost are not, hence strided
       Index_t nb_strided{1};
-      for (int slower_axis{direction + 1}; slower_axis < spatial_dims;
-           ++slower_axis) {
-        nb_strided *= nb_subdomain_grid_pts[slower_axis];
+      for (int slower_dim{direction + 1}; slower_dim < spatial_dims;
+           ++slower_dim) {
+        nb_strided *= nb_subdomain_grid_pts[slower_dim];
       }
+
       // Create an MPI type for the ghost buffer
       MPI_Datatype buffer_mpi_t;
       MPI_Type_vector(nb_strided, nb_contiguous, stride_between_contiguous,
@@ -142,19 +150,23 @@ namespace muGrid {
     // Sending things to the LEFT
     // For each direction...
     for (int direction{0}; direction < spatial_dims; ++direction) {
-      // Figure out the memory layout
-      // When sending left, we need the size of the ghost layer on the right
+      // When sending to left, we need the ghost buffer on right to recevie
+
+      // Figuring the memory layout of the ghost buffer...
+      // All dimensions faster than ghost are contiguous in memory
       auto nb_contiguous{this->nb_ghosts_right[direction]};
       auto stride_between_contiguous{nb_subdomain_grid_pts[direction]};
-      for (int faster_axis{0}; faster_axis < direction; ++faster_axis) {
-        nb_contiguous *= nb_subdomain_grid_pts[faster_axis];
-        stride_between_contiguous *= nb_subdomain_grid_pts[faster_axis];
+      for (int faster_dim{0}; faster_dim < direction; ++faster_dim) {
+        nb_contiguous *= nb_subdomain_grid_pts[faster_dim];
+        stride_between_contiguous *= nb_subdomain_grid_pts[faster_dim];
       }
+      // All dimensions slower than ghost are not, hence strided
       Index_t nb_strided{1};
-      for (int slower_axis{direction + 1}; slower_axis < spatial_dims;
-           ++slower_axis) {
-        nb_strided *= nb_subdomain_grid_pts[slower_axis];
+      for (int slower_dim{direction + 1}; slower_dim < spatial_dims;
+           ++slower_dim) {
+        nb_strided *= nb_subdomain_grid_pts[slower_dim];
       }
+
       // Create an MPI type for the ghost buffer
       MPI_Datatype buffer_mpi_t;
       MPI_Type_vector(nb_strided, nb_contiguous, stride_between_contiguous,
