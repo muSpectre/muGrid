@@ -260,16 +260,11 @@ namespace muGrid {
   // ----------------------------------------------------------------------
   BOOST_AUTO_TEST_CASE(cartesian) {
     auto & comm{MPIContext::get_context().comm};
-    const DynCcoord_t & nb_domain_grid_pts{4, 4};
-    const DynCcoord_t & nb_ghosts_left{1, 1};
-    const DynCcoord_t & nb_ghosts_right{1, 1};
 
-    // Create some reference values
-    Eigen::MatrixXd ref_values(4, 4);
-    ref_values << 1., 5., 9., 13.,
-                  2., 6., 10., 14.,
-                  3., 7., 11., 15.,
-                  4., 8., 12., 16.;
+    const DynCcoord_t & nb_domain_grid_pts{15, 15};
+    Eigen::MatrixXd ref_values{Eigen::MatrixXd::Random(15, 15)};
+    const DynCcoord_t & nb_ghosts_left{2, 2};
+    const DynCcoord_t & nb_ghosts_right{3, 3};
 
     std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}, {4, 1}};
     for (auto & nb_subdivisions : nb_subdivisions_to_test) {
