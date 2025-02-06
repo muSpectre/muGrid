@@ -5,6 +5,7 @@ Change log for µGrid
 -------------------------
 
 - ENH: General convolution operator for fields
+- ENH: Domain decomposition with ghost buffer communication
 
 0.93.3 (11Nov24)
 ----------------
