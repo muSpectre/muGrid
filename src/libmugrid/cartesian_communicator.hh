@@ -35,12 +35,12 @@ namespace muGrid {
     const DynCcoord_t & get_coordinates() const;
 
     //! send to right; receive from left
-    void sendrecv_right(int direction, void * send_offset, void * recv_offset,
-                        MPI_Datatype mpi_t) const;
+    void sendrecv_right(int direction, int count, void * send_offset,
+                        void * recv_offset, MPI_Datatype mpi_t) const;
 
     //! send to left; receive from right
-    void sendrecv_left(int direction, void * send_offset, void * recv_offset,
-                       MPI_Datatype mpi_t) const;
+    void sendrecv_left(int direction, int count, void * send_offset,
+                       void * recv_offset, MPI_Datatype mpi_t) const;
 
    protected:
     Parent_t parent;

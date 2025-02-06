@@ -45,21 +45,23 @@ namespace muGrid {
     return *this;
   }
 
-  void CartesianCommunicator::sendrecv_right(int direction, void * send_offset,
+  void CartesianCommunicator::sendrecv_right(int direction, int count,
+                                             void * send_offset,
                                              void * recv_offset,
                                              MPI_Datatype mpi_t) const {
     MPI_Status status;
-    MPI_Sendrecv(send_offset, 1, mpi_t, this->right_ranks[direction], 0,
-                 recv_offset, 1, mpi_t, this->left_ranks[direction], 0,
+    MPI_Sendrecv(send_offset, count, mpi_t, this->right_ranks[direction], 0,
+                 recv_offset, count, mpi_t, this->left_ranks[direction], 0,
                  this->comm, &status);
   }
 
-  void CartesianCommunicator::sendrecv_left(int direction, void * send_offset,
+  void CartesianCommunicator::sendrecv_left(int direction, int count,
+                                            void * send_offset,
                                             void * recv_offset,
                                             MPI_Datatype mpi_t) const {
     MPI_Status status;
-    MPI_Sendrecv(send_offset, 1, mpi_t, this->left_ranks[direction], 0,
-                 recv_offset, 1, mpi_t, this->right_ranks[direction], 0,
+    MPI_Sendrecv(send_offset, count, mpi_t, this->left_ranks[direction], 0,
+                 recv_offset, count, mpi_t, this->right_ranks[direction], 0,
                  this->comm, &status);
   }
 
