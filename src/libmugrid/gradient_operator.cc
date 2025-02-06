@@ -162,9 +162,6 @@ namespace muGrid {
         gradient_block.noalias() = grad * permutation_matrix;
       }
     }
-
-    std::cout << "End of constructor" << std::endl;
-
   }
 
   /* ---------------------------------------------------------------------- */
