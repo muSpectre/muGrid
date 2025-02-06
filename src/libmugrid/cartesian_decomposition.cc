@@ -49,6 +49,15 @@ namespace muGrid {
       }
     }
 
+    // Check if the ghost buffer covers more than one subdomain (process)
+    for (int dim{0}; dim < spatial_dims; ++dim) {
+      if (nb_ghosts_left[dim] > nb_subdomain_grid_pts[dim] ||
+          nb_ghosts_right[dim] > nb_subdomain_grid_pts[dim]) {
+        throw RuntimeError("It is not allowed to have ghost buffers covering "
+                           "more than one subdomain.");
+      }
+    }
+
     // Adjust domain decomposition for ghosts
     nb_subdomain_grid_pts += nb_ghosts_left + nb_ghosts_right;
     subdomain_locations -= nb_ghosts_left;
@@ -117,7 +126,6 @@ namespace muGrid {
           element_size * strides[strides.size() - spatial_dims + direction]};
 
       // Offset of send and receive buffers
-      // FIXME?(Yizhen): in rare cases, this can be zero or even negative.
       Index_t send_layer{nb_subdomain_grid_pts[direction] -
                          nb_ghosts_right[direction] -
                          nb_ghosts_left[direction]};
