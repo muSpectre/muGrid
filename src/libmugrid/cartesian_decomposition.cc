@@ -89,60 +89,85 @@ namespace muGrid {
     // correct offset)
     auto element_size{static_cast<Index_t>(field.get_element_size_in_bytes())};
 
+    // Sending things to the RIGHT
     // For each direction...
     for (int direction{0}; direction < spatial_dims; ++direction) {
-
-      // Create an MPI type for data at a slice of locations
-      MPI_Datatype buffer_mpi_t{block_mpi_t};
-      for (int other_direction{0}; other_direction < spatial_dims;
-           ++other_direction) {
-        if (other_direction == direction)
-          continue;
-        // FIXME(Yizhen): this stride doesn't work for 3d?
-        auto stride_in_other_direction{
-            strides[strides.size() - spatial_dims + other_direction]};
-        MPI_Type_vector(nb_subdomain_grid_pts[other_direction], 1,
-                        stride_in_other_direction / blocklength, buffer_mpi_t,
-                        &buffer_mpi_t);
-        MPI_Type_commit(&buffer_mpi_t);
+      // Figure out the memory layout
+      // When sending right, we need the size of the ghost layer on the left
+      auto nb_contiguous{this->nb_ghosts_left[direction]};
+      auto stride_between_contiguous{nb_subdomain_grid_pts[direction]};
+      for (int faster_axis{0}; faster_axis < direction; ++faster_axis) {
+        nb_contiguous *= nb_subdomain_grid_pts[faster_axis];
+        stride_between_contiguous *= nb_subdomain_grid_pts[faster_axis];
       }
+      Index_t nb_strided{1};
+      for (int slower_axis{direction + 1}; slower_axis < spatial_dims;
+           ++slower_axis) {
+        nb_strided *= nb_subdomain_grid_pts[slower_axis];
+      }
+      // Create an MPI type for the ghost buffer
+      MPI_Datatype buffer_mpi_t;
+      MPI_Type_vector(nb_strided, nb_contiguous, stride_between_contiguous,
+                      block_mpi_t, &buffer_mpi_t);
+      MPI_Type_commit(&buffer_mpi_t);
 
-      // Stride in ghost buffer in units of bytes
+      // Stride between layers of the ghost buffer (unit: bytes!), used in
+      // pointer arithmetic
       auto stride_in_direction{
           element_size * strides[strides.size() - spatial_dims + direction]};
 
-      // Sending things to the RIGHT
-      // When sending right, we need the size of the ghost layer on the left
-      for (int ghost_layer{0}; ghost_layer < this->nb_ghosts_left[direction];
-           ++ghost_layer) {
-        // Offset of send and receive buffers
-        Index_t send_layer{nb_subdomain_grid_pts[direction] -
-                           nb_ghosts_right[direction] -
-                           nb_ghosts_left[direction] + ghost_layer};
-        Index_t send_offset{stride_in_direction * send_layer};
-        Index_t recv_offset{stride_in_direction * ghost_layer};
+      // Offset of send and receive buffers
+      // FIXME?(Yizhen): in rare cases, this can be zero or even negative.
+      Index_t send_layer{nb_subdomain_grid_pts[direction] -
+                         nb_ghosts_right[direction] -
+                         nb_ghosts_left[direction]};
+      Index_t recv_layer{0};
 
-        // send to right, receive from left
-        this->comm.sendrecv_right(
-            direction, static_cast<void *>(begin_addr + send_offset),
-            static_cast<void *>(begin_addr + recv_offset), buffer_mpi_t);
+      // Send to right, receive from left
+      this->comm.sendrecv_right(
+          direction,
+          static_cast<void *>(begin_addr + stride_in_direction * send_layer),
+          static_cast<void *>(begin_addr + stride_in_direction * recv_layer),
+          buffer_mpi_t);
+    }
+
+    // Sending things to the LEFT
+    // For each direction...
+    for (int direction{0}; direction < spatial_dims; ++direction) {
+      // Figure out the memory layout
+      // When sending left, we need the size of the ghost layer on the right
+      auto nb_contiguous{this->nb_ghosts_right[direction]};
+      auto stride_between_contiguous{nb_subdomain_grid_pts[direction]};
+      for (int faster_axis{0}; faster_axis < direction; ++faster_axis) {
+        nb_contiguous *= nb_subdomain_grid_pts[faster_axis];
+        stride_between_contiguous *= nb_subdomain_grid_pts[faster_axis];
       }
-
-      // Sending things to the LEFT
-      for (int ghost_layer{0}; ghost_layer < this->nb_ghosts_right[direction];
-           ++ghost_layer) {
-        // Offset of send and receive buffers
-        Index_t send_offset{stride_in_direction *
-                            (nb_ghosts_left[direction] + ghost_layer)};
-        Index_t recv_layer{nb_subdomain_grid_pts[direction] -
-                           nb_ghosts_right[direction] + ghost_layer};
-        Index_t recv_offset{stride_in_direction * recv_layer};
-
-        // send to left, receive from right
-        this->comm.sendrecv_left(
-            direction, static_cast<void *>(begin_addr + send_offset),
-            static_cast<void *>(begin_addr + recv_offset), buffer_mpi_t);
+      Index_t nb_strided{1};
+      for (int slower_axis{direction + 1}; slower_axis < spatial_dims;
+           ++slower_axis) {
+        nb_strided *= nb_subdomain_grid_pts[slower_axis];
       }
+      // Create an MPI type for the ghost buffer
+      MPI_Datatype buffer_mpi_t;
+      MPI_Type_vector(nb_strided, nb_contiguous, stride_between_contiguous,
+                      block_mpi_t, &buffer_mpi_t);
+      MPI_Type_commit(&buffer_mpi_t);
+
+      // Stride between layers of the ghost buffer (unit: bytes!), used in
+      // pointer arithmetic
+      auto stride_in_direction{
+          element_size * strides[strides.size() - spatial_dims + direction]};
+
+      // Offset of send and receive buffers
+      Index_t send_layer{nb_ghosts_left[direction]};
+      Index_t recv_layer{nb_subdomain_grid_pts[direction] -
+                         nb_ghosts_right[direction]};
+      // Send to left, receive from right
+      this->comm.sendrecv_left(
+          direction,
+          static_cast<void *>(begin_addr + stride_in_direction * send_layer),
+          static_cast<void *>(begin_addr + stride_in_direction * recv_layer),
+          buffer_mpi_t);
     }
   }
 
