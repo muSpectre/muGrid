@@ -141,7 +141,7 @@ namespace muGrid {
 
       // Send to right, receive from left
       this->comm.sendrecv_right(
-          direction,
+          direction, 1,
           static_cast<void *>(begin_addr + stride_in_direction * send_layer),
           static_cast<void *>(begin_addr + stride_in_direction * recv_layer),
           buffer_mpi_t);
@@ -184,7 +184,7 @@ namespace muGrid {
                          nb_ghosts_right[direction]};
       // Send to left, receive from right
       this->comm.sendrecv_left(
-          direction,
+          direction, 1,
           static_cast<void *>(begin_addr + stride_in_direction * send_layer),
           static_cast<void *>(begin_addr + stride_in_direction * recv_layer),
           buffer_mpi_t);
