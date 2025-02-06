@@ -122,8 +122,8 @@ namespace muGrid {
 
       // Offset of send and receive buffers
       Index_t send_offset_right{nb_subdomain_grid_pts[direction] -
-                                nb_ghosts_right[direction] -
-                                nb_ghosts_left[direction]};
+                                this->nb_ghosts_right[direction] -
+                                this->nb_ghosts_left[direction]};
       Index_t recv_offset_right{0};
 
       // Send to right, receive from left
@@ -149,9 +149,9 @@ namespace muGrid {
       MPI_Type_commit(&ghost_right_mpi_t);
 
       // Offset of send and receive buffers
-      Index_t send_offset_left{nb_ghosts_left[direction]};
+      Index_t send_offset_left{this->nb_ghosts_left[direction]};
       Index_t recv_offset_left{nb_subdomain_grid_pts[direction] -
-                               nb_ghosts_right[direction]};
+                               this->nb_ghosts_right[direction]};
       // Send to left, receive from right
       this->comm.sendrecv_left(
           direction, 1,
@@ -172,10 +172,10 @@ namespace muGrid {
   }
 
   const DynCcoord_t CartesianDecomposition::get_nb_subdomain_grid_pts() const {
-    return (this->collection)->get_nb_subdomain_grid_pts();
+    return this->collection->get_nb_subdomain_grid_pts();
   }
   const DynCcoord_t CartesianDecomposition::get_subdomain_locations() const {
-    return (this->collection)->get_subdomain_locations();
+    return this->collection->get_subdomain_locations();
   }
 
 #endif  // WITH_MPI
