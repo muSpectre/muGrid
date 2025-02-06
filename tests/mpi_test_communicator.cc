@@ -277,7 +277,7 @@ namespace muGrid {
 
     // Decide the size of the whole domain 
     int spatial_dims{nb_subdivisions.size()};
-    int nb_grid_pts_per_dim{10};
+    int nb_grid_pts_per_dim{5};
     const DynCcoord_t & nb_domain_grid_pts{
         DynCcoord_t(spatial_dims, nb_grid_pts_per_dim)};
 
