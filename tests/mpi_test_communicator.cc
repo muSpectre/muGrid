@@ -275,13 +275,13 @@ namespace muGrid {
     else
       throw RuntimeError("Not planned for this number of processes.");
 
-    // Decide the size of the whole domain and some reference values
+    // Decide the size of the whole domain 
     int spatial_dims{nb_subdivisions.size()};
     int nb_grid_pts_per_dim{10};
     const DynCcoord_t & nb_domain_grid_pts{
         DynCcoord_t(spatial_dims, nb_grid_pts_per_dim)};
 
-    // A function get referrence values.
+    // A function to get referrence values
     auto && get_ref_value{
         [nb_grid_pts_per_dim](const DynCcoord_t & global_coords) {
           Index_t val{0};
@@ -306,7 +306,7 @@ namespace muGrid {
     const std::string field_name{"test_field"};
     auto & field{collection.real_field(field_name, nb_components)};
 
-    // Fill the non-ghost cells of the field with some values
+    // Fill the non-ghost cells of the field with the reference values.
     auto & subdomain_locations{cart_decomp.get_subdomain_locations()};
     auto & nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
     auto && field_map{field.get_sub_pt_map(Unknown)};
@@ -330,22 +330,13 @@ namespace muGrid {
         auto && global_coords{(subdomain_locations + local_coords) %
                               nb_domain_grid_pts};
         field_map[id] << get_ref_value(global_coords);
-        if (comm.rank() == 0) {
-          std::cout << "id: " << id << std::endl;
-          std::cout << "subdomain_locations: " << subdomain_locations
-                    << std::endl;
-          std::cout << "local_coords: " << local_coords << std::endl;
-          std::cout << "global_coords: " << global_coords << std::endl;
-          std::cout << " field_value: " << get_ref_value(global_coords)
-                    << std::endl;
-        }
       }
     }
 
-    // Communicate the ghost cells
+    // Communicate the ghost buffer
     cart_decomp.communicate_ghosts(field_name);
 
-    // Check the values at the ghost cells are still the same
+    // Check the values at the ghost cells are correct
     for (auto && pixel_id_coords : pixels.enumerate()) {
       auto && id(std::get<0>(pixel_id_coords));
       auto && local_coords{std::get<1>(pixel_id_coords)};
@@ -364,9 +355,8 @@ namespace muGrid {
       if (is_ghost_left || is_ghost_right) {
         auto && global_coords{(subdomain_locations + local_coords) %
                               nb_domain_grid_pts};
-        if (comm.rank() == 0)
-          BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0),
-                            get_ref_value(global_coords));
+        BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0),
+                          get_ref_value(global_coords));
       }
     }
   }
