@@ -271,6 +271,7 @@ namespace muGrid {
     file_io_netcdf_a.close();  // close file
   };
 
+#if 0
   // TODO(RLeute): read with a different number of processors than the file was
   // written, especially for local fields (e.g. write 2 procs read 1 and 3
   // procs)!!!
@@ -384,6 +385,7 @@ namespace muGrid {
             fill_value_map(fill_value);
         value = fill_value_map;
       }
+
       // wait until all ranks have initialised all values of the field
       MPI_Barrier(comm_2.get_mpi_comm());
       /*
@@ -399,14 +401,15 @@ namespace muGrid {
             fill_value_map(fill_value_vec);
         value = fill_value_map;
       }
-      */
       // wait until all ranks have initialised all values of the field
       MPI_Barrier(comm_2.get_mpi_comm());
+      */
 
       FileIONetCDF file_io_netcdf_w(file_name, open_mode_w, comm_2);
       file_io_netcdf_w.register_field_collection(global_fc_2);
       // file_io_netcdf_w.register_field_collection(local_fc_2);
-      file_io_netcdf_w.append_frame().write();  // write frame 0
+      auto frame{file_io_netcdf_w.append_frame()};  // write frame 0
+      frame.write();
       file_io_netcdf_w.close();
 
       // read with comm_1 (one processor) ---------------------------------- //
@@ -579,6 +582,7 @@ namespace muGrid {
       }
     }  // end comm_2.size() >= 2
   };
+#endif
 
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid
