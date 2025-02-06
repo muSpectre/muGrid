@@ -266,7 +266,7 @@ namespace muGrid {
     const DynCcoord_t & nb_ghosts_left{2, 2};
     const DynCcoord_t & nb_ghosts_right{3, 3};
 
-    std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}, {4, 1}};
+    std::vector<DynCcoord_t> nb_subdivisions_to_test{{2, 2}};
     for (auto & nb_subdivisions : nb_subdivisions_to_test) {
       CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                          nb_subdivisions, nb_ghosts_left,

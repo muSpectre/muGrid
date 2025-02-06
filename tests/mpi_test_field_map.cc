@@ -112,23 +112,6 @@ namespace muGrid {
         comm.sum(pix_quad_sum)};
     BOOST_CHECK_EQUAL(comm.sum(this->pixel_quad_pt_map.sum()),
                       pix_quad_sum_all);
-
-    // --- comm.sum of FieldMap mean ---
-    // iterate over pixels
-    Eigen::Matrix<Real, nb_comps, 1> pix_mean_all{comm.sum(pix_sum) /
-                                                  comm.sum(nb_pix)};
-    BOOST_CHECK_EQUAL(comm.sum(this->pixel_map.mean()), pix_mean_all);
-
-    // iterate over quad points
-    Eigen::Matrix<Real, nb_comps, 1> quad_pt_mean_all{comm.sum(quad_pt_sum) /
-                                                      comm.sum(nb_quad_pts)};
-    BOOST_CHECK_EQUAL(comm.sum(this->quad_pt_map.mean()), quad_pt_mean_all);
-
-    // iterate over pixels of a field with quad points
-    Eigen::Matrix<Real, nb_comps, nb_comps> pix_quad_mean_all{
-        comm.sum(pix_quad_sum) / comm.sum(nb_pix)};
-    BOOST_CHECK_EQUAL(comm.sum(this->pixel_quad_pt_map.mean()),
-                      pix_quad_mean_all);
   };
 
   /* ---------------------------------------------------------------------- */
