@@ -8,6 +8,8 @@
 
 using muGrid::Decomposition;
 using muGrid::CartesianDecomposition;
+using muGrid::Communicator;
+using muGrid::DynCcoord_t;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -39,15 +41,23 @@ void add_cartesian_decomposition(py::module & mod) {
                                                     "CartesianDecomposition")
       .def(py::init<const Communicator &, const DynCcoord_t &,
                     const DynCcoord_t &, const DynCcoord_t &,
-                    const DynCcoord_t &, const SubPtMap_t &>(),
-           " comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
-           "nb_ghost_left"_a, "nb_ghost_right"_a, "nb_sub_pts"_a = {})
+                    const DynCcoord_t &>(),
+           "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
+           "nb_ghost_left"_a, "nb_ghost_right"_a)
       .def("communicate_ghosts", &CartesianDecomposition::communicate_ghosts,
-           "field_name"_a);
+           "field_name"_a)
+      .def_property_readonly("collection",
+                             &CartesianDecomposition::get_collection)
+      .def_property_readonly("nb_subdivisions",
+                             &CartesianDecomposition::get_nb_subdivisions)
+      .def_property_readonly("nb_subdomain_grid_pts",
+                             &CartesianDecomposition::get_nb_subdomain_grid_pts)
+      .def_property_readonly("subdomain_locations",
+                             &CartesianDecomposition::get_subdomain_locations);
 }
 
 // Combined binding function
-void add_decomposition_classses(py::module & mod) {
+void add_decomposition_classes(py::module & mod) {
   add_decomposition(mod);
   add_cartesian_decomposition(mod);
 }
