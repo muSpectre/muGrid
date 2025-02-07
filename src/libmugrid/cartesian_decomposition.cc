@@ -37,19 +37,17 @@ namespace muGrid {
     }
 
     // Compute bare domain decomposition without ghosts
-    // FIXME(Lars): This is a suboptimal decomposition. We actually want each
-    // the number of grid point per MPI process to vary by 1 in each direction
-    // at most.
     auto nb_subdomain_grid_pts{nb_domain_grid_pts / nb_subdivisions};
     auto coordinates{this->comm.get_coordinates()};
     auto subdomain_locations{coordinates * nb_subdomain_grid_pts};
+    auto nb_residual_grid_pts{nb_domain_grid_pts % nb_subdivisions};
     for (int dim{0}; dim < spatial_dims; ++dim) {
-      if (coordinates[dim] == nb_subdivisions[dim] - 1) {
-        // We are the last MPI process on the right, add missing grid points
-        // here
-        nb_subdomain_grid_pts[dim] +=
-            nb_domain_grid_pts[dim] -
-            nb_subdomain_grid_pts[dim] * nb_subdivisions[dim];
+      // Adjust domain decomposition for the residual grid points
+      if (coordinates[dim] < nb_residual_grid_pts[dim]) {
+        nb_subdomain_grid_pts[dim] += 1;
+        subdomain_locations[dim] += coordinates[dim];
+      } else {
+        subdomain_locations[dim] += nb_residual_grid_pts[dim];
       }
     }
 
@@ -63,8 +61,8 @@ namespace muGrid {
     }
 
     // Adjust domain decomposition for ghosts
-    nb_subdomain_grid_pts += nb_ghosts_left + nb_ghosts_right;
     subdomain_locations -= nb_ghosts_left;
+    nb_subdomain_grid_pts += nb_ghosts_left + nb_ghosts_right;
 
     // Initialize field collection (we now know the subdivision)
     this->collection = std::make_unique<GlobalFieldCollection>(
@@ -86,6 +84,10 @@ namespace muGrid {
     // Get strides (in unit: elements)
     auto strides{field.get_strides(IterUnit::SubPt)};
 
+    // Total number of elements in the field
+    auto nb_total_elements{strides[strides.size() - 1] *
+                           nb_subdomain_grid_pts[spatial_dims - 1]};
+
     // Get the begin address of the field data (cast into char * for pointer
     // arithemtic)
     auto * begin_addr{static_cast<char *>(field.get_void_data_ptr())};
@@ -103,9 +105,7 @@ namespace muGrid {
       auto stride_in_next_dim{stride_in_direction *
                               nb_subdomain_grid_pts[direction]};
       // Number of blocks inside the ghost buffer
-      auto nb_blocks_seen_in_next_dim{strides[strides.size() - 1] *
-                                      nb_subdomain_grid_pts[spatial_dims - 1] /
-                                      stride_in_next_dim};
+      auto nb_blocks_seen_in_next_dim{nb_total_elements / stride_in_next_dim};
 
       // Sending things to the RIGHT
 
