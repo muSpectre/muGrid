@@ -115,7 +115,7 @@ namespace muGrid {
    public:
     explicit Communicator(MPI_Comm comm = MPI_COMM_SELF);
     Communicator(const Communicator & other);
-    ~Communicator();
+    virtual ~Communicator();
 
     Communicator & operator=(const Communicator & other);
 
@@ -365,12 +365,13 @@ namespace muGrid {
       }
     }
 
-    MPI_Comm get_mpi_comm() { return this->comm; }
+    //! get the underlying MPI communicator
+    MPI_Comm get_mpi_comm() const { return this->comm; }
 
     //! find whether the underlying communicator is mpi
     static bool has_mpi() { return true; }
 
-   private:
+   protected:
     MPI_Comm comm;
   };
 

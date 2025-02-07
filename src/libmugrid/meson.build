@@ -38,7 +38,9 @@ endif
 
 if mpi.found()
     mugrid_sources += [
-        'communicator.cc'
+        'communicator.cc',
+        'cartesian_communicator.cc',
+        'cartesian_decomposition.cc'
     ]
 endif
 

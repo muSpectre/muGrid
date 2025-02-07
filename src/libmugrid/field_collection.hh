@@ -701,7 +701,6 @@ namespace muGrid {
      * set the number of sub points per pixel/voxel for a given tag. Can only be
      * done once per tag
      */
-
     void set_nb_sub_pts(const std::string & tag,
                         const Index_t & nb_sub_pts_per_pixel);
 

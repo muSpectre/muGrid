@@ -40,6 +40,11 @@
 
 #include <sstream>
 
+#ifdef WITH_MPI
+#include "mpi.h"
+#include "communicator.hh"
+#endif
+
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
@@ -81,9 +86,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void StateField::assert_typeid(const std::type_info & type) const {
-    if (this->get_stored_typeid() != type) {
+    if (this->get_typeid() != type) {
       std::stringstream s;
-      s << "Field stores data of type `" << this->get_stored_typeid().name()
+      s << "Field stores data of type `" << this->get_typeid().name()
         << "`, which differs from `" << typeid(Int).name() << "`.";
       throw std::runtime_error(s.str());
     }
@@ -145,8 +150,22 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  const std::type_info & TypedStateField<T>::get_stored_typeid() const {
+  const std::type_info & TypedStateField<T>::get_typeid() const {
     return typeid(T);
+  }
+
+#ifdef WITH_MPI
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  const MPI_Datatype TypedStateField<T>::get_mpi_type() const {
+    return mpi_type<T>();
+  }
+#endif
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T>
+  const std::size_t TypedStateField<T>::get_element_size_in_bytes() const {
+    return sizeof(T);
   }
 
   /* ---------------------------------------------------------------------- */

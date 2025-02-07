@@ -30,7 +30,7 @@ if mpi.found()
     add_project_arguments('-DWITH_MPI', language : ['c', 'cpp'])
     netcdf = dependency('pnetcdf', required : false)
     mugrid_dependencies += [mpi, netcdf]
-    mpi_processes = ['1', '2']  # MPI processes to use for parallel tests
+    mpi_processes = ['1', '2', '4', '8']  # MPI processes to use for parallel tests
 else
     netcdf = dependency('netcdf', required : false)
     mugrid_dependencies += [netcdf]

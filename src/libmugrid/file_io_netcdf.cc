@@ -3221,7 +3221,7 @@ namespace muGrid {
       muGrid::Field & var_field,
       const std::vector<std::shared_ptr<NetCDFDim>> & var_dims, bool hidden) {
     std::string var_name{var_field.get_name()};
-    const std::type_info & type_id{var_field.get_stored_typeid()};
+    const std::type_info & type_id{var_field.get_typeid()};
     nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
     IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
 
@@ -3237,7 +3237,7 @@ namespace muGrid {
       const std::vector<std::shared_ptr<NetCDFDim>> & var_dims) {
     std::string var_name{var_state_field.get_unique_prefix()};
     const std::type_info & type_id{
-        var_state_field.current().get_stored_typeid()};
+        var_state_field.current().get_typeid()};
     nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
     IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
 

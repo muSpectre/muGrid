@@ -55,6 +55,10 @@
 #include <vector>
 #include <utility>
 
+#ifdef WITH_MPI
+#include "mpi.h"
+#endif
+
 namespace muGrid {
 
   //! forward declaration of the `muGrid::FieldCollection`
@@ -111,7 +115,15 @@ namespace muGrid {
     const Unit & get_physical_unit() const;
 
     //! return type_id of stored type
-    virtual const std::type_info & get_stored_typeid() const = 0;
+    virtual const std::type_info & get_typeid() const = 0;
+
+    //! return the size of the elementary field entry in bytes
+    virtual const std::size_t get_element_size_in_bytes() const = 0;
+
+#ifdef WITH_MPI
+    //! return the MPI representation of the stored type
+    virtual const MPI_Datatype get_mpi_type() const = 0;
+#endif
 
     /**
      * assert that the stored type corresponds to the given type id
@@ -241,7 +253,15 @@ namespace muGrid {
     TypedStateField & operator=(TypedStateField && other) = delete;
 
     //! return type_id of stored type
-    const std::type_info & get_stored_typeid() const final;
+    const std::type_info & get_typeid() const final;
+
+#ifdef WITH_MPI
+    //! return the MPI representation of the stored type
+    const MPI_Datatype get_mpi_type() const final;
+#endif
+
+    //! return the size of the elementary field entry in bytes
+    const std::size_t get_element_size_in_bytes() const final;
 
     //! return a reference to the current field
     TypedField<T> & current();

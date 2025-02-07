@@ -267,7 +267,7 @@ namespace muGrid {
     auto & scalar_field{fc.register_field<Real>("scalar_field", 1, quad)};
     auto & vector_field{
         fc.register_field<Real>("vector_field", NbComponents, quad)};
-    const bool is_same_type{scalar_field.get_stored_typeid() == typeid(Real)};
+    const bool is_same_type{scalar_field.get_typeid() == typeid(Real)};
     BOOST_CHECK(is_same_type);
 
     BOOST_CHECK_THROW(scalar_field.push_back(Real{3}), FieldError);

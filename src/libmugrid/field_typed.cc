@@ -119,7 +119,7 @@ namespace muGrid {
       std::stringstream error{};
       error << "Can not cast field '" << other.get_name()
             << "' to a typed field of type '" << typeid(T).name()
-            << "', because it is of type '" << other.get_stored_typeid().name()
+            << "', because it is of type '" << other.get_typeid().name()
             << "'.";
       throw FieldError(error.str());
     }
@@ -134,7 +134,7 @@ namespace muGrid {
       std::stringstream error{};
       error << "Can not cast field '" << other.get_name()
             << "' to a typed field of type '" << typeid(T).name()
-            << "', because it is of type '" << other.get_stored_typeid().name()
+            << "', because it is of type '" << other.get_typeid().name()
             << "'.";
       throw FieldError(error.str());
     }
