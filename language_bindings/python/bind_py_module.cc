@@ -42,6 +42,7 @@ PYBIND11_MODULE(_muGrid, mod) {
 
   add_common_mugrid(mod);
   add_communicator(mod);
+  add_decomposition_classes(mod);
   add_field_classes(mod);
   add_state_field_classes(mod);
   add_field_collection_classes(mod);
