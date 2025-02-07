@@ -42,6 +42,7 @@ import mpi4py
 import muGrid
 
 from python_communicator_tests import Communicator_Check
+from python_decomposition_tests import DecompositionCheck
 
 if __name__ == '__main__':
     unittest.main()
