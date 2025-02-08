@@ -258,7 +258,31 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
-  BOOST_AUTO_TEST_CASE(cartesian_decomposition) {
+  BOOST_AUTO_TEST_CASE(domain_decomposition_test) {
+    auto & comm{MPIContext::get_context().comm};
+
+    // A large enough domain
+    DynCcoord_t nb_domain_grid_pts{1, 10};
+
+    // Decomposition only along one dimension
+    DynCcoord_t nb_subdivisions{1, comm.size()};
+    DynCcoord_t nb_ghosts_left{1, 0};
+    DynCcoord_t nb_ghosts_right{1, 0};
+    CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
+                                       nb_subdivisions, nb_ghosts_left,
+                                       nb_ghosts_right};
+
+    // Check the number of subdomain grid points adds up
+    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
+    int dim{1};
+    auto res{comm.template sum<Index_t>(nb_subdomain_grid_pts[dim] -
+                                        nb_ghosts_left[dim] -
+                                        nb_ghosts_right[dim])};
+    BOOST_CHECK_EQUAL(res, nb_domain_grid_pts[dim]);
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(inter_subdomain_communicate_test) {
     auto & comm{MPIContext::get_context().comm};
 
     // Decide the number of subdivisions according to number of processes.
@@ -275,7 +299,7 @@ namespace muGrid {
     else
       throw RuntimeError("Not planned for this number of processes.");
 
-    // Decide the size of the whole domain 
+    // Decide the size of the whole domain
     int spatial_dims{nb_subdivisions.size()};
     int nb_grid_pts_per_dim{5};
     const DynCcoord_t & nb_domain_grid_pts{
