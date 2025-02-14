@@ -58,7 +58,7 @@ class DecompositionCheck(unittest.TestCase):
                     subdomain_locations + np.array(index)
                 ) % nb_domain_grid_pts
                 full_index = (..., *index)
-                field.s[full_index] = ref_values[global_coords]
+                field.s[full_index] = ref_values[tuple(global_coords)]
 
         # Communicate ghost cells
         cart_decomp.communicate_ghosts(field_name)
@@ -77,7 +77,7 @@ class DecompositionCheck(unittest.TestCase):
                 full_index = (..., *index)
                 self.assertEqual(
                     field.s[full_index],
-                    ref_values[global_coords],
+                    ref_values[tuple(global_coords)],
                     f"Mismatch at {index}",
                 )
 
