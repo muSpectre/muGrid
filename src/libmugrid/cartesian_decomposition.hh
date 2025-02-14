@@ -8,7 +8,6 @@
 #include "decomposition.hh"
 
 namespace muGrid {
-
   class CartesianDecomposition : public Decomposition {
    public:
     using Parent_t = Decomposition;
@@ -45,7 +44,6 @@ namespace muGrid {
     DynCcoord_t nb_ghosts_right;
     CartesianCommunicator comm;
   };
-
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_CARTESIAN_DECOMPOSITION_HH_

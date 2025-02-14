@@ -433,7 +433,7 @@ namespace muGrid {
     static bool has_mpi() { return false; }
   };
 
-#endif
+#endif  // WITH_MPI
 
 }  // namespace muGrid
 
