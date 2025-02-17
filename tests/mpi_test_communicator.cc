@@ -330,7 +330,7 @@ namespace muGrid {
     const std::string field_name{"test_field"};
     auto & field{collection.real_field(field_name, nb_components)};
 
-    // Fill the non-ghost cells of the field with the reference values.
+    // Fill the field with some values
     auto & subdomain_locations{cart_decomp.get_subdomain_locations()};
     auto & nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
     auto && field_map{field.get_sub_pt_map(Unknown)};
@@ -354,6 +354,8 @@ namespace muGrid {
         auto && global_coords{(subdomain_locations + local_coords) %
                               nb_domain_grid_pts};
         field_map[id] << get_ref_value(global_coords);
+      } else {
+        field_map[id] << -1;
       }
     }
 
@@ -364,24 +366,10 @@ namespace muGrid {
     for (auto && pixel_id_coords : pixels.enumerate()) {
       auto && id(std::get<0>(pixel_id_coords));
       auto && local_coords{std::get<1>(pixel_id_coords)};
-
-      auto && left_check{local_coords - nb_ghosts_left};
-      bool is_ghost_left{
-          std::any_of(left_check.begin(), left_check.end(),
-                      [](const auto & elem) { return elem < 0; })};
-
-      auto && right_check{local_coords + nb_ghosts_right -
-                          nb_subdomain_grid_pts};
-      bool is_ghost_right{
-          std::any_of(right_check.begin(), right_check.end(),
-                      [](const auto & elem) { return elem >= 0; })};
-
-      if (is_ghost_left || is_ghost_right) {
-        auto && global_coords{(subdomain_locations + local_coords) %
-                              nb_domain_grid_pts};
-        BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0),
-                          get_ref_value(global_coords));
-      }
+      auto && global_coords{(subdomain_locations + local_coords) %
+                            nb_domain_grid_pts};
+      BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0),
+                        get_ref_value(global_coords));
     }
   }
 

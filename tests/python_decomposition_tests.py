@@ -28,7 +28,9 @@ class DecompositionCheck(unittest.TestCase):
         nb_pts_per_dim = 5
         nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
 
-        ref_values = np.reshape(np.arange(nb_pts_per_dim**spatial_dim), nb_domain_grid_pts)
+        ref_values = np.reshape(
+            np.arange(nb_pts_per_dim**spatial_dim), nb_domain_grid_pts
+        )
 
         nb_ghost_left = np.full(spatial_dim, 1)
         nb_ghost_right = np.full(spatial_dim, 2)
@@ -57,29 +59,21 @@ class DecompositionCheck(unittest.TestCase):
                 global_coords = (
                     subdomain_locations + np.array(index)
                 ) % nb_domain_grid_pts
-                full_index = (..., *index)
-                field.s[full_index] = ref_values[tuple(global_coords)]
+                field.s[(..., *index)] = ref_values[tuple(global_coords)]
+            else:
+                field.s[(..., *index)] = -1
 
         # Communicate ghost cells
         cart_decomp.communicate_ghosts(field_name)
 
         # Validate ghost cells
         for index in np.ndindex(*nb_subdomain_grid_pts):
-            is_ghost = any(
-                idx < nb_ghost_left[dim]
-                or idx >= nb_subdomain_grid_pts[dim] - nb_ghost_right[dim]
-                for dim, idx in enumerate(index)
+            global_coords = (subdomain_locations + np.array(index)) % nb_domain_grid_pts
+            self.assertEqual(
+                field.s[(..., *index)],
+                ref_values[tuple(global_coords)],
+                f"Mismatch at {index}",
             )
-            if is_ghost:
-                global_coords = (
-                    subdomain_locations + np.array(index)
-                ) % nb_domain_grid_pts
-                full_index = (..., *index)
-                self.assertEqual(
-                    field.s[full_index],
-                    ref_values[tuple(global_coords)],
-                    f"Mismatch at {index}",
-                )
 
 
 if __name__ == "__main__":
