@@ -47,7 +47,7 @@ if boost_test.found()
         'mpi_test_communicator.cc',
         'mpi_test_field_map.cc',
     ]
-    if mugrid_with_netcdf
+    if mpi.found() and mugrid_with_netcdf  # this test is not compatible with stub MPI
         mugrid_mpi_test_sources += ['io_mpi_test_file_io_netcdf.cc']
     endif
 
