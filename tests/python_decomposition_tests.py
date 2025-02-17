@@ -2,7 +2,6 @@ import unittest
 import numpy as np
 
 import muGrid
-from mpi4py import MPI
 
 
 class DecompositionCheck(unittest.TestCase):
@@ -20,7 +19,11 @@ class DecompositionCheck(unittest.TestCase):
             raise NotImplementedError("Not planned for this number of processes.")
 
     def test_communicate_ghost(self):
-        comm = MPI.COMM_WORLD
+        try:
+            from mpi4py import MPI
+            comm = muGrid.Communicator(MPI.COMM_WORLD)
+        except ImportError:
+            comm = muGrid.Communicator()
         nb_processes = comm.size
         nb_subdivisions = self.get_nb_subdivisions(nb_processes)
 
@@ -35,7 +38,7 @@ class DecompositionCheck(unittest.TestCase):
         nb_ghost_left = np.full(spatial_dim, 1)
         nb_ghost_right = np.full(spatial_dim, 2)
         cart_decomp = muGrid.CartesianDecomposition(
-            muGrid.Communicator(comm),
+            comm,
             nb_domain_grid_pts.tolist(),
             nb_subdivisions,
             nb_ghost_left.tolist(),
