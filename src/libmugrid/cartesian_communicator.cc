@@ -93,13 +93,13 @@ namespace muGrid {
       Index_t send_offset, Index_t recv_offset, char * begin_addr,
       int stride_in_direction, int elem_size_in_bytes) const {
     for (int count{0}; count < nb_block; ++count) {
-      begin_addr += stride_in_next_dim * elem_size_in_bytes;
       auto recv_addr{static_cast<void *>(
           begin_addr + recv_offset * stride_in_direction * elem_size_in_bytes)};
       auto send_addr{static_cast<void *>(
           begin_addr + send_offset * stride_in_direction * elem_size_in_bytes)};
       std::memcpy(recv_addr, send_addr,
                   block_len * stride_in_direction * elem_size_in_bytes);
+      begin_addr += stride_in_next_dim * elem_size_in_bytes;
     }
   }
 
@@ -108,13 +108,13 @@ namespace muGrid {
       Index_t send_offset, Index_t recv_offset, char * begin_addr,
       int stride_in_direction, int elem_size_in_bytes) const {
     for (int count{0}; count < nb_block; ++count) {
-      begin_addr += stride_in_next_dim * elem_size_in_bytes;
       auto recv_addr{static_cast<void *>(
           begin_addr + recv_offset * stride_in_direction * elem_size_in_bytes)};
       auto send_addr{static_cast<void *>(
           begin_addr + send_offset * stride_in_direction * elem_size_in_bytes)};
       std::memcpy(recv_addr, send_addr,
                   block_len * stride_in_direction * elem_size_in_bytes);
+      begin_addr += stride_in_next_dim * elem_size_in_bytes;
     }
   }
 #endif  // WITH_MPI

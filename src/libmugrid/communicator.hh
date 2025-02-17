@@ -398,6 +398,12 @@ namespace muGrid {
       return arg;
     }
 
+    //! sum on EigenMatrix types
+    template <typename T>
+    DynMatrix_t<T> sum(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+      return arg;
+    }
+
     //! max reduction on scalar types
     template <typename T>
     T max(const T & arg) const {
@@ -411,9 +417,15 @@ namespace muGrid {
       return arg;
     }
 
-    //! gather on EigenMatrix types
+    //! gather on scalar types
     template <typename T>
     T gather(const T & arg) const {
+      return arg;
+    }
+
+    //! gather on EigenMatrix types
+    template <typename T>
+    DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
       return arg;
     }
 
