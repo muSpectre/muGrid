@@ -48,8 +48,8 @@ class DecompositionCheck(unittest.TestCase):
         field_name = "test_field"
         field = cart_decomp.collection.real_field(field_name)
 
-        subdomain_locations = cart_decomp.subdomain_locations
         nb_subdomain_grid_pts = cart_decomp.nb_subdomain_grid_pts
+        global_coords = cart_decomp.global_coords
 
         # Fill non-ghost cells
         for index in np.ndindex(*nb_subdomain_grid_pts):
@@ -59,10 +59,8 @@ class DecompositionCheck(unittest.TestCase):
                 for dim, idx in enumerate(index)
             )
             if is_not_ghost:
-                global_coords = (
-                    subdomain_locations + np.array(index)
-                ) % nb_domain_grid_pts
-                field.s[(..., *index)] = ref_values[tuple(global_coords)]
+                ref_index = global_coords[(..., *index)]
+                field.s[(..., *index)] = ref_values[tuple(ref_index)]
             else:
                 field.s[(..., *index)] = -1
 
@@ -71,10 +69,10 @@ class DecompositionCheck(unittest.TestCase):
 
         # Validate ghost cells
         for index in np.ndindex(*nb_subdomain_grid_pts):
-            global_coords = (subdomain_locations + np.array(index)) % nb_domain_grid_pts
+            ref_index = global_coords[(..., *index)]
             self.assertEqual(
                 field.s[(..., *index)],
-                ref_values[tuple(global_coords)],
+                ref_values[tuple(ref_index)],
                 f"Mismatch at {index}",
             )
 

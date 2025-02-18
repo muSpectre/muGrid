@@ -161,6 +161,10 @@ namespace muGrid {
     return this->comm.get_nb_subdivisions();
   }
 
+  const DynCcoord_t CartesianDecomposition::get_nb_domain_grid_pts() const {
+    return this->collection->get_nb_domain_grid_pts();
+  }
+
   const DynCcoord_t CartesianDecomposition::get_nb_subdomain_grid_pts() const {
     return this->collection->get_nb_subdomain_grid_pts();
   }

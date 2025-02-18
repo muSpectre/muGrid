@@ -32,6 +32,9 @@ namespace muGrid {
     //! get the number of subdivisions
     const DynCcoord_t get_nb_subdivisions() const;
 
+    //! get the number of grid points of the whole domain
+    const DynCcoord_t get_nb_domain_grid_pts() const;
+
     //! get the number of grid points per subdomain
     const DynCcoord_t get_nb_subdomain_grid_pts() const;
 
