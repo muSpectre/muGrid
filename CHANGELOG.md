@@ -1,7 +1,7 @@
 Change log for µGrid
 ====================
 
-0.94.0 (not yet released)
+0.94.0 (18Feb25)
 -------------------------
 
 - ENH: General convolution operator for fields
