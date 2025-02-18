@@ -45,6 +45,7 @@ if boost_test.found()
     mugrid_mpi_test_sources = [
         'main_test_suite.cc',
         'mpi_test_communicator.cc',
+        'mpi_test_decomposition.cc',
         'mpi_test_field_map.cc',
     ]
     if mpi.found() and mugrid_with_netcdf  # this test is not compatible with stub MPI
@@ -74,7 +75,7 @@ if boost_test.found()
         endif
     else
         test(
-            'mpi_mugrid_main_test_suite-without_MPI',
+            'mpi_mugrid_main_test_suite-with_stub',
             mpi_main_test_suite,
             timeout: test_timeout,
         )
