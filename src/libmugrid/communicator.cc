@@ -36,6 +36,7 @@
 #include "communicator.hh"
 
 namespace muGrid {
+#ifdef WITH_MPI
 
   Communicator::Communicator(MPI_Comm comm) : comm{comm} {}
 
@@ -47,5 +48,5 @@ namespace muGrid {
     this->comm = other.comm;
     return *this;
   }
-
+#endif
 }  // namespace muGrid

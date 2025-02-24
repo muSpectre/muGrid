@@ -22,6 +22,9 @@ mugrid_sources = [
     'field_typed.cc',
     'field_map.cc',
     'physics_domain.cc',
+    'communicator.cc',
+    'cartesian_communicator.cc',
+    'cartesian_decomposition.cc',
     'options_dictionary.cc',
     'raw_memory_operations.cc',
     'state_field.cc',
@@ -33,14 +36,6 @@ mugrid_sources = [
 if mugrid_with_netcdf
     mugrid_sources += [
         'file_io_netcdf.cc',
-    ]
-endif
-
-if mpi.found()
-    mugrid_sources += [
-        'communicator.cc',
-        'cartesian_communicator.cc',
-        'cartesian_decomposition.cc'
     ]
 endif
 

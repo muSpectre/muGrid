@@ -10,7 +10,6 @@
 
 namespace muGrid {
 
-#ifdef WITH_MPI
   class CartesianCommunicator : public Communicator {
    public:
     using Parent_t = Communicator;
@@ -34,23 +33,39 @@ namespace muGrid {
 
     const DynCcoord_t & get_coordinates() const;
 
+#ifdef WITH_MPI
     //! send to right; receive from left
-    void sendrecv_right(int direction, int count, void * send_offset,
-                        void * recv_offset, MPI_Datatype mpi_t) const;
+    void sendrecv_right(int direction, int block_len, int stride_in_next_dim,
+                        int nb_block, Index_t send_offset, Index_t recv_offset,
+                        char * begin_addr, int stride_in_direction,
+                        int elem_size_in_bytes, MPI_Datatype elem_mpi_t) const;
 
     //! send to left; receive from right
-    void sendrecv_left(int direction, int count, void * send_offset,
-                       void * recv_offset, MPI_Datatype mpi_t) const;
+    void sendrecv_left(int direction, int block_len, int stride_in_next_dim,
+                       int nb_block, Index_t send_offset, Index_t recv_offset,
+                       char * begin_addr, int stride_in_direction,
+                       int elem_size_in_bytes, MPI_Datatype elem_mpi_t) const;
+#else   // not WITH_MPI
+    void sendrecv_right(int direction, int block_len, int stride_in_next_dim,
+                        int nb_block, Index_t send_offset, Index_t recv_offset,
+                        char * begin_addr, int stride_in_direction,
+                        int elem_size_in_bytes) const;
+
+    void sendrecv_left(int direction, int block_len, int stride_in_next_dim,
+                       int nb_block, Index_t send_offset, Index_t recv_offset,
+                       char * begin_addr, int stride_in_direction,
+                       int elem_size_in_bytes) const;
+#endif  // WITH_MPI
 
    protected:
     Parent_t parent;
     DynCcoord_t nb_subdivisions;
     DynCcoord_t coordinates;
+#if WITH_MPI
     std::vector<int> right_ranks;
     std::vector<int> left_ranks;
-  };
-
 #endif  // WITH_MPI
+  };
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_CARTESIAN_COMMUNICATOR_HH_
