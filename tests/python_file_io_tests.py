@@ -77,8 +77,11 @@ class FileIOTest(unittest.TestCase):
         self.fc_loc.initialise()
 
     def test_FileIONetCDF_Fields(self):
-        if os.path.exists(self.file_f_name):
-            os.remove(self.file_f_name)
+        if self.comm.rank == 0:
+            if os.path.exists(self.file_f_name):
+                os.remove(self.file_f_name)
+
+        self.comm.Barrier()
 
         file_io_object = muGrid.FileIONetCDF(self.file_f_name, muGrid.OpenMode.Write, self.comm)
 
@@ -156,8 +159,11 @@ class FileIOTest(unittest.TestCase):
         self.assertTrue((a_loc == 5678).all())
 
     def test_FileIONetCDF_StateFields(self):
-        if os.path.exists(self.file_sf_name):
-            os.remove(self.file_sf_name)
+        if self.comm.rank == 0:
+            if os.path.exists(self.file_sf_name):
+                os.remove(self.file_sf_name)
+
+        self.comm.Barrier()
 
         file_io_object = muGrid.FileIONetCDF(self.file_sf_name, muGrid.OpenMode.Write, self.comm)
 
@@ -243,8 +249,11 @@ class FileIOTest(unittest.TestCase):
 
     def test_FileIONetCDF_global_attributes(self):
         # --- write global attributes --- #
-        if os.path.exists(self.file_ga_name):
-            os.remove(self.file_ga_name)
+        if self.comm.rank == 0:
+            if os.path.exists(self.file_ga_name):
+                os.remove(self.file_ga_name)
+
+        self.comm.Barrier()
 
         file_io_object_w = muGrid.FileIONetCDF(self.file_ga_name, muGrid.OpenMode.Write, self.comm)
 
@@ -357,12 +366,8 @@ class FileIOTest(unittest.TestCase):
                       + " size which is not allowed!")
         self.assertTrue(str(cm.exception)[:len(error_code)] == error_code)
 
-        def random_name_generator(size=6, chars=string.ascii_uppercase
-                                  + string.ascii_lowercase + string.digits):
-            return ''.join(random.choice(chars) for _ in range(size))
-
-        valid_new_value = random_name_generator(len(old_value))
-        valid_new_name = random_name_generator(len(old_name))
+        valid_new_value = "abc!!!"
+        valid_new_name = "global_att_new"
 
         file_io_object_a.update_global_attribute(old_name,
                                                  valid_new_name,

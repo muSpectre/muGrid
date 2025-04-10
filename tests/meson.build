@@ -96,21 +96,19 @@ envdata.append('TESTS_BUILDDIR', meson.current_build_dir())
 #
 # General tests on pyton bindings
 #
-python_binding_test_suite = files('python_binding_tests.py')
-
 test(
     'mugrid_python_binding_tests',
     python,
-    args : [python_binding_test_suite, '-v', '-f'],
+    args : ['-m', 'pytest', '-v', '-s'],
     env : envdata,
     depends : [mugrid_python],
     timeout : test_timeout,
+    workdir : meson.source_root(),
 )
 
 #
 # Parallel computing specific tests on python bindings
 #
-mpi_python_binding_test_suite = files('python_mpi_binding_tests.py')
 if mpi.found()
     mpiexec = find_program('mpiexec', required : false)
     if mpiexec.found()
@@ -121,14 +119,16 @@ if mpi.found()
                 args : [
                     '-n', n,
                     '--oversubscribe', python.full_path(),
-                    mpi_python_binding_test_suite,
+                    '-m',
+                    'pytest',
                     '-v',
-                    '-f',
+                    '-s',
                 ],
                 env : envdata,
                 depends : [mugrid_python],
                 timeout : test_timeout, # Test can take a long time
                 is_parallel : false, # Don't run any other test in parallel
+                workdir : meson.source_root(),
             )
         endforeach
     else
