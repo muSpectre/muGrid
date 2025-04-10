@@ -73,10 +73,10 @@ namespace muGrid {
      * and necessary information to indicate its shape.
      *
      * @param pixel_operator The pixel-wise operator raveled as a matrix.
-     * @param conv_pts_shape Shape of convolution points.
-     * @param nb_pixelnodal_pts Number of pixel nodal points.
+     * @param conv_pts_shape Shape of the stencil.
+     * @param nb_pixelnodal_pts Number of nodal points per pixel.
      * @param nb_quad_pts Number of quadrature points per pixel.
-     * @param nb_operators Number of operators.
+     * @param nb_operators Number of operators in the stencil.
      */
     ConvolutionOperator(
         const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
