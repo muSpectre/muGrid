@@ -138,7 +138,7 @@ else
     test(
         'mugrid_python_binding_tests',
         python,
-        args : [mpi_python_binding_test_suite, '-v', '-f'],
+        args : ['-m', 'pytest', '-v', '-f'],
         env : envdata,
         depends : [mugrid_python],
         timeout : test_timeout,
