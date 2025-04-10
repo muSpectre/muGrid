@@ -103,7 +103,7 @@ test(
     env : envdata,
     depends : [mugrid_python],
     timeout : test_timeout,
-    workdir : meson.source_root(),
+    workdir : join_paths(meson.source_root(), 'tests'),
 )
 
 #
@@ -128,7 +128,7 @@ if mpi.found()
                 depends : [mugrid_python],
                 timeout : test_timeout, # Test can take a long time
                 is_parallel : false, # Don't run any other test in parallel
-                workdir : meson.source_root(),
+                workdir : join_paths(meson.source_root(), 'tests'),
             )
         endforeach
     else
@@ -142,5 +142,6 @@ else
         env : envdata,
         depends : [mugrid_python],
         timeout : test_timeout,
+        workdir : join_paths(meson.source_root(), 'tests'),
     )
 endif
