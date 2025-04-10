@@ -59,113 +59,111 @@ namespace py = pybind11;
 // A helper class that bounces calls to virtual methods back to Python 
 class PyConvolutionOperator : public ConvolutionOperatorBase {
 public:
-  // Inherit the constructors 
-  using ConvolutionOperatorBase::ConvolutionOperatorBase;
+    // Inherit the constructors
+    using ConvolutionOperatorBase::ConvolutionOperatorBase;
 
-  // Trampoline (one for each virtual function) 
+    // Trampoline (one for each virtual function)
 
-  void apply(const TypedFieldBase<Real> & nodal_field,
-                      TypedFieldBase<Real> & quadrature_point_field) const override {
-    PYBIND11_OVERRIDE_PURE(
-      void,
-      ConvolutionOperatorBase,
-      apply,
-      nodal_field, quadrature_point_field
-    );
-  }
+    void apply(const TypedFieldBase<Real> &nodal_field,
+               TypedFieldBase<Real> &quadrature_point_field) const override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            ConvolutionOperatorBase,
+            apply,
+            nodal_field, quadrature_point_field
+        );
+    }
 
-  void apply_increment(
-        const TypedFieldBase<Real> & nodal_field, const Real & alpha,
-        TypedFieldBase<Real> & quadrature_point_field) const override {
-    PYBIND11_OVERRIDE_PURE(
-      void,
-      ConvolutionOperatorBase,
-      apply_increment,
-      nodal_field, alpha, quadrature_point_field
-    );
-  }
+    void apply_increment(
+        const TypedFieldBase<Real> &nodal_field, const Real &alpha,
+        TypedFieldBase<Real> &quadrature_point_field) const override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            ConvolutionOperatorBase,
+            apply_increment,
+            nodal_field, alpha, quadrature_point_field
+        );
+    }
 
-  void 
-  transpose(const TypedFieldBase<Real> & quadrature_point_field,
-                  TypedFieldBase<Real> & nodal_field,
-                  const std::vector<Real> & weights = {}) const override {
-    PYBIND11_OVERRIDE_PURE(
-      void,
-      ConvolutionOperatorBase,
-      transpose,
-      quadrature_point_field, nodal_field, weights
-    );
-  }
+    void
+    transpose(const TypedFieldBase<Real> &quadrature_point_field,
+              TypedFieldBase<Real> &nodal_field,
+              const std::vector<Real> &weights = {}) const override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            ConvolutionOperatorBase,
+            transpose,
+            quadrature_point_field, nodal_field, weights
+        );
+    }
 
-  void transpose_increment(
-      const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
-      TypedFieldBase<Real> & nodal_field,
-      const std::vector<Real> & weights = {}) const override {
-    PYBIND11_OVERRIDE_PURE(
-      void,
-      ConvolutionOperatorBase,
-      transpose,
-      quadrature_point_field, alpha, nodal_field, weights
-    );
-  }
+    void transpose_increment(
+        const TypedFieldBase<Real> &quadrature_point_field, const Real &alpha,
+        TypedFieldBase<Real> &nodal_field,
+        const std::vector<Real> &weights = {}) const override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            ConvolutionOperatorBase,
+            transpose,
+            quadrature_point_field, alpha, nodal_field, weights
+        );
+    }
 
-  Index_t get_nb_quad_pts() const override {
-    PYBIND11_OVERRIDE_PURE(
-      Index_t,
-      ConvolutionOperatorBase,
-      get_nb_quad_pts,
-    );
-  }
+    Index_t get_nb_quad_pts() const override {
+        PYBIND11_OVERRIDE_PURE(
+            Index_t,
+            ConvolutionOperatorBase,
+            get_nb_quad_pts,
+        );
+    }
 
-  Index_t get_nb_nodal_pts() const override {
-    PYBIND11_OVERRIDE_PURE(
-      Index_t,
-      ConvolutionOperatorBase,
-      get_nb_nodal_pts,
-    );
-  }
+    Index_t get_nb_nodal_pts() const override {
+        PYBIND11_OVERRIDE_PURE(
+            Index_t,
+            ConvolutionOperatorBase,
+            get_nb_nodal_pts,
+        );
+    }
 
-  Index_t get_spatial_dim() const override {
-    PYBIND11_OVERRIDE_PURE(
-      Index_t,
-      ConvolutionOperatorBase,
-      get_spatial_dim,
-    );
-  }
+    Index_t get_spatial_dim() const override {
+        PYBIND11_OVERRIDE_PURE(
+            Index_t,
+            ConvolutionOperatorBase,
+            get_spatial_dim,
+        );
+    }
 };
 
 
-// Bind class GraidentOperatorBase 
-void add_convolution_operator_base(py::module & mod) {
-  py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
-    .def(py::init<>())
-    .def("apply", &ConvolutionOperatorBase::apply, "nodal_field"_a, "quadrature_point_field"_a)
-    .def("get_nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
-    .def("get_nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
-    .def("get_spatial_dim", &ConvolutionOperatorBase::get_spatial_dim)
-    ;
+// Bind class GraidentOperatorBase
+void add_convolution_operator_base(py::module &mod) {
+    py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
+            .def(py::init<>())
+            .def("apply", &ConvolutionOperatorBase::apply, "nodal_field"_a, "quadrature_point_field"_a)
+            .def("get_nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
+            .def("get_nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
+            .def("get_spatial_dim", &ConvolutionOperatorBase::get_spatial_dim);
 }
 
 
 // Bind class ConvolutionOperator
-void add_convolution_operator_default(py::module & mod) {
-  py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
-    .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &,
-        const Index_t &, const Index_t &, const Index_t &>(),
-        "pixel_operator"_a, "conv_pts_shape"_a, "nb_pixelnodal_pts"_a,
-        "nb_quad_pts"_a, "nb_operators"_a)
-    .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
-    .def("transpose", &ConvolutionOperator::transpose, "quadrature_point_field"_a, 
-        "nodal_field"_a, "weights"_a=std::vector<Real>{})
-    .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
-    .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
-    .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
-    .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)
-    ;
+void add_convolution_operator_default(py::module &mod) {
+    py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
+            .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &,
+                     const Index_t &, const Index_t &, const Index_t &>(),
+                 "pixel_operator"_a, "conv_pts_shape"_a, "nb_pixelnodal_pts"_a,
+                 "nb_quad_pts"_a, "nb_operators"_a)
+            .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
+            .def("transpose", &ConvolutionOperator::transpose, "quadrature_point_field"_a,
+                 "nodal_field"_a, "weights"_a = std::vector<Real>{})
+            .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
+            .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
+            .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
+            .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts);
 }
 
 
-void add_convolution_operator_classes(py::module & mod) {
-  add_convolution_operator_base(mod);
-  add_convolution_operator_default(mod);
+void add_convolution_operator_classes(py::module &mod) {
+    add_convolution_operator_base(mod);
+    add_convolution_operator_default(mod);
 }
