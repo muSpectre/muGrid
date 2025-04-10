@@ -28,7 +28,8 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest",
-    "pytest-cov"
+    "pytest-cov",
+    "NuMPI>=0.7.3"
 ]
 
 [project.urls]

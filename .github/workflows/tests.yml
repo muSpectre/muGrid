@@ -67,7 +67,7 @@ jobs:
               libboost-test-dev \
               libnetcdf-dev
           fi
-          python3 -m pip install build meson
+          python3 -m pip install build meson pytest
           python3 -m pip list
 
       - name: Compile with Meson
