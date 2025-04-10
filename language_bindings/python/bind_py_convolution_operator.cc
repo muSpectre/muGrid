@@ -1,11 +1,11 @@
 /**
-* @file   bind_py_field.cc
+* @file   bind_py_convolution_operator.cc
 *
-* @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
+* @author Yizhen Wang <yizhen.wang@imtek.uni-freiburg.de>
 *
-* @date   16 Oct 2019
+* @date   28 Nov 2024
 *
-* @brief  Python bindings for fields
+* @brief  Python bindings for the convolution operator
 *
 * Copyright © 2018 Till Junge
 *
