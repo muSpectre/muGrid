@@ -66,7 +66,7 @@ namespace muGrid {
    * in the µGrid codebase. It is used for consistency throughout the code. It
    * is also capable of representing -1, which is a requirement for Eigen.
    */
-  using Dim_t = int;
+  using Dim_t = int;  // FIXME(pastewka): This type is used nowhere in the code (only in tests)
 
   /**
    * @typedef Index_t
@@ -149,7 +149,7 @@ namespace muGrid {
     ColMajor,  //!< column-major storage order (first index is fast)
     ArrayOfStructures = ColMajor,  //!< components are consecutive in memory
     RowMajor,  //!< row-major storage order (last index is fast)
-    StructurOfArrays = RowMajor,  //< pixels are consecutive in memory
+    StructureOfArrays = RowMajor,  //< pixels are consecutive in memory
     Unknown,   //!< storage order is unknown, only for `WrappedField`
     Automatic  //!< inherit storage order from `FieldCollection`
   };
