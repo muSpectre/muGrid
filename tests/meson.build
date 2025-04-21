@@ -99,11 +99,10 @@ envdata.append('TESTS_BUILDDIR', meson.current_build_dir())
 test(
     'mugrid_python_binding_tests',
     python,
-    args : ['-m', 'pytest', '-v', '-s'],
+    args : ['-m', 'pytest', '-v', '-s', join_paths(meson.project_source_root(), 'tests')],
     env : envdata,
     depends : [mugrid_python],
     timeout : test_timeout,
-    workdir : join_paths(meson.source_root(), 'tests'),
 )
 
 #
@@ -123,12 +122,12 @@ if mpi.found()
                     'pytest',
                     '-v',
                     '-s',
+                    join_paths(meson.project_source_root(), 'tests')
                 ],
                 env : envdata,
                 depends : [mugrid_python],
                 timeout : test_timeout, # Test can take a long time
                 is_parallel : false, # Don't run any other test in parallel
-                workdir : join_paths(meson.source_root(), 'tests'),
             )
         endforeach
     else
@@ -138,10 +137,9 @@ else
     test(
         'mugrid_python_binding_tests',
         python,
-        args : ['-m', 'pytest', '-v', '-f'],
+        args : ['-m', 'pytest', '-v', '-f', join_paths(meson.project_source_root(), 'tests')],
         env : envdata,
         depends : [mugrid_python],
         timeout : test_timeout,
-        workdir : join_paths(meson.source_root(), 'tests'),
     )
 endif

@@ -109,6 +109,14 @@ public:
         );
     }
 
+    Index_t get_nb_operators() const override {
+        PYBIND11_OVERRIDE_PURE(
+            Index_t,
+            ConvolutionOperatorBase,
+            get_nb_operators,
+        );
+    }
+
     Index_t get_nb_quad_pts() const override {
         PYBIND11_OVERRIDE_PURE(
             Index_t,
@@ -149,17 +157,46 @@ void add_convolution_operator_base(py::module &mod) {
 // Bind class ConvolutionOperator
 void add_convolution_operator_default(py::module &mod) {
     py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
-            .def(py::init<Eigen::Ref<const Eigen::MatrixXd>, const Shape_t &,
-                     const Index_t &, const Index_t &, const Index_t &>(),
-                 "pixel_operator"_a, "conv_pts_shape"_a, "nb_pixelnodal_pts"_a,
-                 "nb_quad_pts"_a, "nb_operators"_a)
+            .def(py::init([](Index_t nb_dims, py::array_t<Real, py::array::f_style | py::array::forcecast> array) {
+                     // Array should have shape (directions, quadrature-points, nodal-points, pixels)
+                     // pixels portion has nb_dims. Everything in front is omitted.
+                     if (nb_dims != 1 && nb_dims != 2 && nb_dims != 3) {
+                         throw std::runtime_error("Stencil must be 1D, 2D or 3D");
+                     }
+                     ssize_t nb_operators{1};
+                     if (array.ndim() > nb_dims + 2) {
+                         nb_operators = array.shape(array.ndim() - nb_dims - 3);
+                     }
+                     ssize_t nb_quad_pts{1};
+                     if (array.ndim() > nb_dims + 1) {
+                         nb_quad_pts = array.shape(array.ndim() - nb_dims - 2);
+                     }
+                     ssize_t nb_nodal_pts{1};
+                     if (array.ndim() > nb_dims) {
+                         nb_nodal_pts = array.shape(array.ndim() - nb_dims - 1);
+                     }
+                     Shape_t nb_stencil_pts(nb_dims);
+                     std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
+                               nb_stencil_pts.begin());
+                     const auto nb_rows{nb_operators * nb_quad_pts};
+                     const auto nb_cols{
+                         nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
+                                                        nb_stencil_pts.end(), 1,
+                                                        std::multiplies<Index_t>())
+                     };
+                std::cout << nb_operators << " " << nb_quad_pts << " "  << nb_nodal_pts << std::endl;
+                     return ConvolutionOperator(Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
+                                                nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
+                 }),
+                 "nb_spatial_dims"_a, "pixel_operator"_a)
             .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
             .def("transpose", &ConvolutionOperator::transpose, "quadrature_point_field"_a,
                  "nodal_field"_a, "weights"_a = std::vector<Real>{})
             .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
             .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
             .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
-            .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts);
+            .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)
+            .def_property_readonly("nb_operators", &ConvolutionOperator::get_nb_operators);
 }
 
 

@@ -291,6 +291,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  Index_t ConvolutionOperator::get_nb_operators() const {
+    return this->nb_operators;
+  }
+
+  /* ---------------------------------------------------------------------- */
   Index_t ConvolutionOperator::get_nb_nodal_pts() const {
     return this->nb_pixelnodal_pts;
   }

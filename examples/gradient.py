@@ -20,13 +20,15 @@ nodal_field.p = np.sin(2 * np.pi * x)
 gradient = np.array(
     [
         [  # Derivative in x-direction
-            [[-1, 1], [0, 0]],  # Bottom-left triangle (first quadrature point)
-            [[0, 0], [-1, 1]],  # Top-right triangle (second quadrature point)
+            [[[-1, 1], [0, 0]]],  # Bottom-left triangle (first quadrature point)
+            [[[0, 0], [-1, 1]]],  # Top-right triangle (second quadrature point)
         ],
         [  # Derivative in y-direction
-            [[-1, 0], [1, 0]],  # Bottom-left triangle (first quadrature point)
-            [[0, -1], [0, 1]],  # Top-right triangle (second quadrature point)
+            [[[-1, 0], [1, 0]]],  # Bottom-left triangle (first quadrature point)
+            [[[0, -1], [0, 1]]],  # Top-right triangle (second quadrature point)
         ],
     ],
 )
-op = ConvolutionOperator(gradient)
+print(gradient.shape)
+op = ConvolutionOperator(2, gradient)
+print(op.nb_operators, op.nb_quad_pts, op.nb_nodal_pts)
