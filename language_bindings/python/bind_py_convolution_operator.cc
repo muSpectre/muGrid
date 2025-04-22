@@ -185,7 +185,6 @@ void add_convolution_operator_default(py::module &mod) {
                                                         nb_stencil_pts.end(), 1,
                                                         std::multiplies<Index_t>())
                      };
-                std::cout << nb_operators << " " << nb_quad_pts << " "  << nb_nodal_pts << std::endl;
                      return ConvolutionOperator(Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
                                                 nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
                  }),
