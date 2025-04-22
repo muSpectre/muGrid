@@ -81,7 +81,7 @@ class FileIOTest(unittest.TestCase):
             if os.path.exists(self.file_f_name):
                 os.remove(self.file_f_name)
 
-        self.comm.Barrier()
+        self.comm.barrier()
 
         file_io_object = muGrid.FileIONetCDF(self.file_f_name, muGrid.OpenMode.Write, self.comm)
 
@@ -163,7 +163,7 @@ class FileIOTest(unittest.TestCase):
             if os.path.exists(self.file_sf_name):
                 os.remove(self.file_sf_name)
 
-        self.comm.Barrier()
+        self.comm.barrier()
 
         file_io_object = muGrid.FileIONetCDF(self.file_sf_name, muGrid.OpenMode.Write, self.comm)
 
@@ -253,7 +253,7 @@ class FileIOTest(unittest.TestCase):
             if os.path.exists(self.file_ga_name):
                 os.remove(self.file_ga_name)
 
-        self.comm.Barrier()
+        self.comm.barrier()
 
         file_io_object_w = muGrid.FileIONetCDF(self.file_ga_name, muGrid.OpenMode.Write, self.comm)
 
