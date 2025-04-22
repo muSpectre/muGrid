@@ -148,9 +148,10 @@ void add_convolution_operator_base(py::module &mod) {
     py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
             .def(py::init<>())
             .def("apply", &ConvolutionOperatorBase::apply, "nodal_field"_a, "quadrature_point_field"_a)
-            .def("get_nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
-            .def("get_nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
-            .def("get_spatial_dim", &ConvolutionOperatorBase::get_spatial_dim);
+            .def_property_readonly("nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
+            .def_property_readonly("nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
+            .def_property_readonly("nb_operators", &ConvolutionOperatorBase::get_nb_operators)
+            .def_property_readonly("spatial_dim", &ConvolutionOperatorBase::get_spatial_dim);
 }
 
 
