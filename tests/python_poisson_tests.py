@@ -14,4 +14,4 @@ def test_poisson_solver(comm, nb_grid_pts=(32, 32)):
     assert laplace.nb_operators == 1
     assert laplace.nb_quad_pts == 1
 
-    assert decomposition.nb_subdivisions == s
+    np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
