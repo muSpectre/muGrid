@@ -87,9 +87,9 @@ void add_field(py::module &mod) {
             .def_property_readonly("is_global", &Field::is_global)
             .def_property_readonly("sub_division", &Field::get_sub_division_tag)
             .def_property_readonly(
-                "coords", [](const Field &eng) { return py_coords<Real>(eng); })
+                "coords", [](const Field &self) { return py_coords<Real>(self); })
             .def_property_readonly(
-                "icoords", [](const Field &eng) { return py_coords<Int>(eng); });
+                "icoords", [](const Field &self) { return py_coords<Int>(self); });
 }
 
 template<class T, muGrid::IterUnit iter_unit>

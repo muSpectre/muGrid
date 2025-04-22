@@ -46,18 +46,18 @@ namespace py = pybind11;
 
 namespace muGrid {
     template<typename T>
-    T normalize_coord(Int coord, Real length) {
-        return static_cast<T>(coord / length);
+    T normalize_coord(Int coord, Int length) {
+        return static_cast<T>(CcoordOps::modulo(coord, length) / length);
     }
 
     template<>
-    inline Int normalize_coord<Int>(Int coord, Real length) {
-        return coord;
+    inline Int normalize_coord<Int>(Int coord, Int length) {
+        return CcoordOps::modulo(coord, length);
     }
 
-    template<typename T>
-    auto py_coords(const Field &field) {
-        auto &fc{field.get_collection()};
+    template<typename T, class C>
+    auto py_coords(const C &field_like) {
+        auto &fc{field_like.get_collection()};
         if (fc.get_domain() != FieldCollection::ValidityDomain::Global) {
             throw RuntimeError("Coordinates can only be computed for global fields");
         }
@@ -65,7 +65,7 @@ namespace muGrid {
         auto &gfc{dynamic_cast<const GlobalFieldCollection &>(fc)};
 
         std::vector<Index_t> shape{};
-        const Index_t dim{field.get_spatial_dim()};
+        const Index_t dim{field_like.get_spatial_dim()};
         shape.push_back(dim);
         const auto &nb_subdomain_grid_pts{gfc.get_nb_subdomain_grid_pts()};
         for (auto &&n: nb_subdomain_grid_pts) {

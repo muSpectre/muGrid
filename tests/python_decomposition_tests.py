@@ -47,7 +47,7 @@ class DecompositionCheck(unittest.TestCase):
         field = cart_decomp.collection.real_field(field_name)
 
         # Create reference values
-        global_coords = cart_decomp.global_coords
+        global_coords = cart_decomp.icoords
         weights = np.arange(spatial_dim) + 1
         ref_values = np.einsum("i, i...->...", weights, global_coords)
 
