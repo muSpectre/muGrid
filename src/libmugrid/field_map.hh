@@ -295,6 +295,7 @@ namespace muGrid {
     //! random access operator
     Return_t<Mutability> operator[](size_t index) {
       assert(this->is_initialised);
+      assert(index >= 0);
       assert(index <= static_cast<size_t>(this->field.get_nb_entries()));
       return Return_t<Mutability>{this->data_ptr + index * this->stride,
                                   this->nb_rows, this->nb_cols};
@@ -303,6 +304,7 @@ namespace muGrid {
     //! random const access operator
     Return_t<Mapping::Const> operator[](size_t index) const {
       assert(this->is_initialised);
+      assert(index >= 0);
       assert(index <= static_cast<size_t>(this->field.get_nb_entries()));
       return Return_t<Mapping::Const>{this->data_ptr + index * this->stride,
                                       this->nb_rows, this->nb_cols};

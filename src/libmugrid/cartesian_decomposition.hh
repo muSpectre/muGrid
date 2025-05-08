@@ -29,6 +29,9 @@ namespace muGrid {
     //! get the field collection
     GlobalFieldCollection & get_collection() const;
 
+    //! get the spatial dimension
+    const Index_t get_spatial_dim() const;
+
     //! get the number of subdivisions
     const DynCcoord_t get_nb_subdivisions() const;
 

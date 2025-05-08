@@ -2,6 +2,7 @@
 
 #include "libmugrid/decomposition.hh"
 #include "libmugrid/cartesian_decomposition.hh"
+#include "libmugrid/python_helpers.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -12,6 +13,8 @@ using muGrid::Communicator;
 using muGrid::Int;
 using muGrid::Index_t;
 using muGrid::DynCcoord_t;
+using muGrid::Real;
+using muGrid::py_coords;
 using Pixels_t = muGrid::CcoordOps::DynamicPixels;
 using pybind11::literals::operator""_a;
 
@@ -59,36 +62,14 @@ void add_cartesian_decomposition(py::module & mod) {
                              &CartesianDecomposition::get_nb_subdomain_grid_pts)
       .def_property_readonly("subdomain_locations",
                              &CartesianDecomposition::get_subdomain_locations)
-      .def_property_readonly("global_coords", [](CartesianDecomposition & cart_decomp) {
-        // Create a NumPy array with shape = (dim, nx, ny, ...)
-        std::vector<Index_t> shape{};
-        const auto & nb_subdomain_grid_pts{
-            cart_decomp.get_nb_subdomain_grid_pts()};
-        auto dim{nb_subdomain_grid_pts.size()};
-        shape.push_back(dim);
-        for (auto nb : nb_subdomain_grid_pts) {
-          shape.push_back(nb);
-        }
-        py::array_t<Int, py::array::f_style> coords(shape);
-
-        // Get necessary information
-        const auto & nb_domain_grid_pts{cart_decomp.get_nb_domain_grid_pts()};
-        const auto & subdomain_locations{cart_decomp.get_subdomain_locations()};
-        auto * ptr{static_cast<Int *>(coords.request().ptr)};
-
-        // Fill the array with global coordinates
-        Pixels_t pixels{nb_subdomain_grid_pts};
-        for (auto pixel_id_coords : pixels.enumerate()) {
-          auto local_coords{std::get<1>(pixel_id_coords)};
-          auto global_coords{(subdomain_locations + local_coords) %
-                             nb_domain_grid_pts};
-          for (int i{0}; i < dim; ++i) {
-            *ptr = global_coords[i];
-            ptr++;
-          }
-        }
-        return coords;
-      });
+      .def_property_readonly("coords",
+                             [](const CartesianDecomposition & self) {
+                               return py_coords<Real>(self);
+                             })
+      .def_property_readonly("icoords",
+                             [](const CartesianDecomposition & self) {
+                               return py_coords<Int>(self);
+                             });
 }
 
 // Combined binding function

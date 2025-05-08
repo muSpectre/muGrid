@@ -41,7 +41,7 @@ import muGrid
 import numpy as np
 
 
-class Communicator_Check(unittest.TestCase):
+class CommunicatorCheck(unittest.TestCase):
     def test_sum_default(self):
         # The default communicator is COMM_SELF, i.e. each process by itself
         comm = muGrid.Communicator()

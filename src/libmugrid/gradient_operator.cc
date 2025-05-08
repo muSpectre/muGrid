@@ -389,6 +389,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  Index_t GradientOperator::get_nb_operators() const {
+    return this->spatial_dim;
+  }
+
+  /* ---------------------------------------------------------------------- */
   Index_t GradientOperator::get_nb_nodal_pts() const {
     return this->nb_pixelnodal_pts;
   }

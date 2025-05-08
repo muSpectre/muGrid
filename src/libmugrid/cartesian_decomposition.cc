@@ -157,6 +157,10 @@ namespace muGrid {
     return *this->collection;
   }
 
+  const Index_t CartesianDecomposition::get_spatial_dim() const {
+    return this->collection->get_spatial_dim();
+  }
+
   const DynCcoord_t CartesianDecomposition::get_nb_subdivisions() const {
     return this->comm.get_nb_subdivisions();
   }
