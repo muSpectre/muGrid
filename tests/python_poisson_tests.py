@@ -38,9 +38,6 @@ from NuMPI.Testing.Subdivision import suggest_subdivisions
 import muGrid
 
 
-import numpy as np
-
-
 def conjugate_gradients(
     comm: muGrid.Communicator,
     fc: muGrid.FieldCollection,
@@ -93,7 +90,7 @@ def conjugate_gradients(
     if callback:
         callback(x.s, r, p.s)
 
-    rr = comm.sum(np.dot(r, r))  # initial residual dot product
+    rr = comm.sum(np.dot(r.ravel(), r.ravel()))  # initial residual dot product
     if rr < tol_sq:
         return x
 
@@ -102,7 +99,7 @@ def conjugate_gradients(
         hessp(p, Ap)
 
         # Update x (and residual)
-        pAp = comm.sum(np.dot(p.s, Ap.s))
+        pAp = comm.sum(np.dot(p.s.ravel(), Ap.s.ravel()))
         if pAp <= 0:
             raise RuntimeError("Hessian is not positive definite")
 
@@ -114,7 +111,7 @@ def conjugate_gradients(
             callback(x.s, r, p.s)
 
         # Check convergence
-        next_rr = comm.sum(np.dot(r, r))
+        next_rr = comm.sum(np.dot(r.ravel(), r.ravel()))
         if next_rr < tol_sq:
             return x
 
@@ -150,7 +147,9 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(32, 32)):
     solution = decomposition.collection.real_field("solution")
 
     def callback(x, r, p):
-        """Callback function to print the current solution, residual, and search direction."""
+        """
+        Callback function to print the current solution, residual, and search direction.
+        """
         print(x)
 
     conjugate_gradients(
