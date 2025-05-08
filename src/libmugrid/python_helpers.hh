@@ -47,7 +47,7 @@ namespace py = pybind11;
 namespace muGrid {
     template<typename T>
     T normalize_coord(Int coord, Int length) {
-        return static_cast<T>(CcoordOps::modulo(coord, length) / length);
+        return static_cast<T>(CcoordOps::modulo(coord, length)) / length;
     }
 
     template<>
