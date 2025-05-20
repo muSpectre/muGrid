@@ -47,12 +47,19 @@
 namespace muGrid {
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::ConvolutionOperator(
-        const Eigen::MatrixXd &pixel_operator, const Shape_t &conv_pts_shape,
-        const Index_t &nb_pixelnodal_pts, const Index_t &nb_quad_pts,
+        const Shape_t &pixel_offset,
+        const Eigen::MatrixXd &pixel_operator,
+        const Shape_t &conv_pts_shape,
+        const Index_t &nb_pixelnodal_pts,
+        const Index_t &nb_quad_pts,
         const Index_t &nb_operators)
-        : Parent{}, pixel_operator{pixel_operator},
-          conv_pts_shape{conv_pts_shape}, nb_pixelnodal_pts{nb_pixelnodal_pts},
-          nb_quad_pts{nb_quad_pts}, nb_operators{nb_operators},
+        : Parent{},
+          pixel_offset{pixel_offset},
+          pixel_operator{pixel_operator},
+          conv_pts_shape{conv_pts_shape},
+          nb_pixelnodal_pts{nb_pixelnodal_pts},
+          nb_quad_pts{nb_quad_pts},
+          nb_operators{nb_operators},
           spatial_dim{static_cast<Index_t>(conv_pts_shape.size())},
           nb_conv_pts{get_nb_from_shape(conv_pts_shape)} {
         // Check the dimension of the pixel operator
@@ -128,10 +135,10 @@ namespace muGrid {
                 quadrature_point_field.get_collection())
         };
         auto &pixels{collection.get_pixels()};
-        auto &&nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
         // relative coordinates of the nodal points inside the convolution space
-        CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};
+        CcoordOps::DynamicPixels conv_space{
+            DynCcoord_t(this->conv_pts_shape), DynCcoord_t(this->pixel_offset)};
 
         // For each pixel...
         for (auto &&id_base_ccoord: pixels.enumerate()) {
@@ -241,7 +248,6 @@ namespace muGrid {
                 quadrature_point_field.get_collection())
         };
         auto &pixels{collection.get_pixels()};
-        auto &&nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
         // pixel offsets of the points inside the convolution space
         CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};

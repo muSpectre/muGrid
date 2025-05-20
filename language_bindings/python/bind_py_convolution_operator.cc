@@ -158,36 +158,39 @@ void add_convolution_operator_base(py::module &mod) {
 // Bind class ConvolutionOperator
 void add_convolution_operator_default(py::module &mod) {
     py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
-            .def(py::init([](Index_t nb_dims, py::array_t<Real, py::array::f_style | py::array::forcecast> array) {
-                     // Array should have shape (directions, quadrature-points, nodal-points, pixels)
-                     // pixels portion has nb_dims. Everything in front is omitted.
-                     if (nb_dims != 1 && nb_dims != 2 && nb_dims != 3) {
-                         throw std::runtime_error("Stencil must be 1D, 2D or 3D");
-                     }
-                     ssize_t nb_operators{1};
-                     if (array.ndim() > nb_dims) {
-                         nb_operators = array.shape(0);
-                     }
-                     ssize_t nb_quad_pts{1};
-                     if (array.ndim() > nb_dims + 1) {
-                         nb_quad_pts = array.shape(1);
-                     }
-                     ssize_t nb_nodal_pts{1};
-                     if (array.ndim() > nb_dims + 2) {
-                         nb_nodal_pts = array.shape(2);
-                     }
-                     Shape_t nb_stencil_pts(nb_dims);
-                     std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
-                               nb_stencil_pts.begin());
-                     const auto nb_rows{nb_operators * nb_quad_pts};
-                     const auto nb_cols{
-                         nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
-                                                        nb_stencil_pts.end(), 1,
-                                                        std::multiplies<Index_t>())
-                     };
-                     return ConvolutionOperator(Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
-                                                nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
-                 }),
+            .def(py::init(
+                     [](const Shape_t &offset, py::array_t<Real, py::array::f_style | py::array::forcecast> array) {
+                         // Array should have shape (directions, quadrature-points, nodal-points, pixels)
+                         // pixels portion has nb_dims. Everything in front is omitted.
+                         const auto nb_dims{offset.size()};
+                         if (nb_dims != 1 && nb_dims != 2 && nb_dims != 3) {
+                             throw std::runtime_error("Stencil must be 1D, 2D or 3D");
+                         }
+                         ssize_t nb_operators{1};
+                         if (array.ndim() > nb_dims) {
+                             nb_operators = array.shape(0);
+                         }
+                         ssize_t nb_quad_pts{1};
+                         if (array.ndim() > nb_dims + 1) {
+                             nb_quad_pts = array.shape(1);
+                         }
+                         ssize_t nb_nodal_pts{1};
+                         if (array.ndim() > nb_dims + 2) {
+                             nb_nodal_pts = array.shape(2);
+                         }
+                         Shape_t nb_stencil_pts(nb_dims);
+                         std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
+                                   nb_stencil_pts.begin());
+                         const auto nb_rows{nb_operators * nb_quad_pts};
+                         const auto nb_cols{
+                             nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
+                                                            nb_stencil_pts.end(), 1,
+                                                            std::multiplies<Index_t>())
+                         };
+                         return ConvolutionOperator(
+                             offset, Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
+                             nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
+                     }),
                  "nb_spatial_dims"_a, "pixel_operator"_a)
             .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
             .def("transpose", &ConvolutionOperator::transpose, "quadrature_point_field"_a,

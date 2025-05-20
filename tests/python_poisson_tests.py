@@ -33,133 +33,90 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import numpy as np
-from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
+from muGrid.Solvers import conjugate_gradients
+
+# from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 
-def conjugate_gradients(
-    comm: muGrid.Communicator,
-    fc: muGrid.FieldCollection,
-    hessp: callable,
-    b: muGrid.Field,
-    x: muGrid.Field,
-    tol: float = 1e-6,
-    max_iter: int = 1000,
-    callback: callable = None,
-):
-    """
-    Conjugate gradient method for matrix-free solution of the linear problem
-    Ax = b, where A is represented by the function hessp (which computes the
-    product of A with a vector). The method iteratively refines the solution x
-    until the residual ||Ax - b|| is less than tol or until max_iter iterations
-    are reached.
+def test_fd_stencil():
+    stencil = np.array(
+        [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
+    )  # FD-stencil for the Laplacian
+    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    assert laplace.nb_operators == 1
+    assert laplace.nb_quad_pts == 1
 
-    Parameters
-    ----------
-    comm : muGrid.Communicator
-        Communicator for parallel processing.
-    fc : muGrid.FieldCollection
-        Collection holding temporary fields of the CG algorithm.
-    hessp : callable
-        Function that computes the product of the Hessian matrix A with a vector.
-    b : muGrid.Field
-        Right-hand side vector.
-    x : muGrid.Field
-        Initial guess for the solution.
-    tol : float, optional
-        Tolerance for convergence. The default is 1e-6.
-    max_iter : int, optional
-        Maximum number of iterations. The default is 1000.
-    callback : callable, optional
-        Function to call after each iteration with the current solution, residual,
-        and search direction.
-
-    Returns
-    -------
-    x : array_like
-        Approximate solution to the system Ax = b. (Same as input field x.)
-    """
-    tol_sq = tol * tol
-    p = fc.real_field("cg-search-direction")
-    Ap = fc.real_field("cg-hessian-product")
-    hessp(x, p)
-    p.s = b.s - p.s
-    r = np.copy(p.s)  # residual
-
-    if callback:
-        callback(x.s, r, p.s)
-
-    rr = comm.sum(np.dot(r.ravel(), r.ravel()))  # initial residual dot product
-    if rr < tol_sq:
-        return x
-
-    for _ in range(max_iter):
-        # Compute Hessian product
-        hessp(p, Ap)
-
-        # Update x (and residual)
-        pAp = comm.sum(np.dot(p.s.ravel(), Ap.s.ravel()))
-        if pAp <= 0:
-            raise RuntimeError("Hessian is not positive definite")
-
-        alpha = rr / pAp
-        x.s += alpha * p.s
-        r -= alpha * Ap.s
-
-        if callback:
-            callback(x.s, r, p.s)
-
-        # Check convergence
-        next_rr = comm.sum(np.dot(r.ravel(), r.ravel()))
-        if next_rr < tol_sq:
-            return x
-
-        # Update search direction
-        beta = next_rr / rr
-        rr = next_rr
-        p.s *= beta
-        p.s += r
-
-    raise RuntimeError("Conjugate gradient algorithm did not converge")
+    fc = muGrid.GlobalFieldCollection([3, 3])
+    ifield = fc.real_field("input-field")
+    ofield = fc.real_field("output-field")
+    ifield.p[...] = 1
+    ifield.p[1, 1] = 2
+    laplace.apply(ifield, ofield)
+    np.testing.assert_allclose(ofield.p, stencil)
+    np.testing.assert_allclose(np.sum(ifield.p * ofield.p), -4)
 
 
-def test_fd_poisson_solver(comm, nb_grid_pts=(32, 32)):
+def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     """Finite-differences Poisson solver"""
-    s = suggest_subdivisions(len(nb_grid_pts), comm.size)
+    # s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
-    decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
+    # decomposition =
+    # muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
+    # fc = decomposition.collection
+    fc = muGrid.GlobalFieldCollection(nb_grid_pts)
+    grid_spacing = 1 / np.array(nb_grid_pts)  # Grid spacing
 
     stencil = np.array(
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
-    laplace = muGrid.ConvolutionOperator(len(nb_grid_pts), stencil)
+    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
     assert laplace.nb_operators == 1
     assert laplace.nb_quad_pts == 1
 
-    np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
+    # np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
 
-    x, y = decomposition.coords  # Domain-local coords for each pixel
+    # x, y = decomposition.coords  # Domain-local coords for each pixel
+    x, y = np.meshgrid(
+        np.arange(nb_grid_pts[0]) / nb_grid_pts[0],
+        np.arange(nb_grid_pts[1]) / nb_grid_pts[1],
+        indexing="ij",
+    )
 
-    rhs = decomposition.collection.real_field("rhs")
+    rhs = fc.real_field("rhs")
+    solution = fc.real_field("solution")
+
     rhs.p = np.sin(2 * np.pi * x)
 
-    solution = decomposition.collection.real_field("solution")
-
-    def callback(x, r, p):
+    def callback(it, x, r, p):
         """
         Callback function to print the current solution, residual, and search direction.
         """
-        print(x)
+        print(it, np.dot(r.ravel(), r.ravel()))
+
+    def hessp(x, Ax):
+        """
+        Function to compute the product of the Hessian matrix with a vector.
+        The Hessian is represented by the convolution operator.
+        """
+        laplace.apply(x, Ax)
+        # We need the minus sign because the Laplace operator is negative
+        # definite, but the conjugate-gradients solver assumes a
+        # positive-definite operator.
+        Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        return Ax
 
     conjugate_gradients(
         comm,
-        decomposition.collection,
-        lambda x, Ax: laplace.apply(x, Ax),  # linear operator
-        solution,
+        fc,
+        hessp,  # linear operator
         rhs,
+        solution,
         tol=1e-6,
         callback=callback,
     )
 
-    print(solution.s)
+    np.testing.assert_allclose(
+        solution.p, np.sin(2 * np.pi * x) / (2 * np.pi) ** 2, atol=1e-5
+    )

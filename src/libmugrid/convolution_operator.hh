@@ -78,9 +78,12 @@ namespace muGrid {
          * @param nb_operators Number of operators in the stencil.
          */
         ConvolutionOperator(
-            const Eigen::MatrixXd &pixel_operator, const Shape_t &conv_pts_shape,
+            const Shape_t &pixel_offset,
+            const Eigen::MatrixXd &pixel_operator,
+            const Shape_t &conv_pts_shape,
             const Index_t &nb_pixelnodal_pts,
-            const Index_t &nb_quad_pts, const Index_t &nb_operators);
+            const Index_t &nb_quad_pts,
+            const Index_t &nb_operators);
 
         //! Copy constructor
         ConvolutionOperator(const ConvolutionOperator &other) = delete;
@@ -184,6 +187,10 @@ namespace muGrid {
         Index_t get_spatial_dim() const final;
 
     protected:
+        /**
+         * stencil offset in number of pixels
+         */
+        Shape_t pixel_offset{};
         /**
          * matrix linking the nodal degrees of freedom to their quadrature-point
          * values.

@@ -35,8 +35,8 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import functools
-
 import unittest
+
 import numpy as np
 
 import muGrid
@@ -74,7 +74,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
             nb_stencil_x,
             nb_stencil_y,
         )
-        d_op = muGrid.ConvolutionOperator(2, stencil_oqij)
+        d_op = muGrid.ConvolutionOperator([0, 0], stencil_oqij)
 
         # Check that convolution operator has correct shape
         assert d_op.nb_operators == nb_operators
@@ -103,7 +103,8 @@ class ConvolutionOperatorCheck(unittest.TestCase):
             nb_y_pts,
         )
 
-        # Apply the gradient operator to the `nodal` field and write result to the `quad` field
+        # Apply the gradient operator to the `nodal` field and write result to the
+        # `quad` field
         d_op.apply(nodal, quad)
 
         # Compute the reference value
