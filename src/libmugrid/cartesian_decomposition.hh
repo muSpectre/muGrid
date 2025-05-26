@@ -8,48 +8,53 @@
 #include "decomposition.hh"
 
 namespace muGrid {
-  class CartesianDecomposition : public Decomposition {
-   public:
-    using Parent_t = Decomposition;
-    using SubPtMap_t = FieldCollection::SubPtMap_t;
-    CartesianDecomposition(const Communicator & comm,
-                           const DynCcoord_t & nb_domain_grid_pts,
-                           const DynCcoord_t & nb_subdivisions,
-                           const DynCcoord_t & nb_ghost_left,
-                           const DynCcoord_t & nb_ghost_right,
-                           const SubPtMap_t & nb_sub_pts = {});
+    class CartesianDecomposition : public Decomposition {
+    public:
+        using Parent_t = Decomposition;
+        using SubPtMap_t = FieldCollection::SubPtMap_t;
 
-    CartesianDecomposition() = delete;
+        CartesianDecomposition(const Communicator &comm,
+                               const DynCcoord_t &nb_domain_grid_pts,
+                               const DynCcoord_t &nb_subdivisions,
+                               const DynCcoord_t &nb_ghost_left,
+                               const DynCcoord_t &nb_ghost_right,
+                               const SubPtMap_t &nb_sub_pts = {});
 
-    virtual ~CartesianDecomposition() {}
+        CartesianDecomposition() = delete;
 
-    //! fill the ghost buffers with the values from the neighboring processes.
-    void communicate_ghosts(std::string field_name) const;
+        virtual ~CartesianDecomposition() {
+        }
 
-    //! get the field collection
-    GlobalFieldCollection & get_collection() const;
+        //! fill the ghost buffers with the values from the neighboring processes.
+        void communicate_ghosts(const Field &field) const;
 
-    //! get the spatial dimension
-    const Index_t get_spatial_dim() const;
+        //! fill the ghost buffers with the values from the neighboring processes.
+        void communicate_ghosts(std::string field_name) const;
 
-    //! get the number of subdivisions
-    const DynCcoord_t get_nb_subdivisions() const;
+        //! get the field collection
+        GlobalFieldCollection &get_collection() const;
 
-    //! get the number of grid points of the whole domain
-    const DynCcoord_t get_nb_domain_grid_pts() const;
+        //! get the spatial dimension
+        const Index_t get_spatial_dim() const;
 
-    //! get the number of grid points per subdomain
-    const DynCcoord_t get_nb_subdomain_grid_pts() const;
+        //! get the number of subdivisions
+        const DynCcoord_t get_nb_subdivisions() const;
 
-    //! get the subdomain locations
-    const DynCcoord_t get_subdomain_locations() const;
+        //! get the number of grid points of the whole domain
+        const DynCcoord_t get_nb_domain_grid_pts() const;
 
-   protected:
-    std::unique_ptr<GlobalFieldCollection> collection;
-    DynCcoord_t nb_ghosts_left;
-    DynCcoord_t nb_ghosts_right;
-    CartesianCommunicator comm;
-  };
-}  // namespace muGrid
+        //! get the number of grid points per subdomain
+        const DynCcoord_t get_nb_subdomain_grid_pts() const;
+
+        //! get the subdomain locations
+        const DynCcoord_t get_subdomain_locations() const;
+
+    protected:
+        std::unique_ptr<GlobalFieldCollection> collection;
+        DynCcoord_t nb_ghosts_left;
+        DynCcoord_t nb_ghosts_right;
+        CartesianCommunicator comm;
+    };
+} // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_CARTESIAN_DECOMPOSITION_HH_

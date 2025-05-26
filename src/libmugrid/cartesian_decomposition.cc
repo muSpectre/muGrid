@@ -70,15 +70,12 @@ namespace muGrid {
     }
 
     void
-    CartesianDecomposition::communicate_ghosts(std::string field_name) const {
+    CartesianDecomposition::communicate_ghosts(const Field &field) const {
         // Get shape of the fields on this processor
         auto nb_subdomain_grid_pts{this->get_nb_subdomain_grid_pts()};
 
         // Get spatial dimensions
         int spatial_dims{nb_subdomain_grid_pts.size()};
-
-        // Get field
-        auto &field{this->collection->get_field(field_name)};
 
         // Get strides (in unit: elements)
         auto strides{field.get_strides(IterUnit::SubPt)};
@@ -164,6 +161,11 @@ namespace muGrid {
                                stride_in_direction, element_size);
 #endif
         }
+    }
+
+    void
+    CartesianDecomposition::communicate_ghosts(std::string field_name) const {
+        this->communicate_ghosts(this->collection->get_field(field_name));
     }
 
     GlobalFieldCollection &CartesianDecomposition::get_collection() const {

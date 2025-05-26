@@ -2,6 +2,7 @@
 
 #include "libmugrid/decomposition.hh"
 #include "libmugrid/cartesian_decomposition.hh"
+#include "libmugrid/field.hh"
 #include "libmugrid/python_helpers.hh"
 
 #include <pybind11/pybind11.h>
@@ -14,6 +15,7 @@ using muGrid::Int;
 using muGrid::Index_t;
 using muGrid::DynCcoord_t;
 using muGrid::Real;
+using muGrid::Field;
 using muGrid::py_coords;
 using Pixels_t = muGrid::CcoordOps::DynamicPixels;
 using pybind11::literals::operator""_a;
@@ -28,6 +30,10 @@ public:
 
     // Trampoline (one for each virtual function)
 
+    void communicate_ghosts(const Field &field) const override {
+        PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts, field);
+    }
+
     void communicate_ghosts(std::string field_name) const override {
         PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts, field_name);
     }
@@ -37,7 +43,13 @@ public:
 void add_decomposition(py::module &mod) {
     py::class_<Decomposition, PyDecomposition>(mod, "Decomposition")
             .def(py::init<>())
-            .def("communicate_ghosts", &Decomposition::communicate_ghosts,
+            .def("communicate_ghosts", [](const Decomposition &self, const Field &field) {
+                     self.communicate_ghosts(field);
+                 },
+                 "field"_a)
+            .def("communicate_ghosts", [](const Decomposition &self, std::string field_name) {
+                     self.communicate_ghosts(field_name);
+                 },
                  "field_name"_a);
 }
 
@@ -50,8 +62,6 @@ void add_cartesian_decomposition(py::module &mod) {
                      const DynCcoord_t &>(),
                  "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
                  "nb_ghost_left"_a, "nb_ghost_right"_a)
-            .def("communicate_ghosts", &CartesianDecomposition::communicate_ghosts,
-                 "field_name"_a)
             .def_property_readonly("collection",
                                    &CartesianDecomposition::get_collection)
             .def_property_readonly("nb_subdivisions",
