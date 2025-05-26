@@ -22,58 +22,66 @@ namespace py = pybind11;
 
 // A helper class that bounces calls to virtual methods back to Python
 class PyDecomposition : public Decomposition {
- public:
-  // Inherit the constructors
-  using Decomposition::Decomposition;
+public:
+    // Inherit the constructors
+    using Decomposition::Decomposition;
 
-  // Trampoline (one for each virtual function)
+    // Trampoline (one for each virtual function)
 
-  void communicate_ghosts(std::string field_name) const override {
-    PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts, field_name);
-  }
+    void communicate_ghosts(std::string field_name) const override {
+        PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts, field_name);
+    }
 };
 
 // Bind abstract class Decomposition
-void add_decomposition(py::module & mod) {
-  py::class_<Decomposition, PyDecomposition>(mod, "Decomposition")
-      .def(py::init<>())
-      .def("communicate_ghosts", &Decomposition::communicate_ghosts,
-           "field_name"_a);
+void add_decomposition(py::module &mod) {
+    py::class_<Decomposition, PyDecomposition>(mod, "Decomposition")
+            .def(py::init<>())
+            .def("communicate_ghosts", &Decomposition::communicate_ghosts,
+                 "field_name"_a);
 }
 
 // Bind class Cartesian Decomposition
-void add_cartesian_decomposition(py::module & mod) {
-  py::class_<CartesianDecomposition, Decomposition>(mod,
-                                                    "CartesianDecomposition")
-      .def(py::init<const Communicator &, const DynCcoord_t &,
-                    const DynCcoord_t &, const DynCcoord_t &,
-                    const DynCcoord_t &>(),
-           "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
-           "nb_ghost_left"_a, "nb_ghost_right"_a)
-      .def("communicate_ghosts", &CartesianDecomposition::communicate_ghosts,
-           "field_name"_a)
-      .def_property_readonly("collection",
-                             &CartesianDecomposition::get_collection)
-      .def_property_readonly("nb_subdivisions",
-                             &CartesianDecomposition::get_nb_subdivisions)
-      .def_property_readonly("nb_domain_grid_pts",
-                             &CartesianDecomposition::get_nb_domain_grid_pts)
-      .def_property_readonly("nb_subdomain_grid_pts",
-                             &CartesianDecomposition::get_nb_subdomain_grid_pts)
-      .def_property_readonly("subdomain_locations",
-                             &CartesianDecomposition::get_subdomain_locations)
-      .def_property_readonly("coords",
-                             [](const CartesianDecomposition & self) {
-                               return py_coords<Real>(self);
-                             })
-      .def_property_readonly("icoords",
-                             [](const CartesianDecomposition & self) {
-                               return py_coords<Int>(self);
-                             });
+void add_cartesian_decomposition(py::module &mod) {
+    py::class_<CartesianDecomposition, Decomposition>(mod,
+                                                      "CartesianDecomposition")
+            .def(py::init<const Communicator &, const DynCcoord_t &,
+                     const DynCcoord_t &, const DynCcoord_t &,
+                     const DynCcoord_t &>(),
+                 "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
+                 "nb_ghost_left"_a, "nb_ghost_right"_a)
+            .def("communicate_ghosts", &CartesianDecomposition::communicate_ghosts,
+                 "field_name"_a)
+            .def_property_readonly("collection",
+                                   &CartesianDecomposition::get_collection)
+            .def_property_readonly("nb_subdivisions",
+                                   &CartesianDecomposition::get_nb_subdivisions)
+            .def_property_readonly("nb_domain_grid_pts",
+                                   &CartesianDecomposition::get_nb_domain_grid_pts)
+            .def_property_readonly("nb_subdomain_grid_pts",
+                                   &CartesianDecomposition::get_nb_subdomain_grid_pts)
+            .def_property_readonly("subdomain_locations",
+                                   &CartesianDecomposition::get_subdomain_locations)
+            .def_property_readonly("coords",
+                                   [](const CartesianDecomposition &self) {
+                                       return py_coords<Real, false>(self);
+                                   })
+            .def_property_readonly("icoords",
+                                   [](const CartesianDecomposition &self) {
+                                       return py_coords<Int, false>(self);
+                                   })
+            .def_property_readonly("coordsg",
+                                   [](const CartesianDecomposition &self) {
+                                       return py_coords<Real, true>(self);
+                                   })
+            .def_property_readonly("icoordsg",
+                                   [](const CartesianDecomposition &self) {
+                                       return py_coords<Int, true>(self);
+                                   });
 }
 
 // Combined binding function
-void add_decomposition_classes(py::module & mod) {
-  add_decomposition(mod);
-  add_cartesian_decomposition(mod);
+void add_decomposition_classes(py::module &mod) {
+    add_decomposition(mod);
+    add_cartesian_decomposition(mod);
 }

@@ -1,8 +1,14 @@
 Change log for µGrid
 ====================
 
-0.94.0 (18Feb25)
+0.95.0 (not yet released)
 -------------------------
+
+- ENH: Accessor properties for field access without (`s`, `p`) and with ghosts (`sg`, `pg`)
+- ENH: Parallel conjugate gradient solver
+
+0.94.0 (18Feb25)
+----------------
 
 - ENH: General convolution operator for fields
 - ENH: Domain decomposition with ghost buffer communication

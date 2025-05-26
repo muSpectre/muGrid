@@ -87,31 +87,49 @@ void add_field(py::module &mod) {
             .def_property_readonly("is_global", &Field::is_global)
             .def_property_readonly("sub_division", &Field::get_sub_division_tag)
             .def_property_readonly(
-                "coords", [](const Field &self) { return py_coords<Real>(self); })
+                "coords", [](const Field &self) { return py_coords<Real, false>(self); })
             .def_property_readonly(
-                "icoords", [](const Field &self) { return py_coords<Int>(self); });
+                "icoords", [](const Field &self) { return py_coords<Int, false>(self); })
+            .def_property_readonly(
+                "coordsg", [](const Field &self) { return py_coords<Real, true>(self); })
+            .def_property_readonly(
+                "icoordsg", [](const Field &self) { return py_coords<Int, true>(self); });
 }
 
-template<class T, muGrid::IterUnit iter_unit>
+template<class T, muGrid::IterUnit iter_unit, bool with_ghosts>
 decltype(auto) array_getter(TypedFieldBase<T> &self) {
-    return muGrid::numpy_wrap(self, iter_unit);
+    if (with_ghosts) {
+        return muGrid::numpy_wrap(self, iter_unit, self.get_shape(iter_unit));
+    } else {
+        return muGrid::numpy_wrap(self, iter_unit, self.get_shape_without_ghosts(iter_unit));
+    }
 }
 
-template<class T, muGrid::IterUnit iter_unit>
+template<class T, muGrid::IterUnit iter_unit, bool with_ghosts>
 void array_setter(TypedFieldBase<T> &self, py::array_t<T> array) {
     const Shape_t array_shape(array.shape(), array.shape() + array.ndim());
-    if (array_shape != self.get_shape(iter_unit)) {
+    Shape_t self_shape{};
+    if (with_ghosts) {
+        self_shape = self.get_shape(iter_unit);
+    } else {
+        self_shape = self.get_shape_without_ghosts(iter_unit);
+    }
+    if (array_shape != self_shape) {
         std::stringstream error{};
         error << "Dimension mismatch: The shape " << array_shape
-                << " is not equal to the field shape " << self.get_shape(iter_unit)
-                << ".";
+                << " is not equal to the field shape " << self_shape;
+        if (with_ghosts) {
+            error << ".";
+        } else {
+            error << " without ghost buffers.";
+        }
         throw RuntimeError{error.str()};
     }
     Shape_t array_strides(array.strides(), array.strides() + array.ndim());
     // numpy arrays have stride in bytes
     for (auto &&s: array_strides) s /= sizeof(T);
-    strided_copy(self.get_shape(iter_unit), array_strides,
-                 self.get_strides(iter_unit), array.data(), self.data());
+    strided_copy(self_shape, array_strides, self.get_strides(iter_unit),
+                 array.data(), self.data());
 }
 
 template<class T>
@@ -133,11 +151,17 @@ void add_typed_field(py::module &mod, std::string name) {
                     return muGrid::numpy_wrap(self, it);
                 },
                 "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
-            .def_property("s", array_getter<T, muGrid::IterUnit::SubPt>,
-                          array_setter<T, muGrid::IterUnit::SubPt>,
+            .def_property("sg", array_getter<T, muGrid::IterUnit::SubPt, true>,
+                          array_setter<T, muGrid::IterUnit::SubPt, true>,
                           py::keep_alive<0, 1>())
-            .def_property("p", array_getter<T, muGrid::IterUnit::Pixel>,
-                          array_setter<T, muGrid::IterUnit::Pixel>,
+            .def_property("pg", array_getter<T, muGrid::IterUnit::Pixel, true>,
+                          array_setter<T, muGrid::IterUnit::Pixel, true>,
+                          py::keep_alive<0, 1>())
+            .def_property("s", array_getter<T, muGrid::IterUnit::SubPt, false>,
+                          array_setter<T, muGrid::IterUnit::SubPt, false>,
+                          py::keep_alive<0, 1>())
+            .def_property("p", array_getter<T, muGrid::IterUnit::Pixel, false>,
+                          array_setter<T, muGrid::IterUnit::Pixel, false>,
                           py::keep_alive<0, 1>())
             .def(
                 "get_pixel_map",
@@ -191,13 +215,13 @@ void add_mutable_mapped_field(py::module &mod, const std::string &name) {
 
     py::class_<MappedField_t>(mod, name.c_str())
             .def_property_readonly("field",
-                                   [](MappedField_t &mf) -> muGrid::TypedField<T> &{
+                                   [](MappedField_t &mf) -> muGrid::TypedField<T> & {
                                        return mf.get_field();
                                    })
             .def_property_readonly(
                 "map",
                 [](MappedField_t &mf)
-            -> muGrid::FieldMap<T, muGrid::Mapping::Mut> &{
+            -> muGrid::FieldMap<T, muGrid::Mapping::Mut> & {
                     return mf.get_map();
                 });
 }

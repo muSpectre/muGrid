@@ -96,6 +96,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  Shape_t LocalFieldCollection::get_pixels_shape_without_ghosts() const {
+    return Shape_t{this->nb_pixels};
+  }
+
+  /* ---------------------------------------------------------------------- */
   Shape_t LocalFieldCollection::get_pixels_strides(Index_t element_size) const {
     return Shape_t{element_size};
   }

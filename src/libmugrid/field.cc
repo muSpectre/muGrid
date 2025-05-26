@@ -184,6 +184,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  Shape_t Field::get_pixels_shape_without_ghosts() const {
+    return this->collection.get_pixels_shape_without_ghosts();
+  }
+
+  /* ---------------------------------------------------------------------- */
   Shape_t Field::get_shape(const IterUnit & iter_type) const {
     Shape_t shape;
 
@@ -191,6 +196,19 @@ namespace muGrid {
       shape.push_back(n);
     }
     for (auto && n : this->get_pixels_shape()) {
+      shape.push_back(n);
+    }
+    return shape;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Shape_t Field::get_shape_without_ghosts(const IterUnit & iter_type) const {
+    Shape_t shape;
+
+    for (auto && n : this->get_sub_pt_shape(iter_type)) {
+      shape.push_back(n);
+    }
+    for (auto && n : this->get_pixels_shape_without_ghosts()) {
       shape.push_back(n);
     }
     return shape;

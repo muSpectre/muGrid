@@ -55,7 +55,7 @@ namespace muGrid {
         return CcoordOps::modulo(coord, length);
     }
 
-    template<typename T, class C>
+    template<typename T, bool with_ghosts, class C>
     auto py_coords(const C &field_like) {
         auto &fc{field_like.get_collection()};
         if (fc.get_domain() != FieldCollection::ValidityDomain::Global) {
@@ -67,13 +67,19 @@ namespace muGrid {
         std::vector<Index_t> shape{};
         const Index_t dim{field_like.get_spatial_dim()};
         shape.push_back(dim);
-        const auto &nb_subdomain_grid_pts{gfc.get_nb_subdomain_grid_pts()};
+        auto nb_subdomain_grid_pts{gfc.get_nb_subdomain_grid_pts_without_ghosts()};
+        if (with_ghosts) {
+            nb_subdomain_grid_pts = gfc.get_nb_subdomain_grid_pts();
+        }
         for (auto &&n: nb_subdomain_grid_pts) {
             shape.push_back(n);
         }
         py::array_t<T, py::array::f_style> coords(shape);
         const auto &nb_domain_grid_pts{gfc.get_nb_domain_grid_pts()};
-        const auto &subdomain_locations{gfc.get_subdomain_locations()};
+        auto subdomain_locations{gfc.get_subdomain_locations_without_ghosts()};
+        if (with_ghosts) {
+            subdomain_locations = gfc.get_subdomain_locations();
+        }
         const auto nb_subdomain_pixels{
             CcoordOps::get_size(nb_subdomain_grid_pts)
         };

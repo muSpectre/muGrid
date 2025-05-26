@@ -40,104 +40,106 @@
 #include "field_collection_global.hh"
 
 namespace muGrid {
-
-  /** `muGrid::LocalFieldCollection` derives from `muGrid::FieldCollection`
-   * and stores local fields, i.e. fields that are only defined for a subset of
-   * all pixels/voxels in the computational domain. The coordinates of these
-   * active pixels are explicitly stored by this field collection.
-   * `muGrid::LocalFieldCollection::add_pixel` allows to add individual
-   * pixels/voxels to the field collection.
-   */
-  class LocalFieldCollection : public FieldCollection {
-   public:
-    //! alias for base class
-    using Parent = FieldCollection;
-    //! Default constructor
-    LocalFieldCollection() = delete;
-
-    /**
-     * Constructor
-     * @param spatial_dimension spatial dimension of the field (can be
-     *                    muGrid::Unknown, e.g., in the case of the local fields
-     *                    for storing internal material variables)
+    /** `muGrid::LocalFieldCollection` derives from `muGrid::FieldCollection`
+     * and stores local fields, i.e. fields that are only defined for a subset of
+     * all pixels/voxels in the computational domain. The coordinates of these
+     * active pixels are explicitly stored by this field collection.
+     * `muGrid::LocalFieldCollection::add_pixel` allows to add individual
+     * pixels/voxels to the field collection.
      */
-    LocalFieldCollection(const Index_t & spatial_dimension,
-                         const SubPtMap_t & nb_sub_pts = {});
+    class LocalFieldCollection : public FieldCollection {
+    public:
+        //! alias for base class
+        using Parent = FieldCollection;
 
-    /**
-     * Constructor with explicit given name for the field collection. This name
-     * can be arbitrary and only has to be unique for all LocalFieldCollections
-     * which are saved to the same NetCDF file through the parallel IO object
-     * 'FileIONetCDF'. If you register two LocalFieldCollections with the same
-     * name in a FileIONetCDF object you will get a
-     * muGrid::FieldCollectionError.
-     */
-    LocalFieldCollection(const Index_t & spatial_dimension,
-                         const std::string & name,
-                         const SubPtMap_t & nb_sub_pts = {});
+        //! Default constructor
+        LocalFieldCollection() = delete;
 
-    //! Copy constructor
-    LocalFieldCollection(const LocalFieldCollection & other) = delete;
+        /**
+         * Constructor
+         * @param spatial_dimension spatial dimension of the field (can be
+         *                    muGrid::Unknown, e.g., in the case of the local fields
+         *                    for storing internal material variables)
+         */
+        LocalFieldCollection(const Index_t &spatial_dimension,
+                             const SubPtMap_t &nb_sub_pts = {});
 
-    //! Move constructor
-    LocalFieldCollection(LocalFieldCollection && other) = default;
+        /**
+         * Constructor with explicit given name for the field collection. This name
+         * can be arbitrary and only has to be unique for all LocalFieldCollections
+         * which are saved to the same NetCDF file through the parallel IO object
+         * 'FileIONetCDF'. If you register two LocalFieldCollections with the same
+         * name in a FileIONetCDF object you will get a
+         * muGrid::FieldCollectionError.
+         */
+        LocalFieldCollection(const Index_t &spatial_dimension,
+                             const std::string &name,
+                             const SubPtMap_t &nb_sub_pts = {});
 
-    //! Destructor
-    virtual ~LocalFieldCollection() = default;
+        //! Copy constructor
+        LocalFieldCollection(const LocalFieldCollection &other) = delete;
 
-    //! Copy assignment operator
-    LocalFieldCollection &
-    operator=(const LocalFieldCollection & other) = delete;
+        //! Move constructor
+        LocalFieldCollection(LocalFieldCollection &&other) = default;
 
-    //! Move assignment operator
-    LocalFieldCollection & operator=(LocalFieldCollection && other) = delete;
+        //! Destructor
+        virtual ~LocalFieldCollection() = default;
 
-    /**
-     * Insert a new pixel/voxel into the collection.
-     * @param global_index refers to the linear index this pixel has in the
-     *                     global field collection defining the problem space
-     */
-    void add_pixel(const size_t & global_index);
+        //! Copy assignment operator
+        LocalFieldCollection &
+        operator=(const LocalFieldCollection &other) = delete;
 
-    /**
-     * Freeze the set of pixels this collection is responsible for and allocate
-     * memory for all fields of the collection. Fields added lateron will have
-     * their memory allocated upon construction
-     */
-    void initialise();
+        //! Move assignment operator
+        LocalFieldCollection &operator=(LocalFieldCollection &&other) = delete;
 
-    /**
-     * obtain a new field collection with the same domain and pixels and a
-     * given new name
-     */
-    LocalFieldCollection
-    get_empty_clone(const std::string & new_name) const;
+        /**
+         * Insert a new pixel/voxel into the collection.
+         * @param global_index refers to the linear index this pixel has in the
+         *                     global field collection defining the problem space
+         */
+        void add_pixel(const size_t &global_index);
 
-    /**
-     * obtain a new field collection with the same domain and pixels and the
-     * same name
-     */
-    LocalFieldCollection
-    get_empty_clone() const;
+        /**
+         * Freeze the set of pixels this collection is responsible for and allocate
+         * memory for all fields of the collection. Fields added lateron will have
+         * their memory allocated upon construction
+         */
+        void initialise();
 
-    //! return shape of the pixels
-    virtual Shape_t get_pixels_shape() const;
+        /**
+         * obtain a new field collection with the same domain and pixels and a
+         * given new name
+         */
+        LocalFieldCollection
+        get_empty_clone(const std::string &new_name) const;
 
-    //! return strides of the pixels
-    virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
+        /**
+         * obtain a new field collection with the same domain and pixels and the
+         * same name
+         */
+        LocalFieldCollection
+        get_empty_clone() const;
 
-    std::map<Index_t, Index_t> & get_global_to_local_index_map() {
-      return this->global_to_local_index_map;
-    }
+        //! return shape of the pixels
+        virtual Shape_t get_pixels_shape() const;
 
-    //! return the unique name of the local field collection
-    const std::string & get_name() const;
+        //! return shape of the pixels
+        virtual Shape_t get_pixels_shape_without_ghosts() const;
 
-   protected:
-    std::map<Index_t, Index_t> global_to_local_index_map{};
-    std::string name{};
-  };
+        //! return strides of the pixels
+        virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
-}  // namespace muGrid
+        std::map<Index_t, Index_t> &get_global_to_local_index_map() {
+            return this->global_to_local_index_map;
+        }
+
+        //! return the unique name of the local field collection
+        const std::string &get_name() const;
+
+    protected:
+        std::map<Index_t, Index_t> global_to_local_index_map{};
+        std::string name{};
+    };
+} // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_FIELD_COLLECTION_LOCAL_HH_

@@ -33,11 +33,10 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import numpy as np
+from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
 from muGrid.Solvers import conjugate_gradients
-
-# from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 
 def test_fd_stencil():
@@ -60,12 +59,11 @@ def test_fd_stencil():
 
 def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     """Finite-differences Poisson solver"""
-    # s = suggest_subdivisions(len(nb_grid_pts), comm.size)
+    s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
-    # decomposition =
-    # muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
-    # fc = decomposition.collection
-    fc = muGrid.GlobalFieldCollection(nb_grid_pts)
+    decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
+    fc = decomposition.collection
+    # fc = muGrid.GlobalFieldCollection(nb_grid_pts)
     grid_spacing = 1 / np.array(nb_grid_pts)  # Grid spacing
 
     stencil = np.array(
@@ -77,12 +75,12 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
 
     # np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
 
-    # x, y = decomposition.coords  # Domain-local coords for each pixel
-    x, y = np.meshgrid(
-        np.arange(nb_grid_pts[0]) / nb_grid_pts[0],
-        np.arange(nb_grid_pts[1]) / nb_grid_pts[1],
-        indexing="ij",
-    )
+    x, y = decomposition.coords  # Domain-local coords for each pixel
+    # x, y = np.meshgrid(
+    #     np.arange(nb_grid_pts[0]) / nb_grid_pts[0],
+    #     np.arange(nb_grid_pts[1]) / nb_grid_pts[1],
+    #     indexing="ij",
+    # )
 
     rhs = fc.real_field("rhs")
     solution = fc.real_field("solution")
@@ -100,6 +98,7 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         Function to compute the product of the Hessian matrix with a vector.
         The Hessian is represented by the convolution operator.
         """
+        decomposition.communicate_ghosts(x)
         laplace.apply(x, Ax)
         # We need the minus sign because the Laplace operator is negative
         # definite, but the conjugate-gradients solver assumes a
