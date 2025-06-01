@@ -46,7 +46,7 @@ def test_communicate_ghost():
     field = cart_decomp.collection.real_field(field_name)
 
     # Create reference values
-    global_coords = cart_decomp.icoords
+    global_coords = cart_decomp.icoordsg
     weights = np.arange(spatial_dim) + 1
     ref_values = np.einsum("i, i...->...", weights, global_coords)
 
@@ -65,10 +65,12 @@ def test_communicate_ghost():
 
     # Check accessors
     np.testing.assert_array_equal(
-        field.s.shape, np.array(field.sg.shape) - nb_ghost_left - nb_ghost_right
+        field.s.shape[-spatial_dim:],
+        np.array(field.sg.shape)[-spatial_dim:] - nb_ghost_left - nb_ghost_right,
     )
     np.testing.assert_array_equal(
-        field.p.shape, np.array(field.pg.shape) - nb_ghost_left - nb_ghost_right
+        field.p.shape[-spatial_dim:],
+        np.array(field.pg.shape)[-spatial_dim:] - nb_ghost_left - nb_ghost_right,
     )
 
     # Communicate ghost cells
