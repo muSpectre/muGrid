@@ -220,7 +220,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  Shape_t Field::get_offset_without_ghosts(const IterUnit & iter_type) const {
+  Shape_t Field::get_offsets_without_ghosts(const IterUnit & iter_type) const {
     Shape_t offset;
 
     for (auto && n : this->get_sub_pt_shape(iter_type)) {

@@ -86,7 +86,7 @@ def test_communicate_ghost():
         )
 
 
-def test_field_accessors(comm, nb_grid_pts=(4, 4)):
+def test_field_accessors(comm, nb_grid_pts=(128, 128)):
     s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
     decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
@@ -97,7 +97,11 @@ def test_field_accessors(comm, nb_grid_pts=(4, 4)):
     xg, yg = decomposition.coordsg
     field.pg = xg + 100 * yg
 
-    with np.printoptions(precision=2):
-        print()
-        print(field.pg)
-        print(field.p)
+    np.testing.assert_allclose(field.pg[..., 1:-1, 1:-1], field.p)
+    np.testing.assert_allclose(field.sg[..., 1:-1, 1:-1], field.s)
+
+    # Test setter
+    field.pg = np.random.random(field.pg.shape)
+
+    np.testing.assert_allclose(field.pg[..., 1:-1, 1:-1], field.p)
+    np.testing.assert_allclose(field.sg[..., 1:-1, 1:-1], field.s)

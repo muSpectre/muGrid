@@ -238,7 +238,7 @@ namespace muGrid {
           * potential ghost buffers (for passing the field to generic
           * multidimensional array objects such as numpy.ndarray)
           */
-        Shape_t get_offset_without_ghosts(const IterUnit &iter_type) const;
+        Shape_t get_offsets_without_ghosts(const IterUnit &iter_type) const;
 
         /**
          * evaluate and return the overall strides field (for passing the field to

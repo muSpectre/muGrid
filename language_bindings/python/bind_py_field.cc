@@ -102,7 +102,7 @@ decltype(auto) array_getter(TypedFieldBase<T> &self) {
         return muGrid::numpy_wrap(self, iter_unit, self.get_shape(iter_unit));
     } else {
         return muGrid::numpy_wrap(self, iter_unit, self.get_shape_without_ghosts(iter_unit),
-                                  self.get_offset_without_ghosts(iter_unit));
+                                  self.get_offsets_without_ghosts(iter_unit));
     }
 }
 
@@ -110,10 +110,19 @@ template<class T, muGrid::IterUnit iter_unit, bool with_ghosts>
 void array_setter(TypedFieldBase<T> &self, py::array_t<T> array) {
     const Shape_t array_shape(array.shape(), array.shape() + array.ndim());
     Shape_t self_shape{};
+    Index_t buffer_offset{0};
     if (with_ghosts) {
         self_shape = self.get_shape(iter_unit);
     } else {
         self_shape = self.get_shape_without_ghosts(iter_unit);
+        Shape_t self_strides{self.get_strides(iter_unit)};
+        Shape_t self_offsets{self.get_offsets_without_ghosts(iter_unit)};
+        for (auto &&tup: akantu::zip(self_strides, self_offsets)) {
+            auto &&s{std::get<0>(tup)};
+            auto &&o{std::get<1>(tup)};
+            buffer_offset += o * s;
+        }
+
     }
     if (array_shape != self_shape) {
         std::stringstream error{};
@@ -130,7 +139,7 @@ void array_setter(TypedFieldBase<T> &self, py::array_t<T> array) {
     // numpy arrays have stride in bytes
     for (auto &&s: array_strides) s /= sizeof(T);
     strided_copy(self_shape, array_strides, self.get_strides(iter_unit),
-                 array.data(), self.data());
+                 array.data(), self.data() + buffer_offset);
 }
 
 template<class T>
