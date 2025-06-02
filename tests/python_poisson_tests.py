@@ -57,7 +57,7 @@ def test_fd_stencil():
     np.testing.assert_allclose(np.sum(ifield.p * ofield.p), -4)
 
 
-def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
+def test_fd_poisson_solver(comm, nb_grid_pts=(4, 4)):
     """Finite-differences Poisson solver"""
     s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
@@ -98,7 +98,14 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         Function to compute the product of the Hessian matrix with a vector.
         The Hessian is represented by the convolution operator.
         """
+        print("=== hessp ===")
+        with np.printoptions(precision=2):
+            print(x.p)
+            print(x.pg)
         decomposition.communicate_ghosts(x)
+        with np.printoptions(precision=2):
+            print(x.p)
+            print(x.pg)
         laplace.apply(x, Ax)
         # We need the minus sign because the Laplace operator is negative
         # definite, but the conjugate-gradients solver assumes a

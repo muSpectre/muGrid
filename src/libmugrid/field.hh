@@ -215,6 +215,12 @@ namespace muGrid {
         Shape_t get_pixels_shape_without_ghosts() const;
 
         /**
+         * evaluate and return the offset of the pixels in the storage without
+         * any potential ghost buffers
+         */
+        Shape_t get_pixels_offset_without_ghosts() const;
+
+        /**
           * evaluate and return the overall shape of the field (for passing the
           * field to generic multidimensional array objects such as numpy.ndarray)
           */
@@ -226,6 +232,13 @@ namespace muGrid {
           * multidimensional array objects such as numpy.ndarray)
           */
         Shape_t get_shape_without_ghosts(const IterUnit &iter_type) const;
+
+        /**
+          * evaluate and return the overall offset of the field without any
+          * potential ghost buffers (for passing the field to generic
+          * multidimensional array objects such as numpy.ndarray)
+          */
+        Shape_t get_offset_without_ghosts(const IterUnit &iter_type) const;
 
         /**
          * evaluate and return the overall strides field (for passing the field to

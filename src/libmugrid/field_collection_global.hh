@@ -239,6 +239,9 @@ namespace muGrid {
         //! return shape of the pixels without ghosts
         virtual Shape_t get_pixels_shape_without_ghosts() const;
 
+        //! return the offset of the pixels in the storage without ghosts
+        virtual Shape_t get_pixels_offset_without_ghosts() const;
+
         //! return strides of the pixels
         virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 

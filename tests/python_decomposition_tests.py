@@ -1,4 +1,5 @@
 import numpy as np
+from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
 
@@ -83,3 +84,20 @@ def test_communicate_ghost():
             ref_values[(..., *index)],
             err_msg=f"Mismatch at {index}",
         )
+
+
+def test_field_accessors(comm, nb_grid_pts=(4, 4)):
+    s = suggest_subdivisions(len(nb_grid_pts), comm.size)
+
+    decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
+    fc = decomposition.collection
+
+    field = fc.real_field("test-field")
+
+    xg, yg = decomposition.coordsg
+    field.pg = xg + 100 * yg
+
+    with np.printoptions(precision=2):
+        print()
+        print(field.pg)
+        print(field.p)

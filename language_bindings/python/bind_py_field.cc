@@ -101,7 +101,8 @@ decltype(auto) array_getter(TypedFieldBase<T> &self) {
     if (with_ghosts) {
         return muGrid::numpy_wrap(self, iter_unit, self.get_shape(iter_unit));
     } else {
-        return muGrid::numpy_wrap(self, iter_unit, self.get_shape_without_ghosts(iter_unit));
+        return muGrid::numpy_wrap(self, iter_unit, self.get_shape_without_ghosts(iter_unit),
+                                  self.get_offset_without_ghosts(iter_unit));
     }
 }
 

@@ -201,6 +201,11 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    Shape_t GlobalFieldCollection::get_pixels_offset_without_ghosts() const {
+        return Shape_t{this->nb_ghosts_left};
+    }
+
+    /* ---------------------------------------------------------------------- */
     Shape_t
     GlobalFieldCollection::get_pixels_strides(Index_t element_size) const {
         Shape_t strides{this->pixels.get_strides()};

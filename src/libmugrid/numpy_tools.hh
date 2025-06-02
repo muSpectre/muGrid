@@ -434,22 +434,32 @@ namespace muGrid {
         IterUnit iter_type; // IterUnit that will give input shape
     };
 
-    /* Wrap a column-major field into a numpy array, without copying the data */
+    /* Wrap a field into a numpy array, without copying the data */
     template<typename T>
     py::array_t<T, py::array::f_style>
     numpy_wrap(const TypedFieldBase<T> &field,
                IterUnit iter_type = IterUnit::SubPt,
-               Shape_t shape = {}) {
-        if (shape.size() == 0) {
+               Shape_t shape = {},
+               Shape_t offset = {}) {
+        if (shape.empty()) {
             shape = field.get_shape(iter_type);
         }
+        Shape_t strides1{field.get_strides(iter_type, 1)};
+        if (offset.empty()) {
+            offset.resize(strides1.size());
+        }
+        Index_t buffer_offset{0};
+        for (auto &&tup: akantu::zip(strides1, offset)) {
+            auto &&s{std::get<0>(tup)};
+            auto &&o{std::get<1>(tup)};
+            buffer_offset += o * s;
+        }
         Shape_t strides{field.get_strides(iter_type, sizeof(T))};
-        return py::array_t<T, py::array::f_style>(shape, strides, field.data(),
-                                                  py::capsule([]() {
-                                                  }));
+        return py::array_t<T, py::array::f_style>(shape, strides, field.data() + buffer_offset,
+                                                  py::capsule([]() {}));
     }
 
-    /* Copy a column-major field into a numpy array */
+    /* Copy a field into a numpy array */
     template<typename T>
     py::array_t<T, py::array::f_style>
     numpy_copy(const TypedFieldBase<T> &field,
