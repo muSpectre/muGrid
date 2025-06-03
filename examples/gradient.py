@@ -29,7 +29,7 @@ gradient = np.array(
         ],
     ],
 )
-op = ConvolutionOperator(2, gradient)
+op = ConvolutionOperator([0, 0], gradient)
 
 # Apply the gradient operator to the nodal field and write result to the quad field
 op.apply(nodal_field, quad_field)
