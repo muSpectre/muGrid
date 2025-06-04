@@ -52,6 +52,8 @@ from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder, S
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 if hasattr(_muGrid, 'FileIONetCDF'):
     OpenMode = _muGrid.FileIONetCDF.OpenMode
+
+
     def FileIONetCDF(file_name, open_mode=OpenMode.Read, communicator=None):
         """
         This function is used to open a NetCDF file with a specified mode and
@@ -82,9 +84,6 @@ if hasattr(_muGrid, 'FileIONetCDF'):
             open mode.
         """
         return _muGrid.FileIONetCDF(file_name, open_mode, Communicator(communicator))
-else:
-    def FileIONetCDF(*args, **kwargs):
-        raise ModuleNotFoundError("muGrid was installed without netCDF support")
 
 from .Parallel import Communicator
 

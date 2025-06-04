@@ -43,9 +43,7 @@ from python_common_tests import *
 from python_communicator_tests import *
 from python_field_tests import *
 from python_convolution_operator_tests import *
-
-if 'FileIONetCDF' in dir(muGrid):
-    from python_file_io_tests import FileIOTest
+from python_file_io_tests import *
 
 if __name__ == '__main__':
     unittest.main()
