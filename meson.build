@@ -25,7 +25,7 @@ mugrid_dependencies = [dl, execinfo]
 # This produces lots of Warning from Eigen3. Disabling for now.
 # add_project_arguments('-Weffc++', language: 'cpp')
 
-mpi = dependency('mpi', language : 'cpp', required : false)
+mpi = dependency('mpi', language : 'cpp', required : get_option('mpi'))
 if mpi.found()
     add_project_arguments('-DWITH_MPI', language : ['c', 'cpp'])
     netcdf = dependency('pnetcdf', required : false)

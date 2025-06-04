@@ -102,6 +102,18 @@ Navigate to the build folder and run:
 
    $ meson compile
 
+Manually enabling and disabling features
+****************************************
+
+By default, Meson autodetects features for you. However, sometimes you may want
+to manually enable or disable a specific feature, for example when compiling the
+serial version of *µ*\Grid on a system that has MPI installed. To disable MPI,
+setup with
+
+.. code-block:: sh
+
+   $ meson setup -Dmpi=disabled buildDir
+
 Getting help and reporting bugs
 *******************************
 
