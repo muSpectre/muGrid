@@ -45,14 +45,27 @@ has_mpi = _muGrid.Communicator.has_mpi
 if has_mpi and MPI is None:
     raise RuntimeError("MPI support is enabled for muGrid but mpi4py is not available.")
 
-from _muGrid import (get_domain_ccoord, get_domain_index, Pixel, StorageOrder, SubPt, DynCcoord, DynRcoord, IterUnit,
-                     Verbosity, GlobalFieldCollection, LocalFieldCollection, Unit, Dictionary, ConvolutionOperatorBase,
-                     ConvolutionOperator, Decomposition, CartesianDecomposition)
+from _muGrid import CartesianDecomposition  # noqa: F401, E402
+from _muGrid import ConvolutionOperator  # noqa: F401, E402
+from _muGrid import ConvolutionOperatorBase  # noqa: F401, E402
+from _muGrid import Decomposition  # noqa: F401, E402
+from _muGrid import Dictionary  # noqa: F401, E402
+from _muGrid import DynCcoord  # noqa: F401, E402
+from _muGrid import DynRcoord  # noqa: F401, E402
+from _muGrid import GlobalFieldCollection  # noqa: F401, E402
+from _muGrid import IterUnit  # noqa: F401, E402
+from _muGrid import LocalFieldCollection  # noqa: F401, E402
+from _muGrid import Pixel  # noqa: F401, E402
+from _muGrid import StorageOrder  # noqa: F401, E402
+from _muGrid import SubPt  # noqa: F401, E402
+from _muGrid import Unit  # noqa: F401, E402
+from _muGrid import Verbosity  # noqa: F401, E402
+from _muGrid import get_domain_ccoord  # noqa: F401, E402
+from _muGrid import get_domain_index  # noqa: F401, E402
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
-if hasattr(_muGrid, 'FileIONetCDF'):
+if hasattr(_muGrid, "FileIONetCDF"):
     OpenMode = _muGrid.FileIONetCDF.OpenMode
-
 
     def FileIONetCDF(file_name, open_mode=OpenMode.Read, communicator=None):
         """
@@ -85,6 +98,12 @@ if hasattr(_muGrid, 'FileIONetCDF'):
         """
         return _muGrid.FileIONetCDF(file_name, open_mode, Communicator(communicator))
 
-from .Parallel import Communicator
+else:
+
+    def FileIONetCDF(*args, **kwargs):
+        raise ModuleNotFoundError("muGrid was installed without netCDF support")
+
+
+from .Parallel import Communicator  # noqa: E402
 
 __version__ = _muGrid.version.description()

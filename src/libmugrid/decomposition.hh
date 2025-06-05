@@ -7,16 +7,20 @@
 
 
 namespace muGrid {
-
-  class Decomposition {
+    class Decomposition {
     public:
-      Decomposition() {} 
-      virtual ~Decomposition() {}
+        Decomposition() {
+        }
 
-      //! fill the ghost buffers with the values from the neighboring processes.
-      virtual void communicate_ghosts(std::string field_name) const = 0;
-  };
+        virtual ~Decomposition() {
+        }
 
+        //! fill the ghost buffers with the values from the neighboring processes.
+        virtual void communicate_ghosts(const Field &field) const = 0;
+
+        //! fill the ghost buffers with the values from the neighboring processes.
+        virtual void communicate_ghosts(std::string field_name) const = 0;
+    };
 } // namespace muGrid
 
 #endif // SRC_LIBMUGRID_DECOMPOSITION_HH_

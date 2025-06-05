@@ -181,7 +181,18 @@ namespace muGrid {
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights = {}) const = 0;
 
-    /**
+      /**
+       * @brief Returns the number of operators per pixel/voxel.
+       *
+       * Calculates the total number of operators associated with each
+       * pixel/voxel, summing the quadrature points of all elements belonging to
+       * the pixel/voxel.
+       *
+       * @return The total number of quadrature points per pixel/voxel.
+       */
+      virtual Index_t get_nb_operators() const = 0;
+
+   /**
      * @brief Returns the number of quadrature points per pixel/voxel.
      *
      * Calculates the total number of quadrature points associated with each

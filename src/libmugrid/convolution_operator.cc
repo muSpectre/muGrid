@@ -45,259 +45,276 @@
 #include <sstream>
 
 namespace muGrid {
-
-  /* ---------------------------------------------------------------------- */
-  ConvolutionOperator::ConvolutionOperator(
-      const Eigen::MatrixXd & pixel_operator, const Shape_t & conv_pts_shape, 
-      const Index_t & nb_pixelnodal_pts,
-      const Index_t & nb_quad_pts, const Index_t & nb_operators)
-      : Parent{}, pixel_operator{pixel_operator}, conv_pts_shape{conv_pts_shape},
+    /* ---------------------------------------------------------------------- */
+    ConvolutionOperator::ConvolutionOperator(
+        const Shape_t &pixel_offset,
+        const Eigen::MatrixXd &pixel_operator,
+        const Shape_t &conv_pts_shape,
+        const Index_t &nb_pixelnodal_pts,
+        const Index_t &nb_quad_pts,
+        const Index_t &nb_operators)
+        : Parent{},
+          pixel_offset{pixel_offset},
+          pixel_operator{pixel_operator},
+          conv_pts_shape{conv_pts_shape},
           nb_pixelnodal_pts{nb_pixelnodal_pts},
-          nb_quad_pts{nb_quad_pts}, nb_operators{nb_operators},
+          nb_quad_pts{nb_quad_pts},
+          nb_operators{nb_operators},
           spatial_dim{static_cast<Index_t>(conv_pts_shape.size())},
           nb_conv_pts{get_nb_from_shape(conv_pts_shape)} {
-    // Check the dimension of the pixel operator
-    if (pixel_operator.cols() != this->nb_pixelnodal_pts * this->nb_conv_pts) {
-      std::stringstream err_msg{};
-      err_msg << "Size mismatch: Expected the operator has "
-              << this->nb_pixelnodal_pts * this->nb_conv_pts
-              << " columns. but received an operator with "
-              << pixel_operator.cols()
-              << " columns";
-      throw RuntimeError{err_msg.str()};
-    }
-    if (pixel_operator.rows() != this->nb_operators * this->nb_quad_pts) {
-      std::stringstream err_msg{};
-      err_msg << "Size mismatch: Expected the operator has "
-              << this->nb_operators * this->nb_quad_pts
-              << " rows. but received an operator with "
-              << pixel_operator.rows()
-              << " rows";
-      throw RuntimeError{err_msg.str()};
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void ConvolutionOperator::apply(
-      const TypedFieldBase<Real> & nodal_field,
-      TypedFieldBase<Real> & quadrature_point_field) const {
-    quadrature_point_field.set_zero();
-    this->apply_increment(nodal_field, 1., quadrature_point_field);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void ConvolutionOperator::apply_increment(
-      const TypedFieldBase<Real> & nodal_field, const Real & alpha,
-      TypedFieldBase<Real> & quadrature_point_field) const {
-    if (not quadrature_point_field.is_global()) {
-      std::stringstream err_msg{};
-      err_msg << "Field type error: quadrature_point_field must be a global "
-                 "field (registered in a global FieldCollection)";
-      throw RuntimeError{err_msg.str()};
-    }
-    if (not nodal_field.is_global()) {
-      std::stringstream err_msg{};
-      err_msg << "Field type error: nodal_field must be a global "
-                 "field (registered in a global FieldCollection)";
-      throw RuntimeError{err_msg.str()};
-    }
-
-    // number of components in the field we'd like to apply the convolution
-    Index_t nb_nodal_component{nodal_field.get_nb_components()};
-
-    // number of components in the field where we'd like to write the result
-    Index_t nb_quad_component{quadrature_point_field.get_nb_components()};
-
-    // check if they match
-    if (nb_quad_component != this->nb_operators * nb_nodal_component) {
-      std::stringstream err_msg{};
-      err_msg << "Size mismatch: Expected a field with "
-              << this->nb_operators * nb_nodal_component
-              << " components (number of operators * number of components "
-                "in the nodal field) but received a field with "
-              << nb_quad_component
-              << " components.";
-      throw RuntimeError{err_msg.str()};
-    }
-
-    // get nodal field map, where the values at one location is interpreted 
-    // as a matrix with [nb_nodal_component] rows
-    auto nodal_map{nodal_field.get_pixel_map(nb_nodal_component)};
-    // get quadrature point field map, where the values at one location is 
-    // interpreted as a matrix with [nb_operators] rows
-    auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
-
-    auto & collection{dynamic_cast<GlobalFieldCollection &>(
-        quadrature_point_field.get_collection())};
-    auto & pixels{collection.get_pixels()};
-    auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
-
-    // relative coordinates of the nodal points inside the convolution space
-    CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};
-
-    // For each pixel...
-    for (auto && id_base_ccoord : pixels.enumerate()) {
-      auto && id{std::get<0>(id_base_ccoord)};
-      auto && base_ccoord{std::get<1>(id_base_ccoord)};
-
-      // get the quadrature point value relative to this pixel
-      auto && value{quad_map[id]};
-      // Expected arrangement:
-      // [op1|u_x[q1], op1|u_y[q1], op1|u_x[q2], op1|u_y[q2]]
-      // [op2|u_x[q1], op2|u_y[q1], op2|u_x[q2], op2|u_y[q2]]
-
-      // For each convolution points involved in the current pixel...
-      for (auto && tup : akantu::enumerate(conv_space)) {
-        // get the nodal values
-        auto && index{std::get<0>(tup)};
-        auto && offset{std::get<1>(tup)};
-        // FIXME(yizhen): in parallel, it doesn't work
-        auto && ccoord{(base_ccoord + offset) % nb_subdomain_grid_pts};
-        // transpose to make the shape compatible for multiplication
-        auto && nodal_vals{nodal_map[pixels.get_index(ccoord)].transpose()};
-
-        // For each quadrature point in the current pixel...
-        for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; ++idx_quad) {
-          // get the chunk that corresponding to this quadrature point
-          auto && quad_vals{value.block(
-              0, idx_quad * nb_nodal_component,
-              this->nb_operators, nb_nodal_component)};
-          // get the chunk that represents the contribution of this node to
-          // this quadrature point
-          auto && B_block{this->pixel_operator.block(
-              idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
-              this->nb_operators, this->nb_pixelnodal_pts)};
-          // compute
-          quad_vals += alpha * B_block * nodal_vals;
+        // Check the dimension of the pixel operator
+        if (pixel_operator.cols() != this->nb_pixelnodal_pts * this->nb_conv_pts) {
+            std::stringstream err_msg{};
+            err_msg << "Size mismatch: Expected the operator has "
+                    << this->nb_pixelnodal_pts * this->nb_conv_pts
+                    << " columns. but received an operator with "
+                    << pixel_operator.cols() << " columns";
+            throw RuntimeError{err_msg.str()};
         }
-      }
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void ConvolutionOperator::transpose(
-      const TypedFieldBase<Real> & quadrature_point_field,
-      TypedFieldBase<Real> & nodal_field,
-      const std::vector<Real> & weights) const {
-    // set nodal field to zero
-    nodal_field.set_zero();
-    this->transpose_increment(quadrature_point_field, 1., nodal_field,
-                                    weights);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  void ConvolutionOperator::transpose_increment(
-      const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
-      TypedFieldBase<Real> & nodal_field,
-      const std::vector<Real> & weights) const {
-    // check quadrature point field type == global
-    if (not quadrature_point_field.is_global()) {
-      std::stringstream err_msg{};
-      err_msg << "Field type error: quadrature_point_field must be a global "
-                 "field (registered in a global FieldCollection)";
-      throw RuntimeError{err_msg.str()};
-    }
-    // check nodal field type == global
-    if (not nodal_field.is_global()) {
-      std::stringstream err_msg{};
-      err_msg << "Field type error: nodal_field must be a global "
-                 "field (registered in a global FieldCollection)";
-      throw RuntimeError{err_msg.str()};
-    }
-
-    // number of components in the gradient field
-    Index_t nb_quad_component{quadrature_point_field.get_nb_components()};
-
-    // number of components in the nodal field
-    Index_t nb_nodal_component{nodal_field.get_nb_components()};
-
-    if (nb_quad_component != this->nb_operators * nb_nodal_component) {
-      std::stringstream err_msg{};
-      err_msg << "Size mismatch: Expected a field with "
-              << this->nb_operators * nb_nodal_component
-              << " components (number of operators * number of components "
-                "in the nodal field) but received a field with "
-              << nb_quad_component
-              << " components.";
-      throw RuntimeError{err_msg.str()};
-    }
-
-    // get nodal field map, where the values at one location is interpreted 
-    // as a matrix with [nb_field_comps] rows
-    auto nodal_map{nodal_field.get_pixel_map(nb_nodal_component)};
-    // get quadrature point field map, where the values at one location is 
-    // interpreted as a matrix with [nb_operators] rows
-    auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
-
-    // preprocess weights
-    bool use_default_weights{weights.size() == 0};
-    std::vector<Real> default_weights{};
-    if (use_default_weights) {
-      default_weights.resize(this->nb_quad_pts, 1.);
-    }
-    const auto & quad_weights{use_default_weights ? default_weights : weights};
-
-    auto & collection{dynamic_cast<GlobalFieldCollection &>(
-        quadrature_point_field.get_collection())};
-    auto & pixels{collection.get_pixels()};
-    auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
-
-    // pixel offsets of the points inside the convolution space
-    CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};
-
-    // For each pixel...
-    for (auto && id_base_ccoord : pixels.enumerate()) {
-      auto && id{std::get<0>(id_base_ccoord)};
-      auto && base_ccoord{std::get<1>(id_base_ccoord)};
-
-      // get the quadrature point value relative to this pixel
-      auto && value{quad_map[id]};
-
-      // For each convolution points involved in the current pixel...
-      for (auto && tup : akantu::enumerate(conv_space)) {
-        // get the nodal values relative to B-chunk
-        auto && index{std::get<0>(tup)};
-        auto && offset{std::get<1>(tup)};
-        auto && ccoord{(base_ccoord + offset) % nb_subdomain_grid_pts};
-        auto && nodal_vals{nodal_map[pixels.get_index(ccoord)]};
-
-        // For each quadrature point
-        for (Index_t idx_quad=0; idx_quad < this->nb_quad_pts; ++idx_quad) {
-          // get the chunk that corresponding to this quadrature point
-          auto && quad_vals{value.block(
-              0, idx_quad * nb_nodal_component,
-              this->nb_operators, nb_nodal_component)};
-          // get the chunk that represents the contribution of this node to
-          // this quadrature point; and transpose it.
-          auto && B_block_T{this->pixel_operator.block(
-              idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
-              this->nb_operators, this->nb_pixelnodal_pts).transpose()};
-          // compute
-          nodal_vals += alpha * quad_weights[idx_quad] * B_block_T * quad_vals;
+        if (pixel_operator.rows() != this->nb_operators * this->nb_quad_pts) {
+            std::stringstream err_msg{};
+            err_msg << "Size mismatch: Expected the operator has "
+                    << this->nb_operators * this->nb_quad_pts
+                    << " rows. but received an operator with "
+                    << pixel_operator.rows() << " rows";
+            throw RuntimeError{err_msg.str()};
         }
-      }
     }
-  }
 
-  /* ---------------------------------------------------------------------- */
-  const Eigen::MatrixXd &
-  ConvolutionOperator::get_pixel_operator() const {
-    return this->pixel_operator;
-  }
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::apply(
+        const TypedFieldBase<Real> &nodal_field,
+        TypedFieldBase<Real> &quadrature_point_field) const {
+        quadrature_point_field.set_zero();
+        this->apply_increment(nodal_field, 1., quadrature_point_field);
+    }
 
-  /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperator::get_nb_quad_pts() const {
-    return this->nb_quad_pts;
-  }
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::apply_increment(
+        const TypedFieldBase<Real> &nodal_field, const Real &alpha,
+        TypedFieldBase<Real> &quadrature_point_field) const {
+        if (not quadrature_point_field.is_global()) {
+            std::stringstream err_msg{};
+            err_msg << "Field type error: quadrature_point_field must be a global "
+                    "field (registered in a global FieldCollection)";
+            throw RuntimeError{err_msg.str()};
+        }
+        if (not nodal_field.is_global()) {
+            std::stringstream err_msg{};
+            err_msg << "Field type error: nodal_field must be a global "
+                    "field (registered in a global FieldCollection)";
+            throw RuntimeError{err_msg.str()};
+        }
 
-  /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperator::get_nb_nodal_pts() const {
-    return this->nb_pixelnodal_pts;
-  }
+        // number of components in the field we'd like to apply the convolution
+        Index_t nb_nodal_components{nodal_field.get_nb_components()};
 
-  /* ---------------------------------------------------------------------- */
-  Index_t ConvolutionOperator::get_spatial_dim() const {
-    return this->spatial_dim;
-  }
+        // number of components in the field where we'd like to write the result
+        Index_t nb_quad_components{quadrature_point_field.get_nb_components()};
 
-}  // namespace muGrid
+        // check if they match
+        if (nb_quad_components != this->nb_operators * nb_nodal_components) {
+            std::stringstream err_msg{};
+            err_msg << "Size mismatch: Expected a quadrature field with "
+                    << this->nb_operators * nb_nodal_components << " components ("
+                    << this->nb_operators << " operators × " << nb_nodal_components
+                    << " components in the nodal field) but received a field with "
+                    << nb_quad_components << " components.";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // get nodal field map, where the values at one location is interpreted
+        // as a matrix with [nb_nodal_components] rows
+        auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
+        // get quadrature point field map, where the values at one location is
+        // interpreted as a matrix with [nb_operators] rows
+        auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
+
+        auto &collection{
+            dynamic_cast<GlobalFieldCollection &>(
+                quadrature_point_field.get_collection())
+        };
+        auto &pixels{collection.get_pixels()};
+
+        // relative coordinates of the nodal points inside the convolution space
+        CcoordOps::DynamicPixels conv_space{
+            DynCcoord_t(this->conv_pts_shape), DynCcoord_t(this->pixel_offset)};
+
+        // For each pixel...
+        for (auto &&id_base_ccoord: pixels.enumerate()) {
+            auto &&id{std::get<0>(id_base_ccoord)};
+            auto &&base_ccoord{std::get<1>(id_base_ccoord)};
+
+            // get the quadrature point value relative to this pixel
+            auto &&value{quad_map[id]};
+            // Expected arrangement:
+            // [op1|u_x[q1], op1|u_y[q1], op1|u_x[q2], op1|u_y[q2]]
+            // [op2|u_x[q1], op2|u_y[q1], op2|u_x[q2], op2|u_y[q2]]
+
+            // For each convolution points involved in the current pixel...
+            for (auto &&tup: akantu::enumerate(conv_space)) {
+                // get the nodal values
+                auto &&index{std::get<0>(tup)};
+                auto &&offset{std::get<1>(tup)};
+                auto &&ccoord{pixels.get_neighbour(base_ccoord, offset)};
+                // transpose to make the shape compatible for multiplication
+                auto &&nodal_vals{nodal_map[pixels.get_index(ccoord)].transpose()};
+
+                // For each quadrature point in the current pixel...
+                for (Index_t idx_quad = 0; idx_quad < this->nb_quad_pts; ++idx_quad) {
+                    // get the chunk that corresponding to this quadrature point
+                    auto &&quad_vals{
+                        value.block(0, idx_quad * nb_nodal_components,
+                                    this->nb_operators,
+                                    nb_nodal_components)
+                    };
+                    // get the chunk that represents the contribution of this node to
+                    // this quadrature point
+                    auto &&B_block{
+                        this->pixel_operator.block(
+                            idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
+                            this->nb_operators, this->nb_pixelnodal_pts)
+                    };
+                    // compute
+                    quad_vals += alpha * B_block * nodal_vals;
+                }
+            }
+        }
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::transpose(
+        const TypedFieldBase<Real> &quadrature_point_field,
+        TypedFieldBase<Real> &nodal_field,
+        const std::vector<Real> &weights) const {
+        // set nodal field to zero
+        nodal_field.set_zero();
+        this->transpose_increment(quadrature_point_field, 1., nodal_field, weights);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::transpose_increment(
+        const TypedFieldBase<Real> &quadrature_point_field, const Real &alpha,
+        TypedFieldBase<Real> &nodal_field,
+        const std::vector<Real> &weights) const {
+        // check quadrature point field type == global
+        if (not quadrature_point_field.is_global()) {
+            std::stringstream err_msg{};
+            err_msg << "Field type error: quadrature_point_field must be a global "
+                    "field (registered in a global FieldCollection)";
+            throw RuntimeError{err_msg.str()};
+        }
+        // check nodal field type == global
+        if (not nodal_field.is_global()) {
+            std::stringstream err_msg{};
+            err_msg << "Field type error: nodal_field must be a global "
+                    "field (registered in a global FieldCollection)";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // number of components in the gradient field
+        Index_t nb_quad_components{quadrature_point_field.get_nb_components()};
+
+        // number of components in the nodal field
+        Index_t nb_nodal_components{nodal_field.get_nb_components()};
+
+        if (nb_quad_components != this->nb_operators * nb_nodal_components) {
+            std::stringstream err_msg{};
+            err_msg << "Size mismatch: Expected a quadrature field with "
+                    << this->nb_operators * nb_nodal_components << " components ("
+                    << this->nb_operators << " operators × " << nb_nodal_components
+                    << " components in the nodal field) but received a field with "
+                    << nb_quad_components << " components.";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // get nodal field map, where the values at one location is interpreted
+        // as a matrix with [nb_field_comps] rows
+        auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
+        // get quadrature point field map, where the values at one location is
+        // interpreted as a matrix with [nb_operators] rows
+        auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
+
+        // preprocess weights
+        bool use_default_weights{weights.size() == 0};
+        std::vector<Real> default_weights{};
+        if (use_default_weights) {
+            default_weights.resize(this->nb_quad_pts, 1.);
+        }
+        const auto &quad_weights{use_default_weights ? default_weights : weights};
+
+        auto &collection{
+            dynamic_cast<GlobalFieldCollection &>(
+                quadrature_point_field.get_collection())
+        };
+        auto &pixels{collection.get_pixels()};
+
+        // pixel offsets of the points inside the convolution space
+        CcoordOps::DynamicPixels conv_space{DynCcoord_t(this->conv_pts_shape)};
+
+        // For each pixel...
+        for (auto &&id_base_ccoord: pixels.enumerate()) {
+            auto &&id{std::get<0>(id_base_ccoord)};
+            auto &&base_ccoord{std::get<1>(id_base_ccoord)};
+
+            // get the quadrature point value relative to this pixel
+            auto &&value{quad_map[id]};
+
+            // For each convolution points involved in the current pixel...
+            for (auto &&tup: akantu::enumerate(conv_space)) {
+                // get the nodal values relative to B-chunk
+                auto &&index{std::get<0>(tup)};
+                auto &&offset{std::get<1>(tup)};
+                auto &&ccoord{pixels.get_neighbour(base_ccoord, offset)};
+                auto &&nodal_vals{nodal_map[pixels.get_index(ccoord)]};
+
+                // For each quadrature point
+                for (Index_t idx_quad = 0; idx_quad < this->nb_quad_pts; ++idx_quad) {
+                    // get the chunk that corresponding to this quadrature point
+                    auto &&quad_vals{
+                        value.block(0, idx_quad * nb_nodal_components,
+                                    this->nb_operators,
+                                    nb_nodal_components)
+                    };
+                    // get the chunk that represents the contribution of this node to
+                    // this quadrature point; and transpose it.
+                    auto &&B_block_T{
+                        this->pixel_operator
+                        .block(idx_quad * this->nb_operators,
+                               index * this->nb_pixelnodal_pts,
+                               this->nb_operators,
+                               this->nb_pixelnodal_pts)
+                        .transpose()
+                    };
+                    // compute
+                    nodal_vals += alpha * quad_weights[idx_quad] * B_block_T * quad_vals;
+                }
+            }
+        }
+    }
+
+    /* ---------------------------------------------------------------------- */
+    const Eigen::MatrixXd &ConvolutionOperator::get_pixel_operator() const {
+        return this->pixel_operator;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    Index_t ConvolutionOperator::get_nb_quad_pts() const {
+        return this->nb_quad_pts;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    Index_t ConvolutionOperator::get_nb_operators() const {
+        return this->nb_operators;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    Index_t ConvolutionOperator::get_nb_nodal_pts() const {
+        return this->nb_pixelnodal_pts;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    Index_t ConvolutionOperator::get_spatial_dim() const {
+        return this->spatial_dim;
+    }
+} // namespace muGrid

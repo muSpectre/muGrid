@@ -1,8 +1,15 @@
 Change log for µGrid
 ====================
 
+0.95.0 (05June25)
+-----------------
+
+- ENH: Accessor properties for field access without (`s`, `p`) and with ghosts (`sg`, `pg`)
+- ENH: Parallel conjugate gradient solver
+- MAINT: Removed support for Python 3.8
+
 0.94.0 (18Feb25)
--------------------------
+----------------
 
 - ENH: General convolution operator for fields
 - ENH: Domain decomposition with ghost buffer communication

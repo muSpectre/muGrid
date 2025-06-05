@@ -35,6 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import unittest
+
 import numpy as np
 
 import muGrid
@@ -208,6 +209,12 @@ class FieldCheck(unittest.TestCase):
         field_array[:] = 5  # assigne value 5 to pixel 1
 
         self.assertEqual(fc.get_name(), lfc_name)
+
+    def test_accessors(self):
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
+        field = fc.register_real_field("test-field", 1, 'pixel')
+        assert field.p.shape == field.pg.shape
+        assert field.s.shape == field.sg.shape
 
 
 if __name__ == "__main__":

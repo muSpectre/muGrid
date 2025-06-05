@@ -17,7 +17,9 @@ envdata.append('TESTS_BUILDDIR', meson.current_build_dir())
 examples = [
     'components.py',
     'field_collection.py',
+    'gradient.py',
     'io.py',
+    'poisson.py',
     'sub_points.py'
 ]
 
