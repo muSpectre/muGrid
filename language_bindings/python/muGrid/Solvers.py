@@ -68,7 +68,6 @@ def conjugate_gradients(
 
         # Update x (and residual)
         pAp = comm.sum(np.dot(p.s.ravel(), Ap.s.ravel()))
-        print("pAp =", pAp)
         if pAp <= 0:
             raise RuntimeError("Hessian is not positive definite")
 

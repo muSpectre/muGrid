@@ -19,6 +19,7 @@ examples = [
     'field_collection.py',
     'gradient.py',
     'io.py',
+    'poisson.py',
     'sub_points.py'
 ]
 
