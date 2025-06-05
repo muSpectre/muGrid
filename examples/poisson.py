@@ -2,7 +2,10 @@
 
 import argparse
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:
+    plt = None
 import numpy as np
 from mpi4py import MPI
 from NuMPI.Testing.Subdivision import suggest_subdivisions
@@ -69,7 +72,8 @@ conjugate_gradients(
     maxiter=1000,
 )
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-ax1.imshow(rhs.p)
-ax2.imshow(solution.p)
-plt.show()
+if plt is not None:
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+    ax1.imshow(rhs.p)
+    ax2.imshow(solution.p)
+    plt.show()
