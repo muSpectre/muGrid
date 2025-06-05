@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Python Bindings" href="Python.html" /><link rel="prev" title="Summary" href="Summary.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Getting Started - µGrid 0.94.0-12-g78c8b26 documentation</title>
+        <title>Getting Started - µGrid 0.94.0-60-g4aaf45b documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.94.0-12-g78c8b26
+      <a href="index.html"><div class="brand">µGrid 0.94.0-60-g4aaf45b
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -191,7 +191,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.94.0-12-g78c8b26
+  <span class="sidebar-brand-text">µGrid 0.94.0-60-g4aaf45b
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -333,6 +333,16 @@ Navigate to the build folder and run:</p>
 </pre></div>
 </div>
 </section>
+<section id="manually-enabling-and-disabling-features">
+<h2>Manually enabling and disabling features<a class="headerlink" href="#manually-enabling-and-disabling-features" title="Link to this heading">¶</a></h2>
+<p>By default, Meson autodetects features for you. However, sometimes you may want
+to manually enable or disable a specific feature, for example when compiling the
+serial version of <em>µ</em>Grid on a system that has MPI installed. To disable MPI,
+setup with</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>meson<span class="w"> </span>setup<span class="w"> </span>-Dmpi<span class="o">=</span>disabled<span class="w"> </span>buildDir
+</pre></div>
+</div>
+</section>
 <section id="getting-help-and-reporting-bugs">
 <h2>Getting help and reporting bugs<a class="headerlink" href="#getting-help-and-reporting-bugs" title="Link to this heading">¶</a></h2>
 <p><em>µ</em>Grid is under active development and the documentation
@@ -406,6 +416,7 @@ be documented and have unit tests. Please submit merge requests for review.</p>
 <li><a class="reference internal" href="#python-quick-start">Python quick start</a></li>
 <li><a class="reference internal" href="#obtaining-grid-s-source-code">Obtaining <em>µ</em>Grid’s source code</a></li>
 <li><a class="reference internal" href="#building-grid">Building <em>µ</em>Grid</a></li>
+<li><a class="reference internal" href="#manually-enabling-and-disabling-features">Manually enabling and disabling features</a></li>
 <li><a class="reference internal" href="#getting-help-and-reporting-bugs">Getting help and reporting bugs</a></li>
 <li><a class="reference internal" href="#contribute">Contribute</a></li>
 </ul>
@@ -419,7 +430,7 @@ be documented and have unit tests. Please submit merge requests for review.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=e1e5044d"></script>
+</div><script src="_static/documentation_options.js?v=be2295b5"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=5fa4622c"></script>

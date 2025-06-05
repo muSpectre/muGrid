@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="C++ Bindings" href="Cplusplus.html" /><link rel="prev" title="Getting Started" href="GettingStarted.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Python Bindings - µGrid 0.94.0-12-g78c8b26 documentation</title>
+        <title>Python Bindings - µGrid 0.94.0-60-g4aaf45b documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.94.0-12-g78c8b26
+      <a href="index.html"><div class="brand">µGrid 0.94.0-60-g4aaf45b
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -191,7 +191,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
   
-  <span class="sidebar-brand-text">µGrid 0.94.0-12-g78c8b26
+  <span class="sidebar-brand-text">µGrid 0.94.0-60-g4aaf45b
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -405,6 +405,66 @@ a view on the underlying data, but with different shapes. The <cite>s</cite> acc
 <cite>(components, sub-points, pixels)</cite> and exposes the sub-points explicitly. The <cite>p</cite> accessor folds
 the sub-points into the last dimension of the components.</p>
 </section>
+<section id="convolutions">
+<h2>Convolutions<a class="headerlink" href="#convolutions" title="Link to this heading">¶</a></h2>
+<p>A common operation in numerical analysis is the convolution of a field with a short-ranged stencil. µGrid has utility
+functions that make this convolution simple. A convolution turns a field defined on nodal points into a field defined
+on quadrature points. This means field of shape</p>
+<p>is turned into a field of shape</p>
+<p>where the same convolution is applied to each component. Note that the convolution operation itself may have multiple
+components (which we will refer to as operators in the following), meaning that the output field may have the shape</p>
+<p>As an example, we consider the gradient of a two dimensional field with a single nodal point.
+If we use two linear finite elements per pixel, we can represent the derivative by two quadrature points per pixel.
+The gradient itself has two components, one for each direction of the gradient, which means we need two operators
+to represent it. The stencil then has the shape</p>
+<p>or in this specific case</p>
+<p>because we are only considering a two-dimensional problem where there are two operators of the gradient.</p>
+<p>Note that the stencil can be of a lower dimensional shape, in which case missing dimensions are assumed to
+be unity. It is assumed that first <cite>nodel-points</cite>, then <cite>quadrature-points</cite> and finally <cite>operators</cite> are
+missing. This means we can represent a simple forward-differences gradient operator in two dimensions as</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConvolutionOperator</span><span class="p">,</span> <span class="n">GlobalFieldCollection</span>
+
+<span class="c1"># Two dimensional grid</span>
+<span class="n">nx</span><span class="p">,</span> <span class="n">ny</span> <span class="o">=</span> <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quad&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">})</span>
+
+<span class="c1"># Get nodal field</span>
+<span class="n">nodal_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;nodal-field&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get quadrature field of shape (2, quad, nx, ny)</span>
+<span class="n">quad_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;quad-field&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span> <span class="s2">&quot;quad&quot;</span><span class="p">)</span>
+
+<span class="c1"># Fill nodal field with a sine-wave</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">nodal_field</span><span class="o">.</span><span class="n">icoords</span>
+<span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span>
+
+<span class="c1"># Derivative stencil of shape (2, quad, 2, 2)</span>
+<span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="p">[</span>  <span class="c1"># Derivative in x-direction</span>
+            <span class="p">[[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]],</span>  <span class="c1"># Bottom-left triangle (first quadrature point)</span>
+            <span class="p">[[[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span>  <span class="c1"># Top-right triangle (second quadrature point)</span>
+        <span class="p">],</span>
+        <span class="p">[</span>  <span class="c1"># Derivative in y-direction</span>
+            <span class="p">[[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]],</span>  <span class="c1"># Bottom-left triangle (first quadrature point)</span>
+            <span class="p">[[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span>  <span class="c1"># Top-right triangle (second quadrature point)</span>
+        <span class="p">],</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">ConvolutionOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
+
+<span class="c1"># Apply the gradient operator to the nodal field and write result to the quad field</span>
+<span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="p">,</span> <span class="n">quad_field</span><span class="p">)</span>
+
+<span class="c1"># Check that the quadrature field has the correct derivative</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
+    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mf">0.25</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-5</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
 <section id="numpy-views">
 <h2>numpy views<a class="headerlink" href="#numpy-views" title="Link to this heading">¶</a></h2>
 <p>The multidimensional array representation of a field is accessible via the
@@ -564,6 +624,7 @@ from a field collection to disk:</p>
 <li><a class="reference internal" href="#field-collections">Field collections</a></li>
 <li><a class="reference internal" href="#components">Components</a></li>
 <li><a class="reference internal" href="#sub-points">Sub-points</a></li>
+<li><a class="reference internal" href="#convolutions">Convolutions</a></li>
 <li><a class="reference internal" href="#numpy-views">numpy views</a></li>
 <li><a class="reference internal" href="#i-o">I/O</a></li>
 </ul>
@@ -577,7 +638,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=e1e5044d"></script>
+</div><script src="_static/documentation_options.js?v=be2295b5"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=5fa4622c"></script>

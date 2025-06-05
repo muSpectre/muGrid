@@ -123,6 +123,56 @@ a view on the underlying data, but with different shapes. The `s` accessor has t
 `(components, sub-points, pixels)` and exposes the sub-points explicitly. The `p` accessor folds
 the sub-points into the last dimension of the components.
 
+Convolutions
+************
+
+A common operation in numerical analysis is the convolution of a field with a short-ranged stencil. µGrid has utility
+functions that make this convolution simple. A convolution turns a field defined on nodal points into a field defined
+on quadrature points. This means field of shape
+
+.. code-block:: Python
+    (components, nodal-points, pixels)
+
+is turned into a field of shape
+
+.. codd-block:: Python
+    (components, quadrature-points, pixels)
+
+where the same convolution is applied to each component. Note that the convolution operation itself may have multiple
+components (which we will refer to as operators in the following), meaning that the output field may have the shape
+
+.. codd-block:: Python
+    (operators, components, quadrature-points, pixels)
+
+As an example, we consider the gradient of a two dimensional field with a single nodal point.
+If we use two linear finite elements per pixel, we can represent the derivative by two quadrature points per pixel.
+The gradient itself has two components, one for each direction of the gradient, which means we need two operators
+to represent it. The stencil then has the shape
+
+.. code-block:: Python
+    (operators, quadrature-points, nodal-points, pixels)
+
+or in this specific case
+
+.. code-block:: Python
+    (2, 2, 1, 2, 2)
+
+because we are only considering a two-dimensional problem where there are two operators of the gradient.
+
+Note that the stencil can be of a lower dimensional shape, in which case missing dimensions are assumed to
+be unity. It is assumed that first `nodel-points`, then `quadrature-points` and finally `operators` are
+missing. This means we can represent a simple forward-differences gradient operator in two dimensions as
+
+.. code-block:: Python
+    stencil = np.array([
+        [[-1, 1], [0, 0]],
+        [[-1, 0], [1, 0]]
+    ])
+    op = muGrid.ConvolutionOperator(2, stencil)
+
+.. literalinclude:: ../../examples/gradient.py
+    :language: python
+
 numpy views
 ***********
 
