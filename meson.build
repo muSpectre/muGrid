@@ -2,7 +2,8 @@ project(
     'muGrid', # Project name
     'c', 'cpp', # Project type. We need a C and C++ compiler.
     default_options : ['cpp_std=c++17'], # Yes, we need C++17, at least for std::optional
-    version : run_command('python3', 'discover_version.py', check : true).stdout().strip()
+    version : run_command('python3', 'discover_version.py', check : true).stdout().strip(),
+    meson_version : '>=1.1'
 )
 
 pymod = import('python')
@@ -17,8 +18,8 @@ version_hash = version[2]
 
 # Those are requirements on *some older* systems, hence optional
 cc = meson.get_compiler('c')
-dl = cc.find_library('dl', required: false)
-execinfo = cc.find_library('execinfo', required: false)
+dl = cc.find_library('dl', required : false)
+execinfo = cc.find_library('execinfo', required : false)
 
 mugrid_dependencies = [dl, execinfo]
 
