@@ -129,10 +129,10 @@ namespace muGrid {
                 nb_blocks_seen_in_next_dim, send_offset_right, recv_offset_right,
                 begin_addr, stride_in_direction, element_size, field.get_mpi_type());
 #else
-      this->comm.sendrecv_right(direction, block_len_ghost_left,
-                                stride_in_next_dim, nb_blocks_seen_in_next_dim,
-                                send_offset_right, recv_offset_right,
-                                begin_addr, stride_in_direction, element_size);
+            this->comm.sendrecv_right(direction, block_len_ghost_left,
+                                      stride_in_next_dim, nb_blocks_seen_in_next_dim,
+                                      send_offset_right, recv_offset_right,
+                                      begin_addr, stride_in_direction, element_size);
 #endif
 
             // Sending things to the LEFT
@@ -155,10 +155,10 @@ namespace muGrid {
                 nb_blocks_seen_in_next_dim, send_offset_left, recv_offset_left,
                 begin_addr, stride_in_direction, element_size, field.get_mpi_type());
 #else
-      this->comm.sendrecv_left(direction, block_len_ghost_right,
-                               stride_in_next_dim, nb_blocks_seen_in_next_dim,
-                               send_offset_left, recv_offset_left, begin_addr,
-                               stride_in_direction, element_size);
+            this->comm.sendrecv_left(direction, block_len_ghost_right,
+                                     stride_in_next_dim, nb_blocks_seen_in_next_dim,
+                                     send_offset_left, recv_offset_left, begin_addr,
+                                     stride_in_direction, element_size);
 #endif
         }
     }

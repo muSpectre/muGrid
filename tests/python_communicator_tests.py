@@ -34,98 +34,103 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import unittest
+import numpy as np
+import pytest
 
 import muGrid
 
-import numpy as np
+
+def test_sum_default():
+    # The default communicator is COMM_SELF, i.e. each process by itself
+    comm = muGrid.Communicator()
+    assert comm.sum(comm.rank + 3) == 3
 
 
-class CommunicatorCheck(unittest.TestCase):
-    def test_sum_default(self):
-        # The default communicator is COMM_SELF, i.e. each process by itself
+@pytest.mark.skipif(
+    not muGrid.has_mpi, reason="muGrid was compiled without MPI support"
+)
+def test_sum_comm_world():
+    try:
+        from mpi4py import MPI
+
+        comm = muGrid.Communicator(MPI.COMM_WORLD)
+    except ImportError:
         comm = muGrid.Communicator()
-        self.assertEqual(comm.sum(comm.rank+3), 3)
+    # 1 + 2 + 3 + ... + n = n*(n+1)/2
+    assert comm.sum(comm.rank + 3) == comm.size * (comm.size + 1) / 2 + 2 * comm.size
 
-    @unittest.skipIf(not muGrid.has_mpi,
-                     'muGrid was compiled without MPI support')
-    def test_sum_comm_world(self):
-        try:
-            from mpi4py import MPI
-            comm = muGrid.Communicator(MPI.COMM_WORLD)
-        except ImportError:
-            comm = muGrid.Communicator()
-        # 1 + 2 + 3 + ... + n = n*(n+1)/2
-        self.assertEqual(comm.sum(comm.rank+3),
-                         comm.size*(comm.size+1)/2 + 2*comm.size)
 
-    def test_cum_sum_comm_world(self):
-        try:
-            from mpi4py import MPI
-            comm = muGrid.Communicator(MPI.COMM_WORLD)
-        except ImportError:
-            comm = muGrid.Communicator()
-        # 1 + 2 + 3 + ... + n = n*(n+1)/2
-        self.assertEqual(comm.cumulative_sum(comm.rank+1),
-                         comm.rank*(comm.rank+1)/2 + comm.rank + 1)
+def test_cum_sum_comm_world():
+    try:
+        from mpi4py import MPI
 
-    def test_bcast_1(self):
-        # The default communicator is COMM_SELF, i.e. each process by itself
+        comm = muGrid.Communicator(MPI.COMM_WORLD)
+    except ImportError:
         comm = muGrid.Communicator()
-        scalar_arg = comm.rank + 3
-        res = comm.bcast(scalar_arg, 0)
-        self.assertEqual(res, 3)
-
-        scalar_arg = comm.rank + 1
-        res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
-        self.assertEqual(res, comm.size)
-
-    # TODO(RLeute): I think we need such a test
-    # def test_get_comm(self):
-    #     # test if the function get comm works and returns the mpi communicator
-    #     from mpi4py import MPI
-    #     mpi_communicator = MPI.COMM_WORLD
-    #     comm = muGrid.Communicator(mpi_communicator)
-    #     self.assertEqual(comm.mpi_comm, mpi_communicator)
-
-    @unittest.skipIf(not muGrid.has_mpi,
-                     'muFFT was compiled without MPI support')
-    def test_bcast_2(self):
-        try:
-            from mpi4py import MPI
-            comm = muGrid.Communicator(MPI.COMM_WORLD)
-        except ImportError:
-            comm = muGrid.Communicator()
-        scalar_arg = comm.rank + 3
-        res = comm.bcast(scalar_arg, 0)
-        self.assertEqual(res, 3)
-
-        scalar_arg = comm.rank + 1
-        res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
-        self.assertEqual(res, comm.size)
-
-    def test_gather(self):
-        try:
-            from mpi4py import MPI
-            comm = muGrid.Communicator(MPI.COMM_WORLD)
-        except ImportError:
-            comm = muGrid.Communicator()
-
-        # gather arrays "a" with different lengths on the ranks
-        a = np.arange(comm.rank*2+4).reshape((-1, 2)).T
-
-        a_gathered = comm.gather(a)
-
-        # construct reference
-        for i in range(comm.size):
-            if i == 0:
-                a_ref = np.arange(i*2+4).reshape((-1, 2))
-            elif i >= 1:
-                a_tmp = np.arange(i*2+4).reshape((-1, 2))
-                a_ref = np.concatenate((a_ref, a_tmp), axis=0)
-
-        self.assertTrue((a_gathered == a_ref.T).all())
+    # 1 + 2 + 3 + ... + n = n*(n+1)/2
+    assert (
+        comm.cumulative_sum(comm.rank + 1)
+        == comm.rank * (comm.rank + 1) / 2 + comm.rank + 1
+    )
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_bcast_1():
+    # The default communicator is COMM_SELF, i.e. each process by itself
+    comm = muGrid.Communicator()
+    scalar_arg = comm.rank + 3
+    res = comm.bcast(scalar_arg, 0)
+    assert res == 3
+
+    scalar_arg = comm.rank + 1
+    res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
+    assert res == comm.size
+
+
+# TODO(RLeute): I think we need such a test
+# def test_get_comm():
+#     # test if the function get comm works and returns the mpi communicator
+#     from mpi4py import MPI
+#     mpi_communicator = MPI.COMM_WORLD
+#     comm = muGrid.Communicator(mpi_communicator)
+#     self.assertEqual(comm.mpi_comm, mpi_communicator)
+
+
+@pytest.mark.skipif(not muGrid.has_mpi, reason="muFFT was compiled without MPI support")
+def test_bcast_2():
+    try:
+        from mpi4py import MPI
+
+        comm = muGrid.Communicator(MPI.COMM_WORLD)
+    except ImportError:
+        comm = muGrid.Communicator()
+    scalar_arg = comm.rank + 3
+    res = comm.bcast(scalar_arg, 0)
+    assert res == 3
+
+    scalar_arg = comm.rank + 1
+    res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
+    assert res == comm.size
+
+
+def test_gather():
+    try:
+        from mpi4py import MPI
+
+        comm = muGrid.Communicator(MPI.COMM_WORLD)
+    except ImportError:
+        comm = muGrid.Communicator()
+
+    # gather arrays "a" with different lengths on the ranks
+    a = np.arange(comm.rank * 2 + 4).reshape((-1, 2)).T
+
+    a_gathered = comm.gather(a)
+
+    # construct reference
+    for i in range(comm.size):
+        if i == 0:
+            a_ref = np.arange(i * 2 + 4).reshape((-1, 2))
+        elif i >= 1:
+            a_tmp = np.arange(i * 2 + 4).reshape((-1, 2))
+            a_ref = np.concatenate((a_ref, a_tmp), axis=0)
+
+    assert (a_gathered == a_ref.T).all()

@@ -137,7 +137,7 @@ else
     test(
         'mugrid_python_binding_tests',
         python,
-        args : ['-m', 'pytest', '-v', '-f', join_paths(meson.project_source_root(), 'tests')],
+        args : ['-m', 'pytest', '-v', '-s', join_paths(meson.project_source_root(), 'tests')],
         env : envdata,
         depends : [mugrid_python],
         timeout : test_timeout,

@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
@@ -6,10 +7,16 @@ import muGrid
 
 def get_nb_subdivisions(nb_processes: int):
     subdivision_setup = {
-        1: (1,),
-        2: (2,),
-        4: (2, 2),
-        8: (2, 2, 2),
+        1: [(1,), (1, 1)],
+        2: [
+            (2,),
+        ],
+        4: [
+            (2, 2),
+        ],
+        8: [
+            (2, 2, 2),
+        ],
     }
     if nb_processes in subdivision_setup:
         return subdivision_setup[nb_processes]
@@ -17,8 +24,7 @@ def get_nb_subdivisions(nb_processes: int):
         raise NotImplementedError("Not planned for this number of processes.")
 
 
-def test_communicate_ghost():
-    # Create a communicator
+def make_subdivisions():
     try:
         from mpi4py import MPI
 
@@ -29,6 +35,13 @@ def test_communicate_ghost():
 
     # Create a Cartesian decomposition
     nb_subdivisions = get_nb_subdivisions(nb_processes)
+
+    return [(comm, s) for s in nb_subdivisions]
+
+
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_communicate_ghosts(comm, nb_subdivisions):
+    # Create a Cartesian decomposition
     spatial_dim = len(nb_subdivisions)
     nb_pts_per_dim = 5
     nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
@@ -75,7 +88,13 @@ def test_communicate_ghost():
     )
 
     # Communicate ghost cells
-    cart_decomp.communicate_ghosts(field_name)
+    print("BEFORE")
+    with np.printoptions(precision=2):
+        print(field.pg)
+    cart_decomp.communicate_ghosts(field)
+    print("AFTER")
+    with np.printoptions(precision=2):
+        print(field.pg)
 
     # Check values at all grid points
     for index in np.ndindex(*nb_subdomain_grid_pts):

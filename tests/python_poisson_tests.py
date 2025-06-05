@@ -114,6 +114,7 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         solution,
         tol=1e-6,
         callback=callback,
+        maxiter=10,
     )
 
     np.testing.assert_allclose(
