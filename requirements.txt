@@ -10,7 +10,7 @@ flake8==4.0.1
     #   pytest-flake8
 iniconfig==2.1.0
     # via pytest
-mccabe==0.6.1
+mccabe==0.7.0
     # via flake8
 numpi==0.7.3
     # via mugrid (pyproject.toml)
