@@ -20,7 +20,7 @@ numpy==2.2.5
     #   scipy
 packaging==25.0
     # via pytest
-pluggy==1.5.0
+pluggy==1.6.0
     # via pytest
 primefac==2.0.12
     # via numpi
