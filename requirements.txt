@@ -24,7 +24,7 @@ pluggy==1.5.0
     # via pytest
 primefac==2.0.12
     # via numpi
-pycodestyle==2.8.0
+pycodestyle==2.14.0
     # via flake8
 pyflakes==2.4.0
     # via flake8
