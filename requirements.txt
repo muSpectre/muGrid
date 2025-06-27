@@ -12,7 +12,7 @@ iniconfig==2.1.0
     # via pytest
 mccabe==0.6.1
     # via flake8
-numpi==0.7.3
+numpi==0.8.2
     # via mugrid (pyproject.toml)
 numpy==2.2.5
     # via
