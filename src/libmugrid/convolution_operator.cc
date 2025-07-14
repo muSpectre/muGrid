@@ -155,12 +155,14 @@ namespace muGrid {
           // all the components are exactly in one column
           auto && effective_nodal_vals{nodal_vals.col(i_pixelnodal)};
           // the "operator" is interpreted as a matrix with shape (o q, s ijk),
-          // so the corresponding chunk is a colum; transpose so it becomes a row.
+          // so the corresponding chunk is a colum; transpose so it becomes a
+          // row.
           auto && effective_op_vals{
               this->pixel_operator
                   .col(index * this->nb_pixelnodal_pts + i_pixelnodal)
                   .transpose()};
-          // compute
+          // compute (col * row, such that the operator is broadcasted to all
+          // components)
           quad_vals += alpha * effective_nodal_vals * effective_op_vals;
         }
       }
@@ -214,11 +216,11 @@ namespace muGrid {
     }
 
     // get nodal field map, where the values at one location is interpreted
-    // as a matrix with [nb_field_comps] rows
+    // as a matrix with [nb_nodal_comps] rows
     auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
     // get quadrature point field map, where the values at one location is
-    // interpreted as a matrix with [nb_operators] rows
-    auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
+    // interpreted as a matrix with [nb_nodal_comps] rows
+    auto quad_map{quadrature_point_field.get_pixel_map(nb_nodal_components)};
 
     // preprocess weights
     bool use_default_weights{weights.size() == 0};
@@ -241,7 +243,8 @@ namespace muGrid {
       auto && base_ccoord{std::get<1>(id_base_ccoord)};
 
       // get the quadrature point value relative to this pixel
-      auto && value{quad_map[id]};
+      // which should be interpreted as a matrix with shape (c, o q)
+      auto && quad_vals{quad_map[id]};
 
       // For each convolution points involved in the current pixel...
       for (auto && tup : akantu::enumerate(conv_space)) {
@@ -249,24 +252,24 @@ namespace muGrid {
         auto && index{std::get<0>(tup)};
         auto && offset{std::get<1>(tup)};
         auto && ccoord{pixels.get_neighbour(base_ccoord, offset)};
+        // which should be interpreted as a matrix with shape (c, s)
         auto && nodal_vals{nodal_map[pixels.get_index(ccoord)]};
 
-        // For each quadrature point
-        for (Index_t idx_quad = 0; idx_quad < this->nb_quad_pts; ++idx_quad) {
-          // get the chunk that corresponding to this quadrature point
-          auto && quad_vals{value.block(0, idx_quad * nb_nodal_components,
-                                        this->nb_operators,
-                                        nb_nodal_components)};
-          // get the chunk that represents the contribution of this node to
-          // this quadrature point; and transpose it.
-          auto && B_block_T{this->pixel_operator
-                                .block(idx_quad * this->nb_operators,
-                                       index * this->nb_pixelnodal_pts,
-                                       this->nb_operators,
-                                       this->nb_pixelnodal_pts)
-                                .transpose()};
+        // Because of "quadrature weights", we need to loop quadrature points
+        // For each quadrature points
+        for (Index_t i_quad = 0; i_quad < this->nb_quad_pts; ++i_quad) {
+          // get the columns corresponding to this quadrature point, should have shape (c, o)
+          auto && effetive_quad_vals{
+              quad_vals.block(0, i_quad * this->nb_operators,
+                              nb_nodal_components, this->nb_operators)};
+          // the operator is interpreted as a matrix with shape (o q, s ijk),
+          // get the corresponding block with shape (o, s)
+          auto && effective_op_vals{this->pixel_operator.block(
+              i_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
+              this->nb_operators, this->nb_pixelnodal_pts)};
           // compute
-          nodal_vals += alpha * quad_weights[idx_quad] * B_block_T * quad_vals;
+          nodal_vals += alpha * quad_weights[i_quad] * effetive_quad_vals *
+                        effective_op_vals;
         }
       }
     }
