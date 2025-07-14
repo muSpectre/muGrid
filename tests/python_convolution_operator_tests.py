@@ -92,12 +92,12 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         nodal.p = nodal_vals.reshape(nb_field_components, nb_x_pts, nb_y_pts)
 
         # Create a quadrature field to store the result
-        quad = fc.real_field("quad-grad", (nb_operators, nb_field_components), "quad")
+        quad = fc.real_field("quad-grad", (nb_field_components, nb_operators), "quad")
 
         # Check that quadrature field has correct shape
         assert quad.s.shape == (
-            nb_operators,
             nb_field_components,
+            nb_operators,
             nb_quad_pts,
             nb_x_pts,
             nb_y_pts,
@@ -127,16 +127,18 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         )
 
         grad_ref_ocqxy = np.einsum(
-            "oqij,ijcxy->ocqxy", stencil_oqij, offset_nodes_ijcxy
+            "oqij,ijcxy->coqxy", stencil_oqij, offset_nodes_ijcxy
         )
         assert grad_ref_ocqxy.shape == (
-            nb_operators,
             nb_field_components,
+            nb_operators,
             nb_quad_pts,
             nb_x_pts,
             nb_y_pts,
         )
 
+        print(f"actual\n{quad.s}")
+        print(f"desired\n{grad_ref_ocqxy}")
         # Check
         np.testing.assert_allclose(quad.s, grad_ref_ocqxy)
 
