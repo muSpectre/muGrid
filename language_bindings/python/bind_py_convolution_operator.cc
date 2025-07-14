@@ -179,8 +179,11 @@ void add_convolution_operator_default(py::module &mod) {
                              nb_nodal_pts = array.shape(2);
                          }
                          Shape_t nb_stencil_pts(nb_dims);
+                         // .shape() returns a pointer to dimension array
                          std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
                                    nb_stencil_pts.begin());
+                        // The operator is interpreted as a matrix (due to limit of Eigen),
+                        // with "operator x quad_pts" rows.
                          const auto nb_rows{nb_operators * nb_quad_pts};
                          const auto nb_cols{
                              nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
