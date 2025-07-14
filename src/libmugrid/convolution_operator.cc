@@ -120,8 +120,8 @@ namespace muGrid {
     // as a matrix with [nb_nodal_components] rows
     auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
     // get quadrature point field map, where the values at one location is
-    // interpreted as a matrix with [nb_operators] rows
-    auto quad_map{quadrature_point_field.get_pixel_map(this->nb_operators)};
+    // interpreted as a matrix with [nb_nodal_components] rows
+    auto quad_map{quadrature_point_field.get_pixel_map(nb_nodal_components)};
 
     auto & collection{dynamic_cast<GlobalFieldCollection &>(
         quadrature_point_field.get_collection())};
@@ -133,37 +133,35 @@ namespace muGrid {
 
     // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {
+      // get the quadrature values,
       auto && id{std::get<0>(id_base_ccoord)};
       auto && base_ccoord{std::get<1>(id_base_ccoord)};
-
-      // get the quadrature point value relative to this pixel
-      auto && value{quad_map[id]};
-      // Expected arrangement:
-      // [op1|u_x[q1], op1|u_y[q1], op1|u_x[q2], op1|u_y[q2]]
-      // [op2|u_x[q1], op2|u_y[q1], op2|u_x[q2], op2|u_y[q2]]
+      // which should be interpreted as a matrix with shape (c, o q)
+      // (It is already set to zero in the caller function "apply")
+      auto && quad_vals{quad_map[id]};
 
       // For each convolution points involved in the current pixel...
       for (auto && tup : akantu::enumerate(conv_space)) {
-        // get the nodal values
+        // get the nodal values,
         auto && index{std::get<0>(tup)};
         auto && offset{std::get<1>(tup)};
         auto && ccoord{pixels.get_neighbour(base_ccoord, offset)};
-        // transpose to make the shape compatible for multiplication
-        auto && nodal_vals{nodal_map[pixels.get_index(ccoord)].transpose()};
+        // which should be interpreted as a matrix with shape (c, s)
+        auto && nodal_vals{nodal_map[pixels.get_index(ccoord)]};
 
-        // For each quadrature point in the current pixel...
-        for (Index_t idx_quad = 0; idx_quad < this->nb_quad_pts; ++idx_quad) {
-          // get the chunk that corresponding to this quadrature point
-          auto && quad_vals{value.block(0, idx_quad * nb_nodal_components,
-                                        this->nb_operators,
-                                        nb_nodal_components)};
-          // get the chunk that represents the contribution of this node to
-          // this quadrature point
-          auto && B_block{this->pixel_operator.block(
-              idx_quad * this->nb_operators, index * this->nb_pixelnodal_pts,
-              this->nb_operators, this->nb_pixelnodal_pts)};
+        // For each contributive nodal-pixel points, i.e. sub-pts of nodal field
+        for (Index_t i_pixelnodal = 0; i_pixelnodal < this->nb_pixelnodal_pts;
+             ++i_pixelnodal) {
+          // all the components are exactly in one column
+          auto && effective_nodal_vals{nodal_vals.col(i_pixelnodal)};
+          // the "operator" is interpreted as a matrix with shape (o q, s ijk),
+          // so the corresponding chunk is a colum; transpose so it becomes a row.
+          auto && effective_op_vals{
+              this->pixel_operator
+                  .col(index * this->nb_pixelnodal_pts + i_pixelnodal)
+                  .transpose()};
           // compute
-          quad_vals += alpha * B_block * nodal_vals;
+          quad_vals += alpha * effective_nodal_vals * effective_op_vals;
         }
       }
     }
