@@ -7,11 +7,15 @@ try:
 except ModuleNotFoundError:
     plt = None
 import numpy as np
-from mpi4py import MPI
-from NuMPI.Testing.Subdivision import suggest_subdivisions
-
 import muGrid
 from muGrid.Solvers import conjugate_gradients
+try:
+    from mpi4py import MPI
+    comm = muGrid.Communicator(MPI.COMM_WORLD)
+except ImportError:
+    comm = muGrid.Communicator()
+
+from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 parser = argparse.ArgumentParser(
     prog="Poisson", description="Solve the Poisson equation"
@@ -21,7 +25,6 @@ args = parser.parse_args()
 
 nb_grid_pts = [int(x) for x in args.nb_grid_pts.split(",")]
 
-comm = muGrid.Communicator(MPI.COMM_WORLD)
 s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
 decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
