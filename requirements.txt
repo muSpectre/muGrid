@@ -4,7 +4,7 @@ coverage==7.8.0
     # via pytest-cov
 discoverversion==0.2.6
     # via numpi
-flake8==4.0.1
+flake8==7.3.0
     # via
     #   numpi
     #   pytest-flake8
