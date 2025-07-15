@@ -1,4 +1,10 @@
 import numpy as np
+import pytest
+import muGrid
+if not muGrid.has_mpi:
+    print("IO example is skipped: muGrid has no OpenMode in serial build")
+    exit(0)
+
 from muGrid import GlobalFieldCollection, FileIONetCDF, OpenMode
 
 # Two dimensional grid
