@@ -34,7 +34,7 @@ pytest==8.4.1
     #   numpi
     #   pytest-cov
     #   pytest-flake8
-pytest-cov==6.2.1
+pytest-cov==6.3.0
     # via
     #   mugrid (pyproject.toml)
     #   numpi
