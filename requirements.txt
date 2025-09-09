@@ -14,7 +14,7 @@ mccabe==0.7.0
     # via flake8
 numpi==0.8.2
     # via mugrid (pyproject.toml)
-numpy==2.3.1
+numpy==2.3.3
     # via
     #   mugrid (pyproject.toml)
     #   scipy
