@@ -182,7 +182,10 @@ namespace muGrid {
         void initialise(const DynCcoord_t &nb_domain_grid_pts,
                         const DynCcoord_t &nb_subdomain_grid_pts,
                         const DynCcoord_t &subdomain_locations,
-                        const DynCcoord_t &pixels_strides);
+                        const DynCcoord_t &pixels_strides,
+                        const DynCcoord_t &nb_ghosts_left = {},
+                        const DynCcoord_t &nb_ghosts_right = {});
+
 
         /**
          * freeze the problem size and allocate memory for all fields of the
@@ -193,11 +196,15 @@ namespace muGrid {
         void initialise(const Ccoord_t<Dim> &nb_domain_grid_pts,
                         const Ccoord_t<Dim> &nb_subdomain_grid_pts,
                         const Ccoord_t<Dim> &subdomain_locations,
-                        const Ccoord_t<Dim> &pixels_strides) {
+                        const Ccoord_t<Dim> &pixels_strides,
+                        const Ccoord_t<Dim> &nb_ghosts_left = {},
+                        const Ccoord_t<Dim> &nb_ghosts_right = {}) {
             this->initialise(DynCcoord_t{nb_domain_grid_pts},
                              DynCcoord_t{nb_subdomain_grid_pts},
                              DynCcoord_t{subdomain_locations},
-                             DynCcoord_t{pixels_strides});
+                             DynCcoord_t{pixels_strides},
+                             DynCcoord_t{nb_ghosts_left},
+                             DynCcoord_t{nb_ghosts_right});
         }
 
         /**
@@ -209,7 +216,9 @@ namespace muGrid {
                         const DynCcoord_t &nb_subdomain_grid_pts = {},
                         const DynCcoord_t &subdomain_locations = {},
                         StorageOrder pixels_storage_order =
-                                StorageOrder::Automatic);
+                                StorageOrder::Automatic,
+                        const DynCcoord_t &nb_ghosts_left = {},
+                        const DynCcoord_t &nb_ghosts_right = {});
 
         /**
          * freeze the problem size and allocate memory for all fields of the
@@ -221,11 +230,15 @@ namespace muGrid {
                         const Ccoord_t<Dim> &nb_subdomain_grid_pts = {},
                         const Ccoord_t<Dim> &subdomain_locations = {},
                         StorageOrder pixels_storage_order =
-                                StorageOrder::Automatic) {
+                                StorageOrder::Automatic,
+                        const Ccoord_t<Dim> &nb_ghosts_left = {},
+                        const Ccoord_t<Dim> &nb_ghosts_right = {}) {
             this->initialise(DynCcoord_t{nb_domain_grid_pts},
                              DynCcoord_t{nb_subdomain_grid_pts},
                              DynCcoord_t{subdomain_locations},
-                             pixels_storage_order);
+                             pixels_storage_order,
+                             DynCcoord_t{nb_ghosts_left},
+                             DynCcoord_t{nb_ghosts_right});
         }
 
         /**
@@ -251,23 +264,25 @@ namespace muGrid {
         }
 
         //! returns the process-local (subdomain) number of grid points in each
-        //! direction
+        //! direction including the ghost cells
         const DynCcoord_t &get_nb_subdomain_grid_pts() const {
             return this->get_pixels().get_nb_subdomain_grid_pts();
         }
 
         //! returns the process-local (subdomain) number of grid points in each
-        //! direction
+        //! directionl, but without the ghost cells
         DynCcoord_t get_nb_subdomain_grid_pts_without_ghosts() const {
             return this->get_pixels().get_nb_subdomain_grid_pts() - this->nb_ghosts_left - this->nb_ghosts_right;
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid
+        //! including the ghost cells
         const DynCcoord_t &get_subdomain_locations() const {
             return this->get_pixels().get_subdomain_locations();
         }
 
-        //! returns the process-local (subdomain) locations of subdomain grid
+        //! returns the process-local (subdomain) locations of subdomain grid,
+        //! but without the ghost cells
         DynCcoord_t get_subdomain_locations_without_ghosts() const {
             return this->get_pixels().get_subdomain_locations() + this->nb_ghosts_left;
         }

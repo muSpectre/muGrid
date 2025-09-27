@@ -34,7 +34,7 @@ public:
         PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts, field);
     }
 
-    void communicate_ghosts(std::string field_name) const override {
+    void communicate_ghosts(const std::string &field_name) const override {
         PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts, field_name);
     }
 };
@@ -63,7 +63,7 @@ void add_cartesian_decomposition(py::module &mod) {
                  "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
                  "nb_ghosts_left"_a, "nb_ghosts_right"_a)
             .def_property_readonly("collection",
-                                   &CartesianDecomposition::get_collection)
+                                   py::overload_cast<>(&CartesianDecomposition::get_collection, py::const_))
             .def_property_readonly("nb_subdivisions",
                                    &CartesianDecomposition::get_nb_subdivisions)
             .def_property_readonly("nb_domain_grid_pts",

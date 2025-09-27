@@ -91,12 +91,9 @@ namespace muGrid {
         StorageOrder storage_order,
         const DynCcoord_t &nb_ghosts_left,
         const DynCcoord_t &nb_ghosts_right)
-        : Parent{ValidityDomain::Global, nb_domain_grid_pts.get_dim(), nb_sub_pts, storage_order},
-          nb_ghosts_left{nb_ghosts_left.get_dim() == 0 ? DynCcoord_t(nb_domain_grid_pts.get_dim()) : nb_ghosts_left},
-          nb_ghosts_right{
-              nb_ghosts_right.get_dim() == 0 ? DynCcoord_t(nb_domain_grid_pts.get_dim()) : nb_ghosts_right
-          } {
-        this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations, pixels_storage_order);
+        : Parent{ValidityDomain::Global, nb_domain_grid_pts.get_dim(), nb_sub_pts, storage_order} {
+        this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations, pixels_storage_order,
+                         nb_ghosts_left, nb_ghosts_right);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -104,7 +101,13 @@ namespace muGrid {
     GlobalFieldCollection::initialise(const DynCcoord_t &nb_domain_grid_pts,
                                       const DynCcoord_t &nb_subdomain_grid_pts,
                                       const DynCcoord_t &subdomain_locations,
-                                      const DynCcoord_t &pixels_strides) {
+                                      const DynCcoord_t &pixels_strides,
+                                      const DynCcoord_t &nb_ghosts_left,
+                                      const DynCcoord_t &nb_ghosts_right) {
+        if (this->initialised) {
+            throw FieldCollectionError("double initialisation");
+        }
+
         // sanity check 1
         auto nb_domain_grid_pts_total{get_nb_from_shape(nb_domain_grid_pts)};
         if (nb_domain_grid_pts_total <= 0) {
@@ -129,9 +132,12 @@ namespace muGrid {
             throw FieldCollectionError(s.str());
         }
 
-        if (this->initialised) {
-            throw FieldCollectionError("double initialisation");
-        }
+        // Set ghost buffer sizes
+        this->nb_ghosts_left = nb_ghosts_left.get_dim() == 0
+                                   ? DynCcoord_t(nb_domain_grid_pts.get_dim())
+                                   : nb_ghosts_left;
+        this->nb_ghosts_right =
+                nb_ghosts_right.get_dim() == 0 ? DynCcoord_t(nb_domain_grid_pts.get_dim()) : nb_ghosts_right;
 
         this->nb_domain_grid_pts = nb_domain_grid_pts;
         this->pixels = CcoordOps::DynamicPixels(
@@ -154,7 +160,9 @@ namespace muGrid {
     GlobalFieldCollection::initialise(const DynCcoord_t &nb_domain_grid_pts,
                                       const DynCcoord_t &nb_subdomain_grid_pts,
                                       const DynCcoord_t &subdomain_locations,
-                                      StorageOrder pixels_storage_order) {
+                                      StorageOrder pixels_storage_order,
+                                      const DynCcoord_t &nb_ghosts_left,
+                                      const DynCcoord_t &nb_ghosts_right) {
         if (pixels_storage_order == StorageOrder::Automatic) {
             pixels_storage_order = this->get_storage_order();
         }
@@ -167,7 +175,7 @@ namespace muGrid {
             nb_domain_grid_pts, _nb_subdomain_grid_pts, subdomain_locations,
             pixels_storage_order == StorageOrder::ColMajor
                 ? CcoordOps::get_col_major_strides(_nb_subdomain_grid_pts)
-                : CcoordOps::get_row_major_strides(_nb_subdomain_grid_pts));
+                : CcoordOps::get_row_major_strides(_nb_subdomain_grid_pts), nb_ghosts_left, nb_ghosts_right);
     }
 
     /* ---------------------------------------------------------------------- */
