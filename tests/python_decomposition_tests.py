@@ -45,14 +45,14 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     spatial_dim = len(nb_subdivisions)
     nb_pts_per_dim = 5
     nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
-    nb_ghost_left = np.full(spatial_dim, 1)
-    nb_ghost_right = np.full(spatial_dim, 2)
+    nb_ghosts_left = np.full(spatial_dim, 1)
+    nb_ghosts_right = np.full(spatial_dim, 2)
     cart_decomp = muGrid.CartesianDecomposition(
         comm,
         nb_domain_grid_pts.tolist(),
         nb_subdivisions,
-        nb_ghost_left.tolist(),
-        nb_ghost_right.tolist(),
+        nb_ghosts_left.tolist(),
+        nb_ghosts_right.tolist(),
     )
 
     # Create a field for testing
@@ -68,8 +68,8 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     nb_subdomain_grid_pts = cart_decomp.nb_subdomain_grid_pts
     for index in np.ndindex(*nb_subdomain_grid_pts):
         is_not_ghost = all(
-            idx >= nb_ghost_left[dim]
-            and idx < nb_subdomain_grid_pts[dim] - nb_ghost_right[dim]
+            idx >= nb_ghosts_left[dim]
+            and idx < nb_subdomain_grid_pts[dim] - nb_ghosts_right[dim]
             for dim, idx in enumerate(index)
         )
         if is_not_ghost:
@@ -80,11 +80,11 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     # Check accessors
     np.testing.assert_array_equal(
         field.s.shape[-spatial_dim:],
-        np.array(field.sg.shape)[-spatial_dim:] - nb_ghost_left - nb_ghost_right,
+        np.array(field.sg.shape)[-spatial_dim:] - nb_ghosts_left - nb_ghosts_right,
     )
     np.testing.assert_array_equal(
         field.p.shape[-spatial_dim:],
-        np.array(field.pg.shape)[-spatial_dim:] - nb_ghost_left - nb_ghost_right,
+        np.array(field.pg.shape)[-spatial_dim:] - nb_ghosts_left - nb_ghosts_right,
     )
 
     # Communicate ghost cells

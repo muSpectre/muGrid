@@ -61,7 +61,7 @@ void add_cartesian_decomposition(py::module &mod) {
                      const DynCcoord_t &, const DynCcoord_t &,
                      const DynCcoord_t &>(),
                  "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
-                 "nb_ghost_left"_a, "nb_ghost_right"_a)
+                 "nb_ghosts_left"_a, "nb_ghosts_right"_a)
             .def_property_readonly("collection",
                                    &CartesianDecomposition::get_collection)
             .def_property_readonly("nb_subdivisions",

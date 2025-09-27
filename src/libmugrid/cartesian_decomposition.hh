@@ -16,8 +16,8 @@ namespace muGrid {
         CartesianDecomposition(const Communicator &comm,
                                const DynCcoord_t &nb_domain_grid_pts,
                                const DynCcoord_t &nb_subdivisions,
-                               const DynCcoord_t &nb_ghost_left,
-                               const DynCcoord_t &nb_ghost_right,
+                               const DynCcoord_t &nb_ghosts_left,
+                               const DynCcoord_t &nb_ghosts_right,
                                const SubPtMap_t &nb_sub_pts = {});
 
         CartesianDecomposition() = delete;
