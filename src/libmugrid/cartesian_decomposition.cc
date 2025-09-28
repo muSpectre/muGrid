@@ -55,8 +55,11 @@ namespace muGrid {
         this->check_dimension(nb_ghosts_left, "nb_ghosts_left");
         this->check_dimension(nb_ghosts_right, "nb_ghosts_right");
 
-        // Create Cartesian communicator if this has not already happend
+        // Create Cartesian communicator if this has not already happened
         if (this->cart_comm) {
+            // Since we don't have a Cartesian communicator, we assume that the
+            // subdivision information does not come from the communicator but
+            // some auxiliary source (e.g. the FFT library).
             this->cart_comm = std::make_unique<CartesianCommunicator>(
                 this->comm, nb_subdivisions);
         }
