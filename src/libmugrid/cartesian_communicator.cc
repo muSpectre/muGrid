@@ -58,10 +58,7 @@ namespace muGrid {
         const std::vector<int> & right_ranks)
         : Parent_t{parent.get_mpi_comm()}, parent{parent},
           nb_subdivisions{nb_subdivisions}, coordinates{coordinates},
-          left_ranks{left_ranks}, right_ranks{right_ranks} {
-        std::cout << "CartesianCommunicator::CartesianCommunicator: "
-                  << nb_subdivisions << std::endl;
-    }
+          left_ranks{left_ranks}, right_ranks{right_ranks} {}
 
     CartesianCommunicator &
     CartesianCommunicator::operator=(const CartesianCommunicator & other) {

@@ -41,7 +41,8 @@ namespace muGrid {
                    const DynCcoord_t & nb_subdomain_grid_pts_without_ghosts,
                    const DynCcoord_t & subdomain_locations_without_ghosts,
                    const DynCcoord_t & nb_ghosts_left,
-                   const DynCcoord_t & nb_ghosts_right);
+                   const DynCcoord_t & nb_ghosts_right,
+                   const DynCcoord_t & subdomain_strides = DynCcoord_t{});
 
         //! initialise and determine subdomains from subdivisions
         void initialise(const DynCcoord_t & nb_domain_grid_pts,
