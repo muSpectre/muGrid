@@ -79,9 +79,12 @@ namespace muGrid {
         for (int dim{0}; dim < spatial_dims; ++dim) {
             if (nb_ghosts_left[dim] > nb_subdomain_grid_pts[dim] ||
                 nb_ghosts_right[dim] > nb_subdomain_grid_pts[dim]) {
-                throw RuntimeError("Ghost buffers that are larger than a "
-                                   "single subdomain are currently not "
-                                   "supported.");
+                std::stringstream s;
+                s << "Ghost buffer dimension " << dim << " is too large ("
+                  << nb_ghosts_left[dim] << " left, " << nb_ghosts_right[dim]
+                  << " right) for the subdomain size of "
+                  << nb_subdomain_grid_pts[dim] << " grid points.";
+                throw RuntimeError(s.str());
             }
         }
 
