@@ -45,7 +45,7 @@ namespace muGrid {
      * domain, i.e. are defined for every pixel/voxel.
      */
     class GlobalFieldCollection : public FieldCollection {
-    public:
+       public:
         //! alias of base class
         using Parent = FieldCollection;
         using Parent::SubPtMap_t;
@@ -57,120 +57,118 @@ namespace muGrid {
 
         /**
          * Constructor
-         * @param spatial_dimension number of spatial dimensions, must be 1, 2, 3,
-         * or Unknown
+         * @param spatial_dimension number of spatial dimensions, must be 1, 2,
+         * 3, or Unknown
          * @param nb_sub_pts number of quadrature points per pixel/voxel
          */
-        GlobalFieldCollection(const Index_t &spatial_dimension,
-                              const SubPtMap_t &nb_sub_pts = {},
-                              StorageOrder storage_order =
-                                      StorageOrder::ArrayOfStructures);
+        GlobalFieldCollection(
+            const Index_t & spatial_dimension,
+            const SubPtMap_t & nb_sub_pts = {},
+            StorageOrder storage_order = StorageOrder::ArrayOfStructures);
 
         /**
          * Constructor with initialization
-         * @param nb_subdomain_grid_pts number of grid points on the current MPI
-         * process (subdomain)
-         * @param subdomain_locations location of the current subdomain within the
-         * global grid
+         * @param nb_subdomain_grid_pts_with_ghosts number of grid points on the
+         * current MPI process (subdomain)
+         * @param subdomain_locations_with_ghosts location of the current
+         * subdomain within the global grid
          * @param nb_sub_pts number of quadrature points per pixel/voxel
          */
-        GlobalFieldCollection(const DynCcoord_t &nb_domain_grid_pts,
-                              const DynCcoord_t &nb_subdomain_grid_pts = {},
-                              const DynCcoord_t &subdomain_locations = {},
-                              const SubPtMap_t &nb_sub_pts = {},
-                              StorageOrder storage_order =
-                                      StorageOrder::ArrayOfStructures,
-                              const DynCcoord_t &nb_ghosts_left = {},
-                              const DynCcoord_t &nb_ghosts_right = {});
+        GlobalFieldCollection(
+            const DynCcoord_t & nb_domain_grid_pts,
+            const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts = {},
+            const DynCcoord_t & subdomain_locations_with_ghosts = {},
+            const SubPtMap_t & nb_sub_pts = {},
+            StorageOrder storage_order = StorageOrder::ArrayOfStructures,
+            const DynCcoord_t & nb_ghosts_left = {},
+            const DynCcoord_t & nb_ghosts_right = {});
 
         /**
          * Constructor with initialisation
-         * @param nb_subdomain_grid_pts number of grid points on the current MPI
-         * process (subdomain)
-         * @param subdomain_locations location of the current subdomain within the
-         * global grid
+         * @param nb_subdomain_grid_pts_with_ghosts number of grid points on the
+         * current MPI process (subdomain)
+         * @param subdomain_locations_with_ghosts location of the current
+         * subdomain within the global grid
          * @param pixels_strides strides specifying memory layout of the pixels
-         * @param storage_order Storage order of the pixels vs subdivision portion
-         *                    of the field. In a column-major storage order, the
-         *                    pixel subdivision (i.e. the components of the field)
-         *                    are stored next to each other in memory, file in a
-         *                    row-major storage order for each component the
-         *                    pixels are stored next to each other in memory.
-         *                    (This is also sometimes called the array of structures
-         *                    vs. structure of arrays storage order.)
-         *                    Important: The pixels or subpoints have their own
-         *                    storage order that is not affected by this setting.
+         * @param storage_order Storage order of the pixels vs subdivision
+         * portion of the field. In a column-major storage order, the pixel
+         * subdivision (i.e. the components of the field) are stored next to
+         * each other in memory, file in a row-major storage order for each
+         * component the pixels are stored next to each other in memory. (This
+         * is also sometimes called the array of structures vs. structure of
+         * arrays storage order.) Important: The pixels or subpoints have their
+         * own storage order that is not affected by this setting.
          */
-        GlobalFieldCollection(const DynCcoord_t &nb_domain_grid_pts,
-                              const DynCcoord_t &nb_subdomain_grid_pts,
-                              const DynCcoord_t &subdomain_locations,
-                              const DynCcoord_t &pixels_strides,
-                              const SubPtMap_t &nb_sub_pts = {},
-                              StorageOrder storage_order =
-                                      StorageOrder::ArrayOfStructures,
-                              const DynCcoord_t &nb_ghosts_left = {},
-                              const DynCcoord_t &nb_ghosts_right = {});
+        GlobalFieldCollection(
+            const DynCcoord_t & nb_domain_grid_pts,
+            const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
+            const DynCcoord_t & subdomain_locations_with_ghosts,
+            const DynCcoord_t & pixels_strides,
+            const SubPtMap_t & nb_sub_pts = {},
+            StorageOrder storage_order = StorageOrder::ArrayOfStructures,
+            const DynCcoord_t & nb_ghosts_left = {},
+            const DynCcoord_t & nb_ghosts_right = {});
 
         /**
          * Constructor with initialisation
-         * @param nb_subdomain_grid_pts number of grid points on the current MPI
-         * process (subdomain)
-         * @param subdomain_locations location of the current subdomain within the
-         * global grid
+         * @param nb_subdomain_grid_pts_with_ghosts number of grid points on the
+         * current MPI process (subdomain)
+         * @param subdomain_locations_with_ghosts location of the current
+         * subdomain within the global grid
          * @param pixels_storage_order Storage order of the pixels
-         * @param storage_order Storage order of the pixels vs subdivision portion
-         *                    of the field. In a column-major storage order, the
-         *                    pixel subdivision (i.e. the components of the field)
-         *                    are stored next to each other in memory, file in a
-         *                    row-major storage order for each component the
-         *                    pixels are stored next to each other in memory.
-         *                    (This is also sometimes called the array of structures
-         *                    vs. structure of arrays storage order.)
-         *                    Important: The pixels or subpoints have their own
-         *                    storage order that is not affected by this setting.
+         * @param storage_order Storage order of the pixels vs subdivision
+         * portion of the field. In a column-major storage order, the pixel
+         * subdivision (i.e. the components of the field) are stored next to
+         * each other in memory, file in a row-major storage order for each
+         * component the pixels are stored next to each other in memory. (This
+         * is also sometimes called the array of structures vs. structure of
+         * arrays storage order.) Important: The pixels or subpoints have their
+         * own storage order that is not affected by this setting.
          */
-        GlobalFieldCollection(const DynCcoord_t &nb_domain_grid_pts,
-                              const DynCcoord_t &nb_subdomain_grid_pts,
-                              const DynCcoord_t &subdomain_locations,
-                              StorageOrder pixels_storage_order,
-                              const SubPtMap_t &nb_sub_pts = {},
-                              StorageOrder storage_order =
-                                      StorageOrder::ArrayOfStructures,
-                              const DynCcoord_t &nb_ghosts_left = {},
-                              const DynCcoord_t &nb_ghosts_right = {});
+        GlobalFieldCollection(
+            const DynCcoord_t & nb_domain_grid_pts,
+            const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
+            const DynCcoord_t & subdomain_locations_with_ghosts,
+            StorageOrder pixels_storage_order,
+            const SubPtMap_t & nb_sub_pts = {},
+            StorageOrder storage_order = StorageOrder::ArrayOfStructures,
+            const DynCcoord_t & nb_ghosts_left = {},
+            const DynCcoord_t & nb_ghosts_right = {});
 
         //! Copy constructor
-        GlobalFieldCollection(const GlobalFieldCollection &other) = delete;
+        GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
 
         //! Move constructor
-        GlobalFieldCollection(GlobalFieldCollection &&other) = default;
+        GlobalFieldCollection(GlobalFieldCollection && other) = default;
 
         //! Destructor
         virtual ~GlobalFieldCollection() = default;
 
         //! Copy assignment operator
         GlobalFieldCollection &
-        operator=(const GlobalFieldCollection &other) = delete;
+        operator=(const GlobalFieldCollection & other) = delete;
 
         //! Move assignment operator
-        GlobalFieldCollection &operator=(GlobalFieldCollection &&other) = delete;
+        GlobalFieldCollection &
+        operator=(GlobalFieldCollection && other) = delete;
 
         //! Return the pixels class that allows to iterator over pixels
-        const DynamicPixels &get_pixels() const;
+        const DynamicPixels & get_pixels() const;
 
-        //! evaluate and return the linear index corresponding to dynamic `ccoord`
-        Index_t get_index(const DynCcoord_t &ccoord) const {
+        //! evaluate and return the linear index corresponding to dynamic
+        //! `ccoord`
+        Index_t get_index(const DynCcoord_t & ccoord) const {
             return this->get_pixels().get_index(ccoord);
         }
 
         //! evaluate and return the linear index corresponding to `ccoord`
-        template<size_t Dim>
-        Index_t get_index(const Ccoord_t<Dim> &ccoord) const {
+        template <size_t Dim>
+        Index_t get_index(const Ccoord_t<Dim> & ccoord) const {
             return this->pixels.get_index(ccoord);
         }
 
         //! return coordinates of the i-th pixel
-        DynCcoord_t get_ccoord(const Index_t &index) const {
+        DynCcoord_t get_ccoord(const Index_t & index) const {
             return this->pixels.get_ccoord(index);
         }
 
@@ -179,32 +177,30 @@ namespace muGrid {
          * collection. Fields added later on will have their memory allocated
          * upon construction.
          */
-        void initialise(const DynCcoord_t &nb_domain_grid_pts,
-                        const DynCcoord_t &nb_subdomain_grid_pts,
-                        const DynCcoord_t &subdomain_locations,
-                        const DynCcoord_t &pixels_strides,
-                        const DynCcoord_t &nb_ghosts_left = {},
-                        const DynCcoord_t &nb_ghosts_right = {});
-
+        void initialise(const DynCcoord_t & nb_domain_grid_pts,
+                        const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
+                        const DynCcoord_t & subdomain_locations_with_ghosts,
+                        const DynCcoord_t & pixels_strides,
+                        const DynCcoord_t & nb_ghosts_left = {},
+                        const DynCcoord_t & nb_ghosts_right = {});
 
         /**
          * freeze the problem size and allocate memory for all fields of the
          * collection. Fields added later on will have their memory allocated
          * upon construction.
          */
-        template<size_t Dim>
-        void initialise(const Ccoord_t<Dim> &nb_domain_grid_pts,
-                        const Ccoord_t<Dim> &nb_subdomain_grid_pts,
-                        const Ccoord_t<Dim> &subdomain_locations,
-                        const Ccoord_t<Dim> &pixels_strides,
-                        const Ccoord_t<Dim> &nb_ghosts_left = {},
-                        const Ccoord_t<Dim> &nb_ghosts_right = {}) {
-            this->initialise(DynCcoord_t{nb_domain_grid_pts},
-                             DynCcoord_t{nb_subdomain_grid_pts},
-                             DynCcoord_t{subdomain_locations},
-                             DynCcoord_t{pixels_strides},
-                             DynCcoord_t{nb_ghosts_left},
-                             DynCcoord_t{nb_ghosts_right});
+        template <size_t Dim>
+        void initialise(const Ccoord_t<Dim> & nb_domain_grid_pts,
+                        const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                        const Ccoord_t<Dim> & subdomain_locations,
+                        const Ccoord_t<Dim> & pixels_strides,
+                        const Ccoord_t<Dim> & nb_ghosts_left = {},
+                        const Ccoord_t<Dim> & nb_ghosts_right = {}) {
+            this->initialise(
+                DynCcoord_t{nb_domain_grid_pts},
+                DynCcoord_t{nb_subdomain_grid_pts},
+                DynCcoord_t{subdomain_locations}, DynCcoord_t{pixels_strides},
+                DynCcoord_t{nb_ghosts_left}, DynCcoord_t{nb_ghosts_right});
         }
 
         /**
@@ -212,32 +208,31 @@ namespace muGrid {
          * collection. Fields added later on will have their memory allocated
          * upon construction.
          */
-        void initialise(const DynCcoord_t &nb_domain_grid_pts,
-                        const DynCcoord_t &nb_subdomain_grid_pts = {},
-                        const DynCcoord_t &subdomain_locations = {},
-                        StorageOrder pixels_storage_order =
-                                StorageOrder::Automatic,
-                        const DynCcoord_t &nb_ghosts_left = {},
-                        const DynCcoord_t &nb_ghosts_right = {});
+        void
+        initialise(const DynCcoord_t & nb_domain_grid_pts,
+                   const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts = {},
+                   const DynCcoord_t & subdomain_locations_with_ghosts = {},
+                   StorageOrder pixels_storage_order = StorageOrder::Automatic,
+                   const DynCcoord_t & nb_ghosts_left = {},
+                   const DynCcoord_t & nb_ghosts_right = {});
 
         /**
          * freeze the problem size and allocate memory for all fields of the
          * collection. Fields added later on will have their memory allocated
          * upon construction.
          */
-        template<size_t Dim>
-        void initialise(const Ccoord_t<Dim> &nb_domain_grid_pts,
-                        const Ccoord_t<Dim> &nb_subdomain_grid_pts = {},
-                        const Ccoord_t<Dim> &subdomain_locations = {},
-                        StorageOrder pixels_storage_order =
-                                StorageOrder::Automatic,
-                        const Ccoord_t<Dim> &nb_ghosts_left = {},
-                        const Ccoord_t<Dim> &nb_ghosts_right = {}) {
+        template <size_t Dim>
+        void
+        initialise(const Ccoord_t<Dim> & nb_domain_grid_pts,
+                   const Ccoord_t<Dim> & nb_subdomain_grid_pts = {},
+                   const Ccoord_t<Dim> & subdomain_locations = {},
+                   StorageOrder pixels_storage_order = StorageOrder::Automatic,
+                   const Ccoord_t<Dim> & nb_ghosts_left = {},
+                   const Ccoord_t<Dim> & nb_ghosts_right = {}) {
             this->initialise(DynCcoord_t{nb_domain_grid_pts},
                              DynCcoord_t{nb_subdomain_grid_pts},
                              DynCcoord_t{subdomain_locations},
-                             pixels_storage_order,
-                             DynCcoord_t{nb_ghosts_left},
+                             pixels_storage_order, DynCcoord_t{nb_ghosts_left},
                              DynCcoord_t{nb_ghosts_right});
         }
 
@@ -259,40 +254,65 @@ namespace muGrid {
         virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
         //! returns the global (domain) number of grid points in each direction
-        const DynCcoord_t &get_nb_domain_grid_pts() const {
+        const DynCcoord_t & get_nb_domain_grid_pts() const {
             return this->nb_domain_grid_pts;
         }
 
         //! returns the process-local (subdomain) number of grid points in each
         //! direction including the ghost cells
-        const DynCcoord_t &get_nb_subdomain_grid_pts() const {
+        const DynCcoord_t & get_nb_subdomain_grid_pts_with_ghosts() const {
             return this->get_pixels().get_nb_subdomain_grid_pts();
         }
 
         //! returns the process-local (subdomain) number of grid points in each
         //! directionl, but without the ghost cells
         DynCcoord_t get_nb_subdomain_grid_pts_without_ghosts() const {
-            return this->get_pixels().get_nb_subdomain_grid_pts() - this->nb_ghosts_left - this->nb_ghosts_right;
+            return this->get_pixels().get_nb_subdomain_grid_pts() -
+                   this->nb_ghosts_left - this->nb_ghosts_right;
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid
         //! including the ghost cells
-        const DynCcoord_t &get_subdomain_locations() const {
+        const DynCcoord_t & get_subdomain_locations_with_ghosts() const {
             return this->get_pixels().get_subdomain_locations();
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid,
         //! but without the ghost cells
         DynCcoord_t get_subdomain_locations_without_ghosts() const {
-            return this->get_pixels().get_subdomain_locations() + this->nb_ghosts_left;
+            return this->get_pixels().get_subdomain_locations() +
+                   this->nb_ghosts_left;
         }
 
-    protected:
-        DynamicPixels pixels{}; //!< helper to iterate over the grid
-        DynCcoord_t nb_domain_grid_pts{}; // number of domain (global) grid points
+        /**
+         * @brief Returns the number of ghost cells on the left side of the
+         * subdomain.
+         *
+         * @return const reference to a `DynCcoord_t` object containing the
+         * number of left ghost cells.
+         */
+        const DynCcoord_t & get_nb_ghosts_left() const {
+            return this->nb_ghosts_left;
+        }
+
+        /**
+         * @brief Returns the number of ghost cells on the right side of the
+         * subdomain.
+         *
+         * @return const reference to a `DynCcoord_t` object containing the
+         * number of right ghost cells.
+         */
+        const DynCcoord_t & get_nb_ghosts_right() const {
+            return this->nb_ghosts_right;
+        }
+
+       protected:
+        DynamicPixels pixels{};  //!< helper to iterate over the grid
+        DynCcoord_t
+            nb_domain_grid_pts{};  // number of domain (global) grid points
         DynCcoord_t nb_ghosts_left{};
         DynCcoord_t nb_ghosts_right{};
     };
-} // namespace muGrid
+}  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_FIELD_COLLECTION_GLOBAL_HH_

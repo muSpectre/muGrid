@@ -65,26 +65,30 @@ namespace muGrid {
         const GlobalFieldCollection & get_collection() const;
 
         //! get the spatial dimension
-        Index_t get_spatial_dim() const;
+        virtual Index_t get_spatial_dim() const;
 
         //! get the number of subdivisions
-        DynCcoord_t get_nb_subdivisions() const;
+        const DynCcoord_t & get_nb_subdivisions() const;
 
         //! get the number of grid points of the whole domain
-        DynCcoord_t get_nb_domain_grid_pts() const;
+        virtual const DynCcoord_t & get_nb_domain_grid_pts() const;
 
         //! get the number of grid points per subdomain
-        DynCcoord_t get_nb_subdomain_grid_pts() const;
+        const DynCcoord_t & get_nb_subdomain_grid_pts_with_ghosts() const;
+
+        //! get the number of grid points per subdomain
+        const DynCcoord_t & get_nb_subdomain_grid_pts_without_ghosts() const;
 
         //! get the subdomain locations
-        DynCcoord_t get_subdomain_locations() const;
+        const DynCcoord_t & get_subdomain_locations_with_ghosts() const;
+
+        //! get the subdomain locations
+        const DynCcoord_t & get_subdomain_locations_without_ghosts() const;
 
        protected:
         Communicator comm;
         std::unique_ptr<CartesianCommunicator> cart_comm;
         GlobalFieldCollection collection;
-        DynCcoord_t nb_ghosts_left{};
-        DynCcoord_t nb_ghosts_right{};
 
         void check_dimension(const DynCcoord_t & n,
                              const std::string & name) const;

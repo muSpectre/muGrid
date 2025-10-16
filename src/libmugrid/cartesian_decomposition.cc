@@ -64,10 +64,6 @@ namespace muGrid {
                 this->comm, nb_subdivisions);
         }
 
-        // Store ghost buffer information
-        this->nb_ghosts_left = nb_ghosts_left;
-        this->nb_ghosts_right = nb_ghosts_right;
-
         // Get spatial dimensions
         auto spatial_dims{nb_domain_grid_pts.size()};
 
@@ -146,7 +142,8 @@ namespace muGrid {
 
     void CartesianDecomposition::communicate_ghosts(const Field & field) const {
         // Get shape of the fields on this processor
-        auto nb_subdomain_grid_pts{this->get_nb_subdomain_grid_pts()};
+        auto nb_subdomain_grid_pts{
+            this->get_nb_subdomain_grid_pts_with_ghosts()};
 
         // Get spatial dimensions
         int spatial_dims{nb_subdomain_grid_pts.size()};
@@ -167,6 +164,10 @@ namespace muGrid {
         auto element_size{
             static_cast<Index_t>(field.get_element_size_in_bytes())};
 
+        // Get ghost buffer sizes
+        auto nb_ghosts_left{this->collection.get_nb_ghosts_left()};
+        auto nb_ghosts_right{this->collection.get_nb_ghosts_right()};
+
         // For each direction...
         for (int direction{0}; direction < spatial_dims; ++direction) {
             // Stride in the send/recv direction
@@ -182,12 +183,12 @@ namespace muGrid {
             // Sending things to the RIGHT
             // When sending right, we need the ghost buffer on left to receive
             auto block_len_ghost_left{stride_in_direction *
-                                      this->nb_ghosts_left[direction]};
+                                      nb_ghosts_left[direction]};
 
             // Offset of send and receive buffers
             Index_t send_offset_right{nb_subdomain_grid_pts[direction] -
-                                      this->nb_ghosts_right[direction] -
-                                      this->nb_ghosts_left[direction]};
+                                      nb_ghosts_right[direction] -
+                                      nb_ghosts_left[direction]};
             Index_t recv_offset_right{0};
 
 #ifdef WITH_MPI
@@ -207,12 +208,12 @@ namespace muGrid {
             // Sending things to the LEFT
             // When sending left, we need the ghost buffer on right to receive
             auto block_len_ghost_right{stride_in_direction *
-                                       this->nb_ghosts_right[direction]};
+                                       nb_ghosts_right[direction]};
 
             // Offset of send and receive buffers
-            Index_t send_offset_left{this->nb_ghosts_left[direction]};
+            Index_t send_offset_left{nb_ghosts_left[direction]};
             Index_t recv_offset_left{nb_subdomain_grid_pts[direction] -
-                                     this->nb_ghosts_right[direction]};
+                                     nb_ghosts_right[direction]};
 
 #ifdef WITH_MPI
             this->cart_comm->sendrecv_left(
@@ -247,19 +248,31 @@ namespace muGrid {
         return this->collection.get_spatial_dim();
     }
 
-    DynCcoord_t CartesianDecomposition::get_nb_subdivisions() const {
+    const DynCcoord_t & CartesianDecomposition::get_nb_subdivisions() const {
         return this->cart_comm->get_nb_subdivisions();
     }
 
-    DynCcoord_t CartesianDecomposition::get_nb_domain_grid_pts() const {
+    const DynCcoord_t & CartesianDecomposition::get_nb_domain_grid_pts() const {
         return this->collection.get_nb_domain_grid_pts();
     }
 
-    DynCcoord_t CartesianDecomposition::get_nb_subdomain_grid_pts() const {
-        return this->collection.get_nb_subdomain_grid_pts();
+    const DynCcoord_t &
+    CartesianDecomposition::get_nb_subdomain_grid_pts_with_ghosts() const {
+        return this->collection.get_nb_subdomain_grid_pts_with_ghosts();
     }
 
-    DynCcoord_t CartesianDecomposition::get_subdomain_locations() const {
-        return this->collection.get_subdomain_locations();
+    const DynCcoord_t &
+    CartesianDecomposition::get_nb_subdomain_grid_pts_without_ghosts() const {
+        return this->collection.get_nb_subdomain_grid_pts_without_ghosts();
+    }
+
+    const DynCcoord_t &
+    CartesianDecomposition::get_subdomain_locations_with_ghosts() const {
+        return this->collection.get_subdomain_locations_with_ghosts();
+    }
+
+    const DynCcoord_t &
+    CartesianDecomposition::get_subdomain_locations_without_ghosts() const {
+        return this->collection.get_subdomain_locations_without_ghosts();
     }
 }  // namespace muGrid

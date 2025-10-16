@@ -26,7 +26,7 @@ namespace muGrid {
                                        nb_ghosts_right};
 
     // Check the number of subdomain grid points adds up
-    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
+    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts_with_ghosts()};
     int dim{1};
     auto res{comm.template sum<Index_t>(nb_subdomain_grid_pts[dim] -
                                         nb_ghosts_left[dim] -
@@ -84,8 +84,8 @@ namespace muGrid {
     auto & field{collection.real_field(field_name, nb_components)};
 
     // Fill the field with some values
-    auto subdomain_locations{cart_decomp.get_subdomain_locations()};
-    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
+    auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
+    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts_with_ghosts()};
     auto && field_map{field.get_sub_pt_map(Unknown)};
     CcoordOps::DynamicPixels pixels{nb_subdomain_grid_pts};
     for (auto && pixel_id_coords : pixels.enumerate()) {
