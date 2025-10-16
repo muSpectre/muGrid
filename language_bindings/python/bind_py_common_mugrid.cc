@@ -93,7 +93,6 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
                err << "index " << index << " out of range 0.."
                    << self.get_dim() - 1;
                throw std::out_of_range(err.str());
-               std::cout << err.str() << "\n";
              }
              return self[index];
            })

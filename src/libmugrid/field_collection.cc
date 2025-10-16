@@ -414,6 +414,16 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  const Field & FieldCollection::get_field(const std::string & unique_name) const {
+    if (not this->field_exists(unique_name)) {
+      std::stringstream err_stream{};
+      err_stream << "The field '" << unique_name << "' does not exist";
+      throw FieldCollectionError(err_stream.str());
+    }
+    return *this->fields.at(unique_name);
+  }
+
+  /* ---------------------------------------------------------------------- */
   auto
   FieldCollection::pop_field(const std::string & unique_name) -> Field_ptr {
     if (not this->field_exists(unique_name)) {

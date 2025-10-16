@@ -774,6 +774,12 @@ namespace muGrid {
         Field &get_field(const std::string &unique_name);
 
         /**
+         * returns a (base-type) reference to the field identified by `unique_name`.
+         * Throws a `muGrid::FieldCollectionError` if the field does not exist.
+         */
+        const Field &get_field(const std::string &unique_name) const;
+
+        /**
          * returns the unique ptr holding the field named unique_name. Warning: note
          * that this effectively removes the field from the collection. You can use
          * this to delete fields to free memory

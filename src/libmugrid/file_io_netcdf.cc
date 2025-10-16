@@ -684,9 +684,9 @@ namespace muGrid {
       const muGrid::GlobalFieldCollection & fc_global) {
     const DynCcoord_t & nb_domain_grid_pts{fc_global.get_nb_domain_grid_pts()};
     const DynCcoord_t & nb_subdomain_grid_pts{
-        fc_global.get_nb_subdomain_grid_pts()};
+        fc_global.get_nb_subdomain_grid_pts_with_ghosts()};
     const DynCcoord_t & subdomain_locations{
-        fc_global.get_subdomain_locations()};
+        fc_global.get_subdomain_locations_with_ghosts()};
 
     // init global field collection "local_pixels"
     this->GFC_local_pixels.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,

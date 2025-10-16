@@ -67,8 +67,8 @@ void add_testing(py::module & mod) {
                                               info.shape.end() - dim, 1,
                                               std::multiplies<Index_t>())};
         NumpyProxy<Real> input_proxy(
-            fc.get_nb_domain_grid_pts(), fc.get_nb_subdomain_grid_pts(),
-            fc.get_subdomain_locations(), nb_dof_per_pixel, input_array);
+            fc.get_nb_domain_grid_pts(), fc.get_nb_subdomain_grid_pts_with_ghosts(),
+            fc.get_subdomain_locations_with_ghosts(), nb_dof_per_pixel, input_array);
         return numpy_copy(input_proxy.get_field(), input_proxy.get_iter_type());
       },
       "fc"_a, "input_array"_a,
