@@ -77,13 +77,13 @@ namespace muGrid {
         const DynCcoord_t & get_nb_subdomain_grid_pts_with_ghosts() const;
 
         //! get the number of grid points per subdomain
-        const DynCcoord_t & get_nb_subdomain_grid_pts_without_ghosts() const;
+        DynCcoord_t get_nb_subdomain_grid_pts_without_ghosts() const;
 
         //! get the subdomain locations
         const DynCcoord_t & get_subdomain_locations_with_ghosts() const;
 
         //! get the subdomain locations
-        const DynCcoord_t & get_subdomain_locations_without_ghosts() const;
+        DynCcoord_t get_subdomain_locations_without_ghosts() const;
 
        protected:
         Communicator comm;

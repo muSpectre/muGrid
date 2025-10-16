@@ -261,7 +261,7 @@ namespace muGrid {
         return this->collection.get_nb_subdomain_grid_pts_with_ghosts();
     }
 
-    const DynCcoord_t &
+    DynCcoord_t
     CartesianDecomposition::get_nb_subdomain_grid_pts_without_ghosts() const {
         return this->collection.get_nb_subdomain_grid_pts_without_ghosts();
     }
@@ -271,7 +271,7 @@ namespace muGrid {
         return this->collection.get_subdomain_locations_with_ghosts();
     }
 
-    const DynCcoord_t &
+    DynCcoord_t
     CartesianDecomposition::get_subdomain_locations_without_ghosts() const {
         return this->collection.get_subdomain_locations_without_ghosts();
     }

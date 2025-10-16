@@ -65,7 +65,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     ref_values = np.einsum("i, i...->...", weights, global_coords)
 
     # Fill the field, non-ghost with reference values, ghost with some other value
-    nb_subdomain_grid_pts = cart_decomp.nb_subdomain_grid_pts
+    nb_subdomain_grid_pts = cart_decomp.nb_subdomain_grid_pts_with_ghosts
     for index in np.ndindex(*nb_subdomain_grid_pts):
         is_not_ghost = all(
             idx >= nb_ghosts_left[dim]
