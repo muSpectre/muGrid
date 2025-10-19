@@ -101,7 +101,10 @@ tensor-valued field that contains 2 x 2 matrices:
     :language: python
 
 Note that there is a difference between a scalar field and a field with a single component.
+When a single component is specified, this is reflected in the shape of the field:
 
+.. literalinclude:: ../../examples/scalar.py
+    :language: python
 
 Sub-points
 **********
