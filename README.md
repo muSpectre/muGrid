@@ -10,7 +10,9 @@ implemented using the Message Passing Interface (MPI).
 [Python](https://www.python.org/).
 
 This README contains only a small quick start guide. Please refer to the
-[full documentation](https://muspectre.github.io/muGrid/) for more help.
+[full documentation](https://muspectre.github.io/muGrid/) or the DeepWiki
+[LLM-generated documentation](https://deepwiki.com/muSpectre/muGrid)
+for more help.
 
 ## Quick start
 
