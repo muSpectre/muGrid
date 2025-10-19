@@ -33,7 +33,7 @@ or when writing the field to a file. The default representation has the shape
     (components, sub-points, pixels)
 
 As a concrete example, a second-rank tensor (for example the deformation
-gradient) living on two quadrature points in three dimensions with a spatial
+gradient) living on two quadrature points in two dimensions with a spatial
 discretization of 11 x 12 grid points would have the following shape:
 
 .. code-block:: Python
