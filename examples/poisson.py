@@ -9,8 +9,10 @@ except ModuleNotFoundError:
 import numpy as np
 import muGrid
 from muGrid.Solvers import conjugate_gradients
+
 try:
     from mpi4py import MPI
+
     comm = muGrid.Communicator(MPI.COMM_WORLD)
 except ImportError:
     comm = muGrid.Communicator()

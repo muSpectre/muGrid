@@ -92,13 +92,16 @@ which will raise an exception if the field does not exist.
 Components
 **********
 
-In the above example, we registered a scalar field, which has one component. Vector or
+In the above example, we registered a scalar field, which has no components. Vector or
 tensor-valued field can be defined by specifying either simply a number of components or
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:
 
 .. literalinclude:: ../../examples/components.py
     :language: python
+
+Note that there is a difference between a scalar field and a field with a single component.
+
 
 Sub-points
 **********
