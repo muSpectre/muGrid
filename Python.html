@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ Bindings" href="Cplusplus.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>Python Bindings - µGrid 0.95.0-27-g68ddfe8 documentation</title>
+        <title>Python Bindings - µGrid 0.95.0-55-g8aef9e6 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-27-g68ddfe8
+      <a href="index.html"><div class="brand">µGrid 0.95.0-55-g8aef9e6
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-27-g68ddfe8
+  <span class="sidebar-brand-text">µGrid 0.95.0-55-g8aef9e6
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -267,7 +267,7 @@ or when writing the field to a file. The default representation has the shape</p
 </pre></div>
 </div>
 <p>As a concrete example, a second-rank tensor (for example the deformation
-gradient) living on two quadrature points in three dimensions with a spatial
+gradient) living on two quadrature points in two dimensions with a spatial
 discretization of 11 x 12 grid points would have the following shape:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
 </pre></div>
@@ -309,10 +309,10 @@ certain locations in the domain.</p></li>
 
 <span class="c1"># Get a scalar (real-valued) field</span>
 <span class="c1"># This call creates a new field if it does not exist.</span>
-<span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s1">&#39;my-real-valued-field&#39;</span><span class="p">)</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check the registered fields</span>
-<span class="k">assert</span> <span class="n">fc</span><span class="o">.</span><span class="n">field_names</span> <span class="o">==</span> <span class="p">[</span><span class="s1">&#39;my-real-valued-field&#39;</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">fc</span><span class="o">.</span><span class="n">field_names</span> <span class="o">==</span> <span class="p">[</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">]</span>
 
 <span class="c1"># Fill the field with random numbers</span>
 <span class="n">field</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">)</span>
@@ -321,7 +321,7 @@ certain locations in the domain.</p></li>
 <span class="n">field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mi">42</span>
 
 <span class="c1"># Get the field, but now into a different variable</span>
-<span class="n">field2</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s1">&#39;my-real-valued-field&#39;</span><span class="p">)</span>
+<span class="n">field2</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check that the value is the same</span>
 <span class="k">assert</span> <span class="n">field2</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
@@ -339,7 +339,7 @@ which will raise an exception if the field does not exist.</p>
 </section>
 <section id="components">
 <h2>Components<a class="headerlink" href="#components" title="Link to this heading">¶</a></h2>
-<p>In the above example, we registered a scalar field, which has one component. Vector or
+<p>In the above example, we registered a scalar field, which has no components. Vector or
 tensor-valued field can be defined by specifying either simply a number of components or
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:</p>
@@ -351,10 +351,30 @@ tensor-valued field that contains 2 x 2 matrices:</p>
 <span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s1">&#39;strain&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
 
 <span class="c1"># Fill the field with random numbers</span>
 <span class="n">strain</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Note that there is a difference between a scalar field and a field with a single component.
+When a single component is specified, this is reflected in the shape of the field:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+
+<span class="c1"># Two dimensional grid</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Get a scalar field</span>
+<span class="n">phase</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;phase&quot;</span><span class="p">)</span>
+<span class="c1"># The 1 is the number of sub points</span>
+<span class="k">assert</span> <span class="n">phase</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">]</span>
+
+<span class="c1"># Get a single component field</span>
+<span class="n">single</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;single&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="c1"># Now there is an explicit component dimension of 1</span>
+<span class="k">assert</span> <span class="n">single</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">]</span>
 </pre></div>
 </div>
 </section>
@@ -373,13 +393,13 @@ a sub-division of each pixel into five elements:</p>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;element&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
 <span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span>
-    <span class="s1">&#39;strain&#39;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
+    <span class="s2">&quot;strain&quot;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
     <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># shape of components</span>
-    <span class="s1">&#39;element&#39;</span>  <span class="c1"># sub-point type</span>
+    <span class="s2">&quot;element&quot;</span><span class="p">,</span>  <span class="c1"># sub-point type</span>
 <span class="p">)</span>
 
 <span class="c1"># Fill the field with random numbers</span>
@@ -400,14 +420,26 @@ the sub-points into the last dimension of the components.</p>
 <p>A common operation in numerical analysis is the convolution of a field with a short-ranged stencil. µGrid has utility
 functions that make this convolution simple. A convolution turns a field defined on nodal points into a field defined
 on quadrature points. This means field of shape</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">nodal</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>is turned into a field of shape</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">quadrature</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>where the same convolution is applied to each component. Note that the convolution operation itself may have multiple
 components (which we will refer to as operators in the following), meaning that the output field may have the shape</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">operators</span><span class="p">,</span> <span class="n">components</span><span class="p">,</span> <span class="n">quadrature</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>As an example, we consider the gradient of a two dimensional field with a single nodal point.
 If we use two linear finite elements per pixel, we can represent the derivative by two quadrature points per pixel.
 The gradient itself has two components, one for each direction of the gradient, which means we need two operators
 to represent it. The stencil then has the shape</p>
 <p>or in this specific case</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>because we are only considering a two-dimensional problem where there are two operators of the gradient.</p>
 <p>Note that the stencil can be of a lower dimensional shape, in which case missing dimensions are assumed to
 be unity. It is assumed that first <cite>nodel-points</cite>, then <cite>quadrature-points</cite> and finally <cite>operators</cite> are
@@ -503,6 +535,7 @@ from a field collection to disk:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
 <span class="k">if</span> <span class="ow">not</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_mpi</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;IO example is skipped: muGrid has no OpenMode in serial build&quot;</span><span class="p">)</span>
     <span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
@@ -511,20 +544,20 @@ from a field collection to disk:</p>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;element&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
 <span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span>
-    <span class="s1">&#39;strain&#39;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
+    <span class="s2">&quot;strain&quot;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
     <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># shape of components</span>
-    <span class="s1">&#39;element&#39;</span>  <span class="c1"># sub-point type</span>
+    <span class="s2">&quot;element&quot;</span><span class="p">,</span>  <span class="c1"># sub-point type</span>
 <span class="p">)</span>
 
 <span class="c1"># Fill the field with random numbers</span>
 <span class="n">strain</span><span class="o">.</span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
 
 <span class="c1"># Initialize a file I/O object</span>
-<span class="n">file</span> <span class="o">=</span> <span class="n">FileIONetCDF</span><span class="p">(</span><span class="s1">&#39;example.nc&#39;</span><span class="p">,</span> <span class="n">OpenMode</span><span class="o">.</span><span class="n">Overwrite</span><span class="p">)</span>
+<span class="n">file</span> <span class="o">=</span> <span class="n">FileIONetCDF</span><span class="p">(</span><span class="s2">&quot;example.nc&quot;</span><span class="p">,</span> <span class="n">OpenMode</span><span class="o">.</span><span class="n">Overwrite</span><span class="p">)</span>
 <span class="n">file</span><span class="o">.</span><span class="n">register_field_collection</span><span class="p">(</span><span class="n">fc</span><span class="p">)</span>  <span class="c1"># Register the field collection with the file</span>
 <span class="n">file</span><span class="o">.</span><span class="n">append_frame</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>  <span class="c1"># Write all fields of the field collection to the file</span>
 </pre></div>
@@ -634,7 +667,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=4eeb409e"></script>
+</div><script src="_static/documentation_options.js?v=c279a9e1"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

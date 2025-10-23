@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Coding Convention" href="CodingConvention.html"><link rel="prev" title="Python Bindings" href="Python.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>C++ Bindings - µGrid 0.95.0-27-g68ddfe8 documentation</title>
+        <title>C++ Bindings - µGrid 0.95.0-55-g8aef9e6 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-27-g68ddfe8
+      <a href="index.html"><div class="brand">µGrid 0.95.0-55-g8aef9e6
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-27-g68ddfe8
+  <span class="sidebar-brand-text">µGrid 0.95.0-55-g8aef9e6
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -257,14 +257,21 @@ for details.</p>
 <dt class="sig sig-object cpp" id="_CPPv45Dim_t">
 <span id="_CPPv35Dim_t"></span><span id="_CPPv25Dim_t"></span><span id="Dim_t"></span><span class="target" id="group__Scalars_1gadb9abd11d65aa4aceb8c353c9ffc73c8"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Dim_t</span></span></span><a class="headerlink" href="#_CPPv45Dim_t" title="Link to this definition">¶</a><br /></dt>
 <dd><p>A type alias for signed integers used for static dimensions. </p>
-<p>This type alias is used to represent signed integers for static dimensions in the µGrid codebase. It is used for consistency throughout the code. It is also capable of representing -1, which is a requirement for Eigen. </p>
+<p>This type alias is used to represent signed integers for static dimensions in the µGrid codebase. It is used for consistency throughout the code. It is also capable of representing -1, which can be used to denote unknown or undefined dimensions. </p>
 </dd></dl>
 
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv47Index_t">
-<span id="_CPPv37Index_t"></span><span id="_CPPv27Index_t"></span><span id="Index_t"></span><span class="target" id="group__Scalars_1ga5a813730b575f743a76f350d28fa7588"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Index</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Index_t</span></span></span><a class="headerlink" href="#_CPPv47Index_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>A type alias for Eigen::Index used for size-related values. </p>
-<p>This type alias is used to represent size-related values in the µGrid codebase. It is used for consistency with Eigen and to handle large arrays that have more indices than can be counted with Dim_t. For example, arrays with dimensions 65536 × 65536 would overflow Dim_t, so Index_t is used instead. </p>
+<span id="_CPPv37Index_t"></span><span id="_CPPv27Index_t"></span><span id="Index_t"></span><span class="target" id="group__Scalars_1ga5a813730b575f743a76f350d28fa7588"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><a class="reference internal" href="CplusplusAPI.html#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ptrdiff_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Index_t</span></span></span><a class="headerlink" href="#_CPPv47Index_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A type alias for std::ptrdiff_t used for size-related values. </p>
+<p>This type alias is used to represent size-related values in the µGrid codebase. It ensures compatibility with Eigen’s indexing system and supports large arrays that exceed the range of Dim_t. For example, arrays with dimensions 65536 × 65536 would overflow Dim_t, so Index_t is used instead. </p>
+</dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv46Size_t">
+<span id="_CPPv36Size_t"></span><span id="_CPPv26Size_t"></span><span id="Size_t"></span><span class="target" id="group__Scalars_1ga9d1ff52ae1bbb561d7c483b69ce29ce4"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><a class="reference internal" href="CplusplusAPI.html#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Size_t</span></span></span><a class="headerlink" href="#_CPPv46Size_t" title="Link to this definition">¶</a><br /></dt>
+<dd><p>A type alias for std::size_t used for size-related values. </p>
+<p>This type alias is used to represent unsigned size-related values in the µGrid codebase. It is typically used for indexing and size calculations where negative values are not expected. </p>
 </dd></dl>
 
 <dl class="cpp type">
@@ -569,6 +576,7 @@ drastically reducing boilerplate code.</p>
 <li><a class="reference internal" href="#common-type-aliases">Common Type Aliases</a><ul>
 <li><a class="reference internal" href="#_CPPv45Dim_t"><code class="docutils literal notranslate"><span class="pre">Dim_t</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv47Index_t"><code class="docutils literal notranslate"><span class="pre">Index_t</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv46Size_t"><code class="docutils literal notranslate"><span class="pre">Size_t</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv44Uint"><code class="docutils literal notranslate"><span class="pre">Uint</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv43Int"><code class="docutils literal notranslate"><span class="pre">Int</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv44Real"><code class="docutils literal notranslate"><span class="pre">Real</span></code></a></li>
@@ -598,7 +606,7 @@ drastically reducing boilerplate code.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=4eeb409e"></script>
+</div><script src="_static/documentation_options.js?v=c279a9e1"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
