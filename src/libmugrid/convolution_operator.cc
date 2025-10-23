@@ -128,8 +128,8 @@ namespace muGrid {
     auto & pixels{collection.get_pixels()};
 
     // relative coordinates of the nodal points inside the convolution space
-    CcoordOps::Pixels conv_space{DynCcoord_t(this->conv_pts_shape),
-                                        DynCcoord_t(this->pixel_offset)};
+    CcoordOps::Pixels conv_space{IntCoord_t(this->conv_pts_shape),
+                                        IntCoord_t(this->pixel_offset)};
 
     // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {
@@ -235,7 +235,7 @@ namespace muGrid {
     auto & pixels{collection.get_pixels()};
 
     // pixel offsets of the points inside the convolution space
-    CcoordOps::Pixels conv_space{DynCcoord_t(this->conv_pts_shape)};
+    CcoordOps::Pixels conv_space{IntCoord_t(this->conv_pts_shape)};
 
     // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {

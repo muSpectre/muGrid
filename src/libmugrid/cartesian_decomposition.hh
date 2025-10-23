@@ -24,10 +24,10 @@ namespace muGrid {
          * Constructor with immediate initialization
          */
         CartesianDecomposition(const Communicator & comm,
-                               const DynCcoord_t & nb_domain_grid_pts,
-                               const DynCcoord_t & nb_subdivisions,
-                               const DynCcoord_t & nb_ghosts_left,
-                               const DynCcoord_t & nb_ghosts_right,
+                               const IntCoord_t & nb_domain_grid_pts,
+                               const IntCoord_t & nb_subdivisions,
+                               const IntCoord_t & nb_ghosts_left,
+                               const IntCoord_t & nb_ghosts_right,
                                const SubPtMap_t & nb_sub_pts = {});
 
         CartesianDecomposition() = delete;
@@ -36,19 +36,19 @@ namespace muGrid {
 
         //! initialise with known subdomains
         void
-        initialise(const DynCcoord_t & nb_domain_grid_pts,
-                   const DynCcoord_t & nb_subdivisions,
-                   const DynCcoord_t & nb_subdomain_grid_pts_without_ghosts,
-                   const DynCcoord_t & subdomain_locations_without_ghosts,
-                   const DynCcoord_t & nb_ghosts_left,
-                   const DynCcoord_t & nb_ghosts_right,
-                   const DynCcoord_t & subdomain_strides = DynCcoord_t{});
+        initialise(const IntCoord_t & nb_domain_grid_pts,
+                   const IntCoord_t & nb_subdivisions,
+                   const IntCoord_t & nb_subdomain_grid_pts_without_ghosts,
+                   const IntCoord_t & subdomain_locations_without_ghosts,
+                   const IntCoord_t & nb_ghosts_left,
+                   const IntCoord_t & nb_ghosts_right,
+                   const IntCoord_t & subdomain_strides = IntCoord_t{});
 
         //! initialise and determine subdomains from subdivisions
-        void initialise(const DynCcoord_t & nb_domain_grid_pts,
-                        const DynCcoord_t & nb_subdivisions,
-                        const DynCcoord_t & nb_ghosts_left,
-                        const DynCcoord_t & nb_ghosts_right);
+        void initialise(const IntCoord_t & nb_domain_grid_pts,
+                        const IntCoord_t & nb_subdivisions,
+                        const IntCoord_t & nb_ghosts_left,
+                        const IntCoord_t & nb_ghosts_right);
 
         //! fill the ghost buffers with the values from the neighboring
         //! processes.
@@ -68,29 +68,29 @@ namespace muGrid {
         virtual Index_t get_spatial_dim() const;
 
         //! get the number of subdivisions
-        const DynCcoord_t & get_nb_subdivisions() const;
+        const IntCoord_t & get_nb_subdivisions() const;
 
         //! get the number of grid points of the whole domain
-        virtual const DynCcoord_t & get_nb_domain_grid_pts() const;
+        virtual const IntCoord_t & get_nb_domain_grid_pts() const;
 
         //! get the number of grid points per subdomain
-        const DynCcoord_t & get_nb_subdomain_grid_pts_with_ghosts() const;
+        const IntCoord_t & get_nb_subdomain_grid_pts_with_ghosts() const;
 
         //! get the number of grid points per subdomain
-        DynCcoord_t get_nb_subdomain_grid_pts_without_ghosts() const;
+        IntCoord_t get_nb_subdomain_grid_pts_without_ghosts() const;
 
         //! get the subdomain locations
-        const DynCcoord_t & get_subdomain_locations_with_ghosts() const;
+        const IntCoord_t & get_subdomain_locations_with_ghosts() const;
 
         //! get the subdomain locations
-        DynCcoord_t get_subdomain_locations_without_ghosts() const;
+        IntCoord_t get_subdomain_locations_without_ghosts() const;
 
        protected:
         Communicator comm;
         std::unique_ptr<CartesianCommunicator> cart_comm;
         GlobalFieldCollection collection;
 
-        void check_dimension(const DynCcoord_t & n,
+        void check_dimension(const IntCoord_t & n,
                              const std::string & name) const;
     };
 }  // namespace muGrid

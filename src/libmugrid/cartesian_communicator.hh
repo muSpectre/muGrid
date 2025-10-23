@@ -22,7 +22,7 @@ namespace muGrid {
          * @param nb_subdivisions The number of subdivisions in each direction.
          */
         explicit CartesianCommunicator(const Parent_t & parent,
-                                       const DynCcoord_t & nb_subdivisions);
+                                       const IntCoord_t & nb_subdivisions);
         /**
          * @brief Construct a Cartesian communicator.
          * @details This constructor initializes a CartesianCommunicator object
@@ -36,8 +36,8 @@ namespace muGrid {
          * @param right_ranks A vector of ranks for communication to the right.
          */
         explicit CartesianCommunicator(const Parent_t & parent,
-                                       const DynCcoord_t & nb_subdivisions,
-                                       const DynCcoord_t & coordinates,
+                                       const IntCoord_t & nb_subdivisions,
+                                       const IntCoord_t & coordinates,
                                        const std::vector<int> & left_ranks,
                                        const std::vector<int> & right_ranks);
 
@@ -47,9 +47,9 @@ namespace muGrid {
 
         CartesianCommunicator & operator=(const CartesianCommunicator & other);
 
-        const DynCcoord_t & get_nb_subdivisions() const;
+        const IntCoord_t & get_nb_subdivisions() const;
 
-        const DynCcoord_t & get_coordinates() const;
+        const IntCoord_t & get_coordinates() const;
 
 #ifdef WITH_MPI
         //! send to right; receive from left
@@ -82,8 +82,8 @@ namespace muGrid {
 
        protected:
         Parent_t parent;
-        DynCcoord_t nb_subdivisions;
-        DynCcoord_t coordinates;
+        IntCoord_t nb_subdivisions;
+        IntCoord_t coordinates;
 #if WITH_MPI
         std::vector<int> left_ranks;
         std::vector<int> right_ranks;

@@ -69,56 +69,56 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(test_is_buffer_contiguous) {
-    DynCcoord_t nb_grid_pts2({2, 3});
-    DynCcoord_t column_major2({1, 2});
-    DynCcoord_t row_major2({3, 1});
+    IntCoord_t nb_grid_pts2({2, 3});
+    IntCoord_t column_major2({1, 2});
+    IntCoord_t row_major2({3, 1});
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(
         nb_grid_pts2, CcoordOps::get_col_major_strides(nb_grid_pts2)));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts2, column_major2));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts2, row_major2));
-    DynCcoord_t non_contiguous2({6, 1});
+    IntCoord_t non_contiguous2({6, 1});
     BOOST_CHECK(
         !CcoordOps::is_buffer_contiguous(nb_grid_pts2, non_contiguous2));
 
-    DynCcoord_t nb_grid_pts3({5, 3, 4});
-    DynCcoord_t column_major3({1, 5, 15});
-    DynCcoord_t row_major3({12, 4, 1});
+    IntCoord_t nb_grid_pts3({5, 3, 4});
+    IntCoord_t column_major3({1, 5, 15});
+    IntCoord_t row_major3({12, 4, 1});
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(
         nb_grid_pts3, CcoordOps::get_col_major_strides(nb_grid_pts3)));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3, column_major3));
     BOOST_CHECK(CcoordOps::is_buffer_contiguous(nb_grid_pts3, row_major3));
-    DynCcoord_t partial_transpose3({1, 20, 5});
+    IntCoord_t partial_transpose3({1, 20, 5});
     BOOST_CHECK(
         CcoordOps::is_buffer_contiguous(nb_grid_pts3, partial_transpose3));
-    DynCcoord_t non_contiguous3({6, 5, 15});
+    IntCoord_t non_contiguous3({6, 5, 15});
     BOOST_CHECK(
         !CcoordOps::is_buffer_contiguous(nb_grid_pts3, non_contiguous3));
   }
 
   BOOST_AUTO_TEST_CASE(test_get_size_large) {
-    muGrid::DynCcoord_t nb_grid_pts{65536, 65536}, nb_grid_pts2{131072, 131072};
+    muGrid::IntCoord_t nb_grid_pts{65536, 65536}, nb_grid_pts2{131072, 131072};
     BOOST_CHECK(CcoordOps::get_size(nb_grid_pts) == 65536L * 65536L);
     BOOST_CHECK(CcoordOps::get_size(nb_grid_pts2) == 131072L * 131072L);
   }
 
   BOOST_AUTO_TEST_CASE(arithmetic_operators) {
-    DynCcoord_t a{3, 4};
-    DynCcoord_t b{1, 2};
-    DynCcoord_t sum{4, 6};
-    DynCcoord_t diff{2, 2};
+    IntCoord_t a{3, 4};
+    IntCoord_t b{1, 2};
+    IntCoord_t sum{4, 6};
+    IntCoord_t diff{2, 2};
 
-    DynCcoord_t c{a + b};
+    IntCoord_t c{a + b};
 
     BOOST_CHECK_EQUAL(sum, c);
 
     c = a - b;
     BOOST_CHECK_EQUAL(diff, c);
 
-    DynRcoord_t c1{1, 2, 3};
-    DynRcoord_t c2{1.3, 2.8, 5.7};
+    RealCoord_t c1{1, 2, 3};
+    RealCoord_t c2{1.3, 2.8, 5.7};
 
-    DynRcoord_t c1pc2{c1[0] + c2[0], c1[1] + c2[1], c1[2] + c2[2]};
-    DynRcoord_t c1mc2{c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2]};
+    RealCoord_t c1pc2{c1[0] + c2[0], c1[1] + c2[1], c1[2] + c2[2]};
+    RealCoord_t c1mc2{c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2]};
 
     BOOST_CHECK_EQUAL(c1 + c2, c1pc2);
     BOOST_CHECK_EQUAL(c1 - c2, c1mc2);

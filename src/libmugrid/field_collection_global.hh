@@ -75,13 +75,13 @@ namespace muGrid {
          * @param nb_sub_pts number of quadrature points per pixel/voxel
          */
         GlobalFieldCollection(
-            const DynCcoord_t & nb_domain_grid_pts,
-            const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts = {},
-            const DynCcoord_t & subdomain_locations_with_ghosts = {},
+            const IntCoord_t & nb_domain_grid_pts,
+            const IntCoord_t & nb_subdomain_grid_pts_with_ghosts = {},
+            const IntCoord_t & subdomain_locations_with_ghosts = {},
             const SubPtMap_t & nb_sub_pts = {},
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
-            const DynCcoord_t & nb_ghosts_left = {},
-            const DynCcoord_t & nb_ghosts_right = {});
+            const IntCoord_t & nb_ghosts_left = {},
+            const IntCoord_t & nb_ghosts_right = {});
 
         /**
          * Constructor with initialisation
@@ -100,14 +100,14 @@ namespace muGrid {
          * own storage order that is not affected by this setting.
          */
         GlobalFieldCollection(
-            const DynCcoord_t & nb_domain_grid_pts,
-            const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
-            const DynCcoord_t & subdomain_locations_with_ghosts,
-            const DynCcoord_t & pixels_strides,
+            const IntCoord_t & nb_domain_grid_pts,
+            const IntCoord_t & nb_subdomain_grid_pts_with_ghosts,
+            const IntCoord_t & subdomain_locations_with_ghosts,
+            const IntCoord_t & pixels_strides,
             const SubPtMap_t & nb_sub_pts = {},
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
-            const DynCcoord_t & nb_ghosts_left = {},
-            const DynCcoord_t & nb_ghosts_right = {});
+            const IntCoord_t & nb_ghosts_left = {},
+            const IntCoord_t & nb_ghosts_right = {});
 
         /**
          * Constructor with initialisation
@@ -126,14 +126,14 @@ namespace muGrid {
          * own storage order that is not affected by this setting.
          */
         GlobalFieldCollection(
-            const DynCcoord_t & nb_domain_grid_pts,
-            const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
-            const DynCcoord_t & subdomain_locations_with_ghosts,
+            const IntCoord_t & nb_domain_grid_pts,
+            const IntCoord_t & nb_subdomain_grid_pts_with_ghosts,
+            const IntCoord_t & subdomain_locations_with_ghosts,
             StorageOrder pixels_storage_order,
             const SubPtMap_t & nb_sub_pts = {},
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
-            const DynCcoord_t & nb_ghosts_left = {},
-            const DynCcoord_t & nb_ghosts_right = {});
+            const IntCoord_t & nb_ghosts_left = {},
+            const IntCoord_t & nb_ghosts_right = {});
 
         //! Copy constructor
         GlobalFieldCollection(const GlobalFieldCollection & other) = delete;
@@ -157,7 +157,7 @@ namespace muGrid {
 
         //! evaluate and return the linear index corresponding to dynamic
         //! `ccoord`
-        Index_t get_index(const DynCcoord_t & ccoord) const {
+        Index_t get_index(const IntCoord_t & ccoord) const {
             return this->get_pixels().get_index(ccoord);
         }
 
@@ -168,7 +168,7 @@ namespace muGrid {
         }
 
         //! return coordinates of the i-th pixel
-        DynCcoord_t get_ccoord(const Index_t & index) const {
+        IntCoord_t get_ccoord(const Index_t & index) const {
             return this->pixels.get_ccoord(index);
         }
 
@@ -177,12 +177,12 @@ namespace muGrid {
          * collection. Fields added later on will have their memory allocated
          * upon construction.
          */
-        void initialise(const DynCcoord_t & nb_domain_grid_pts,
-                        const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
-                        const DynCcoord_t & subdomain_locations_with_ghosts,
-                        const DynCcoord_t & pixels_strides,
-                        const DynCcoord_t & nb_ghosts_left = {},
-                        const DynCcoord_t & nb_ghosts_right = {});
+        void initialise(const IntCoord_t & nb_domain_grid_pts,
+                        const IntCoord_t & nb_subdomain_grid_pts_with_ghosts,
+                        const IntCoord_t & subdomain_locations_with_ghosts,
+                        const IntCoord_t & pixels_strides,
+                        const IntCoord_t & nb_ghosts_left = {},
+                        const IntCoord_t & nb_ghosts_right = {});
 
         /**
          * freeze the problem size and allocate memory for all fields of the
@@ -197,10 +197,10 @@ namespace muGrid {
                         const Ccoord_t<Dim> & nb_ghosts_left = {},
                         const Ccoord_t<Dim> & nb_ghosts_right = {}) {
             this->initialise(
-                DynCcoord_t{nb_domain_grid_pts},
-                DynCcoord_t{nb_subdomain_grid_pts},
-                DynCcoord_t{subdomain_locations}, DynCcoord_t{pixels_strides},
-                DynCcoord_t{nb_ghosts_left}, DynCcoord_t{nb_ghosts_right});
+                IntCoord_t{nb_domain_grid_pts},
+                IntCoord_t{nb_subdomain_grid_pts},
+                IntCoord_t{subdomain_locations}, IntCoord_t{pixels_strides},
+                IntCoord_t{nb_ghosts_left}, IntCoord_t{nb_ghosts_right});
         }
 
         /**
@@ -209,12 +209,12 @@ namespace muGrid {
          * upon construction.
          */
         void
-        initialise(const DynCcoord_t & nb_domain_grid_pts,
-                   const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts = {},
-                   const DynCcoord_t & subdomain_locations_with_ghosts = {},
+        initialise(const IntCoord_t & nb_domain_grid_pts,
+                   const IntCoord_t & nb_subdomain_grid_pts_with_ghosts = {},
+                   const IntCoord_t & subdomain_locations_with_ghosts = {},
                    StorageOrder pixels_storage_order = StorageOrder::Automatic,
-                   const DynCcoord_t & nb_ghosts_left = {},
-                   const DynCcoord_t & nb_ghosts_right = {});
+                   const IntCoord_t & nb_ghosts_left = {},
+                   const IntCoord_t & nb_ghosts_right = {});
 
         /**
          * freeze the problem size and allocate memory for all fields of the
@@ -229,11 +229,11 @@ namespace muGrid {
                    StorageOrder pixels_storage_order = StorageOrder::Automatic,
                    const Ccoord_t<Dim> & nb_ghosts_left = {},
                    const Ccoord_t<Dim> & nb_ghosts_right = {}) {
-            this->initialise(DynCcoord_t{nb_domain_grid_pts},
-                             DynCcoord_t{nb_subdomain_grid_pts},
-                             DynCcoord_t{subdomain_locations},
-                             pixels_storage_order, DynCcoord_t{nb_ghosts_left},
-                             DynCcoord_t{nb_ghosts_right});
+            this->initialise(IntCoord_t{nb_domain_grid_pts},
+                             IntCoord_t{nb_subdomain_grid_pts},
+                             IntCoord_t{subdomain_locations},
+                             pixels_storage_order, IntCoord_t{nb_ghosts_left},
+                             IntCoord_t{nb_ghosts_right});
         }
 
         /**
@@ -254,32 +254,32 @@ namespace muGrid {
         virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
         //! returns the global (domain) number of grid points in each direction
-        const DynCcoord_t & get_nb_domain_grid_pts() const {
+        const IntCoord_t & get_nb_domain_grid_pts() const {
             return this->nb_domain_grid_pts;
         }
 
         //! returns the process-local (subdomain) number of grid points in each
         //! direction including the ghost cells
-        const DynCcoord_t & get_nb_subdomain_grid_pts_with_ghosts() const {
+        const IntCoord_t & get_nb_subdomain_grid_pts_with_ghosts() const {
             return this->get_pixels().get_nb_subdomain_grid_pts();
         }
 
         //! returns the process-local (subdomain) number of grid points in each
         //! directionl, but without the ghost cells
-        DynCcoord_t get_nb_subdomain_grid_pts_without_ghosts() const {
+        IntCoord_t get_nb_subdomain_grid_pts_without_ghosts() const {
             return this->get_pixels().get_nb_subdomain_grid_pts() -
                    this->nb_ghosts_left - this->nb_ghosts_right;
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid
         //! including the ghost cells
-        const DynCcoord_t & get_subdomain_locations_with_ghosts() const {
+        const IntCoord_t & get_subdomain_locations_with_ghosts() const {
             return this->get_pixels().get_subdomain_locations();
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid,
         //! but without the ghost cells
-        DynCcoord_t get_subdomain_locations_without_ghosts() const {
+        IntCoord_t get_subdomain_locations_without_ghosts() const {
             return this->get_pixels().get_subdomain_locations() +
                    this->nb_ghosts_left;
         }
@@ -288,10 +288,10 @@ namespace muGrid {
          * @brief Returns the number of ghost cells on the left side of the
          * subdomain.
          *
-         * @return const reference to a `DynCcoord_t` object containing the
+         * @return const reference to a `IntCoord_t` object containing the
          * number of left ghost cells.
          */
-        const DynCcoord_t & get_nb_ghosts_left() const {
+        const IntCoord_t & get_nb_ghosts_left() const {
             return this->nb_ghosts_left;
         }
 
@@ -299,19 +299,19 @@ namespace muGrid {
          * @brief Returns the number of ghost cells on the right side of the
          * subdomain.
          *
-         * @return const reference to a `DynCcoord_t` object containing the
+         * @return const reference to a `IntCoord_t` object containing the
          * number of right ghost cells.
          */
-        const DynCcoord_t & get_nb_ghosts_right() const {
+        const IntCoord_t & get_nb_ghosts_right() const {
             return this->nb_ghosts_right;
         }
 
        protected:
         Pixels pixels{};  //!< helper to iterate over the grid
-        DynCcoord_t
+        IntCoord_t
             nb_domain_grid_pts{};  // number of domain (global) grid points
-        DynCcoord_t nb_ghosts_left{};
-        DynCcoord_t nb_ghosts_right{};
+        IntCoord_t nb_ghosts_left{};
+        IntCoord_t nb_ghosts_right{};
     };
 }  // namespace muGrid
 

@@ -221,23 +221,23 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(test_ccoord_unit_grid_pts) {
-    DynCcoord_t nb_grid_pts1{1, 2};
-    DynCcoord_t strides1{1, 1};
-    DynCcoord_t ccoord1{0, 1};
+    IntCoord_t nb_grid_pts1{1, 2};
+    IntCoord_t strides1{1, 1};
+    IntCoord_t ccoord1{0, 1};
     BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
-                          nb_grid_pts1, DynCcoord_t{}, strides1, 1), ccoord1);
+                          nb_grid_pts1, IntCoord_t{}, strides1, 1), ccoord1);
 
-    DynCcoord_t nb_grid_pts2{1, 1, 2};
-    DynCcoord_t strides2{1, 1, 1};
-    DynCcoord_t ccoord2{0, 0, 1};
+    IntCoord_t nb_grid_pts2{1, 1, 2};
+    IntCoord_t strides2{1, 1, 1};
+    IntCoord_t ccoord2{0, 0, 1};
     BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
-                          nb_grid_pts2, DynCcoord_t{}, strides2, 1), ccoord2);
+                          nb_grid_pts2, IntCoord_t{}, strides2, 1), ccoord2);
 
-    DynCcoord_t nb_grid_pts3{1, 2, 1};
-    DynCcoord_t strides3{1, 1, 1};
-    DynCcoord_t ccoord3{0, 1, 0};
+    IntCoord_t nb_grid_pts3{1, 2, 1};
+    IntCoord_t strides3{1, 1, 1};
+    IntCoord_t ccoord3{0, 1, 0};
     BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
-                          nb_grid_pts3, DynCcoord_t{}, strides3, 1), ccoord3);
+                          nb_grid_pts3, IntCoord_t{}, strides3, 1), ccoord3);
   }
 
   BOOST_AUTO_TEST_CASE(vector_test) {

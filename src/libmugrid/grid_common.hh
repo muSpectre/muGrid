@@ -604,13 +604,13 @@ namespace muGrid {
    * Cell coordinates, i.e. up to three integer numbers with dynamic (determined
    * during runtime) dimension
    */
-  using DynCcoord_t = DynCcoord<fourD>;  // 4D for alignment
+  using IntCoord_t = DynCcoord<fourD>;  // 4D for alignment
 
   /**
    * Real space coordinates, i.e. up to three floating point numbers with
    * dynamic (determined during runtime) dimension
    */
-  using DynRcoord_t = DynCcoord<fourD, Real>;  // 4D for alignment
+  using RealCoord_t = DynCcoord<fourD, Real>;  // 4D for alignment
 
   /**
    * Enum class for verbose-flag

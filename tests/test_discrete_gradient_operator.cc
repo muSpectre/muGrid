@@ -69,8 +69,8 @@ namespace muGrid {
   GlobalFieldCollection
   create_uniform_gradient(const Eigen::Ref<Eigen::MatrixXd> & grad_input) {
     typename Fixture::template Grad_t<Rank> grad{grad_input};
-    DynCcoord_t nb_grid_points(Fixture::Dim);
-    DynRcoord_t grid_length(Fixture::Dim);
+    IntCoord_t nb_grid_points(Fixture::Dim);
+    RealCoord_t grid_length(Fixture::Dim);
 
     for (Index_t i{0}; i < Fixture::Dim; ++i) {
       nb_grid_points[i] = 3 + i;
@@ -133,7 +133,7 @@ namespace muGrid {
       auto && pixels{collection.get_pixels()};
       auto && nb_domain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
-      DynCcoord_t valid_grid_pts{nb_domain_grid_pts};
+      IntCoord_t valid_grid_pts{nb_domain_grid_pts};
       for (auto && val : valid_grid_pts) {
         --val;
       }
@@ -167,8 +167,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(transpose_operator, Fix, DOperatorFixtures,
                                    Fix) {
-    const DynCcoord_t nb_subdomain_grid_pts{
-        Fix::Dim == twoD ? DynCcoord_t{2, 2} : DynCcoord_t{2, 2, 2}};
+    const IntCoord_t nb_subdomain_grid_pts{
+        Fix::Dim == twoD ? IntCoord_t{2, 2} : IntCoord_t{2, 2, 2}};
     GlobalFieldCollection collection{nb_subdomain_grid_pts,
                                      nb_subdomain_grid_pts};
     const std::string nodal_pt_tag{"nodal_pt"};

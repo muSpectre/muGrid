@@ -92,9 +92,9 @@ namespace muGrid {
     Communicator comm{MPIContext::get_context().comm};
     static constexpr Index_t spatial_dimension{twoD};
     const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
-    const DynCcoord_t nb_subdomain_grid_pts{2, 3};
-    const DynCcoord_t nb_domain_grid_pts;
-    const DynCcoord_t subdomain_locations;
+    const IntCoord_t nb_subdomain_grid_pts{2, 3};
+    const IntCoord_t nb_domain_grid_pts;
+    const IntCoord_t subdomain_locations;
     const std::string quad{"quad"};
     muGrid::GlobalFieldCollection global_fc;
 

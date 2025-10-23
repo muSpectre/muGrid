@@ -62,9 +62,9 @@ namespace muGrid {
     const Index_t spatial_dimension{twoD};
     const muGrid::FieldCollection::SubPtMap_t & nb_sub_pts{{"one", 1}};
 
-    const DynCcoord_t & nb_domain_grid_pts{3, 3};
-    const DynCcoord_t & nb_subdomain_grid_pts{3, 3};
-    const DynCcoord_t & subdomain_locations{0, 0};
+    const IntCoord_t & nb_domain_grid_pts{3, 3};
+    const IntCoord_t & nb_subdomain_grid_pts{3, 3};
+    const IntCoord_t & subdomain_locations{0, 0};
     muGrid::GlobalFieldCollection global_fc(nb_domain_grid_pts,
                                             nb_subdomain_grid_pts,
                                             subdomain_locations, nb_sub_pts);

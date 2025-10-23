@@ -13,7 +13,7 @@ using muGrid::CartesianDecomposition;
 using muGrid::Communicator;
 using muGrid::Int;
 using muGrid::Index_t;
-using muGrid::DynCcoord_t;
+using muGrid::IntCoord_t;
 using muGrid::Real;
 using muGrid::Field;
 using muGrid::py_coords;
@@ -62,9 +62,9 @@ void add_decomposition(py::module & mod) {
 void add_cartesian_decomposition(py::module & mod) {
     py::class_<CartesianDecomposition, Decomposition>(mod,
                                                       "CartesianDecomposition")
-        .def(py::init<const Communicator &, const DynCcoord_t &,
-                      const DynCcoord_t &, const DynCcoord_t &,
-                      const DynCcoord_t &>(),
+        .def(py::init<const Communicator &, const IntCoord_t &,
+                      const IntCoord_t &, const IntCoord_t &,
+                      const IntCoord_t &>(),
              "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
              "nb_ghosts_left"_a, "nb_ghosts_right"_a)
         .def_property_readonly(

@@ -17,9 +17,9 @@ namespace muGrid {
         : Parent_t{}, comm{comm}, collection(spatial_dimension, nb_sub_pts) {}
 
     CartesianDecomposition::CartesianDecomposition(
-        const Communicator & comm, const DynCcoord_t & nb_domain_grid_pts,
-        const DynCcoord_t & nb_subdivisions, const DynCcoord_t & nb_ghosts_left,
-        const DynCcoord_t & nb_ghosts_right, const SubPtMap_t & nb_sub_pts)
+        const Communicator & comm, const IntCoord_t & nb_domain_grid_pts,
+        const IntCoord_t & nb_subdivisions, const IntCoord_t & nb_ghosts_left,
+        const IntCoord_t & nb_ghosts_right, const SubPtMap_t & nb_sub_pts)
         : Parent_t{}, comm{comm},
           collection(nb_domain_grid_pts.size(), nb_sub_pts) {
         this->initialise(nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left,
@@ -27,7 +27,7 @@ namespace muGrid {
     }
 
     void
-    CartesianDecomposition::check_dimension(const DynCcoord_t & n,
+    CartesianDecomposition::check_dimension(const IntCoord_t & n,
                                             const std::string & name) const {
         if (this->collection.get_spatial_dim() != n.get_dim()) {
             std::stringstream s;
@@ -39,13 +39,13 @@ namespace muGrid {
     }
 
     void CartesianDecomposition::initialise(
-        const DynCcoord_t & nb_domain_grid_pts,
-        const DynCcoord_t & nb_subdivisions,
-        const DynCcoord_t & nb_subdomain_grid_pts_without_ghosts,
-        const DynCcoord_t & subdomain_locations_without_ghosts,
-        const DynCcoord_t & nb_ghosts_left,
-        const DynCcoord_t & nb_ghosts_right,
-        const DynCcoord_t & subdomain_strides) {
+        const IntCoord_t & nb_domain_grid_pts,
+        const IntCoord_t & nb_subdivisions,
+        const IntCoord_t & nb_subdomain_grid_pts_without_ghosts,
+        const IntCoord_t & subdomain_locations_without_ghosts,
+        const IntCoord_t & nb_ghosts_left,
+        const IntCoord_t & nb_ghosts_right,
+        const IntCoord_t & subdomain_strides) {
         // Idiot checks
         this->check_dimension(nb_domain_grid_pts, "nb_domain_grid_pts");
         this->check_dimension(nb_subdivisions, "nb_subdivisions");
@@ -104,10 +104,10 @@ namespace muGrid {
     }
 
     void
-    CartesianDecomposition::initialise(const DynCcoord_t & nb_domain_grid_pts,
-                                       const DynCcoord_t & nb_subdivisions,
-                                       const DynCcoord_t & nb_ghosts_left,
-                                       const DynCcoord_t & nb_ghosts_right) {
+    CartesianDecomposition::initialise(const IntCoord_t & nb_domain_grid_pts,
+                                       const IntCoord_t & nb_subdivisions,
+                                       const IntCoord_t & nb_ghosts_left,
+                                       const IntCoord_t & nb_ghosts_right) {
         // Idiot checks
         this->check_dimension(nb_domain_grid_pts, "nb_domain_grid_pts");
         this->check_dimension(nb_subdivisions, "nb_subdivisions");
@@ -249,30 +249,30 @@ namespace muGrid {
         return this->collection.get_spatial_dim();
     }
 
-    const DynCcoord_t & CartesianDecomposition::get_nb_subdivisions() const {
+    const IntCoord_t & CartesianDecomposition::get_nb_subdivisions() const {
         return this->cart_comm->get_nb_subdivisions();
     }
 
-    const DynCcoord_t & CartesianDecomposition::get_nb_domain_grid_pts() const {
+    const IntCoord_t & CartesianDecomposition::get_nb_domain_grid_pts() const {
         return this->collection.get_nb_domain_grid_pts();
     }
 
-    const DynCcoord_t &
+    const IntCoord_t &
     CartesianDecomposition::get_nb_subdomain_grid_pts_with_ghosts() const {
         return this->collection.get_nb_subdomain_grid_pts_with_ghosts();
     }
 
-    DynCcoord_t
+    IntCoord_t
     CartesianDecomposition::get_nb_subdomain_grid_pts_without_ghosts() const {
         return this->collection.get_nb_subdomain_grid_pts_without_ghosts();
     }
 
-    const DynCcoord_t &
+    const IntCoord_t &
     CartesianDecomposition::get_subdomain_locations_with_ghosts() const {
         return this->collection.get_subdomain_locations_with_ghosts();
     }
 
-    DynCcoord_t
+    IntCoord_t
     CartesianDecomposition::get_subdomain_locations_without_ghosts() const {
         return this->collection.get_subdomain_locations_without_ghosts();
     }

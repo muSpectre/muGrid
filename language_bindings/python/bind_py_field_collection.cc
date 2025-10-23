@@ -48,7 +48,7 @@
 #include <map>
 
 using muGrid::Complex;
-using muGrid::DynCcoord_t;
+using muGrid::IntCoord_t;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
 using muGrid::Index_t;
@@ -460,42 +460,42 @@ void add_global_field_collection(py::module &mod) {
                      StorageOrder>(),
                  "spatial_dimension"_a, "sub_pts"_a,
                  "storage_order"_a = StorageOrder::ColMajor)
-            .def(py::init<const DynCcoord_t &, const DynCcoord_t &,
-                     const DynCcoord_t &, const FieldCollection::SubPtMap_t &,
+            .def(py::init<const IntCoord_t &, const IntCoord_t &,
+                     const IntCoord_t &, const FieldCollection::SubPtMap_t &,
                      StorageOrder>(),
-                 "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = DynCcoord_t{},
-                 "subdomain_locations"_a = DynCcoord_t{},
+                 "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = IntCoord_t{},
+                 "subdomain_locations"_a = IntCoord_t{},
                  "sub_pts"_a = FieldCollection::SubPtMap_t{},
                  "storage_order"_a = StorageOrder::ColMajor)
-            .def(py::init<const DynCcoord_t &, const DynCcoord_t &,
-                     const DynCcoord_t &, const DynCcoord_t &,
+            .def(py::init<const IntCoord_t &, const IntCoord_t &,
+                     const IntCoord_t &, const IntCoord_t &,
                      const FieldCollection::SubPtMap_t &, StorageOrder>(),
                  "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
                  "subdomain_locations"_a, "pixels_strides"_a, "sub_pts"_a,
                  "storage_order"_a = StorageOrder::ColMajor)
-            .def(py::init<const DynCcoord_t &, const DynCcoord_t &,
-                     const DynCcoord_t &, StorageOrder,
+            .def(py::init<const IntCoord_t &, const IntCoord_t &,
+                     const IntCoord_t &, StorageOrder,
                      const FieldCollection::SubPtMap_t &, StorageOrder>(),
                  "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
                  "subdomain_locations"_a, "pixels_storage_order"_a, "sub_pts"_a,
                  "storage_order"_a = StorageOrder::ColMajor)
             .def("initialise",
                  static_cast<void(GlobalFieldCollection::*)(
-                     const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &,
-                     const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &)>(&
+                     const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
+                     const IntCoord_t &, const IntCoord_t &, const IntCoord_t &)>(&
                      GlobalFieldCollection::initialise),
                  "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
                  "subdomain_locations"_a, "pixels_strides"_a,
-                 "nb_ghosts_left"_a = DynCcoord_t{}, "nb_ghosts_right"_a = DynCcoord_t{})
+                 "nb_ghosts_left"_a = IntCoord_t{}, "nb_ghosts_right"_a = IntCoord_t{})
             .def("initialise",
                  static_cast<void(GlobalFieldCollection::*)(
-                     const DynCcoord_t &, const DynCcoord_t &, const DynCcoord_t &,
-                     StorageOrder, const DynCcoord_t &, const DynCcoord_t &)>(&
+                     const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
+                     StorageOrder, const IntCoord_t &, const IntCoord_t &)>(&
                      GlobalFieldCollection::initialise),
-                 "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = DynCcoord_t{},
-                 "subdomain_locations"_a = DynCcoord_t{},
+                 "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = IntCoord_t{},
+                 "subdomain_locations"_a = IntCoord_t{},
                  "pixels_storage_order"_a = StorageOrder::Automatic,
-                 "nb_ghosts_left"_a = DynCcoord_t{}, "nb_ghosts_right"_a = DynCcoord_t{})
+                 "nb_ghosts_left"_a = IntCoord_t{}, "nb_ghosts_right"_a = IntCoord_t{})
             .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels);
 }
 

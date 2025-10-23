@@ -42,8 +42,8 @@ namespace muGrid {
   namespace CcoordOps {
 
     //------------------------------------------------------------------------//
-    Dim_t get_index(const DynCcoord_t & nb_grid_pts,
-                    const DynCcoord_t & locations, const DynCcoord_t & ccoord) {
+    Dim_t get_index(const IntCoord_t & nb_grid_pts,
+                    const IntCoord_t & locations, const IntCoord_t & ccoord) {
       const Dim_t dim{nb_grid_pts.get_dim()};
       if (locations.get_dim() != dim) {
         std::stringstream error{};
@@ -69,10 +69,10 @@ namespace muGrid {
     }
 
     //-----------------------------------------------------------------------//
-    Real compute_pixel_volume(const DynCcoord_t & nb_grid_pts,
-                              const DynRcoord_t & lenghts) {
+    Real compute_pixel_volume(const IntCoord_t & nb_grid_pts,
+                              const RealCoord_t & lengths) {
       Real vol{1.0};
-      for (auto && tup : akantu::zip(nb_grid_pts, lenghts)) {
+      for (auto && tup : akantu::zip(nb_grid_pts, lengths)) {
         auto && nb_grid_pt{std::get<0>(tup)};
         auto && length{std::get<1>(tup)};
         vol *= (length / nb_grid_pt);
@@ -80,8 +80,8 @@ namespace muGrid {
       return vol;
     }
 
-    size_t get_buffer_size(const DynCcoord_t & nb_grid_pts,
-                           const DynCcoord_t & strides) {
+    size_t get_buffer_size(const IntCoord_t & nb_grid_pts,
+                           const IntCoord_t & strides) {
       const Dim_t & dim{nb_grid_pts.get_dim()};
       if (strides.get_dim() != dim) {
         std::stringstream error{};
@@ -124,13 +124,13 @@ namespace muGrid {
           axes_order{}, contiguous{false} {}
 
     /* ---------------------------------------------------------------------- */
-    Pixels::Pixels(const DynCcoord_t & nb_subdomain_grid_pts,
-                                 const DynCcoord_t & subdomain_locations)
+    Pixels::Pixels(const IntCoord_t & nb_subdomain_grid_pts,
+                                 const IntCoord_t & subdomain_locations)
         : dim(nb_subdomain_grid_pts.get_dim()),
           nb_subdomain_grid_pts(nb_subdomain_grid_pts),
           subdomain_locations{
               subdomain_locations.get_dim() == 0
-                  ? DynCcoord_t(nb_subdomain_grid_pts.get_dim())
+                  ? IntCoord_t(nb_subdomain_grid_pts.get_dim())
                   : subdomain_locations},
           strides(get_col_major_strides(nb_subdomain_grid_pts)),
           axes_order{compute_axes_order(nb_subdomain_grid_pts, this->strides)},
@@ -145,14 +145,14 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    Pixels::Pixels(const DynCcoord_t & nb_subdomain_grid_pts,
-                                 const DynCcoord_t & subdomain_locations,
-                                 const DynCcoord_t & strides)
+    Pixels::Pixels(const IntCoord_t & nb_subdomain_grid_pts,
+                                 const IntCoord_t & subdomain_locations,
+                                 const IntCoord_t & strides)
         : dim(nb_subdomain_grid_pts.get_dim()),
           nb_subdomain_grid_pts(nb_subdomain_grid_pts),
           subdomain_locations{
               subdomain_locations.get_dim() == 0
-              ? DynCcoord_t(nb_subdomain_grid_pts.get_dim())
+              ? IntCoord_t(nb_subdomain_grid_pts.get_dim())
               : subdomain_locations},
           strides{strides},
           axes_order{compute_axes_order(nb_subdomain_grid_pts, strides)},
@@ -180,7 +180,7 @@ namespace muGrid {
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
           subdomain_locations(subdomain_locations),
           strides(get_col_major_strides(nb_subdomain_grid_pts)),
-          axes_order{compute_axes_order(DynCcoord_t{nb_subdomain_grid_pts},
+          axes_order{compute_axes_order(IntCoord_t{nb_subdomain_grid_pts},
                                         this->strides)},
           contiguous{true} {}
 
@@ -191,10 +191,10 @@ namespace muGrid {
                                  const Ccoord_t<Dim> & strides)
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
           subdomain_locations(subdomain_locations), strides{strides},
-          axes_order{compute_axes_order(DynCcoord_t{nb_subdomain_grid_pts},
-                                        DynCcoord_t{strides})},
-          contiguous{is_buffer_contiguous(DynCcoord_t{nb_subdomain_grid_pts},
-                                          DynCcoord_t{strides})} {}
+          axes_order{compute_axes_order(IntCoord_t{nb_subdomain_grid_pts},
+                                        IntCoord_t{strides})},
+          contiguous{is_buffer_contiguous(IntCoord_t{nb_subdomain_grid_pts},
+                                          IntCoord_t{strides})} {}
 
     /* ---------------------------------------------------------------------- */
     auto Pixels::begin() const -> iterator {
