@@ -1,6 +1,11 @@
 Change log for µGrid
 ====================
 
+0.96.0 (not yet released)
+-------------------------
+
+- ENH: Looping over strides fields
+
 0.95.0 (15Juli25)
 -----------------
 
