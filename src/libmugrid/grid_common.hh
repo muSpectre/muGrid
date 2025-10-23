@@ -558,10 +558,10 @@ namespace muGrid {
     }
 
     //! return the spatial dimension of this coordinate
-    const Dim_t & get_dim() const { return this->dim; }
+    Dim_t get_dim() const { return this->dim; }
 
     //! return the spatial dimension of this coordinate, STL compatibility
-    const Dim_t & size() const { return this->dim; }
+    Dim_t size() const { return this->dim; }
 
     //! convert into a vector
     explicit operator std::vector<T>() const {

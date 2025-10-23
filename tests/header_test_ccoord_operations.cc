@@ -97,7 +97,7 @@ namespace muGrid {
     for (size_t i{0}; i < nb_pix; ++i) {
       BOOST_CHECK_EQUAL(
           i, CcoordOps::get_index(sizes, locations,
-                                  CcoordOps::get_ccoord(sizes, locations, i)));
+                                  CcoordOps::get_coord(sizes, locations, i)));
     }
   }
 
@@ -121,14 +121,14 @@ namespace muGrid {
       BOOST_CHECK_EQUAL(
           i, CcoordOps::get_index_from_strides(
                  strides, Ccoord{},
-                 CcoordOps::get_ccoord(sizes, locations, i)));
+                 CcoordOps::get_coord(sizes, locations, i)));
     }
 
     for (size_t i{0}; i < nb_pix; ++i) {
       BOOST_CHECK_EQUAL(
           i, CcoordOps::get_index(
           sizes, Ccoord{},
-          CcoordOps::get_ccoord_from_strides(sizes, locations, strides, i)));
+          CcoordOps::get_coord_from_strides(sizes, locations, strides, i)));
     }
   }
 
@@ -152,7 +152,7 @@ namespace muGrid {
       BOOST_CHECK_EQUAL(
           i, CcoordOps::get_index_from_strides(
           strides, Ccoord{},
-          CcoordOps::get_ccoord_from_strides(sizes, locations, strides, i)));
+          CcoordOps::get_coord_from_strides(sizes, locations, strides, i)));
     }
   }
 
@@ -174,10 +174,10 @@ namespace muGrid {
     const size_t nb_pix{CcoordOps::get_size(sizes)};
 
     for (size_t i{0}; i < nb_pix; ++i) {
-      auto coord{CcoordOps::get_ccoord(sizes, locations, i)};
+      auto coord{CcoordOps::get_coord(sizes, locations, i)};
       auto j{CcoordOps::get_index_from_strides(strides, Ccoord{}, coord)};
       auto coord2{
-          CcoordOps::get_ccoord_from_strides(sizes, Ccoord{}, strides, j)};
+          CcoordOps::get_coord_from_strides(sizes, Ccoord{}, strides, j)};
       for (Dim_t k{0}; k < dim; ++k) {
         BOOST_CHECK_EQUAL(coord[k], coord2[k]);
       }
@@ -210,10 +210,10 @@ namespace muGrid {
     const size_t nb_pix{CcoordOps::get_size(sizes)};
 
     for (size_t i{0}; i < nb_pix; ++i) {
-      auto coord{CcoordOps::get_ccoord(sizes, locations, i)};
+      auto coord{CcoordOps::get_coord(sizes, locations, i)};
       auto j{CcoordOps::get_index_from_strides(strides, Ccoord{}, coord)};
       auto coord2{
-          CcoordOps::get_ccoord_from_strides(sizes, Ccoord{}, strides, j)};
+          CcoordOps::get_coord_from_strides(sizes, Ccoord{}, strides, j)};
       for (Dim_t k{0}; k < dim; ++k) {
         BOOST_CHECK_EQUAL(coord[k], coord2[k]);
       }
@@ -224,19 +224,19 @@ namespace muGrid {
     IntCoord_t nb_grid_pts1{1, 2};
     IntCoord_t strides1{1, 1};
     IntCoord_t ccoord1{0, 1};
-    BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
+    BOOST_CHECK_EQUAL(CcoordOps::get_coord_from_strides(
                           nb_grid_pts1, IntCoord_t{}, strides1, 1), ccoord1);
 
     IntCoord_t nb_grid_pts2{1, 1, 2};
     IntCoord_t strides2{1, 1, 1};
     IntCoord_t ccoord2{0, 0, 1};
-    BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
+    BOOST_CHECK_EQUAL(CcoordOps::get_coord_from_strides(
                           nb_grid_pts2, IntCoord_t{}, strides2, 1), ccoord2);
 
     IntCoord_t nb_grid_pts3{1, 2, 1};
     IntCoord_t strides3{1, 1, 1};
     IntCoord_t ccoord3{0, 1, 0};
-    BOOST_CHECK_EQUAL(CcoordOps::get_ccoord_from_strides(
+    BOOST_CHECK_EQUAL(CcoordOps::get_coord_from_strides(
                           nb_grid_pts3, IntCoord_t{}, strides3, 1), ccoord3);
   }
 

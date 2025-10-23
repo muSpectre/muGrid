@@ -73,7 +73,7 @@ namespace muGrid {
         detect_storage_order(const IntCoord_t &nb_subdomain_grid_pts,
                              const Shape_t &components_shape, Index_t nb_sub_pts,
                              py::array_t<T, flags> &array) {
-            auto &dim{nb_subdomain_grid_pts.get_dim()};
+            auto dim{nb_subdomain_grid_pts.get_dim()};
             if (static_cast<py::ssize_t>(dim + components_shape.size()) !=
                 array.ndim()) {
                 std::stringstream s;

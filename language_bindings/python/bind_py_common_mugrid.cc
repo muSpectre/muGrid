@@ -110,12 +110,12 @@ void add_get_cube_helper(py::module & mod) {
 }
 
 template <Index_t dim>
-void add_get_ccoord_helper(py::module & mod) {
+void add_get_coord_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
       [](Ccoord nb_grid_pts, Index_t index) {
-        return muGrid::CcoordOps::get_ccoord<dim>(nb_grid_pts, Ccoord{}, index);
+        return muGrid::CcoordOps::get_coord<dim>(nb_grid_pts, Ccoord{}, index);
       },
       "nb_grid_pts"_a, "i"_a,
       "return the cell coordinate corresponding to the i'th cell in a grid of "
@@ -130,9 +130,9 @@ void add_get_cube(py::module & mod) {
   add_get_cube_helper<muGrid::threeD, Index_t>(mod);
   add_get_cube_helper<muGrid::threeD, muGrid::Real>(mod);
 
-  add_get_ccoord_helper<muGrid::oneD>(mod);
-  add_get_ccoord_helper<muGrid::twoD>(mod);
-  add_get_ccoord_helper<muGrid::threeD>(mod);
+  add_get_coord_helper<muGrid::oneD>(mod);
+  add_get_coord_helper<muGrid::twoD>(mod);
+  add_get_coord_helper<muGrid::threeD>(mod);
 }
 
 template <Index_t dim>

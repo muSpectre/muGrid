@@ -352,7 +352,7 @@ namespace muGrid {
         //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts
         template <size_t Dim>
-        constexpr Ccoord_t<Dim> get_ccoord(const Ccoord_t<Dim> & nb_grid_pts,
+        constexpr Ccoord_t<Dim> get_coord(const Ccoord_t<Dim> & nb_grid_pts,
                                            const Ccoord_t<Dim> & locations,
                                            Index_t index) {
             Ccoord_t<Dim> retval{{0}};
@@ -369,12 +369,12 @@ namespace muGrid {
         //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts
         template <size_t Dim, size_t... I>
-        constexpr Ccoord_t<Dim> get_ccoord(const Ccoord_t<Dim> & nb_grid_pts,
+        constexpr Ccoord_t<Dim> get_coord(const Ccoord_t<Dim> & nb_grid_pts,
                                            const Ccoord_t<Dim> & locations,
                                            Index_t index,
                                            std::index_sequence<I...>) {
             Ccoord_t<Dim> ccoord{
-                get_ccoord<Dim>(nb_grid_pts, locations, index)};
+                get_coord<Dim>(nb_grid_pts, locations, index)};
             return Ccoord_t<Dim>({ccoord[I]...});
         }
 
@@ -382,11 +382,11 @@ namespace muGrid {
         //! get the i-th pixel in a grid of size nb_grid_pts - specialization
         //! for one dimension
         template <size_t... I>
-        constexpr Ccoord_t<1> get_ccoord(const Ccoord_t<1> & nb_grid_pts,
+        constexpr Ccoord_t<1> get_coord(const Ccoord_t<1> & nb_grid_pts,
                                          const Ccoord_t<1> & locations,
                                          Index_t index,
                                          std::index_sequence<I...>) {
-            return Ccoord_t<1>({get_ccoord<1>(nb_grid_pts, locations, index)});
+            return Ccoord_t<1>({get_coord<1>(nb_grid_pts, locations, index)});
         }
 
         //! compute the order of the axes given strides, fastest first
@@ -421,7 +421,7 @@ namespace muGrid {
         //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
         template <size_t dim>
-        Ccoord_t<dim> get_ccoord_from_axes_order(
+        Ccoord_t<dim> get_coord_from_axes_order(
             const Ccoord_t<dim> & nb_grid_pts, const Ccoord_t<dim> & locations,
             const Ccoord_t<dim> & strides, const Ccoord_t<dim> & axes_order,
             Index_t index) {
@@ -439,11 +439,11 @@ namespace muGrid {
 
         //! get the i-th pixel in a grid of size nb_grid_pts, with strides
         template <size_t dim>
-        Ccoord_t<dim> get_ccoord_from_strides(const Ccoord_t<dim> & nb_grid_pts,
+        Ccoord_t<dim> get_coord_from_strides(const Ccoord_t<dim> & nb_grid_pts,
                                               const Ccoord_t<dim> & locations,
                                               const Ccoord_t<dim> & strides,
                                               Index_t index) {
-            return get_ccoord_from_axes_order(
+            return get_coord_from_axes_order(
                 nb_grid_pts, locations, strides,
                 compute_axes_order(nb_grid_pts, strides), index);
         }
@@ -451,10 +451,10 @@ namespace muGrid {
         //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
         template <class T>
-        T get_ccoord_from_axes_order(const T & nb_grid_pts, const T & locations,
+        T get_coord_from_axes_order(const T & nb_grid_pts, const T & locations,
                                      const T & strides, const T & axes_order,
                                      Index_t index) {
-            auto & dim{nb_grid_pts.get_dim()};
+            auto dim{nb_grid_pts.get_dim()};
             T retval(dim);
             for (Index_t i{dim - 1}; i >= 0; --i) {
                 Index_t cur_coord{index / strides[axes_order[i]]};
@@ -469,9 +469,9 @@ namespace muGrid {
 
         //! get the i-th pixel in a grid of size nb_grid_pts, with strides
         template <class T>
-        T get_ccoord_from_strides(const T & nb_grid_pts, const T & locations,
+        T get_coord_from_strides(const T & nb_grid_pts, const T & locations,
                                   const T & strides, Index_t index) {
-            return get_ccoord_from_axes_order(
+            return get_coord_from_axes_order(
                 nb_grid_pts, locations, strides,
                 compute_axes_order(nb_grid_pts, strides), index);
         }
@@ -713,8 +713,8 @@ namespace muGrid {
             }
 
             //! return coordinates of the i-th pixel
-            IntCoord_t get_ccoord(const Index_t & index) const {
-                return get_ccoord_from_axes_order(
+            IntCoord_t get_coord(const Index_t & index) const {
+                return get_coord_from_axes_order(
                     this->nb_subdomain_grid_pts, this->subdomain_locations,
                     this->strides, this->axes_order, index);
             }
@@ -777,7 +777,7 @@ namespace muGrid {
 
                 //! dereferencing
                 value_type operator*() const {
-                    return this->pixels.get_ccoord(this->index);
+                    return this->pixels.get_coord(this->index);
                 }
 
                 //! pre-increment

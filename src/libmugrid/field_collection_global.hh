@@ -168,8 +168,8 @@ namespace muGrid {
         }
 
         //! return coordinates of the i-th pixel
-        IntCoord_t get_ccoord(const Index_t & index) const {
-            return this->pixels.get_ccoord(index);
+        IntCoord_t get_coord(const Index_t & index) const {
+            return this->pixels.get_coord(index);
         }
 
         /**
