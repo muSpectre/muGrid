@@ -104,7 +104,8 @@ namespace muGrid {
         const DynCcoord_t & nb_domain_grid_pts,
         const DynCcoord_t & nb_subdomain_grid_pts_with_ghosts,
         const DynCcoord_t & subdomain_locations_with_ghosts,
-        const DynCcoord_t & pixels_strides, const DynCcoord_t & nb_ghosts_left,
+        const DynCcoord_t & pixels_strides,
+        const DynCcoord_t & nb_ghosts_left,
         const DynCcoord_t & nb_ghosts_right) {
         if (this->initialised) {
             throw FieldCollectionError("double initialisation");

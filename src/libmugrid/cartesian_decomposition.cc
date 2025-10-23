@@ -43,7 +43,8 @@ namespace muGrid {
         const DynCcoord_t & nb_subdivisions,
         const DynCcoord_t & nb_subdomain_grid_pts_without_ghosts,
         const DynCcoord_t & subdomain_locations_without_ghosts,
-        const DynCcoord_t & nb_ghosts_left, const DynCcoord_t & nb_ghosts_right,
+        const DynCcoord_t & nb_ghosts_left,
+        const DynCcoord_t & nb_ghosts_right,
         const DynCcoord_t & subdomain_strides) {
         // Idiot checks
         this->check_dimension(nb_domain_grid_pts, "nb_domain_grid_pts");
@@ -92,8 +93,8 @@ namespace muGrid {
         if (subdomain_strides.get_dim() == 0) {
             this->collection.initialise(
                 nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
-                StorageOrder::ArrayOfStructures, nb_ghosts_left,
-                nb_ghosts_right);
+                StorageOrder::ArrayOfStructures,
+                nb_ghosts_left, nb_ghosts_right);
         } else {
             this->check_dimension(subdomain_strides, "subdomain_strides");
             this->collection.initialise(

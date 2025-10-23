@@ -235,19 +235,6 @@ namespace muGrid {
       return Enumerator(*this);
     }
 
-    /* ----------------------------------------------------------------------*/
-    template <size_t Dim>
-    const Pixels<Dim> & DynamicPixels::get_dimensioned_pixels() const {
-      if (Dim != this->dim) {
-        std::stringstream error{};
-        error << "You are trying to get a " << Dim
-              << "-dimensional statically dimensioned view on a " << this->dim
-              << "-dimensional DynamicPixels object";
-        throw RuntimeError(error.str());
-      }
-      return static_cast<const Pixels<Dim> &>(*this);
-    }
-
     template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
                                           const Ccoord_t<oneD> &);
     template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
@@ -263,12 +250,6 @@ namespace muGrid {
     template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
                                           const Ccoord_t<threeD> &,
                                           const Ccoord_t<threeD> &);
-    template const Pixels<oneD> &
-    DynamicPixels::get_dimensioned_pixels<oneD>() const;
-    template const Pixels<twoD> &
-    DynamicPixels::get_dimensioned_pixels<twoD>() const;
-    template const Pixels<threeD> &
-    DynamicPixels::get_dimensioned_pixels<threeD>() const;
   }  // namespace CcoordOps
 
 }  // namespace muGrid

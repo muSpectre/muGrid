@@ -91,6 +91,7 @@ namespace muGrid {
   constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
   constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
   constexpr Index_t threeD{3};  //!< constant for a three-dimensional problem
+  constexpr Index_t fourD{3};   //!< constant for a four-dimensional problem
   constexpr Index_t zerothOrder{0};   //!< constant for scalars
   constexpr Index_t firstOrder{1};    //!< constant for vectors
   constexpr Index_t secondOrder{2};   //!< constant second-order tensors
@@ -603,13 +604,13 @@ namespace muGrid {
    * Cell coordinates, i.e. up to three integer numbers with dynamic (determined
    * during runtime) dimension
    */
-  using DynCcoord_t = DynCcoord<threeD>;
+  using DynCcoord_t = DynCcoord<fourD>;  // 4D for alignment
 
   /**
    * Real space coordinates, i.e. up to three floating point numbers with
    * dynamic (determined during runtime) dimension
    */
-  using DynRcoord_t = DynCcoord<threeD, Real>;
+  using DynRcoord_t = DynCcoord<fourD, Real>;  // 4D for alignment
 
   /**
    * Enum class for verbose-flag
@@ -619,10 +620,10 @@ namespace muGrid {
   /**
    * comparison operators for Verbosity-class
    */
-  bool operator<(const Verbosity v1, const Verbosity v2);
-  bool operator>(const Verbosity v1, const Verbosity v2);
-  bool operator<=(const Verbosity v1, const Verbosity v2);
-  bool operator>=(const Verbosity v1, const Verbosity v2);
+  bool operator<(Verbosity v1, Verbosity v2);
+  bool operator>(Verbosity v1, Verbosity v2);
+  bool operator<=(Verbosity v1, Verbosity v2);
+  bool operator>=(Verbosity v1, Verbosity v2);
 
   /**
    * return a Eigen representation of the data stored in a std::array (e.g., for

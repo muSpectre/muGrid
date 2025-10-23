@@ -172,7 +172,7 @@ namespace muGrid {
       nb_domain_grid_pts[i] = nb_grid;
       nb_subdomain_grid_pts[i] = nb_grid;
     }
-    CcoordOps::Pixels<Fix::spatial_dimension()> pixels{nb_subdomain_grid_pts};
+    CcoordOps::DynamicPixels pixels{nb_subdomain_grid_pts};
     BOOST_CHECK(not Fix::fc.is_initialised());
     BOOST_CHECK_NO_THROW(
         Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts));

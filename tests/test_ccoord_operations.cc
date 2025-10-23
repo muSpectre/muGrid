@@ -42,29 +42,6 @@
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(ccoords_operations);
 
-  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_dynamic_pixels, Fix,
-                                   testGoodies::dimlist, Fix) {
-    constexpr auto Dim{Fix::dim};
-    using Ccoord = Ccoord_t<Dim>;
-    constexpr Index_t size{5};
-    Ccoord nb_grid_pts{CcoordOps::get_cube<Dim>(size)};
-    for (int i{0}; i < Dim; ++i) {
-      nb_grid_pts[i] += i;
-    }
-
-    CcoordOps::Pixels<Dim> static_pix(nb_grid_pts);
-    CcoordOps::DynamicPixels dynamic_pix(nb_grid_pts);
-
-    for (auto && tup : akantu::zip(static_pix, dynamic_pix)) {
-      auto && stat{std::get<0>(tup)};
-      auto && dyna{std::get<1>(tup)};
-      for (Dim_t i{0}; i < Dim; ++i) {
-        BOOST_CHECK_EQUAL(stat[i], dyna[i]);
-      }
-    }
-    BOOST_CHECK_EQUAL(static_pix.size(), dynamic_pix.size());
-  }
-
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_enumeration, Fix, testGoodies::dimlist,
                                    Fix) {
     constexpr auto Dim{Fix::dim};

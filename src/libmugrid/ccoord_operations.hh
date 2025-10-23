@@ -130,24 +130,20 @@ namespace muGrid {
         }
 
         //! returns a grid of equal number of grid points in each direction
-        template<size_t MaxDim = threeD>
+        template<size_t MaxDim = fourD>  // 4 to ease alignment
         DynCcoord<MaxDim> get_cube(const Dim_t &dim, const Index_t &nb_grid_pts) {
             switch (dim) {
                 case oneD: {
                     return DynCcoord<MaxDim>{get_cube<oneD>(nb_grid_pts)};
-                    break;
                 }
                 case twoD: {
                     return DynCcoord<MaxDim>{get_cube<twoD>(nb_grid_pts)};
-                    break;
                 }
                 case threeD: {
                     return DynCcoord<MaxDim>{get_cube<threeD>(nb_grid_pts)};
-                    break;
                 }
-                default:
+            default:
                     throw RuntimeError("Unknown dimension");
-                    break;
             }
         }
 
@@ -634,10 +630,6 @@ namespace muGrid {
         size_t get_buffer_size(const Shape_t &nb_grid_pts,
                                const Shape_t &strides);
 
-        //! forward declaration
-        template<size_t Dim>
-        class Pixels;
-
         /**
          * Iteration over square (or cubic) discretisation grids. Duplicates
          * capabilities of `muGrid::CcoordOps::Pixels` without needing to be
@@ -717,15 +709,6 @@ namespace muGrid {
                        this->subdomain_locations;
             }
 
-            /**
-             * return a reference to the Pixels object cast into a statically
-             * dimensioned grid. the statically dimensioned version duplicates
-             * `muGrid::Ccoordops::DynamicPixels`'s capabilities, but iterates much
-             * more efficiently.
-             */
-            template<size_t Dim>
-            const Pixels<Dim> &get_dimensioned_pixels() const;
-
             class iterator;
 
             //! stl conformance
@@ -779,7 +762,7 @@ namespace muGrid {
         class DynamicPixels::iterator {
         public:
             //! stl
-            using value_type = DynCcoord<threeD>;
+            using value_type = DynCcoord_t;
             using const_value_type = const value_type; //!< stl conformance
             using pointer = value_type *; //!< stl conformance
             using difference_type = std::ptrdiff_t; //!< stl conformance
@@ -918,148 +901,6 @@ namespace muGrid {
         protected:
             const DynamicPixels &pixels;
         };
-
-        /**
-         * Centralised iteration over square (or cubic) discretisation grids.
-         */
-        template<size_t Dim>
-        class Pixels : public DynamicPixels {
-        public:
-            //! base class
-            using Parent = DynamicPixels;
-
-            //! cell coordinates
-            using Ccoord = Ccoord_t<Dim>;
-
-            //! constructor
-            Pixels(const Ccoord &nb_subdomain_grid_pts = Ccoord{},
-                   const Ccoord &subdomain_locations = Ccoord{})
-                : Parent{nb_subdomain_grid_pts, subdomain_locations} {
-            }
-
-            //! constructor with strides
-            Pixels(const Ccoord &nb_subdomain_grid_pts,
-                   const Ccoord &subdomain_locations, const Ccoord &strides)
-                : Parent{nb_subdomain_grid_pts, subdomain_locations, strides} {
-            }
-
-            //! copy constructor
-            Pixels(const Pixels &other) = default;
-
-            //! assignment operator
-            Pixels &operator=(const Pixels &other) = default;
-
-            virtual ~Pixels() = default;
-
-            //! return index for a ccoord
-            Index_t get_index(const Ccoord &ccoord) const {
-                return muGrid::CcoordOps::get_index(this->get_nb_grid_pts(),
-                                                    this->get_subdomain_locations(), ccoord);
-            }
-
-            //! return coordinates of the i-th pixel
-            Ccoord get_ccoord(const Index_t &index) const {
-                return get_ccoord_from_axes_order(
-                    this->nb_subdomain_grid_pts.template get<Dim>(),
-                    this->subdomain_locations.template get<Dim>(),
-                    this->strides.template get<Dim>(),
-                    this->axes_order.template get<Dim>(), index);
-            }
-
-            /**
-             * iterators over `Pixels` dereferences to cell coordinates
-             */
-            class iterator {
-            public:
-                using value_type = Ccoord; //!< stl conformance
-                using const_value_type = const value_type; //!< stl conformance
-                using pointer = value_type *; //!< stl conformance
-                using difference_type = std::ptrdiff_t; //!< stl conformance
-                using iterator_category = std::forward_iterator_tag;
-                //!< stl
-                                                                             //!< conformance
-                using reference = value_type; //!< stl conformance
-
-                //! constructor
-                explicit iterator(const Pixels &pixels, bool begin = true);
-
-                virtual ~iterator() = default;
-
-                //! dereferencing
-                inline value_type operator*() const;
-
-                //! pre-increment
-                inline iterator &operator++();
-
-                //! inequality
-                inline bool operator!=(const iterator &other) const;
-
-                //! equality
-                inline bool operator==(const iterator &other) const;
-
-            protected:
-                const Pixels &pixels; //!< ref to pixels in cell
-                size_t index; //!< index of currently pointed-to pixel
-            };
-
-            //! stl conformance
-            inline iterator begin() const { return iterator(*this); }
-            //! stl conformance
-            inline iterator end() const { return iterator(*this, false); }
-            //! stl conformance
-            inline size_t size() const { return get_size(this->get_nb_grid_pts()); }
-
-        protected:
-            const Ccoord &get_nb_grid_pts() const {
-                return this->nb_subdomain_grid_pts.template get<Dim>();
-            }
-
-            const Ccoord &get_subdomain_locations() const {
-                return this->subdomain_locations.template get<Dim>();
-            }
-
-            const Ccoord &get_strides() const {
-                return this->strides.template get<Dim>();
-            }
-        };
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        Pixels<Dim>::iterator::iterator(const Pixels &pixels, bool begin)
-            : pixels{pixels},
-              index{begin ? 0 : get_size(pixels.get_nb_grid_pts())} {
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        typename Pixels<Dim>::iterator::value_type
-        Pixels<Dim>::iterator::operator*() const {
-            return this->pixels.get_ccoord(this->index);
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        bool Pixels<Dim>::iterator::operator!=(const iterator &other) const {
-            return this->index != other.index;
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        bool Pixels<Dim>::iterator::operator==(const iterator &other) const {
-            return not(*this != other);
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        typename Pixels<Dim>::iterator &Pixels<Dim>::iterator::operator++() {
-            ++this->index;
-            return *this;
-        }
     } // namespace CcoordOps
 } // namespace muGrid
 
