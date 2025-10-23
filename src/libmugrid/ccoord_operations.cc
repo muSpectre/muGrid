@@ -196,45 +196,6 @@ namespace muGrid {
           contiguous{is_buffer_contiguous(IntCoord_t{nb_subdomain_grid_pts},
                                           IntCoord_t{strides})} {}
 
-    /* ---------------------------------------------------------------------- */
-    auto Pixels::begin() const -> iterator {
-      return iterator(*this, 0);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    auto Pixels::end() const -> iterator {
-      return iterator(*this, this->size());
-    }
-
-    /* ---------------------------------------------------------------------- */
-    Pixels::Enumerator::Enumerator(const Pixels & pixels)
-        : pixels{pixels} {}
-
-    /* ---------------------------------------------------------------------- */
-    auto Pixels::Enumerator::begin() const -> iterator {
-      return iterator{this->pixels, 0};
-    }
-
-    /* ---------------------------------------------------------------------- */
-    auto Pixels::Enumerator::end() const -> iterator {
-      return iterator{this->pixels, this->pixels.size()};
-    }
-
-    /* ---------------------------------------------------------------------- */
-    size_t Pixels::Enumerator::size() const {
-      return this->pixels.size();
-    }
-
-    /* ---------------------------------------------------------------------- */
-    size_t Pixels::size() const {
-      return get_size(this->nb_subdomain_grid_pts);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    auto Pixels::enumerate() const -> Enumerator {
-      return Enumerator(*this);
-    }
-
     template Pixels::Pixels(const Ccoord_t<oneD> &,
                                           const Ccoord_t<oneD> &);
     template Pixels::Pixels(const Ccoord_t<twoD> &,

@@ -726,16 +726,91 @@ namespace muGrid {
                        this->subdomain_locations;
             }
 
-            class iterator;
+            /**
+             * Iterator class for `muSpectre::Pixels`
+             */
+            class iterator {
+               public:
+                //! stl
+                using value_type = IntCoord_t;
+                using const_value_type = const value_type;  //!< stl conformance
+                using pointer = value_type *;               //!< stl conformance
+                using difference_type = std::ptrdiff_t;     //!< stl conformance
+                using iterator_category = std::forward_iterator_tag;
+                //!< stl
+                //!< conformance
+
+                //! constructor
+                iterator(const Pixels & pixels, size_t index)
+                    : pixels{pixels}, index{index} {
+                    if (!pixels.contiguous) {
+                        std::stringstream message{};
+                        message << "Iterating over a Pixels object is only "
+                                   "supported "
+                                   "for contiguous buffers. You specified a "
+                                   "grid of "
+                                   "shape "
+                                << pixels.nb_subdomain_grid_pts
+                                << " with non-contiguous "
+                                << "strides " << pixels.strides << ".";
+                        throw RuntimeError{message.str()};
+                    }
+                }
+
+                //! Default constructor
+                iterator() = delete;
+
+                //! Copy constructor
+                iterator(const iterator & other) = default;
+
+                //! Move constructor
+                iterator(iterator && other) = default;
+
+                //! Destructor
+                ~iterator() = default;
+
+                //! Copy assignment operator
+                iterator & operator=(const iterator & other) = delete;
+
+                //! Move assignment operator
+                iterator & operator=(iterator && other) = delete;
+
+                //! dereferencing
+                inline value_type operator*() const {
+                    return this->pixels.get_ccoord(this->index);
+                }
+
+                //! pre-increment
+                inline iterator & operator++() {
+                    ++this->index;
+                    return *this;
+                }
+
+                //! inequality
+                bool operator!=(const iterator & other) const {
+                    return this->index != other.index;
+                }
+
+                //! equality
+                bool operator==(const iterator & other) const {
+                    return not(*this != other);
+                }
+
+               protected:
+                const Pixels & pixels;  //!< ref to pixels in cell
+                size_t index;           //!< index of currently pointed-to pixel
+            };
 
             //! stl conformance
-            iterator begin() const;
+            iterator begin() const { return iterator(*this, 0); }
 
             //! stl conformance
-            iterator end() const;
+            iterator end() const { return iterator(*this, this->size()); }
 
             //! stl conformance
-            size_t size() const;
+            size_t size() const {
+                return get_size(this->nb_subdomain_grid_pts);
+            }
 
             //! return spatial dimension
             const Dim_t & get_dim() const { return this->dim; }
@@ -758,13 +833,91 @@ namespace muGrid {
             //! return the strides used for iterating over the pixels
             const IntCoord_t & get_strides() const { return this->strides; }
 
-            class Enumerator;
+            /**
+             * enumerator class for `muSpectre::Pixels`
+             */
+            class Enumerator final {
+               public:
+                //! Default constructor
+                Enumerator() = delete;
+
+                //! Constructor
+                explicit Enumerator(const Pixels & pixels) : pixels{pixels} {}
+
+                //! Copy constructor
+                Enumerator(const Enumerator & other) = default;
+
+                //! Move constructor
+                Enumerator(Enumerator && other) = default;
+
+                //! Destructor
+                virtual ~Enumerator() = default;
+
+                //! Copy assignment operator
+                Enumerator & operator=(const Enumerator & other) = delete;
+
+                //! Move assignment operator
+                Enumerator & operator=(Enumerator && other) = delete;
+
+                /**
+                 * @class iterator
+                 * @brief A derived class from Pixels::iterator, used for
+                 * iterating over Pixels.
+                 *
+                 * This class is a final class, meaning it cannot be further
+                 * derived from. It provides a custom implementation of the
+                 * dereference operator (*).
+                 *
+                 * @tparam Parent Alias for the base class Pixels::iterator.
+                 *
+                 * @note The using Parent::Parent; statement is a C++11 feature
+                 * called "Inheriting Constructors" which means that this
+                 * derived class will have the same constructors as the base
+                 * class.
+                 */
+                class iterator final : public Pixels::iterator {
+                   public:
+                    using Parent = Pixels::iterator;
+                    using Parent::Parent;
+
+                    /**
+                     * @brief Overloaded dereference operator (*).
+                     *
+                     * This function returns a tuple containing the index of the
+                     * pixel and the pixel's coordinates.
+                     *
+                     * @return std::tuple<Index_t, Parent::value_type> A tuple
+                     * containing the index of the pixel and the pixel's
+                     * coordinates.
+                     */
+                    std::tuple<Index_t, Parent::value_type> operator*() const {
+                        auto && pixel{this->Parent::operator*()};
+                        return std::tuple<Index_t, Parent::value_type>{
+                            this->pixels.get_index(pixel), pixel};
+                    }
+                };
+
+                //! stl conformance
+                iterator begin() const { return iterator{this->pixels, 0}; }
+
+                //! stl conformance
+                iterator end() const {
+                    return iterator{this->pixels, this->pixels.size()};
+                }
+
+                //! stl conformance
+                size_t size() const { return this->pixels.size(); }
+
+               protected:
+                const Pixels & pixels;
+            };
+
             /**
              * iterates in tuples of pixel index ond coordinate. Useful in
              * parallel problems, where simple enumeration of the pixels would
              * be incorrect
              */
-            Enumerator enumerate() const;
+            Enumerator enumerate() const { return Enumerator(*this); }
 
            protected:
             Dim_t dim;                         //!< spatial dimension
@@ -773,156 +926,6 @@ namespace muGrid {
             IntCoord_t strides;                //!< strides of memory layout
             IntCoord_t axes_order;             //!< order of axes
             bool contiguous;                   //!< is this a contiguous buffer?
-        };
-
-        /**
-         * Iterator class for `muSpectre::Pixels`
-         */
-        class Pixels::iterator {
-           public:
-            //! stl
-            using value_type = IntCoord_t;
-            using const_value_type = const value_type;  //!< stl conformance
-            using pointer = value_type *;               //!< stl conformance
-            using difference_type = std::ptrdiff_t;     //!< stl conformance
-            using iterator_category = std::forward_iterator_tag;
-            //!< stl
-            //!< conformance
-
-            //! constructor
-            iterator(const Pixels & pixels, size_t index)
-                : pixels{pixels}, index{index} {
-                if (!pixels.contiguous) {
-                    std::stringstream message{};
-                    message
-                        << "Iterating over a Pixels object is only supported "
-                           "for contiguous buffers. You specified a grid of "
-                           "shape "
-                        << pixels.nb_subdomain_grid_pts
-                        << " with non-contiguous "
-                        << "strides " << pixels.strides << ".";
-                    throw RuntimeError{message.str()};
-                }
-            }
-
-            //! Default constructor
-            iterator() = delete;
-
-            //! Copy constructor
-            iterator(const iterator & other) = default;
-
-            //! Move constructor
-            iterator(iterator && other) = default;
-
-            //! Destructor
-            ~iterator() = default;
-
-            //! Copy assignment operator
-            iterator & operator=(const iterator & other) = delete;
-
-            //! Move assignment operator
-            iterator & operator=(iterator && other) = delete;
-
-            //! dereferencing
-            inline value_type operator*() const {
-                return this->pixels.get_ccoord(this->index);
-            }
-
-            //! pre-increment
-            inline iterator & operator++() {
-                ++this->index;
-                return *this;
-            }
-
-            //! inequality
-            bool operator!=(const iterator & other) const {
-                return this->index != other.index;
-            }
-
-            //! equality
-            bool operator==(const iterator & other) const {
-                return not(*this != other);
-            }
-
-           protected:
-            const Pixels & pixels;  //!< ref to pixels in cell
-            size_t index;           //!< index of currently pointed-to pixel
-        };
-
-        /**
-         * enumerator class for `muSpectre::Pixels`
-         */
-        class Pixels::Enumerator final {
-           public:
-            //! Default constructor
-            Enumerator() = delete;
-
-            //! Constructor
-            explicit Enumerator(const Pixels & pixels);
-
-            //! Copy constructor
-            Enumerator(const Enumerator & other) = default;
-
-            //! Move constructor
-            Enumerator(Enumerator && other) = default;
-
-            //! Destructor
-            virtual ~Enumerator() = default;
-
-            //! Copy assignment operator
-            Enumerator & operator=(const Enumerator & other) = delete;
-
-            //! Move assignment operator
-            Enumerator & operator=(Enumerator && other) = delete;
-
-            /**
-             * @class iterator
-             * @brief A derived class from Pixels::iterator, used for iterating
-             * over Pixels.
-             *
-             * This class is a final class, meaning it cannot be further derived
-             * from. It provides a custom implementation of the dereference
-             * operator (*).
-             *
-             * @tparam Parent Alias for the base class Pixels::iterator.
-             *
-             * @note The using Parent::Parent; statement is a C++11 feature
-             * called "Inheriting Constructors" which means that this derived
-             * class will have the same constructors as the base class.
-             */
-            class iterator final : public Pixels::iterator {
-               public:
-                using Parent = Pixels::iterator;
-                using Parent::Parent;
-
-                /**
-                 * @brief Overloaded dereference operator (*).
-                 *
-                 * This function returns a tuple containing the index of the
-                 * pixel and the pixel's coordinates.
-                 *
-                 * @return std::tuple<Index_t, Parent::value_type> A tuple
-                 * containing the index of the pixel and the pixel's
-                 * coordinates.
-                 */
-                std::tuple<Index_t, Parent::value_type> operator*() const {
-                    auto && pixel{this->Parent::operator*()};
-                    return std::tuple<Index_t, Parent::value_type>{
-                        this->pixels.get_index(pixel), pixel};
-                }
-            };
-
-            //! stl conformance
-            iterator begin() const;
-
-            //! stl conformance
-            iterator end() const;
-
-            //! stl conformance
-            size_t size() const;
-
-           protected:
-            const Pixels & pixels;
         };
     }  // namespace CcoordOps
 }  // namespace muGrid
