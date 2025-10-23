@@ -52,7 +52,7 @@ namespace muGrid {
       nb_grid_pts[i] += i;
     }
 
-    CcoordOps::DynamicPixels dynamic_pix(nb_grid_pts);
+    CcoordOps::Pixels dynamic_pix(nb_grid_pts);
     for (auto && tup :
          akantu::zip(akantu::enumerate(dynamic_pix), dynamic_pix.enumerate())) {
       auto && aka_tup{std::get<0>(tup)};

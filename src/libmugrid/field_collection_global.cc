@@ -146,7 +146,7 @@ namespace muGrid {
                                     : nb_ghosts_right;
 
         this->nb_domain_grid_pts = nb_domain_grid_pts;
-        this->pixels = CcoordOps::DynamicPixels(_nb_subdomain_grid_pts,
+        this->pixels = CcoordOps::Pixels(_nb_subdomain_grid_pts,
                                                 subdomain_locations_with_ghosts,
                                                 pixels_strides);
         this->nb_pixels = CcoordOps::get_size(_nb_subdomain_grid_pts);
@@ -185,7 +185,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const typename GlobalFieldCollection::DynamicPixels &
+    const typename GlobalFieldCollection::Pixels &
     GlobalFieldCollection::get_pixels() const {
         if (not(this->initialised)) {
             throw FieldCollectionError(

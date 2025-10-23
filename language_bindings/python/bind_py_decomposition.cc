@@ -17,7 +17,7 @@ using muGrid::DynCcoord_t;
 using muGrid::Real;
 using muGrid::Field;
 using muGrid::py_coords;
-using Pixels_t = muGrid::CcoordOps::DynamicPixels;
+using Pixels_t = muGrid::CcoordOps::Pixels;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;

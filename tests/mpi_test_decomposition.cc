@@ -87,7 +87,7 @@ namespace muGrid {
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
     auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts_with_ghosts()};
     auto && field_map{field.get_sub_pt_map(Unknown)};
-    CcoordOps::DynamicPixels pixels{nb_subdomain_grid_pts};
+    CcoordOps::Pixels pixels{nb_subdomain_grid_pts};
     for (auto && pixel_id_coords : pixels.enumerate()) {
       auto && id{std::get<0>(pixel_id_coords)};
       auto && local_coords{std::get<1>(pixel_id_coords)};

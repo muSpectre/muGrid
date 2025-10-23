@@ -252,7 +252,7 @@ namespace muGrid {
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
     // Offsets of nodes connected by a pixel
-    CcoordOps::DynamicPixels offsets{CcoordOps::get_cube(this->spatial_dim, 2)};
+    CcoordOps::Pixels offsets{CcoordOps::get_cube(this->spatial_dim, 2)};
     // For each pixel...
     for (auto && id_base_ccoord : pixels.enumerate()) {
       auto && id{std::get<0>(id_base_ccoord)};
@@ -345,7 +345,7 @@ namespace muGrid {
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
     // pixel index offsets for whole stencil of [ij,i+j,ij+,i+j+] in 2D  ...
-    CcoordOps::DynamicPixels offsets{CcoordOps::get_cube(this->spatial_dim, 2)};
+    CcoordOps::Pixels offsets{CcoordOps::get_cube(this->spatial_dim, 2)};
 
     // loop over pixels
     for (auto && id_base_ccoord : pixels.enumerate()) {

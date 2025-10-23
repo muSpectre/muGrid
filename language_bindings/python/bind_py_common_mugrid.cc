@@ -155,19 +155,19 @@ void add_get_index(py::module & mod) {
 }
 
 void add_pixels(py::module & mod) {
-  py::class_<muGrid::CcoordOps::DynamicPixels::Enumerator>(mod, "Enumerator")
-      .def("__len__", &muGrid::CcoordOps::DynamicPixels::Enumerator::size)
+  py::class_<muGrid::CcoordOps::Pixels::Enumerator>(mod, "Enumerator")
+      .def("__len__", &muGrid::CcoordOps::Pixels::Enumerator::size)
       .def("__iter__",
-           [](muGrid::CcoordOps::DynamicPixels::Enumerator & enumerator) {
+           [](muGrid::CcoordOps::Pixels::Enumerator & enumerator) {
              return py::make_iterator(enumerator.begin(), enumerator.end());
            });
-  py::class_<muGrid::CcoordOps::DynamicPixels>(mod, "DynamicPixels")
-      .def("__len__", &muGrid::CcoordOps::DynamicPixels::size)
+  py::class_<muGrid::CcoordOps::Pixels>(mod, "Pixels")
+      .def("__len__", &muGrid::CcoordOps::Pixels::size)
       .def("__iter__",
-           [](muGrid::CcoordOps::DynamicPixels & pixels) {
+           [](muGrid::CcoordOps::Pixels & pixels) {
              return py::make_iterator(pixels.begin(), pixels.end());
            })
-      .def("enumerate", &muGrid::CcoordOps::DynamicPixels::enumerate);
+      .def("enumerate", &muGrid::CcoordOps::Pixels::enumerate);
 }
 
 void add_unit(py::module & mod) {

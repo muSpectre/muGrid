@@ -119,12 +119,12 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    DynamicPixels::DynamicPixels()
+    Pixels::Pixels()
         : dim{}, nb_subdomain_grid_pts{}, subdomain_locations{}, strides{},
           axes_order{}, contiguous{false} {}
 
     /* ---------------------------------------------------------------------- */
-    DynamicPixels::DynamicPixels(const DynCcoord_t & nb_subdomain_grid_pts,
+    Pixels::Pixels(const DynCcoord_t & nb_subdomain_grid_pts,
                                  const DynCcoord_t & subdomain_locations)
         : dim(nb_subdomain_grid_pts.get_dim()),
           nb_subdomain_grid_pts(nb_subdomain_grid_pts),
@@ -145,7 +145,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    DynamicPixels::DynamicPixels(const DynCcoord_t & nb_subdomain_grid_pts,
+    Pixels::Pixels(const DynCcoord_t & nb_subdomain_grid_pts,
                                  const DynCcoord_t & subdomain_locations,
                                  const DynCcoord_t & strides)
         : dim(nb_subdomain_grid_pts.get_dim()),
@@ -175,7 +175,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     template <size_t Dim>
-    DynamicPixels::DynamicPixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+    Pixels::Pixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
                                  const Ccoord_t<Dim> & subdomain_locations)
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
           subdomain_locations(subdomain_locations),
@@ -186,7 +186,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     template <size_t Dim>
-    DynamicPixels::DynamicPixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+    Pixels::Pixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
                                  const Ccoord_t<Dim> & subdomain_locations,
                                  const Ccoord_t<Dim> & strides)
         : dim(Dim), nb_subdomain_grid_pts(nb_subdomain_grid_pts),
@@ -197,57 +197,57 @@ namespace muGrid {
                                           DynCcoord_t{strides})} {}
 
     /* ---------------------------------------------------------------------- */
-    auto DynamicPixels::begin() const -> iterator {
+    auto Pixels::begin() const -> iterator {
       return iterator(*this, 0);
     }
 
     /* ---------------------------------------------------------------------- */
-    auto DynamicPixels::end() const -> iterator {
+    auto Pixels::end() const -> iterator {
       return iterator(*this, this->size());
     }
 
     /* ---------------------------------------------------------------------- */
-    DynamicPixels::Enumerator::Enumerator(const DynamicPixels & pixels)
+    Pixels::Enumerator::Enumerator(const Pixels & pixels)
         : pixels{pixels} {}
 
     /* ---------------------------------------------------------------------- */
-    auto DynamicPixels::Enumerator::begin() const -> iterator {
+    auto Pixels::Enumerator::begin() const -> iterator {
       return iterator{this->pixels, 0};
     }
 
     /* ---------------------------------------------------------------------- */
-    auto DynamicPixels::Enumerator::end() const -> iterator {
+    auto Pixels::Enumerator::end() const -> iterator {
       return iterator{this->pixels, this->pixels.size()};
     }
 
     /* ---------------------------------------------------------------------- */
-    size_t DynamicPixels::Enumerator::size() const {
+    size_t Pixels::Enumerator::size() const {
       return this->pixels.size();
     }
 
     /* ---------------------------------------------------------------------- */
-    size_t DynamicPixels::size() const {
+    size_t Pixels::size() const {
       return get_size(this->nb_subdomain_grid_pts);
     }
 
     /* ---------------------------------------------------------------------- */
-    auto DynamicPixels::enumerate() const -> Enumerator {
+    auto Pixels::enumerate() const -> Enumerator {
       return Enumerator(*this);
     }
 
-    template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
+    template Pixels::Pixels(const Ccoord_t<oneD> &,
                                           const Ccoord_t<oneD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
+    template Pixels::Pixels(const Ccoord_t<twoD> &,
                                           const Ccoord_t<twoD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
+    template Pixels::Pixels(const Ccoord_t<threeD> &,
                                           const Ccoord_t<threeD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<oneD> &,
+    template Pixels::Pixels(const Ccoord_t<oneD> &,
                                           const Ccoord_t<oneD> &,
                                           const Ccoord_t<oneD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<twoD> &,
+    template Pixels::Pixels(const Ccoord_t<twoD> &,
                                           const Ccoord_t<twoD> &,
                                           const Ccoord_t<twoD> &);
-    template DynamicPixels::DynamicPixels(const Ccoord_t<threeD> &,
+    template Pixels::Pixels(const Ccoord_t<threeD> &,
                                           const Ccoord_t<threeD> &,
                                           const Ccoord_t<threeD> &);
   }  // namespace CcoordOps

@@ -50,7 +50,7 @@ namespace muGrid {
         using Parent = FieldCollection;
         using Parent::SubPtMap_t;
         //! pixel iterator
-        using DynamicPixels = CcoordOps::DynamicPixels;
+        using Pixels = CcoordOps::Pixels;
 
         //! Default constructor
         GlobalFieldCollection() = delete;
@@ -153,7 +153,7 @@ namespace muGrid {
         operator=(GlobalFieldCollection && other) = delete;
 
         //! Return the pixels class that allows to iterator over pixels
-        const DynamicPixels & get_pixels() const;
+        const Pixels & get_pixels() const;
 
         //! evaluate and return the linear index corresponding to dynamic
         //! `ccoord`
@@ -307,7 +307,7 @@ namespace muGrid {
         }
 
        protected:
-        DynamicPixels pixels{};  //!< helper to iterate over the grid
+        Pixels pixels{};  //!< helper to iterate over the grid
         DynCcoord_t
             nb_domain_grid_pts{};  // number of domain (global) grid points
         DynCcoord_t nb_ghosts_left{};

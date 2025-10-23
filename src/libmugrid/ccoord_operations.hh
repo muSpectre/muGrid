@@ -635,12 +635,12 @@ namespace muGrid {
          * capabilities of `muGrid::CcoordOps::Pixels` without needing to be
          * templated with the spatial dimension. Iteration is slower, though.
          */
-        class DynamicPixels {
+        class Pixels {
         public:
-            DynamicPixels();
+            Pixels();
 
             //! Constructor with default strides (column-major pixel storage order)
-            explicit DynamicPixels(
+            explicit Pixels(
                 const DynCcoord_t &nb_subdomain_grid_pts,
                 const DynCcoord_t &subdomain_locations = DynCcoord_t{});
 
@@ -648,36 +648,36 @@ namespace muGrid {
              * Constructor with custom strides (any, including partially transposed
              * pixel storage order)
              */
-            DynamicPixels(const DynCcoord_t &nb_subdomain_grid_pts,
+            Pixels(const DynCcoord_t &nb_subdomain_grid_pts,
                           const DynCcoord_t &subdomain_locations,
                           const DynCcoord_t &strides);
 
             //! Constructor with default strides from statically sized coords
             template<size_t Dim>
-            explicit DynamicPixels(
+            explicit Pixels(
                 const Ccoord_t<Dim> &nb_subdomain_grid_pts,
                 const Ccoord_t<Dim> &subdomain_locations = Ccoord_t<Dim>{});
 
             //! Constructor with custom strides from statically sized coords
             template<size_t Dim>
-            DynamicPixels(const Ccoord_t<Dim> &nb_subdomain_grid_pts,
+            Pixels(const Ccoord_t<Dim> &nb_subdomain_grid_pts,
                           const Ccoord_t<Dim> &subdomain_locations,
                           const Ccoord_t<Dim> &strides);
 
             //! Copy constructor
-            DynamicPixels(const DynamicPixels &other) = default;
+            Pixels(const Pixels &other) = default;
 
             //! Move constructor
-            DynamicPixels(DynamicPixels &&other) = default;
+            Pixels(Pixels &&other) = default;
 
             //! Destructor
-            virtual ~DynamicPixels() = default;
+            virtual ~Pixels() = default;
 
             //! Copy assignment operator
-            DynamicPixels &operator=(const DynamicPixels &other) = default;
+            Pixels &operator=(const Pixels &other) = default;
 
             //! Move assignment operator
-            DynamicPixels &operator=(DynamicPixels &&other) = default;
+            Pixels &operator=(Pixels &&other) = default;
 
             //! evaluate and return the linear index corresponding to dynamic `ccoord`
             Index_t get_index(const DynCcoord_t &ccoord) const {
@@ -757,9 +757,9 @@ namespace muGrid {
         };
 
         /**
-         * Iterator class for `muSpectre::DynamicPixels`
+         * Iterator class for `muSpectre::Pixels`
          */
-        class DynamicPixels::iterator {
+        class Pixels::iterator {
         public:
             //! stl
             using value_type = DynCcoord_t;
@@ -771,11 +771,11 @@ namespace muGrid {
                                                                        //!< conformance
 
             //! constructor
-            iterator(const DynamicPixels &pixels, size_t index)
+            iterator(const Pixels &pixels, size_t index)
                 : pixels{pixels}, index{index} {
                 if (!pixels.contiguous) {
                     std::stringstream message{};
-                    message << "Iterating over a DynamicPixels object is only supported "
+                    message << "Iterating over a Pixels object is only supported "
                             "for contiguous buffers. You specified a grid of shape "
                             << pixels.nb_subdomain_grid_pts << " with non-contiguous "
                             << "strides " << pixels.strides << ".";
@@ -823,20 +823,20 @@ namespace muGrid {
             }
 
         protected:
-            const DynamicPixels &pixels; //!< ref to pixels in cell
+            const Pixels &pixels; //!< ref to pixels in cell
             size_t index; //!< index of currently pointed-to pixel
         };
 
         /**
-         * enumerator class for `muSpectre::DynamicPixels`
+         * enumerator class for `muSpectre::Pixels`
          */
-        class DynamicPixels::Enumerator final {
+        class Pixels::Enumerator final {
         public:
             //! Default constructor
             Enumerator() = delete;
 
             //! Constructor
-            explicit Enumerator(const DynamicPixels &pixels);
+            explicit Enumerator(const Pixels &pixels);
 
             //! Copy constructor
             Enumerator(const Enumerator &other) = default;
@@ -855,21 +855,21 @@ namespace muGrid {
 
             /**
              * @class iterator
-             * @brief A derived class from DynamicPixels::iterator, used for iterating
+             * @brief A derived class from Pixels::iterator, used for iterating
              * over Pixels.
              *
              * This class is a final class, meaning it cannot be further derived from.
              * It provides a custom implementation of the dereference operator (*).
              *
-             * @tparam Parent Alias for the base class DynamicPixels::iterator.
+             * @tparam Parent Alias for the base class Pixels::iterator.
              *
              * @note The using Parent::Parent; statement is a C++11 feature called
              * "Inheriting Constructors" which means that this derived class will
              * have the same constructors as the base class.
              */
-            class iterator final : public DynamicPixels::iterator {
+            class iterator final : public Pixels::iterator {
             public:
-                using Parent = DynamicPixels::iterator;
+                using Parent = Pixels::iterator;
                 using Parent::Parent;
 
                 /**
@@ -899,7 +899,7 @@ namespace muGrid {
             size_t size() const;
 
         protected:
-            const DynamicPixels &pixels;
+            const Pixels &pixels;
         };
     } // namespace CcoordOps
 } // namespace muGrid
