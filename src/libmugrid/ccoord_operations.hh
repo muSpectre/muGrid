@@ -776,12 +776,12 @@ namespace muGrid {
                 iterator & operator=(iterator && other) = delete;
 
                 //! dereferencing
-                inline value_type operator*() const {
+                value_type operator*() const {
                     return this->pixels.get_ccoord(this->index);
                 }
 
                 //! pre-increment
-                inline iterator & operator++() {
+                iterator & operator++() {
                     ++this->index;
                     return *this;
                 }
@@ -813,7 +813,7 @@ namespace muGrid {
             }
 
             //! return spatial dimension
-            const Dim_t & get_dim() const { return this->dim; }
+            Dim_t get_dim() const { return this->dim; }
 
             //! return the resolution of the discretisation grid in each spatial
             //! dim
