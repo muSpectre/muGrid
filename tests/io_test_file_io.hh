@@ -71,9 +71,9 @@ namespace muGrid {
     Communicator comm{MPIContext::get_context().comm};
     static constexpr Index_t spatial_dimension{twoD};
     const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
-    const DynCcoord_t nb_subdomain_grid_pts{3, 4};
-    const DynCcoord_t nb_domain_grid_pts{3, 4};
-    const DynCcoord_t subdomain_locations{0, 0};
+    const IntCoord_t nb_subdomain_grid_pts{3, 4};
+    const IntCoord_t nb_domain_grid_pts{3, 4};
+    const IntCoord_t subdomain_locations{0, 0};
     const std::string quad{"quad"};
     muGrid::GlobalFieldCollection global_fc;
 
@@ -130,9 +130,9 @@ namespace muGrid {
     const std::string pixel{"pixel"};
     const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{pixel, 1}};
     static constexpr Index_t spatial_dimension{twoD};
-    const DynCcoord_t nb_subdomain_grid_pts{3, 3};
-    const DynCcoord_t nb_domain_grid_pts{3, 3};
-    const DynCcoord_t subdomain_locations{0, 0};
+    const IntCoord_t nb_subdomain_grid_pts{3, 3};
+    const IntCoord_t nb_domain_grid_pts{3, 3};
+    const IntCoord_t subdomain_locations{0, 0};
     muGrid::GlobalFieldCollection global_fc;
 
     std::vector<std::string> names;  // names for the fields

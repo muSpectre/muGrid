@@ -69,11 +69,11 @@ namespace muGrid {
     namespace internal {
         //! convert strides into the storage order description used by muGrid
         template<typename T, int flags = py::array::forcecast>
-        inline std::tuple<StorageOrder, DynCcoord_t, Shape_t>
-        detect_storage_order(const DynCcoord_t &nb_subdomain_grid_pts,
+        inline std::tuple<StorageOrder, IntCoord_t, Shape_t>
+        detect_storage_order(const IntCoord_t &nb_subdomain_grid_pts,
                              const Shape_t &components_shape, Index_t nb_sub_pts,
                              py::array_t<T, flags> &array) {
-            auto &dim{nb_subdomain_grid_pts.get_dim()};
+            auto dim{nb_subdomain_grid_pts.get_dim()};
             if (static_cast<py::ssize_t>(dim + components_shape.size()) !=
                 array.ndim()) {
                 std::stringstream s;
@@ -90,7 +90,7 @@ namespace muGrid {
             Shape_t strides{};
 
             Shape_t components_strides{};
-            DynCcoord_t pixels_strides{};
+            IntCoord_t pixels_strides{};
             for (size_t i = 0; i < components_shape.size(); ++i) {
                 components_strides.push_back(array.strides(i));
                 strides.push_back(array.strides(i) / array.itemsize());
@@ -259,9 +259,9 @@ namespace muGrid {
          *    (component_1, component_2, sub_pt, grid_x, grid_y, grid_z)
          * where the number of components and grid indices can be arbitrary.
          */
-        NumpyProxy(DynCcoord_t nb_domain_grid_pts,
-                   DynCcoord_t nb_subdomain_grid_pts,
-                   DynCcoord_t subdomain_locations, Index_t nb_dof_per_pixel,
+        NumpyProxy(IntCoord_t nb_domain_grid_pts,
+                   IntCoord_t nb_subdomain_grid_pts,
+                   IntCoord_t subdomain_locations, Index_t nb_dof_per_pixel,
                    py::array_t<T, flags> &array,
                    const Unit &unit = Unit::unitless())
             : collection{}, field{}, iter_type{IterUnit::Pixel} {
@@ -348,9 +348,9 @@ namespace muGrid {
          * where the number of components and grid indices can be arbitrary. The
          * sub_pt dimension can be omitted if there is only a single sub-point.
          */
-        NumpyProxy(DynCcoord_t nb_domain_grid_pts,
-                   DynCcoord_t nb_subdomain_grid_pts,
-                   DynCcoord_t subdomain_locations, Index_t nb_sub_pts,
+        NumpyProxy(IntCoord_t nb_domain_grid_pts,
+                   IntCoord_t nb_subdomain_grid_pts,
+                   IntCoord_t subdomain_locations, Index_t nb_sub_pts,
                    Shape_t components_shape, py::array_t<T, flags> &array,
                    const Unit &unit = Unit::unitless())
             : collection{}, field{}, iter_type{IterUnit::SubPt} {

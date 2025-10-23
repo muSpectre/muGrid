@@ -15,18 +15,18 @@ namespace muGrid {
     auto & comm{MPIContext::get_context().comm};
 
     // A large enough domain
-    DynCcoord_t nb_domain_grid_pts{1, 10};
+    IntCoord_t nb_domain_grid_pts{1, 10};
 
     // Decomposition only along one dimension
-    DynCcoord_t nb_subdivisions{1, comm.size()};
-    DynCcoord_t nb_ghosts_left{1, 0};
-    DynCcoord_t nb_ghosts_right{1, 0};
+    IntCoord_t nb_subdivisions{1, comm.size()};
+    IntCoord_t nb_ghosts_left{1, 0};
+    IntCoord_t nb_ghosts_right{1, 0};
     CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                        nb_subdivisions, nb_ghosts_left,
                                        nb_ghosts_right};
 
     // Check the number of subdomain grid points adds up
-    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
+    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts_with_ghosts()};
     int dim{1};
     auto res{comm.template sum<Index_t>(nb_subdomain_grid_pts[dim] -
                                         nb_ghosts_left[dim] -
@@ -40,27 +40,27 @@ namespace muGrid {
 
     // Decide the number of subdivisions according to number of processes.
     int nb_process{comm.size()};
-    DynCcoord_t nb_subdivisions{};
+    IntCoord_t nb_subdivisions{};
     if (nb_process == 1)
-      nb_subdivisions = DynCcoord_t{1};
+      nb_subdivisions = IntCoord_t{1};
     else if (nb_process == 2)
-      nb_subdivisions = DynCcoord_t{2};
+      nb_subdivisions = IntCoord_t{2};
     else if (nb_process == 4)
-      nb_subdivisions = DynCcoord_t{2, 2};
+      nb_subdivisions = IntCoord_t{2, 2};
     else if (nb_process == 8)
-      nb_subdivisions = DynCcoord_t{2, 2, 2};
+      nb_subdivisions = IntCoord_t{2, 2, 2};
     else
       throw RuntimeError("Not planned for this number of processes.");
 
     // Decide the size of the whole domain
     int spatial_dims{nb_subdivisions.size()};
     int nb_grid_pts_per_dim{5};
-    const DynCcoord_t & nb_domain_grid_pts{
-        DynCcoord_t(spatial_dims, nb_grid_pts_per_dim)};
+    const IntCoord_t & nb_domain_grid_pts{
+        IntCoord_t(spatial_dims, nb_grid_pts_per_dim)};
 
     // A function to get referrence values
     auto && get_ref_value{
-        [nb_grid_pts_per_dim](const DynCcoord_t & global_coords) {
+        [nb_grid_pts_per_dim](const IntCoord_t & global_coords) {
           Index_t val{0};
           Index_t coeff{1};
           for (int dim{0}; dim < global_coords.size(); ++dim) {
@@ -71,8 +71,8 @@ namespace muGrid {
         }};
 
     // Create a Cartesian decomposition with ghost buffers
-    const DynCcoord_t & nb_ghosts_left{DynCcoord_t(spatial_dims, 1)};
-    const DynCcoord_t & nb_ghosts_right{DynCcoord_t(spatial_dims, 2)};
+    const IntCoord_t & nb_ghosts_left{IntCoord_t(spatial_dims, 1)};
+    const IntCoord_t & nb_ghosts_right{IntCoord_t(spatial_dims, 2)};
     CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                        nb_subdivisions, nb_ghosts_left,
                                        nb_ghosts_right};
@@ -84,10 +84,10 @@ namespace muGrid {
     auto & field{collection.real_field(field_name, nb_components)};
 
     // Fill the field with some values
-    auto & subdomain_locations{cart_decomp.get_subdomain_locations()};
-    auto & nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts()};
+    auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
+    auto nb_subdomain_grid_pts{cart_decomp.get_nb_subdomain_grid_pts_with_ghosts()};
     auto && field_map{field.get_sub_pt_map(Unknown)};
-    CcoordOps::DynamicPixels pixels{nb_subdomain_grid_pts};
+    CcoordOps::Pixels pixels{nb_subdomain_grid_pts};
     for (auto && pixel_id_coords : pixels.enumerate()) {
       auto && id{std::get<0>(pixel_id_coords)};
       auto && local_coords{std::get<1>(pixel_id_coords)};

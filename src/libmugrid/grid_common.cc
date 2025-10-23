@@ -38,22 +38,22 @@
 #include "grid_common.hh"
 namespace muGrid {
   /* ---------------------------------------------------------------------- */
-  bool operator<(const Verbosity v1, const Verbosity v2) {
+  bool operator<(Verbosity v1, Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) < static_cast<T>(v2);
   }
 
-  bool operator>(const Verbosity v1, const Verbosity v2) {
+  bool operator>(Verbosity v1, Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) > static_cast<T>(v2);
   }
 
-  bool operator<=(const Verbosity v1, const Verbosity v2) {
+  bool operator<=(Verbosity v1, Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) <= static_cast<T>(v2);
   }
 
-  bool operator>=(const Verbosity v1, const Verbosity v2) {
+  bool operator>=(Verbosity v1, Verbosity v2) {
     using T = std::underlying_type_t<Verbosity>;
     return static_cast<T>(v1) >= static_cast<T>(v2);
   }

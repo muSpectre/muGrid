@@ -33,7 +33,7 @@ or when writing the field to a file. The default representation has the shape
     (components, sub-points, pixels)
 
 As a concrete example, a second-rank tensor (for example the deformation
-gradient) living on two quadrature points in three dimensions with a spatial
+gradient) living on two quadrature points in two dimensions with a spatial
 discretization of 11 x 12 grid points would have the following shape:
 
 .. code-block:: Python
@@ -92,12 +92,18 @@ which will raise an exception if the field does not exist.
 Components
 **********
 
-In the above example, we registered a scalar field, which has one component. Vector or
+In the above example, we registered a scalar field, which has no components. Vector or
 tensor-valued field can be defined by specifying either simply a number of components or
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:
 
 .. literalinclude:: ../../examples/components.py
+    :language: python
+
+Note that there is a difference between a scalar field and a field with a single component.
+When a single component is specified, this is reflected in the shape of the field:
+
+.. literalinclude:: ../../examples/scalar.py
     :language: python
 
 Sub-points
@@ -131,17 +137,20 @@ functions that make this convolution simple. A convolution turns a field defined
 on quadrature points. This means field of shape
 
 .. code-block:: Python
+
     (components, nodal-points, pixels)
 
 is turned into a field of shape
 
-.. codd-block:: Python
+.. code-block:: Python
+
     (components, quadrature-points, pixels)
 
 where the same convolution is applied to each component. Note that the convolution operation itself may have multiple
 components (which we will refer to as operators in the following), meaning that the output field may have the shape
 
-.. codd-block:: Python
+.. code-block:: Python
+
     (operators, components, quadrature-points, pixels)
 
 As an example, we consider the gradient of a two dimensional field with a single nodal point.
@@ -155,6 +164,7 @@ to represent it. The stencil then has the shape
 or in this specific case
 
 .. code-block:: Python
+
     (2, 2, 1, 2, 2)
 
 because we are only considering a two-dimensional problem where there are two operators of the gradient.

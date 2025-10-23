@@ -9,17 +9,15 @@
 namespace muGrid {
     class Decomposition {
     public:
-        Decomposition() {
-        }
+        Decomposition() = default;
 
-        virtual ~Decomposition() {
-        }
+        virtual ~Decomposition() = default;
 
         //! fill the ghost buffers with the values from the neighboring processes.
         virtual void communicate_ghosts(const Field &field) const = 0;
 
         //! fill the ghost buffers with the values from the neighboring processes.
-        virtual void communicate_ghosts(std::string field_name) const = 0;
+        virtual void communicate_ghosts(const std::string &field_name) const = 0;
     };
 } // namespace muGrid
 

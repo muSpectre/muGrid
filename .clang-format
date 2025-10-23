@@ -1,4 +1,6 @@
 AccessModifierOffset: -1
+IndentWidth: 4
+UseTab: Never
 SpacesBeforeTrailingComments: 2
 NamespaceIndentation: All
 SortIncludes: false

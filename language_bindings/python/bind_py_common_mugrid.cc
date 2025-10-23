@@ -93,7 +93,6 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
                err << "index " << index << " out of range 0.."
                    << self.get_dim() - 1;
                throw std::out_of_range(err.str());
-               std::cout << err.str() << "\n";
              }
              return self[index];
            })
@@ -111,12 +110,12 @@ void add_get_cube_helper(py::module & mod) {
 }
 
 template <Index_t dim>
-void add_get_ccoord_helper(py::module & mod) {
+void add_get_coord_helper(py::module & mod) {
   using Ccoord = muGrid::Ccoord_t<dim>;
   mod.def(
       "get_domain_ccoord",
       [](Ccoord nb_grid_pts, Index_t index) {
-        return muGrid::CcoordOps::get_ccoord<dim>(nb_grid_pts, Ccoord{}, index);
+        return muGrid::CcoordOps::get_coord<dim>(nb_grid_pts, Ccoord{}, index);
       },
       "nb_grid_pts"_a, "i"_a,
       "return the cell coordinate corresponding to the i'th cell in a grid of "
@@ -131,9 +130,9 @@ void add_get_cube(py::module & mod) {
   add_get_cube_helper<muGrid::threeD, Index_t>(mod);
   add_get_cube_helper<muGrid::threeD, muGrid::Real>(mod);
 
-  add_get_ccoord_helper<muGrid::oneD>(mod);
-  add_get_ccoord_helper<muGrid::twoD>(mod);
-  add_get_ccoord_helper<muGrid::threeD>(mod);
+  add_get_coord_helper<muGrid::oneD>(mod);
+  add_get_coord_helper<muGrid::twoD>(mod);
+  add_get_coord_helper<muGrid::threeD>(mod);
 }
 
 template <Index_t dim>
@@ -155,32 +154,20 @@ void add_get_index(py::module & mod) {
   add_get_index_helper<muGrid::threeD>(mod);
 }
 
-template <Index_t dim>
-void add_Pixels_helper(py::module & mod) {
-  std::stringstream name{};
-  name << "Pixels" << dim << "d";
-  using Ccoord = muGrid::Ccoord_t<dim>;
-  py::class_<muGrid::CcoordOps::Pixels<dim>> Pixels(mod, name.str().c_str());
-  Pixels.def(py::init<Ccoord>());
-}
-
-void add_Pixels(py::module & mod) {
-  py::class_<muGrid::CcoordOps::DynamicPixels::Enumerator>(mod, "Enumerator")
-      .def("__len__", &muGrid::CcoordOps::DynamicPixels::Enumerator::size)
+void add_pixels(py::module & mod) {
+  py::class_<muGrid::CcoordOps::Pixels::Enumerator>(mod, "Enumerator")
+      .def("__len__", &muGrid::CcoordOps::Pixels::Enumerator::size)
       .def("__iter__",
-           [](muGrid::CcoordOps::DynamicPixels::Enumerator & enumerator) {
+           [](muGrid::CcoordOps::Pixels::Enumerator & enumerator) {
              return py::make_iterator(enumerator.begin(), enumerator.end());
            });
-  py::class_<muGrid::CcoordOps::DynamicPixels>(mod, "DynamicPixels")
-      .def("__len__", &muGrid::CcoordOps::DynamicPixels::size)
+  py::class_<muGrid::CcoordOps::Pixels>(mod, "Pixels")
+      .def("__len__", &muGrid::CcoordOps::Pixels::size)
       .def("__iter__",
-           [](muGrid::CcoordOps::DynamicPixels & pixels) {
+           [](muGrid::CcoordOps::Pixels & pixels) {
              return py::make_iterator(pixels.begin(), pixels.end());
            })
-      .def("enumerate", &muGrid::CcoordOps::DynamicPixels::enumerate);
-  add_Pixels_helper<muGrid::oneD>(mod);
-  add_Pixels_helper<muGrid::twoD>(mod);
-  add_Pixels_helper<muGrid::threeD>(mod);
+      .def("enumerate", &muGrid::CcoordOps::Pixels::enumerate);
 }
 
 void add_unit(py::module & mod) {
@@ -205,7 +192,7 @@ void add_common_mugrid(py::module & mod) {
 
   add_get_cube(mod);
 
-  add_Pixels(mod);
+  add_pixels(mod);
 
   add_unit(mod);
 

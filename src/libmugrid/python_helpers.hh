@@ -69,7 +69,7 @@ namespace muGrid {
         shape.push_back(dim);
         auto nb_subdomain_grid_pts{gfc.get_nb_subdomain_grid_pts_without_ghosts()};
         if (with_ghosts) {
-            nb_subdomain_grid_pts = gfc.get_nb_subdomain_grid_pts();
+            nb_subdomain_grid_pts = gfc.get_nb_subdomain_grid_pts_with_ghosts();
         }
         for (auto &&n: nb_subdomain_grid_pts) {
             shape.push_back(n);
@@ -78,7 +78,7 @@ namespace muGrid {
         const auto &nb_domain_grid_pts{gfc.get_nb_domain_grid_pts()};
         auto subdomain_locations{gfc.get_subdomain_locations_without_ghosts()};
         if (with_ghosts) {
-            subdomain_locations = gfc.get_subdomain_locations();
+            subdomain_locations = gfc.get_subdomain_locations_with_ghosts();
         }
         const auto nb_subdomain_pixels{
             CcoordOps::get_size(nb_subdomain_grid_pts)

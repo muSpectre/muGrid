@@ -167,15 +167,15 @@ void add_convolution_operator_default(py::module &mod) {
                              throw std::runtime_error("Stencil must be 1D, 2D or 3D");
                          }
                          ssize_t nb_operators{1};
-                         if (array.ndim() > nb_dims) {
+                         if (static_cast<size_t>(array.ndim()) > nb_dims) {
                              nb_operators = array.shape(0);
                          }
                          ssize_t nb_quad_pts{1};
-                         if (array.ndim() > nb_dims + 1) {
+                         if (static_cast<size_t>(array.ndim()) > nb_dims + 1) {
                              nb_quad_pts = array.shape(1);
                          }
                          ssize_t nb_nodal_pts{1};
-                         if (array.ndim() > nb_dims + 2) {
+                         if (static_cast<size_t>(array.ndim()) > nb_dims + 2) {
                              nb_nodal_pts = array.shape(2);
                          }
                          Shape_t nb_stencil_pts(nb_dims);

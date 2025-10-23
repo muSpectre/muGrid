@@ -3,13 +3,13 @@ from muGrid import GlobalFieldCollection
 
 # Two dimensional grid
 nb_grid_pts = (11, 12, 13)
-fc = GlobalFieldCollection(nb_grid_pts, sub_pts={'element': 5})
+fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"element": 5})
 
 # Get a tensor-field (for example to represent the strain)
 strain = fc.real_field(
-    'strain',  # name of the field
+    "strain",  # name of the field
     (3, 3),  # shape of components
-    'element'  # sub-point type
+    "element",  # sub-point type
 )
 
 # Fill the field with random numbers

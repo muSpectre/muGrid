@@ -41,9 +41,6 @@
 
 #include "exception.hh"
 #include "grid_common.hh"
-#include "iterators.hh"
-
-#include <utility>
 
 #ifndef SRC_LIBMUGRID_CCOORD_OPERATIONS_HH_
 #define SRC_LIBMUGRID_CCOORD_OPERATIONS_HH_
@@ -51,33 +48,35 @@
 namespace muGrid {
     namespace CcoordOps {
         namespace internal {
-            //! simple helper returning the first argument and ignoring the second
-            template<typename T>
+            //! simple helper returning the first argument and ignoring the
+            //! second
+            template <typename T>
             constexpr T ret(T val, size_t /*dummy*/) {
                 return val;
             }
 
             //! helper to build cubes
-            template<Dim_t Dim, typename T, size_t... I>
-            constexpr std::array<T, Dim> cube_fun(T val, std::index_sequence<I...>) {
+            template <Dim_t Dim, typename T, size_t... I>
+            constexpr std::array<T, Dim> cube_fun(T val,
+                                                  std::index_sequence<I...>) {
                 return std::array<T, Dim>{ret(val, I)...};
             }
 
             //! computes hermitian size according to FFTW
-            template<Dim_t Dim, size_t... I>
-            constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> &nb_grid_pts,
+            template <Dim_t Dim, size_t... I>
+            constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & nb_grid_pts,
                                          std::index_sequence<I...>) {
-                return Ccoord_t<Dim>{
-                    nb_grid_pts.front() / 2 + 1,
-                    nb_grid_pts[I + 1]...
-                };
+                return Ccoord_t<Dim>{nb_grid_pts.front() / 2 + 1,
+                                     nb_grid_pts[I + 1]...};
             }
 
             //! compute the stride in a direction of a column-major grid
-            template<Dim_t Dim>
-            constexpr Index_t col_major_stride(const Ccoord_t<Dim> &nb_grid_pts,
-                                               const size_t index) {
-                static_assert(Dim > 0, "only for positive numbers of dimensions");
+            template <Dim_t Dim>
+            constexpr Index_t
+            col_major_stride(const Ccoord_t<Dim> & nb_grid_pts,
+                             const size_t index) {
+                static_assert(Dim > 0,
+                              "only for positive numbers of dimensions");
 
                 Index_t ret_val{1};
                 for (size_t i{0}; i < index; ++i) {
@@ -87,10 +86,12 @@ namespace muGrid {
             }
 
             //! compute the stride in a direction of a row-major grid
-            template<Dim_t Dim>
-            constexpr Index_t row_major_stride(const Ccoord_t<Dim> &nb_grid_pts,
-                                               const size_t index) {
-                static_assert(Dim > 0, "only for positive numbers of dimensions");
+            template <Dim_t Dim>
+            constexpr Index_t
+            row_major_stride(const Ccoord_t<Dim> & nb_grid_pts,
+                             const size_t index) {
+                static_assert(Dim > 0,
+                              "only for positive numbers of dimensions");
 
                 Index_t ret_val{1};
                 for (size_t i{Dim - 1}; i > index; --i) {
@@ -100,60 +101,57 @@ namespace muGrid {
             }
 
             //! get all strides from a column-major grid (helper function)
-            template<Dim_t Dim, size_t... I>
+            template <Dim_t Dim, size_t... I>
             constexpr Ccoord_t<Dim>
-            compute_col_major_strides(const Ccoord_t<Dim> &nb_grid_pts,
+            compute_col_major_strides(const Ccoord_t<Dim> & nb_grid_pts,
                                       std::index_sequence<I...>) {
                 return Ccoord_t<Dim>{col_major_stride<Dim>(nb_grid_pts, I)...};
             }
 
             //! get all strides from a row-major grid (helper function)
-            template<Dim_t Dim, size_t... I>
+            template <Dim_t Dim, size_t... I>
             constexpr Ccoord_t<Dim>
-            compute_row_major_strides(const Ccoord_t<Dim> &nb_grid_pts,
+            compute_row_major_strides(const Ccoord_t<Dim> & nb_grid_pts,
                                       std::index_sequence<I...>) {
                 return Ccoord_t<Dim>{row_major_stride<Dim>(nb_grid_pts, I)...};
             }
-        } // namespace internal
+        }  // namespace internal
 
         //! modulo operator that can handle negative values
-        template<typename T>
-        inline T modulo(const T &a, const T &b) {
+        template <typename T>
+        T modulo(const T & a, const T & b) {
             return (b + (a % b)) % b;
         }
 
         //! returns a grid of equal number of grid points in each direction
-        template<size_t Dim, typename T>
+        template <size_t Dim, typename T>
         constexpr std::array<T, Dim> get_cube(T nb_grid_pts) {
             return internal::cube_fun<Dim>(nb_grid_pts,
                                            std::make_index_sequence<Dim>{});
         }
 
         //! returns a grid of equal number of grid points in each direction
-        template<size_t MaxDim = threeD>
-        DynCcoord<MaxDim> get_cube(const Dim_t &dim, const Index_t &nb_grid_pts) {
+        template <size_t MaxDim = fourD>  // 4 to ease alignment
+        DynCcoord<MaxDim> get_cube(const Dim_t & dim,
+                                   const Index_t & nb_grid_pts) {
             switch (dim) {
-                case oneD: {
-                    return DynCcoord<MaxDim>{get_cube<oneD>(nb_grid_pts)};
-                    break;
-                }
-                case twoD: {
-                    return DynCcoord<MaxDim>{get_cube<twoD>(nb_grid_pts)};
-                    break;
-                }
-                case threeD: {
-                    return DynCcoord<MaxDim>{get_cube<threeD>(nb_grid_pts)};
-                    break;
-                }
-                default:
-                    throw RuntimeError("Unknown dimension");
-                    break;
+            case oneD: {
+                return DynCcoord<MaxDim>{get_cube<oneD>(nb_grid_pts)};
+            }
+            case twoD: {
+                return DynCcoord<MaxDim>{get_cube<twoD>(nb_grid_pts)};
+            }
+            case threeD: {
+                return DynCcoord<MaxDim>{get_cube<threeD>(nb_grid_pts)};
+            }
+            default:
+                throw RuntimeError("Unknown dimension");
             }
         }
 
         //! return physical vector of a cell of cubic pixels
-        template<size_t Dim>
-        Eigen::Matrix<Real, Dim, 1> get_vector(const Ccoord_t<Dim> &ccoord,
+        template <size_t Dim>
+        Eigen::Matrix<Real, Dim, 1> get_vector(const Ccoord_t<Dim> & ccoord,
                                                Real pix_size = 1.) {
             Eigen::Matrix<Real, Dim, 1> retval;
             for (size_t i{0}; i < Dim; ++i) {
@@ -163,9 +161,9 @@ namespace muGrid {
         }
 
         //! return physical vector of a cell of general pixels
-        template<size_t Dim, typename T>
+        template <size_t Dim, typename T>
         Eigen::Matrix<T, Dim, 1>
-        get_vector(const Ccoord_t<Dim> &ccoord,
+        get_vector(const Ccoord_t<Dim> & ccoord,
                    Eigen::Matrix<T, Dim_t(Dim), 1> pix_size) {
             Eigen::Matrix<T, Dim, 1> retval{pix_size};
             for (size_t i{0}; i < Dim; ++i) {
@@ -175,9 +173,10 @@ namespace muGrid {
         }
 
         //! return physical vector of a cell of general pixels
-        template<size_t Dim, typename T>
-        Eigen::Matrix<T, Dim, 1> get_vector(const Ccoord_t<Dim> &ccoord,
-                                            const std::array<T, Dim> &pix_size) {
+        template <size_t Dim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const Ccoord_t<Dim> & ccoord,
+                   const std::array<T, Dim> & pix_size) {
             Eigen::Matrix<T, Dim, 1> retval{};
             for (size_t i{0}; i < Dim; ++i) {
                 retval[i] = pix_size[i] * ccoord[i];
@@ -186,9 +185,10 @@ namespace muGrid {
         }
 
         //! return physical vector of a cell of general pixels
-        template<size_t Dim, size_t MaxDim, typename T>
-        Eigen::Matrix<T, Dim, 1> get_vector(const Ccoord_t<Dim> &ccoord,
-                                            const DynCcoord<MaxDim, T> &pix_size) {
+        template <size_t Dim, size_t MaxDim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const Ccoord_t<Dim> & ccoord,
+                   const DynCcoord<MaxDim, T> & pix_size) {
             assert(Dim == pix_size.get_dim());
             Eigen::Matrix<T, Dim, 1> retval{};
             for (size_t i{0}; i < Dim; ++i) {
@@ -197,10 +197,11 @@ namespace muGrid {
             return retval;
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! return physical vector of a cell of cubic pixels
-        template<size_t Dim>
-        Eigen::Matrix<Real, Dim, 1> get_vector(const DynCcoord_t &ccoord,
+        template <size_t Dim>
+        Eigen::Matrix<Real, Dim, 1> get_vector(const IntCoord_t & ccoord,
                                                Real pix_size = 1.) {
             assert(Dim == ccoord.get_dim());
             Eigen::Matrix<Real, Dim, 1> retval;
@@ -210,11 +211,12 @@ namespace muGrid {
             return retval;
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! return physical vector of a cell of general pixels
-        template<size_t Dim, typename T>
+        template <size_t Dim, typename T>
         Eigen::Matrix<T, Dim, 1>
-        get_vector(const DynCcoord_t ccoord,
+        get_vector(const IntCoord_t ccoord,
                    Eigen::Matrix<T, Dim_t(Dim), 1> pix_size) {
             assert(Dim == ccoord.get_dim());
             Eigen::Matrix<T, Dim, 1> retval = pix_size;
@@ -224,11 +226,13 @@ namespace muGrid {
             return retval;
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! return physical vector of a cell of general pixels
-        template<size_t Dim, typename T>
-        Eigen::Matrix<T, Dim, 1> get_vector(const DynCcoord_t ccoord,
-                                            const std::array<T, Dim> &pix_size) {
+        template <size_t Dim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const IntCoord_t ccoord,
+                   const std::array<T, Dim> & pix_size) {
             assert(Dim == ccoord.get_dim());
             Eigen::Matrix<T, Dim, 1> retval{};
             for (size_t i{0}; i < Dim; ++i) {
@@ -237,11 +241,13 @@ namespace muGrid {
             return retval;
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! return physical vector of a cell of general pixels
-        template<size_t Dim, size_t MaxDim, typename T>
-        Eigen::Matrix<T, Dim, 1> get_vector(const DynCcoord_t ccoord,
-                                            const DynCcoord<MaxDim, T> &pix_size) {
+        template <size_t Dim, size_t MaxDim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const IntCoord_t ccoord,
+                   const DynCcoord<MaxDim, T> & pix_size) {
             assert(Dim == ccoord.get_dim());
             assert(Dim == pix_size.get_dim());
             Eigen::Matrix<T, Dim, 1> retval{};
@@ -251,106 +257,104 @@ namespace muGrid {
             return retval;
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a column-major grid
-        template<size_t Dim>
+        template <size_t Dim>
         constexpr Ccoord_t<Dim>
-        get_col_major_strides(const Ccoord_t<Dim> &nb_grid_pts) {
+        get_col_major_strides(const Ccoord_t<Dim> & nb_grid_pts) {
             return internal::compute_col_major_strides<Dim>(
                 nb_grid_pts, std::make_index_sequence<Dim>{});
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a column-major grid
-        template<size_t MaxDim>
+        template <size_t MaxDim>
         constexpr DynCcoord<MaxDim>
-        get_col_major_strides(const DynCcoord<MaxDim> &nb_grid_pts) {
+        get_col_major_strides(const DynCcoord<MaxDim> & nb_grid_pts) {
             switch (nb_grid_pts.get_dim()) {
-                case oneD: {
-                    return DynCcoord<MaxDim>{
-                        internal::compute_col_major_strides<oneD>(
-                            nb_grid_pts.template get<oneD>(),
-                            std::make_index_sequence<oneD>{})
-                    };
-                    break;
-                }
-                case twoD: {
-                    return DynCcoord<MaxDim>{
-                        internal::compute_col_major_strides<twoD>(
-                            nb_grid_pts.template get<twoD>(),
-                            std::make_index_sequence<twoD>{})
-                    };
-                    break;
-                }
-                case threeD: {
-                    return DynCcoord<MaxDim>{
-                        internal::compute_col_major_strides<threeD>(
-                            nb_grid_pts.template get<threeD>(),
-                            std::make_index_sequence<threeD>{})
-                    };
-                    break;
-                }
-                default:
-                    throw RuntimeError(
-                        "unforeseen dimensionality, is it really necessary to have other "
-                        "dimensions than 1, 2, and 3?");
-                    break;
+            case oneD: {
+                return DynCcoord<MaxDim>{
+                    internal::compute_col_major_strides<oneD>(
+                        nb_grid_pts.template get<oneD>(),
+                        std::make_index_sequence<oneD>{})};
+                break;
+            }
+            case twoD: {
+                return DynCcoord<MaxDim>{
+                    internal::compute_col_major_strides<twoD>(
+                        nb_grid_pts.template get<twoD>(),
+                        std::make_index_sequence<twoD>{})};
+                break;
+            }
+            case threeD: {
+                return DynCcoord<MaxDim>{
+                    internal::compute_col_major_strides<threeD>(
+                        nb_grid_pts.template get<threeD>(),
+                        std::make_index_sequence<threeD>{})};
+                break;
+            }
+            default:
+                throw RuntimeError("unforeseen dimensionality, is it really "
+                                   "necessary to have other "
+                                   "dimensions than 1, 2, and 3?");
+                break;
             }
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a row-major grid
-        template<size_t Dim>
+        template <size_t Dim>
         constexpr Ccoord_t<Dim>
-        get_row_major_strides(const Ccoord_t<Dim> &nb_grid_pts) {
+        get_row_major_strides(const Ccoord_t<Dim> & nb_grid_pts) {
             return internal::compute_row_major_strides<Dim>(
                 nb_grid_pts, std::make_index_sequence<Dim>{});
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a row-major grid
-        template<size_t MaxDim>
+        template <size_t MaxDim>
         constexpr DynCcoord<MaxDim>
-        get_row_major_strides(const DynCcoord<MaxDim> &nb_grid_pts) {
+        get_row_major_strides(const DynCcoord<MaxDim> & nb_grid_pts) {
             switch (nb_grid_pts.get_dim()) {
-                case oneD: {
-                    return DynCcoord<MaxDim>{
-                        internal::compute_row_major_strides<oneD>(
-                            nb_grid_pts.template get<oneD>(),
-                            std::make_index_sequence<oneD>{})
-                    };
-                    break;
-                }
-                case twoD: {
-                    return DynCcoord<MaxDim>{
-                        internal::compute_row_major_strides<twoD>(
-                            nb_grid_pts.template get<twoD>(),
-                            std::make_index_sequence<twoD>{})
-                    };
-                    break;
-                }
-                case threeD: {
-                    return DynCcoord<MaxDim>{
-                        internal::compute_row_major_strides<threeD>(
-                            nb_grid_pts.template get<threeD>(),
-                            std::make_index_sequence<threeD>{})
-                    };
-                    break;
-                }
-                default:
-                    throw RuntimeError(
-                        "unforeseen dimensionality, is it really necessary to have other "
-                        "dimensions than 1, 2, and 3?");
-                    break;
+            case oneD: {
+                return DynCcoord<MaxDim>{
+                    internal::compute_row_major_strides<oneD>(
+                        nb_grid_pts.template get<oneD>(),
+                        std::make_index_sequence<oneD>{})};
+                break;
+            }
+            case twoD: {
+                return DynCcoord<MaxDim>{
+                    internal::compute_row_major_strides<twoD>(
+                        nb_grid_pts.template get<twoD>(),
+                        std::make_index_sequence<twoD>{})};
+                break;
+            }
+            case threeD: {
+                return DynCcoord<MaxDim>{
+                    internal::compute_row_major_strides<threeD>(
+                        nb_grid_pts.template get<threeD>(),
+                        std::make_index_sequence<threeD>{})};
+                break;
+            }
+            default:
+                throw RuntimeError("unforeseen dimensionality, is it really "
+                                   "necessary to have other "
+                                   "dimensions than 1, 2, and 3?");
+                break;
             }
         }
 
         //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts
-        template<size_t Dim>
-        constexpr Ccoord_t<Dim> get_ccoord(const Ccoord_t<Dim> &nb_grid_pts,
-                                           const Ccoord_t<Dim> &locations,
-                                           Index_t index) {
+        template <size_t Dim>
+        constexpr Ccoord_t<Dim> get_coord(const Ccoord_t<Dim> & nb_grid_pts,
+                                          const Ccoord_t<Dim> & locations,
+                                          Index_t index) {
             Ccoord_t<Dim> retval{{0}};
             Index_t factor{1};
             for (size_t i{0}; i < Dim; ++i) {
@@ -364,32 +368,33 @@ namespace muGrid {
 
         //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts
-        template<size_t Dim, size_t... I>
-        constexpr Ccoord_t<Dim> get_ccoord(const Ccoord_t<Dim> &nb_grid_pts,
-                                           const Ccoord_t<Dim> &locations,
-                                           Index_t index,
-                                           std::index_sequence<I...>) {
-            Ccoord_t<Dim> ccoord{get_ccoord<Dim>(nb_grid_pts, locations, index)};
+        template <size_t Dim, size_t... I>
+        constexpr Ccoord_t<Dim> get_coord(const Ccoord_t<Dim> & nb_grid_pts,
+                                          const Ccoord_t<Dim> & locations,
+                                          Index_t index,
+                                          std::index_sequence<I...>) {
+            Ccoord_t<Dim> ccoord{get_coord<Dim>(nb_grid_pts, locations, index)};
             return Ccoord_t<Dim>({ccoord[I]...});
         }
 
         //------------------------------------------------------------------------//
-        //! get the i-th pixel in a grid of size nb_grid_pts - specialization for
-        //! one dimension
-        template<size_t... I>
-        constexpr Ccoord_t<1> get_ccoord(const Ccoord_t<1> &nb_grid_pts,
-                                         const Ccoord_t<1> &locations,
-                                         Index_t index, std::index_sequence<I...>) {
-            return Ccoord_t<1>({get_ccoord<1>(nb_grid_pts, locations, index)});
+        //! get the i-th pixel in a grid of size nb_grid_pts - specialization
+        //! for one dimension
+        template <size_t... I>
+        constexpr Ccoord_t<1> get_coord(const Ccoord_t<1> & nb_grid_pts,
+                                        const Ccoord_t<1> & locations,
+                                        Index_t index,
+                                        std::index_sequence<I...>) {
+            return Ccoord_t<1>({get_coord<1>(nb_grid_pts, locations, index)});
         }
 
         //! compute the order of the axes given strides, fastest first
-        template<class T>
-        T compute_axes_order(const T &shape, const T &strides) {
+        template <class T>
+        T compute_axes_order(const T & shape, const T & strides) {
             T axes_order(shape.size());
             std::iota(axes_order.begin(), axes_order.end(), 0);
             std::sort(axes_order.begin(), axes_order.end(),
-                      [&shape, &strides](const Dim_t &a, const Dim_t &b) {
+                      [&shape, &strides](const Dim_t & a, const Dim_t & b) {
                           return (strides[a] == 1 and strides[b] == 1 and
                                   shape[a] < shape[b]) or
                                  strides[a] < strides[b];
@@ -398,13 +403,13 @@ namespace muGrid {
         }
 
         //! compute the order of the axes given strides, fastest first
-        template<size_t dim>
-        Ccoord_t<dim> compute_axes_order(const Ccoord_t<dim> &shape,
-                                         const Ccoord_t<dim> &strides) {
+        template <size_t dim>
+        Ccoord_t<dim> compute_axes_order(const Ccoord_t<dim> & shape,
+                                         const Ccoord_t<dim> & strides) {
             Ccoord_t<dim> axes_order;
             std::iota(axes_order.begin(), axes_order.end(), 0);
             std::sort(axes_order.begin(), axes_order.end(),
-                      [&shape, &strides](const Dim_t &a, const Dim_t &b) {
+                      [&shape, &strides](const Dim_t & a, const Dim_t & b) {
                           return (strides[a] == 1 and strides[b] == 1 and
                                   shape[a] < shape[b]) or
                                  strides[a] < strides[b];
@@ -412,14 +417,12 @@ namespace muGrid {
             return axes_order;
         }
 
-        //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
-        template<size_t dim>
-        Ccoord_t<dim> get_ccoord_from_axes_order(const Ccoord_t<dim> &nb_grid_pts,
-                                                 const Ccoord_t<dim> &locations,
-                                                 const Ccoord_t<dim> &strides,
-                                                 const Ccoord_t<dim> &axes_order,
-                                                 Index_t index) {
+        template <size_t dim>
+        Ccoord_t<dim> get_coord_from_axes_order(
+            const Ccoord_t<dim> & nb_grid_pts, const Ccoord_t<dim> & locations,
+            const Ccoord_t<dim> & strides, const Ccoord_t<dim> & axes_order,
+            Index_t index) {
             Ccoord_t<dim> retval{{nb_grid_pts[0]}};
             for (Index_t i{dim - 1}; i >= 0; --i) {
                 Index_t cur_coord{index / strides[axes_order[i]]};
@@ -433,29 +436,39 @@ namespace muGrid {
         }
 
         //! get the i-th pixel in a grid of size nb_grid_pts, with strides
-        template<size_t dim>
-        Ccoord_t<dim> get_ccoord_from_strides(const Ccoord_t<dim> &nb_grid_pts,
-                                              const Ccoord_t<dim> &locations,
-                                              const Ccoord_t<dim> &strides,
-                                              Index_t index) {
-            return get_ccoord_from_axes_order(
+        template <size_t dim>
+        Ccoord_t<dim> get_coord_from_strides(const Ccoord_t<dim> & nb_grid_pts,
+                                             const Ccoord_t<dim> & locations,
+                                             const Ccoord_t<dim> & strides,
+                                             Index_t index) {
+            return get_coord_from_axes_order(
                 nb_grid_pts, locations, strides,
                 compute_axes_order(nb_grid_pts, strides), index);
         }
 
-        //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
-        template<class T>
-        T get_ccoord_from_axes_order(const T &nb_grid_pts, const T &locations,
-                                     const T &strides, const T &axes_order,
-                                     Index_t index) {
-            auto &dim{nb_grid_pts.get_dim()};
+        //! and location
+        template <class T>
+        T get_coord0_from_axes_order(const T & nb_grid_pts, const T & strides,
+                                     const T & axes_order, Index_t index) {
+            auto dim{nb_grid_pts.get_dim()};
             T retval(dim);
             for (Index_t i{dim - 1}; i >= 0; --i) {
                 Index_t cur_coord{index / strides[axes_order[i]]};
                 retval[axes_order[i]] = cur_coord;
                 index -= cur_coord * strides[axes_order[i]];
             }
+            return retval;
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        template <class T>
+        T get_coord_from_axes_order(const T & nb_grid_pts, const T & locations,
+                                    const T & strides, const T & axes_order,
+                                    Index_t index) {
+            auto dim{nb_grid_pts.get_dim()};
+            auto retval{get_coord0_from_axes_order(nb_grid_pts, strides,
+                                                   axes_order, index)};
             for (Dim_t i{0}; i < dim; ++i) {
                 retval[i] += locations[i];
             }
@@ -463,20 +476,20 @@ namespace muGrid {
         }
 
         //! get the i-th pixel in a grid of size nb_grid_pts, with strides
-        template<class T>
-        T get_ccoord_from_strides(const T &nb_grid_pts, const T &locations,
-                                  const T &strides, Index_t index) {
-            return get_ccoord_from_axes_order(
+        template <class T>
+        T get_coord_from_strides(const T & nb_grid_pts, const T & locations,
+                                 const T & strides, Index_t index) {
+            return get_coord_from_axes_order(
                 nb_grid_pts, locations, strides,
                 compute_axes_order(nb_grid_pts, strides), index);
         }
 
         //------------------------------------------------------------------------//
         //! get the linear index of a pixel in a column-major grid
-        template<size_t Dim>
-        constexpr Dim_t get_index(const Ccoord_t<Dim> &nb_grid_pts,
-                                  const Ccoord_t<Dim> &locations,
-                                  const Ccoord_t<Dim> &ccoord) {
+        template <size_t Dim>
+        constexpr Dim_t get_index(const Ccoord_t<Dim> & nb_grid_pts,
+                                  const Ccoord_t<Dim> & locations,
+                                  const Ccoord_t<Dim> & ccoord) {
             Dim_t retval{0};
             Dim_t factor{1};
             for (size_t i{0}; i < Dim; ++i) {
@@ -489,40 +502,41 @@ namespace muGrid {
         }
 
         //! get the linear index of a pixel in a column-major grid
-        Dim_t get_index(const DynCcoord_t &nb_grid_pts,
-                        const DynCcoord_t &locations, const DynCcoord_t &ccoord);
+        Dim_t get_index(const IntCoord_t & nb_grid_pts,
+                        const IntCoord_t & locations,
+                        const IntCoord_t & ccoord);
 
         //-----------------------------------------------------------------------//
-        //! these functions can be used whenever it is necessary to calculate the
-        //! volume of a cell or each pixels of the cell
-        template<size_t MaxDim, typename T>
-        T compute_volume(const DynCcoord<MaxDim, T> &lengths) {
+        //! these functions can be used whenever it is necessary to calculate
+        //! the volume of a cell or each pixels of the cell
+        template <size_t MaxDim, typename T>
+        T compute_volume(const DynCcoord<MaxDim, T> & lengths) {
             T vol{};
             vol++;
-            for (auto &&length: lengths) {
+            for (auto && length : lengths) {
                 vol *= length;
             }
             return vol;
         }
 
-        //! these functions can be used whenever it is necessary to calculate the
-        //! volume of a cell or each pixels of the cell
-        template<typename T>
-        T compute_volume(const std::vector<T> &lengths) {
+        //! these functions can be used whenever it is necessary to calculate
+        //! the volume of a cell or each pixels of the cell
+        template <typename T>
+        T compute_volume(const std::vector<T> & lengths) {
             T vol{};
             vol++;
-            for (auto &&length: lengths) {
+            for (auto && length : lengths) {
                 vol *= length;
             }
             return vol;
         }
 
-        Real compute_pixel_volume(const DynCcoord_t &nb_grid_pts,
-                                  const DynRcoord_t &lenghts);
+        Real compute_pixel_volume(const IntCoord_t & nb_grid_pts,
+                                  const RealCoord_t & lengths);
 
         //! check whether strides represent a contiguous buffer
-        template<class T>
-        bool is_buffer_contiguous(const T &nb_grid_pts, const T &strides) {
+        template <class T>
+        bool is_buffer_contiguous(const T & nb_grid_pts, const T & strides) {
             Index_t dim{static_cast<Index_t>(nb_grid_pts.size())};
             if (dim == 0) {
                 return true;
@@ -531,7 +545,8 @@ namespace muGrid {
                 return true;
             }
             if (static_cast<Index_t>(strides.size()) != dim) {
-                throw RuntimeError("Mismatch between dimensions of nb_grid_pts and "
+                throw RuntimeError(
+                    "Mismatch between dimensions of nb_grid_pts and "
                     "strides");
             }
             auto axes{compute_axes_order(nb_grid_pts, strides)};
@@ -545,42 +560,44 @@ namespace muGrid {
         }
 
         //! get the linear index of a pixel given a set of strides
-        template<size_t Dim>
-        constexpr Index_t get_index_from_strides(const Ccoord_t<Dim> &strides,
-                                                 const Ccoord_t<Dim> &locations,
-                                                 const Ccoord_t<Dim> &ccoord) {
+        template <size_t Dim>
+        constexpr Index_t
+        get_index_from_strides(const Ccoord_t<Dim> & strides,
+                               const Ccoord_t<Dim> & locations,
+                               const Ccoord_t<Dim> & ccoord) {
             Index_t retval{0};
-            for (const auto &tup: akantu::zip(strides, locations, ccoord)) {
-                const auto &stride{std::get<0>(tup)};
-                const auto &location{std::get<1>(tup)};
-                const auto &coord{std::get<2>(tup)};
+            for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
+                const auto & stride{std::get<0>(tup)};
+                const auto & location{std::get<1>(tup)};
+                const auto & coord{std::get<2>(tup)};
                 retval += stride * (coord - location);
             }
             return retval;
         }
 
         //! get the linear index of a pixel given a set of strides
-        template<class T>
-        Index_t get_index_from_strides(const T &strides, const T &locations,
-                                       const T &ccoord) {
+        template <class T>
+        Index_t get_index_from_strides(const T & strides, const T & locations,
+                                       const T & ccoord) {
             const auto dim{strides.size()};
             if (locations.size() != dim) {
                 std::stringstream error{};
                 error << "Dimension mismatch between strides (dim = " << dim
-                        << ") and locations (dim = " << locations.get_dim() << ")";
+                      << ") and locations (dim = " << locations.get_dim()
+                      << ")";
                 throw RuntimeError(error.str());
             }
             if (ccoord.size() != dim) {
                 std::stringstream error{};
                 error << "Dimension mismatch between strides (dim = " << dim
-                        << ") and ccoord (dim = " << ccoord.get_dim() << ")";
+                      << ") and ccoord (dim = " << ccoord.get_dim() << ")";
                 throw RuntimeError(error.str());
             }
             Index_t retval{0};
-            for (const auto &tup: akantu::zip(strides, locations, ccoord)) {
-                const auto &stride{std::get<0>(tup)};
-                const auto &location{std::get<1>(tup)};
-                const auto &coord{std::get<2>(tup)};
+            for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
+                const auto & stride{std::get<0>(tup)};
+                const auto & location{std::get<1>(tup)};
+                const auto & coord{std::get<2>(tup)};
                 retval += stride * (coord - location);
             }
             return retval;
@@ -588,8 +605,8 @@ namespace muGrid {
 
         //-----------------------------------------------------------------------//
         //! get the number of pixels in a grid
-        template<size_t Dim>
-        constexpr size_t get_size(const Ccoord_t<Dim> &nb_grid_pts) {
+        template <size_t Dim>
+        constexpr size_t get_size(const Ccoord_t<Dim> & nb_grid_pts) {
             size_t retval{1};
             for (size_t i{0}; i < Dim; ++i) {
                 retval *= nb_grid_pts[i];
@@ -599,8 +616,8 @@ namespace muGrid {
 
         //-----------------------------------------------------------------------//
         //! get the number of pixels in a grid
-        template<size_t MaxDim>
-        size_t get_size(const DynCcoord<MaxDim> &nb_grid_pts) {
+        template <size_t MaxDim>
+        size_t get_size(const DynCcoord<MaxDim> & nb_grid_pts) {
             size_t retval{1};
             Dim_t dim{nb_grid_pts.get_dim()};
             for (Dim_t i{0}; i < dim; ++i) {
@@ -611,91 +628,90 @@ namespace muGrid {
 
         //-----------------------------------------------------------------------//
         //! get the buffer size required to store a grid given its strides
-        template<size_t dim>
-        constexpr size_t get_buffer_size(const Ccoord_t<dim> &nb_grid_pts,
-                                         const Ccoord_t<dim> &strides) {
+        template <size_t dim>
+        constexpr size_t get_buffer_size(const Ccoord_t<dim> & nb_grid_pts,
+                                         const Ccoord_t<dim> & strides) {
             size_t buffer_size{0};
-            // We need to loop over the dimensions because the largest stride can
-            // occur anywhere. (It depends on the storage order.)
+            // We need to loop over the dimensions because the largest stride
+            // can occur anywhere. (It depends on the storage order.)
             for (size_t i{0}; i < dim; ++i) {
-                buffer_size = std::max(
-                    buffer_size, static_cast<size_t>(nb_grid_pts[i] * strides[i]));
+                buffer_size =
+                    std::max(buffer_size,
+                             static_cast<size_t>(nb_grid_pts[i] * strides[i]));
             }
             return buffer_size;
         }
 
         //-----------------------------------------------------------------------//
         //! get the buffer size required to store a grid given its strides
-        size_t get_buffer_size(const DynCcoord_t &nb_grid_pts,
-                               const DynCcoord_t &strides);
+        size_t get_buffer_size(const IntCoord_t & nb_grid_pts,
+                               const IntCoord_t & strides);
 
         //-----------------------------------------------------------------------//
         //! get the buffer size required to store a grid given its strides
-        size_t get_buffer_size(const Shape_t &nb_grid_pts,
-                               const Shape_t &strides);
-
-        //! forward declaration
-        template<size_t Dim>
-        class Pixels;
+        size_t get_buffer_size(const Shape_t & nb_grid_pts,
+                               const Shape_t & strides);
 
         /**
          * Iteration over square (or cubic) discretisation grids. Duplicates
          * capabilities of `muGrid::CcoordOps::Pixels` without needing to be
          * templated with the spatial dimension. Iteration is slower, though.
          */
-        class DynamicPixels {
-        public:
-            DynamicPixels();
+        class Pixels {
+           public:
+            Pixels();
 
-            //! Constructor with default strides (column-major pixel storage order)
-            explicit DynamicPixels(
-                const DynCcoord_t &nb_subdomain_grid_pts,
-                const DynCcoord_t &subdomain_locations = DynCcoord_t{});
+            //! Constructor with default strides (column-major pixel storage
+            //! order)
+            explicit Pixels(
+                const IntCoord_t & nb_subdomain_grid_pts,
+                const IntCoord_t & subdomain_locations = IntCoord_t{});
 
             /**
-             * Constructor with custom strides (any, including partially transposed
-             * pixel storage order)
+             * Constructor with custom strides (any, including partially
+             * transposed pixel storage order)
              */
-            DynamicPixels(const DynCcoord_t &nb_subdomain_grid_pts,
-                          const DynCcoord_t &subdomain_locations,
-                          const DynCcoord_t &strides);
+            Pixels(const IntCoord_t & nb_subdomain_grid_pts,
+                   const IntCoord_t & subdomain_locations,
+                   const IntCoord_t & strides);
 
             //! Constructor with default strides from statically sized coords
-            template<size_t Dim>
-            explicit DynamicPixels(
-                const Ccoord_t<Dim> &nb_subdomain_grid_pts,
-                const Ccoord_t<Dim> &subdomain_locations = Ccoord_t<Dim>{});
+            template <size_t Dim>
+            explicit Pixels(
+                const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                const Ccoord_t<Dim> & subdomain_locations = Ccoord_t<Dim>{});
 
             //! Constructor with custom strides from statically sized coords
-            template<size_t Dim>
-            DynamicPixels(const Ccoord_t<Dim> &nb_subdomain_grid_pts,
-                          const Ccoord_t<Dim> &subdomain_locations,
-                          const Ccoord_t<Dim> &strides);
+            template <size_t Dim>
+            Pixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
+                   const Ccoord_t<Dim> & subdomain_locations,
+                   const Ccoord_t<Dim> & strides);
 
             //! Copy constructor
-            DynamicPixels(const DynamicPixels &other) = default;
+            Pixels(const Pixels & other) = default;
 
             //! Move constructor
-            DynamicPixels(DynamicPixels &&other) = default;
+            Pixels(Pixels && other) = default;
 
             //! Destructor
-            virtual ~DynamicPixels() = default;
+            virtual ~Pixels() = default;
 
             //! Copy assignment operator
-            DynamicPixels &operator=(const DynamicPixels &other) = default;
+            Pixels & operator=(const Pixels & other) = default;
 
             //! Move assignment operator
-            DynamicPixels &operator=(DynamicPixels &&other) = default;
+            Pixels & operator=(Pixels && other) = default;
 
-            //! evaluate and return the linear index corresponding to dynamic `ccoord`
-            Index_t get_index(const DynCcoord_t &ccoord) const {
-                return get_index_from_strides(this->strides, this->subdomain_locations,
-                                              ccoord);
+            //! evaluate and return the linear index corresponding to dynamic
+            //! `ccoord`
+            Index_t get_index(const IntCoord_t & ccoord) const {
+                return get_index_from_strides(
+                    this->strides, this->subdomain_locations, ccoord);
             }
 
             //! evaluate and return the linear index corresponding to `ccoord`
-            template<size_t Dim>
-            Index_t get_index(const Ccoord_t<Dim> &ccoord) const {
+            template <size_t Dim>
+            Index_t get_index(const Ccoord_t<Dim> & ccoord) const {
                 if (this->dim != Dim) {
                     throw RuntimeError("dimension mismatch");
                 }
@@ -705,362 +721,227 @@ namespace muGrid {
             }
 
             //! return coordinates of the i-th pixel
-            DynCcoord_t get_ccoord(const Index_t &index) const {
-                return get_ccoord_from_axes_order(
+            IntCoord_t get_coord(const Index_t & index) const {
+                return get_coord_from_axes_order(
                     this->nb_subdomain_grid_pts, this->subdomain_locations,
                     this->strides, this->axes_order, index);
             }
 
-            DynCcoord_t get_neighbour(const DynCcoord_t &ccoord,
-                                      const DynCcoord_t &offset) const {
-                return modulo(ccoord + offset - this->subdomain_locations, this->nb_subdomain_grid_pts) +
+            //! return coordinates of the i-th pixel, with zero as location
+            IntCoord_t get_coord0(const Index_t & index) const {
+                return get_coord0_from_axes_order(this->nb_subdomain_grid_pts,
+                                                  this->strides,
+                                                  this->axes_order, index);
+            }
+
+            IntCoord_t get_neighbour(const IntCoord_t & ccoord,
+                                     const IntCoord_t & offset) const {
+                return modulo(ccoord + offset - this->subdomain_locations,
+                              this->nb_subdomain_grid_pts) +
                        this->subdomain_locations;
             }
 
             /**
-             * return a reference to the Pixels object cast into a statically
-             * dimensioned grid. the statically dimensioned version duplicates
-             * `muGrid::Ccoordops::DynamicPixels`'s capabilities, but iterates much
-             * more efficiently.
+             * Iterator class for `muSpectre::Pixels`
              */
-            template<size_t Dim>
-            const Pixels<Dim> &get_dimensioned_pixels() const;
+            class iterator {
+               public:
+                //! stl
+                using value_type = IntCoord_t;
+                using const_value_type = const value_type;  //!< stl conformance
+                using pointer = value_type *;               //!< stl conformance
+                using difference_type = std::ptrdiff_t;     //!< stl conformance
+                using iterator_category = std::forward_iterator_tag;
+                //!< stl
+                //!< conformance
 
-            class iterator;
+                //! constructor
+                iterator(const Pixels & pixels, Size_t index)
+                    : pixels{pixels}, coord0{pixels.get_coord0(index)} {}
+
+                //! Default constructor
+                iterator() = delete;
+
+                //! Copy constructor
+                iterator(const iterator & other) = default;
+
+                //! Move constructor
+                iterator(iterator && other) = default;
+
+                //! Destructor
+                ~iterator() = default;
+
+                //! Copy assignment operator
+                iterator & operator=(const iterator & other) = delete;
+
+                //! Move assignment operator
+                iterator & operator=(iterator && other) = delete;
+
+                //! dereferencing
+                value_type operator*() const {
+                    return this->pixels.subdomain_locations + this->coord0;
+                }
+
+                //! pre-increment
+                iterator & operator++() {
+                    Index_t axis{this->pixels.axes_order[0]};
+                    // Increase fastest index
+                    ++this->coord0[axis];
+                    // Check whether coordinate is out of bounds
+                    Index_t aindex{0};
+                    while (this->coord0[axis] >=
+                               this->pixels.nb_subdomain_grid_pts[axis] &&
+                           aindex < this->pixels.dim - 1) {
+                        this->coord0[axis] = 0;
+                        // Get next fastest axis
+                        axis = this->pixels.axes_order[++aindex];
+                        ++this->coord0[axis];
+                    }
+                    return *this;
+                }
+
+                //! inequality
+                bool operator!=(const iterator & other) const {
+                    return this->coord0 != other.coord0;
+                }
+
+                //! equality
+                bool operator==(const iterator & other) const {
+                    return not(*this != other);
+                }
+
+               protected:
+                const Pixels & pixels;  //!< ref to pixels in cell
+                IntCoord_t coord0;      //!< coordinate of current pixel
+            };
 
             //! stl conformance
-            iterator begin() const;
+            iterator begin() const { return iterator(*this, 0); }
 
             //! stl conformance
-            iterator end() const;
+            iterator end() const { return iterator(*this, this->size()); }
 
             //! stl conformance
-            size_t size() const;
+            size_t size() const {
+                return get_size(this->nb_subdomain_grid_pts);
+            }
 
             //! return spatial dimension
-            const Dim_t &get_dim() const { return this->dim; }
+            Dim_t get_dim() const { return this->dim; }
 
-            //! return the resolution of the discretisation grid in each spatial dim
-            const DynCcoord_t &get_nb_subdomain_grid_pts() const {
+            //! return the resolution of the discretisation grid in each spatial
+            //! dim
+            const IntCoord_t & get_nb_subdomain_grid_pts() const {
                 return this->nb_subdomain_grid_pts;
             }
 
             /**
-             * return the ccoordinates of the bottom, left, (front) pixel/voxel of
-             * this processors partition of the discretisation grid. For sequential
-             * calculations, this is alvays the origin
+             * return the ccoordinates of the bottom, left, (front) pixel/voxel
+             * of this processors partition of the discretisation grid. For
+             * sequential calculations, this is alvays the origin
              */
-            const DynCcoord_t &get_subdomain_locations() const {
+            const IntCoord_t & get_subdomain_locations() const {
                 return this->subdomain_locations;
             }
 
             //! return the strides used for iterating over the pixels
-            const DynCcoord_t &get_strides() const { return this->strides; }
-
-            class Enumerator;
-            /**
-             * iterates in tuples of pixel index ond coordinate. Useful in parallel
-             * problems, where simple enumeration of the pixels would be incorrect
-             */
-            Enumerator enumerate() const;
-
-        protected:
-            Dim_t dim; //!< spatial dimension
-            DynCcoord_t nb_subdomain_grid_pts; //!< nb_grid_pts of this domain
-            DynCcoord_t subdomain_locations; //!< locations of this domain
-            DynCcoord_t strides; //!< strides of memory layout
-            DynCcoord_t axes_order; //!< order of axes
-            bool contiguous; //!< is this a contiguous buffer?
-        };
-
-        /**
-         * Iterator class for `muSpectre::DynamicPixels`
-         */
-        class DynamicPixels::iterator {
-        public:
-            //! stl
-            using value_type = DynCcoord<threeD>;
-            using const_value_type = const value_type; //!< stl conformance
-            using pointer = value_type *; //!< stl conformance
-            using difference_type = std::ptrdiff_t; //!< stl conformance
-            using iterator_category = std::forward_iterator_tag;
-            //!< stl
-                                                                       //!< conformance
-
-            //! constructor
-            iterator(const DynamicPixels &pixels, size_t index)
-                : pixels{pixels}, index{index} {
-                if (!pixels.contiguous) {
-                    std::stringstream message{};
-                    message << "Iterating over a DynamicPixels object is only supported "
-                            "for contiguous buffers. You specified a grid of shape "
-                            << pixels.nb_subdomain_grid_pts << " with non-contiguous "
-                            << "strides " << pixels.strides << ".";
-                    throw RuntimeError{message.str()};
-                }
-            }
-
-            //! Default constructor
-            iterator() = delete;
-
-            //! Copy constructor
-            iterator(const iterator &other) = default;
-
-            //! Move constructor
-            iterator(iterator &&other) = default;
-
-            //! Destructor
-            ~iterator() = default;
-
-            //! Copy assignment operator
-            iterator &operator=(const iterator &other) = delete;
-
-            //! Move assignment operator
-            iterator &operator=(iterator &&other) = delete;
-
-            //! dereferencing
-            inline value_type operator*() const {
-                return this->pixels.get_ccoord(this->index);
-            }
-
-            //! pre-increment
-            inline iterator &operator++() {
-                ++this->index;
-                return *this;
-            }
-
-            //! inequality
-            bool operator!=(const iterator &other) const {
-                return this->index != other.index;
-            }
-
-            //! equality
-            bool operator==(const iterator &other) const {
-                return not(*this != other);
-            }
-
-        protected:
-            const DynamicPixels &pixels; //!< ref to pixels in cell
-            size_t index; //!< index of currently pointed-to pixel
-        };
-
-        /**
-         * enumerator class for `muSpectre::DynamicPixels`
-         */
-        class DynamicPixels::Enumerator final {
-        public:
-            //! Default constructor
-            Enumerator() = delete;
-
-            //! Constructor
-            explicit Enumerator(const DynamicPixels &pixels);
-
-            //! Copy constructor
-            Enumerator(const Enumerator &other) = default;
-
-            //! Move constructor
-            Enumerator(Enumerator &&other) = default;
-
-            //! Destructor
-            virtual ~Enumerator() = default;
-
-            //! Copy assignment operator
-            Enumerator &operator=(const Enumerator &other) = delete;
-
-            //! Move assignment operator
-            Enumerator &operator=(Enumerator &&other) = delete;
+            const IntCoord_t & get_strides() const { return this->strides; }
 
             /**
-             * @class iterator
-             * @brief A derived class from DynamicPixels::iterator, used for iterating
-             * over Pixels.
-             *
-             * This class is a final class, meaning it cannot be further derived from.
-             * It provides a custom implementation of the dereference operator (*).
-             *
-             * @tparam Parent Alias for the base class DynamicPixels::iterator.
-             *
-             * @note The using Parent::Parent; statement is a C++11 feature called
-             * "Inheriting Constructors" which means that this derived class will
-             * have the same constructors as the base class.
+             * enumerator class for `muSpectre::Pixels`
              */
-            class iterator final : public DynamicPixels::iterator {
-            public:
-                using Parent = DynamicPixels::iterator;
-                using Parent::Parent;
+            class Enumerator final {
+               public:
+                //! Default constructor
+                Enumerator() = delete;
+
+                //! Constructor
+                explicit Enumerator(const Pixels & pixels) : pixels{pixels} {}
+
+                //! Copy constructor
+                Enumerator(const Enumerator & other) = default;
+
+                //! Move constructor
+                Enumerator(Enumerator && other) = default;
+
+                //! Destructor
+                virtual ~Enumerator() = default;
+
+                //! Copy assignment operator
+                Enumerator & operator=(const Enumerator & other) = delete;
+
+                //! Move assignment operator
+                Enumerator & operator=(Enumerator && other) = delete;
 
                 /**
-                 * @brief Overloaded dereference operator (*).
+                 * @class iterator
+                 * @brief A derived class from Pixels::iterator, used for
+                 * iterating over Pixels.
                  *
-                 * This function returns a tuple containing the index of the pixel and
-                 * the pixel's coordinates.
+                 * This class is a final class, meaning it cannot be further
+                 * derived from. It provides a custom implementation of the
+                 * dereference operator (*).
                  *
-                 * @return std::tuple<Index_t, Parent::value_type> A tuple containing
-                 * the index of the pixel and the pixel's coordinates.
+                 * @tparam Parent Alias for the base class Pixels::iterator.
+                 *
+                 * @note The using Parent::Parent; statement is a C++11 feature
+                 * called "Inheriting Constructors" which means that this
+                 * derived class will have the same constructors as the base
+                 * class.
                  */
-                std::tuple<Index_t, Parent::value_type> operator*() const {
-                    auto &&pixel{this->Parent::operator*()};
-                    return std::tuple<Index_t, Parent::value_type>{
-                        this->pixels.get_index(pixel), pixel
-                    };
+                class iterator final : public Pixels::iterator {
+                   public:
+                    using Parent = Pixels::iterator;
+                    using Parent::Parent;
+
+                    /**
+                     * @brief Overloaded dereference operator (*).
+                     *
+                     * This function returns a tuple containing the index of the
+                     * pixel and the pixel's coordinates.
+                     *
+                     * @return std::tuple<Index_t, Parent::value_type> A tuple
+                     * containing the index of the pixel and the pixel's
+                     * coordinates.
+                     */
+                    std::tuple<Index_t, Parent::value_type> operator*() const {
+                        auto && pixel{this->Parent::operator*()};
+                        return std::tuple<Index_t, Parent::value_type>{
+                            this->pixels.get_index(pixel), pixel};
+                    }
+                };
+
+                //! stl conformance
+                iterator begin() const { return iterator{this->pixels, 0}; }
+
+                //! stl conformance
+                iterator end() const {
+                    return iterator{this->pixels, this->pixels.size()};
                 }
+
+                //! stl conformance
+                size_t size() const { return this->pixels.size(); }
+
+               protected:
+                const Pixels & pixels;
             };
-
-            //! stl conformance
-            iterator begin() const;
-
-            //! stl conformance
-            iterator end() const;
-
-            //! stl conformance
-            size_t size() const;
-
-        protected:
-            const DynamicPixels &pixels;
-        };
-
-        /**
-         * Centralised iteration over square (or cubic) discretisation grids.
-         */
-        template<size_t Dim>
-        class Pixels : public DynamicPixels {
-        public:
-            //! base class
-            using Parent = DynamicPixels;
-
-            //! cell coordinates
-            using Ccoord = Ccoord_t<Dim>;
-
-            //! constructor
-            Pixels(const Ccoord &nb_subdomain_grid_pts = Ccoord{},
-                   const Ccoord &subdomain_locations = Ccoord{})
-                : Parent{nb_subdomain_grid_pts, subdomain_locations} {
-            }
-
-            //! constructor with strides
-            Pixels(const Ccoord &nb_subdomain_grid_pts,
-                   const Ccoord &subdomain_locations, const Ccoord &strides)
-                : Parent{nb_subdomain_grid_pts, subdomain_locations, strides} {
-            }
-
-            //! copy constructor
-            Pixels(const Pixels &other) = default;
-
-            //! assignment operator
-            Pixels &operator=(const Pixels &other) = default;
-
-            virtual ~Pixels() = default;
-
-            //! return index for a ccoord
-            Index_t get_index(const Ccoord &ccoord) const {
-                return muGrid::CcoordOps::get_index(this->get_nb_grid_pts(),
-                                                    this->get_subdomain_locations(), ccoord);
-            }
-
-            //! return coordinates of the i-th pixel
-            Ccoord get_ccoord(const Index_t &index) const {
-                return get_ccoord_from_axes_order(
-                    this->nb_subdomain_grid_pts.template get<Dim>(),
-                    this->subdomain_locations.template get<Dim>(),
-                    this->strides.template get<Dim>(),
-                    this->axes_order.template get<Dim>(), index);
-            }
 
             /**
-             * iterators over `Pixels` dereferences to cell coordinates
+             * iterates in tuples of pixel index ond coordinate. Useful in
+             * parallel problems, where simple enumeration of the pixels would
+             * be incorrect
              */
-            class iterator {
-            public:
-                using value_type = Ccoord; //!< stl conformance
-                using const_value_type = const value_type; //!< stl conformance
-                using pointer = value_type *; //!< stl conformance
-                using difference_type = std::ptrdiff_t; //!< stl conformance
-                using iterator_category = std::forward_iterator_tag;
-                //!< stl
-                                                                             //!< conformance
-                using reference = value_type; //!< stl conformance
+            Enumerator enumerate() const { return Enumerator(*this); }
 
-                //! constructor
-                explicit iterator(const Pixels &pixels, bool begin = true);
-
-                virtual ~iterator() = default;
-
-                //! dereferencing
-                inline value_type operator*() const;
-
-                //! pre-increment
-                inline iterator &operator++();
-
-                //! inequality
-                inline bool operator!=(const iterator &other) const;
-
-                //! equality
-                inline bool operator==(const iterator &other) const;
-
-            protected:
-                const Pixels &pixels; //!< ref to pixels in cell
-                size_t index; //!< index of currently pointed-to pixel
-            };
-
-            //! stl conformance
-            inline iterator begin() const { return iterator(*this); }
-            //! stl conformance
-            inline iterator end() const { return iterator(*this, false); }
-            //! stl conformance
-            inline size_t size() const { return get_size(this->get_nb_grid_pts()); }
-
-        protected:
-            const Ccoord &get_nb_grid_pts() const {
-                return this->nb_subdomain_grid_pts.template get<Dim>();
-            }
-
-            const Ccoord &get_subdomain_locations() const {
-                return this->subdomain_locations.template get<Dim>();
-            }
-
-            const Ccoord &get_strides() const {
-                return this->strides.template get<Dim>();
-            }
+           protected:
+            Dim_t dim;                         //!< spatial dimension
+            IntCoord_t nb_subdomain_grid_pts;  //!< nb_grid_pts of this domain
+            IntCoord_t subdomain_locations;    //!< locations of this domain
+            IntCoord_t strides;                //!< strides of memory layout
+            IntCoord_t axes_order;             //!< order of axes
+            bool contiguous;                   //!< is this a contiguous buffer?
         };
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        Pixels<Dim>::iterator::iterator(const Pixels &pixels, bool begin)
-            : pixels{pixels},
-              index{begin ? 0 : get_size(pixels.get_nb_grid_pts())} {
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        typename Pixels<Dim>::iterator::value_type
-        Pixels<Dim>::iterator::operator*() const {
-            return this->pixels.get_ccoord(this->index);
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        bool Pixels<Dim>::iterator::operator!=(const iterator &other) const {
-            return this->index != other.index;
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        bool Pixels<Dim>::iterator::operator==(const iterator &other) const {
-            return not(*this != other);
-        }
-
-        /* ----------------------------------------------------------------------
-         */
-        template<size_t Dim>
-        typename Pixels<Dim>::iterator &Pixels<Dim>::iterator::operator++() {
-            ++this->index;
-            return *this;
-        }
-    } // namespace CcoordOps
-} // namespace muGrid
+    }  // namespace CcoordOps
+}  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_CCOORD_OPERATIONS_HH_
