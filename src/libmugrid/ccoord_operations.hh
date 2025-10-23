@@ -417,6 +417,24 @@ namespace muGrid {
             return axes_order;
         }
 
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        template <size_t dim>
+        Ccoord_t<dim> get_coord_from_axes_order(
+            const Ccoord_t<dim> & nb_grid_pts, const Ccoord_t<dim> & locations,
+            const Ccoord_t<dim> & strides, const Ccoord_t<dim> & axes_order,
+            Index_t index) {
+            Ccoord_t<dim> retval{{nb_grid_pts[0]}};
+            for (Index_t i{dim - 1}; i >= 0; --i) {
+                Index_t cur_coord{index / strides[axes_order[i]]};
+                retval[axes_order[i]] = cur_coord;
+                index -= cur_coord * strides[axes_order[i]];
+            }
+            for (size_t i{0}; i < dim; ++i) {
+                retval[i] += locations[i];
+            }
+            return retval;
+        }
+
         //! get the i-th pixel in a grid of size nb_grid_pts, with strides
         template <size_t dim>
         Ccoord_t<dim> get_coord_from_strides(const Ccoord_t<dim> & nb_grid_pts,
