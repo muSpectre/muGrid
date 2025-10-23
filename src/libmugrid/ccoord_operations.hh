@@ -417,25 +417,6 @@ namespace muGrid {
             return axes_order;
         }
 
-        //------------------------------------------------------------------------//
-        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
-        template <size_t dim>
-        Ccoord_t<dim> get_coord_from_axes_order(
-            const Ccoord_t<dim> & nb_grid_pts, const Ccoord_t<dim> & locations,
-            const Ccoord_t<dim> & strides, const Ccoord_t<dim> & axes_order,
-            Index_t index) {
-            Ccoord_t<dim> retval{{nb_grid_pts[0]}};
-            for (Index_t i{dim - 1}; i >= 0; --i) {
-                Index_t cur_coord{index / strides[axes_order[i]]};
-                retval[axes_order[i]] = cur_coord;
-                index -= cur_coord * strides[axes_order[i]];
-            }
-            for (size_t i{0}; i < dim; ++i) {
-                retval[i] += locations[i];
-            }
-            return retval;
-        }
-
         //! get the i-th pixel in a grid of size nb_grid_pts, with strides
         template <size_t dim>
         Ccoord_t<dim> get_coord_from_strides(const Ccoord_t<dim> & nb_grid_pts,
@@ -447,12 +428,11 @@ namespace muGrid {
                 compute_axes_order(nb_grid_pts, strides), index);
         }
 
-        //------------------------------------------------------------------------//
         //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        //! and location
         template <class T>
-        T get_coord_from_axes_order(const T & nb_grid_pts, const T & locations,
-                                    const T & strides, const T & axes_order,
-                                    Index_t index) {
+        T get_coord0_from_axes_order(const T & nb_grid_pts, const T & strides,
+                                     const T & axes_order, Index_t index) {
             auto dim{nb_grid_pts.get_dim()};
             T retval(dim);
             for (Index_t i{dim - 1}; i >= 0; --i) {
@@ -460,6 +440,17 @@ namespace muGrid {
                 retval[axes_order[i]] = cur_coord;
                 index -= cur_coord * strides[axes_order[i]];
             }
+            return retval;
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        template <class T>
+        T get_coord_from_axes_order(const T & nb_grid_pts, const T & locations,
+                                    const T & strides, const T & axes_order,
+                                    Index_t index) {
+            auto dim{nb_grid_pts.get_dim()};
+            auto retval{get_coord0_from_axes_order(nb_grid_pts, strides,
+                                                   axes_order, index)};
             for (Dim_t i{0}; i < dim; ++i) {
                 retval[i] += locations[i];
             }
@@ -718,6 +709,13 @@ namespace muGrid {
                     this->strides, this->axes_order, index);
             }
 
+            //! return coordinates of the i-th pixel, with zero as location
+            IntCoord_t get_coord0(const Index_t & index) const {
+                return get_coord0_from_axes_order(this->nb_subdomain_grid_pts,
+                                                  this->strides,
+                                                  this->axes_order, index);
+            }
+
             IntCoord_t get_neighbour(const IntCoord_t & ccoord,
                                      const IntCoord_t & offset) const {
                 return modulo(ccoord + offset - this->subdomain_locations,
@@ -741,7 +739,7 @@ namespace muGrid {
 
                 //! constructor
                 iterator(const Pixels & pixels, Size_t index)
-                    : pixels{pixels}, coord{pixels.get_coord(index)} {}
+                    : pixels{pixels}, coord0{pixels.get_coord0(index)} {}
 
                 //! Default constructor
                 iterator() = delete;
@@ -762,31 +760,31 @@ namespace muGrid {
                 iterator & operator=(iterator && other) = delete;
 
                 //! dereferencing
-                value_type operator*() const { return this->coord; }
+                value_type operator*() const {
+                    return this->pixels.subdomain_locations + this->coord0;
+                }
 
                 //! pre-increment
                 iterator & operator++() {
                     Index_t axis{this->pixels.axes_order[0]};
                     // Increase fastest index
-                    ++this->coord[axis];
+                    ++this->coord0[axis];
                     // Check whether coordinate is out of bounds
                     Index_t aindex{0};
-                    while (this->coord[axis] >=
-                               this->pixels.subdomain_locations[axis] +
-                                   this->pixels.nb_subdomain_grid_pts[axis] &&
+                    while (this->coord0[axis] >=
+                               this->pixels.nb_subdomain_grid_pts[axis] &&
                            aindex < this->pixels.dim - 1) {
-                        this->coord[axis] =
-                            this->pixels.subdomain_locations[axis];
+                        this->coord0[axis] = 0;
                         // Get next fastest axis
                         axis = this->pixels.axes_order[++aindex];
-                        ++this->coord[axis];
+                        ++this->coord0[axis];
                     }
                     return *this;
                 }
 
                 //! inequality
                 bool operator!=(const iterator & other) const {
-                    return this->coord != other.coord;
+                    return this->coord0 != other.coord0;
                 }
 
                 //! equality
@@ -796,7 +794,7 @@ namespace muGrid {
 
                protected:
                 const Pixels & pixels;  //!< ref to pixels in cell
-                IntCoord_t coord;       //!< coordinate of current pixel
+                IntCoord_t coord0;      //!< coordinate of current pixel
             };
 
             //! stl conformance
