@@ -45,296 +45,299 @@
 
 namespace muGrid {
 
-  /**
-   * MappedFields are a combination of a field and an associated map, and as
-   * such it does not introduce any new functionality that Fields and FieldMaps
-   * do not already possess. They provide a convenience structure for the
-   * default use case of internal variables, which are typically used only by a
-   * single material and always the same way.
-   */
-  template <class FieldMapType>
-  class MappedField {
-   public:
-    //! stored scalar type
-    using Scalar = typename FieldMapType::Scalar;
-    //! return type for iterators over this- map
-    using Return_t = typename FieldMapType::template Return_t<
-        FieldMapType::FieldMutability()>;
-    //! iterator over this map
-    using iterator = typename FieldMapType::iterator;
-    //! constant iterator over this map
-    using const_iterator = typename FieldMapType::const_iterator;
-    //! detemine at compile time whether the field map is statically sized
-    constexpr static bool IsStatic() { return FieldMapType::IsStatic(); }
-    //! Default constructor
-    MappedField() = delete;
-
     /**
-     * Constructor with name and collection for statically sized mapped fields
+     * MappedFields are a combination of a field and an associated map, and as
+     * such it does not introduce any new functionality that Fields and
+     * FieldMaps do not already possess. They provide a convenience structure
+     * for the default use case of internal variables, which are typically used
+     * only by a single material and always the same way.
      */
-    template <bool StaticConstructor = IsStatic(),
-              std::enable_if_t<StaticConstructor, int> = 0>
-    MappedField(const std::string & unique_name, FieldCollection & collection,
-                const std::string & sub_division_tag,
-                const Unit & unit = Unit::unitless())
-        : field(collection.register_field<Scalar>(
-              unique_name, FieldMapType::Stride(), sub_division_tag, unit)),
-          map{this->field} {
-      static_assert(
-          StaticConstructor == IsStatic(),
-          "StaticConstructor is a SFINAE parameter, do not touch it.");
-    }
+    template <class FieldMapType>
+    class MappedField {
+       public:
+        //! stored scalar type
+        using Scalar = typename FieldMapType::Scalar;
+        //! return type for iterators over this- map
+        using Return_t = typename FieldMapType::template Return_t<
+            FieldMapType::FieldMutability()>;
+        //! iterator over this map
+        using iterator = typename FieldMapType::iterator;
+        //! constant iterator over this map
+        using const_iterator = typename FieldMapType::const_iterator;
+        //! detemine at compile time whether the field map is statically sized
+        constexpr static bool IsStatic() { return FieldMapType::IsStatic(); }
+        //! Default constructor
+        MappedField() = delete;
+
+        /**
+         * Constructor with name and collection for statically sized mapped
+         * fields
+         */
+        template <bool StaticConstructor = IsStatic(),
+                  std::enable_if_t<StaticConstructor, int> = 0>
+        MappedField(const std::string & unique_name,
+                    FieldCollection & collection,
+                    const std::string & sub_division_tag,
+                    const Unit & unit = Unit::unitless())
+            : field(collection.register_field<Scalar>(
+                  unique_name, FieldMapType::Stride(), sub_division_tag, unit)),
+              map{this->field} {
+            static_assert(
+                StaticConstructor == IsStatic(),
+                "StaticConstructor is a SFINAE parameter, do not touch it.");
+        }
+
+        /**
+         * Constructor for dynamically sized mapped field
+         *
+         * @param unique_name unique identifier for this field
+         * @param nb_rows number of rows for the iterates
+         * @param nb_cols number of columns for the iterates
+         * @param iter_type whether to iterate over pixels or quadrature points
+         * @param collection collection where the field is to be registered
+         * @param unit physical units of mapped field
+         * @param nb_sub_pts number of subpoints per pixel. Specify only if
+         *                   iter_type is `muGrid::IterUnit::FreePt`
+         */
+        template <bool StaticConstructor = IsStatic(),
+                  std::enable_if_t<not StaticConstructor, int> = 0>
+        MappedField(const std::string & unique_name, const Index_t & nb_rows,
+                    const Index_t & nb_cols, const IterUnit & iter_type,
+                    FieldCollection & collection,
+                    const std::string & sub_division_tag,
+                    const Unit & unit = Unit::unitless())
+            : field{collection.register_field<Scalar>(
+                  unique_name, {nb_rows, nb_cols}, sub_division_tag, unit)},
+              map{this->field, nb_rows, iter_type} {
+            static_assert(
+                StaticConstructor == IsStatic(),
+                "StaticConstructor is a SFINAE parameter, do not touch it.");
+        }
+
+        /**
+         * Constructor of statically sized mapped fields from a pre-existing
+         * field checking the consistency of the size of the map and the field
+         * is handled in the constructor of the FieldMap
+         */
+        template <bool StaticConstructor = IsStatic(),
+                  std::enable_if_t<StaticConstructor, int> = 0>
+        explicit MappedField(TypedField<Scalar> & field)
+            : field{field}, map{this->field} {}
+
+        /**
+         * Constructor of statically sized mapped fields from a pre-existing
+         * field checking the consistency of the size of the map and the field
+         * is handled in the constructor of the FieldMap
+         */
+        template <bool StaticConstructor = IsStatic(),
+                  std::enable_if_t<not StaticConstructor, int> = 0>
+        MappedField(TypedField<Scalar> & field, const Index_t & nb_rows,
+                    const IterUnit & iter_type)
+            : field{field}, map{this->field, nb_rows, iter_type} {}
+
+        //! Copy constructor
+        MappedField(const MappedField & other) = delete;
+
+        //! Move constructor
+        MappedField(MappedField && other) = default;
+
+        //! Destructor
+        virtual ~MappedField() = default;
+
+        //! Copy assignment operator
+        MappedField & operator=(const MappedField & other) = delete;
+
+        //! Move assignment operator
+        MappedField & operator=(MappedField && other) = default;
+
+        //! subtraction assignment
+        MappedField & operator-=(const MappedField & other) {
+            this->get_field() -= other.get_field();
+            return *this;
+        }
+
+        //! addition assignment
+        MappedField & operator+=(const MappedField & other) {
+            this->get_field() += other.get_field();
+            return *this;
+        }
+
+        //! Copy assignment operator
+        MappedField & operator=(const TypedFieldBase<Scalar> & other) {
+            this->get_field() = other;
+            return *this;
+        }
+
+        //! Copy assignment operator
+        MappedField &
+        operator=(const typename TypedFieldBase<Scalar>::Negative & other) {
+            this->get_field() = other;
+            return *this;
+        }
+
+        //! random access operator
+        Return_t operator[](size_t index) {
+            assert(this->field.get_collection().is_initialised());
+            assert(index <=
+                   static_cast<size_t>(this->field.get_nb_buffer_entries()));
+            return this->map[index];
+        }
+
+        //! stl
+        iterator begin() { return this->map.begin(); }
+
+        //! stl
+        iterator end() { return this->map.end(); }
+
+        //! stl
+        const_iterator begin() const { return this->map.begin(); }
+
+        //! stl
+        const_iterator end() const { return this->map.end(); }
+
+        //! return a reference to the mapped field
+        TypedField<Scalar> & get_field() { return this->field; }
+
+        //! return a reference to the mapped field
+        const TypedField<Scalar> & get_field() const { return this->field; }
+
+        //! return a reference to the map
+        FieldMapType & get_map() { return this->map; }
+
+        //! return a reference to the map
+        const FieldMapType & get_map() const { return this->map; }
+
+       protected:
+        TypedField<Scalar> & field;  //!< reference to mapped field
+        FieldMapType map;            //!< associated field map
+    };
 
     /**
-     * Constructor for dynamically sized mapped field
+     * Alias of `muGrid::MappedField` for a map with corresponding
+     * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+     * point by quadrature point with a chosen, statically sized plain `Eigen`
+     * type
      *
-     * @param unique_name unique identifier for this field
-     * @param nb_rows number of rows for the iterates
-     * @param nb_cols number of columns for the iterates
-     * @param iter_type whether to iterate over pixels or quadrature points
-     * @param collection collection where the field is to be registered
-     * @param unit physical units of mapped field
-     * @param nb_sub_pts number of subpoints per pixel. Specify only if
-     *                   iter_type is `muGrid::IterUnit::FreePt`
+     * @tparam EigenPlain a statically sized `Eigen::Array` or `Eigen::Matrix`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam IterationType describes the pixel-subdivision
      */
-    template <bool StaticConstructor = IsStatic(),
-              std::enable_if_t<not StaticConstructor, int> = 0>
-    MappedField(const std::string & unique_name, const Index_t & nb_rows,
-                const Index_t & nb_cols, const IterUnit & iter_type,
-                FieldCollection & collection,
-                const std::string & sub_division_tag,
-                const Unit & unit = Unit::unitless())
-        : field{collection.register_field<Scalar>(
-              unique_name, {nb_rows, nb_cols}, sub_division_tag, unit)},
-          map{this->field, nb_rows, iter_type} {
-      static_assert(
-          StaticConstructor == IsStatic(),
-          "StaticConstructor is a SFINAE parameter, do not touch it.");
-    }
+    template <class EigenPlain, Mapping Mutability, IterUnit IterationType>
+    using MappedEigenField =
+        MappedField<EigenFieldMap<EigenPlain, Mutability, IterationType>>;
 
     /**
-     * Constructor of statically sized mapped fields from a pre-existing field
-     * checking the consistency of the size of the map and the field is handled
-     * in the constructor of the FieldMap
+     * Alias of `muGrid::MappedField` for a map with corresponding
+     * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+     * point by quadrature point with statically sized `Eigen::Matrix` iterates
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam NbRow number of rows of the iterate
+     * @tparam NbCol number of columns of the iterate
+     * @tparam IterationType describes the pixel-subdivision
      */
-    template <bool StaticConstructor = IsStatic(),
-              std::enable_if_t<StaticConstructor, int> = 0>
-    explicit MappedField(TypedField<Scalar> & field)
-        : field{field}, map{this->field} {}
+    template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
+              IterUnit IterationType>
+    using MappedMatrixField =
+        MappedField<MatrixFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
     /**
-     * Constructor of statically sized mapped fields from a pre-existing field
-     * checking the consistency of the size of the map and the field is handled
-     * in the constructor of the FieldMap
+     * Alias of `muGrid::MappedField` for a map with corresponding
+     * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+     * point by quadrature point with statically sized `Eigen::Array` iterates
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam NbRow number of rows of the iterate
+     * @tparam NbCol number of columns of the iterate
+     * @tparam IterationType describes the pixel-subdivision
      */
-    template <bool StaticConstructor = IsStatic(),
-              std::enable_if_t<not StaticConstructor, int> = 0>
-    MappedField(TypedField<Scalar> & field, const Index_t & nb_rows,
-                const IterUnit & iter_type)
-        : field{field}, map{this->field, nb_rows, iter_type} {}
+    template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
+              IterUnit IterationType>
+    using MappedArrayField =
+        MappedField<ArrayFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
 
-    //! Copy constructor
-    MappedField(const MappedField & other) = delete;
+    /**
+     * Alias of `muGrid::MappedField` for a map of scalars with corresponding
+     * `muSpectre::Field` you wish to iterate over.
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam IterationType describes the pixel-subdivision
+     */
+    template <typename T, Mapping Mutability, IterUnit IterationType>
+    using MappedScalarField =
+        MappedField<ScalarFieldMap<T, Mutability, IterationType>>;
 
-    //! Move constructor
-    MappedField(MappedField && other) = default;
+    /**
+     * Alias of `muGrid::MappedField` for a map of second-rank with
+     * corresponding `muSpectre::Field` you wish to iterate over.
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam Rank tensorial rank
+     * @tparam Dim spatial dimension of the tensors
+     * @tparam IterationType describes the pixel-subdivision
+     */
+    template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
+              IterUnit IterationType>
+    using MappedTensorField =
+        MappedField<TensorFieldMap<T, Mutability, Rank, Dim, IterationType>>;
 
-    //! Destructor
-    virtual ~MappedField() = default;
+    /**
+     * Alias of `muGrid::MappedField` for a map of second-rank with
+     * corresponding `muSpectre::Field` you wish to iterate over.
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam Dim spatial dimension of the tensors
+     * @tparam IterationType describes the pixel-subdivision
+     */
+    template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
+    using MappedT1Field =
+        MappedField<T1FieldMap<T, Mutability, Dim, IterationType>>;
 
-    //! Copy assignment operator
-    MappedField & operator=(const MappedField & other) = delete;
+    /**
+     * Alias of `muGrid::MappedField` for a map of first-rank with corresponding
+     * `muSpectre::Field` you wish to iterate over.
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam Dim spatial dimension of the tensors
+     * @tparam IterationType describes the pixel-subdivision
+     */
+    template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
+    using MappedT2Field =
+        MappedField<T2FieldMap<T, Mutability, Dim, IterationType>>;
 
-    //! Move assignment operator
-    MappedField & operator=(MappedField && other) = default;
-
-    //! subtraction assignment
-    MappedField & operator-=(const MappedField & other) {
-      this->get_field() -= other.get_field();
-      return *this;
-    }
-
-    //! addition assignment
-    MappedField & operator+=(const MappedField & other) {
-      this->get_field() += other.get_field();
-      return *this;
-    }
-
-    //! Copy assignment operator
-    MappedField & operator=(const TypedFieldBase<Scalar> & other) {
-      this->get_field() = other;
-      return *this;
-    }
-
-    //! Copy assignment operator
-    MappedField &
-    operator=(const typename TypedFieldBase<Scalar>::Negative & other) {
-      this->get_field() = other;
-      return *this;
-    }
-
-    //! random access operator
-    Return_t operator[](size_t index) {
-      assert(this->field.get_collection().is_initialised());
-      assert(index <= static_cast<size_t>(this->field.get_nb_entries()));
-      return this->map[index];
-    }
-
-    //! stl
-    iterator begin() { return this->map.begin(); }
-
-    //! stl
-    iterator end() { return this->map.end(); }
-
-    //! stl
-    const_iterator begin() const { return this->map.begin(); }
-
-    //! stl
-    const_iterator end() const { return this->map.end(); }
-
-    //! return a reference to the mapped field
-    TypedField<Scalar> & get_field() { return this->field; }
-
-    //! return a reference to the mapped field
-    const TypedField<Scalar> & get_field() const { return this->field; }
-
-    //! return a reference to the map
-    FieldMapType & get_map() { return this->map; }
-
-    //! return a reference to the map
-    const FieldMapType & get_map() const { return this->map; }
-
-   protected:
-    TypedField<Scalar> & field;  //!< reference to mapped field
-    FieldMapType map;            //!< associated field map
-  };
-
-  /**
-   * Alias of `muGrid::MappedField` for a map with corresponding
-   * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
-   * point by quadrature point with a chosen, statically sized plain `Eigen`
-   * type
-   *
-   * @tparam EigenPlain a statically sized `Eigen::Array` or `Eigen::Matrix`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <class EigenPlain, Mapping Mutability, IterUnit IterationType>
-  using MappedEigenField =
-      MappedField<EigenFieldMap<EigenPlain, Mutability, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map with corresponding
-   * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
-   * point by quadrature point with statically sized `Eigen::Matrix` iterates
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam NbRow number of rows of the iterate
-   * @tparam NbCol number of columns of the iterate
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            IterUnit IterationType>
-  using MappedMatrixField =
-      MappedField<MatrixFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map with corresponding
-   * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
-   * point by quadrature point with statically sized `Eigen::Array` iterates
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam NbRow number of rows of the iterate
-   * @tparam NbCol number of columns of the iterate
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t NbRow, Dim_t NbCol,
-            IterUnit IterationType>
-  using MappedArrayField =
-      MappedField<ArrayFieldMap<T, Mutability, NbRow, NbCol, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map of scalars with corresponding
-   * `muSpectre::Field` you wish to iterate over.
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, IterUnit IterationType>
-  using MappedScalarField =
-      MappedField<ScalarFieldMap<T, Mutability, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over.
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam Rank tensorial rank
-   * @tparam Dim spatial dimension of the tensors
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t Rank, Dim_t Dim,
-            IterUnit IterationType>
-  using MappedTensorField =
-      MappedField<TensorFieldMap<T, Mutability, Rank, Dim, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map of second-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over.
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam Dim spatial dimension of the tensors
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
-  using MappedT1Field =
-      MappedField<T1FieldMap<T, Mutability, Dim, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map of first-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over.
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam Dim spatial dimension of the tensors
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
-  using MappedT2Field =
-      MappedField<T2FieldMap<T, Mutability, Dim, IterationType>>;
-
-  /**
-   * Alias of `muGrid::MappedField` for a map of fourth-rank with corresponding
-   * `muSpectre::Field` you wish to iterate over.
-   *
-   * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
-   * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
-   * @tparam Mutability whether or not the map allows to modify the content of
-   * the field
-   * @tparam Dim spatial dimension of the tensors
-   * @tparam IterationType describes the pixel-subdivision
-   */
-  template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
-  using MappedT4Field =
-      MappedField<T4FieldMap<T, Mutability, Dim, IterationType>>;
+    /**
+     * Alias of `muGrid::MappedField` for a map of fourth-rank with
+     * corresponding `muSpectre::Field` you wish to iterate over.
+     *
+     * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
+     * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
+     * @tparam Mutability whether or not the map allows to modify the content of
+     * the field
+     * @tparam Dim spatial dimension of the tensors
+     * @tparam IterationType describes the pixel-subdivision
+     */
+    template <typename T, Mapping Mutability, Dim_t Dim, IterUnit IterationType>
+    using MappedT4Field =
+        MappedField<T4FieldMap<T, Mutability, Dim, IterationType>>;
 
 }  // namespace muGrid
 
