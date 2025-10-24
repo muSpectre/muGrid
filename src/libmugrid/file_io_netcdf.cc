@@ -93,19 +93,17 @@ namespace muGrid {
     }
 
     /* register all field collections */
+    // Dispatch based on domain type using safer type checking
     muGrid::FieldCollection::ValidityDomain domain{fc.get_domain()};
-    switch (domain) {
-    case muGrid::FieldCollection::ValidityDomain::Global:
-      register_field_collection_global(
-          dynamic_cast<muGrid::GlobalFieldCollection &>(fc), field_names,
-          state_field_unique_prefixes);
-      break;
-    case muGrid::FieldCollection::ValidityDomain::Local:
-      register_field_collection_local(
-          dynamic_cast<muGrid::LocalFieldCollection &>(fc), field_names,
-          state_field_unique_prefixes);
-      break;
-    default:
+    if (domain == muGrid::FieldCollection::ValidityDomain::Global) {
+      auto & fc_global = static_cast<muGrid::GlobalFieldCollection &>(fc);
+      register_field_collection_global(fc_global, field_names,
+                                       state_field_unique_prefixes);
+    } else if (domain == muGrid::FieldCollection::ValidityDomain::Local) {
+      auto & fc_local = static_cast<muGrid::LocalFieldCollection &>(fc);
+      register_field_collection_local(fc_local, field_names,
+                                      state_field_unique_prefixes);
+    } else {
       throw FileIOError(
           "Your field collection does not belong to a valid domain (either "
           "ValidityDomain::Local or ValidityDomain::Global is possible).");
@@ -1501,67 +1499,27 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const std::vector<char> & NetCDFAtt::get_typed_value_c() const {
-    if (this->data_type == MU_NC_CHAR) {
-      return std::get<std::vector<char>>(this->value);
-    } else {
-      throw FileIOError("Your NetCDFAtt is of type '" +
-                        std::to_string(this->data_type) +
-                        "' but you should only call the function "
-                        "'NetCDFAtt::get_typed_value_c()' if the NetCDFAtt "
-                        "data_type is 'MU_NC_CHAR'");
-    }
+    return this->get_typed_value<char>();
   }
 
   /* ---------------------------------------------------------------------- */
   const std::vector<muGrid::Int> & NetCDFAtt::get_typed_value_i() const {
-    if (this->data_type == MU_NC_INT) {
-      return std::get<std::vector<muGrid::Int>>(this->value);
-    } else {
-      throw FileIOError("Your NetCDFAtt is of type '" +
-                        std::to_string(this->data_type) +
-                        "' but you should only call the function "
-                        "'NetCDFAtt::get_typed_value_i()' if the NetCDFAtt "
-                        "data_type is 'MU_NC_INT'");
-    }
+    return this->get_typed_value<muGrid::Int>();
   }
 
   /* ---------------------------------------------------------------------- */
   const std::vector<muGrid::Uint> & NetCDFAtt::get_typed_value_ui() const {
-    if (this->data_type == MU_NC_UINT) {
-      return std::get<std::vector<muGrid::Uint>>(this->value);
-    } else {
-      throw FileIOError("Your NetCDFAtt is of type '" +
-                        std::to_string(this->data_type) +
-                        "' but you should only call the function "
-                        "'NetCDFAtt::get_typed_value_ui()' if the NetCDFAtt "
-                        "data_type is 'MU_NC_UINT'");
-    }
+    return this->get_typed_value<muGrid::Uint>();
   }
 
   /* ---------------------------------------------------------------------- */
   const std::vector<muGrid::Index_t> & NetCDFAtt::get_typed_value_l() const {
-    if (this->data_type == MU_NC_INDEX_T) {
-      return std::get<std::vector<muGrid::Index_t>>(this->value);
-    } else {
-      throw FileIOError("Your NetCDFAtt is of type '" +
-                        std::to_string(this->data_type) +
-                        "' but you should only call the function "
-                        "'NetCDFAtt::get_typed_value_l()' if the NetCDFAtt "
-                        "data_type is 'MU_NC_INDEX_T'");
-    }
+    return this->get_typed_value<muGrid::Index_t>();
   }
 
   /* ---------------------------------------------------------------------- */
   const std::vector<muGrid::Real> & NetCDFAtt::get_typed_value_d() const {
-    if (this->data_type == MU_NC_REAL) {
-      return std::get<std::vector<muGrid::Real>>(this->value);
-    } else {
-      throw FileIOError("Your NetCDFAtt is of type '" +
-                        std::to_string(this->data_type) +
-                        "' but you should only call the function "
-                        "'NetCDFAtt::get_typed_value_d()' if the NetCDFAtt "
-                        "data_type is 'MU_NC_REAL'");
-    }
+    return this->get_typed_value<muGrid::Real>();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -2139,33 +2097,26 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   nc_type NetCDFVarBase::typeid_to_nc_type(const std::type_info & type_id) {
-    // possible types:
-    // NC_BYTE, NC_CHAR, NC_SHORT, NC_INT, NC_FLOAT and NC_DOUBLE
-    // NC_UBYTE, NC_USHORT, NC_UINT, NC_INT64 and NC_UINT64 (for CDF-5)
-    nc_type type{NC_NAT};  // Not A Type
-
-    // if (type_id == typeid(byte)) {
-    //   type = NC_BYTE;
-    // } else
+    // Dispatch to compile-time type mapping using netcdf_type<T>()
+    // This is a runtime wrapper that uses type_id comparison but maps to
+    // the pre-computed compile-time values
     if (type_id == typeid(char)) {
-      type = MU_NC_CHAR;
+      return MU_NC_CHAR;
     } else if (type_id == typeid(muGrid::Int)) {
-      type = MU_NC_INT;
+      return MU_NC_INT;
     } else if (type_id == typeid(muGrid::Uint)) {
-      type = MU_NC_UINT;
+      return MU_NC_UINT;
     } else if (type_id == typeid(muGrid::Index_t)) {
-      type = MU_NC_INDEX_T;
+      return MU_NC_INDEX_T;
     } else if (type_id == typeid(muGrid::Real)) {
-      type = MU_NC_REAL;
+      return MU_NC_REAL;
     } else {
       std::string name{type_id.name()};
       throw FileIOError("The given type_id '" + name +
                         "' can not be associated with a NetCDF nc_type. "
-                        "Probably this case is not implemented in "
-                        "NetCDFVarBase::typeid_to_nc_type().");
+                        "Supported types are: char, muGrid::Int, muGrid::Uint, "
+                        "muGrid::Index_t, and muGrid::Real.");
     }
-
-    return type;
   }
 
   /* ---------------------------------------------------------------------- */

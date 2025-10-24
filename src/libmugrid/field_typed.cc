@@ -377,12 +377,11 @@ namespace muGrid {
   template <typename T>
   TypedFieldBase<T> &
   TypedFieldBase<T>::operator=(const TypedFieldBase & other) {
-    switch (this->collection.get_domain()) {
-    case FieldCollection::ValidityDomain::Local: {
+    // Dispatch based on domain type
+    auto domain = this->collection.get_domain();
+    if (domain == FieldCollection::ValidityDomain::Local) {
       this->eigen_vec() = other.eigen_vec();
-      break;
-    }
-    case FieldCollection::ValidityDomain::Global: {
+    } else if (domain == FieldCollection::ValidityDomain::Global) {
       auto && my_shape{this->get_shape(IterUnit::SubPt)};
       auto && other_shape{other.get_shape(IterUnit::SubPt)};
       if (my_shape != other_shape) {
@@ -395,11 +394,8 @@ namespace muGrid {
       auto && other_strides{other.get_strides(IterUnit::SubPt)};
       raw_mem_ops::strided_copy(my_shape, other_strides, my_strides,
                                 other.data(), this->data_ptr);
-      break;
-    }
-    default:
+    } else {
       throw FieldError("Unknown ValidityDomain type");
-      break;
     }
     return *this;
   }

@@ -374,17 +374,16 @@ namespace muGrid {
     //! return a const pointer on the attribute value
     const void * get_value() const;
 
-    //! return the attribute values in its 'real type', there is a function for
-    //! each type indicated by the suffix of the function name. It is only
-    //! allowed to call the function of the correct return type. This can be
-    //! satisfyed by using NetCDFAtt::get_data_type(), i.e.
-    //! muGrid::MU_NC_CHAR    --  get_typed_value_c()
-    //! muGrid::MU_NC_INT     --  get_typed_value_i()
-    //! muGrid::MU_NC_UINT    --  get_typed_value_ui()
-    //! muGrid::MU_NC_INDEX_T --  get_typed_value_l()
-    //! muGrid::MU_NC_REAL    --  get_typed_value_d()
-    //! If you call a function which is not matching the data type a FileIOError
+    //! return the attribute values in its 'real type'. It is only
+    //! allowed to call the function with a type that matches the attribute's
+    //! data_type. If you call it with a mismatched type, a FileIOError
     //! will be thrown.
+    //! Supported types: char, muGrid::Int, muGrid::Uint, muGrid::Index_t,
+    //! muGrid::Real
+    template <typename T>
+    const std::vector<T> & get_typed_value() const;
+
+    // Convenience overloads for backward compatibility
     const std::vector<char> & get_typed_value_c() const;
     const std::vector<muGrid::Int> & get_typed_value_i() const;
     const std::vector<muGrid::Uint> & get_typed_value_ui() const;
@@ -451,6 +450,20 @@ namespace muGrid {
         false};  // true if name, data_type and nelems was set, else false
     bool value_initialised{false};  // true if value was set, else false
   };
+
+  // Template implementation for get_typed_value
+  template <typename T>
+  const std::vector<T> & NetCDFAtt::get_typed_value() const {
+    try {
+      return std::get<std::vector<T>>(this->value);
+    } catch (const std::bad_variant_access &) {
+      std::string type_name = typeid(T).name();
+      throw FileIOError(
+          "Attempted to get NetCDFAtt value as type '" + type_name +
+          "' but the actual data type is '" + std::to_string(this->data_type) +
+          "'");
+    }
+  }
 
   /**
    * Class to represent GLOBAL NetCDF attributes which do not belong to a
@@ -711,6 +724,13 @@ namespace muGrid {
 
     //! Convert a "std::type_info"  into a NetCDF "nc_type" type.
     static nc_type typeid_to_nc_type(const std::type_info & type_id);
+
+    //! Compile-time type to nc_type mapping for supported types
+    //! This uses the pre-computed netcdf_type<T>() values
+    template <typename T>
+    static constexpr nc_type type_to_nc_type() {
+      return netcdf_type<T>();
+    }
 
 #ifdef WITH_MPI
     //! convert a nc_type data_type into a MPI_Datatype

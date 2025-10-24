@@ -40,6 +40,9 @@
 #ifndef SRC_LIBMUGRID_OPTIONAL_MAPPED_FIELD_HH_
 #define SRC_LIBMUGRID_OPTIONAL_MAPPED_FIELD_HH_
 
+#include <optional>
+#include <memory>
+
 namespace muGrid {
 
   /**
@@ -76,29 +79,26 @@ namespace muGrid {
     OptionalMappedField & operator=(OptionalMappedField && other) = delete;
 
     //! returns whether the field has been created
-    bool has_value() const { return this->field_exists; }
+    bool has_value() const { return this->mapped_field.has_value(); }
 
     /**
      * returns a reference to the held mapped field. If the field has not yet
      * been created, this call will cause it to be.
      */
     MappedField & get() {
-      if (not this->field_exists) {
+      if (not this->mapped_field.has_value()) {
         this->mapped_field = std::make_unique<MappedField>(
             this->unique_name, this->collection, this->sub_division_tag);
-        this->field_exists = true;
       }
-      return *this->mapped_field;
+      return *this->mapped_field.value();
     }
 
    protected:
-    bool field_exists{false};
-
     FieldCollection & collection;
     std::string unique_name;
     std::string sub_division_tag;
 
-    std::unique_ptr<MappedField> mapped_field{nullptr};
+    std::optional<std::unique_ptr<MappedField>> mapped_field{};
   };
 
 }  // namespace muGrid
