@@ -37,7 +37,7 @@ cd ..
 
 XML2="libxml2-2.15.1"
 echo "Installing ${XML2}"
-curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
+curl -L https://download.gnome.org/sources/libxml2/2.15/${XML2}.tar.xz | tar -Jx
 cd ${XML2}
 ./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --without-lzma --without-python --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
