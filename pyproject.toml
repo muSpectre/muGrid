@@ -41,11 +41,11 @@ changelog = "https://github.com/muSpectre/muGrid/blob/main/CHANGELOG.md"
 select = "*manylinux*"
 # Build static NetCDF library
 before-all = [
-    "NETCDF_VERSION='4.9.0'",
+    "NETCDF_VERSION='4.9.3'",
     "curl -L https://github.com/Unidata/netcdf-c/archive/refs/tags/v${NETCDF_VERSION}.tar.gz | tar -xzC /tmp",
     "mkdir /tmp/build-netcdf",
     "pushd /tmp/build-netcdf",
-    "cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_TESTSETS=OFF -DBUILD_UTILITIES=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DENABLE_CDF5=ON -DENABLE_DAP=OFF -DENABLE_NETCDF4=OFF -DENABLE_NETCDF_4=OFF -DENABLE_PLUGINS=OFF /tmp/netcdf-c-${NETCDF_VERSION}",
+    "cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_TESTSETS=OFF -DBUILD_UTILITIES=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DENABLE_CDF5=ON -DENABLE_DAP=OFF -DENABLE_DAP2=OFF -DENABLE_DAP4=OFF -DENABLE_NETCDF4=OFF -DENABLE_NETCDF_4=OFF -DENABLE_PLUGINS=OFF /tmp/netcdf-c-${NETCDF_VERSION}",
     "make install",
     "popd",
     "rm -rf /tmp/build-netcdf /tmp/netcdf-c-${NETCDF_VERSION}"
