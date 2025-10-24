@@ -42,6 +42,7 @@
 #include <typeinfo>
 #include <type_traits>
 #include <iomanip>
+#include <variant>
 
 #include "communicator.hh"
 #include "grid_common.hh"
@@ -430,19 +431,20 @@ namespace muGrid {
     //! return a non const pointer on the attribute value
     void * get_value_non_const_ptr();
 
-    std::string att_name;
-    nc_type data_type;
-    IOSize_t nelems{0};
+    // Variant type for attribute values
+    // Supports: char, short, int, float, double, unsigned short, unsigned int,
+    // std::int64_t and std::uint64_t
+    using AttributeValue = std::variant<
+        std::vector<char>,
+        std::vector<muGrid::Int>,
+        std::vector<muGrid::Uint>,
+        std::vector<muGrid::Index_t>,
+        std::vector<muGrid::Real>>;
 
-    // possible values are: char, short, int, float, double, unsigned short,
-    // unsigned int, std::int64_t and std::uint64_t
-    // Only one of these following vectors can be non zero size. Would be
-    // represented by std::variant in C++17.
-    std::vector<char> value_c{};
-    std::vector<muGrid::Int> value_i{};
-    std::vector<muGrid::Uint> value_ui{};
-    std::vector<muGrid::Index_t> value_l{};
-    std::vector<muGrid::Real> value_d{};
+    std::string att_name;
+    nc_type data_type{NC_NAT};
+    IOSize_t nelems{0};
+    AttributeValue value{std::vector<char>()};  // default to empty char vector
 
     // flags to see whether the attribute was already initialised or not
     bool name_initialised{
@@ -689,6 +691,24 @@ namespace muGrid {
 
     virtual std::vector<IODiff_t> get_nc_imap_local() const = 0;
 
+    //! Helper method to get start value for a dimension base name
+    //! Subclasses may override to add support for additional dimension types
+    //! Returns {found, value} where found indicates if the dimension was handled
+    struct DimensionStartValue {
+      bool found{false};
+      IOSize_t value{0};
+    };
+
+    //! Get the start value for a specific dimension type
+    //! This method is called by compute_start_vector to get individual dimension values
+    virtual DimensionStartValue get_dimension_start_value(
+        const std::string & base_name, const Index_t & frame) const;
+
+    //! Common implementation to compute start vector for both global and state fields
+    //! Subclasses call this to avoid code duplication
+    std::vector<IOSize_t> compute_start_vector_global(
+        const Index_t & frame) const;
+
     //! Convert a "std::type_info"  into a NetCDF "nc_type" type.
     static nc_type typeid_to_nc_type(const std::type_info & type_id);
 
@@ -918,6 +938,10 @@ namespace muGrid {
 
     //! return the number of fields belonging to the state field (nb_memory + 1)
     size_t get_nb_fields() const;
+
+    //! Override to handle history_index dimension
+    DimensionStartValue get_dimension_start_value(
+        const std::string & base_name, const Index_t & frame) const override;
 
     //! A vector of IOSize_t values specifying the index in the variable
     //! where the first of the data values will be written. This function gives
@@ -1584,6 +1608,20 @@ namespace muGrid {
     //! way.
     std::string
     register_lfc_to_gfc_local_pixels(muGrid::LocalFieldCollection & fc_local);
+
+    //! Helper method to check if a variable with given name is already registered
+    //! Throws FileIOError if duplicate is found
+    void check_variable_not_registered(const NetCDFVariables & variables,
+                                       const std::string & var_name,
+                                       const std::string & var_type);
+
+    //! Helper method to collect field names from state field and add to tracking
+    void collect_state_field_names(muGrid::StateField & state_field);
+
+    //! Helper method to setup variable attributes and local field info
+    //! Used for both global and local field registration
+    void setup_variable_metadata(NetCDFVarBase & var,
+                                 const std::string & local_field_name = "");
 
     //! write contents of all fields within the field collection with the name
     //! in field_names that have no frame dimension.

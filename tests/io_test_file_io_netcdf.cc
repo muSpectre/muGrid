@@ -674,5 +674,184 @@ namespace muGrid {
     }
   }
 
+  // Tests for Phase 1 refactoring improvements
+  BOOST_AUTO_TEST_CASE(NetCDFAttVariantStorage) {
+    // Test 1.2: Variant-based attribute storage
+    // Verify that all attribute types are correctly stored and retrieved
+
+    // Test char vector
+    std::vector<char> char_values{'h', 'e', 'l', 'l', 'o'};
+    muGrid::NetCDFAtt att_char("test_char", char_values);
+    BOOST_CHECK_EQUAL(att_char.get_data_type(), muGrid::MU_NC_CHAR);
+    BOOST_CHECK_EQUAL(att_char.get_nelems(), 5);
+    // Verify individual elements instead of comparing vectors
+    const auto & retrieved_char = att_char.get_typed_value_c();
+    BOOST_CHECK_EQUAL(retrieved_char[0], 'h');
+    BOOST_CHECK_EQUAL(retrieved_char.size(), size_t(5));
+
+    // Test int vector
+    std::vector<muGrid::Int> int_values{1, 2, 3, 4, 5};
+    muGrid::NetCDFAtt att_int("test_int", int_values);
+    BOOST_CHECK_EQUAL(att_int.get_data_type(), muGrid::MU_NC_INT);
+    BOOST_CHECK_EQUAL(att_int.get_nelems(), 5);
+    const auto & retrieved_int = att_int.get_typed_value_i();
+    BOOST_CHECK_EQUAL(retrieved_int[0], 1);
+    BOOST_CHECK_EQUAL(retrieved_int.size(), size_t(5));
+
+    // Test uint vector
+    std::vector<muGrid::Uint> uint_values{10, 20, 30};
+    muGrid::NetCDFAtt att_uint("test_uint", uint_values);
+    BOOST_CHECK_EQUAL(att_uint.get_data_type(), muGrid::MU_NC_UINT);
+    BOOST_CHECK_EQUAL(att_uint.get_nelems(), 3);
+    const auto & retrieved_uint = att_uint.get_typed_value_ui();
+    BOOST_CHECK_EQUAL(retrieved_uint[0], 10u);
+    BOOST_CHECK_EQUAL(retrieved_uint.size(), size_t(3));
+
+    // Test Index_t vector
+    std::vector<muGrid::Index_t> index_values{100, 200, 300, 400};
+    muGrid::NetCDFAtt att_index("test_index", index_values);
+    BOOST_CHECK_EQUAL(att_index.get_data_type(), muGrid::MU_NC_INDEX_T);
+    BOOST_CHECK_EQUAL(att_index.get_nelems(), 4);
+    const auto & retrieved_index = att_index.get_typed_value_l();
+    BOOST_CHECK_EQUAL(retrieved_index[0], 100);
+    BOOST_CHECK_EQUAL(retrieved_index.size(), size_t(4));
+
+    // Test Real vector
+    std::vector<muGrid::Real> real_values{1.5, 2.5, 3.5};
+    muGrid::NetCDFAtt att_real("test_real", real_values);
+    BOOST_CHECK_EQUAL(att_real.get_data_type(), muGrid::MU_NC_REAL);
+    BOOST_CHECK_EQUAL(att_real.get_nelems(), 3);
+    const auto & retrieved_real = att_real.get_typed_value_d();
+    BOOST_CHECK_EQUAL(retrieved_real[0], 1.5);
+    BOOST_CHECK_EQUAL(retrieved_real.size(), size_t(3));
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFAttVariantDataSize) {
+    // Test that variant-based storage correctly computes data sizes
+    std::vector<char> char_vals{'a', 'b', 'c'};
+    muGrid::NetCDFAtt att_char("test", char_vals);
+    BOOST_CHECK_EQUAL(att_char.get_data_size(), 3 * sizeof(char));
+
+    std::vector<muGrid::Real> real_vals{1.0, 2.0};
+    muGrid::NetCDFAtt att_real("test", real_vals);
+    BOOST_CHECK_EQUAL(att_real.get_data_size(), 2 * sizeof(muGrid::Real));
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFAttVariantGetValue) {
+    // Test that get_value() correctly returns void pointer to variant data
+    std::vector<muGrid::Int> int_values{42, 84};
+    muGrid::NetCDFAtt att("test", int_values);
+
+    const void * ptr = att.get_value();
+    const muGrid::Int * int_ptr = static_cast<const muGrid::Int *>(ptr);
+    BOOST_CHECK_EQUAL(int_ptr[0], 42);
+    BOOST_CHECK_EQUAL(int_ptr[1], 84);
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFAttVariantGetValueAsString) {
+    // Test that get_value_as_string() works with variant storage
+    // Use a string directly which has a built-in vector serialization
+    std::string test_str{"test_value"};
+    muGrid::NetCDFAtt att("test", test_str);
+    std::string str_value = att.get_value_as_string();
+    // String formatting produces output, just verify non-empty
+    BOOST_CHECK(!str_value.empty());
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFAttVariantStringConstructor) {
+    // Test convenience constructor for strings using variant
+    std::string test_string{"hello world"};
+    muGrid::NetCDFAtt att("test", test_string);
+    BOOST_CHECK_EQUAL(att.get_data_type(), muGrid::MU_NC_CHAR);
+    BOOST_CHECK_EQUAL(att.get_nelems(), test_string.size());
+
+    // String should be stored as char vector
+    const std::vector<char> & char_vals = att.get_typed_value_c();
+    std::string retrieved(char_vals.begin(), char_vals.end());
+    BOOST_CHECK_EQUAL(retrieved, test_string);
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFAttVariantEqualValue) {
+    // Test that equal_value() works correctly with variant storage
+    std::vector<muGrid::Real> real_values{1.5, 2.5, 3.5};
+    muGrid::NetCDFAtt att("test", real_values);
+
+    // Create matching void pointer - must have same size and values
+    std::vector<muGrid::Real> same_values{1.5, 2.5, 3.5};
+    void * ptr = same_values.data();
+    // equal_value should recognize that the content is the same
+    bool is_equal = att.equal_value(ptr);
+    BOOST_CHECK(is_equal);
+
+    // Create non-matching void pointer - different final value
+    std::vector<muGrid::Real> diff_values{1.5, 2.5, 4.0};
+    void * diff_ptr = diff_values.data();
+    // equal_value should recognize that the content is different
+    bool is_not_equal = att.equal_value(diff_ptr);
+    BOOST_CHECK(!is_not_equal);
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFDimensionStartValueComputation) {
+    // Test 1.1: Dimension layout helper methods
+    auto & comm{MPIContext::get_context().comm};
+    const Index_t spatial_dimension{twoD};
+    const muGrid::FieldCollection::SubPtMap_t & nb_sub_pts{{"one", 1}};
+
+    const IntCoord_t & nb_domain_grid_pts{3, 3};
+    const IntCoord_t & nb_subdomain_grid_pts{3, 3};
+    const IntCoord_t & subdomain_locations{0, 0};
+    muGrid::GlobalFieldCollection global_fc(nb_domain_grid_pts,
+                                            nb_subdomain_grid_pts,
+                                            subdomain_locations, nb_sub_pts);
+
+    const std::string & unique_name{"test_field"};
+    global_fc.register_real_field(unique_name, 1);
+
+    muGrid::Field & field{global_fc.get_field(unique_name)};
+
+    NetCDFDimensions dimensions;
+    std::vector<std::shared_ptr<NetCDFDim>> dim_sp;
+    dimensions.add_field_dims_global(field, dim_sp);
+
+    // Create a NetCDFVar to test dimension computation
+    NetCDFVariables variables;
+    NetCDFVarBase & var{variables.add_field_var(field, dim_sp)};
+
+    // Test that get_start_global() successfully computes start values
+    // using the extracted helper methods. Verify it returns non-empty vector
+    auto starts = var.get_start_global(0);
+    BOOST_CHECK(!starts.empty());
+    // Verify that all start values are numeric (can be accessed)
+    for (size_t i = 0; i < starts.size(); ++i) {
+      BOOST_CHECK(starts[i] >= 0);  // Start indices should be non-negative
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(NetCDFAttributeTypeDetection) {
+    // Test that attribute types are correctly detected from constructors
+    // This ensures variant assignment is type-safe
+
+    // Implicit type detection
+    std::vector<char> c{'x'};
+    muGrid::NetCDFAtt att_c("c", c);
+    BOOST_CHECK_EQUAL(att_c.get_data_type(), muGrid::MU_NC_CHAR);
+
+    std::vector<muGrid::Int> i{42};
+    muGrid::NetCDFAtt att_i("i", i);
+    BOOST_CHECK_EQUAL(att_i.get_data_type(), muGrid::MU_NC_INT);
+
+    std::vector<muGrid::Uint> u{99};
+    muGrid::NetCDFAtt att_u("u", u);
+    BOOST_CHECK_EQUAL(att_u.get_data_type(), muGrid::MU_NC_UINT);
+
+    std::vector<muGrid::Index_t> l{999};
+    muGrid::NetCDFAtt att_l("l", l);
+    BOOST_CHECK_EQUAL(att_l.get_data_type(), muGrid::MU_NC_INDEX_T);
+
+    std::vector<muGrid::Real> d{3.14};
+    muGrid::NetCDFAtt att_d("d", d);
+    BOOST_CHECK_EQUAL(att_d.get_data_type(), muGrid::MU_NC_REAL);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid
