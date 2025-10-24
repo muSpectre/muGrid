@@ -673,9 +673,9 @@ namespace muGrid {
       const muGrid::GlobalFieldCollection & fc_global) {
     const IntCoord_t & nb_domain_grid_pts{fc_global.get_nb_domain_grid_pts()};
     const IntCoord_t & nb_subdomain_grid_pts{
-        fc_global.get_nb_subdomain_grid_pts_with_ghosts()};
+        fc_global.get_nb_subdomain_grid_pts_without_ghosts()};
     const IntCoord_t & subdomain_locations{
-        fc_global.get_subdomain_locations_with_ghosts()};
+        fc_global.get_subdomain_locations_without_ghosts()};
 
     // init global field collection "local_pixels"
     this->GFC_local_pixels.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts,
@@ -2009,8 +2009,7 @@ namespace muGrid {
           count = static_cast<IOSize_t>(
               dynamic_cast<muGrid::GlobalFieldCollection &>(
                   this->get_field().get_collection())
-                  .get_pixels()
-                  .get_nb_subdomain_grid_pts()[0]);
+                  .get_nb_subdomain_grid_pts_without_ghosts()[0]);
         } else {
           throw FileIOError("err_local");
         }
@@ -2019,8 +2018,7 @@ namespace muGrid {
           count = static_cast<IOSize_t>(
               dynamic_cast<muGrid::GlobalFieldCollection &>(
                   this->get_field().get_collection())
-                  .get_pixels()
-                  .get_nb_subdomain_grid_pts()[1]);
+                  .get_nb_subdomain_grid_pts_without_ghosts()[1]);
         } else {
           throw FileIOError("err_local");
         }
@@ -2029,8 +2027,7 @@ namespace muGrid {
           count = static_cast<IOSize_t>(
               dynamic_cast<muGrid::GlobalFieldCollection &>(
                   this->get_field().get_collection())
-                  .get_pixels()
-                  .get_nb_subdomain_grid_pts()[2]);
+                  .get_nb_subdomain_grid_pts_without_ghosts()[2]);
         } else {
           throw FileIOError("err_local");
         }
@@ -2567,8 +2564,7 @@ namespace muGrid {
         result.value = static_cast<IOSize_t>(
             dynamic_cast<muGrid::GlobalFieldCollection &>(
                 this->get_field().get_collection())
-                .get_pixels()
-                .get_subdomain_locations()[0]);
+                .get_subdomain_locations_without_ghosts()[0]);
         result.found = true;
       }
     } else if (base_name == "ny") {
@@ -2576,8 +2572,7 @@ namespace muGrid {
         result.value = static_cast<IOSize_t>(
             dynamic_cast<muGrid::GlobalFieldCollection &>(
                 this->get_field().get_collection())
-                .get_pixels()
-                .get_subdomain_locations()[1]);
+                .get_subdomain_locations_without_ghosts()[1]);
         result.found = true;
       }
     } else if (base_name == "nz") {
@@ -2585,8 +2580,7 @@ namespace muGrid {
         result.value = static_cast<IOSize_t>(
             dynamic_cast<muGrid::GlobalFieldCollection &>(
                 this->get_field().get_collection())
-                .get_pixels()
-                .get_subdomain_locations()[2]);
+                .get_subdomain_locations_without_ghosts()[2]);
         result.found = true;
       }
     } else if (base_name == "subpt" || base_name == "tensor_dim") {

@@ -48,13 +48,17 @@ import time
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.skipif(not muGrid.has_mpi, reason="muGrid has no OpenMode in serial build")
+pytestmark = pytest.mark.skipif(
+    not muGrid.has_mpi, reason="muGrid has no OpenMode in serial build"
+)
 
 
 class FileIOTest(unittest.TestCase):
     def setUp(self):
         self.nb_domain_grid_pts = (3, 3, 3)
         self.nb_subdomain_grid_pts = (3, 3, 3)
+        self.nb_ghosts_left = (1, 1, 1)
+        self.nb_ghosts_right = (2, 2, 2)
         self.file_f_name = "python_binding_io_field-tests.nc"
         self.file_sf_name = "python_binding_io_state-field-tests.nc"
         self.file_ga_name = "python_binding_io_global-attributes-tests.nc"
@@ -64,7 +68,9 @@ class FileIOTest(unittest.TestCase):
             self.comm = muGrid.Communicator()
 
         # global field collection
-        self.fc_glob = muGrid.GlobalFieldCollection(len(self.nb_domain_grid_pts))
+        self.fc_glob = muGrid.GlobalFieldCollection(
+            len(self.nb_domain_grid_pts),
+        )
         self.fc_glob.initialise(self.nb_domain_grid_pts, self.nb_subdomain_grid_pts)
 
         # local field collection

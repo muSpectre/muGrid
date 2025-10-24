@@ -793,8 +793,6 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(NetCDFDimensionStartValueComputation) {
     // Test 1.1: Dimension layout helper methods
-    auto & comm{MPIContext::get_context().comm};
-    const Index_t spatial_dimension{twoD};
     const muGrid::FieldCollection::SubPtMap_t & nb_sub_pts{{"one", 1}};
 
     const IntCoord_t & nb_domain_grid_pts{3, 3};

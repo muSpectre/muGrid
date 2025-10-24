@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 from NuMPI.Testing.Subdivision import suggest_subdivisions
@@ -88,13 +90,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     )
 
     # Communicate ghost cells
-    print("BEFORE")
-    with np.printoptions(precision=2):
-        print(field.pg)
     cart_decomp.communicate_ghosts(field)
-    print("AFTER")
-    with np.printoptions(precision=2):
-        print(field.pg)
 
     # Check values at all grid points
     for index in np.ndindex(*nb_subdomain_grid_pts):
@@ -124,3 +120,40 @@ def test_field_accessors(comm, nb_grid_pts=(128, 128)):
 
     np.testing.assert_allclose(field.pg[..., 1:-1, 1:-1], field.p)
     np.testing.assert_allclose(field.sg[..., 1:-1, 1:-1], field.s)
+
+
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_io(comm, nb_subdivisions):
+    filename = "test_io_output.nc"
+
+    if comm.rank == 0:
+        if os.path.exists(filename):
+            os.remove(filename)
+
+    comm.barrier()
+
+    # Create a Cartesian decomposition
+    spatial_dim = len(nb_subdivisions)
+    nb_pts_per_dim = 5
+    nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
+    nb_ghost_left = np.full(spatial_dim, 1)
+    nb_ghost_right = np.full(spatial_dim, 2)
+    cart_decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghost_left.tolist(),
+        nb_ghost_right.tolist(),
+    )
+
+    # Create a field for testing
+    field_name = "test_field"
+    field = cart_decomp.collection.real_field(field_name)
+
+    field.pg = (cart_decomp.icoordsg**2).sum(axis=0)
+
+    # Write to file
+    f = muGrid.FileIONetCDF(filename, muGrid.OpenMode.Write, comm)
+    f.register_field_collection(cart_decomp.collection)
+    f.append_frame().write()
+    f.close()
