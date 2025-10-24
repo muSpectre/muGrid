@@ -25,8 +25,8 @@ echo "Installing into prefix ${INSTALL_PREFIX}..."
 echo "PATH is ${PATH}"
 echo "PKG_CONFIG_PATH is ${PKG_CONFIG_PATH}"
 
-XML2="libxml2-2.12.9"
-curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
+XML2="libxml2-2.15.1"
+curl -L https://download.gnome.org/sources/libxml2/2.15/${XML2}.tar.xz | tar -Jx
 cd ${XML2}
 ./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --without-lzma --without-python --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
@@ -38,6 +38,6 @@ cd ..
 NETCDF_VERSION="4.9.3"
 curl -L https://github.com/Unidata/netcdf-c/archive/refs/tags/v${NETCDF_VERSION}.tar.gz | tar -zx
 cd netcdf-c-${NETCDF_VERSION}
-./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
+./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-dap --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
 make install
