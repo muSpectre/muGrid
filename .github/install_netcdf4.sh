@@ -50,6 +50,6 @@ NETCDF_VERSION="4.9.3"
 echo "Installing netcdf-c-${NETCDF_VERSION}"
 curl -L https://github.com/Unidata/netcdf-c/archive/refs/tags/v${NETCDF_VERSION}.tar.gz | tar -zx
 cd netcdf-c-${NETCDF_VERSION}
-./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
+./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-dap --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
 make install
