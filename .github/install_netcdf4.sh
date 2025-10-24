@@ -25,8 +25,19 @@ echo "Installing into prefix ${INSTALL_PREFIX}..."
 echo "PATH is ${PATH}"
 echo "PKG_CONFIG_PATH is ${PKG_CONFIG_PATH}"
 
+LIBZIP_VERSION="1.11.4"
+echo "Installing libzip-${LIBZIP_VERSION}"
+curl -L https://libzip.org/download/libzip-${LIBZIP_VERSION}.tar.xz | tar -Jx
+mkdir build-libzip-${LIBZIP_VERSION}
+cd build-libzip-${LIBZIP_VERSION}
+cmake -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX ../libzip-${LIBZIP_VERSION}
+make
+make install
+cd ..
+
 XML2="libxml2-2.15.1"
-curl -L https://download.gnome.org/sources/libxml2/2.15/${XML2}.tar.xz | tar -Jx
+echo "Installing ${XML2}"
+curl -L https://download.gnome.org/sources/libxml2/2.12/${XML2}.tar.xz | tar -Jx
 cd ${XML2}
 ./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --without-lzma --without-python --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
@@ -36,8 +47,9 @@ cd ..
 #NETCDF="netcdf-c-4.9.2"
 #curl -L https://downloads.unidata.ucar.edu/netcdf-c/4.9.2/${NETCDF}.tar.gz | tar -zx
 NETCDF_VERSION="4.9.3"
+echo "Installing netcdf-c-${NETCDF_VERSION}"
 curl -L https://github.com/Unidata/netcdf-c/archive/refs/tags/v${NETCDF_VERSION}.tar.gz | tar -zx
 cd netcdf-c-${NETCDF_VERSION}
-./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-dap --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
+./configure --build=$(echo $ARCHFLAGS | sed 's/-arch //') --disable-hdf5 --disable-byterange --enable-static --disable-shared --with-pic --prefix=$INSTALL_PREFIX
 make
 make install
