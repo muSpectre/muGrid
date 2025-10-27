@@ -211,18 +211,16 @@ namespace muGrid {
                 Index_t recv_offset_right{0};
 
 #ifdef WITH_MPI
-                this->cart_comm->sendrecv_right(
-                    direction, block_len_ghost_left, stride_in_next_dim,
-                    nb_blocks_seen_in_next_dim, send_offset_right,
-                    recv_offset_right, begin_addr, stride_in_direction,
-                    element_size, field.get_mpi_type());
+                MPI_Datatype mpi_type{field.get_mpi_type()};
+                void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
 #else
+                void * mpi_type_ptr{nullptr};
+#endif
                 this->cart_comm->sendrecv_right(
                     direction, block_len_ghost_left, stride_in_next_dim,
                     nb_blocks_seen_in_next_dim, send_offset_right,
                     recv_offset_right, begin_addr, stride_in_direction,
-                    element_size);
-#endif
+                    element_size, mpi_type_ptr);
             }
 
             // Perform multiple communication steps to the LEFT
@@ -237,17 +235,16 @@ namespace muGrid {
                                          nb_ghosts_right[direction]};
 
 #ifdef WITH_MPI
+                MPI_Datatype mpi_type_left{field.get_mpi_type()};
+                void * mpi_type_ptr_left{static_cast<void *>(&mpi_type_left)};
+#else
+                void * mpi_type_ptr_left{nullptr};
+#endif
                 this->cart_comm->sendrecv_left(
                     direction, block_len_ghost_right, stride_in_next_dim,
                     nb_blocks_seen_in_next_dim, send_offset_left, recv_offset_left,
                     begin_addr, stride_in_direction, element_size,
-                    field.get_mpi_type());
-#else
-                this->cart_comm->sendrecv_left(
-                    direction, block_len_ghost_right, stride_in_next_dim,
-                    nb_blocks_seen_in_next_dim, send_offset_left, recv_offset_left,
-                    begin_addr, stride_in_direction, element_size);
-#endif
+                    mpi_type_ptr_left);
             }
         }
     }
