@@ -954,7 +954,7 @@ namespace muGrid {
     NetCDFVarStateField & operator=(NetCDFVarStateField && other) = delete;
 
     //! get a reference to the field represented by the NetCDF variable
-    const muGrid::Field & get_field() const;
+    const muGrid::Field & get_field() const override;
 
     //! return the number of fields belonging to the state field (nb_memory + 1)
     size_t get_nb_fields() const;
@@ -966,35 +966,35 @@ namespace muGrid {
     //! A vector of IOSize_t values specifying the index in the variable
     //! where the first of the data values will be written. This function gives
     //! the start for contiguous global fields written with ncmu_put_varm_all
-    std::vector<IOSize_t> get_start_global(const Index_t & frame) const;
+    std::vector<IOSize_t> get_start_global(const Index_t & frame) const override;
 
     //! A vector of IOSize_t values specifying the index in the variable
     //! where the first of the data values will be written. This function gives
     //! the start for distributed local fields written with ncmu_put_varn_all
     std::vector<IOSize_t> get_start_local(const Index_t & frame,
-                                          muGrid::Field & local_pixels) const;
+                                          muGrid::Field & local_pixels) const override;
 
     // A vector of Size_t integers that specifies the sampling interval
     // along each dimension of the netCDF variable.
-    std::vector<IODiff_t> get_nc_stride() const;
+    std::vector<IODiff_t> get_nc_stride() const override;
 
     // A vector of IOSize_t integers that the mapping between the dimensions of
     // a NetCDF variable and the in-memory structure of the internal data array.
-    std::vector<IODiff_t> get_nc_imap_global() const;
+    std::vector<IODiff_t> get_nc_imap_global() const override;
 
-    std::vector<IODiff_t> get_nc_imap_local() const;
+    std::vector<IODiff_t> get_nc_imap_local() const override;
 
     //! actual call of NetCDF functions to write a single NetCDFVar into the
     //! NetCDF file
     void write(const int netcdf_id, const Index_t & tot_nb_frames,
                GlobalFieldCollection & GFC_local_pixels,
-               const Index_t & frame_index);
+               const Index_t & frame_index) override;
 
     //! actual call of NetCDF functions to read in the data of a single
     //! NetCDFVar from a NetCDF file
     void read(const int netcdf_id, const Index_t & tot_nb_frames,
               GlobalFieldCollection & GFC_local_pixels,
-              const Index_t & frame_index);
+              const Index_t & frame_index) override;
 
    protected:
     muGrid::StateField &
