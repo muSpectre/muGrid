@@ -5,6 +5,7 @@ Change log for µGrid
 -------------------------
 
 - ENH: Looping over strides fields
+- ENH: Ghost buffers larger than subdomains
 
 0.95.0 (15Juli25)
 -----------------
