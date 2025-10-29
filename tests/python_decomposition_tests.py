@@ -153,7 +153,11 @@ def test_io(comm, nb_subdivisions):
     field.pg = (cart_decomp.icoordsg**2).sum(axis=0)
 
     # Write to file
-    f = muGrid.FileIONetCDF(filename, muGrid.OpenMode.Write, comm)
+    try:
+        f = muGrid.FileIONetCDF(filename, muGrid.OpenMode.Write, comm)
+    except RuntimeError as e:
+        print(f"Opening file for write failed on rank {comm.rank}/{comm.size}")
+        raise e
     f.register_field_collection(cart_decomp.collection)
     f.append_frame().write()
     f.close()
