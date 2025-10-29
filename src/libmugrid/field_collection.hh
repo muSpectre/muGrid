@@ -688,6 +688,9 @@ namespace muGrid {
         //! returns the number of pixels present in the collection
         Index_t get_nb_pixels() const;
 
+        //! returns the number of pixels present in the collection without ghosts
+        virtual Index_t get_nb_pixels_without_ghosts() const;
+
         /**
          * returns the number of (virtual) pixels required to store the underlying
          * data that may involve padding regions

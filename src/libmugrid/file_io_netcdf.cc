@@ -1217,7 +1217,7 @@ namespace muGrid {
       const muGrid::Field & field,
       std::vector<std::shared_ptr<NetCDFDim>> & field_dims,
       const Communicator & comm, std::string state_field_name) {
-    IOSize_t nb_pts{static_cast<IOSize_t>(field.get_nb_pixels())};  // i
+    IOSize_t nb_pts{static_cast<IOSize_t>(field.get_nb_pixels_without_ghosts())};  // i
     IOSize_t nb_pts_glob{comm.sum(nb_pts)};  // sum of all local nb_pts
     IOSize_t nb_subpt{static_cast<IOSize_t>(field.get_nb_sub_pts())};  // s
     Shape_t component_shape{field.get_components_shape()};  // tensor dims
@@ -1969,7 +1969,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   IOSize_t NetCDFVarBase::get_bufcount_mpi_global() const {
-    Index_t bufcount{this->get_field().get_nb_pixels() *
+    Index_t bufcount{this->get_field().get_nb_pixels_without_ghosts() *
                      this->get_field().get_nb_sub_pts() *
                      this->get_field().get_nb_components()};
     return static_cast<IOSize_t>(bufcount);
@@ -2738,7 +2738,7 @@ namespace muGrid {
       iter_type = muGrid::IterUnit::Pixel;
     }
     std::vector<IODiff_t> imap_strides{
-        this->get_field().get_nb_pixels() *
+        this->get_field().get_nb_pixels_without_ghosts() *
         this->get_field().get_nb_dof_per_pixel()};  // imap of frame (nb_dofs)
     auto strides_wrong_type{this->get_field().get_strides(iter_type)};
     std::vector<IODiff_t> strides(strides_wrong_type.begin(),
@@ -2766,7 +2766,7 @@ namespace muGrid {
       iter_type = muGrid::IterUnit::Pixel;
     }
     std::vector<IODiff_t> imap_strides{
-        this->get_field().get_nb_pixels() *
+        this->get_field().get_nb_pixels_without_ghosts() *
         this->get_field()
             .get_nb_dof_per_pixel()};  // imap of frame (nb_pix*nb_dofs)
     auto strides_wrong_type{this->get_field().get_strides(iter_type)};
@@ -2943,7 +2943,7 @@ namespace muGrid {
     IODiff_t nb_history{
         static_cast<IODiff_t>(this->state_field.get_nb_memory() + 1)};
     std::vector<IODiff_t> imap_strides{
-        this->get_field().get_nb_pixels() *
+        this->get_field().get_nb_pixels_without_ghosts() *
         this->get_field().get_nb_dof_per_pixel() *
         nb_history};  // imap of frame (nb_dofs * (nb_memory +1))
     imap_strides.push_back(imap_strides[0] /
@@ -2977,7 +2977,7 @@ namespace muGrid {
     IODiff_t nb_history{
         static_cast<IODiff_t>(this->state_field.get_nb_memory() + 1)};
     std::vector<IODiff_t> imap_strides{
-        this->get_field().get_nb_pixels() *
+        this->get_field().get_nb_pixels_without_ghosts() *
         this->get_field()
             .get_nb_dof_per_pixel()};  // imap of frame
                                        // (nb_pix*nb_dofs*nb_history)

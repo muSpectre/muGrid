@@ -99,6 +99,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  Index_t Field::get_nb_pixels_without_ghosts() const {
+    return this->collection.get_nb_pixels_without_ghosts();
+  }
+
+  /* ---------------------------------------------------------------------- */
   Index_t Field::get_nb_buffer_pixels() const {
     return this->collection.get_nb_buffer_pixels();
   }

@@ -137,8 +137,8 @@ class ConvolutionOperatorCheck(unittest.TestCase):
             nb_y_pts,
         )
 
-        print(f"actual\n{quad.s}")
-        print(f"desired\n{grad_ref_ocqxy}")
+        # print(f"actual\n{quad.s}")
+        # print(f"desired\n{grad_ref_ocqxy}")
         # Check
         np.testing.assert_allclose(quad.s, grad_ref_ocqxy)
 

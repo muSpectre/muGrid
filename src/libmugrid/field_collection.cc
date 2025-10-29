@@ -276,6 +276,11 @@ namespace muGrid {
   Index_t FieldCollection::get_nb_pixels() const { return this->nb_pixels; }
 
   /* ---------------------------------------------------------------------- */
+  Index_t FieldCollection::get_nb_pixels_without_ghosts() const {
+    return this->get_nb_pixels();
+  }
+
+  /* ---------------------------------------------------------------------- */
   Index_t FieldCollection::get_nb_buffer_pixels() const {
     return this->nb_buffer_pixels;
   }

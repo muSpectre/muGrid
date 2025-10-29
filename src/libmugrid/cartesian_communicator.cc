@@ -70,9 +70,11 @@ namespace muGrid {
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
         Index_t send_offset, Index_t recv_offset, char * begin_addr,
         int stride_in_direction, int elem_size_in_bytes,
-        MPI_Datatype elem_mpi_t) const {
+        void * elem_mpi_t) const {
+        // Cast void pointer to MPI_Datatype for MPI implementation
+        MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
         MPI_Datatype buffer_mpi_t;
-        MPI_Type_vector(nb_blocks, block_len, stride_in_next_dim, elem_mpi_t,
+        MPI_Type_vector(nb_blocks, block_len, stride_in_next_dim, mpi_datatype,
                         &buffer_mpi_t);
         MPI_Type_commit(&buffer_mpi_t);
         auto recv_addr{
@@ -91,9 +93,11 @@ namespace muGrid {
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
         Index_t send_offset, Index_t recv_offset, char * begin_addr,
         int stride_in_direction, int elem_size_in_bytes,
-        MPI_Datatype elem_mpi_t) const {
+        void * elem_mpi_t) const {
+        // Cast void pointer to MPI_Datatype for MPI implementation
+        MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
         MPI_Datatype buffer_mpi_t;
-        MPI_Type_vector(nb_blocks, block_len, stride_in_next_dim, elem_mpi_t,
+        MPI_Type_vector(nb_blocks, block_len, stride_in_next_dim, mpi_datatype,
                         &buffer_mpi_t);
         MPI_Type_commit(&buffer_mpi_t);
         auto recv_addr{
@@ -116,7 +120,10 @@ namespace muGrid {
     void CartesianCommunicator::sendrecv_right(
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
         Index_t send_offset, Index_t recv_offset, char * begin_addr,
-        int stride_in_direction, int elem_size_in_bytes) const {
+        int stride_in_direction, int elem_size_in_bytes,
+        void * elem_mpi_t) const {
+        // Note: elem_mpi_t is not used in serial mode (ignored parameter)
+        (void)elem_mpi_t;  // Suppress unused parameter warning
         for (int count{0}; count < nb_blocks; ++count) {
             auto recv_addr{static_cast<void *>(
                 begin_addr +
@@ -132,7 +139,10 @@ namespace muGrid {
     void CartesianCommunicator::sendrecv_left(
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
         Index_t send_offset, Index_t recv_offset, char * begin_addr,
-        int stride_in_direction, int elem_size_in_bytes) const {
+        int stride_in_direction, int elem_size_in_bytes,
+        void * elem_mpi_t) const {
+        // Note: elem_mpi_t is not used in serial mode (ignored parameter)
+        (void)elem_mpi_t;  // Suppress unused parameter warning
         for (int count{0}; count < nb_blocks; ++count) {
             auto recv_addr{static_cast<void *>(
                 begin_addr +

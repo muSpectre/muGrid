@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import pytest
 from NuMPI.Testing.Subdivision import suggest_subdivisions
@@ -126,12 +124,6 @@ def test_field_accessors(comm, nb_grid_pts=(128, 128)):
 def test_io(comm, nb_subdivisions):
     filename = "test_io_output.nc"
 
-    if comm.rank == 0:
-        if os.path.exists(filename):
-            os.remove(filename)
-
-    comm.barrier()
-
     # Create a Cartesian decomposition
     spatial_dim = len(nb_subdivisions)
     nb_pts_per_dim = 5
@@ -153,7 +145,11 @@ def test_io(comm, nb_subdivisions):
     field.pg = (cart_decomp.icoordsg**2).sum(axis=0)
 
     # Write to file
-    f = muGrid.FileIONetCDF(filename, muGrid.OpenMode.Write, comm)
+    try:
+        f = muGrid.FileIONetCDF(filename, muGrid.OpenMode.Overwrite, comm)
+    except RuntimeError as e:
+        print(f"Opening file for write failed on rank {comm.rank}/{comm.size}")
+        raise e
     f.register_field_collection(cart_decomp.collection)
     f.append_frame().write()
     f.close()

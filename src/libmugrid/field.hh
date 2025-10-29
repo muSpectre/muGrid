@@ -151,6 +151,9 @@ namespace muGrid {
         //! return the number of pixels
         Index_t get_nb_pixels() const;
 
+        //! return the number of pixels without ghosts
+        Index_t get_nb_pixels_without_ghosts() const;
+
         /**
          * return the number of pixels that are required for the buffer. This can
          * be larger than get_nb_pixels if the buffer contains padding regions.

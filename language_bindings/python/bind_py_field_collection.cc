@@ -379,6 +379,8 @@ void add_field_collection(py::module & mod) {
         .def("field_exists", &FieldCollection::field_exists)
         .def("state_field_exists", &FieldCollection::state_field_exists)
         .def_property_readonly("nb_pixels", &FieldCollection::get_nb_pixels)
+        .def_property_readonly("nb_pixels_without_ghosts",
+                               &FieldCollection::get_nb_pixels_without_ghosts)
         .def(
             "get_nb_sub_pts",
             [](const FieldCollection & coll, const std::string & tag) {
