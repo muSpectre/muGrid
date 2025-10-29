@@ -83,7 +83,7 @@ namespace muGrid {
         LocalFieldCollection(LocalFieldCollection &&other) = default;
 
         //! Destructor
-        virtual ~LocalFieldCollection() = default;
+        ~LocalFieldCollection() override = default;
 
         //! Copy assignment operator
         LocalFieldCollection &
@@ -121,19 +121,19 @@ namespace muGrid {
         get_empty_clone() const;
 
         //! return shape of the pixels
-        virtual Shape_t get_pixels_shape() const;
+        Shape_t get_pixels_shape() const override;
 
         //! return shape of the pixels
-        virtual Shape_t get_pixels_shape_without_ghosts() const;
+        Shape_t get_pixels_shape_without_ghosts() const override;
 
         //! return the number of pixels without ghosts
-        virtual Index_t get_nb_pixels_without_ghosts() const override;
+        Index_t get_nb_pixels_without_ghosts() const override;
 
         //! return the offset of the pixels in the storage without ghosts
-        virtual Shape_t get_pixels_offset_without_ghosts() const;
+        Shape_t get_pixels_offset_without_ghosts() const override;
 
         //! return strides of the pixels
-        virtual Shape_t get_pixels_strides(Index_t element_size = 1) const;
+        Shape_t get_pixels_strides(Index_t element_size = 1) const override;
 
         std::map<Index_t, Index_t> &get_global_to_local_index_map() {
             return this->global_to_local_index_map;

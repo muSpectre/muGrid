@@ -92,7 +92,7 @@ namespace muGrid {
         ConvolutionOperator(ConvolutionOperator &&other) = default;
 
         //! Destructor
-        virtual ~ConvolutionOperator() = default;
+        ~ConvolutionOperator() override = default;
 
         //! Copy assignment operator
         ConvolutionOperator &
