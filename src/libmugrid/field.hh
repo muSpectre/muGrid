@@ -139,7 +139,7 @@ namespace muGrid {
         //! return a const reference to the field's collection
         FieldCollection &get_collection() const;
 
-        //! return the number of components stored per sub-point po1int
+        //! return the number of components stored per sub-point point
         const Index_t &get_nb_components() const;
 
         //! return the number of sub points per pixel
