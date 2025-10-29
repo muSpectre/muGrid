@@ -139,7 +139,7 @@ namespace muGrid {
         //! return a const reference to the field's collection
         FieldCollection &get_collection() const;
 
-        //! return the number of components stored per sub-point point
+        //! return the number of components stored per sub-point po1int
         const Index_t &get_nb_components() const;
 
         //! return the number of sub points per pixel
@@ -150,6 +150,9 @@ namespace muGrid {
 
         //! return the number of pixels
         Index_t get_nb_pixels() const;
+
+        //! return the number of pixels without ghosts
+        Index_t get_nb_pixels_without_ghosts() const;
 
         /**
          * return the number of pixels that are required for the buffer. This can

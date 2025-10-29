@@ -104,6 +104,11 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    Index_t LocalFieldCollection::get_nb_pixels_without_ghosts() const {
+        return this->get_nb_pixels();
+    }
+
+    /* ---------------------------------------------------------------------- */
     Shape_t LocalFieldCollection::get_pixels_offset_without_ghosts() const {
         return Shape_t{0}; // no offset for local fields
     }
