@@ -65,9 +65,6 @@ namespace muGrid {
                 this->comm, nb_subdivisions);
         }
 
-        // Get spatial dimensions
-        auto spatial_dims{nb_domain_grid_pts.size()};
-
         // Grid points and locations
         auto nb_subdomain_grid_pts{nb_subdomain_grid_pts_without_ghosts};
         auto subdomain_locations{subdomain_locations_without_ghosts};
