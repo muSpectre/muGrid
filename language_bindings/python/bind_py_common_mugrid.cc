@@ -88,17 +88,7 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
         .def("__len__", &DynCcoord<MaxDim, T>::get_dim)
         .def("__str__",
              [](const DynCcoord<MaxDim, T> & self) {
-                 if (self.get_dim() == 0) {
-                     // Corner case
-                     return std::string("()");
-                 }
-                 std::stringstream s;
-                 s << "(";
-                 for (int i{0}; i < self.get_dim() - 1; ++i) {
-                     s << self[i] << ", ";
-                 }
-                 s << self[self.get_dim() - 1] << ")";
-                 return s.str();
+                 return (std::stringstream() << self).str();
              })
         .def("__getitem__",
              [](const DynCcoord<MaxDim, T> & self, const Index_t & index) {
