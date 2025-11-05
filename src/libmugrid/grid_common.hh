@@ -58,7 +58,7 @@ namespace muGrid {
      * @{
      */
 
-/**
+    /**
      * @typedef Dim_t
      * @brief A type alias for signed integers used for static dimensions.
      *
@@ -423,7 +423,7 @@ namespace muGrid {
 
         //! comparison operator
         bool operator!=(const DynCcoord & other) const {
-            return !(*  this == other);
+            return !(*this == other);
         }
 
         //! element-wise addition
@@ -494,8 +494,7 @@ namespace muGrid {
 
         //! element-wise subtraction
         template <typename T2>
-        DynCcoord<MaxDim, decltype(T{} - T2{})>
-        operator-(T2 other) const {
+        DynCcoord<MaxDim, decltype(T{} - T2{})> operator-(T2 other) const {
             DynCcoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
             for (Dim_t i{0}; i < this->get_dim(); ++i) {
                 retval[i] = this->operator[](i) - other;

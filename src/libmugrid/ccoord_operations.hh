@@ -793,7 +793,9 @@ namespace muGrid {
                     ++this->coord0[axis];
                     // Check whether coordinate is out of bounds
                     Index_t aindex{0};
-                    while (aindex < this->pixels.dim-1 && this->coord0[axis] >= this->pixels.nb_subdomain_grid_pts[axis]) {
+                    while (aindex < this->pixels.dim - 1 &&
+                           this->coord0[axis] >=
+                               this->pixels.nb_subdomain_grid_pts[axis]) {
                         this->coord0[axis] = 0;
                         // Get next fastest axis
                         axis = this->pixels.axes_order[++aindex];
@@ -822,7 +824,7 @@ namespace muGrid {
 
             //! stl conformance
             iterator end() const {
-                return ++iterator(*this, this->nb_subdomain_grid_pts-1);
+                return ++iterator(*this, this->nb_subdomain_grid_pts - 1);
             }
 
             //! stl conformance
@@ -832,7 +834,8 @@ namespace muGrid {
 
             //! buffer size, including padding
             size_t buffer_size() const {
-                return get_buffer_size(this->nb_subdomain_grid_pts, this->strides);
+                return get_buffer_size(this->nb_subdomain_grid_pts,
+                                       this->strides);
             }
 
             //! return spatial dimension
@@ -925,7 +928,8 @@ namespace muGrid {
 
                 //! stl conformance
                 iterator end() const {
-                    iterator it{this->pixels, this->pixels.nb_subdomain_grid_pts-1};
+                    iterator it{this->pixels,
+                                this->pixels.nb_subdomain_grid_pts - 1};
                     ++it;
                     return it;
                 }
@@ -933,7 +937,9 @@ namespace muGrid {
                 //! stl conformance
                 size_t size() const { return this->pixels.size(); }
 
-                size_t buffer_size() const { return this->pixels.buffer_size(); }
+                size_t buffer_size() const {
+                    return this->pixels.buffer_size();
+                }
 
                protected:
                 const Pixels & pixels;
