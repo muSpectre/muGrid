@@ -759,6 +759,10 @@ namespace muGrid {
                 iterator(const Pixels & pixels, Size_t index)
                     : pixels{pixels}, coord0{pixels.get_coord0(index)} {}
 
+                //! constructor
+                iterator(const Pixels & pixels, IntCoord_t coord0)
+                    : pixels{pixels}, coord0{coord0} {}
+
                 //! Default constructor
                 iterator() = delete;
 
@@ -784,14 +788,12 @@ namespace muGrid {
 
                 //! pre-increment
                 iterator & operator++() {
-                    Index_t axis{this->pixels.axes_order[0]};
+                    auto axis{this->pixels.axes_order[0]};
                     // Increase fastest index
                     ++this->coord0[axis];
                     // Check whether coordinate is out of bounds
                     Index_t aindex{0};
-                    while (this->coord0[axis] >=
-                               this->pixels.nb_subdomain_grid_pts[axis] &&
-                           aindex < this->pixels.dim - 1) {
+                    while (aindex < this->pixels.dim-1 && this->coord0[axis] >= this->pixels.nb_subdomain_grid_pts[axis]) {
                         this->coord0[axis] = 0;
                         // Get next fastest axis
                         axis = this->pixels.axes_order[++aindex];
@@ -819,11 +821,18 @@ namespace muGrid {
             iterator begin() const { return iterator(*this, 0); }
 
             //! stl conformance
-            iterator end() const { return iterator(*this, this->size()); }
+            iterator end() const {
+                return ++iterator(*this, this->nb_subdomain_grid_pts-1);
+            }
 
             //! stl conformance
             size_t size() const {
                 return get_size(this->nb_subdomain_grid_pts);
+            }
+
+            //! buffer size, including padding
+            size_t buffer_size() const {
+                return get_buffer_size(this->nb_subdomain_grid_pts, this->strides);
             }
 
             //! return spatial dimension
@@ -916,11 +925,15 @@ namespace muGrid {
 
                 //! stl conformance
                 iterator end() const {
-                    return iterator{this->pixels, this->pixels.size()};
+                    iterator it{this->pixels, this->pixels.nb_subdomain_grid_pts-1};
+                    ++it;
+                    return it;
                 }
 
                 //! stl conformance
                 size_t size() const { return this->pixels.size(); }
+
+                size_t buffer_size() const { return this->pixels.buffer_size(); }
 
                protected:
                 const Pixels & pixels;

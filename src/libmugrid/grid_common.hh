@@ -492,6 +492,17 @@ namespace muGrid {
             return retval;
         }
 
+        //! element-wise subtraction
+        template <typename T2>
+        DynCcoord<MaxDim, decltype(T{} - T2{})>
+        operator-(T2 other) const {
+            DynCcoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
+            for (Dim_t i{0}; i < this->get_dim(); ++i) {
+                retval[i] = this->operator[](i) - other;
+            }
+            return retval;
+        }
+
         //! element-wise multiplication
         template <typename T2>
         DynCcoord<MaxDim, decltype(T{} * T2{})>

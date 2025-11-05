@@ -133,9 +133,13 @@ namespace muGrid {
 
     // For each pixel...
     for (auto && [id, base_ccoord] : pixels.enumerate()) {
+      std::cout << base_ccoord << " " << id << std::endl;
+
       // which should be interpreted as a matrix with shape (c, o q)
       // (It is already set to zero in the caller function "apply")
       auto && quad_vals{quad_map[id]};
+
+      std::cout << base_ccoord << " " << nodal_map[id] << " " << quad_vals << std::endl;
 
       // For each convolution points involved in the current pixel...
       for (auto && [index, offset] : akantu::enumerate(conv_space)) {
