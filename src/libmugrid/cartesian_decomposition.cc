@@ -43,8 +43,7 @@ namespace muGrid {
         const IntCoord_t & nb_subdivisions,
         const IntCoord_t & nb_subdomain_grid_pts_without_ghosts,
         const IntCoord_t & subdomain_locations_without_ghosts,
-        const IntCoord_t & nb_ghosts_left,
-        const IntCoord_t & nb_ghosts_right,
+        const IntCoord_t & nb_ghosts_left, const IntCoord_t & nb_ghosts_right,
         const IntCoord_t & subdomain_strides) {
         // Idiot checks
         this->check_dimension(nb_domain_grid_pts, "nb_domain_grid_pts");
@@ -77,8 +76,8 @@ namespace muGrid {
         if (subdomain_strides.get_dim() == 0) {
             this->collection.initialise(
                 nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
-                StorageOrder::ArrayOfStructures,
-                nb_ghosts_left, nb_ghosts_right);
+                StorageOrder::ArrayOfStructures, nb_ghosts_left,
+                nb_ghosts_right);
         } else {
             this->check_dimension(subdomain_strides, "subdomain_strides");
             this->collection.initialise(
@@ -137,12 +136,13 @@ namespace muGrid {
         auto strides{field.get_strides(IterUnit::SubPt)};
 
         // Total number of elements in the field
+        // FIXME: This appears to be assuming a column-major field
         auto nb_total_elements{strides[strides.size() - 1] *
                                nb_subdomain_grid_pts[spatial_dims - 1]};
 
         // Get the begin address of the field data (cast into char * for pointer
         // arithemtic)
-        auto * begin_addr{static_cast<char *>(field.get_void_data_ptr())};
+        auto * data{static_cast<char *>(field.get_void_data_ptr())};
 
         // Get element size (only useful for pointer arithmetic in finding the
         // correct offset)
@@ -154,8 +154,22 @@ namespace muGrid {
         auto nb_ghosts_right{this->collection.get_nb_ghosts_right()};
 
         // Get the number of grid points without ghosts
-        auto nb_subdomain_grid_pts_no_ghosts{
+        auto nb_subdomain_grid_pts_without_ghosts{
             this->get_nb_subdomain_grid_pts_without_ghosts()};
+
+#ifdef WITH_MPI
+        MPI_Datatype mpi_type{field.get_mpi_type()};
+        void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
+#else
+        void * mpi_type_ptr{nullptr};
+#endif
+
+        // FIXME! The code below assumes a specific form of data layout,
+        // essentially column-major but with potentially varying slides
+        // --- i.e. the first axis needs to be fastest and then it becomes
+        // slower in order of the axes. It also assumes an array of structures
+        // layout. We should either generalize or introduce a guard that fails
+        // if the data layout is wrong.
 
         // For each direction...
         for (int direction{0}; direction < spatial_dims; ++direction) {
@@ -171,7 +185,14 @@ namespace muGrid {
 
             // Calculate number of communication steps needed
             // Each step can exchange at most subdomain_size worth of data
-            auto nb_subdomain_size{nb_subdomain_grid_pts_no_ghosts[direction]};
+            auto nb_subdomain_size{
+                nb_subdomain_grid_pts_without_ghosts[direction]};
+
+            // Determine the width of the region to communicate
+            auto nb_comm_left{
+                std::min(nb_subdomain_size, nb_ghosts_left[direction])};
+            auto nb_comm_right{
+                std::min(nb_subdomain_size, nb_ghosts_right[direction])};
 
             // Handle zero grid points case: still need to do communication
             // if we have ghost buffers
@@ -195,29 +216,24 @@ namespace muGrid {
 
             // Perform multiple communication steps to the RIGHT
             for (int step{0}; step < nb_steps_right; ++step) {
-                // For each step, we exchange the real data + previously received
-                // ghost data
+                // For each step, we exchange the real data + previously
+                // received ghost data
                 auto block_len_ghost_left{stride_in_direction *
                                           nb_ghosts_left[direction]};
 
-                // Send offset: start from the real data (adjusted for step)
+                // Send offset: This is the grid position in the send/recv
+                // direction where the send buffer starts
                 Index_t send_offset_right{nb_subdomain_grid_pts[direction] -
                                           nb_ghosts_right[direction] -
                                           nb_ghosts_left[direction]};
-                // Receive offset: into the left ghost buffer
+                // Receive offset: This is the grid position in the send/recv
+                // direction of where to receive data
                 Index_t recv_offset_right{0};
 
-#ifdef WITH_MPI
-                MPI_Datatype mpi_type{field.get_mpi_type()};
-                void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
-#else
-                void * mpi_type_ptr{nullptr};
-#endif
                 this->cart_comm->sendrecv_right(
                     direction, block_len_ghost_left, stride_in_next_dim,
                     nb_blocks_seen_in_next_dim, send_offset_right,
-                    recv_offset_right, begin_addr, stride_in_direction,
-                    element_size, mpi_type_ptr);
+                    recv_offset_right, data, stride_in_direction, element_size, mpi_type_ptr);
             }
 
             // Perform multiple communication steps to the LEFT
@@ -231,17 +247,10 @@ namespace muGrid {
                 Index_t recv_offset_left{nb_subdomain_grid_pts[direction] -
                                          nb_ghosts_right[direction]};
 
-#ifdef WITH_MPI
-                MPI_Datatype mpi_type_left{field.get_mpi_type()};
-                void * mpi_type_ptr_left{static_cast<void *>(&mpi_type_left)};
-#else
-                void * mpi_type_ptr_left{nullptr};
-#endif
                 this->cart_comm->sendrecv_left(
                     direction, block_len_ghost_right, stride_in_next_dim,
-                    nb_blocks_seen_in_next_dim, send_offset_left, recv_offset_left,
-                    begin_addr, stride_in_direction, element_size,
-                    mpi_type_ptr_left);
+                    nb_blocks_seen_in_next_dim, send_offset_left,
+                    recv_offset_left, data, stride_in_direction, element_size, mpi_type_ptr);
             }
         }
     }

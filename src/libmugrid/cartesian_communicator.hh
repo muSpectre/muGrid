@@ -58,9 +58,9 @@ namespace muGrid {
          * @param block_len Length of each block to send/receive (in elements).
          * @param stride_in_next_dim Stride to the next block in the next dimension.
          * @param nb_block Number of blocks to send/receive.
-         * @param send_offset Offset of the send buffer (in elements).
-         * @param recv_offset Offset of the receive buffer (in elements).
-         * @param begin_addr Base address of the data buffer.
+         * @param send_offset Offset of the send buffer (in blocks).
+         * @param recv_offset Offset of the receive buffer (in blocks).
+         * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in the communication direction.
          * @param elem_size_in_bytes Size of each element in bytes.
          * @param elem_mpi_t MPI datatype for elements (only used with MPI; ignored
@@ -69,7 +69,7 @@ namespace muGrid {
         void sendrecv_right(int direction, int block_len,
                             int stride_in_next_dim, int nb_block,
                             Index_t send_offset, Index_t recv_offset,
-                            char * begin_addr, int stride_in_direction,
+                            char * data, int stride_in_direction,
                             int elem_size_in_bytes,
                             void * elem_mpi_t) const;
 
@@ -82,7 +82,7 @@ namespace muGrid {
          * @param nb_block Number of blocks to send/receive.
          * @param send_offset Offset of the send buffer (in elements).
          * @param recv_offset Offset of the receive buffer (in elements).
-         * @param begin_addr Base address of the data buffer.
+         * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in the communication direction.
          * @param elem_size_in_bytes Size of each element in bytes.
          * @param elem_mpi_t MPI datatype for elements (only used with MPI; ignored
@@ -90,7 +90,7 @@ namespace muGrid {
          */
         void sendrecv_left(int direction, int block_len, int stride_in_next_dim,
                            int nb_block, Index_t send_offset,
-                           Index_t recv_offset, char * begin_addr,
+                           Index_t recv_offset, char * data,
                            int stride_in_direction, int elem_size_in_bytes,
                            void * elem_mpi_t) const;
 

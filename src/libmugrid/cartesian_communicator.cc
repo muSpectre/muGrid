@@ -68,7 +68,7 @@ namespace muGrid {
 
     void CartesianCommunicator::sendrecv_right(
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
-        Index_t send_offset, Index_t recv_offset, char * begin_addr,
+        Index_t send_offset, Index_t recv_offset, char * data,
         int stride_in_direction, int elem_size_in_bytes,
         void * elem_mpi_t) const {
         // Cast void pointer to MPI_Datatype for MPI implementation
@@ -77,12 +77,10 @@ namespace muGrid {
         MPI_Type_vector(nb_blocks, block_len, stride_in_next_dim, mpi_datatype,
                         &buffer_mpi_t);
         MPI_Type_commit(&buffer_mpi_t);
-        auto recv_addr{
-            static_cast<void *>(begin_addr + recv_offset * stride_in_direction *
-                                                 elem_size_in_bytes)};
-        auto send_addr{
-            static_cast<void *>(begin_addr + send_offset * stride_in_direction *
-                                                 elem_size_in_bytes)};
+        auto recv_addr{static_cast<void *>(
+            data + recv_offset * stride_in_direction * elem_size_in_bytes)};
+        auto send_addr{static_cast<void *>(
+            data + send_offset * stride_in_direction * elem_size_in_bytes)};
         MPI_Status status;
         MPI_Sendrecv(send_addr, 1, buffer_mpi_t, this->right_ranks[direction],
                      0, recv_addr, 1, buffer_mpi_t, this->left_ranks[direction],
@@ -91,7 +89,7 @@ namespace muGrid {
 
     void CartesianCommunicator::sendrecv_left(
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
-        Index_t send_offset, Index_t recv_offset, char * begin_addr,
+        Index_t send_offset, Index_t recv_offset, char * data,
         int stride_in_direction, int elem_size_in_bytes,
         void * elem_mpi_t) const {
         // Cast void pointer to MPI_Datatype for MPI implementation
@@ -100,12 +98,10 @@ namespace muGrid {
         MPI_Type_vector(nb_blocks, block_len, stride_in_next_dim, mpi_datatype,
                         &buffer_mpi_t);
         MPI_Type_commit(&buffer_mpi_t);
-        auto recv_addr{
-            static_cast<void *>(begin_addr + recv_offset * stride_in_direction *
-                                                 elem_size_in_bytes)};
-        auto send_addr{
-            static_cast<void *>(begin_addr + send_offset * stride_in_direction *
-                                                 elem_size_in_bytes)};
+        auto recv_addr{static_cast<void *>(
+            data + recv_offset * stride_in_direction * elem_size_in_bytes)};
+        auto send_addr{static_cast<void *>(
+            data + send_offset * stride_in_direction * elem_size_in_bytes)};
         MPI_Status status;
         MPI_Sendrecv(send_addr, 1, buffer_mpi_t, this->left_ranks[direction], 0,
                      recv_addr, 1, buffer_mpi_t, this->right_ranks[direction],
@@ -119,39 +115,35 @@ namespace muGrid {
 
     void CartesianCommunicator::sendrecv_right(
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
-        Index_t send_offset, Index_t recv_offset, char * begin_addr,
+        Index_t send_offset, Index_t recv_offset, char * data,
         int stride_in_direction, int elem_size_in_bytes,
         void * elem_mpi_t) const {
         // Note: elem_mpi_t is not used in serial mode (ignored parameter)
         (void)elem_mpi_t;  // Suppress unused parameter warning
         for (int count{0}; count < nb_blocks; ++count) {
             auto recv_addr{static_cast<void *>(
-                begin_addr +
-                recv_offset * stride_in_direction * elem_size_in_bytes)};
+                data + recv_offset * stride_in_direction * elem_size_in_bytes)};
             auto send_addr{static_cast<void *>(
-                begin_addr +
-                send_offset * stride_in_direction * elem_size_in_bytes)};
+                data + send_offset * stride_in_direction * elem_size_in_bytes)};
             std::memcpy(recv_addr, send_addr, block_len * elem_size_in_bytes);
-            begin_addr += stride_in_next_dim * elem_size_in_bytes;
+            data += stride_in_next_dim * elem_size_in_bytes;
         }
     }
 
     void CartesianCommunicator::sendrecv_left(
         int direction, int block_len, int stride_in_next_dim, int nb_blocks,
-        Index_t send_offset, Index_t recv_offset, char * begin_addr,
+        Index_t send_offset, Index_t recv_offset, char * data,
         int stride_in_direction, int elem_size_in_bytes,
         void * elem_mpi_t) const {
         // Note: elem_mpi_t is not used in serial mode (ignored parameter)
         (void)elem_mpi_t;  // Suppress unused parameter warning
         for (int count{0}; count < nb_blocks; ++count) {
             auto recv_addr{static_cast<void *>(
-                begin_addr +
-                recv_offset * stride_in_direction * elem_size_in_bytes)};
+                data + recv_offset * stride_in_direction * elem_size_in_bytes)};
             auto send_addr{static_cast<void *>(
-                begin_addr +
-                send_offset * stride_in_direction * elem_size_in_bytes)};
+                data + send_offset * stride_in_direction * elem_size_in_bytes)};
             std::memcpy(recv_addr, send_addr, block_len * elem_size_in_bytes);
-            begin_addr += stride_in_next_dim * elem_size_in_bytes;
+            data += stride_in_next_dim * elem_size_in_bytes;
         }
     }
 #endif  // WITH_MPI
