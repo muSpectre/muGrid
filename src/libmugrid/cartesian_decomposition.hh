@@ -35,14 +35,13 @@ namespace muGrid {
         ~CartesianDecomposition() override = default;
 
         //! initialise with known subdomains
-        void
-        initialise(const IntCoord_t & nb_domain_grid_pts,
-                   const IntCoord_t & nb_subdivisions,
-                   const IntCoord_t & nb_subdomain_grid_pts_without_ghosts,
-                   const IntCoord_t & subdomain_locations_without_ghosts,
-                   const IntCoord_t & nb_ghosts_left,
-                   const IntCoord_t & nb_ghosts_right,
-                   const IntCoord_t & subdomain_strides = IntCoord_t{});
+        void initialise(const IntCoord_t & nb_domain_grid_pts,
+                        const IntCoord_t & nb_subdivisions,
+                        const IntCoord_t & nb_subdomain_grid_pts_without_ghosts,
+                        const IntCoord_t & subdomain_locations_without_ghosts,
+                        const IntCoord_t & nb_ghosts_left,
+                        const IntCoord_t & nb_ghosts_right,
+                        const IntCoord_t & subdomain_strides = IntCoord_t{});
 
         //! initialise and determine subdomains from subdivisions
         void initialise(const IntCoord_t & nb_domain_grid_pts,
@@ -85,10 +84,23 @@ namespace muGrid {
         //! get the subdomain locations
         IntCoord_t get_subdomain_locations_without_ghosts() const;
 
+        //! get the number of ghost cells on the left side
+        const IntCoord_t & get_nb_ghosts_left() const {
+            return this->collection.get_nb_ghosts_left();
+        }
+
+        //! get the number of ghost cells on the right side
+        const IntCoord_t & get_nb_ghosts_right() const {
+            return this->collection.get_nb_ghosts_right();
+        }
+
        protected:
         Communicator comm;
         std::unique_ptr<CartesianCommunicator> cart_comm;
         GlobalFieldCollection collection;
+        std::vector<std::vector<Index_t>> recv_right_sequence;
+        std::vector<std::vector<Index_t>> recv_left_sequence;
+        std::vector<Index_t> nb_sendrecv_steps;
 
         void check_dimension(const IntCoord_t & n,
                              const std::string & name) const;

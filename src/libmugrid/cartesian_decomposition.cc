@@ -56,7 +56,7 @@ namespace muGrid {
         this->check_dimension(nb_ghosts_right, "nb_ghosts_right");
 
         // Create Cartesian communicator if this has not already happened
-        if (this->cart_comm) {
+        if (!this->cart_comm) {
             // Since we don't have a Cartesian communicator, we assume that the
             // subdivision information does not come from the communicator but
             // some auxiliary source (e.g. the FFT library).
@@ -83,6 +83,69 @@ namespace muGrid {
             this->collection.initialise(
                 nb_domain_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
                 subdomain_strides, nb_ghosts_left, nb_ghosts_right);
+        }
+
+        // Determine communication strategy
+        this->recv_right_sequence.resize(this->get_spatial_dim());
+        this->recv_left_sequence.resize(this->get_spatial_dim());
+        this->nb_sendrecv_steps.resize(this->get_spatial_dim());
+        for (int direction{0}; direction < this->get_spatial_dim();
+             ++direction) {
+            // Compute the sequence of sendrecv events required to fill the
+            // ghost buffer
+            this->recv_right_sequence[direction].resize(0);
+            Index_t nb_cum_send_right{0}, nb_cum_send_left{0};
+
+            // Ghost buffers in direction
+            auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
+            auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
+
+            // We can send this many slices to the right now; we need to fill
+            // the left ghost buffer of the right rank
+            auto nb_send_right{
+                std::min(nb_subdomain_grid_pts_without_ghosts[direction],
+                         nb_ghosts_left)};
+
+            // We can send this many slices to the left now; we need to fill
+            // the right ghost buffer of the left rank
+            auto nb_send_left{
+                std::min(nb_subdomain_grid_pts_without_ghosts[direction],
+                         nb_ghosts_right)};
+
+            int step{0};
+            while (this->cart_comm->any(nb_cum_send_right < nb_ghosts_left ||
+                                        nb_cum_send_left < nb_ghosts_right)) {
+                auto nb_recv_left{
+                    this->cart_comm->sendrecv_right(direction, nb_send_right)};
+                auto nb_recv_right{
+                    this->cart_comm->sendrecv_left(direction, nb_send_left)};
+                this->recv_left_sequence[direction].push_back(nb_recv_left);
+                this->recv_right_sequence[direction].push_back(nb_recv_right);
+
+                // Update how many slices we have already sent to the right/left
+                nb_cum_send_right += nb_send_right;
+                nb_cum_send_left += nb_send_left;
+
+                // Determine how much additional data we can now send
+                nb_send_right =
+                    std::min(nb_ghosts_left - nb_cum_send_right, nb_recv_left);
+                nb_send_left =
+                    std::min(nb_ghosts_right - nb_cum_send_left, nb_recv_right);
+
+                // Count how many send/recv cycles we need
+                step++;
+            }
+
+            this->nb_sendrecv_steps[direction] = step;
+
+            std::cout << "ABC " << this->cart_comm->rank() << " " << direction
+                      << " " << nb_domain_grid_pts << " "
+                      << nb_subdomain_grid_pts_without_ghosts << " "
+                      << nb_ghosts_left << " " << nb_ghosts_right << " "
+                      << this->recv_right_sequence[direction] << " "
+                      << this->recv_left_sequence[direction] << " "
+                      << nb_cum_send_right << " " << nb_cum_send_left << " "
+                      << this->nb_sendrecv_steps[direction] << std::endl;
         }
     }
 
@@ -125,37 +188,26 @@ namespace muGrid {
     }
 
     void CartesianDecomposition::communicate_ghosts(const Field & field) const {
-        // Get shape of the fields on this processor
-        auto nb_subdomain_grid_pts{
-            this->get_nb_subdomain_grid_pts_with_ghosts()};
-
         // Get spatial dimensions
-        int spatial_dims{nb_subdomain_grid_pts.size()};
+        auto spatial_dims{this->get_spatial_dim()};
 
         // Get strides (in unit: elements)
         auto strides{field.get_strides(IterUnit::SubPt)};
 
         // Total number of elements in the field
         // FIXME: This appears to be assuming a column-major field
-        auto nb_total_elements{strides[strides.size() - 1] *
-                               nb_subdomain_grid_pts[spatial_dims - 1]};
+        auto nb_total_elements{
+            strides[strides.size() - 1] *
+            this->get_nb_subdomain_grid_pts_with_ghosts()[spatial_dims - 1]};
 
         // Get the begin address of the field data (cast into char * for pointer
-        // arithemtic)
+        // arithmetics)
         auto * data{static_cast<char *>(field.get_void_data_ptr())};
 
         // Get element size (only useful for pointer arithmetic in finding the
         // correct offset)
         auto element_size{
             static_cast<Index_t>(field.get_element_size_in_bytes())};
-
-        // Get ghost buffer sizes
-        auto nb_ghosts_left{this->collection.get_nb_ghosts_left()};
-        auto nb_ghosts_right{this->collection.get_nb_ghosts_right()};
-
-        // Get the number of grid points without ghosts
-        auto nb_subdomain_grid_pts_without_ghosts{
-            this->get_nb_subdomain_grid_pts_without_ghosts()};
 
 #ifdef WITH_MPI
         MPI_Datatype mpi_type{field.get_mpi_type()};
@@ -173,84 +225,147 @@ namespace muGrid {
 
         // For each direction...
         for (int direction{0}; direction < spatial_dims; ++direction) {
-            // Stride in the send/recv direction
-            auto stride_in_direction{
-                strides[strides.size() - spatial_dims + direction]};
-            // Stride in the very next dimension
-            auto stride_in_next_dim{stride_in_direction *
-                                    nb_subdomain_grid_pts[direction]};
-            // Number of blocks inside the ghost buffer
-            auto nb_blocks_seen_in_next_dim{nb_total_elements /
-                                            stride_in_next_dim};
+            // Grid size
+            auto nb_subdomain_grid_pts_without_ghosts{
+                this->get_nb_subdomain_grid_pts_without_ghosts()[direction]};
+
+            // Calculate memory layout; we assume column-major layout
+            // possibly with padding (first index is fastest). The
+            // following contains the instructions to send a single
+            // D-1 dimensional slice of the buffer. The slice has a normal
+            // in `direction`.
+
+            // The block length equals the strides; this is also the stride
+            // between slices which means to send multiple consecutive slices
+            // we just send more blocks.
+            auto block_len{strides[strides.size() - spatial_dims + direction]};
+            // Block stride
+            auto block_stride{
+                direction < spatial_dims - 1
+                    ? strides[strides.size() - spatial_dims + direction + 1]
+                    : nb_total_elements};
+            /*
+             auto block_stride{
+                 block_len *
+                 this->get_nb_subdomain_grid_pts_with_ghosts()[direction]};
+            */
+
+            // Number of blocks for single slice
+            auto nb_blocks{nb_total_elements / block_stride};
 
             // Calculate number of communication steps needed
-            // Each step can exchange at most subdomain_size worth of data
-            auto nb_subdomain_size{
-                nb_subdomain_grid_pts_without_ghosts[direction]};
+            auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
+            auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
 
-            // Determine the width of the region to communicate
-            auto nb_comm_left{
-                std::min(nb_subdomain_size, nb_ghosts_left[direction])};
-            auto nb_comm_right{
-                std::min(nb_subdomain_size, nb_ghosts_right[direction])};
+            // Compute the sequence of sendrecv events required to fill the
+            // ghost buffer
+            Index_t nb_cum_send_right{0}, nb_cum_send_left{0};
+            Index_t nb_cum_recv_right{0}, nb_cum_recv_left{0};
 
-            // Handle zero grid points case: still need to do communication
-            // if we have ghost buffers
-            int nb_steps_left;
-            if (nb_subdomain_size > 0) {
-                nb_steps_left = static_cast<int>(
-                    (nb_ghosts_left[direction] + nb_subdomain_size - 1) /
-                    nb_subdomain_size);
-            } else {
-                nb_steps_left = (nb_ghosts_left[direction] > 0 ? 1 : 0);
-            }
+            // We can send this many slices to the right now; we need to fill
+            // the left ghost buffer of the right rank
+            auto nb_send_right{
+                std::min(nb_subdomain_grid_pts_without_ghosts, nb_ghosts_left)};
 
-            int nb_steps_right;
-            if (nb_subdomain_size > 0) {
-                nb_steps_right = static_cast<int>(
-                    (nb_ghosts_right[direction] + nb_subdomain_size - 1) /
-                    nb_subdomain_size);
-            } else {
-                nb_steps_right = (nb_ghosts_right[direction] > 0 ? 1 : 0);
-            }
+            // We can send this many slices to the left now; we need to fill
+            // the right ghost buffer of the left rank
+            auto nb_send_left{std::min(nb_subdomain_grid_pts_without_ghosts,
+                                       nb_ghosts_right)};
 
-            // Perform multiple communication steps to the RIGHT
-            for (int step{0}; step < nb_steps_right; ++step) {
-                // For each step, we exchange the real data + previously
-                // received ghost data
-                auto block_len_ghost_left{stride_in_direction *
-                                          nb_ghosts_left[direction]};
+            // Loop until ghost buffers have been filled
+            for (Index_t step{0}; step < this->nb_sendrecv_steps[direction];
+                 ++step) {
+                // Idiot check that there is still stuff left to send
+                assert(
+                    this->cart_comm->any(nb_cum_send_right < nb_ghosts_left ||
+                                         nb_cum_send_left < nb_ghosts_right));
 
-                // Send offset: This is the grid position in the send/recv
-                // direction where the send buffer starts
-                Index_t send_offset_right{nb_subdomain_grid_pts[direction] -
-                                          nb_ghosts_right[direction] -
-                                          nb_ghosts_left[direction]};
-                // Receive offset: This is the grid position in the send/recv
-                // direction of where to receive data
-                Index_t recv_offset_right{0};
+                // Get the number of elements that we will receive
+                auto nb_recv_left{this->recv_left_sequence[direction][step]};
+                auto nb_recv_right{this->recv_right_sequence[direction][step]};
 
+                // Idiot check the cached receive sequence
+                assert(nb_recv_left == this->cart_comm->sendrecv_right(
+                                           direction, nb_send_right));
+                assert(nb_recv_right ==
+                       this->cart_comm->sendrecv_left(direction, nb_send_left));
+
+                std::cout << this->cart_comm->rank() << " " << direction << " "
+                          << step << ", nb = "
+                          << this->get_nb_subdomain_grid_pts_without_ghosts()
+                          << " " << this->get_nb_ghosts_left() << " "
+                          << this->get_nb_ghosts_right()
+                          << ", send_right = " << nb_cum_send_right
+                          << " " << nb_send_right
+                          << ", send_left = " << nb_cum_send_left
+                          << " " << nb_send_left
+                          << ", recv_right = " << nb_cum_recv_right
+                          << " " << nb_recv_right
+                          << ", recv_left = " << nb_cum_recv_left
+                          << " " << nb_recv_left
+                          << ", nb_blocks = " << nb_blocks
+                          << ", block_len = " << block_len
+                          << ", block_stride = " << block_stride << std::endl;
+
+                // Perform send to the RIGHT, receive from the LEFT
                 this->cart_comm->sendrecv_right(
-                    direction, block_len_ghost_left, stride_in_next_dim,
-                    nb_blocks_seen_in_next_dim, send_offset_right,
-                    recv_offset_right, data, stride_in_direction, element_size, mpi_type_ptr);
-            }
+                    // send direction, i.e. 0, 1 or 2 (x, y or z)
+                    direction,
+                    // block length
+                    nb_send_right * block_len,
+                    // block stride
+                    block_stride,
+                    // number of blocks to send
+                    nb_blocks,
+                    // slice to send from
+                    nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts -
+                        nb_cum_send_right - nb_send_right,
+                    // number of blocks to receive
+                    nb_recv_left * nb_blocks,
+                    // slice to receive into
+                    nb_ghosts_left - nb_cum_recv_left - nb_recv_left,
+                    // data buffer
+                    data,
+                    // stride in send direction
+                    block_len,
+                    // type information
+                    element_size, mpi_type_ptr);
 
-            // Perform multiple communication steps to the LEFT
-            for (int step{0}; step < nb_steps_left; ++step) {
-                auto block_len_ghost_right{stride_in_direction *
-                                           nb_ghosts_right[direction]};
-
-                // Send offset: start from the real data (adjusted for step)
-                Index_t send_offset_left{nb_ghosts_left[direction]};
-                // Receive offset: into the right ghost buffer
-                Index_t recv_offset_left{nb_subdomain_grid_pts[direction] -
-                                         nb_ghosts_right[direction]};
-
+                // Perform send to the LEFT, receive from the RIGHT
                 this->cart_comm->sendrecv_left(
-                    direction, block_len_ghost_right, stride_in_next_dim,
-                    nb_blocks_seen_in_next_dim, send_offset_left,
-                    recv_offset_left, data, stride_in_direction, element_size, mpi_type_ptr);
+                    // send direction, i.e. 0, 1 or 2 (x, y or z)
+                    direction,
+                    // block length
+                    nb_send_left * block_len,
+                    // block stride
+                    block_stride,
+                    // number of blocks to send
+                    nb_blocks,
+                    // slice to send from
+                    nb_ghosts_left + nb_cum_send_left,
+                    // number of blocks to receive
+                    nb_recv_right * nb_blocks,
+                    // slice to receive into
+                    nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts +
+                        nb_cum_recv_right,
+                    // data buffer
+                    data,
+                    // stride in send direction
+                    block_len,
+                    // type information
+                    element_size, mpi_type_ptr);
+
+                // Update how many blocks we have already sent to the right/left
+                nb_cum_send_right += nb_send_right;
+                nb_cum_send_left += nb_send_left;
+                nb_cum_recv_right += nb_recv_right;
+                nb_cum_recv_left += nb_recv_left;
+
+                // Determine how much additional data we can now send
+                nb_send_right =
+                    std::min(nb_ghosts_left - nb_cum_send_right, nb_recv_left);
+                nb_send_left =
+                    std::min(nb_ghosts_right - nb_cum_send_left, nb_recv_right);
             }
         }
     }
