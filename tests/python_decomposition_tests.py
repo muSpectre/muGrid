@@ -15,13 +15,13 @@ def get_nb_subdivisions(nb_processes: int):
         ],
         4: [
             (4,),
-            # (2, 2),
+            (2, 2),
         ],
         8: [
             (8,),
-            #            (2, 2, 2),
-            # (4, 2, 1),
-            #            (8, 1, 1),
+            (2, 2, 2),
+            (4, 2, 1),
+            (8, 1, 1),
         ],
     }
     if nb_processes in subdivision_setup:
@@ -51,7 +51,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     spatial_dim = len(nb_subdivisions)
     nb_pts_per_dim = 5
     nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
-    nb_ghosts_left = np.full(spatial_dim, 1)
+    nb_ghosts_left = np.full(spatial_dim, 2)
     nb_ghosts_right = np.full(spatial_dim, 2)
     cart_decomp = muGrid.CartesianDecomposition(
         comm,
@@ -103,12 +103,8 @@ def test_communicate_ghosts(comm, nb_subdivisions):
         np.array(field.pg.shape)[-spatial_dim:] - nb_ghosts_left - nb_ghosts_right,
     )
 
-    print(comm.rank, field.pg)
-
     # Communicate ghost cells
     cart_decomp.communicate_ghosts(field)
-
-    print(comm.rank, field.pg)
 
     # Check values at all grid points
     for index in np.ndindex(*nb_subdomain_grid_pts):

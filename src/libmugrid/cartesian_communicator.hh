@@ -164,14 +164,16 @@ namespace muGrid {
          *
          * @param direction The spatial dimension in which to communicate
          *                  (0 <= direction < spatial_dim).
-         * @param block_len Length of each contiguous block to send/receive
-         *                  (in elements).
          * @param block_stride Stride to the next block in the next
          *                     dimension (in elements).
          * @param nb_send_blocks Number of blocks to send.
+         * @param send_block_len Length of each contiguous block to send
+         *                       (in elements).
          * @param send_offset Offset of the first block in the send buffer
          *                    (in blocks, computed as offset * stride_in_direction).
          * @param nb_recv_blocks Number of blocks to receive.
+         * @param recv_block_len Length of each contiguous block to receive
+         *                       (in elements).
          * @param recv_offset Offset of the first block in the receive buffer
          *                    (in blocks, computed as offset * stride_in_direction).
          * @param data Base address of the data buffer.
@@ -181,10 +183,10 @@ namespace muGrid {
          * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
          *                   with MPI; ignored for serial mode.
          */
-        void sendrecv_right(int direction, int block_len,
-                            int block_stride, int nb_send_blocks,
+        void sendrecv_right(int direction, int block_stride,
+                            int nb_send_blocks, int send_block_len,
                             Index_t send_offset, int nb_recv_blocks,
-                            Index_t recv_offset, char * data,
+                            int recv_block_len, Index_t recv_offset, char * data,
                             int stride_in_direction, int elem_size_in_bytes,
                             void * elem_mpi_t) const;
 
@@ -199,14 +201,16 @@ namespace muGrid {
          *
          * @param direction The spatial dimension in which to communicate
          *                  (0 <= direction < spatial_dim).
-         * @param block_len Length of each contiguous block to send/receive
-         *                  (in elements).
          * @param block_stride Stride to the next block in the next
          *                     dimension (in elements).
          * @param nb_send_blocks Number of blocks to send.
+         * @param send_block_len Length of each contiguous block to send
+         *                       (in elements).
          * @param send_offset Offset of the first block in the send buffer
          *                    (in blocks, computed as offset * stride_in_direction).
          * @param nb_recv_blocks Number of blocks to receive.
+         * @param recv_block_len Length of each contiguous block to receive
+         *                       (in elements).
          * @param recv_offset Offset of the first block in the receive buffer
          *                    (in blocks, computed as offset * stride_in_direction).
          * @param data Base address of the data buffer.
@@ -216,9 +220,10 @@ namespace muGrid {
          * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
          *                   with MPI; ignored for serial mode.
          */
-        void sendrecv_left(int direction, int block_len, int block_stride,
-                           int nb_send_blocks, Index_t send_offset,
-                           int nb_recv_blocks, Index_t recv_offset, char * data,
+        void sendrecv_left(int direction, int block_stride, int nb_send_blocks,
+                           int send_block_len, Index_t send_offset,
+                           int nb_recv_blocks, int recv_block_len,
+                           Index_t recv_offset, char * data,
                            int stride_in_direction, int elem_size_in_bytes,
                            void * elem_mpi_t) const;
 

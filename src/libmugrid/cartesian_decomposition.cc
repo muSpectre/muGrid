@@ -137,15 +137,6 @@ namespace muGrid {
             }
 
             this->nb_sendrecv_steps[direction] = step;
-
-            std::cout << "ABC " << this->cart_comm->rank() << " " << direction
-                      << " " << nb_domain_grid_pts << " "
-                      << nb_subdomain_grid_pts_without_ghosts << " "
-                      << nb_ghosts_left << " " << nb_ghosts_right << " "
-                      << this->recv_right_sequence[direction] << " "
-                      << this->recv_left_sequence[direction] << " "
-                      << nb_cum_send_right << " " << nb_cum_send_left << " "
-                      << this->nb_sendrecv_steps[direction] << std::endl;
         }
     }
 
@@ -290,38 +281,23 @@ namespace muGrid {
                 assert(nb_recv_right ==
                        this->cart_comm->sendrecv_left(direction, nb_send_left));
 
-                std::cout << this->cart_comm->rank() << " " << direction << " "
-                          << step << ", nb = "
-                          << this->get_nb_subdomain_grid_pts_without_ghosts()
-                          << " " << this->get_nb_ghosts_left() << " "
-                          << this->get_nb_ghosts_right()
-                          << ", send_right = " << nb_cum_send_right
-                          << " " << nb_send_right
-                          << ", send_left = " << nb_cum_send_left
-                          << " " << nb_send_left
-                          << ", recv_right = " << nb_cum_recv_right
-                          << " " << nb_recv_right
-                          << ", recv_left = " << nb_cum_recv_left
-                          << " " << nb_recv_left
-                          << ", nb_blocks = " << nb_blocks
-                          << ", block_len = " << block_len
-                          << ", block_stride = " << block_stride << std::endl;
-
                 // Perform send to the RIGHT, receive from the LEFT
                 this->cart_comm->sendrecv_right(
                     // send direction, i.e. 0, 1 or 2 (x, y or z)
                     direction,
-                    // block length
-                    nb_send_right * block_len,
                     // block stride
                     block_stride,
                     // number of blocks to send
                     nb_blocks,
+                    // block length
+                    nb_send_right * block_len,
                     // slice to send from
                     nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts -
                         nb_cum_send_right - nb_send_right,
                     // number of blocks to receive
-                    nb_recv_left * nb_blocks,
+                    nb_blocks,
+                    // block length
+                    nb_recv_left * block_len,
                     // slice to receive into
                     nb_ghosts_left - nb_cum_recv_left - nb_recv_left,
                     // data buffer
@@ -335,16 +311,18 @@ namespace muGrid {
                 this->cart_comm->sendrecv_left(
                     // send direction, i.e. 0, 1 or 2 (x, y or z)
                     direction,
-                    // block length
-                    nb_send_left * block_len,
                     // block stride
                     block_stride,
                     // number of blocks to send
                     nb_blocks,
+                    // block length
+                    nb_send_left * block_len,
                     // slice to send from
                     nb_ghosts_left + nb_cum_send_left,
                     // number of blocks to receive
-                    nb_recv_right * nb_blocks,
+                    nb_blocks,
+                    // block length
+                    nb_recv_right * block_len,
                     // slice to receive into
                     nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts +
                         nb_cum_recv_right,
