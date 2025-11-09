@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+from NuMPI import MPI
+from NuMPI.Testing.Assertions import assert_all_allclose
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
@@ -12,10 +14,14 @@ def get_nb_subdivisions(nb_processes: int):
             (2,),
         ],
         4: [
+            (4,),
             (2, 2),
         ],
         8: [
+            (8,),
             (2, 2, 2),
+            (4, 2, 1),
+            (8, 1, 1),
         ],
     }
     if nb_processes in subdivision_setup:
@@ -45,7 +51,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     spatial_dim = len(nb_subdivisions)
     nb_pts_per_dim = 5
     nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
-    nb_ghosts_left = np.full(spatial_dim, 1)
+    nb_ghosts_left = np.full(spatial_dim, 2)
     nb_ghosts_right = np.full(spatial_dim, 2)
     cart_decomp = muGrid.CartesianDecomposition(
         comm,
@@ -54,6 +60,16 @@ def test_communicate_ghosts(comm, nb_subdivisions):
         nb_ghosts_left.tolist(),
         nb_ghosts_right.tolist(),
     )
+
+    # Idiot check the subdivision
+    for i in range(len(nb_subdivisions)):
+        s = comm.sum(cart_decomp.nb_subdomain_grid_pts[i])
+        assert (
+            s
+            == cart_decomp.nb_domain_grid_pts[i]
+            * np.prod(cart_decomp.nb_subdivisions)
+            / cart_decomp.nb_subdivisions[i]
+        )
 
     # Create a field for testing
     field_name = "test_field"
@@ -110,14 +126,14 @@ def test_field_accessors(comm, nb_grid_pts=(128, 128)):
     xg, yg = decomposition.coordsg
     field.pg = xg + 100 * yg
 
-    np.testing.assert_allclose(field.pg[..., 1:-1, 1:-1], field.p)
-    np.testing.assert_allclose(field.sg[..., 1:-1, 1:-1], field.s)
+    assert_all_allclose(MPI.COMM_WORLD, field.pg[..., 1:-1, 1:-1], field.p)
+    assert_all_allclose(MPI.COMM_WORLD, field.sg[..., 1:-1, 1:-1], field.s)
 
     # Test setter
     field.pg = np.random.random(field.pg.shape)
 
-    np.testing.assert_allclose(field.pg[..., 1:-1, 1:-1], field.p)
-    np.testing.assert_allclose(field.sg[..., 1:-1, 1:-1], field.s)
+    assert_all_allclose(MPI.COMM_WORLD, field.pg[..., 1:-1, 1:-1], field.p)
+    assert_all_allclose(MPI.COMM_WORLD, field.sg[..., 1:-1, 1:-1], field.s)
 
 
 @pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
@@ -153,3 +169,20 @@ def test_io(comm, nb_subdivisions):
     f.register_field_collection(cart_decomp.collection)
     f.append_frame().write()
     f.close()
+
+
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_large_ghost_buffers(comm, nb_subdivisions):
+    # Create a Cartesian decomposition
+    spatial_dim = len(nb_subdivisions)
+    nb_pts_per_dim = 5
+    nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
+    nb_ghosts_left = np.full(spatial_dim, 5)
+    nb_ghosts_right = np.full(spatial_dim, 5)
+    muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghosts_left.tolist(),
+        nb_ghosts_right.tolist(),
+    )
