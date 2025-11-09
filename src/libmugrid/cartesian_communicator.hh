@@ -55,12 +55,13 @@ namespace muGrid {
      * halo/boundary exchange along each spatial dimension.
      *
      * The class distinguishes between left and right neighbors: in a given
-     * direction, the left neighbor is at coordinate[direction] - 1 and the right
-     * neighbor is at coordinate[direction] + 1. With periodic boundaries, these
-     * wrap around at the domain edges.
+     * direction, the left neighbor is at coordinate[direction] - 1 and the
+     * right neighbor is at coordinate[direction] + 1. With periodic boundaries,
+     * these wrap around at the domain edges.
      *
      * For efficient structured grid stencil operations, the class provides:
-     * - Template methods for scalar value exchange (sendrecv_left/sendrecv_right)
+     * - Template methods for scalar value exchange
+     * (sendrecv_left/sendrecv_right)
      * - Bulk data transfer methods that handle complex memory layouts via MPI
      *   derived types
      */
@@ -83,7 +84,8 @@ namespace muGrid {
          *               is derived.
          * @param nb_subdivisions The number of subdivisions (ranks) in each
          *                        spatial direction. The product of all elements
-         *                        must equal the size of the parent communicator.
+         *                        must equal the size of the parent
+         * communicator.
          *
          * @throw RuntimeError if the product of nb_subdivisions does not match
          *                     the communicator size.
@@ -170,12 +172,14 @@ namespace muGrid {
          * @param send_block_len Length of each contiguous block to send
          *                       (in elements).
          * @param send_offset Offset of the first block in the send buffer
-         *                    (in blocks, computed as offset * stride_in_direction).
+         *                    (in blocks, computed as offset *
+         * stride_in_direction).
          * @param nb_recv_blocks Number of blocks to receive.
          * @param recv_block_len Length of each contiguous block to receive
          *                       (in elements).
          * @param recv_offset Offset of the first block in the receive buffer
-         *                    (in blocks, computed as offset * stride_in_direction).
+         *                    (in blocks, computed as offset *
+         * stride_in_direction).
          * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in the communication direction
          *                            (in elements).
@@ -183,10 +187,10 @@ namespace muGrid {
          * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
          *                   with MPI; ignored for serial mode.
          */
-        void sendrecv_right(int direction, int block_stride,
-                            int nb_send_blocks, int send_block_len,
-                            Index_t send_offset, int nb_recv_blocks,
-                            int recv_block_len, Index_t recv_offset, char * data,
+        void sendrecv_right(int direction, int block_stride, int nb_send_blocks,
+                            int send_block_len, Index_t send_offset,
+                            int nb_recv_blocks, int recv_block_len,
+                            Index_t recv_offset, char * data,
                             int stride_in_direction, int elem_size_in_bytes,
                             void * elem_mpi_t) const;
 
@@ -207,12 +211,14 @@ namespace muGrid {
          * @param send_block_len Length of each contiguous block to send
          *                       (in elements).
          * @param send_offset Offset of the first block in the send buffer
-         *                    (in blocks, computed as offset * stride_in_direction).
+         *                    (in blocks, computed as offset *
+         * stride_in_direction).
          * @param nb_recv_blocks Number of blocks to receive.
          * @param recv_block_len Length of each contiguous block to receive
          *                       (in elements).
          * @param recv_offset Offset of the first block in the receive buffer
-         *                    (in blocks, computed as offset * stride_in_direction).
+         *                    (in blocks, computed as offset *
+         * stride_in_direction).
          * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in the communication direction
          *                            (in elements).
@@ -245,12 +251,16 @@ namespace muGrid {
          */
         template <typename T>
         T sendrecv_right(int direction, T data) const {
+#ifdef WITH_MPI
             MPI_Status status;
             T value;
             MPI_Sendrecv(&data, 1, mpi_type<T>(), this->right_ranks[direction],
                          0, &value, 1, mpi_type<T>(),
                          this->left_ranks[direction], 0, this->comm, &status);
             return value;
+#else
+            return data;
+#endif
         }
 
         /**
@@ -271,12 +281,16 @@ namespace muGrid {
          */
         template <typename T>
         T sendrecv_left(int direction, T data) const {
+#ifdef WITH_MPI
             MPI_Status status;
             T value;
             MPI_Sendrecv(&data, 1, mpi_type<T>(), this->left_ranks[direction],
                          0, &value, 1, mpi_type<T>(),
                          this->right_ranks[direction], 0, this->comm, &status);
             return value;
+#else
+            return data;
+#endif
         }
 
        protected:
@@ -287,7 +301,8 @@ namespace muGrid {
         //! The number of subdivisions (ranks) in each spatial dimension.
         IntCoord_t nb_subdivisions;
 
-        //! The Cartesian coordinates of this rank (0-indexed in each dimension).
+        //! The Cartesian coordinates of this rank (0-indexed in each
+        //! dimension).
         IntCoord_t coordinates;
 
 #if WITH_MPI
