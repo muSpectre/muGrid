@@ -159,6 +159,7 @@ The gradient itself has two components, one for each direction of the gradient, 
 to represent it. The stencil then has the shape
 
 .. code-block:: Python
+
     (operators, quadrature-points, nodal-points, pixels)
 
 or in this specific case
