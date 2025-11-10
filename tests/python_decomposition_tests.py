@@ -188,7 +188,7 @@ def test_large_ghost_buffers(comm, nb_subdivisions):
     )
 
 
-def test_shift_unit_impulse_vector(comm):
+def test_weird_convolution_input(comm):
     nb_domain_grid_pts = [4, 6]
 
     left_ghosts = [1, 1]
