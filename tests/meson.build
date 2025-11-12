@@ -2,6 +2,15 @@
 # C++ unit tests (through Boost's framework)
 #
 boost_test = dependency('boost', modules : ['unit_test_framework'], required : false)
+
+# Check for PAPI (Performance API) for performance testing
+papi = dependency('papi', required : false)
+if papi.found()
+    message('PAPI found - performance tests will be enabled')
+else
+    message('PAPI not found - performance tests will be skipped')
+endif
+
 if boost_test.found()
     #
     # General tests
@@ -38,6 +47,25 @@ if boost_test.found()
     )
 
     test('mugrid_main_test_suite', main_test_suite, timeout : test_timeout)
+
+    #
+    # Performance tests with PAPI
+    #
+    if papi.found()
+        performance_test_sources = [
+            'main_test_suite.cc',
+            'test_convolution_performance.cc',
+        ]
+
+        performance_test_suite = executable(
+            'mugrid_performance_test_suite',
+            performance_test_sources,
+            dependencies : [mugrid, boost_test, papi],
+        )
+
+        test('mugrid_performance_test_suite', performance_test_suite,
+             timeout : test_timeout)
+    endif
 
     #
     # Parallel computing specific tests
