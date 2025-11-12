@@ -193,42 +193,29 @@ class ConvolutionOperatorCheck(unittest.TestCase):
 
 
 @pytest.mark.skip(
-    reason="Segmentation fault when applying operator to local fields "
-    "with mismatched shapes. Should be caught with proper validation "
-    "instead of crashing. Skipped to allow other tests to run. This "
-    "test documents the issue for future fixes."
+    reason="Known limitation: Local fields from CartesianDecomposition "
+    "cause segfault instead of raising error. The C++ validation check "
+    "for global fields exists but exception is not properly propagated."
 )
 def test_malformed_convolution_input(comm):
-    """Test convolution operator with mismatched field shapes.
+    """Test convolution operator with local fields raises error.
 
-    This test is KNOWN to cause a segmentation fault with the current
-    implementation. It is included here to ensure that proper error
-    handling is implemented to catch shape mismatches early rather than
-    leading to memory access violations.
+    The ConvolutionOperator is designed to work only with global fields.
+    Local fields from CartesianDecomposition should be rejected with a
+    clear error message.
 
-    The problem: The convolution operator attempts to apply a 4D stencil
-    (shape (1, 2, 3, 3)) to two fields, where the output field is defined
-    on the same grid as the input field. However, the stencil expects the
-    output field to have components that are operators × input_components.
+    This test documents that the validation to reject local fields has
+    been implemented in C++, but the exception handling needs to be
+    verified to ensure proper error propagation.
 
-    Expected behavior (once fixed):
-    - Should raise a RuntimeError with a clear message about component
-      mismatch
-    - Should NOT cause a segmentation fault
-    - Error message should explain that the output field needs
-      nb_operators * nb_input_components components
+    Setup
+    -----
+    - Uses CartesianDecomposition to create local fields (wrong!)
+    - Attempts to apply ConvolutionOperator to these local fields
 
-    Current behavior:
-    - Causes a segmentation fault or memory corruption
-    - No clear error message about the shape mismatch
-
-    This is marked with pytest.mark.skip to allow the test suite to
-    continue running while highlighting this known issue.
-
-    Parameters
-    ----------
-    comm : muGrid.Communicator
-        The communicator (serial or MPI-based) for domain decomposition
+    Expected behavior
+    -----------------
+    Should raise a RuntimeError with message about field type mismatch.
     """
     nb_domain_grid_pts = [4, 6]
 
@@ -270,11 +257,13 @@ def test_malformed_convolution_input(comm):
             ],
         ],
     )
-    # Stencil shape: (nb_operators=1, nb_quad_pts=2, stencil_y=3, stencil_x=3)
-    # But we're using it on a local field collection (after decomposition)
+    # Stencil shape: (nb_operators=1, nb_quad_pts=2, stencil_y=3,
+    # stencil_x=3) But we're using it on a local field collection
+    # (after decomposition)
     shift_op = muGrid.ConvolutionOperator([-1, -1], shift)
-    # This should raise an error or handle gracefully, not segfault
-    shift_op.apply(nodal_field1, nodal_field2)
+    # This should raise an error because fields are local, not global
+    with pytest.raises(RuntimeError):
+        shift_op.apply(nodal_field1, nodal_field2)
 
 
 def test_convolution_component_mismatch_global():
@@ -374,8 +363,8 @@ def test_convolution_component_mismatch_multiple_operators_global():
 
 
 @pytest.mark.skip(
-    reason="Segmentation fault when input field is on wrong sub-point "
-    "type. Should be caught with validation instead of crashing."
+    reason="Known limitation: Wrong input sub-point type causes segfault. "
+    "Validation check exists in C++ but needs exception handling review."
 )
 def test_convolution_wrong_input_subpt_type_global():
     """Test that wrong sub-point type on input field is caught.
@@ -435,8 +424,8 @@ def test_convolution_wrong_input_subpt_type_global():
 
 
 @pytest.mark.skip(
-    reason="Segmentation fault when output field is on wrong sub-point "
-    "type. Should be caught with validation instead of crashing."
+    reason="Known limitation: Wrong output sub-point type causes segfault. "
+    "Validation check exists in C++ but needs exception handling review."
 )
 def test_convolution_wrong_output_subpt_type_global():
     """Test that wrong sub-point type on output field is caught.

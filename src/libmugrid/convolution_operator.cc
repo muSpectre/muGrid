@@ -101,6 +101,20 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
+        // Check that both fields have the same spatial dimensions
+        if (nodal_field.get_collection().get_spatial_dim() !=
+            quadrature_point_field.get_collection().get_spatial_dim()) {
+            std::stringstream err_msg{};
+            err_msg << "Spatial dimension mismatch: nodal field is defined "
+                       "in "
+                    << nodal_field.get_collection().get_spatial_dim()
+                    << "D space, but quadrature field is defined in "
+                    << quadrature_point_field.get_collection()
+                           .get_spatial_dim()
+                    << "D space";
+            throw RuntimeError{err_msg.str()};
+        }
+
         // number of components in the field we'd like to apply the convolution
         Index_t nb_nodal_components{nodal_field.get_nb_components()};
 
@@ -198,6 +212,20 @@ namespace muGrid {
             std::stringstream err_msg{};
             err_msg << "Field type error: nodal_field must be a global "
                        "field (registered in a global FieldCollection)";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // Check that both fields have the same spatial dimensions
+        if (quadrature_point_field.get_collection().get_spatial_dim() !=
+            nodal_field.get_collection().get_spatial_dim()) {
+            std::stringstream err_msg{};
+            err_msg << "Spatial dimension mismatch: quadrature field is "
+                       "defined in "
+                    << quadrature_point_field.get_collection()
+                           .get_spatial_dim()
+                    << "D space, but nodal field is defined in "
+                    << nodal_field.get_collection().get_spatial_dim()
+                    << "D space";
             throw RuntimeError{err_msg.str()};
         }
 
