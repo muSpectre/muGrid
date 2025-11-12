@@ -194,19 +194,15 @@ class ConvolutionOperatorCheck(unittest.TestCase):
 
 @pytest.mark.skip(
     reason="Known limitation: Local fields from CartesianDecomposition "
-    "cause segfault instead of raising error. The C++ validation check "
-    "for global fields exists but exception is not properly propagated."
+    "cause segfault. Exception checking for is_global() exists in C++ but "
+    "exception propagation needs review."
 )
 def test_malformed_convolution_input(comm):
     """Test convolution operator with local fields raises error.
 
     The ConvolutionOperator is designed to work only with global fields.
     Local fields from CartesianDecomposition should be rejected with a
-    clear error message.
-
-    This test documents that the validation to reject local fields has
-    been implemented in C++, but the exception handling needs to be
-    verified to ensure proper error propagation.
+    clear error message about field type.
 
     Setup
     -----
@@ -362,37 +358,25 @@ def test_convolution_component_mismatch_multiple_operators_global():
         conv_op.apply(nodal_field, quad_field)
 
 
-@pytest.mark.skip(
-    reason="Known limitation: Wrong input sub-point type causes segfault. "
-    "Validation check exists in C++ but needs exception handling review."
-)
 def test_convolution_wrong_input_subpt_type_global():
-    """Test that wrong sub-point type on input field is caught.
+    """Test that mismatched sub-point counts are caught.
 
-    The ConvolutionOperator.apply() method expects the input field to be
-    defined on nodal points (default, no sub-point specification).
-
-    If the input field is defined on a different sub-point type (e.g.,
-    quadrature points), the operator should detect this and fail
-    gracefully.
+    The ConvolutionOperator requires that input and output fields have
+    the same number of sub-points per pixel. This test verifies that
+    fields with mismatched sub-point counts are rejected with a clear
+    error message.
 
     Setup
     -----
     - Creates a 2D grid with a simple stencil
-    - Creates an input field with quadrature sub-points (wrong!)
-    - Creates an output field with quadrature sub-points (correct)
+    - Creates an input field with 2 sub-points (quadrature)
+    - Creates an output field with 1 sub-point (nodal)
     - Tries to apply the operator
 
     Expected behavior
     -----------------
-    Should raise an error because the input field has incompatible
-    sub-point type. The specific error depends on implementation but
-    should not segfault.
-
-    Current behavior
-    ----------------
-    Causes a segmentation fault (Eigen assertion failure on matrix
-    dimensions).
+    Should raise a RuntimeError with message about sub-point count
+    mismatch.
     """
     nb_x_pts = 3
     nb_y_pts = 3
@@ -401,57 +385,42 @@ def test_convolution_wrong_input_subpt_type_global():
     stencil = np.array([[[1, 0], [0, 1]]])
     conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
-    # Create field collection
-    fc = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={"quad": 2})
+    # Create field collection with different sub-point counts
+    fc_nodal = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts))
+    fc_quad = muGrid.GlobalFieldCollection(
+        (nb_x_pts, nb_y_pts), sub_pts={"quad": 2}
+    )
 
-    # Input field on QUADRATURE POINTS (wrong - should be on nodal)
-    nodal_field_wrong = fc.real_field("quad-field", (1,), "quad")
+    # Input field with 2 sub-points (from quad collection)
+    nodal_field_wrong = fc_quad.real_field("quad-field", (1,), "quad")
 
-    # Output field on quadrature points (correct)
-    quad_field = fc.real_field("quad-output", (1,), "quad")
+    # Output field with 1 sub-point (from nodal collection)
+    quad_field = fc_nodal.real_field("quad-output", (1,))
 
-    # This should raise an error or handle gracefully
-    # The error could be about field type mismatch or sub-point mismatch
-    try:
+    # This should raise an error about sub-point count mismatch
+    with pytest.raises(RuntimeError):
         conv_op.apply(nodal_field_wrong, quad_field)
-        # If no error is raised, that's also a problem - document it
-        raise AssertionError(
-            "Expected an error when input field is on wrong sub-point type"
-        )
-    except (RuntimeError, ValueError):
-        # Expected: some kind of validation error
-        pass
 
 
-@pytest.mark.skip(
-    reason="Known limitation: Wrong output sub-point type causes segfault. "
-    "Validation check exists in C++ but needs exception handling review."
-)
 def test_convolution_wrong_output_subpt_type_global():
-    """Test that wrong sub-point type on output field is caught.
+    """Test that mismatched output sub-point count is caught.
 
-    The ConvolutionOperator.apply() method expects the output field to be
-    defined on quadrature points (specified via sub_pts parameter).
-
-    If the output field is defined on a different sub-point type, the
-    operator should detect this and fail gracefully.
+    The ConvolutionOperator requires that input and output fields have
+    the same number of sub-points per pixel. This test verifies that
+    an output field with wrong sub-point count is rejected with a clear
+    error message.
 
     Setup
     -----
     - Creates a 2D grid with a simple stencil
-    - Creates an input field on nodal points (correct)
-    - Creates an output field on nodal points (wrong!)
+    - Creates an input field with 1 sub-point (nodal)
+    - Creates an output field with 2 sub-points (quadrature)
     - Tries to apply the operator
 
     Expected behavior
     -----------------
-    Should raise an error because the output field has incompatible
-    sub-point type.
-
-    Current behavior
-    ----------------
-    Likely causes a segmentation fault (Eigen assertion failure on
-    matrix dimensions).
+    Should raise a RuntimeError with message about sub-point count
+    mismatch.
     """
     nb_x_pts = 3
     nb_y_pts = 3
@@ -460,21 +429,18 @@ def test_convolution_wrong_output_subpt_type_global():
     stencil = np.array([[[1, 0], [0, 1]]])
     conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
-    # Create field collection with quadrature points
-    fc = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={"quad": 2})
+    # Create field collections with different sub-point counts
+    fc_nodal = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts))
+    fc_quad = muGrid.GlobalFieldCollection(
+        (nb_x_pts, nb_y_pts), sub_pts={"quad": 2}
+    )
 
-    # Input field on nodal points (correct)
-    nodal_field = fc.real_field("nodal", (1,))
+    # Input field with 1 sub-point (from nodal collection)
+    nodal_field = fc_nodal.real_field("nodal", (1,))
 
-    # Output field on NODAL POINTS (wrong - should be on quad)
-    quad_field_wrong = fc.real_field("output-nodal", (1,))
+    # Output field with 2 sub-points (from quad collection) - wrong!
+    quad_field_wrong = fc_quad.real_field("output-quad", (1,), "quad")
 
-    # This should raise an error or handle gracefully
-    try:
+    # This should raise an error about sub-point count mismatch
+    with pytest.raises(RuntimeError):
         conv_op.apply(nodal_field, quad_field_wrong)
-        raise AssertionError(
-            "Expected an error when output field is on wrong sub-point type"
-        )
-    except (RuntimeError, ValueError):
-        # Expected: some kind of validation error
-        pass
