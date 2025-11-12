@@ -101,6 +101,20 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
+        // Check that both fields have the same spatial dimensions
+        if (nodal_field.get_collection().get_spatial_dim() !=
+            quadrature_point_field.get_collection().get_spatial_dim()) {
+            std::stringstream err_msg{};
+            err_msg << "Spatial dimension mismatch: nodal field is defined "
+                       "in "
+                    << nodal_field.get_collection().get_spatial_dim()
+                    << "D space, but quadrature field is defined in "
+                    << quadrature_point_field.get_collection()
+                           .get_spatial_dim()
+                    << "D space";
+            throw RuntimeError{err_msg.str()};
+        }
+
         // number of components in the field we'd like to apply the convolution
         Index_t nb_nodal_components{nodal_field.get_nb_components()};
 
@@ -116,6 +130,17 @@ namespace muGrid {
                 << this->nb_operators << " operators × " << nb_nodal_components
                 << " components in the nodal field) but received a field with "
                 << nb_quad_components << " components.";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // Both fields must be from the same field collection to ensure
+        // compatible internal structure for pixel mapping
+        if (&nodal_field.get_collection() !=
+            &quadrature_point_field.get_collection()) {
+            std::stringstream err_msg{};
+            err_msg << "Field collection mismatch: nodal_field and "
+                       "quadrature_point_field must be from the same "
+                       "FieldCollection";
             throw RuntimeError{err_msg.str()};
         }
 
@@ -201,6 +226,20 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
+        // Check that both fields have the same spatial dimensions
+        if (quadrature_point_field.get_collection().get_spatial_dim() !=
+            nodal_field.get_collection().get_spatial_dim()) {
+            std::stringstream err_msg{};
+            err_msg << "Spatial dimension mismatch: quadrature field is "
+                       "defined in "
+                    << quadrature_point_field.get_collection()
+                           .get_spatial_dim()
+                    << "D space, but nodal field is defined in "
+                    << nodal_field.get_collection().get_spatial_dim()
+                    << "D space";
+            throw RuntimeError{err_msg.str()};
+        }
+
         // number of components in the gradient field
         Index_t nb_quad_components{quadrature_point_field.get_nb_components()};
 
@@ -215,6 +254,16 @@ namespace muGrid {
                 << this->nb_operators << " operators × " << nb_nodal_components
                 << " components in the nodal field) but received a field with "
                 << nb_quad_components << " components.";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // Both fields must be from the same field collection to ensure
+        // compatible internal structure for pixel mapping
+        if (&quadrature_point_field.get_collection() !=
+            &nodal_field.get_collection()) {
+            std::stringstream err_msg{};
+            err_msg << "Field collection mismatch: quadrature_point_field and "
+                       "nodal_field must be from the same FieldCollection";
             throw RuntimeError{err_msg.str()};
         }
 
