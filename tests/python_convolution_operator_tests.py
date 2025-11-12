@@ -38,6 +38,7 @@ import functools
 import unittest
 
 import numpy as np
+from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
 
@@ -151,5 +152,47 @@ class ConvolutionOperatorCheck(unittest.TestCase):
     )
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_malformed_convolution_input(comm):
+    nb_domain_grid_pts = [4, 6]
+
+    left_ghosts = [1, 1]
+    right_ghosts = [1, 1]
+
+    decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts,
+        suggest_subdivisions(2, comm.size),
+        left_ghosts,
+        right_ghosts)
+
+    fc = decomp.collection
+
+    # Get nodal field
+    nodal_field1 = fc.real_field("nodal-field1", (2,))
+    nodal_field2 = fc.real_field("nodal-field2", (2,))
+
+    impulse_locations = (nodal_field1.icoordsg[0] == 0) & (
+        nodal_field1.icoordsg[1] == 0
+    )
+    nodal_field1.pg[0, impulse_locations] = 1
+    nodal_field2.pg[1, impulse_locations] = 1
+
+    shift = np.array(
+        [
+            [
+                [
+                    [1, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                ],
+                [
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 1],
+                ],
+            ],
+        ],
+    )
+    print(shift.shape)
+    shift_op = muGrid.ConvolutionOperator([-1, -1], shift)
+    shift_op.apply(nodal_field1, nodal_field2)
