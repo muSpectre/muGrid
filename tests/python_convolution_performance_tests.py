@@ -591,3 +591,135 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
 
     # Check that both solutions agree
     np.testing.assert_allclose(solution.s, mugrid_solution)
+
+
+def test_quad_triangle_3_mugrid_vs_manual():
+    """
+    Compares wall-clock time and correctness of computing quadrature points on
+    triangles using muGrid convolution vs. 'manual' tensor-matrix multiplication.
+    """
+
+    # prepare muGrid operator
+    def prepare_muGrid():
+        kernel_quad_triangle_3 = np.array(
+            [
+                [  # operator 1
+                    [  # quadrature point 1
+                        [
+                            [2/3, 1/6],
+                            [1/6, 0],
+                        ]
+                    ],
+                    [  # quadrature point 2
+                        [
+                            [1/6, 1/6],
+                            [2/3, 0],
+                        ]
+                    ],
+                    [  # quadrature point 3
+                        [
+                            [1/6, 2/3],
+                            [1/6, 0],
+                        ]
+                    ],
+                    [  # quadrature point 4
+                        [
+                            [0, 1/6],
+                            [1/6, 2/3],
+                        ]
+                    ],
+                    [  # quadrature point 5
+                        [
+                            [0, 2/3],
+                            [1/6, 1/6],
+                        ]
+                    ],
+                    [  # quadrature point 6
+                        [
+                            [0, 1/6],
+                            [2/3, 1/6],
+                        ]
+                    ],
+                ]
+            ]
+        )
+        return muGrid.ConvolutionOperator([0, 0], kernel_quad_triangle_3)
+
+    # prepare manual operator
+    def prepare_manual_combined():
+        return np.array([
+            [2/3, 1/6, 1/6, 0],  # q1
+            [1/6, 2/3, 1/6, 0],  # q2
+            [1/6, 1/6, 2/3, 0],  # q3
+            [0, 1/6, 1/6, 2/3],  # q4
+            [0, 1/6, 2/3, 1/6],  # q5
+            [0, 2/3, 1/6, 1/6]   # q6
+        ])
+
+    def quad_manual_combined(a, Nx, Ny, m_quad):
+        F = a.reshape((Nx, Ny))
+
+        # periodic wrap
+        F = np.vstack([F, F[0:1, :]])
+        F = np.hstack([F, F[:, 0:1]])
+
+        # stack square-adjacent nodal values
+        bl = F[:-1, :-1]
+        br = F[:-1, 1:]
+        tl = F[1:, :-1]
+        tr = F[1:, 1:]
+
+        stack = np.stack([bl, tl, br, tr], axis=-1)
+        res = np.einsum('ij,xyj->xyi', m_quad, stack)
+        return res  # shape (Nx, Ny, 6)
+
+    # setup
+    Nx, Ny = 1000, 1000
+    nb_grid_pts = (Nx, Ny)
+
+    fc = muGrid.GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 6})
+    nodal_field = fc.real_field("nodal")
+    quad_field = fc.real_field("quad", 1, "quad")
+
+    # random nodal values
+    init_field = np.random.rand(Nx, Ny)
+    nodal_field.p = init_field
+
+    # prepare operators
+    op_mugrid = prepare_muGrid()
+    m_quad = prepare_manual_combined()
+
+    # run muGrid operator
+    t0 = time.perf_counter()
+    op_mugrid.apply(nodal_field, quad_field)
+    t1 = time.perf_counter()
+
+    quad_mugrid = quad_field.p.copy()
+
+    # reset for manual
+    quad_field.p.fill(0.0)
+
+    # run manual operator
+    t2 = time.perf_counter()
+    quad_manual = quad_manual_combined(init_field, Nx, Ny, m_quad)
+    t3 = time.perf_counter()
+
+    quad_manual = quad_manual.transpose(2, 0, 1)  # -> shape (6, Nx, Ny)
+
+    # optional timing output
+    print(f"muGrid operator time:  {t1 - t0:.6f} s")
+    print(f"Manual operator time:  {t3 - t2:.6f} s")
+
+    # correctness check
+    np.testing.assert_allclose(
+        quad_mugrid,
+        quad_manual,
+        rtol=1e-10,
+        atol=1e-12,
+    )
+
+    # compare wall-clock time
+    assert (t1 - t0) < 1.05 * (t3 - t2), (
+        f"muGrid slower than manual quadrature: "
+        f"muGrid {t1-t0:.6f}s vs. tensor-matrix mul {t3-t2:.6f}s"
+    )
