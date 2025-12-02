@@ -212,41 +212,29 @@ namespace muGrid {
 
         auto & collection{dynamic_cast<GlobalFieldCollection &>(
             quadrature_point_field.get_collection())};
+        // FIXME(Yizhen): now it needs to differ inner and boundary pixels,
+        // and the inner pixels shall also be used to create sparse operator.
         auto & pixels{collection.get_pixels()};
+        // get a sparse representation of the operator
+        auto sparse_operator{
+            this->create_sparse_operator(pixels.get_nb_subdomain_grid_pts())};
 
-        // relative coordinates of the nodal points inside the convolution space
-        CcoordOps::Pixels conv_space{IntCoord_t(this->conv_pts_shape),
-                                     IntCoord_t(this->pixel_offset)};
-
-        // For each pixel...
-        for (auto && [id, base_ccoord] : pixels.enumerate()) {
-            // which should be interpreted as a matrix with shape (c, o q)
-            // (It is already set to zero in the caller function "apply")
-            auto && quad_vals{quad_map[id]};
-
-            // For each convolution points involved in the current pixel...
-            for (auto && [index, offset] : akantu::enumerate(conv_space)) {
-                auto && ccoord{pixels.get_neighbour(base_ccoord, offset)};
-                // which should be interpreted as a matrix with shape (c, s)
-                auto && nodal_vals{nodal_map[pixels.get_index(ccoord)]};
-
-                // For each contributive nodal-pixel points, i.e. sub-pts of
-                // nodal field
-                for (Index_t i_pixelnodal = 0;
-                     i_pixelnodal < this->nb_pixelnodal_pts; ++i_pixelnodal) {
-                    // all the components are exactly in one column
-                    auto && effective_nodal_vals{nodal_vals.col(i_pixelnodal)};
-                    // the "operator" is interpreted as a matrix with shape (o
-                    // q, s ijk), so the corresponding chunk is a colum;
-                    // transpose so it becomes a row.
-                    auto && effective_op_vals{
-                        this->pixel_operator
-                            .col(index * this->nb_pixelnodal_pts + i_pixelnodal)
-                            .transpose()};
-                    // compute (col * row, such that the operator is broadcasted
-                    // to all components)
-                    quad_vals +=
-                        alpha * effective_nodal_vals * effective_op_vals;
+        // For each pixel (without ghost)...
+        for (auto && [pixel_id, _] : pixels.enumerate()) {
+            // in quad-pt field, it should be interpreted as a matrix with shape
+            // (c, o q)
+            auto && quad_vals{quad_map[pixel_id]};
+            // For each non-zero entry in the operator
+            for (const auto & [out_col_id, in_col_id, pixel_id_offset, value] :
+                 sparse_operator) {
+                // in nodal field, it should be interpreted as a matrix with
+                // shape (c, s)
+                auto && nodal_vals{nodal_map[pixel_id + pixel_id_offset]};
+                // for each component
+                for (Index_t component_id = 0;
+                     component_id < nb_nodal_components; ++component_id) {
+                    quad_vals(component_id, out_col_id) +=
+                        alpha * nodal_vals(component_id, in_col_id) * value;
                 }
             }
         }
