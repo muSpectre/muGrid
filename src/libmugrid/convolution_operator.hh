@@ -222,6 +222,14 @@ namespace muGrid {
          */
         Index_t spatial_dim;
         Index_t nb_conv_pts;
+
+       private:
+        // A sequence of (output value offset, input value offset, input pixel
+        // offset, value)
+        using SparseOperator =
+            std::vector<std::tuple<Index_t, Index_t, Index_t, Real>>;
+        //! Get a sparse representation of the pixel operator
+        SparseOperator create_sparse_operator(const IntCoord_t nb_pixels) const;
     };
 } // namespace muGrid
 #endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_

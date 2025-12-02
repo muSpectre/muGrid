@@ -45,6 +45,7 @@
 #include <sstream>
 
 namespace muGrid {
+
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::ConvolutionOperator(
         const Shape_t & pixel_offset, const Eigen::MatrixXd & pixel_operator,
@@ -73,6 +74,63 @@ namespace muGrid {
                     << pixel_operator.rows() << " rows";
             throw RuntimeError{err_msg.str()};
         }
+    }
+
+    /* ---------------------------------------------------------------------- */
+    ConvolutionOperator::SparseOperator
+    ConvolutionOperator::create_sparse_operator(const IntCoord_t nb_pixels) const {
+        // Helpers for conversion between index and coordinates
+        const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
+                                              IntCoord_t(this->pixel_offset)};
+        const CcoordOps::Pixels grid_pixels{nb_pixels};
+
+        // An empty sequence to save output
+        SparseOperator sparse_op{};
+        // Loop through each value of pixel operator
+        for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
+            for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
+                 ++i_col) {
+                // Only the non-zero values are of the interest
+                if (this->pixel_operator(i_row, i_col) != 0.) {
+                    // The output field shall have shape (components, operators,
+                    // quadrature points, pixels). Because of `FieldMap`, the
+                    // pixel index is separated and the others are interpreted
+                    // as a matrix. For the matrix, we set components to use the
+                    // row index, then the operators and quadrature points are
+                    // ravelled in column index. The latter is equivalent to
+                    // `i_row`, so that is the first entry in tuple.
+                    // // Decompose column index into node, stencil indices.
+                    // // (assume column-major)
+                    // const auto i_op{i_row % this->nb_operators};
+                    // const auto i_quad{i_row / this->nb_operators};
+                    // const auto i_op_quad{i_op + i_row * nb_operators};
+                    // assert (i_op_quad == i_row);
+
+                    // Decompose column index into node, stencil indices.
+                    // (assume column-major)
+                    const auto i_node{i_col % this->nb_pixelnodal_pts};
+                    const auto i_stencil{i_col / this->nb_pixelnodal_pts};
+                    // The input field shall have shape (components, nodes,
+                    // pixels). Because of `FieldMap`, the pixel index is
+                    // separated and the others are interpreted as a matrix. For
+                    // the matrix, we set components to use the row index, then
+                    // nodes use column index. So `i_node` is the second entry
+                    // in tuple.
+
+                    // Stencil index in `pixel_operator` is not aware of the
+                    // grid shape, so it must be decomposed to coordinates, and
+                    // reconstructed to index to use in grid.
+                    const auto coords{kernel_pixels.get_coord(i_stencil)};
+                    const auto pixel_offset_in_grid{
+                        grid_pixels.get_index(coords)};
+                    // Add this entry
+                    sparse_op.push_back(
+                        std::make_tuple(i_row, i_node, pixel_offset_in_grid,
+                                        this->pixel_operator(i_row, i_col)));
+                }
+            }
+        }
+        return sparse_op;
     }
 
     /* ---------------------------------------------------------------------- */
