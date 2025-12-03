@@ -202,6 +202,14 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
+        /* FIXME(Yizhen): remove the `FieldMap` middle layer
+         * Alternative 1: the raw pointer, available in TypedFieldBase<T>
+         *   auto nodal_data{nodal_field.data()};
+         *   auto quadrature_data{quadrature_point_field.data()
+         * Alternative 2: the vector, must downcast to TypedField<T>
+         *   auto & nodal_values{dynamic_cast<const TypedField<Real> &>(nodal_field).get_const_values()};
+         *   auto & quadrature_values{dynamic_cast<TypedField<Real> &>(quadrature_point_field).get_values()};
+         */
         // get nodal field map, where the values at one location is interpreted
         // as a matrix with [nb_nodal_components] rows
         auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
