@@ -1,10 +1,17 @@
 import numpy as np
 
-from muGrid import ConvolutionOperator, GlobalFieldCollection
+from muGrid import ConvolutionOperator, GlobalFieldCollection, CartesianDecomposition, Communicator
+try:
+    from mpi4py import MPI
+    comm = Communicator(MPI.COMM_WORLD)
+except ImportError:
+    comm = Communicator()
 
 # Two dimensional grid
 nx, ny = nb_grid_pts = (1024, 2)
-fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 2})
+decomposition = CartesianDecomposition(comm, nb_grid_pts, (1, 1), (1, 1), (1, 1))
+fc = decomposition.collection
+fc.set_nb_sub_pts("quad", 2)
 
 # Get nodal field
 nodal_field = fc.real_field("nodal-field")
@@ -15,6 +22,7 @@ quad_field = fc.real_field("quad-field", (2,), "quad")
 # Fill nodal field with a sine-wave
 x, y = nodal_field.icoords
 nodal_field.p = np.sin(2 * np.pi * x / nx)
+decomposition.communicate_ghosts(nodal_field)
 
 # Derivative stencil of shape (2, quad, 2, 2)
 gradient = np.array(
