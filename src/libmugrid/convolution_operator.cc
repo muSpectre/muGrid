@@ -123,6 +123,9 @@ namespace muGrid {
                     const auto coords{kernel_pixels.get_coord(i_stencil)};
                     const auto pixel_offset_in_grid{
                         grid_pixels.get_index(coords)};
+                    // std::cout << "i_stencil=" << i_stencil << std::endl;
+                    // std::cout << "coords=" << coords << std::endl;
+                    // std::cout << "offset=" << pixel_offset_in_grid << std::endl;
                     // Add this entry
                     sparse_op.push_back(
                         std::make_tuple(i_row, i_node, pixel_offset_in_grid,
@@ -212,38 +215,56 @@ namespace muGrid {
          */
         // get nodal field map, where the values at one location is interpreted
         // as a matrix with [nb_nodal_components] rows
-        auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
+        const auto nodal_map{nodal_field.get_pixel_map(nb_nodal_components)};
         // get quadrature point field map, where the values at one location is
         // interpreted as a matrix with [nb_nodal_components] rows
         auto quad_map{
             quadrature_point_field.get_pixel_map(nb_nodal_components)};
 
+        // Get the collection object (mostly to get different shapes)
         auto & collection{dynamic_cast<GlobalFieldCollection &>(
             quadrature_point_field.get_collection())};
-        // FIXME(Yizhen): now it needs to differ inner and boundary pixels,
-        // and the inner pixels shall also be used to create sparse operator.
-        auto & pixels{collection.get_pixels()};
-        // get a sparse representation of the operator
+        // std::cout << "Number ghost cells left" << IntCoord_t(collection.get_pixels_offset_without_ghosts()) << std::endl;
+
+        // Get a sparse representation of the operator; Note it needs to know
+        // the whole domain (with ghosts) to get the correct pixel offset.
         auto sparse_operator{
-            this->create_sparse_operator(pixels.get_nb_subdomain_grid_pts())};
+            this->create_sparse_operator(collection.get_nb_subdomain_grid_pts_with_ghosts())};
+
+        // FIXME(Yizhen): why does the default pixels treat non-ghost coordinates as starting from (0,0) ?
+        // auto & pixels{collection.get_pixels()};
+        CcoordOps::Pixels pixels{collection.get_nb_subdomain_grid_pts_with_ghosts(), IntCoord_t{}};
+        // std::cout << "strides=" << pixels.get_strides() << std::endl;
+        // std::cout << "coord_origin=" << pixels.get_coord(0) << std::endl;
+        auto fixed_offset{pixels.get_index(IntCoord_t(collection.get_pixels_offset_without_ghosts()))};
+        // std::cout << "Fixed offset=" << fixed_offset << std::endl;
+        CcoordOps::Pixels inner_pixels{
+            collection.get_nb_subdomain_grid_pts_without_ghosts(),
+            IntCoord_t{}, IntCoord_t(collection.get_pixels_strides())};
 
         // For each pixel (without ghost)...
-        for (auto && [pixel_id, _] : pixels.enumerate()) {
+        for (auto && [pixel_id, _] : inner_pixels.enumerate()) {
             // in quad-pt field, it should be interpreted as a matrix with shape
             // (c, o q)
-            auto && quad_vals{quad_map[pixel_id]};
+            // std::cout << "---------------------------------------" << std::endl;
+            const auto quad_index{pixel_id + fixed_offset};
+            auto && quad_vals{quad_map[quad_index]};
+            // std::cout << "before, quad_map[" << quad_index << "] ="<< quad_vals << std::endl;
             // For each non-zero entry in the operator
             for (const auto & [out_col_id, in_col_id, pixel_id_offset, value] :
                  sparse_operator) {
                 // in nodal field, it should be interpreted as a matrix with
                 // shape (c, s)
-                auto && nodal_vals{nodal_map[pixel_id + pixel_id_offset]};
+                const auto nodal_index{pixel_id + fixed_offset + pixel_id_offset};
+                // std::cout << "...access nodal map with index " << nodal_index << std::endl;
+                auto && nodal_vals{nodal_map[nodal_index]};
                 // for each component
                 for (Index_t component_id = 0;
                      component_id < nb_nodal_components; ++component_id) {
                     quad_vals(component_id, out_col_id) +=
                         alpha * nodal_vals(component_id, in_col_id) * value;
                 }
+                // std::cout << "now, quad_map[" << quad_index << "] ="<< quad_vals << std::endl;
             }
         }
     }

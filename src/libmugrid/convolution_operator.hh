@@ -227,7 +227,7 @@ namespace muGrid {
         // A sequence of (output value offset, input value offset, input pixel
         // offset, value)
         using SparseOperator =
-            std::vector<std::tuple<Index_t, Index_t, Index_t, Real>>;
+            typename std::vector<std::tuple<Index_t, Index_t, Index_t, Real>>;
         //! Get a sparse representation of the pixel operator
         SparseOperator create_sparse_operator(const IntCoord_t nb_pixels) const;
     };

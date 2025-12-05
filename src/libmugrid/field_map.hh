@@ -344,6 +344,7 @@ namespace muGrid {
 
         //! return const reference to the mapped field
         const Field_t & get_field() const;
+        const Index_t get_stride() const;
 
        protected:
         //! mapped field. Needed for query at initialisations
