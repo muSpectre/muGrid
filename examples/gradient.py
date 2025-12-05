@@ -44,5 +44,10 @@ op.apply(nodal_field, quad_field)
 
 # Check that the quadrature field has the correct derivative
 np.testing.assert_allclose(
-    quad_field.s[0, 0], 2 * np.pi * np.cos(2 * np.pi * (x + 0.25) / nx) / nx, atol=1e-5
+    # because the gradient stencil is linearly interpolating, it should compare against
+    # the analytic value evaluated at the middle of two grid points, hence (x + 0.5)
+    quad_field.s[0, 0], 2 * np.pi * np.cos(2 * np.pi * (x + 0.5) / nx) / nx, atol=1e-8
+)
+np.testing.assert_allclose(
+    quad_field.s[1, 0], 0
 )
