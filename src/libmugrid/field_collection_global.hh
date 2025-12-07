@@ -93,7 +93,7 @@ namespace muGrid {
          * @param storage_order Storage order of the pixels vs subdivision
          * portion of the field. In a column-major storage order, the pixel
          * subdivision (i.e. the components of the field) are stored next to
-         * each other in memory, file in a row-major storage order for each
+         * each other in memory, while in a row-major storage order, for each
          * component the pixels are stored next to each other in memory. (This
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
@@ -119,7 +119,7 @@ namespace muGrid {
          * @param storage_order Storage order of the pixels vs subdivision
          * portion of the field. In a column-major storage order, the pixel
          * subdivision (i.e. the components of the field) are stored next to
-         * each other in memory, file in a row-major storage order for each
+         * each other in memory, while in a row-major storage order for each
          * component the pixels are stored next to each other in memory. (This
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
@@ -308,6 +308,9 @@ namespace muGrid {
         const IntCoord_t & get_nb_ghosts_right() const {
             return this->nb_ghosts_right;
         }
+
+       private:
+        const IntCoord_t compute_pixels_strides(const IntCoord_t &nb_grid_pts, StorageOrder pixels_storage_order) const;
 
        protected:
         Pixels pixels{};  //!< helper to iterate over the grid
