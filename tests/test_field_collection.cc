@@ -183,7 +183,7 @@ namespace muGrid {
         Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts),
         FieldCollectionError);
 
-    for (auto && tup : akantu::zip(Fix::fc.get_pixels(), pixels)) {
+    for (auto && tup : akantu::zip(Fix::fc.get_pixels_with_ghosts(), pixels)) {
       auto && stored_id{std::get<0>(tup)};
       auto && ref_id{std::get<1>(tup)};
       for (int i{0}; i < Fix::spatial_dimension(); ++i) {

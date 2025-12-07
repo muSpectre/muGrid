@@ -153,23 +153,26 @@ namespace muGrid {
         operator=(GlobalFieldCollection && other) = delete;
 
         //! Return the pixels class that allows to iterator over pixels
-        const Pixels & get_pixels() const;
+        const Pixels & get_pixels_with_ghosts() const;
+
+        //! Return the pixels class that allows to iterator over pixels
+        const Pixels & get_pixels_without_ghosts() const;
 
         //! evaluate and return the linear index corresponding to dynamic
         //! `ccoord`
         Index_t get_index(const IntCoord_t & ccoord) const {
-            return this->get_pixels().get_index(ccoord);
+            return this->get_pixels_with_ghosts().get_index(ccoord);
         }
 
         //! evaluate and return the linear index corresponding to `ccoord`
         template <size_t Dim>
         Index_t get_index(const Ccoord_t<Dim> & ccoord) const {
-            return this->pixels.get_index(ccoord);
+            return this->pixels_with_ghosts.get_index(ccoord);
         }
 
         //! return coordinates of the i-th pixel
         IntCoord_t get_coord(const Index_t & index) const {
-            return this->pixels.get_coord(index);
+            return this->pixels_with_ghosts.get_coord(index);
         }
 
         /**
@@ -264,26 +267,26 @@ namespace muGrid {
         //! returns the process-local (subdomain) number of grid points in each
         //! direction including the ghost cells
         const IntCoord_t & get_nb_subdomain_grid_pts_with_ghosts() const {
-            return this->get_pixels().get_nb_subdomain_grid_pts();
+            return this->get_pixels_with_ghosts().get_nb_subdomain_grid_pts();
         }
 
         //! returns the process-local (subdomain) number of grid points in each
         //! directionl, but without the ghost cells
         IntCoord_t get_nb_subdomain_grid_pts_without_ghosts() const {
-            return this->get_pixels().get_nb_subdomain_grid_pts() -
+            return this->get_pixels_with_ghosts().get_nb_subdomain_grid_pts() -
                    this->nb_ghosts_left - this->nb_ghosts_right;
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid
         //! including the ghost cells
         const IntCoord_t & get_subdomain_locations_with_ghosts() const {
-            return this->get_pixels().get_subdomain_locations();
+            return this->get_pixels_with_ghosts().get_subdomain_locations();
         }
 
         //! returns the process-local (subdomain) locations of subdomain grid,
         //! but without the ghost cells
         IntCoord_t get_subdomain_locations_without_ghosts() const {
-            return this->get_pixels().get_subdomain_locations() +
+            return this->get_pixels_with_ghosts().get_subdomain_locations() +
                    this->nb_ghosts_left;
         }
 
@@ -313,7 +316,8 @@ namespace muGrid {
         const IntCoord_t compute_pixels_strides(const IntCoord_t &nb_grid_pts, StorageOrder pixels_storage_order) const;
 
        protected:
-        Pixels pixels{};  //!< helper to iterate over the grid
+        Pixels pixels_with_ghosts{};  //!< helper to iterate over the grid
+        Pixels pixels_without_ghosts{};  //!< helper to iterate over the grid
         IntCoord_t
             nb_domain_grid_pts{};  // number of domain (global) grid points
         IntCoord_t nb_ghosts_left{};

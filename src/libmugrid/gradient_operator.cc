@@ -248,7 +248,7 @@ namespace muGrid {
 
     auto & collection{dynamic_cast<GlobalFieldCollection &>(
         quadrature_point_field.get_collection())};
-    auto & pixels{collection.get_pixels()};
+    auto & pixels{collection.get_pixels_with_ghosts()};
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
     // Offsets of nodes connected by a pixel
@@ -341,7 +341,7 @@ namespace muGrid {
 
     auto & collection{dynamic_cast<GlobalFieldCollection &>(
         quadrature_point_field.get_collection())};
-    auto & pixels{collection.get_pixels()};
+    auto & pixels{collection.get_pixels_with_ghosts()};
     auto && nb_subdomain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
     // pixel index offsets for whole stencil of [ij,i+j,ij+,i+j+] in 2D  ...

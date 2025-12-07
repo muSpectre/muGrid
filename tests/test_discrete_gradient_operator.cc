@@ -90,7 +90,7 @@ namespace muGrid {
 
     // fill nodal field
     // not using auto && because g++ 5
-    for (auto id_pixel : collection.get_pixels().enumerate()) {
+    for (auto id_pixel : collection.get_pixels_with_ghosts().enumerate()) {
       auto && id{std::get<0>(id_pixel)};
       auto && ccoord{std::get<1>(id_pixel)};
 
@@ -130,7 +130,7 @@ namespace muGrid {
                                          collection.get_field("nodal_field")),
                                      quad_pt_field);
       auto && quad_pt_map{quad_pt_field.get_pixel_map()};
-      auto && pixels{collection.get_pixels()};
+      auto && pixels{collection.get_pixels_with_ghosts()};
       auto && nb_domain_grid_pts{pixels.get_nb_subdomain_grid_pts()};
 
       IntCoord_t valid_grid_pts{nb_domain_grid_pts};

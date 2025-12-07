@@ -149,9 +149,14 @@ namespace muGrid {
         this->nb_ghosts_right = _nb_ghosts_right;
 
         this->nb_domain_grid_pts = nb_domain_grid_pts;
-        this->pixels = CcoordOps::Pixels(_nb_subdomain_grid_pts,
+        this->pixels_with_ghosts = CcoordOps::Pixels(_nb_subdomain_grid_pts,
                                          subdomain_locations_with_ghosts,
                                          pixels_strides);
+        this->pixels_without_ghosts = CcoordOps::Pixels(
+            _nb_subdomain_grid_pts - _nb_ghosts_left - _nb_ghosts_right,
+            subdomain_locations_with_ghosts - _nb_ghosts_left,
+            this->pixels_with_ghosts.get_strides());
+
         this->nb_pixels = CcoordOps::get_size(_nb_subdomain_grid_pts);
         this->nb_buffer_pixels =
                 CcoordOps::get_buffer_size(_nb_subdomain_grid_pts, pixels_strides);
@@ -201,12 +206,22 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     const typename GlobalFieldCollection::Pixels &
-    GlobalFieldCollection::get_pixels() const {
+    GlobalFieldCollection::get_pixels_with_ghosts() const {
         if (not(this->initialised)) {
             throw FieldCollectionError(
                 "Can't iterate over the collection before it is initialised.");
         }
-        return this->pixels;
+        return this->pixels_with_ghosts;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    const typename GlobalFieldCollection::Pixels &
+    GlobalFieldCollection::get_pixels_without_ghosts() const {
+        if (not(this->initialised)) {
+            throw FieldCollectionError(
+                "Can't iterate over the collection before it is initialised.");
+        }
+        return this->pixels_without_ghosts;
     }
 
     /* ---------------------------------------------------------------------- */
@@ -216,19 +231,19 @@ namespace muGrid {
             this->nb_sub_pts
         };
         ret_val.initialise(this->nb_domain_grid_pts,
-                           this->pixels.get_nb_subdomain_grid_pts(),
-                           this->pixels.get_subdomain_locations());
+                           this->pixels_with_ghosts.get_nb_subdomain_grid_pts(),
+                           this->pixels_with_ghosts.get_subdomain_locations());
         return ret_val;
     }
 
     /* ---------------------------------------------------------------------- */
     Shape_t GlobalFieldCollection::get_pixels_shape() const {
-        return static_cast<Shape_t>(this->pixels.get_nb_subdomain_grid_pts());
+        return static_cast<Shape_t>(this->pixels_with_ghosts.get_nb_subdomain_grid_pts());
     }
 
     /* ---------------------------------------------------------------------- */
     Shape_t GlobalFieldCollection::get_pixels_shape_without_ghosts() const {
-        return static_cast<Shape_t>(this->pixels.get_nb_subdomain_grid_pts() -
+        return static_cast<Shape_t>(this->pixels_with_ghosts.get_nb_subdomain_grid_pts() -
                                     this->nb_ghosts_left -
                                     this->nb_ghosts_right);
     }
@@ -247,7 +262,7 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     Shape_t
     GlobalFieldCollection::get_pixels_strides(Index_t element_size) const {
-        Shape_t strides{this->pixels.get_strides()};
+        Shape_t strides{this->pixels_with_ghosts.get_strides()};
         for (auto &&s: strides) {
             s *= element_size;
         }
