@@ -286,8 +286,7 @@ namespace muGrid {
         //! returns the process-local (subdomain) locations of subdomain grid,
         //! but without the ghost cells
         IntCoord_t get_subdomain_locations_without_ghosts() const {
-            return this->get_pixels_with_ghosts().get_subdomain_locations() +
-                   this->nb_ghosts_left;
+            return this->get_pixels_without_ghosts().get_subdomain_locations();
         }
 
         /**
@@ -312,8 +311,14 @@ namespace muGrid {
             return this->nb_ghosts_right;
         }
 
-       private:
-        const IntCoord_t compute_pixels_strides(const IntCoord_t &nb_grid_pts, StorageOrder pixels_storage_order) const;
+        /**
+         * @brief Returns the index of the first non-ghost cell.
+         *
+         * @return an index.
+         */
+        Index_t get_start_index_without_ghosts() const {
+            return this->pixels_with_ghosts.get_index(this->nb_ghosts_left);
+        }
 
        protected:
         Pixels pixels_with_ghosts{};  //!< helper to iterate over the grid

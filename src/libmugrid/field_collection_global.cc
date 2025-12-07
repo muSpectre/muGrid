@@ -110,7 +110,7 @@ namespace muGrid {
             throw FieldCollectionError("double initialisation");
         }
 
-        // sanity check 1
+        // sanity check 1 - domain grid points
         auto nb_domain_grid_pts_total{get_nb_from_shape(nb_domain_grid_pts)};
         if (nb_domain_grid_pts_total <= 0) {
             std::stringstream s;
@@ -120,13 +120,37 @@ namespace muGrid {
                     << "initialisation.";
             throw FieldCollectionError(s.str());
         }
-        // sanity check 2 - the subdomain and / or ghosts may be empty!
+        // sanity check 2 - the subdomain and / or ghosts
         auto _nb_ghosts_left{nb_ghosts_left.get_dim() == 0
                                    ? IntCoord_t(nb_domain_grid_pts.get_dim())
                                    : nb_ghosts_left};
+        auto total_nb_ghosts_left{
+            get_nb_from_shape(_nb_ghosts_left)
+        };
+        if (total_nb_ghosts_left < 0) {
+            std::stringstream s;
+            s << "Invalid nb_ghosts_left " << _nb_ghosts_left
+                    << " (" << total_nb_ghosts_left
+                    << " total ghosts on left) passed during "
+                    << "initialisation.";
+            throw FieldCollectionError(s.str());
+        }
+
         auto _nb_ghosts_right{nb_ghosts_right.get_dim() == 0
                                     ? IntCoord_t(nb_domain_grid_pts.get_dim())
                                     : nb_ghosts_right};
+        auto total_nb_ghosts_right{
+            get_nb_from_shape(_nb_ghosts_right)
+        };
+        if (total_nb_ghosts_right < 0) {
+            std::stringstream s;
+            s << "Invalid nb_ghosts_right " << _nb_ghosts_right
+                    << " (" << total_nb_ghosts_right
+                    << " total ghosts on right) passed during "
+                    << "initialisation.";
+            throw FieldCollectionError(s.str());
+        }
+
         auto _nb_subdomain_grid_pts{
             nb_subdomain_grid_pts_with_ghosts.get_dim() == 0
                 ? nb_domain_grid_pts + _nb_ghosts_left + _nb_ghosts_right
@@ -144,22 +168,28 @@ namespace muGrid {
             throw FieldCollectionError(s.str());
         }
 
+        this->nb_domain_grid_pts = nb_domain_grid_pts;
+
         // Set ghost buffer sizes
         this->nb_ghosts_left = _nb_ghosts_left;
         this->nb_ghosts_right = _nb_ghosts_right;
 
-        this->nb_domain_grid_pts = nb_domain_grid_pts;
-        this->pixels_with_ghosts = CcoordOps::Pixels(_nb_subdomain_grid_pts,
-                                         subdomain_locations_with_ghosts,
-                                         pixels_strides);
+        // Set subdomain pixel iterators
+        auto _subdomain_locations_with_ghosts{
+            subdomain_locations_with_ghosts.get_dim() == 0
+                ? IntCoord_t(nb_domain_grid_pts.get_dim()) - _nb_ghosts_left
+                : subdomain_locations_with_ghosts};
+        this->pixels_with_ghosts =
+            CcoordOps::Pixels(_nb_subdomain_grid_pts,
+                              _subdomain_locations_with_ghosts, pixels_strides);
         this->pixels_without_ghosts = CcoordOps::Pixels(
             _nb_subdomain_grid_pts - _nb_ghosts_left - _nb_ghosts_right,
-            subdomain_locations_with_ghosts - _nb_ghosts_left,
-            this->pixels_with_ghosts.get_strides());
+            _subdomain_locations_with_ghosts + _nb_ghosts_left,
+            pixels_strides);
 
         this->nb_pixels = CcoordOps::get_size(_nb_subdomain_grid_pts);
         this->nb_buffer_pixels =
-                CcoordOps::get_buffer_size(_nb_subdomain_grid_pts, pixels_strides);
+            CcoordOps::get_buffer_size(_nb_subdomain_grid_pts, pixels_strides);
         this->allocate_fields();
         this->pixel_indices.resize(this->nb_pixels);
         for (int i{0}; i < this->nb_pixels; ++i) {
@@ -243,9 +273,8 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     Shape_t GlobalFieldCollection::get_pixels_shape_without_ghosts() const {
-        return static_cast<Shape_t>(this->pixels_with_ghosts.get_nb_subdomain_grid_pts() -
-                                    this->nb_ghosts_left -
-                                    this->nb_ghosts_right);
+        return static_cast<Shape_t>(
+            this->pixels_without_ghosts.get_nb_subdomain_grid_pts());
     }
 
     /* ---------------------------------------------------------------------- */
@@ -269,20 +298,4 @@ namespace muGrid {
         return strides;
     }
 
-    /* ---------------------------------------------------------------------- */
-    const IntCoord_t GlobalFieldCollection::compute_pixels_strides(
-            const IntCoord_t & nb_grid_pts,
-            StorageOrder pixels_storage_order) const {
-        if (pixels_storage_order == StorageOrder::Automatic) {
-            pixels_storage_order = this->get_storage_order();
-        }
-        auto _nb_subdomain_grid_pts{
-            nb_grid_pts.get_dim() == 0
-                ? this->nb_domain_grid_pts
-                : nb_grid_pts
-        };
-        return pixels_storage_order == StorageOrder::ColMajor
-                   ? CcoordOps::get_col_major_strides(_nb_subdomain_grid_pts)
-                   : CcoordOps::get_row_major_strides(_nb_subdomain_grid_pts);
-    }
 } // namespace muGrid
