@@ -120,10 +120,16 @@ namespace muGrid {
                     << "initialisation.";
             throw FieldCollectionError(s.str());
         }
-        // sanity check 2 - the subdomain may be empty!
+        // sanity check 2 - the subdomain and / or ghosts may be empty!
+        auto _nb_ghosts_left{nb_ghosts_left.get_dim() == 0
+                                   ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                   : nb_ghosts_left};
+        auto _nb_ghosts_right{nb_ghosts_right.get_dim() == 0
+                                    ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                    : nb_ghosts_right};
         auto _nb_subdomain_grid_pts{
             nb_subdomain_grid_pts_with_ghosts.get_dim() == 0
-                ? nb_domain_grid_pts + nb_ghosts_left + nb_ghosts_right
+                ? nb_domain_grid_pts + _nb_ghosts_left + _nb_ghosts_right
                 : nb_subdomain_grid_pts_with_ghosts
         };
         auto nb_subdomain_grid_pts_total{
@@ -139,12 +145,8 @@ namespace muGrid {
         }
 
         // Set ghost buffer sizes
-        this->nb_ghosts_left = nb_ghosts_left.get_dim() == 0
-                                   ? IntCoord_t(nb_domain_grid_pts.get_dim())
-                                   : nb_ghosts_left;
-        this->nb_ghosts_right = nb_ghosts_right.get_dim() == 0
-                                    ? IntCoord_t(nb_domain_grid_pts.get_dim())
-                                    : nb_ghosts_right;
+        this->nb_ghosts_left = _nb_ghosts_left;
+        this->nb_ghosts_right = _nb_ghosts_right;
 
         this->nb_domain_grid_pts = nb_domain_grid_pts;
         this->pixels = CcoordOps::Pixels(_nb_subdomain_grid_pts,
@@ -174,12 +176,19 @@ namespace muGrid {
         if (pixels_storage_order == StorageOrder::Automatic) {
             pixels_storage_order = this->get_storage_order();
         }
+        // The domain and / or ghosts may be empty
+        auto _nb_ghosts_left{nb_ghosts_left.get_dim() == 0
+                                   ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                   : nb_ghosts_left};
+        auto _nb_ghosts_right{nb_ghosts_right.get_dim() == 0
+                                    ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                    : nb_ghosts_right};
         auto _nb_subdomain_grid_pts{
             nb_subdomain_grid_pts_with_ghosts.get_dim() == 0
-                ? nb_domain_grid_pts + nb_ghosts_left + nb_ghosts_right
+                ? nb_domain_grid_pts + _nb_ghosts_left + _nb_ghosts_right
                 : nb_subdomain_grid_pts_with_ghosts
         };
-        // Compute pixel strides from subdomain grid points and storage order
+        // Compute pixel strides
         auto pixel_strides{
             pixels_storage_order == StorageOrder::ColMajor
                 ? CcoordOps::get_col_major_strides(_nb_subdomain_grid_pts)
