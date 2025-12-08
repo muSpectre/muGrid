@@ -528,6 +528,7 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
         Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
         return Ax
 
+    t_mugrid = -time.perf_counter()
     conjugate_gradients(
         comm,
         fc,
@@ -536,8 +537,9 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
         solution,
         tol=1e-6,
         maxiter=1000,
-        callback=callback,
+        # callback=callback,
     )
+    t_mugrid += time.perf_counter()
     mugrid_solution = solution.s.copy()
 
     # scipy Laplace sparse matrix
@@ -583,6 +585,7 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
         Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
         return Ax
 
+    t_scipy = -time.perf_counter()
     conjugate_gradients(
         comm,
         fc,
@@ -591,11 +594,22 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
         solution,
         tol=1e-6,
         maxiter=1000,
-        callback=callback,
+        # callback=callback,
     )
+    t_scipy += time.perf_counter()
 
     # Check that both solutions agree
     np.testing.assert_allclose(solution.s, mugrid_solution)
+
+    # Print timing result
+    print(f"muGrid operator time:  {t_mugrid:.6f} s")
+    print(f"Manual operator time:  {t_scipy:.6f} s")
+
+    # Check that the speed is at least comparable
+    assert (t_mugrid) < 1.05 * (t_scipy), (
+        f"muGrid slower than SciPy sparse: "
+        f"muGrid {t_mugrid:.6f}s vs. tensor-matrix mul {t_scipy:.6f}s"
+    )
 
 
 def test_quad_triangle_3_mugrid_vs_manual():
