@@ -78,7 +78,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::SparseOperator
-    ConvolutionOperator::create_sparse_operator(const IntCoord_t & nb_grid_pts) const {
+    ConvolutionOperator::create_sparse_operator(const IntCoord_t & nb_grid_pts, const Index_t nb_nodal_components) const {
         // Helpers for conversion between index and coordinates
         const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
                                               IntCoord_t(this->pixel_offset)};
@@ -92,38 +92,43 @@ namespace muGrid {
                  ++i_col) {
                 // Only the non-zero values are of the interest
                 if (this->pixel_operator(i_row, i_col) != 0.) {
-                    // auto i_output_element{i_row * nb_components};
+                    // for each component
+                    for (Index_t i_component = 0; i_component < nb_nodal_components; ++i_component) {
+                        auto i_element_out{i_row * nb_nodal_components + i_component};
 
-                    // Decompose column index into node, stencil indices.
-                    // (Given we know it is column-major flattened)
-                    auto i_node{i_col % this->nb_pixelnodal_pts};
-                    // auto i_input_element{i_node * nb_components};
+                        // Decompose column index into node, stencil indices.
+                        // (Given we know it is column-major flattened)
+                        auto i_node{i_col % this->nb_pixelnodal_pts};
+                        // auto i_input_element{i_node * nb_components};
 
-                    auto i_stencil{i_col / this->nb_pixelnodal_pts};
+                        auto i_stencil{i_col / this->nb_pixelnodal_pts};
 
-                    // The input field shall have shape (components, nodes,
-                    // pixels). Because of `FieldMap`, the pixel index is
-                    // separated and the others are interpreted as a matrix. For
-                    // the matrix, we set components to use the row index, then
-                    // nodes use column index. So `i_node` is the second entry
-                    // in tuple.
+                        // The input field shall have shape (components, nodes,
+                        // pixels). Because of `FieldMap`, the pixel index is
+                        // separated and the others are interpreted as a matrix. For
+                        // the matrix, we set components to use the row index, then
+                        // nodes use column index. So `i_node` is the second entry
+                        // in tuple.
 
-                    // Stencil index in `pixel_operator` is not aware of the
-                    // grid shape, so it must be decomposed to offset in
-                    // coordinates, and reconstructed to index difference
-                    // for the use of indexing pixels in the grid.
-                    // NOTE: must call "get_coord0" because kernel pixels don't
-                    // care which subdomain.
-                    const auto offset{kernel_pixels.get_coord(i_stencil)};
-                    const auto index_diff{grid_pixels.get_index(offset)};
-
-                    // std::cout << "i_stencil=" << i_stencil << std::endl;
-                    // std::cout << "coords=" << coords << std::endl;
-                    // std::cout << "offset=" << pixel_offset_in_grid << std::endl;
-                    // Add this entry
-                    sparse_op.push_back(
-                        std::make_tuple(i_row, i_node, index_diff,
-                                        this->pixel_operator(i_row, i_col)));
+                        // Stencil index in `pixel_operator` is not aware of the
+                        // grid shape, so it must be decomposed to offset in
+                        // coordinates, and reconstructed to index difference
+                        // for the use of indexing pixels in the grid.
+                        // NOTE: must call "get_coord0" because kernel pixels don't
+                        // care which subdomain.
+                        auto offset{kernel_pixels.get_coord(i_stencil)};
+                        auto index_diff{grid_pixels.get_index(offset)};
+                        auto i_element_in{index_diff * nb_nodal_components * this->nb_pixelnodal_pts +
+                                          i_node * nb_nodal_components +
+                                          i_component};
+                        // std::cout << "i_stencil=" << i_stencil << std::endl;
+                        // std::cout << "coords=" << coords << std::endl;
+                        // std::cout << "offset=" << pixel_offset_in_grid << std::endl;
+                        // Add this entry
+                        sparse_op.push_back(
+                            std::make_tuple(i_element_out, i_element_in,
+                                            this->pixel_operator(i_row, i_col)));
+                    }
                 }
             }
         }
@@ -236,7 +241,8 @@ namespace muGrid {
         // Get a sparse representation of the operator; Note it needs to know
         // the whole domain (with ghosts) to get the correct pixel offset.
         const auto sparse_operator{this->create_sparse_operator(
-            collection.get_nb_subdomain_grid_pts_with_ghosts())};
+            collection.get_nb_subdomain_grid_pts_with_ghosts(),
+            nb_nodal_components)};
 
         // Get the data pointer of both fields, and advance them to pointing
         // at the first pixel that is not ghost.
@@ -248,7 +254,7 @@ namespace muGrid {
 
         // For each pixel (without ghost)...
         auto && pixels_without_ghosts{collection.get_pixels_without_ghosts()};
-        for (auto && [pixel_count, base_coords] : pixels_without_ghosts.enumerate()) {
+        for (auto && [pixel_count, _] : pixels_without_ghosts.enumerate()) {
             // in quad-pt field, it should be interpreted as a matrix with shape
             // (c, o q)
             // std::cout << "---------------------------------------" << std::endl;
@@ -261,22 +267,12 @@ namespace muGrid {
             auto nodal_pixel_start{nodal_start +
                                    pixel_count * nodal_pixel_nb_elements};
             // For each non-zero entry in the operator
-            for (const auto & [out_col_id, in_col_id, pixel_id_offset, value] :
+            for (const auto & [out_index, in_index, value] :
                  sparse_operator) {
                 // std::cout << "...access nodal map with index " << nodal_index
                 //           << std::endl;
-                // for each component
-                for (Index_t component_index = 0;
-                     component_index < nb_nodal_components; ++component_index) {
-                    quad_pixel_start[out_col_id * nb_nodal_components +
-                                     component_index] +=
-                        alpha *
-                        nodal_pixel_start[pixel_id_offset *
-                                              nodal_pixel_nb_elements +
-                                          in_col_id * nb_nodal_components +
-                                          component_index] *
-                        value;
-                }
+                quad_pixel_start[out_index] +=
+                    alpha * nodal_pixel_start[in_index] * value;
             }
             // std::cout << "after, quad_map[" << quad_index
             //           << "] =" << quad_vals << std::endl;
