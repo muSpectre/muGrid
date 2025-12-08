@@ -23,9 +23,9 @@ quad_field = fc.real_field("quad-field", (2,), "quad")
 
 # Fill nodal field with a sine-wave
 x, y = nodal_field.icoords
-values = np.sin(2 * np.pi * x / nx)
+nodal_field.p = np.sin(2 * np.pi * x / nx)
 # Padding to mimic periodic boundary (sine wave is also periodic)
-nodal_field.pg = np.pad(values, tuple(zip(nb_ghosts_left, nb_ghosts_right)), mode='wrap')
+nodal_field.pg = np.pad(nodal_field.p, tuple(zip(nb_ghosts_left, nb_ghosts_right)), mode="wrap")
 
 # Derivative stencil of shape (2, quad, 2, 2)
 gradient = np.array(

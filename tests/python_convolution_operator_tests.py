@@ -124,7 +124,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
 
         # Create the grid
         fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}
+            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}, nb_ghosts_right=(nb_stencil_x - 1, nb_stencil_y - 1)
         )
 
         # A nodal field with some sequence as values

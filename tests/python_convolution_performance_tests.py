@@ -329,11 +329,12 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
 
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
 
         # Create field collection
+        nb_ghosts = (1, 1)
         fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}
+            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}, nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts
         )
 
         # Create fields
@@ -373,14 +374,18 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         nb_field_components = 3
 
         # Create stencil
-        stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
+        stencil = np.random.rand(nb_operators, nb_quad_pts, 1, nb_stencil_x, nb_stencil_y)
 
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
 
         # Create field collection
-        fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}
+        comm = muGrid.Communicator()
+        subdivisions = (1, 1)
+        decomposition = muGrid.CartesianDecomposition(
+            comm, (nb_x_pts, nb_y_pts), subdivisions, (1, 1), (1, 1)
         )
+        fc = decomposition.collection
+        fc.set_nb_sub_pts("quad", nb_quad_pts)
 
         # Create fields
         nodal = fc.real_field("nodal", nb_field_components)
@@ -425,12 +430,12 @@ class ConvolutionPerformanceTests(unittest.TestCase):
             # Create stencil
             stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
 
-            conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+            conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
 
             # Create field collection
-            fc = muGrid.GlobalFieldCollection(
-                (grid_size, grid_size), sub_pts={"quad": nb_quad_pts}
-            )
+            nb_ghosts = (1, 1)
+            fc = muGrid.GlobalFieldCollection((grid_size, grid_size), sub_pts={"quad": nb_quad_pts},
+                nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts)
 
             # Create fields
             nodal = fc.real_field("nodal", nb_components)
@@ -677,13 +682,14 @@ def test_quad_triangle_3_mugrid_vs_manual():
     Nx, Ny = 1000, 1000
     nb_grid_pts = (Nx, Ny)
 
-    fc = muGrid.GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 6})
+    fc = muGrid.GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 6}, nb_ghosts_right=(1, 1))
     nodal_field = fc.real_field("nodal")
     quad_field = fc.real_field("quad", 1, "quad")
 
     # random nodal values
     init_field = np.random.rand(Nx, Ny)
-    nodal_field.p = init_field
+    # Padding to get a periodic boundary
+    nodal_field.pg = np.pad(init_field, (0, 1), mode="wrap")
 
     # prepare operators
     op_mugrid = prepare_muGrid()
