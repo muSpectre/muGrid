@@ -175,6 +175,44 @@ namespace muGrid {
                     << "D space";
             throw RuntimeError{err_msg.str()};
         }
+        // Get the collection object
+        const auto & collection{dynamic_cast<GlobalFieldCollection &>(
+            quadrature_point_field.get_collection())};
+        // Check that fields have enough ghost cells on the left
+        const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
+        const auto min_ghosts_left{IntCoord_t(this->spatial_dim, 0) -
+                                   IntCoord_t(this->pixel_offset)};
+        for (auto direction = 0; direction < collection.get_spatial_dim();
+             ++direction) {
+            if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
+                std::stringstream err_msg{};
+                err_msg << "Ambiguous field shape: on axis " << direction
+                        << ", the convolution expects "
+                        << min_ghosts_left[direction] << " cells on the left, "
+                        << "but the provided fields have only "
+                        << nb_ghosts_left[direction] <<  "ghosts on the left.";
+                throw RuntimeError{err_msg.str()};
+            }
+        }
+
+        // Check that fields have enough ghost cells on the right
+        const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
+        const auto min_ghosts_right{IntCoord_t(this->conv_pts_shape) -
+                                    IntCoord_t(this->spatial_dim, 1) +
+                                    IntCoord_t(this->pixel_offset)};
+        for (auto direction = 0; direction < collection.get_spatial_dim();
+             ++direction) {
+            if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
+                std::stringstream err_msg{};
+                err_msg << "Ambiguous field shape: on axis " << direction
+                        << ", the convolution expects "
+                        << min_ghosts_right[direction]
+                        << " cells on the right, "
+                        << "but the provided fields have only "
+                        << nb_ghosts_right[direction] << "ghosts on the right.";
+                throw RuntimeError{err_msg.str()};
+            }
+        }
 
         // number of components in the field we'd like to apply the convolution
         Index_t nb_nodal_components{nodal_field.get_nb_components()};
