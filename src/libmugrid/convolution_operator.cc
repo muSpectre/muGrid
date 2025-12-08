@@ -239,17 +239,6 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
-        // Both fields must be from the same field collection to ensure
-        // compatible internal structure for pixel mapping
-        if (&nodal_field.get_collection() !=
-            &quadrature_point_field.get_collection()) {
-            std::stringstream err_msg{};
-            err_msg << "Field collection mismatch: nodal_field and "
-                       "quadrature_point_field must be from the same "
-                       "FieldCollection";
-            throw RuntimeError{err_msg.str()};
-        }
-
         /* FIXME(Yizhen): remove the `FieldMap` middle layer
          * Alternative 1: the raw pointer, available in TypedFieldBase<T>
          *   auto nodal_data{nodal_field.data()};
@@ -266,42 +255,33 @@ namespace muGrid {
         auto quad_map{
             quadrature_point_field.get_pixel_map(nb_nodal_components)};
 
-        // Get the collection object (mostly to get different shapes)
-        auto & collection{dynamic_cast<GlobalFieldCollection &>(
-            quadrature_point_field.get_collection())};
-        // std::cout << "Number ghost cells left" << IntCoord_t(collection.get_pixels_offset_without_ghosts()) << std::endl;
-
         // Get a sparse representation of the operator; Note it needs to know
         // the whole domain (with ghosts) to get the correct pixel offset.
-        auto sparse_operator{
-            this->create_sparse_operator(collection.get_nb_subdomain_grid_pts_with_ghosts())};
+        auto sparse_operator{this->create_sparse_operator(
+            collection.get_nb_subdomain_grid_pts_with_ghosts())};
 
-        // FIXME(Yizhen): why does the default pixels treat non-ghost coordinates as starting from (0,0) ?
-        // auto & pixels{collection.get_pixels()};
-        CcoordOps::Pixels pixels{collection.get_nb_subdomain_grid_pts_with_ghosts(), IntCoord_t{}};
-        // std::cout << "strides=" << pixels.get_strides() << std::endl;
-        // std::cout << "coord_origin=" << pixels.get_coord(0) << std::endl;
-        auto fixed_offset{pixels.get_index(IntCoord_t(collection.get_pixels_offset_without_ghosts()))};
-        // std::cout << "Fixed offset=" << fixed_offset << std::endl;
-        CcoordOps::Pixels inner_pixels{
-            collection.get_nb_subdomain_grid_pts_without_ghosts(),
-            IntCoord_t{}, IntCoord_t(collection.get_pixels_strides())};
+        // The index of first non-ghost pixels in the iterator with ghosts
+        auto start_index{collection.get_pixels_index_diff()};
 
         // For each pixel (without ghost)...
-        for (auto && [pixel_id, _] : inner_pixels.enumerate()) {
+        auto && pixels_without_ghosts{collection.get_pixels_without_ghosts()};
+        for (auto && [pixel_count, base_coords] : pixels_without_ghosts.enumerate()) {
             // in quad-pt field, it should be interpreted as a matrix with shape
             // (c, o q)
-            // std::cout << "---------------------------------------" << std::endl;
-            const auto quad_index{pixel_id + fixed_offset};
+            std::cout << "---------------------------------------" << std::endl;
+            std::cout << "base_coords=" << base_coords << std::endl;
+            const auto quad_index{start_index + pixel_count};
             auto && quad_vals{quad_map[quad_index]};
-            // std::cout << "before, quad_map[" << quad_index << "] ="<< quad_vals << std::endl;
+            std::cout << "before, quad_map[" << quad_index << "] =" << quad_vals
+                      << std::endl;
             // For each non-zero entry in the operator
             for (const auto & [out_col_id, in_col_id, pixel_id_offset, value] :
                  sparse_operator) {
                 // in nodal field, it should be interpreted as a matrix with
                 // shape (c, s)
-                const auto nodal_index{pixel_id + fixed_offset + pixel_id_offset};
-                // std::cout << "...access nodal map with index " << nodal_index << std::endl;
+                const auto nodal_index{start_index + pixel_count + pixel_id_offset};
+                std::cout << "...access nodal map with index " << nodal_index
+                          << std::endl;
                 auto && nodal_vals{nodal_map[nodal_index]};
                 // for each component
                 for (Index_t component_id = 0;
@@ -309,8 +289,9 @@ namespace muGrid {
                     quad_vals(component_id, out_col_id) +=
                         alpha * nodal_vals(component_id, in_col_id) * value;
                 }
-                // std::cout << "now, quad_map[" << quad_index << "] ="<< quad_vals << std::endl;
             }
+            std::cout << "after, quad_map[" << quad_index
+                      << "] =" << quad_vals << std::endl;
         }
     }
 
@@ -352,8 +333,7 @@ namespace muGrid {
             std::stringstream err_msg{};
             err_msg << "Spatial dimension mismatch: quadrature field is "
                        "defined in "
-                    << quadrature_point_field.get_collection()
-                           .get_spatial_dim()
+                    << quadrature_point_field.get_collection().get_spatial_dim()
                     << "D space, but nodal field is defined in "
                     << nodal_field.get_collection().get_spatial_dim()
                     << "D space";
@@ -406,7 +386,7 @@ namespace muGrid {
 
         auto & collection{dynamic_cast<GlobalFieldCollection &>(
             quadrature_point_field.get_collection())};
-        auto & pixels{collection.get_pixels()};
+        auto & pixels{collection.get_pixels_with_ghosts()};
 
         // pixel offsets of the points inside the convolution space
         CcoordOps::Pixels conv_space{IntCoord_t(this->conv_pts_shape)};

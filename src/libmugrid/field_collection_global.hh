@@ -312,12 +312,14 @@ namespace muGrid {
         }
 
         /**
-         * @brief Returns the index of the first non-ghost cell.
+        * @brief Returns the index difference between iterators of pixels with
+        * and without ghosts
          *
-         * @return an index.
+         * @return an Index_t instance.
          */
-        Index_t get_start_index_without_ghosts() const {
-            return this->pixels_with_ghosts.get_index(this->nb_ghosts_left);
+        Index_t get_pixels_index_diff() const {
+            return this->pixels_with_ghosts.get_index(
+                this->pixels_without_ghosts.get_coord(0));
         }
 
        protected:
