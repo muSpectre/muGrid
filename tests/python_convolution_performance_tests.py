@@ -603,12 +603,12 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
 
     # Print timing result
     print(f"muGrid operator time:  {t_mugrid:.6f} s")
-    print(f"Manual operator time:  {t_scipy:.6f} s")
+    print(f"SciPy Sparse time:  {t_scipy:.6f} s")
 
     # Check that the speed is at least comparable
     assert (t_mugrid) < 1.05 * (t_scipy), (
         f"muGrid slower than SciPy sparse: "
-        f"muGrid {t_mugrid:.6f}s vs. tensor-matrix mul {t_scipy:.6f}s"
+        f"muGrid {t_mugrid:.6f}s vs. SciPy sparse {t_scipy:.6f}s"
     )
 
 
