@@ -253,11 +253,11 @@ namespace muGrid {
             auto nodal_pixel_start{nodal_start +
                                    pixel_count * nodal_pixel_nb_elements};
             // For each non-zero entry in the operator
-            for (const auto & [out_index, in_index, value] :
+            for (const auto & [quad_index, nodal_index, value] :
                  sparse_operator) {
                 // Add the contribution to the output
-                quad_pixel_start[out_index] +=
-                    alpha * nodal_pixel_start[in_index] * value;
+                quad_pixel_start[quad_index] +=
+                    alpha * nodal_pixel_start[nodal_index] * value;
             }
         }
     }
@@ -392,11 +392,11 @@ namespace muGrid {
             auto nodal_pixel_start{nodal_start +
                                    pixel_count * nodal_pixel_nb_elements};
             // For each non-zero entry in the operator
-            for (const auto & [out_index, in_index, value] :
+            for (const auto & [quad_index, nodal_index, value] :
                  sparse_operator) {
                 // Add the contribution to the output
-                nodal_pixel_start[in_index] +=
-                    alpha * quad_pixel_start[out_index] * value;
+                nodal_pixel_start[nodal_index] +=
+                    alpha * quad_pixel_start[quad_index] * value;
             }
         }
     }
