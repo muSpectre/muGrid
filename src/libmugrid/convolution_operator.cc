@@ -184,7 +184,6 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
-
         // Check that fields have enough ghost cells on the left
         const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
         const auto min_ghosts_left{IntCoord_t(this->spatial_dim, 0) -
@@ -193,11 +192,12 @@ namespace muGrid {
              ++direction) {
             if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
                 std::stringstream err_msg{};
-                err_msg << "Ambiguous field shape: on axis " << direction
-                        << ", the convolution expects "
-                        << min_ghosts_left[direction] << " cells on the left, "
-                        << "but the provided fields have only "
-                        << nb_ghosts_left[direction] <<  "ghosts on the left.";
+                err_msg
+                    << "Ambiguous field shape: on axis " << direction
+                    << ", the convolution expects a minimum of "
+                    << min_ghosts_left[direction]
+                    << " cells on the left, but the provided fields have only "
+                    << nb_ghosts_left[direction] << " ghosts on the left.";
                 throw RuntimeError{err_msg.str()};
             }
         }
@@ -211,12 +211,12 @@ namespace muGrid {
              ++direction) {
             if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
                 std::stringstream err_msg{};
-                err_msg << "Ambiguous field shape: on axis " << direction
-                        << ", the convolution expects "
-                        << min_ghosts_right[direction]
-                        << " cells on the right, "
-                        << "but the provided fields have only "
-                        << nb_ghosts_right[direction] << "ghosts on the right.";
+                err_msg
+                    << "Ambiguous field shape: on axis " << direction
+                    << ", the convolution expects a minimum of "
+                    << min_ghosts_right[direction]
+                    << " cells on the right, but the provided fields have only "
+                    << nb_ghosts_right[direction] << " ghosts on the right.";
                 throw RuntimeError{err_msg.str()};
             }
         }
@@ -268,20 +268,20 @@ namespace muGrid {
         for (auto && [pixel_count, base_coords] : pixels_without_ghosts.enumerate()) {
             // in quad-pt field, it should be interpreted as a matrix with shape
             // (c, o q)
-            std::cout << "---------------------------------------" << std::endl;
-            std::cout << "base_coords=" << base_coords << std::endl;
+            // std::cout << "---------------------------------------" << std::endl;
+            // std::cout << "base_coords=" << base_coords << std::endl;
             const auto quad_index{start_index + pixel_count};
             auto && quad_vals{quad_map[quad_index]};
-            std::cout << "before, quad_map[" << quad_index << "] =" << quad_vals
-                      << std::endl;
+            // std::cout << "before, quad_map[" << quad_index << "] =" << quad_vals
+            //           << std::endl;
             // For each non-zero entry in the operator
             for (const auto & [out_col_id, in_col_id, pixel_id_offset, value] :
                  sparse_operator) {
                 // in nodal field, it should be interpreted as a matrix with
                 // shape (c, s)
                 const auto nodal_index{start_index + pixel_count + pixel_id_offset};
-                std::cout << "...access nodal map with index " << nodal_index
-                          << std::endl;
+                // std::cout << "...access nodal map with index " << nodal_index
+                //           << std::endl;
                 auto && nodal_vals{nodal_map[nodal_index]};
                 // for each component
                 for (Index_t component_id = 0;
@@ -290,8 +290,8 @@ namespace muGrid {
                         alpha * nodal_vals(component_id, in_col_id) * value;
                 }
             }
-            std::cout << "after, quad_map[" << quad_index
-                      << "] =" << quad_vals << std::endl;
+            // std::cout << "after, quad_map[" << quad_index
+            //           << "] =" << quad_vals << std::endl;
         }
     }
 
