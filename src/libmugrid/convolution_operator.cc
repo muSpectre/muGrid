@@ -148,36 +148,43 @@ namespace muGrid {
     void ConvolutionOperator::apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const {
-        if (not quadrature_point_field.is_global()) {
+        // Both fields must be from the same field collection to ensure
+        // compatible internal structure for pixel mapping
+        if (&nodal_field.get_collection() !=
+            &quadrature_point_field.get_collection()) {
             std::stringstream err_msg{};
-            err_msg
-                << "Field type error: quadrature_point_field must be a global "
-                   "field (registered in a global FieldCollection)";
+            err_msg << "Field collection mismatch: nodal_field and "
+                       "quadrature_point_field must be from the same "
+                       "FieldCollection";
             throw RuntimeError{err_msg.str()};
-        }
-        if (not nodal_field.is_global()) {
+            }
+
+        // Get the collection object
+        const auto & collection{dynamic_cast<GlobalFieldCollection &>(
+            quadrature_point_field.get_collection())};
+
+        // Check that fields are global
+        if (collection.get_domain() !=
+            FieldCollection::ValidityDomain::Global) {
             std::stringstream err_msg{};
-            err_msg << "Field type error: nodal_field must be a global "
+            err_msg << "Field type error: nodal_field and "
+                       "quadrature_point_field must be a global "
                        "field (registered in a global FieldCollection)";
             throw RuntimeError{err_msg.str()};
         }
 
-        // Check that both fields have the same spatial dimensions
-        if (nodal_field.get_collection().get_spatial_dim() !=
-            quadrature_point_field.get_collection().get_spatial_dim()) {
+        // Check that fields have the same spatial dimensions as operator
+        if (collection.get_spatial_dim() != this->spatial_dim) {
             std::stringstream err_msg{};
-            err_msg << "Spatial dimension mismatch: nodal field is defined "
-                       "in "
-                    << nodal_field.get_collection().get_spatial_dim()
-                    << "D space, but quadrature field is defined in "
-                    << quadrature_point_field.get_collection()
-                           .get_spatial_dim()
-                    << "D space";
+            err_msg << "Spatial dimension mismatch: nodal_field and "
+                       "quadrature_point_field are defined in "
+                    << collection.get_spatial_dim()
+                    << "D space, but this convolution operator is defined in "
+                    << this->spatial_dim << "D space";
             throw RuntimeError{err_msg.str()};
         }
-        // Get the collection object
-        const auto & collection{dynamic_cast<GlobalFieldCollection &>(
-            quadrature_point_field.get_collection())};
+
+
         // Check that fields have enough ghost cells on the left
         const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
         const auto min_ghosts_left{IntCoord_t(this->spatial_dim, 0) -
