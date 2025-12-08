@@ -228,8 +228,13 @@ namespace muGrid {
         // offset, value)
         using SparseOperator =
             typename std::vector<std::tuple<Index_t, Index_t, Index_t, Real>>;
-        //! Get a sparse representation of the pixel operator
-        SparseOperator create_sparse_operator(const IntCoord_t nb_pixels) const;
+        /**
+         * @brief Get a sparse representation of the pixel operator
+         * @param nb_grid_pts number of process-local (subdomain) grid points
+         * with ghosts
+         */
+        SparseOperator
+        create_sparse_operator(const IntCoord_t & nb_grid_pts) const;
     };
 } // namespace muGrid
 #endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_

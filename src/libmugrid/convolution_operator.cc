@@ -78,11 +78,11 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::SparseOperator
-    ConvolutionOperator::create_sparse_operator(IntCoord_t nb_pixels) const {
+    ConvolutionOperator::create_sparse_operator(const IntCoord_t & nb_grid_pts) const {
         // Helpers for conversion between index and coordinates
-        const CcoordOps::Pixels grid_pixels{nb_pixels};
         const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
                                               IntCoord_t(this->pixel_offset)};
+        const CcoordOps::Pixels grid_pixels{nb_grid_pts};
 
         // An empty sequence to save output
         SparseOperator sparse_op{};
@@ -109,17 +109,20 @@ namespace muGrid {
                     // in tuple.
 
                     // Stencil index in `pixel_operator` is not aware of the
-                    // grid shape, so it must be decomposed to coordinates, and
-                    // reconstructed to index to use in grid.
-                    const auto coords{kernel_pixels.get_coord(i_stencil)};
-                    const auto pixel_offset_in_grid{grid_pixels.get_index(coords)};
+                    // grid shape, so it must be decomposed to offset in
+                    // coordinates, and reconstructed to index difference
+                    // for the use of indexing pixels in the grid.
+                    // NOTE: must call "get_coord0" because kernel pixels don't
+                    // care which subdomain.
+                    const auto offset{kernel_pixels.get_coord(i_stencil)};
+                    const auto index_diff{grid_pixels.get_index(offset)};
 
                     // std::cout << "i_stencil=" << i_stencil << std::endl;
                     // std::cout << "coords=" << coords << std::endl;
                     // std::cout << "offset=" << pixel_offset_in_grid << std::endl;
                     // Add this entry
                     sparse_op.push_back(
-                        std::make_tuple(i_row, i_node, pixel_offset_in_grid,
+                        std::make_tuple(i_row, i_node, index_diff,
                                         this->pixel_operator(i_row, i_col)));
                 }
             }
@@ -232,7 +235,7 @@ namespace muGrid {
 
         // Get a sparse representation of the operator; Note it needs to know
         // the whole domain (with ghosts) to get the correct pixel offset.
-        auto sparse_operator{this->create_sparse_operator(
+        const auto sparse_operator{this->create_sparse_operator(
             collection.get_nb_subdomain_grid_pts_with_ghosts())};
 
         // Get the data pointer of both fields, and advance them to pointing
