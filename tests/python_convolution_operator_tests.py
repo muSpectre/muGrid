@@ -123,14 +123,18 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         assert d_op.nb_nodal_pts == nb_nodal_pts
 
         # Create the grid
+        nb_ghosts_right = (nb_stencil_x - 1, nb_stencil_y - 1)
         fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}, nb_ghosts_right=(nb_stencil_x - 1, nb_stencil_y - 1)
+            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}, nb_ghosts_right=nb_ghosts_right
         )
 
         # A nodal field with some sequence as values
         nodal = fc.real_field("nodal-value", nb_field_components)
-        nodal_vals = 1 + np.arange(nb_field_components * nb_x_pts * nb_y_pts)
-        nodal.p = nodal_vals.reshape(nb_field_components, nb_x_pts, nb_y_pts)
+        nodal_vals = (1 + np.arange(nb_field_components * nb_x_pts * nb_y_pts)).reshape(
+            nb_field_components, nb_x_pts, nb_y_pts)
+        # pad to mimic a periodic boundary
+        pad_width = ((0, 0), (0, nb_stencil_x - 1), (0, nb_stencil_y - 1))
+        nodal.pg = np.pad(nodal_vals, pad_width, "wrap")
 
         # Create a quadrature field to store the result
         quad = fc.real_field("quad-grad", (nb_field_components, nb_operators), "quad")
