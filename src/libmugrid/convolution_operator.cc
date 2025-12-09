@@ -37,7 +37,6 @@
 #include "convolution_operator.hh"
 #include "grid_common.hh"
 #include "field_collection_global.hh"
-#include "field_map.hh"
 #include "ccoord_operations.hh"
 #include "iterators.hh"
 #include "exception.hh"
@@ -236,29 +235,70 @@ namespace muGrid {
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
             nb_nodal_components)};
 
-        // Get the data pointer of both fields, and advance them to pointing
-        // at the first pixel that is not ghost.
-        auto start_index{collection.get_pixels_index_diff()};
-        auto nodal_pixel_nb_elements{nb_nodal_components * this->nb_pixelnodal_pts};
-        auto nodal_start{nodal_field.data() + start_index * nodal_pixel_nb_elements};
+        // Get the data pointer of both fields
+        auto nodal_pixel{nodal_field.data()};
+        auto quad_pixel{quadrature_point_field.data()};
+
+        // Get number of elements in each pixel
+        auto nodal_pixel_nb_elements{nb_nodal_components *
+                                     this->nb_pixelnodal_pts};
         auto quad_pixel_nb_elements{nb_quad_components * this->nb_quad_pts};
-        auto quad_start{quadrature_point_field.data() + start_index * quad_pixel_nb_elements};
+
+        // Advance pointers to the first pixel that is not ghost.
+        auto start_pixel_index{collection.get_pixels_index_diff()};
+        nodal_pixel += start_pixel_index * nodal_pixel_nb_elements;
+        quad_pixel += start_pixel_index * quad_pixel_nb_elements;
+
+        // Get shape of the pixels without ghosts
+        auto nb_pixels_without_ghosts{
+            collection.get_pixels_shape_without_ghosts()};
+        // Fill it up to 3D
+        while (nb_pixels_without_ghosts.size() < 3) {
+            nb_pixels_without_ghosts.push_back(1);
+        }
+
+        // Get number of ghosts
+        Shape_t ghosts_count{collection.get_nb_ghosts_left() +
+                             collection.get_nb_ghosts_right()};
+        // Fill it up to 2D (we don't need to know the ghost in z)
+        while (ghosts_count.size() < 2) {
+            ghosts_count.push_back(0);
+        }
+        // Compute number of ghost elements to advance  for each related axis
+        auto nodal_ghosts_count_x{ghosts_count[0] * nodal_pixel_nb_elements};
+        auto nodal_ghosts_count_y{
+            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
+            nodal_pixel_nb_elements};
+        auto quad_ghosts_count_x{ghosts_count[0] * quad_pixel_nb_elements};
+        auto quad_ghosts_count_y{
+            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
+            quad_pixel_nb_elements};
 
         // For each pixel (without ghost)...
-        auto && pixels_without_ghosts{collection.get_pixels_without_ghosts()};
-        for (auto && [pixel_count, _] : pixels_without_ghosts.enumerate()) {
-            // Get the pointers at the start of this pixel
-            auto quad_pixel_start{quad_start +
-                                  pixel_count * quad_pixel_nb_elements};
-            auto nodal_pixel_start{nodal_start +
-                                   pixel_count * nodal_pixel_nb_elements};
-            // For each non-zero entry in the operator
-            for (const auto & [quad_index, nodal_index, value] :
-                 sparse_operator) {
-                // Add the contribution to the output
-                quad_pixel_start[quad_index] +=
-                    alpha * nodal_pixel_start[nodal_index] * value;
+        for (Index_t z_index = 0; z_index < nb_pixels_without_ghosts[2];
+             ++z_index) {
+            for (Index_t y_index = 0; y_index < nb_pixels_without_ghosts[1];
+                 ++y_index) {
+                for (Index_t x_index = 0; x_index < nb_pixels_without_ghosts[0];
+                     ++x_index) {
+                    // For each non-zero entry in the operator
+                    for (const auto & [quad_index, nodal_index, value] :
+                         sparse_operator) {
+                        // Add the contribution to the output
+                        quad_pixel[quad_index] +=
+                            alpha * nodal_pixel[nodal_index] * value;
+                    }
+                    // Advance the pointer to the next pixel
+                    nodal_pixel += nodal_pixel_nb_elements;
+                    quad_pixel += quad_pixel_nb_elements;
+                }
+                // Advance the pointer to skip the ghosts
+                nodal_pixel += nodal_ghosts_count_x;
+                quad_pixel += quad_ghosts_count_x;
             }
+            // Advance the pointer to skip more ghosts
+            nodal_pixel += nodal_ghosts_count_y;
+            quad_pixel += quad_ghosts_count_y;
         }
     }
 
@@ -375,29 +415,72 @@ namespace muGrid {
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
             nb_nodal_components)};
 
-        // Get the data pointer of both fields, and advance them to pointing
-        // at the first pixel that is not ghost.
-        auto start_index{collection.get_pixels_index_diff()};
-        auto nodal_pixel_nb_elements{nb_nodal_components * this->nb_pixelnodal_pts};
-        auto nodal_start{nodal_field.data() + start_index * nodal_pixel_nb_elements};
+        // Get the data pointer of both fields
+        auto nodal_pixel{nodal_field.data()};
+        auto quad_pixel{quadrature_point_field.data()};
+
+        // Get number of elements in each pixel
+        auto nodal_pixel_nb_elements{nb_nodal_components *
+                                     this->nb_pixelnodal_pts};
         auto quad_pixel_nb_elements{nb_quad_components * this->nb_quad_pts};
-        auto quad_start{quadrature_point_field.data() + start_index * quad_pixel_nb_elements};
+
+        // Advance pointers to the first pixel that is not ghost.
+        auto start_pixel_index{collection.get_pixels_index_diff()};
+        nodal_pixel += start_pixel_index * nodal_pixel_nb_elements;
+        quad_pixel += start_pixel_index * quad_pixel_nb_elements;
+
+        // Get shape of the pixels without ghosts
+        auto nb_pixels_without_ghosts{
+            collection.get_pixels_shape_without_ghosts()};
+        // Fill it up to 3D
+        while (nb_pixels_without_ghosts.size() < 3) {
+            nb_pixels_without_ghosts.push_back(1);
+        }
+
+        // Get number of ghosts
+        Shape_t ghosts_count{collection.get_nb_ghosts_left() +
+                             collection.get_nb_ghosts_right()};
+        // Fill it up to 2D (we don't need to know the ghost in z)
+        while (ghosts_count.size() < 2) {
+            ghosts_count.push_back(0);
+        }
+        // Compute number of ghost elements to advance  for each related axis
+        auto nodal_ghosts_count_x{ghosts_count[0] * nodal_pixel_nb_elements};
+        auto nodal_ghosts_count_y{
+            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
+            nodal_pixel_nb_elements};
+        auto quad_ghosts_count_x{ghosts_count[0] * quad_pixel_nb_elements};
+        auto quad_ghosts_count_y{
+            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
+            quad_pixel_nb_elements};
 
         // For each pixel (without ghost)...
-        auto && pixels_without_ghosts{collection.get_pixels_without_ghosts()};
-        for (auto && [pixel_count, _] : pixels_without_ghosts.enumerate()) {
-            // Get the pointers at the start of this pixel
-            auto quad_pixel_start{quad_start +
-                                  pixel_count * quad_pixel_nb_elements};
-            auto nodal_pixel_start{nodal_start +
-                                   pixel_count * nodal_pixel_nb_elements};
-            // For each non-zero entry in the operator
-            for (const auto & [quad_index, nodal_index, value] :
-                 sparse_operator) {
-                // Add the contribution to the output
-                nodal_pixel_start[nodal_index] +=
-                    alpha * quad_pixel_start[quad_index] * value;
+        for (Index_t z_index = 0; z_index < nb_pixels_without_ghosts[2];
+             ++z_index) {
+            for (Index_t y_index = 0; y_index < nb_pixels_without_ghosts[1];
+                 ++y_index) {
+                for (Index_t x_index = 0; x_index < nb_pixels_without_ghosts[0];
+                     ++x_index) {
+                    // For each non-zero entry in the operator
+                    for (const auto & [quad_index, nodal_index, value] :
+                         sparse_operator) {
+                        // Add the contribution to the output. Note because the
+                        // operator is transposed, thus quadrature point field
+                        // acts as the input.
+                        nodal_pixel[nodal_index] +=
+                            alpha * quad_pixel[quad_index] * value;
+                    }
+                    // Advance the pointer to the next pixel
+                    nodal_pixel += nodal_pixel_nb_elements;
+                    quad_pixel += quad_pixel_nb_elements;
+                }
+                // Advance the pointer to skip the ghosts
+                nodal_pixel += nodal_ghosts_count_x;
+                quad_pixel += quad_ghosts_count_x;
             }
+            // Advance the pointer to skip more ghosts
+            nodal_pixel += nodal_ghosts_count_y;
+            quad_pixel += quad_ghosts_count_y;
         }
     }
 
