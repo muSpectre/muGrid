@@ -307,8 +307,11 @@ namespace muGrid {
         //! Tolerance for considering operator values as zero
         static constexpr Real zero_tolerance = 1e-14;
 
-        //! Cached sparse operator for reuse
-        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_sparse_op{};
+        //! Cached sparse operators for reuse (two orderings for optimal access)
+        //! Row-major: groups by quad index (optimal for apply - write locality)
+        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_apply_op{};
+        //! Column-major: groups by nodal index (optimal for transpose - write locality)
+        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_transpose_op{};
         mutable std::optional<SparseOperatorCacheKey> cached_key{};
 
         /**
@@ -323,26 +326,54 @@ namespace muGrid {
             const TypedFieldBase<Real> &quad_field) const;
 
         /**
-         * @brief Get or create the sparse operator representation
+         * @brief Get or create sparse operator for apply operation
          * @param nb_grid_pts number of process-local (subdomain) grid points
          * with ghosts
          * @param nb_nodal_components number of components in nodal field
-         * @return Reference to the sparse operator (cached)
+         * @return Reference to the sparse operator (cached, row-major order)
          */
         const SparseOperatorSoA<HostSpace>&
-        get_sparse_operator(const IntCoord_t & nb_grid_pts,
-                            const Index_t nb_nodal_components) const;
+        get_apply_operator(const IntCoord_t & nb_grid_pts,
+                           const Index_t nb_nodal_components) const;
 
         /**
-         * @brief Create a new sparse operator representation
+         * @brief Get or create sparse operator for transpose operation
          * @param nb_grid_pts number of process-local (subdomain) grid points
          * with ghosts
          * @param nb_nodal_components number of components in nodal field
-         * @return The sparse operator in SoA format
+         * @return Reference to the sparse operator (cached, column-major order)
+         */
+        const SparseOperatorSoA<HostSpace>&
+        get_transpose_operator(const IntCoord_t & nb_grid_pts,
+                               const Index_t nb_nodal_components) const;
+
+        /**
+         * @brief Create sparse operator with row-major ordering
+         * @param nb_grid_pts number of process-local (subdomain) grid points
+         * with ghosts
+         * @param nb_nodal_components number of components in nodal field
+         * @return The sparse operator in SoA format (row-major order)
+         *
+         * Row-major order groups entries by quad index, providing write
+         * locality for apply_increment (scatter to quad_data).
          */
         SparseOperatorSoA<HostSpace>
-        create_sparse_operator(const IntCoord_t & nb_grid_pts,
-                               const Index_t nb_nodal_components) const;
+        create_apply_operator(const IntCoord_t & nb_grid_pts,
+                              const Index_t nb_nodal_components) const;
+
+        /**
+         * @brief Create sparse operator with column-major ordering
+         * @param nb_grid_pts number of process-local (subdomain) grid points
+         * with ghosts
+         * @param nb_nodal_components number of components in nodal field
+         * @return The sparse operator in SoA format (column-major order)
+         *
+         * Column-major order groups entries by nodal index, providing write
+         * locality for transpose_increment (scatter to nodal_data).
+         */
+        SparseOperatorSoA<HostSpace>
+        create_transpose_operator(const IntCoord_t & nb_grid_pts,
+                                  const Index_t nb_nodal_components) const;
 
         /**
          * @brief Compute grid traversal parameters

@@ -214,27 +214,49 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
-    ConvolutionOperator::get_sparse_operator(
+    ConvolutionOperator::get_apply_operator(
         const IntCoord_t & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
         SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
-        if (this->cached_sparse_op.has_value() &&
+        if (this->cached_apply_op.has_value() &&
             this->cached_key.has_value() &&
             this->cached_key.value() == key) {
-            return this->cached_sparse_op.value();
+            return this->cached_apply_op.value();
         }
 
-        // Create new sparse operator and cache it
-        this->cached_sparse_op = this->create_sparse_operator(nb_grid_pts,
-                                                              nb_nodal_components);
+        // Cache invalidated - clear both operators and rebuild
+        this->cached_apply_op = this->create_apply_operator(nb_grid_pts,
+                                                            nb_nodal_components);
+        this->cached_transpose_op.reset();
         this->cached_key = key;
-        return this->cached_sparse_op.value();
+        return this->cached_apply_op.value();
+    }
+
+    /* ---------------------------------------------------------------------- */
+    const SparseOperatorSoA<HostSpace>&
+    ConvolutionOperator::get_transpose_operator(
+        const IntCoord_t & nb_grid_pts,
+        const Index_t nb_nodal_components) const {
+        // Check if we have a cached operator with matching parameters
+        SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
+        if (this->cached_transpose_op.has_value() &&
+            this->cached_key.has_value() &&
+            this->cached_key.value() == key) {
+            return this->cached_transpose_op.value();
+        }
+
+        // Cache invalidated - clear both operators and rebuild
+        this->cached_transpose_op = this->create_transpose_operator(
+            nb_grid_pts, nb_nodal_components);
+        this->cached_apply_op.reset();
+        this->cached_key = key;
+        return this->cached_transpose_op.value();
     }
 
     /* ---------------------------------------------------------------------- */
     SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_sparse_operator(
+    ConvolutionOperator::create_apply_operator(
         const IntCoord_t & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between index and coordinates
@@ -262,6 +284,8 @@ namespace muGrid {
         auto h_values = sparse_op.values;
 
         // Second pass: fill the arrays
+        // Row-major order groups entries by quad index, providing write
+        // locality for apply_increment (scatter to quad_data on GPU).
         Index_t entry_idx = 0;
         for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
             for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
@@ -270,27 +294,101 @@ namespace muGrid {
                 if (std::abs(op_value) > zero_tolerance) {
                     // Decompose column index into node, stencil indices.
                     // (Given we know it is column-major flattened)
-                    auto i_node{i_col % this->nb_pixelnodal_pts};
-                    auto i_stencil{i_col / this->nb_pixelnodal_pts};
+                    const auto i_node{i_col % this->nb_pixelnodal_pts};
+                    const auto i_stencil{i_col / this->nb_pixelnodal_pts};
 
                     // Stencil index in `pixel_operator` is not aware of
                     // grid shape, so it must be decomposed to offset in
                     // coordinates, and reconstructed to index difference
                     // for the use of indexing pixels in the grid.
-                    auto offset{kernel_pixels.get_coord(i_stencil)};
-                    auto index_diff{grid_pixels.get_index(offset)};
+                    const auto offset{kernel_pixels.get_coord(i_stencil)};
+                    const auto index_diff{grid_pixels.get_index(offset)};
 
                     // Repeat for each component
                     for (Index_t i_component = 0;
                          i_component < nb_nodal_components; ++i_component) {
                         // Get the index in quad field
-                        auto index_diff_quad{i_row * nb_nodal_components +
-                                             i_component};
+                        const auto index_diff_quad{i_row * nb_nodal_components +
+                                                   i_component};
 
-                        auto index_diff_nodal{index_diff * nb_nodal_components *
-                                                  this->nb_pixelnodal_pts +
-                                              i_node * nb_nodal_components +
-                                              i_component};
+                        const auto index_diff_nodal{
+                            index_diff * nb_nodal_components *
+                                this->nb_pixelnodal_pts +
+                            i_node * nb_nodal_components + i_component};
+
+                        h_quad_indices(entry_idx) = index_diff_quad;
+                        h_nodal_indices(entry_idx) = index_diff_nodal;
+                        h_values(entry_idx) = op_value;
+                        ++entry_idx;
+                    }
+                }
+            }
+        }
+
+        return sparse_op;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    SparseOperatorSoA<HostSpace>
+    ConvolutionOperator::create_transpose_operator(
+        const IntCoord_t & nb_grid_pts,
+        const Index_t nb_nodal_components) const {
+        // Helpers for conversion between index and coordinates
+        const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
+                                              IntCoord_t(this->pixel_offset)};
+        const CcoordOps::Pixels grid_pixels{nb_grid_pts};
+
+        // First pass: count non-zero entries
+        Index_t nnz = 0;
+        for (Index_t i_col = 0; i_col < this->pixel_operator.cols(); ++i_col) {
+            for (Index_t i_row = 0; i_row < this->pixel_operator.rows();
+                 ++i_row) {
+                if (std::abs(this->pixel_operator(i_row, i_col)) > zero_tolerance) {
+                    nnz += nb_nodal_components;
+                }
+            }
+        }
+
+        // Allocate SoA structure
+        SparseOperatorSoA<HostSpace> sparse_op(nnz);
+
+        // Get host-accessible views
+        auto h_quad_indices = sparse_op.quad_indices;
+        auto h_nodal_indices = sparse_op.nodal_indices;
+        auto h_values = sparse_op.values;
+
+        // Second pass: fill the arrays
+        // Column-major order groups entries by nodal index, providing write
+        // locality for transpose_increment (scatter to nodal_data on GPU).
+        Index_t entry_idx = 0;
+        for (Index_t i_col = 0; i_col < this->pixel_operator.cols(); ++i_col) {
+            // Decompose column index into node, stencil indices.
+            // (Given we know it is column-major flattened)
+            const auto i_node{i_col % this->nb_pixelnodal_pts};
+            const auto i_stencil{i_col / this->nb_pixelnodal_pts};
+
+            // Stencil index in `pixel_operator` is not aware of
+            // grid shape, so it must be decomposed to offset in
+            // coordinates, and reconstructed to index difference
+            // for the use of indexing pixels in the grid.
+            const auto offset{kernel_pixels.get_coord(i_stencil)};
+            const auto index_diff{grid_pixels.get_index(offset)};
+
+            for (Index_t i_row = 0; i_row < this->pixel_operator.rows();
+                 ++i_row) {
+                const Real op_value = this->pixel_operator(i_row, i_col);
+                if (std::abs(op_value) > zero_tolerance) {
+                    // Repeat for each component
+                    for (Index_t i_component = 0;
+                         i_component < nb_nodal_components; ++i_component) {
+                        // Get the index in quad field
+                        const auto index_diff_quad{i_row * nb_nodal_components +
+                                                   i_component};
+
+                        const auto index_diff_nodal{
+                            index_diff * nb_nodal_components *
+                                this->nb_pixelnodal_pts +
+                            i_node * nb_nodal_components + i_component};
 
                         h_quad_indices(entry_idx) = index_diff_quad;
                         h_nodal_indices(entry_idx) = index_diff_nodal;
@@ -306,7 +404,8 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     void ConvolutionOperator::clear_cache() const {
-        this->cached_sparse_op.reset();
+        this->cached_apply_op.reset();
+        this->cached_transpose_op.reset();
         this->cached_key.reset();
     }
 
@@ -334,8 +433,8 @@ namespace muGrid {
         const auto params = this->compute_traversal_params(
             collection, nb_nodal_components, nb_quad_components);
 
-        // Get cached sparse operator
-        const auto & sparse_op = this->get_sparse_operator(
+        // Get cached sparse operator (row-major for write locality to quad_data)
+        const auto & sparse_op = this->get_apply_operator(
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
             nb_nodal_components);
 
@@ -416,8 +515,8 @@ namespace muGrid {
         const auto params = this->compute_traversal_params(
             collection, nb_nodal_components, nb_quad_components);
 
-        // Get cached sparse operator
-        const auto & sparse_op = this->get_sparse_operator(
+        // Get cached sparse operator (col-major for write locality to nodal_data)
+        const auto & sparse_op = this->get_transpose_operator(
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
             nb_nodal_components);
 
