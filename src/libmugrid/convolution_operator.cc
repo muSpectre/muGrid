@@ -407,6 +407,8 @@ namespace muGrid {
         this->cached_apply_op.reset();
         this->cached_transpose_op.reset();
         this->cached_key.reset();
+        this->cached_device_apply_op.reset();
+        this->cached_device_transpose_op.reset();
     }
 
     /* ---------------------------------------------------------------------- */
@@ -442,49 +444,9 @@ namespace muGrid {
         const Real* nodal_data = nodal_field.data();
         Real* quad_data = quadrature_point_field.data();
 
-        // Precompute base offsets (skip ghost region)
-        const Index_t nodal_base = params.start_pixel_index *
-                                   params.nodal_elems_per_pixel;
-        const Index_t quad_base = params.start_pixel_index *
-                                  params.quad_elems_per_pixel;
-
-        // Extract values for lambda capture (avoid capturing 'this')
-        const Index_t nx = params.nx;
-        const Index_t ny = params.ny;
-        const Index_t nz = params.nz;
-        const Index_t nodal_stride_x = params.nodal_stride_x;
-        const Index_t nodal_stride_y = params.nodal_stride_y;
-        const Index_t nodal_stride_z = params.nodal_stride_z;
-        const Index_t quad_stride_x = params.quad_stride_x;
-        const Index_t quad_stride_y = params.quad_stride_y;
-        const Index_t quad_stride_z = params.quad_stride_z;
-        const Index_t nnz = sparse_op.size;
-
-        // Use MDRangePolicy for 3D grid traversal (portable across backends)
-        const Index_t* quad_indices = sparse_op.quad_indices.data();
-        const Index_t* nodal_indices = sparse_op.nodal_indices.data();
-        const Real* op_values = sparse_op.values.data();
-
-        using MDPolicy = Kokkos::MDRangePolicy<
-            HostExecutionSpace,
-            Kokkos::Rank<3>,
-            Kokkos::IndexType<Index_t>>;
-
-        Kokkos::parallel_for(
-            "ConvolutionOperator::apply_increment",
-            MDPolicy({0, 0, 0}, {nz, ny, nx}),
-            [=](const Index_t z, const Index_t y, const Index_t x) {
-                const Index_t nodal_offset = nodal_base +
-                    z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
-                const Index_t quad_offset = quad_base +
-                    z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
-
-                for (Index_t i = 0; i < nnz; ++i) {
-                    quad_data[quad_offset + quad_indices[i]] +=
-                        alpha * nodal_data[nodal_offset + nodal_indices[i]] *
-                        op_values[i];
-                }
-            });
+        // Use templated kernel for GPU portability
+        apply_convolution_kernel<HostExecutionSpace, HostSpace>(
+            nodal_data, quad_data, alpha, params, sparse_op);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -524,52 +486,10 @@ namespace muGrid {
         Real* nodal_data = nodal_field.data();
         const Real* quad_data = quadrature_point_field.data();
 
-        // Precompute base offsets (skip ghost region)
-        const Index_t nodal_base = params.start_pixel_index *
-                                   params.nodal_elems_per_pixel;
-        const Index_t quad_base = params.start_pixel_index *
-                                  params.quad_elems_per_pixel;
-
-        // Extract values for lambda capture
-        const Index_t nx = params.nx;
-        const Index_t ny = params.ny;
-        const Index_t nz = params.nz;
-        const Index_t nodal_stride_x = params.nodal_stride_x;
-        const Index_t nodal_stride_y = params.nodal_stride_y;
-        const Index_t nodal_stride_z = params.nodal_stride_z;
-        const Index_t quad_stride_x = params.quad_stride_x;
-        const Index_t quad_stride_y = params.quad_stride_y;
-        const Index_t quad_stride_z = params.quad_stride_z;
-        const Index_t nnz = sparse_op.size;
-
-        // Note: transpose operation scatters to nodal_field.
-        // Multiple pixels may write to the same nodal DOF (overlapping stencils).
-        // For parallel backends, atomic operations ensure thread-safe accumulation.
-        const Index_t* quad_indices = sparse_op.quad_indices.data();
-        const Index_t* nodal_indices = sparse_op.nodal_indices.data();
-        const Real* op_values = sparse_op.values.data();
-
-        using MDPolicy = Kokkos::MDRangePolicy<
-            HostExecutionSpace,
-            Kokkos::Rank<3>,
-            Kokkos::IndexType<Index_t>>;
-
-        Kokkos::parallel_for(
-            "ConvolutionOperator::transpose_increment",
-            MDPolicy({0, 0, 0}, {nz, ny, nx}),
-            [=](const Index_t z, const Index_t y, const Index_t x) {
-                const Index_t nodal_offset = nodal_base +
-                    z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
-                const Index_t quad_offset = quad_base +
-                    z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
-
-                for (Index_t i = 0; i < nnz; ++i) {
-                    Kokkos::atomic_add(
-                        &nodal_data[nodal_offset + nodal_indices[i]],
-                        alpha * quad_data[quad_offset + quad_indices[i]] *
-                        op_values[i]);
-                }
-            });
+        // Use templated kernel for GPU portability
+        // Note: transpose uses atomic_add for thread-safe accumulation
+        transpose_convolution_kernel<HostExecutionSpace, HostSpace>(
+            quad_data, nodal_data, alpha, params, sparse_op);
     }
 
     /* ---------------------------------------------------------------------- */
