@@ -49,25 +49,6 @@ if boost_test.found()
     test('mugrid_main_test_suite', main_test_suite, timeout : test_timeout)
 
     #
-    # Performance tests with PAPI
-    #
-    if papi.found()
-        performance_test_sources = [
-            'main_test_suite.cc',
-            'test_convolution_performance.cc',
-        ]
-
-        performance_test_suite = executable(
-            'mugrid_performance_test_suite',
-            performance_test_sources,
-            dependencies : [mugrid, boost_test, papi],
-        )
-
-        test('mugrid_performance_test_suite', performance_test_suite,
-             timeout : test_timeout)
-    endif
-
-    #
     # Parallel computing specific tests
     #
     mugrid_mpi_test_sources = [

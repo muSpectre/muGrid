@@ -73,6 +73,7 @@ void add_field(py::module &mod) {
             .def("set_zero", &Field::set_zero)
             .def("stride", &Field::get_stride)
             .def_property_readonly("buffer_size", &Field::get_buffer_size)
+            .def_property_readonly("element_size_in_bytes", &Field::get_element_size_in_bytes)
             .def_property_readonly("shape",
                                    [](Field &field) {
                                        return field.get_shape(muGrid::IterUnit::SubPt);

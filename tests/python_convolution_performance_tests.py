@@ -39,6 +39,7 @@ import unittest
 from dataclasses import dataclass
 from typing import Optional
 
+import pytest
 import numpy as np
 from scipy.sparse import coo_array
 
@@ -480,6 +481,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         print("=" * 90 + "\n")
 
 
+@pytest.mark.skip("This needs to be triggered manually")
 def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
     comm = muGrid.Communicator()
     subdivisions = (1, 1)
@@ -612,6 +614,7 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(128, 128)):
     )
 
 
+@pytest.mark.skip("This needs to be triggered manually")
 def test_quad_triangle_3_mugrid_vs_manual():
     """
     Compares wall-clock time and correctness of computing quadrature points on
