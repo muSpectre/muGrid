@@ -113,8 +113,20 @@ endif()
 
 # Python tests
 if(MUGRID_BUILD_PYTHON)
-    find_program(PYTEST_EXECUTABLE pytest)
-    if(PYTEST_EXECUTABLE)
+    # Use the Python interpreter that was found during configuration
+    # Users should ensure CMake is configured with the correct Python
+    # (e.g., by activating venv before running cmake, or by setting -DPython_EXECUTABLE)
+    set(MUGRID_PYTHON_EXECUTABLE "${Python_EXECUTABLE}" CACHE FILEPATH
+        "Python interpreter for running tests (should have numpy and pytest installed)")
+
+    # Check if pytest is available with this Python
+    execute_process(
+        COMMAND ${MUGRID_PYTHON_EXECUTABLE} -c "import pytest"
+        RESULT_VARIABLE PYTEST_CHECK_RESULT
+        OUTPUT_QUIET ERROR_QUIET
+    )
+
+    if(PYTEST_CHECK_RESULT EQUAL 0)
         # Set up Python path for tests
         set(PYTHON_TEST_ENV
             "PYTHONPATH=${CMAKE_BINARY_DIR}/language_bindings/python:${CMAKE_SOURCE_DIR}/language_bindings/python"
@@ -124,7 +136,7 @@ if(MUGRID_BUILD_PYTHON)
         # Serial Python tests
         add_test(
             NAME mugrid_python_binding_tests
-            COMMAND ${Python_EXECUTABLE} -m pytest -v -s ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMAND ${MUGRID_PYTHON_EXECUTABLE} -m pytest -v -s ${CMAKE_CURRENT_SOURCE_DIR}
         )
         set_tests_properties(mugrid_python_binding_tests PROPERTIES
             TIMEOUT 300
@@ -137,7 +149,7 @@ if(MUGRID_BUILD_PYTHON)
                 add_test(
                     NAME mpi_mugrid_python_binding_tests-np_${NP}
                     COMMAND ${MPIEXEC_EXECUTABLE} -n ${NP} --oversubscribe
-                        ${Python_EXECUTABLE} -m pytest -v -s ${CMAKE_CURRENT_SOURCE_DIR}
+                        ${MUGRID_PYTHON_EXECUTABLE} -m pytest -v -s ${CMAKE_CURRENT_SOURCE_DIR}
                 )
                 set_tests_properties(mpi_mugrid_python_binding_tests-np_${NP} PROPERTIES
                     TIMEOUT 300
@@ -147,6 +159,6 @@ if(MUGRID_BUILD_PYTHON)
             endforeach()
         endif()
     else()
-        message(STATUS "pytest not found, skipping Python tests")
+        message(STATUS "pytest not available in ${MUGRID_PYTHON_EXECUTABLE}, skipping Python tests")
     endif()
 endif()
