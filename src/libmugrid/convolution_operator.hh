@@ -266,69 +266,7 @@ namespace muGrid {
          */
         void clear_cache() const;
 
-        /**
-         * Apply convolution on device memory fields.
-         * Data must already be in device memory space.
-         *
-         * @tparam DeviceSpace Target device memory space (CudaSpace, HIPSpace)
-         * @param nodal_data Pointer to nodal field data in device memory
-         * @param quad_data Pointer to quadrature field data in device memory
-         * @param alpha Scaling factor
-         * @param params Grid traversal parameters
-         */
-        template<typename DeviceSpace>
-        void apply_on_device(
-            const Real* nodal_data,
-            Real* quad_data,
-            const Real alpha,
-            const GridTraversalParams& params) const;
-
-        /**
-         * Transpose convolution on device memory fields.
-         * Data must already be in device memory space.
-         *
-         * @tparam DeviceSpace Target device memory space (CudaSpace, HIPSpace)
-         * @param quad_data Pointer to quadrature field data in device memory
-         * @param nodal_data Pointer to nodal field data in device memory
-         * @param alpha Scaling factor
-         * @param params Grid traversal parameters
-         */
-        template<typename DeviceSpace>
-        void transpose_on_device(
-            const Real* quad_data,
-            Real* nodal_data,
-            const Real alpha,
-            const GridTraversalParams& params) const;
-
-        /**
-         * Get or create device-space sparse operator for apply operation.
-         * Lazily copies from host cache to device.
-         *
-         * @tparam DeviceSpace Target device memory space
-         * @param nb_grid_pts Grid points with ghosts
-         * @param nb_nodal_components Number of nodal components
-         * @return Reference to device sparse operator
-         */
-        template<typename DeviceSpace>
-        const SparseOperatorSoA<DeviceSpace>&
-        get_device_apply_operator(const IntCoord_t& nb_grid_pts,
-                                  Index_t nb_nodal_components) const;
-
-        /**
-         * Get or create device-space sparse operator for transpose operation.
-         * Lazily copies from host cache to device.
-         *
-         * @tparam DeviceSpace Target device memory space
-         * @param nb_grid_pts Grid points with ghosts
-         * @param nb_nodal_components Number of nodal components
-         * @return Reference to device sparse operator
-         */
-        template<typename DeviceSpace>
-        const SparseOperatorSoA<DeviceSpace>&
-        get_device_transpose_operator(const IntCoord_t& nb_grid_pts,
-                                      Index_t nb_nodal_components) const;
-
-    protected:
+    private:
         /**
          * stencil offset in number of pixels
          */
@@ -365,7 +303,6 @@ namespace muGrid {
         Index_t spatial_dim;
         Index_t nb_conv_pts;
 
-    private:
         //! Tolerance for considering operator values as zero
         static constexpr Real zero_tolerance = 1e-14;
 
@@ -452,6 +389,68 @@ namespace muGrid {
             const GlobalFieldCollection& collection,
             Index_t nb_nodal_components,
             Index_t nb_quad_components) const;
+
+        /**
+         * Apply convolution on device memory fields.
+         * Data must already be in device memory space.
+         *
+         * @tparam DeviceSpace Target device memory space (CudaSpace, HIPSpace)
+         * @param nodal_data Pointer to nodal field data in device memory
+         * @param quad_data Pointer to quadrature field data in device memory
+         * @param alpha Scaling factor
+         * @param params Grid traversal parameters
+         */
+        template<typename DeviceSpace>
+        void apply_on_device(
+            const Real* nodal_data,
+            Real* quad_data,
+            const Real alpha,
+            const GridTraversalParams& params) const;
+
+        /**
+         * Transpose convolution on device memory fields.
+         * Data must already be in device memory space.
+         *
+         * @tparam DeviceSpace Target device memory space (CudaSpace, HIPSpace)
+         * @param quad_data Pointer to quadrature field data in device memory
+         * @param nodal_data Pointer to nodal field data in device memory
+         * @param alpha Scaling factor
+         * @param params Grid traversal parameters
+         */
+        template<typename DeviceSpace>
+        void transpose_on_device(
+            const Real* quad_data,
+            Real* nodal_data,
+            const Real alpha,
+            const GridTraversalParams& params) const;
+
+        /**
+         * Get or create device-space sparse operator for apply operation.
+         * Lazily copies from host cache to device.
+         *
+         * @tparam DeviceSpace Target device memory space
+         * @param nb_grid_pts Grid points with ghosts
+         * @param nb_nodal_components Number of nodal components
+         * @return Reference to device sparse operator
+         */
+        template<typename DeviceSpace>
+        const SparseOperatorSoA<DeviceSpace>&
+        get_device_apply_operator(const IntCoord_t& nb_grid_pts,
+                                  Index_t nb_nodal_components) const;
+
+        /**
+         * Get or create device-space sparse operator for transpose operation.
+         * Lazily copies from host cache to device.
+         *
+         * @tparam DeviceSpace Target device memory space
+         * @param nb_grid_pts Grid points with ghosts
+         * @param nb_nodal_components Number of nodal components
+         * @return Reference to device sparse operator
+         */
+        template<typename DeviceSpace>
+        const SparseOperatorSoA<DeviceSpace>&
+        get_device_transpose_operator(const IntCoord_t& nb_grid_pts,
+                                      Index_t nb_nodal_components) const;
     };
 
     /**
