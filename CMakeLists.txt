@@ -78,7 +78,13 @@ if(NOT Eigen3_FOUND)
         GIT_TAG 3.4.0
         GIT_SHALLOW TRUE
     )
+    # Disable Eigen's tests and examples to avoid polluting our test suite
+    set(EIGEN_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(eigen)
+    # Restore BUILD_TESTING for muGrid's own tests
+    set(BUILD_TESTING ON CACHE BOOL "" FORCE)
 endif()
 
 # MPI support
