@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ Bindings" href="Cplusplus.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>Python Bindings - µGrid 0.95.0-133-g08ecfe76 documentation</title>
+        <title>Python Bindings - µGrid 0.95.0-167-g01ea58e5 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-133-g08ecfe76
+      <a href="index.html"><div class="brand">µGrid 0.95.0-167-g01ea58e5
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-133-g08ecfe76
+  <span class="sidebar-brand-text">µGrid 0.95.0-167-g01ea58e5
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -429,13 +429,13 @@ on quadrature points. This means field of shape</p>
 </div>
 <p>where the same convolution is applied to each component. Note that the convolution operation itself may have multiple
 components (which we will refer to as operators in the following), meaning that the output field may have the shape</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">operators</span><span class="p">,</span> <span class="n">components</span><span class="p">,</span> <span class="n">quadrature</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">operators</span><span class="p">,</span> <span class="n">quadrature</span><span class="o">-</span><span class="n">points</span><span class="p">,</span> <span class="n">pixels</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>In mathematical notation, the convolution operation can be written as</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[f_{o,c,q,p} = \sum_{n} \sum_{k} s_{o,q,n,k} g_{c,n,p-k}\]</div>
+\[f_{c,o,q,p} = \sum_{n} \sum_{k} s_{o,q,n,k} g_{c,n,p-k}\]</div>
 </div>
 <p>where <span class="math notranslate nohighlight">\(f\)</span> is the output field, <span class="math notranslate nohighlight">\(g\)</span> is the input field, <span class="math notranslate nohighlight">\(s\)</span> is the stencil, <span class="math notranslate nohighlight">\(o\)</span> are the operators, <span class="math notranslate nohighlight">\(c\)</span> are the components,
 <span class="math notranslate nohighlight">\(q\)</span> are the quadrature points, <span class="math notranslate nohighlight">\(n\)</span> are the nodal points, <span class="math notranslate nohighlight">\(p\)</span> are the pixels and <span class="math notranslate nohighlight">\(k\)</span> runs over the stencil width
@@ -444,7 +444,7 @@ components (which we will refer to as operators in the following), meaning that 
 In mathematical notation, the transpose convolution is written as</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[g_{c,n,p} = \sum_{o} \sum_{q} \sum_{k} s_{o,q,n,k} f_{o,c,q,p-k}\]</div>
+\[g_{c,n,p} = \sum_{o} \sum_{q} \sum_{k} s_{o,q,n,k} f_{c,o,q,p-k}\]</div>
 </div>
 <p>with the same stencil <span class="math notranslate nohighlight">\(s\)</span> as above.</p>
 <p>As an example, we consider the gradient of a two dimensional field with a single nodal point.
@@ -464,11 +464,20 @@ be unity. It is assumed that first <cite>nodel-points</cite>, then <cite>quadrat
 missing. This means we can represent a simple forward-differences gradient operator in two dimensions as</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConvolutionOperator</span><span class="p">,</span> <span class="n">GlobalFieldCollection</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConvolutionOperator</span><span class="p">,</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">CartesianDecomposition</span><span class="p">,</span> <span class="n">Communicator</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
+    <span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">()</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span> <span class="o">=</span> <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quad&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">})</span>
+<span class="c1"># Add some ghosts for computing</span>
+<span class="n">nb_ghosts_left</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">nb_ghosts_right</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quad&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="n">nb_ghosts_left</span><span class="p">,</span>
+                           <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="n">nb_ghosts_right</span><span class="p">)</span>
 
 <span class="c1"># Get nodal field</span>
 <span class="n">nodal_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;nodal-field&quot;</span><span class="p">)</span>
@@ -479,6 +488,8 @@ missing. This means we can represent a simple forward-differences gradient opera
 <span class="c1"># Fill nodal field with a sine-wave</span>
 <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">nodal_field</span><span class="o">.</span><span class="n">icoords</span>
 <span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span>
+<span class="c1"># Padding to mimic periodic boundary (sine wave is also periodic)</span>
+<span class="n">nodal_field</span><span class="o">.</span><span class="n">pg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wrap&quot;</span><span class="p">)</span>
 
 <span class="c1"># Derivative stencil of shape (2, quad, 2, 2)</span>
 <span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
@@ -500,7 +511,13 @@ missing. This means we can represent a simple forward-differences gradient opera
 
 <span class="c1"># Check that the quadrature field has the correct derivative</span>
 <span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
-    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mf">0.25</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-5</span>
+    <span class="c1"># Even though the quadrature point can have different locations, because the gradient</span>
+    <span class="c1"># stencil is linearly interpolating, it should compare against the analytic value</span>
+    <span class="c1"># evaluated at the middle of two grid points, hence (x + 0.5)</span>
+    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span>
+<span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
+    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">0</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -685,7 +702,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=1383b1c4"></script>
+</div><script src="_static/documentation_options.js?v=24c92eaf"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
