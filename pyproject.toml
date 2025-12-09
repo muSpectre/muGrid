@@ -1,6 +1,6 @@
 [build-system]
-requires = ["meson>=1.0.0", "meson-python>=0.15.0", "ninja", "numpy>=1.20.0"]
-build-backend = "mesonpy"
+requires = ["scikit-build-core>=0.8", "pybind11>=2.11", "numpy>=1.20.0"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "muGrid"
@@ -36,6 +36,16 @@ test = [
 documentation = "https://muspectre.github.io/muGrid/"
 repository = "https://github.com/muSpectre/muGrid"
 changelog = "https://github.com/muSpectre/muGrid/blob/main/CHANGELOG.md"
+
+[tool.scikit-build]
+cmake.minimum-version = "3.18"
+cmake.build-type = "Release"
+wheel.packages = ["language_bindings/python/muGrid"]
+wheel.install-dir = "muGrid"
+
+[tool.scikit-build.cmake.define]
+MUGRID_BUILD_TESTS = "OFF"
+MUGRID_BUILD_EXAMPLES = "OFF"
 
 [[tool.cibuildwheel.overrides]]
 select = "*manylinux*"
