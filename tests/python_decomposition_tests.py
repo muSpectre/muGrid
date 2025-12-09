@@ -5,6 +5,7 @@ from NuMPI.Testing.Assertions import assert_all_allclose
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
+from muGrid import wrap_field
 
 
 def get_nb_subdivisions(nb_processes: int):
@@ -73,7 +74,8 @@ def test_communicate_ghosts(comm, nb_subdivisions):
 
     # Create a field for testing
     field_name = "test_field"
-    field = cart_decomp.collection.real_field(field_name)
+    field_cpp = cart_decomp.collection.real_field(field_name)
+    field = wrap_field(field_cpp)
 
     # Create reference values
     global_coords = cart_decomp.icoordsg
@@ -104,7 +106,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     )
 
     # Communicate ghost cells
-    cart_decomp.communicate_ghosts(field)
+    cart_decomp.communicate_ghosts(field_cpp)
 
     # Check values at all grid points
     for index in np.ndindex(*nb_subdomain_grid_pts):
@@ -121,16 +123,17 @@ def test_field_accessors(comm, nb_grid_pts=(128, 128)):
     decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
     fc = decomposition.collection
 
-    field = fc.real_field("test-field")
+    field_cpp = fc.real_field("test-field")
+    field = wrap_field(field_cpp)
 
     xg, yg = decomposition.coordsg
-    field.pg = xg + 100 * yg
+    field.pg[...] = xg + 100 * yg
 
     assert_all_allclose(MPI.COMM_WORLD, field.pg[..., 1:-1, 1:-1], field.p)
     assert_all_allclose(MPI.COMM_WORLD, field.sg[..., 1:-1, 1:-1], field.s)
 
-    # Test setter
-    field.pg = np.random.random(field.pg.shape)
+    # Test in-place assignment
+    field.pg[...] = np.random.random(field.pg.shape)
 
     assert_all_allclose(MPI.COMM_WORLD, field.pg[..., 1:-1, 1:-1], field.p)
     assert_all_allclose(MPI.COMM_WORLD, field.sg[..., 1:-1, 1:-1], field.s)
@@ -156,9 +159,10 @@ def test_io(comm, nb_subdivisions):
 
     # Create a field for testing
     field_name = "test_field"
-    field = cart_decomp.collection.real_field(field_name)
+    field_cpp = cart_decomp.collection.real_field(field_name)
+    field = wrap_field(field_cpp)
 
-    field.pg = (cart_decomp.icoordsg**2).sum(axis=0)
+    field.pg[...] = (cart_decomp.icoordsg**2).sum(axis=0)
 
     # Write to file
     try:

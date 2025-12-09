@@ -175,6 +175,16 @@ if(MUGRID_BUILD_PYTHON)
         )
         FetchContent_MakeAvailable(pybind11)
     endif()
+
+    # Fetch DLPack header for zero-copy array exchange
+    message(STATUS "Fetching DLPack header...")
+    FetchContent_Declare(
+        dlpack
+        GIT_REPOSITORY https://github.com/dmlc/dlpack.git
+        GIT_TAG v1.0
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(dlpack)
 endif()
 
 # Print configuration summary

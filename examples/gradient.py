@@ -1,6 +1,6 @@
 import numpy as np
 
-from muGrid import ConvolutionOperator, GlobalFieldCollection, CartesianDecomposition, Communicator
+from muGrid import ConvolutionOperator, GlobalFieldCollection, CartesianDecomposition, Communicator, wrap_field
 try:
     from mpi4py import MPI
     comm = Communicator(MPI.COMM_WORLD)
@@ -16,16 +16,19 @@ fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 2}, nb_ghosts_left=nb_g
                            nb_ghosts_right=nb_ghosts_right)
 
 # Get nodal field
-nodal_field = fc.real_field("nodal-field")
+nodal_field_cpp = fc.real_field("nodal-field")
+nodal_field = wrap_field(nodal_field_cpp)
 
 # Get quadrature field of shape (2, quad, nx, ny)
-quad_field = fc.real_field("quad-field", (2,), "quad")
+quad_field_cpp = fc.real_field("quad-field", (2,), "quad")
+quad_field = wrap_field(quad_field_cpp)
 
 # Fill nodal field with a sine-wave
-x, y = nodal_field.icoords
-nodal_field.p = np.sin(2 * np.pi * x / nx)
+# Generate grid coordinates
+x, y = np.meshgrid(np.arange(nx), np.arange(ny), indexing="ij")
+nodal_field.p[...] = np.sin(2 * np.pi * x / nx)
 # Padding to mimic periodic boundary (sine wave is also periodic)
-nodal_field.pg = np.pad(nodal_field.p, tuple(zip(nb_ghosts_left, nb_ghosts_right)), mode="wrap")
+nodal_field.pg[...] = np.pad(nodal_field.p, tuple(zip(nb_ghosts_left, nb_ghosts_right)), mode="wrap")
 
 # Derivative stencil of shape (2, quad, 2, 2)
 gradient = np.array(
@@ -43,7 +46,7 @@ gradient = np.array(
 op = ConvolutionOperator([0, 0], gradient)
 
 # Apply the gradient operator to the nodal field and write result to the quad field
-op.apply(nodal_field, quad_field)
+op.apply(nodal_field_cpp, quad_field_cpp)
 
 # Check that the quadrature field has the correct derivative
 np.testing.assert_allclose(

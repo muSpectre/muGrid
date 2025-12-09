@@ -8,6 +8,7 @@ except ModuleNotFoundError:
     plt = None
 import numpy as np
 import muGrid
+from muGrid import wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -38,11 +39,13 @@ laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
 
 x, y = decomposition.coords  # Domain-local coords for each pixel
 
-rhs = fc.real_field("rhs")
-solution = fc.real_field("solution")
+rhs_cpp = fc.real_field("rhs")
+solution_cpp = fc.real_field("solution")
+rhs = wrap_field(rhs_cpp)
+solution = wrap_field(solution_cpp)
 
-rhs.p = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
-rhs.p -= np.mean(rhs.p)
+rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
+rhs.p[...] -= np.mean(rhs.p)
 
 
 def callback(it, x, r, p):
@@ -52,26 +55,27 @@ def callback(it, x, r, p):
     print(f"{it:5} {np.dot(r.ravel(), r.ravel()):.5}")
 
 
-def hessp(x, Ax):
+def hessp(x_field, Ax_field):
     """
     Function to compute the product of the Hessian matrix with a vector.
     The Hessian is represented by the convolution operator.
     """
-    decomposition.communicate_ghosts(x)
-    laplace.apply(x, Ax)
+    decomposition.communicate_ghosts(x_field)
+    laplace.apply(x_field, Ax_field)
     # We need the minus sign because the Laplace operator is negative
     # definite, but the conjugate-gradients solver assumes a
     # positive-definite operator.
-    Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-    return Ax
+    Ax = wrap_field(Ax_field)
+    Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+    return Ax_field
 
 
 conjugate_gradients(
     comm,
     fc,
     hessp,  # linear operator
-    rhs,
-    solution,
+    rhs_cpp,
+    solution_cpp,
     tol=1e-6,
     callback=callback,
     maxiter=1000,

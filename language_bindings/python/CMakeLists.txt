@@ -23,6 +23,7 @@ target_include_directories(_muGrid PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src/libmugrid
     ${CMAKE_SOURCE_DIR}/src
+    ${dlpack_SOURCE_DIR}/include
 )
 
 # Compile definitions
@@ -39,6 +40,7 @@ install(TARGETS _muGrid
 # Install pure Python files
 install(FILES
     muGrid/__init__.py
+    muGrid/Field.py
     muGrid/Parallel.py
     muGrid/Solvers.py
     DESTINATION ${Python_SITEARCH}/muGrid

@@ -41,14 +41,18 @@
 #include "libmugrid/field_collection.hh"
 #include "libmugrid/field_collection_global.hh"
 #include "libmugrid/mapped_field.hh"
-#include "libmugrid/numpy_tools.hh"
-#include "libmugrid/python_helpers.hh"
+
+#include <dlpack/dlpack.h>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 
 #include <sstream>
+#include <vector>
+#include <memory>
+#include <complex>
+#include <cstring>
 
 using muGrid::Field;
 using muGrid::FieldCollection;
@@ -59,13 +63,151 @@ using muGrid::Shape_t;
 using muGrid::TypedField;
 using muGrid::TypedFieldBase;
 using muGrid::operator<<;
-using muGrid::raw_mem_ops::strided_copy;
 using pybind11::literals::operator""_a;
 
 using muGrid::Real;
 using muGrid::Int;
-using muGrid::py_coords;
+using muGrid::Complex;
+using muGrid::Uint;
 namespace py = pybind11;
+
+/**
+ * Context for DLPack managed tensor - holds the field reference to prevent
+ * deallocation while the tensor is in use
+ */
+template<typename T>
+struct DLPackContext {
+    TypedFieldBase<T>* field;
+    std::vector<int64_t> shape;
+    std::vector<int64_t> strides;
+
+    DLPackContext(TypedFieldBase<T>* f, const Shape_t& s, const Shape_t& st)
+        : field(f), shape(s.begin(), s.end()) {
+        // DLPack spec says strides are in elements, not bytes
+        strides.reserve(st.size());
+        for (auto stride : st) {
+            strides.push_back(static_cast<int64_t>(stride));
+        }
+    }
+};
+
+/**
+ * Deleter function for DLManagedTensorVersioned
+ */
+template<typename T>
+void dlpack_deleter_versioned(DLManagedTensorVersioned* tensor) {
+    auto* ctx = static_cast<DLPackContext<T>*>(tensor->manager_ctx);
+    delete ctx;
+    delete tensor;
+}
+
+/**
+ * Get DLDataType for C++ types
+ */
+template<typename T>
+DLDataType get_dlpack_dtype();
+
+template<>
+DLDataType get_dlpack_dtype<float>() {
+    return DLDataType{kDLFloat, 32, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<double>() {
+    return DLDataType{kDLFloat, 64, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<int32_t>() {
+    return DLDataType{kDLInt, 32, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<int64_t>() {
+    return DLDataType{kDLInt, 64, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<uint32_t>() {
+    return DLDataType{kDLUInt, 32, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<uint64_t>() {
+    return DLDataType{kDLUInt, 64, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<std::complex<float>>() {
+    return DLDataType{kDLComplex, 64, 1};
+}
+
+template<>
+DLDataType get_dlpack_dtype<std::complex<double>>() {
+    return DLDataType{kDLComplex, 128, 1};
+}
+
+/**
+ * Create a DLPack capsule for a typed field using the versioned protocol
+ */
+template<typename T>
+py::capsule create_dlpack_capsule(TypedFieldBase<T>& field) {
+    auto& coll = field.get_collection();
+    if (!coll.is_initialised()) {
+        throw RuntimeError("Field collection isn't initialised yet");
+    }
+
+    // Get shape and strides for SubPt iteration (full buffer with ghosts)
+    auto iter_unit = muGrid::IterUnit::SubPt;
+    Shape_t shape = field.get_shape(iter_unit);
+    Shape_t strides = field.get_strides(iter_unit, 1);  // strides in elements
+
+    // Create context to hold shape/stride data
+    auto* ctx = new DLPackContext<T>(&field, shape, strides);
+
+    // Create DLManagedTensorVersioned (the modern DLPack protocol)
+    auto* managed = new DLManagedTensorVersioned();
+
+    // Set version
+    managed->version.major = DLPACK_MAJOR_VERSION;
+    managed->version.minor = DLPACK_MINOR_VERSION;
+
+    // Set manager context and deleter
+    managed->manager_ctx = ctx;
+    managed->deleter = dlpack_deleter_versioned<T>;
+
+    // Set flags - 0 means writable, not a copy
+    managed->flags = 0;
+
+    // Fill in tensor info
+    auto& tensor = managed->dl_tensor;
+    tensor.data = field.data();
+    tensor.device = DLDevice{kDLCPU, 0};
+    tensor.ndim = static_cast<int32_t>(shape.size());
+    tensor.dtype = get_dlpack_dtype<T>();
+    tensor.shape = ctx->shape.data();
+    tensor.strides = ctx->strides.data();
+    tensor.byte_offset = 0;
+
+    // Create PyCapsule with the versioned name for DLPack protocol.
+    // The DLPack consumer (e.g., numpy) will rename the capsule to "used_dltensor_versioned"
+    // and call the deleter when done.
+    auto capsule = py::capsule(managed, "dltensor_versioned");
+
+    // Set up a destructor that only cleans up if the capsule was NOT consumed
+    PyCapsule_SetDestructor(capsule.ptr(), [](PyObject* obj) {
+        const char* name = PyCapsule_GetName(obj);
+        // Only delete if capsule was never consumed
+        if (name != nullptr && std::strcmp(name, "dltensor_versioned") == 0) {
+            auto* tensor = static_cast<DLManagedTensorVersioned*>(PyCapsule_GetPointer(obj, name));
+            if (tensor && tensor->deleter) {
+                tensor->deleter(tensor);
+            }
+        }
+    });
+
+    return capsule;
+}
 
 void add_field(py::module &mod) {
     py::class_<Field>(mod, "Field")
@@ -73,9 +215,45 @@ void add_field(py::module &mod) {
             .def("stride", &Field::get_stride)
             .def_property_readonly("buffer_size", &Field::get_buffer_size)
             .def_property_readonly("element_size_in_bytes", &Field::get_element_size_in_bytes)
+            // Shape with ghosts (SubPt layout) - this is what __dlpack__ exports
             .def_property_readonly("shape",
                                    [](Field &field) {
                                        return field.get_shape(muGrid::IterUnit::SubPt);
+                                   })
+            // Shape without ghosts (SubPt layout)
+            .def_property_readonly("shape_s",
+                                   [](Field &field) {
+                                       return field.get_shape_without_ghosts(muGrid::IterUnit::SubPt);
+                                   })
+            // Offsets for slicing out ghosts (SubPt layout)
+            .def_property_readonly("offsets_s",
+                                   [](Field &field) {
+                                       return field.get_offsets_without_ghosts(muGrid::IterUnit::SubPt);
+                                   })
+            // Shape with ghosts (Pixel layout)
+            .def_property_readonly("shape_pg",
+                                   [](Field &field) {
+                                       return field.get_shape(muGrid::IterUnit::Pixel);
+                                   })
+            // Shape without ghosts (Pixel layout)
+            .def_property_readonly("shape_p",
+                                   [](Field &field) {
+                                       return field.get_shape_without_ghosts(muGrid::IterUnit::Pixel);
+                                   })
+            // Offsets for slicing out ghosts (Pixel layout)
+            .def_property_readonly("offsets_p",
+                                   [](Field &field) {
+                                       return field.get_offsets_without_ghosts(muGrid::IterUnit::Pixel);
+                                   })
+            // Strides (SubPt layout, in elements)
+            .def_property_readonly("strides",
+                                   [](Field &field) {
+                                       return field.get_strides(muGrid::IterUnit::SubPt, 1);
+                                   })
+            // Strides (Pixel layout, in elements)
+            .def_property_readonly("strides_p",
+                                   [](Field &field) {
+                                       return field.get_strides(muGrid::IterUnit::Pixel, 1);
                                    })
             .def_property_readonly("pad_size", &Field::get_pad_size)
             .def_property_readonly("name", &Field::get_name)
@@ -86,93 +264,27 @@ void add_field(py::module &mod) {
             .def_property_readonly("nb_buffer_entries", &Field::get_nb_buffer_entries)
             .def_property_readonly("is_global", &Field::is_global)
             .def_property_readonly("sub_division", &Field::get_sub_division_tag)
+            .def_property_readonly("spatial_dim", &Field::get_spatial_dim)
+            // Device introspection for GPU-aware interop
             .def_property_readonly(
-                "coords", [](const Field &self) { return py_coords<Real, false>(self); })
+                "device",
+                [](const Field &) {
+                    // All fields are currently host-space only
+                    return std::string("cpu");
+                },
+                "Returns the device where the field data resides ('cpu' or 'cuda:N' or 'rocm:N')")
             .def_property_readonly(
-                "icoords", [](const Field &self) { return py_coords<Int, false>(self); })
-            .def_property_readonly(
-                "coordsg", [](const Field &self) { return py_coords<Real, true>(self); })
-            .def_property_readonly(
-                "icoordsg", [](const Field &self) { return py_coords<Int, true>(self); });
-}
-
-template<class T, muGrid::IterUnit iter_unit, bool with_ghosts>
-decltype(auto) array_getter(TypedFieldBase<T> &self) {
-    if (with_ghosts) {
-        return muGrid::numpy_wrap(self, iter_unit, self.get_shape(iter_unit));
-    } else {
-        return muGrid::numpy_wrap(self, iter_unit, self.get_shape_without_ghosts(iter_unit),
-                                  self.get_offsets_without_ghosts(iter_unit));
-    }
-}
-
-template<class T, muGrid::IterUnit iter_unit, bool with_ghosts>
-void array_setter(TypedFieldBase<T> &self, py::array_t<T> array) {
-    const Shape_t array_shape(array.shape(), array.shape() + array.ndim());
-    Shape_t self_shape{};
-    Index_t buffer_offset{0};
-    if (with_ghosts) {
-        self_shape = self.get_shape(iter_unit);
-    } else {
-        self_shape = self.get_shape_without_ghosts(iter_unit);
-        Shape_t self_strides{self.get_strides(iter_unit)};
-        Shape_t self_offsets{self.get_offsets_without_ghosts(iter_unit)};
-        for (auto &&tup: akantu::zip(self_strides, self_offsets)) {
-            auto &&s{std::get<0>(tup)};
-            auto &&o{std::get<1>(tup)};
-            buffer_offset += o * s;
-        }
-
-    }
-    if (array_shape != self_shape) {
-        std::stringstream error{};
-        error << "Dimension mismatch: The shape " << array_shape
-                << " is not equal to the field shape " << self_shape;
-        if (with_ghosts) {
-            error << ".";
-        } else {
-            error << " without ghost buffers.";
-        }
-        throw RuntimeError{error.str()};
-    }
-    Shape_t array_strides(array.strides(), array.strides() + array.ndim());
-    // numpy arrays have stride in bytes
-    for (auto &&s: array_strides) s /= sizeof(T);
-    strided_copy(self_shape, array_strides, self.get_strides(iter_unit),
-                 array.data(), self.data() + buffer_offset);
+                "is_on_gpu",
+                [](const Field &) {
+                    // All fields are currently host-space only
+                    return false;
+                },
+                "Returns True if the field data resides on a GPU");
 }
 
 template<class T>
 void add_typed_field(py::module &mod, std::string name) {
-    py::class_<TypedFieldBase<T>, Field>(mod, (name + "Base").c_str(),
-                                         py::buffer_protocol())
-            .def_buffer([](TypedFieldBase<T> &self) {
-                auto &coll = self.get_collection();
-                if (not coll.is_initialised()) {
-                    throw RuntimeError("Field collection isn't initialised yet");
-                }
-                auto subdivision{muGrid::IterUnit::SubPt};
-                return py::buffer_info(self.data(), self.get_shape(subdivision),
-                                       self.get_strides(subdivision, sizeof(T)));
-            })
-            .def(
-                "array",
-                [](TypedFieldBase<T> &self, const muGrid::IterUnit &it) {
-                    return muGrid::numpy_wrap(self, it);
-                },
-                "iteration_type"_a = muGrid::IterUnit::SubPt, py::keep_alive<0, 1>())
-            .def_property("sg", array_getter<T, muGrid::IterUnit::SubPt, true>,
-                          array_setter<T, muGrid::IterUnit::SubPt, true>,
-                          py::keep_alive<0, 1>())
-            .def_property("pg", array_getter<T, muGrid::IterUnit::Pixel, true>,
-                          array_setter<T, muGrid::IterUnit::Pixel, true>,
-                          py::keep_alive<0, 1>())
-            .def_property("s", array_getter<T, muGrid::IterUnit::SubPt, false>,
-                          array_setter<T, muGrid::IterUnit::SubPt, false>,
-                          py::keep_alive<0, 1>())
-            .def_property("p", array_getter<T, muGrid::IterUnit::Pixel, false>,
-                          array_setter<T, muGrid::IterUnit::Pixel, false>,
-                          py::keep_alive<0, 1>())
+    py::class_<TypedFieldBase<T>, Field>(mod, (name + "Base").c_str())
             .def(
                 "get_pixel_map",
                 [](TypedFieldBase<T> &field, const Index_t &nb_rows) {
@@ -186,7 +298,24 @@ void add_typed_field(py::module &mod, std::string name) {
                     return field.get_sub_pt_map(nb_rows);
                 },
                 "nb_rows"_a = muGrid::Unknown,
-                py::return_value_policy::reference_internal);
+                py::return_value_policy::reference_internal)
+            // DLPack support: native implementation without numpy
+            .def(
+                "__dlpack__",
+                [](TypedFieldBase<T> &self, py::object stream) {
+                    (void)stream;  // Stream parameter not used for CPU tensors
+                    return create_dlpack_capsule(self);
+                },
+                "stream"_a = py::none(),
+                "Export field data via DLPack for zero-copy interop with NumPy, PyTorch, JAX, CuPy, etc.")
+            .def(
+                "__dlpack_device__",
+                [](TypedFieldBase<T> &) {
+                    // Return (device_type, device_id)
+                    // kDLCPU = 1, device_id = 0 for host memory
+                    return py::make_tuple(1, 0);
+                },
+                "Return DLPack device tuple (device_type, device_id)");
 
     py::class_<TypedField<T>, TypedFieldBase<T> >(mod, name.c_str())
             .def("clone", &TypedField<T>::clone, "new_name"_a, "allow_overwrite"_a,

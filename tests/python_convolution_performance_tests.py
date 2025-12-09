@@ -44,6 +44,7 @@ import numpy as np
 from scipy.sparse import coo_array
 
 import muGrid
+from muGrid import wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 # Try to import pypapi for hardware counter access
@@ -339,17 +340,18 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         )
 
         # Create fields
-        nodal = fc.real_field("nodal", nb_field_components)
-        quad = fc.real_field("quad", (nb_field_components, nb_operators), "quad")
+        nodal_cpp = fc.real_field("nodal", nb_field_components)
+        quad_cpp = fc.real_field("quad", (nb_field_components, nb_operators), "quad")
+        nodal = wrap_field(nodal_cpp)
 
         # Initialize with random data
-        nodal.p = np.random.rand(*nodal.p.shape)
+        nodal.p[...] = np.random.rand(*nodal.p.shape)
 
         # Measure performance
         metrics = measure_convolution_performance(
             conv_op,
-            nodal,
-            quad,
+            nodal_cpp,
+            quad_cpp,
             grid_size=(nb_x_pts, nb_y_pts),
             stencil_size=(nb_stencil_x, nb_stencil_y),
             num_iterations=100,
@@ -389,17 +391,18 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         fc.set_nb_sub_pts("quad", nb_quad_pts)
 
         # Create fields
-        nodal = fc.real_field("nodal", nb_field_components)
-        quad = fc.real_field("quad", (nb_field_components, nb_operators), "quad")
+        nodal_cpp = fc.real_field("nodal", nb_field_components)
+        quad_cpp = fc.real_field("quad", (nb_field_components, nb_operators), "quad")
+        nodal = wrap_field(nodal_cpp)
 
         # Initialize with random data
-        nodal.p = np.random.rand(*nodal.p.shape)
+        nodal.p[...] = np.random.rand(*nodal.p.shape)
 
         # Measure performance (fewer iterations for large grid)
         metrics = measure_convolution_performance(
             conv_op,
-            nodal,
-            quad,
+            nodal_cpp,
+            quad_cpp,
             grid_size=(nb_x_pts, nb_y_pts),
             stencil_size=(nb_stencil_x, nb_stencil_y),
             num_iterations=10,
@@ -439,18 +442,19 @@ class ConvolutionPerformanceTests(unittest.TestCase):
                 nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts)
 
             # Create fields
-            nodal = fc.real_field("nodal", nb_components)
-            quad = fc.real_field("quad", (nb_components, nb_operators), "quad")
+            nodal_cpp = fc.real_field("nodal", nb_components)
+            quad_cpp = fc.real_field("quad", (nb_components, nb_operators), "quad")
+            nodal = wrap_field(nodal_cpp)
 
             # Initialize with random data
-            nodal.p = np.random.rand(*nodal.p.shape)
+            nodal.p[...] = np.random.rand(*nodal.p.shape)
 
             # Measure performance
             iterations = 100 if grid_size <= 64 else 10
             metrics = measure_convolution_performance(
                 conv_op,
-                nodal,
-                quad,
+                nodal_cpp,
+                quad_cpp,
                 grid_size=(grid_size, grid_size),
                 stencil_size=(nb_stencil, nb_stencil),
                 num_iterations=iterations,
@@ -503,11 +507,13 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
     x, y = decomposition.coords  # Domain-local coords for each pixel
     i, j = decomposition.icoords
 
-    rhs = fc.real_field("rhs")
-    solution = fc.real_field("solution")
+    rhs_cpp = fc.real_field("rhs")
+    solution_cpp = fc.real_field("solution")
+    rhs = wrap_field(rhs_cpp)
+    solution = wrap_field(solution_cpp)
 
-    rhs.p = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
-    rhs.p -= np.mean(rhs.p)
+    rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
+    rhs.p[...] -= np.mean(rhs.p)
 
     solution.s[...] = 0
 
@@ -517,26 +523,27 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
     )  # FD-stencil for the Laplacian
     laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
 
-    def hessp_mugrid(x, Ax):
+    def hessp_mugrid(x_field, Ax_field):
         """
         Function to compute the product of the Hessian matrix with a vector.
         The Hessian is represented by the convolution operator.
         """
-        decomposition.communicate_ghosts(x)
-        laplace.apply(x, Ax)
+        decomposition.communicate_ghosts(x_field)
+        laplace.apply(x_field, Ax_field)
         # We need the minus sign because the Laplace operator is negative
         # definite, but the conjugate-gradients solver assumes a
         # positive-definite operator.
-        Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-        return Ax
+        Ax = wrap_field(Ax_field)
+        Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        return Ax_field
 
     t_mugrid = -time.perf_counter()
     conjugate_gradients(
         comm,
         fc,
         hessp_mugrid,  # linear operator
-        rhs,
-        solution,
+        rhs_cpp,
+        solution_cpp,
         tol=1e-6,
         maxiter=1000,
         # callback=callback,
@@ -575,25 +582,27 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
     # scipy solution
     solution.s[...] = 0
 
-    def hessp_scipy(x, Ax):
+    def hessp_scipy(x_field, Ax_field):
         """
         Function to compute the product of the Hessian matrix with a vector.
         The Hessian is represented by the convolution operator.
         """
-        Ax.p = (laplace @ x.p.reshape(-1)).reshape(nb_grid_pts)
+        x = wrap_field(x_field)
+        Ax = wrap_field(Ax_field)
+        Ax.p[...] = (laplace @ x.p.reshape(-1)).reshape(nb_grid_pts)
         # We need the minus sign because the Laplace operator is negative
         # definite, but the conjugate-gradients solver assumes a
         # positive-definite operator.
-        Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-        return Ax
+        Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        return Ax_field
 
     t_scipy = -time.perf_counter()
     conjugate_gradients(
         comm,
         fc,
         hessp_scipy,  # linear operator
-        rhs,
-        solution,
+        rhs_cpp,
+        solution_cpp,
         tol=1e-6,
         maxiter=1000,
         # callback=callback,
@@ -700,13 +709,15 @@ def test_quad_triangle_3_mugrid_vs_manual():
     nb_grid_pts = (Nx, Ny)
 
     fc = muGrid.GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 6}, nb_ghosts_right=(1, 1))
-    nodal_field = fc.real_field("nodal")
-    quad_field = fc.real_field("quad", 1, "quad")
+    nodal_field_cpp = fc.real_field("nodal")
+    quad_field_cpp = fc.real_field("quad", 1, "quad")
+    nodal_field = wrap_field(nodal_field_cpp)
+    quad_field = wrap_field(quad_field_cpp)
 
     # random nodal values
     init_field = np.random.rand(Nx, Ny)
     # Padding to get a periodic boundary
-    nodal_field.pg = np.pad(init_field, (0, 1), mode="wrap")
+    nodal_field.pg[...] = np.pad(init_field, (0, 1), mode="wrap")
 
     # prepare operators
     op_mugrid = prepare_muGrid()
@@ -714,7 +725,7 @@ def test_quad_triangle_3_mugrid_vs_manual():
 
     # run muGrid operator
     t0 = time.perf_counter()
-    op_mugrid.apply(nodal_field, quad_field)
+    op_mugrid.apply(nodal_field_cpp, quad_field_cpp)
     t1 = time.perf_counter()
 
     quad_mugrid = quad_field.p.copy()
