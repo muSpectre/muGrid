@@ -2,6 +2,15 @@
 # C++ unit tests (through Boost's framework)
 #
 boost_test = dependency('boost', modules : ['unit_test_framework'], required : false)
+
+# Check for PAPI (Performance API) for performance testing
+papi = dependency('papi', required : false)
+if papi.found()
+    message('PAPI found - performance tests will be enabled')
+else
+    message('PAPI not found - performance tests will be skipped')
+endif
+
 if boost_test.found()
     #
     # General tests

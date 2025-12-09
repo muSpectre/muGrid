@@ -222,6 +222,21 @@ namespace muGrid {
          */
         Index_t spatial_dim;
         Index_t nb_conv_pts;
+
+       private:
+        // A sequence of (output value offset, input value offset, input pixel
+        // offset, value)
+        using SparseOperator =
+            typename std::vector<std::tuple<Index_t, Index_t, Real>>;
+        /**
+         * @brief Get a sparse representation of the pixel operator
+         * @param nb_grid_pts number of process-local (subdomain) grid points
+         * with ghosts
+         * @param nb_nodal_components number of components in nodal field
+         */
+        SparseOperator
+        create_sparse_operator(const IntCoord_t & nb_grid_pts,
+                               const Index_t nb_nodal_components) const;
     };
 } // namespace muGrid
 #endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_

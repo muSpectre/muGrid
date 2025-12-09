@@ -24,7 +24,6 @@ jobs:
         - [ubuntu-22.04, manylinux, x86_64]
         - [ubuntu-22.04, manylinux, aarch64]
         - [macos-14, macosx, arm64]
-        - [macos-13, macosx, x86_64]
         # - [windows-2019, win, AMD64]
         python: ["cp39", "cp310", "cp311", "cp312", "cp313", "cp314"]
       fail-fast: false

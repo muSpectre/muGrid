@@ -445,6 +445,11 @@ namespace muGrid {
      */
     std::vector<T> & get_values() { return this->values; }
 
+    /**
+    * return the read-only values of the field
+     */
+    const std::vector<T> & get_const_values() const { return this->values; }
+
     //! give access to collections
     friend FieldCollection;
 

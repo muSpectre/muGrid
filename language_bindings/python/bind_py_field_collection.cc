@@ -512,7 +512,7 @@ void add_global_field_collection(py::module & mod) {
              "pixels_storage_order"_a = StorageOrder::Automatic,
              "nb_ghosts_left"_a = IntCoord_t{},
              "nb_ghosts_right"_a = IntCoord_t{})
-        .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels);
+        .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels_with_ghosts);
 }
 
 void add_local_field_collection(py::module & mod) {

@@ -512,6 +512,7 @@ namespace muGrid {
   template <typename T>
   auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows)
       -> FieldMap<T, Mapping::Mut> {
+    // std::cout << "MUT nb_rows=" << nb_rows << std::endl;
     return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Mut>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Mut>{*this, nb_rows, IterUnit::Pixel};
@@ -521,6 +522,7 @@ namespace muGrid {
   template <typename T>
   auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows) const
       -> FieldMap<T, Mapping::Const> {
+    // std::cout << "CONST nb_rows=" << nb_rows << std::endl;
     return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::Pixel};

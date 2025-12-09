@@ -250,6 +250,12 @@ namespace muGrid {
     return this->field;
   }
 
+/* ---------------------------------------------------------------------- */
+  template <typename T, Mapping Mutability>
+  const Index_t FieldMap<T, Mutability>::get_stride() const {
+    return this->stride;
+  }
+
   /* ---------------------------------------------------------------------- */
   template class FieldMap<Real, Mapping::Const>;
   template class FieldMap<Real, Mapping::Mut>;

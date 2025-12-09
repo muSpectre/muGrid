@@ -1,10 +1,19 @@
 import numpy as np
 
-from muGrid import ConvolutionOperator, GlobalFieldCollection
+from muGrid import ConvolutionOperator, GlobalFieldCollection, CartesianDecomposition, Communicator
+try:
+    from mpi4py import MPI
+    comm = Communicator(MPI.COMM_WORLD)
+except ImportError:
+    comm = Communicator()
 
 # Two dimensional grid
 nx, ny = nb_grid_pts = (1024, 2)
-fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 2})
+# Add some ghosts for computing
+nb_ghosts_left = (0, 0)
+nb_ghosts_right = (1, 1)
+fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 2}, nb_ghosts_left=nb_ghosts_left,
+                           nb_ghosts_right=nb_ghosts_right)
 
 # Get nodal field
 nodal_field = fc.real_field("nodal-field")
@@ -15,6 +24,8 @@ quad_field = fc.real_field("quad-field", (2,), "quad")
 # Fill nodal field with a sine-wave
 x, y = nodal_field.icoords
 nodal_field.p = np.sin(2 * np.pi * x / nx)
+# Padding to mimic periodic boundary (sine wave is also periodic)
+nodal_field.pg = np.pad(nodal_field.p, tuple(zip(nb_ghosts_left, nb_ghosts_right)), mode="wrap")
 
 # Derivative stencil of shape (2, quad, 2, 2)
 gradient = np.array(
@@ -36,5 +47,11 @@ op.apply(nodal_field, quad_field)
 
 # Check that the quadrature field has the correct derivative
 np.testing.assert_allclose(
-    quad_field.s[0, 0], 2 * np.pi * np.cos(2 * np.pi * (x + 0.25) / nx) / nx, atol=1e-5
+    # Even though the quadrature point can have different locations, because the gradient
+    # stencil is linearly interpolating, it should compare against the analytic value
+    # evaluated at the middle of two grid points, hence (x + 0.5)
+    quad_field.s[0, 0], 2 * np.pi * np.cos(2 * np.pi * (x + 0.5) / nx) / nx, atol=1e-8
+)
+np.testing.assert_allclose(
+    quad_field.s[1, 0], 0
 )
