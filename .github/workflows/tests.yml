@@ -51,6 +51,7 @@ jobs:
           pip install -v "numpy${{ matrix.numpy-version }}"
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
+              cmake \
               ninja-build \
               libboost-test-dev \
               openmpi-bin \
@@ -63,29 +64,30 @@ jobs:
               "mpi4py${{ matrix.mpi4py-version }}"
           else
             sudo apt-get install -y \
+              cmake \
               ninja-build \
               libboost-test-dev \
               libnetcdf-dev
           fi
-          python3 -m pip install build meson pytest NuMPI[test]
+          python3 -m pip install build pytest NuMPI[test]
           python3 -m pip list
 
-      - name: Compile with Meson
+      - name: Compile with CMake
         run: |
           if [ "${{ matrix.compiler }}" == "clang" ]; then
             export CC=clang
             export CXX=clang++
           fi
           source venv/bin/activate
-          meson setup builddir
-          cd builddir
-          meson compile
+          cmake -B build -G Ninja
+          cd build
+          cmake --build .
 
       - name: Run tests
         run: |
           source venv/bin/activate
-          cd builddir
-          meson test -v
+          cd build
+          ctest
 
       - name: Test installation of Python extension module
         run: |
