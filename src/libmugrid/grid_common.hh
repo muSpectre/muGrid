@@ -157,8 +157,6 @@ namespace muGrid {
      * @var StructurOfArrays Represents a structure of arrays storage order. In
      * this order, pixels are consecutive in memory. It is equivalent to
      * RowMajor.
-     * @var Unknown Represents an unknown storage order. It is used only for
-     * `WrappedField`.
      * @var Automatic Represents an automatic storage order. In this order, the
      * storage order is inherited from `FieldCollection`.
      */
@@ -167,7 +165,6 @@ namespace muGrid {
         ArrayOfStructures = ColMajor,  //!< components are consecutive in memory
         RowMajor,  //!< row-major storage order (last index is fast)
         StructureOfArrays = RowMajor,  //< pixels are consecutive in memory
-        Unknown,   //!< storage order is unknown, only for `WrappedField`
         Automatic  //!< inherit storage order from `FieldCollection`
     };
 

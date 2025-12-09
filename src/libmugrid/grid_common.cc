@@ -87,10 +87,6 @@ namespace muGrid {
       os << "row-major";
       break;
     }
-    case StorageOrder::Unknown: {
-      os << "unknown";
-      break;
-    }
     case StorageOrder::Automatic: {
       os << "automatic";
       break;

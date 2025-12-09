@@ -58,7 +58,6 @@ using muGrid::RuntimeError;
 using muGrid::Shape_t;
 using muGrid::TypedField;
 using muGrid::TypedFieldBase;
-using muGrid::WrappedField;
 using muGrid::operator<<;
 using muGrid::raw_mem_ops::strided_copy;
 using pybind11::literals::operator""_a;
