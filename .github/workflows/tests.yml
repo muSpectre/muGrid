@@ -87,7 +87,7 @@ jobs:
         run: |
           source venv/bin/activate
           cd build
-          ctest
+          ctest --output-on-failure
 
       - name: Test installation of Python extension module
         run: |
