@@ -42,6 +42,7 @@
 #include "exception.hh"
 
 #include <sstream>
+#include <cmath>
 
 namespace muGrid {
 
@@ -76,91 +77,27 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    ConvolutionOperator::SparseOperator
-    ConvolutionOperator::create_sparse_operator(const IntCoord_t & nb_grid_pts, const Index_t nb_nodal_components) const {
-        // Helpers for conversion between index and coordinates
-        const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
-                                              IntCoord_t(this->pixel_offset)};
-        const CcoordOps::Pixels grid_pixels{nb_grid_pts};
-
-        // An empty sequence to save output
-        SparseOperator sparse_op{};
-        // Loop through each value of pixel operator
-        for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
-            for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
-                 ++i_col) {
-                // Only the non-zero values are of the interest
-                if (this->pixel_operator(i_row, i_col) != 0.) {
-                    // repeat for each component
-                    for (Index_t i_component = 0;
-                         i_component < nb_nodal_components; ++i_component) {
-                        // Get the index in quad field
-                        auto index_diff_quad{i_row * nb_nodal_components +
-                                             i_component};
-
-                        // Decompose column index into node, stencil indices.
-                        // (Given we know it is column-major flattened)
-                        auto i_node{i_col % this->nb_pixelnodal_pts};
-                        auto i_stencil{i_col / this->nb_pixelnodal_pts};
-
-                        // Stencil index in `pixel_operator` is not aware of
-                        // grid shape, so it must be decomposed to offset in
-                        // coordinates, and reconstructed to index difference
-                        // for the use of indexing pixels in the grid.
-                        auto offset{kernel_pixels.get_coord(i_stencil)};
-                        auto index_diff{grid_pixels.get_index(offset)};
-                        auto index_diff_nodal{index_diff * nb_nodal_components *
-                                                  this->nb_pixelnodal_pts +
-                                              i_node * nb_nodal_components +
-                                              i_component};
-
-                        // Create an entry in sparse representation, with index
-                        // differences and operator value
-                        sparse_op.push_back(std::make_tuple(
-                            index_diff_quad, index_diff_nodal,
-                            this->pixel_operator(i_row, i_col)));
-                    }
-                }
-            }
-        }
-        return sparse_op;
-    }
-
-    /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::apply(
-        const TypedFieldBase<Real> & nodal_field,
-        TypedFieldBase<Real> & quadrature_point_field) const {
-        quadrature_point_field.set_zero();
-        this->apply_increment(nodal_field, 1., quadrature_point_field);
-    }
-
-    /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::apply_increment(
-        const TypedFieldBase<Real> & nodal_field, const Real & alpha,
-        TypedFieldBase<Real> & quadrature_point_field) const {
+    const GlobalFieldCollection& ConvolutionOperator::validate_fields(
+        const TypedFieldBase<Real> &nodal_field,
+        const TypedFieldBase<Real> &quad_field) const {
         // Both fields must be from the same field collection to ensure
         // compatible internal structure for pixel mapping
-        if (&nodal_field.get_collection() !=
-            &quadrature_point_field.get_collection()) {
-            std::stringstream err_msg{};
-            err_msg << "Field collection mismatch: nodal_field and "
-                       "quadrature_point_field must be from the same "
-                       "FieldCollection";
-            throw RuntimeError{err_msg.str()};
-            }
+        if (&nodal_field.get_collection() != &quad_field.get_collection()) {
+            throw RuntimeError{
+                "Field collection mismatch: nodal_field and "
+                "quadrature_point_field must be from the same FieldCollection"};
+        }
 
         // Get the collection object
-        const auto & collection{dynamic_cast<GlobalFieldCollection &>(
-            quadrature_point_field.get_collection())};
+        const auto & collection{dynamic_cast<const GlobalFieldCollection &>(
+            quad_field.get_collection())};
 
         // Check that fields are global
         if (collection.get_domain() !=
             FieldCollection::ValidityDomain::Global) {
-            std::stringstream err_msg{};
-            err_msg << "Field type error: nodal_field and "
-                       "quadrature_point_field must be a global "
-                       "field (registered in a global FieldCollection)";
-            throw RuntimeError{err_msg.str()};
+            throw RuntimeError{
+                "Field type error: nodal_field and quadrature_point_field "
+                "must be a global field (registered in a global FieldCollection)"};
         }
 
         // Check that fields have the same spatial dimensions as operator
@@ -178,7 +115,7 @@ namespace muGrid {
         const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
         const auto min_ghosts_left{IntCoord_t(this->spatial_dim, 0) -
                                    IntCoord_t(this->pixel_offset)};
-        for (auto direction = 0; direction < collection.get_spatial_dim();
+        for (Index_t direction = 0; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
                 std::stringstream err_msg{};
@@ -197,7 +134,7 @@ namespace muGrid {
         const auto min_ghosts_right{IntCoord_t(this->conv_pts_shape) -
                                     IntCoord_t(this->spatial_dim, 1) +
                                     IntCoord_t(this->pixel_offset)};
-        for (auto direction = 0; direction < collection.get_spatial_dim();
+        for (Index_t direction = 0; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
                 std::stringstream err_msg{};
@@ -211,11 +148,9 @@ namespace muGrid {
             }
         }
 
-        // number of components in the field we'd like to apply the convolution
+        // number of components in the fields
         Index_t nb_nodal_components{nodal_field.get_nb_components()};
-
-        // number of components in the field where we'd like to write the result
-        Index_t nb_quad_components{quadrature_point_field.get_nb_components()};
+        Index_t nb_quad_components{quad_field.get_nb_components()};
 
         // check if they match
         if (nb_quad_components != this->nb_operators * nb_nodal_components) {
@@ -229,77 +164,228 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
-        // Get a sparse representation of the operator; Note it needs to know
-        // the whole domain (with ghosts) to get the correct pixel offset.
-        const auto sparse_operator{this->create_sparse_operator(
-            collection.get_nb_subdomain_grid_pts_with_ghosts(),
-            nb_nodal_components)};
+        return collection;
+    }
 
-        // Get the data pointer of both fields
-        auto nodal_pixel{nodal_field.data()};
-        auto quad_pixel{quadrature_point_field.data()};
+    /* ---------------------------------------------------------------------- */
+    GridTraversalParams ConvolutionOperator::compute_traversal_params(
+        const GlobalFieldCollection& collection,
+        Index_t nb_nodal_components,
+        Index_t nb_quad_components) const {
+        GridTraversalParams params;
 
-        // Get number of elements in each pixel
-        auto nodal_pixel_nb_elements{nb_nodal_components *
-                                     this->nb_pixelnodal_pts};
-        auto quad_pixel_nb_elements{nb_quad_components * this->nb_quad_pts};
+        // Get shape of the pixels without ghosts (pad to 3D)
+        auto nb_pixels_without_ghosts = pad_shape_to_3d(
+            collection.get_pixels_shape_without_ghosts());
+        params.nx = nb_pixels_without_ghosts[0];
+        params.ny = nb_pixels_without_ghosts[1];
+        params.nz = nb_pixels_without_ghosts[2];
+        params.total_pixels = params.nx * params.ny * params.nz;
 
-        // Advance pointers to the first pixel that is not ghost.
-        auto start_pixel_index{collection.get_pixels_index_diff()};
-        nodal_pixel += start_pixel_index * nodal_pixel_nb_elements;
-        quad_pixel += start_pixel_index * quad_pixel_nb_elements;
+        // Elements per pixel
+        params.nodal_elems_per_pixel = nb_nodal_components *
+                                       this->nb_pixelnodal_pts;
+        params.quad_elems_per_pixel = nb_quad_components * this->nb_quad_pts;
 
-        // Get shape of the pixels without ghosts
-        auto nb_pixels_without_ghosts{
-            collection.get_pixels_shape_without_ghosts()};
-        // Fill it up to 3D
-        while (nb_pixels_without_ghosts.size() < 3) {
-            nb_pixels_without_ghosts.push_back(1);
+        // Starting pixel index (skip ghosts)
+        params.start_pixel_index = collection.get_pixels_index_diff();
+
+        // Ghost counts (pad to 2D for x,y strides)
+        auto ghosts_count = pad_shape_to_3d(
+            collection.get_nb_ghosts_left() + collection.get_nb_ghosts_right(),
+            0);
+
+        // Row width including ghosts
+        params.row_width = params.nx + ghosts_count[0];
+
+        // Strides for navigation
+        params.nodal_stride_x = params.nodal_elems_per_pixel;
+        params.nodal_stride_y = params.row_width * params.nodal_elems_per_pixel;
+        params.nodal_stride_z = params.nodal_stride_y *
+                                (params.ny + ghosts_count[1]);
+
+        params.quad_stride_x = params.quad_elems_per_pixel;
+        params.quad_stride_y = params.row_width * params.quad_elems_per_pixel;
+        params.quad_stride_z = params.quad_stride_y *
+                               (params.ny + ghosts_count[1]);
+
+        return params;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    const SparseOperatorSoA<HostSpace>&
+    ConvolutionOperator::get_sparse_operator(
+        const IntCoord_t & nb_grid_pts,
+        const Index_t nb_nodal_components) const {
+        // Check if we have a cached operator with matching parameters
+        SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
+        if (this->cached_sparse_op.has_value() &&
+            this->cached_key.has_value() &&
+            this->cached_key.value() == key) {
+            return this->cached_sparse_op.value();
         }
 
-        // Get number of ghosts
-        Shape_t ghosts_count{collection.get_nb_ghosts_left() +
-                             collection.get_nb_ghosts_right()};
-        // Fill it up to 2D (we don't need to know the ghost in z)
-        while (ghosts_count.size() < 2) {
-            ghosts_count.push_back(0);
-        }
-        // Compute number of ghost elements to advance  for each related axis
-        auto nodal_ghosts_count_x{ghosts_count[0] * nodal_pixel_nb_elements};
-        auto nodal_ghosts_count_y{
-            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
-            nodal_pixel_nb_elements};
-        auto quad_ghosts_count_x{ghosts_count[0] * quad_pixel_nb_elements};
-        auto quad_ghosts_count_y{
-            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
-            quad_pixel_nb_elements};
+        // Create new sparse operator and cache it
+        this->cached_sparse_op = this->create_sparse_operator(nb_grid_pts,
+                                                              nb_nodal_components);
+        this->cached_key = key;
+        return this->cached_sparse_op.value();
+    }
 
-        // For each pixel (without ghost)...
-        for (Index_t z_index = 0; z_index < nb_pixels_without_ghosts[2];
-             ++z_index) {
-            for (Index_t y_index = 0; y_index < nb_pixels_without_ghosts[1];
-                 ++y_index) {
-                for (Index_t x_index = 0; x_index < nb_pixels_without_ghosts[0];
-                     ++x_index) {
-                    // For each non-zero entry in the operator
-                    for (const auto & [quad_index, nodal_index, value] :
-                         sparse_operator) {
-                        // Add the contribution to the output
-                        quad_pixel[quad_index] +=
-                            alpha * nodal_pixel[nodal_index] * value;
-                    }
-                    // Advance the pointer to the next pixel
-                    nodal_pixel += nodal_pixel_nb_elements;
-                    quad_pixel += quad_pixel_nb_elements;
+    /* ---------------------------------------------------------------------- */
+    SparseOperatorSoA<HostSpace>
+    ConvolutionOperator::create_sparse_operator(
+        const IntCoord_t & nb_grid_pts,
+        const Index_t nb_nodal_components) const {
+        // Helpers for conversion between index and coordinates
+        const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
+                                              IntCoord_t(this->pixel_offset)};
+        const CcoordOps::Pixels grid_pixels{nb_grid_pts};
+
+        // First pass: count non-zero entries
+        Index_t nnz = 0;
+        for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
+            for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
+                 ++i_col) {
+                if (std::abs(this->pixel_operator(i_row, i_col)) > zero_tolerance) {
+                    nnz += nb_nodal_components;
                 }
-                // Advance the pointer to skip the ghosts
-                nodal_pixel += nodal_ghosts_count_x;
-                quad_pixel += quad_ghosts_count_x;
             }
-            // Advance the pointer to skip more ghosts
-            nodal_pixel += nodal_ghosts_count_y;
-            quad_pixel += quad_ghosts_count_y;
         }
+
+        // Allocate SoA structure
+        SparseOperatorSoA<HostSpace> sparse_op(nnz);
+
+        // Get host-accessible views
+        auto h_quad_indices = sparse_op.quad_indices;
+        auto h_nodal_indices = sparse_op.nodal_indices;
+        auto h_values = sparse_op.values;
+
+        // Second pass: fill the arrays
+        Index_t entry_idx = 0;
+        for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
+            for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
+                 ++i_col) {
+                const Real op_value = this->pixel_operator(i_row, i_col);
+                if (std::abs(op_value) > zero_tolerance) {
+                    // Decompose column index into node, stencil indices.
+                    // (Given we know it is column-major flattened)
+                    auto i_node{i_col % this->nb_pixelnodal_pts};
+                    auto i_stencil{i_col / this->nb_pixelnodal_pts};
+
+                    // Stencil index in `pixel_operator` is not aware of
+                    // grid shape, so it must be decomposed to offset in
+                    // coordinates, and reconstructed to index difference
+                    // for the use of indexing pixels in the grid.
+                    auto offset{kernel_pixels.get_coord(i_stencil)};
+                    auto index_diff{grid_pixels.get_index(offset)};
+
+                    // Repeat for each component
+                    for (Index_t i_component = 0;
+                         i_component < nb_nodal_components; ++i_component) {
+                        // Get the index in quad field
+                        auto index_diff_quad{i_row * nb_nodal_components +
+                                             i_component};
+
+                        auto index_diff_nodal{index_diff * nb_nodal_components *
+                                                  this->nb_pixelnodal_pts +
+                                              i_node * nb_nodal_components +
+                                              i_component};
+
+                        h_quad_indices(entry_idx) = index_diff_quad;
+                        h_nodal_indices(entry_idx) = index_diff_nodal;
+                        h_values(entry_idx) = op_value;
+                        ++entry_idx;
+                    }
+                }
+            }
+        }
+
+        return sparse_op;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::clear_cache() const {
+        this->cached_sparse_op.reset();
+        this->cached_key.reset();
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::apply(
+        const TypedFieldBase<Real> & nodal_field,
+        TypedFieldBase<Real> & quadrature_point_field) const {
+        quadrature_point_field.set_zero();
+        this->apply_increment(nodal_field, 1., quadrature_point_field);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::apply_increment(
+        const TypedFieldBase<Real> & nodal_field, const Real & alpha,
+        TypedFieldBase<Real> & quadrature_point_field) const {
+        // Validate fields and get collection
+        const auto & collection = this->validate_fields(nodal_field,
+                                                        quadrature_point_field);
+
+        // Get component counts
+        const Index_t nb_nodal_components = nodal_field.get_nb_components();
+        const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
+
+        // Compute traversal parameters
+        const auto params = this->compute_traversal_params(
+            collection, nb_nodal_components, nb_quad_components);
+
+        // Get cached sparse operator
+        const auto & sparse_op = this->get_sparse_operator(
+            collection.get_nb_subdomain_grid_pts_with_ghosts(),
+            nb_nodal_components);
+
+        // Get raw data pointers
+        const Real* nodal_data = nodal_field.data();
+        Real* quad_data = quadrature_point_field.data();
+
+        // Precompute base offsets (skip ghost region)
+        const Index_t nodal_base = params.start_pixel_index *
+                                   params.nodal_elems_per_pixel;
+        const Index_t quad_base = params.start_pixel_index *
+                                  params.quad_elems_per_pixel;
+
+        // Extract values for lambda capture (avoid capturing 'this')
+        const Index_t nx = params.nx;
+        const Index_t ny = params.ny;
+        const Index_t nz = params.nz;
+        const Index_t nodal_stride_x = params.nodal_stride_x;
+        const Index_t nodal_stride_y = params.nodal_stride_y;
+        const Index_t nodal_stride_z = params.nodal_stride_z;
+        const Index_t quad_stride_x = params.quad_stride_x;
+        const Index_t quad_stride_y = params.quad_stride_y;
+        const Index_t quad_stride_z = params.quad_stride_z;
+        const Index_t nnz = sparse_op.size;
+
+        // Use MDRangePolicy for 3D grid traversal (portable across backends)
+        const Index_t* quad_indices = sparse_op.quad_indices.data();
+        const Index_t* nodal_indices = sparse_op.nodal_indices.data();
+        const Real* op_values = sparse_op.values.data();
+
+        using MDPolicy = Kokkos::MDRangePolicy<
+            HostExecutionSpace,
+            Kokkos::Rank<3>,
+            Kokkos::IndexType<Index_t>>;
+
+        Kokkos::parallel_for(
+            "ConvolutionOperator::apply_increment",
+            MDPolicy({0, 0, 0}, {nz, ny, nx}),
+            [=](const Index_t z, const Index_t y, const Index_t x) {
+                const Index_t nodal_offset = nodal_base +
+                    z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
+                const Index_t quad_offset = quad_base +
+                    z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
+
+                for (Index_t i = 0; i < nnz; ++i) {
+                    quad_data[quad_offset + quad_indices[i]] +=
+                        alpha * nodal_data[nodal_offset + nodal_indices[i]] *
+                        op_values[i];
+                }
+            });
     }
 
     /* ---------------------------------------------------------------------- */
@@ -318,170 +404,73 @@ namespace muGrid {
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
-        // Both fields must be from the same field collection to ensure
-        // compatible internal structure for pixel mapping
-        if (&nodal_field.get_collection() !=
-            &quadrature_point_field.get_collection()) {
-            std::stringstream err_msg{};
-            err_msg << "Field collection mismatch: nodal_field and "
-                       "quadrature_point_field must be from the same "
-                       "FieldCollection";
-            throw RuntimeError{err_msg.str()};
-            }
+        // Validate fields and get collection
+        const auto & collection = this->validate_fields(nodal_field,
+                                                        quadrature_point_field);
 
-        // Get the collection object
-        const auto & collection{dynamic_cast<GlobalFieldCollection &>(
-            quadrature_point_field.get_collection())};
+        // Get component counts
+        const Index_t nb_nodal_components = nodal_field.get_nb_components();
+        const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
-        // Check that fields are global
-        if (collection.get_domain() !=
-            FieldCollection::ValidityDomain::Global) {
-            std::stringstream err_msg{};
-            err_msg << "Field type error: nodal_field and "
-                       "quadrature_point_field must be a global "
-                       "field (registered in a global FieldCollection)";
-            throw RuntimeError{err_msg.str()};
-        }
+        // Compute traversal parameters
+        const auto params = this->compute_traversal_params(
+            collection, nb_nodal_components, nb_quad_components);
 
-        // Check that fields have the same spatial dimensions as operator
-        if (collection.get_spatial_dim() != this->spatial_dim) {
-            std::stringstream err_msg{};
-            err_msg << "Spatial dimension mismatch: nodal_field and "
-                       "quadrature_point_field are defined in "
-                    << collection.get_spatial_dim()
-                    << "D space, but this convolution operator is defined in "
-                    << this->spatial_dim << "D space";
-            throw RuntimeError{err_msg.str()};
-        }
-
-        // Check that fields have enough ghost cells on the left
-        const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
-        const auto min_ghosts_left{IntCoord_t(this->spatial_dim, 0) -
-                                   IntCoord_t(this->pixel_offset)};
-        for (auto direction = 0; direction < collection.get_spatial_dim();
-             ++direction) {
-            if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
-                std::stringstream err_msg{};
-                err_msg
-                    << "Ambiguous field shape: on axis " << direction
-                    << ", the convolution expects a minimum of "
-                    << min_ghosts_left[direction]
-                    << " cells on the left, but the provided fields have only "
-                    << nb_ghosts_left[direction] << " ghosts on the left.";
-                throw RuntimeError{err_msg.str()};
-            }
-        }
-
-        // Check that fields have enough ghost cells on the right
-        const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
-        const auto min_ghosts_right{IntCoord_t(this->conv_pts_shape) -
-                                    IntCoord_t(this->spatial_dim, 1) +
-                                    IntCoord_t(this->pixel_offset)};
-        for (auto direction = 0; direction < collection.get_spatial_dim();
-             ++direction) {
-            if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
-                std::stringstream err_msg{};
-                err_msg
-                    << "Ambiguous field shape: on axis " << direction
-                    << ", the convolution expects a minimum of "
-                    << min_ghosts_right[direction]
-                    << " cells on the right, but the provided fields have only "
-                    << nb_ghosts_right[direction] << " ghosts on the right.";
-                throw RuntimeError{err_msg.str()};
-            }
-        }
-
-        // number of components in the field we'd like to apply the convolution
-        Index_t nb_nodal_components{nodal_field.get_nb_components()};
-
-        // number of components in the field where we'd like to write the result
-        Index_t nb_quad_components{quadrature_point_field.get_nb_components()};
-
-        // check if they match
-        if (nb_quad_components != this->nb_operators * nb_nodal_components) {
-            std::stringstream err_msg{};
-            err_msg
-                << "Size mismatch: Expected a quadrature field with "
-                << this->nb_operators * nb_nodal_components << " components ("
-                << this->nb_operators << " operators × " << nb_nodal_components
-                << " components in the nodal field) but received a field with "
-                << nb_quad_components << " components.";
-            throw RuntimeError{err_msg.str()};
-        }
-
-        // Get a sparse representation of the operator; Note it needs to know
-        // the whole domain (with ghosts) to get the correct pixel offset.
-        const auto sparse_operator{this->create_sparse_operator(
+        // Get cached sparse operator
+        const auto & sparse_op = this->get_sparse_operator(
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
-            nb_nodal_components)};
+            nb_nodal_components);
 
-        // Get the data pointer of both fields
-        auto nodal_pixel{nodal_field.data()};
-        auto quad_pixel{quadrature_point_field.data()};
+        // Get raw data pointers
+        Real* nodal_data = nodal_field.data();
+        const Real* quad_data = quadrature_point_field.data();
 
-        // Get number of elements in each pixel
-        auto nodal_pixel_nb_elements{nb_nodal_components *
-                                     this->nb_pixelnodal_pts};
-        auto quad_pixel_nb_elements{nb_quad_components * this->nb_quad_pts};
+        // Precompute base offsets (skip ghost region)
+        const Index_t nodal_base = params.start_pixel_index *
+                                   params.nodal_elems_per_pixel;
+        const Index_t quad_base = params.start_pixel_index *
+                                  params.quad_elems_per_pixel;
 
-        // Advance pointers to the first pixel that is not ghost.
-        auto start_pixel_index{collection.get_pixels_index_diff()};
-        nodal_pixel += start_pixel_index * nodal_pixel_nb_elements;
-        quad_pixel += start_pixel_index * quad_pixel_nb_elements;
+        // Extract values for lambda capture
+        const Index_t nx = params.nx;
+        const Index_t ny = params.ny;
+        const Index_t nz = params.nz;
+        const Index_t nodal_stride_x = params.nodal_stride_x;
+        const Index_t nodal_stride_y = params.nodal_stride_y;
+        const Index_t nodal_stride_z = params.nodal_stride_z;
+        const Index_t quad_stride_x = params.quad_stride_x;
+        const Index_t quad_stride_y = params.quad_stride_y;
+        const Index_t quad_stride_z = params.quad_stride_z;
+        const Index_t nnz = sparse_op.size;
 
-        // Get shape of the pixels without ghosts
-        auto nb_pixels_without_ghosts{
-            collection.get_pixels_shape_without_ghosts()};
-        // Fill it up to 3D
-        while (nb_pixels_without_ghosts.size() < 3) {
-            nb_pixels_without_ghosts.push_back(1);
-        }
+        // Note: transpose operation scatters to nodal_field.
+        // Multiple pixels may write to the same nodal DOF (overlapping stencils).
+        // For parallel backends, atomic operations ensure thread-safe accumulation.
+        const Index_t* quad_indices = sparse_op.quad_indices.data();
+        const Index_t* nodal_indices = sparse_op.nodal_indices.data();
+        const Real* op_values = sparse_op.values.data();
 
-        // Get number of ghosts
-        Shape_t ghosts_count{collection.get_nb_ghosts_left() +
-                             collection.get_nb_ghosts_right()};
-        // Fill it up to 2D (we don't need to know the ghost in z)
-        while (ghosts_count.size() < 2) {
-            ghosts_count.push_back(0);
-        }
-        // Compute number of ghost elements to advance  for each related axis
-        auto nodal_ghosts_count_x{ghosts_count[0] * nodal_pixel_nb_elements};
-        auto nodal_ghosts_count_y{
-            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
-            nodal_pixel_nb_elements};
-        auto quad_ghosts_count_x{ghosts_count[0] * quad_pixel_nb_elements};
-        auto quad_ghosts_count_y{
-            ghosts_count[1] * (nb_pixels_without_ghosts[0] + ghosts_count[0]) *
-            quad_pixel_nb_elements};
+        using MDPolicy = Kokkos::MDRangePolicy<
+            HostExecutionSpace,
+            Kokkos::Rank<3>,
+            Kokkos::IndexType<Index_t>>;
 
-        // For each pixel (without ghost)...
-        for (Index_t z_index = 0; z_index < nb_pixels_without_ghosts[2];
-             ++z_index) {
-            for (Index_t y_index = 0; y_index < nb_pixels_without_ghosts[1];
-                 ++y_index) {
-                for (Index_t x_index = 0; x_index < nb_pixels_without_ghosts[0];
-                     ++x_index) {
-                    // For each non-zero entry in the operator
-                    for (const auto & [quad_index, nodal_index, value] :
-                         sparse_operator) {
-                        // Add the contribution to the output. Note because the
-                        // operator is transposed, thus quadrature point field
-                        // acts as the input.
-                        nodal_pixel[nodal_index] +=
-                            alpha * quad_pixel[quad_index] * value;
-                    }
-                    // Advance the pointer to the next pixel
-                    nodal_pixel += nodal_pixel_nb_elements;
-                    quad_pixel += quad_pixel_nb_elements;
+        Kokkos::parallel_for(
+            "ConvolutionOperator::transpose_increment",
+            MDPolicy({0, 0, 0}, {nz, ny, nx}),
+            [=](const Index_t z, const Index_t y, const Index_t x) {
+                const Index_t nodal_offset = nodal_base +
+                    z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
+                const Index_t quad_offset = quad_base +
+                    z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
+
+                for (Index_t i = 0; i < nnz; ++i) {
+                    Kokkos::atomic_add(
+                        &nodal_data[nodal_offset + nodal_indices[i]],
+                        alpha * quad_data[quad_offset + quad_indices[i]] *
+                        op_values[i]);
                 }
-                // Advance the pointer to skip the ghosts
-                nodal_pixel += nodal_ghosts_count_x;
-                quad_pixel += quad_ghosts_count_x;
-            }
-            // Advance the pointer to skip more ghosts
-            nodal_pixel += nodal_ghosts_count_y;
-            quad_pixel += quad_ghosts_count_y;
-        }
+            });
     }
 
     /* ---------------------------------------------------------------------- */
