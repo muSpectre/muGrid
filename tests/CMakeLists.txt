@@ -49,6 +49,7 @@ if(Boost_FOUND)
     target_link_libraries(mugrid_main_test_suite PRIVATE
         muGrid
         Boost::unit_test_framework
+        Kokkos::kokkos
     )
     target_include_directories(mugrid_main_test_suite PRIVATE
         ${CMAKE_SOURCE_DIR}/src/libmugrid
@@ -77,6 +78,7 @@ if(Boost_FOUND)
     target_link_libraries(mpi_mugrid_main_test_suite PRIVATE
         muGrid
         Boost::unit_test_framework
+        Kokkos::kokkos
     )
     target_include_directories(mpi_mugrid_main_test_suite PRIVATE
         ${CMAKE_SOURCE_DIR}/src/libmugrid

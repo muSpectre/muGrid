@@ -35,6 +35,7 @@
 
 #include "exception.hh"
 #include "iterators.hh"
+#include "kokkos_types.hh"
 
 #include "Eigen/Dense"
 

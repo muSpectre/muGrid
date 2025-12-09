@@ -39,10 +39,11 @@
 #include "field.hh"
 #include "field_collection.hh"
 #include "grid_common.hh"
+#include "kokkos_types.hh"
 
 #include "Eigen/Dense"
 
-#include <vector>
+#include <type_traits>
 #include <memory>
 
 #ifdef WITH_MPI
@@ -56,10 +57,10 @@ namespace muGrid {
   template <typename T, Mapping Mutability>
   class FieldMap;
   //! forward declaration
-  template <typename T>
+  template <typename T, typename MemorySpace = HostSpace>
   class TypedFieldBase;
 
-  template <typename T>
+  template <typename T, typename MemorySpace>
   class TypedFieldBase : public Field {
     static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                   "You can only register fields templated with one of the "
@@ -99,6 +100,12 @@ namespace muGrid {
                  unit} {}
 
    public:
+    //! Memory space type
+    using Memory_Space = MemorySpace;
+
+    //! Kokkos View type for storage
+    using View_t = FieldView<T, MemorySpace>;
+
     /**
      * Simple structure used to allow for lazy evaluation of the unary '-' sign.
      * When assiging the the negative of a field to another, as in field_a =
@@ -179,115 +186,148 @@ namespace muGrid {
       return sizeof(T);
     }
 
-    //! return a vector map onto the underlying data
-    Eigen_map eigen_mat();
-    //! return a const vector map onto the underlying data
-    Eigen_cmap eigen_mat() const;
+    //! return a vector map onto the underlying data (host-space only)
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_map> eigen_mat();
+    //! return a const vector map onto the underlying data (host-space only)
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_cmap> eigen_mat() const;
 
-    //! return a vector map onto the underlying data
-    EigenVec_map eigen_vec();
-    //! return a const vector map onto the underlying data
-    EigenVec_cmap eigen_vec() const;
-
-    /**
-     * return a matrix map onto the underlying data with one column per
-     * quadrature point
-     */
-    Eigen_map eigen_sub_pt();
-    /**
-     * return a const matrix map onto the underlying data with one column per
-     * quadrature point
-     */
-    Eigen_cmap eigen_sub_pt() const;
+    //! return a vector map onto the underlying data (host-space only)
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, EigenVec_map> eigen_vec();
+    //! return a const vector map onto the underlying data (host-space only)
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, EigenVec_cmap> eigen_vec() const;
 
     /**
      * return a matrix map onto the underlying data with one column per
-     * pixel
+     * quadrature point (host-space only)
      */
-    Eigen_map eigen_pixel();
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_map> eigen_sub_pt();
     /**
      * return a const matrix map onto the underlying data with one column per
-     * pixel
+     * quadrature point (host-space only)
      */
-    Eigen_cmap eigen_pixel() const;
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_cmap> eigen_sub_pt() const;
+
+    /**
+     * return a matrix map onto the underlying data with one column per
+     * pixel (host-space only)
+     */
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_map> eigen_pixel();
+    /**
+     * return a const matrix map onto the underlying data with one column per
+     * pixel (host-space only)
+     */
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_cmap> eigen_pixel() const;
 
     template <typename T_int, Mapping Mutability>
     friend class FieldMap;
 
     /**
      * convenience function returns a map of this field, iterable per pixel.
+     * (host-space only)
      *
      * @param nb_rows optional specification of the number of rows for the
      * iterate. If left to default value, a matrix of shape `nb_components`
      * × `nb_quad_pts` is used
      */
-    FieldMap<T, Mapping::Mut> get_pixel_map(const Index_t & nb_rows = Unknown);
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Mut>>
+    get_pixel_map(const Index_t & nb_rows = Unknown);
 
     /**
      * convenience function returns a const map of this field, iterable per
-     * pixel.
+     * pixel. (host-space only)
      *
      * @param nb_rows optional specification of the number of rows for the
      * iterate. If left to default value, a matrix of shape `nb_components`
      * × `nb_quad_pts` is used
      */
-    FieldMap<T, Mapping::Const>
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Const>>
     get_pixel_map(const Index_t & nb_rows = Unknown) const;
 
     /**
      * convenience function returns a map of this field, iterable per quadrature
-     * point.
+     * point. (host-space only)
      *
      * @param nb_rows optional specification of the number of rows for the
      * iterate. If left to default value, a column vector is used
      */
-    FieldMap<T, Mapping::Mut> get_sub_pt_map(const Index_t & nb_rows = Unknown);
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Mut>>
+    get_sub_pt_map(const Index_t & nb_rows = Unknown);
 
     /**
      * convenience function returns a const  map of this field, iterable per
-     * quadrature point.
+     * quadrature point. (host-space only)
      *
      * @param nb_rows optional specification of the number of rows for the
      * iterate. If left to default value, a column vector is used
      */
-    FieldMap<T, Mapping::Const>
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Const>>
     get_sub_pt_map(const Index_t & nb_rows = Unknown) const;
 
-    //! get the raw data ptr. Don't use unless interfacing with external libs
-    T * data() const;
+    /**
+     * Get the raw data pointer. Only available for host-space fields.
+     * Don't use unless interfacing with external libs.
+     */
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, T *> data() {
+      return this->values.data();
+    }
+
+    /**
+     * Get the raw data pointer (const). Only available for host-space fields.
+     * Don't use unless interfacing with external libs.
+     */
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, const T *> data() const {
+      return this->values.data();
+    }
 
     /**
      * return a pointer to the raw data. Don't use unless interfacing with
-     * external libs
+     * external libs. Only available for host-space fields.
      **/
     void * get_void_data_ptr() const final;
 
-    //! non-const eigen_map with arbitrary sizes
-    Eigen_map eigen_map(const Index_t & nb_rows, const Index_t & nb_cols);
-    //! const eigen_map with arbitrary sizes
-    Eigen_cmap eigen_map(const Index_t & nb_rows,
-                         const Index_t & nb_cols) const;
+    //! non-const eigen_map with arbitrary sizes (host-space only)
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_map>
+    eigen_map(const Index_t & nb_rows, const Index_t & nb_cols);
+    //! const eigen_map with arbitrary sizes (host-space only)
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, Eigen_cmap>
+    eigen_map(const Index_t & nb_rows, const Index_t & nb_cols) const;
+
+    //! Get the underlying Kokkos View for use in kernels
+    View_t & view() { return this->values; }
+    //! Get the underlying Kokkos View (const) for use in kernels
+    const View_t & view() const { return this->values; }
+
+    /**
+     * Deep copy from another field (potentially in a different memory space).
+     * This performs a host-device or device-host transfer as needed.
+     */
+    template <typename OtherSpace>
+    void deep_copy_from(const TypedFieldBase<T, OtherSpace> & src);
 
    protected:
-    //! set the data_ptr
-    void set_data_ptr(T * ptr);
-    /**
-     * in order to accomodate both registered fields (who own and
-     * manage their data) and unregistered temporary field proxies
-     * (piggy-backing on a chunk of existing memory as e.g., a numpy
-     * array) *efficiently*, the `get_ptr_to_entry` methods need to be
-     * branchless. this means that we cannot decide on the fly whether
-     * to return pointers pointing into values or into alt_values, we
-     * need to maintain an (shudder) raw data pointer that is set
-     * either at construction (for unregistered fields) or at any
-     * resize event (which may invalidate existing pointers). For the
-     * coder, this means that they need to be absolutely vigilant that
-     * *any* operation on the values vector that invalidates iterators
-     * needs to be followed by an update of data_ptr, or we will get
-     * super annoying memory bugs.
-     */
-    T * data_ptr{};
+    //! Kokkos View storage for the raw field data
+    View_t values{};
   };
+
+  //! Forward declaration of TypedField (default arg already in field_collection.hh)
+  template <typename T, typename MemorySpace>
+  class TypedField;
 
   /**
    * A `muGrid::TypedField` holds a certain number of components (scalars of
@@ -295,9 +335,10 @@ namespace muGrid {
    *
    * @tparam T type of scalar to hold. Must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`.
+   * @tparam MemorySpace Kokkos memory space (HostSpace by default)
    */
-  template <typename T>
-  class TypedField : public TypedFieldBase<T> {
+  template <typename T, typename MemorySpace>
+  class TypedField : public TypedFieldBase<T, MemorySpace> {
    protected:
     /**
      * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
@@ -331,7 +372,7 @@ namespace muGrid {
 
    public:
     //! base class
-    using Parent = TypedFieldBase<T>;
+    using Parent = TypedFieldBase<T, MemorySpace>;
 
     //! Eigen type to represent the field's data
     using EigenRep_t = typename Parent::EigenRep_t;
@@ -396,26 +437,31 @@ namespace muGrid {
      * add a new scalar value at the end of the field (incurs runtime cost, do
      * not use this in any hot loop). If your field has more than one quadrature
      * point per pixel the same scalar value is pushed back on all quadrature
-     * points of the pixel.
+     * points of the pixel. (host-space only)
      */
-    void push_back(const T & value);
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, void>
+    push_back(const T & value);
 
     /**
      * add a new scalar value at the end of the field (incurs runtime cost, do
      * not use this in any hot loop). Even if you have several quadrature points
      * per pixel you push back only a single value on a single quadrature point.
      * Thus you can push back different values on quadrature points belongign to
-     * the same pixel.
+     * the same pixel. (host-space only)
      */
-    void push_back_single(const T & value);
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, void>
+    push_back_single(const T & value);
 
     /**
      * add a new non-scalar value at the end of the field (incurs runtime cost,
      * do not use this in any hot loop) If your field has more than one
      * quadrature point per pixel the same non-scalar value is pushed back on
-     * all quadrature points of the pixel.
+     * all quadrature points of the pixel. (host-space only)
      */
-    void
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, void>
     push_back(const Eigen::Ref<
               const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value);
 
@@ -424,9 +470,11 @@ namespace muGrid {
      * do not use this in any hot loop) Even if you have several quadrature
      * points per pixel you push back only a single non-scalar value on a single
      * quadrature point. Thus you can push back different values on quadrature
-     * points belongign to the same pixel.
+     * points belongign to the same pixel. (host-space only)
      */
-    void push_back_single(
+    template <typename M = MemorySpace>
+    std::enable_if_t<is_host_space_v<M>, void>
+    push_back_single(
         const Eigen::Ref<
             const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value);
 
@@ -440,40 +488,39 @@ namespace muGrid {
     TypedField & clone(const std::string & new_name,
                        const bool & allow_overwrite = false) const;
 
-    /**
-     * return the values of the field
-     */
-    std::vector<T> & get_values() { return this->values; }
-
-    /**
-    * return the read-only values of the field
-     */
-    const std::vector<T> & get_const_values() const { return this->values; }
-
     //! give access to collections
     friend FieldCollection;
 
    protected:
     void resize() final;
-
-    //! storage of the raw field data
-    std::vector<T> values{};
   };
 
-  //! Alias for real-valued fields
-  using RealField = TypedField<Real>;
-  //! Alias for complex-valued fields
-  using ComplexField = TypedField<Complex>;
-  //! Alias for integer-valued fields
-  using IntField = TypedField<Int>;
-  //! Alias for unsigned integer-valued fields
-  using UintField = TypedField<Uint>;
-  //! Alias for unsigned integer-valued fields
-  using IndexField = TypedField<Index_t>;
+  //! Alias for real-valued host fields
+  using RealField = TypedField<Real, HostSpace>;
+  //! Alias for complex-valued host fields
+  using ComplexField = TypedField<Complex, HostSpace>;
+  //! Alias for integer-valued host fields
+  using IntField = TypedField<Int, HostSpace>;
+  //! Alias for unsigned integer-valued host fields
+  using UintField = TypedField<Uint, HostSpace>;
+  //! Alias for unsigned integer-valued host fields
+  using IndexField = TypedField<Index_t, HostSpace>;
+
+  /**
+   * Free function for deep copying between fields in different memory spaces.
+   */
+  template <typename T, typename DstSpace, typename SrcSpace>
+  void deep_copy(TypedFieldBase<T, DstSpace> & dst,
+                 const TypedFieldBase<T, SrcSpace> & src) {
+    if (dst.view().size() != src.view().size()) {
+      throw FieldError("Size mismatch in deep_copy");
+    }
+    Kokkos::deep_copy(dst.view(), src.view());
+  }
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedField<T> & FieldCollection::register_field_helper(
+  TypedField<T, HostSpace> & FieldCollection::register_field_helper(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit,
       bool allow_existing) {
@@ -503,7 +550,7 @@ namespace muGrid {
               "You can't change the physical unit of a field "
               "by re-registering it.");
         }
-        return static_cast<TypedField<T> &>(field);
+        return static_cast<TypedField<T, HostSpace> &>(field);
       } else {
         std::stringstream error{};
         error << "A Field of name '" << unique_name
@@ -521,9 +568,9 @@ namespace muGrid {
     //! If you get a compiler warning about narrowing conversion on the
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T> * raw_ptr{new TypedField<T>{unique_name, *this, nb_components,
-                                              sub_division_tag, unit}};
-    TypedField<T> & retref{*raw_ptr};
+    TypedField<T, HostSpace> * raw_ptr{new TypedField<T, HostSpace>{
+        unique_name, *this, nb_components, sub_division_tag, unit}};
+    TypedField<T, HostSpace> & retref{*raw_ptr};
     Field_ptr field{raw_ptr};
     if (this->initialised) {
       retref.resize();
@@ -534,7 +581,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedField<T> & FieldCollection::register_field_helper(
+  TypedField<T, HostSpace> & FieldCollection::register_field_helper(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit,
       bool allow_existing) {
@@ -559,7 +606,7 @@ namespace muGrid {
               "You can't change the physical unit of a field "
               "by re-registering it.");
         }
-        return static_cast<TypedField<T> &>(field);
+        return static_cast<TypedField<T, HostSpace> &>(field);
       } else {
         std::stringstream error{};
         error << "A Field of name '" << unique_name
@@ -577,9 +624,9 @@ namespace muGrid {
     //! If you get a compiler warning about narrowing conversion on the
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T> * raw_ptr{new TypedField<T>{
+    TypedField<T, HostSpace> * raw_ptr{new TypedField<T, HostSpace>{
         unique_name, *this, components_shape, sub_division_tag, unit}};
-    TypedField<T> & retref{*raw_ptr};
+    TypedField<T, HostSpace> & retref{*raw_ptr};
     Field_ptr field{raw_ptr};
     if (this->initialised) {
       retref.resize();

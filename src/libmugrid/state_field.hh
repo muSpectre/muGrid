@@ -68,7 +68,7 @@ namespace muGrid {
   class Field;
 
   //! forward declaration of the `muGrid::TypedField`
-  template <typename T>
+  template <typename T, typename MemorySpace>
   class TypedField;
 
   /**

@@ -34,7 +34,6 @@
  *
  */
 #define BOOST_TEST_MODULE base_test test
-#define BOOST_TEST_MAIN
 
 // Meson defines this properly, CMake does not
 #ifndef BOOST_TEST_DYN_LINK
@@ -42,3 +41,16 @@
 #endif
 
 #include <boost/test/unit_test.hpp>
+#include <Kokkos_Core.hpp>
+
+// Global fixture to initialize/finalize Kokkos
+struct KokkosInitializer {
+  KokkosInitializer() {
+    Kokkos::initialize();
+  }
+  ~KokkosInitializer() {
+    Kokkos::finalize();
+  }
+};
+
+BOOST_TEST_GLOBAL_FIXTURE(KokkosInitializer);

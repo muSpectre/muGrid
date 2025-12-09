@@ -39,6 +39,7 @@
 #include "exception.hh"
 #include "grid_common.hh"
 #include "units.hh"
+#include "kokkos_types.hh"
 
 #include <map>
 #include <string>
@@ -52,7 +53,7 @@ namespace muGrid {
     class Field;
 
     //! forward declaration of the `muSpectre::TypedField`
-    template<typename T>
+    template<typename T, typename MemorySpace = HostSpace>
     class TypedField;
 
     //! forward declaration of the state field
@@ -837,19 +838,21 @@ namespace muGrid {
 
         //! internal worker function called by register_<T>_field
         template<typename T>
-        TypedField<T> &register_field_helper(const std::string &unique_name,
-                                             const Index_t &nb_components,
-                                             const std::string &sub_division_tag,
-                                             const Unit &unit,
-                                             bool allow_existing = false);
+        TypedField<T, HostSpace> &register_field_helper(
+            const std::string &unique_name,
+            const Index_t &nb_components,
+            const std::string &sub_division_tag,
+            const Unit &unit,
+            bool allow_existing = false);
 
         //! internal worker function called by register_<T>_field
         template<typename T>
-        TypedField<T> &register_field_helper(const std::string &unique_name,
-                                             const Shape_t &components_shape,
-                                             const std::string &sub_division_tag,
-                                             const Unit &unit,
-                                             bool allow_existing = false);
+        TypedField<T, HostSpace> &register_field_helper(
+            const std::string &unique_name,
+            const Shape_t &components_shape,
+            const std::string &sub_division_tag,
+            const Unit &unit,
+            bool allow_existing = false);
 
         //! internal worker function called by register_<T>_state_field
         template<typename T>

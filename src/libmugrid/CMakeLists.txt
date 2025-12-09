@@ -69,6 +69,9 @@ target_include_directories(muGrid
 # Link Eigen3
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
+# Link Kokkos (required dependency)
+target_link_libraries(muGrid PUBLIC Kokkos::kokkos)
+
 # Compile definitions
 if(MUGRID_WITH_MPI)
     target_compile_definitions(muGrid PUBLIC WITH_MPI)

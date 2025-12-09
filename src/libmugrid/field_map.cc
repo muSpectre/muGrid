@@ -193,7 +193,9 @@ namespace muGrid {
       throw FieldMapError("Can't initialise map before the field collection "
                           "has been initialised");
     }
-    this->data_ptr = this->field.data();
+    // For const fields, we need to cast away const since data_ptr is T*
+    // This is safe because we only provide read access for const maps
+    this->data_ptr = const_cast<T*>(this->field.data());
     this->is_initialised = true;
   }
 

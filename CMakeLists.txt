@@ -59,6 +59,10 @@ option(MUGRID_BUILD_PYTHON "Build Python bindings" ON)
 option(MUGRID_BUILD_TESTS "Build tests" ON)
 option(MUGRID_BUILD_EXAMPLES "Build examples" ON)
 
+# Kokkos backend selection
+set(MUGRID_KOKKOS_BACKEND "SERIAL" CACHE STRING "Kokkos execution backend")
+set_property(CACHE MUGRID_KOKKOS_BACKEND PROPERTY STRINGS SERIAL OPENMP CUDA HIP)
+
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -85,6 +89,28 @@ if(NOT Eigen3_FOUND)
     FetchContent_MakeAvailable(eigen)
     # Restore BUILD_TESTING for muGrid's own tests
     set(BUILD_TESTING ON CACHE BOOL "" FORCE)
+endif()
+
+# Find or fetch Kokkos (required dependency)
+find_package(Kokkos 4.0 QUIET)
+if(NOT Kokkos_FOUND)
+    message(STATUS "Kokkos not found, fetching from GitHub...")
+    # Enable the selected backend
+    set(Kokkos_ENABLE_${MUGRID_KOKKOS_BACKEND} ON CACHE BOOL "" FORCE)
+    # Disable Kokkos tests
+    set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+    set(Kokkos_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    # Enable PIC for shared library linking
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        kokkos
+        GIT_REPOSITORY https://github.com/kokkos/kokkos.git
+        GIT_TAG 4.5.00
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(kokkos)
+else()
+    message(STATUS "Kokkos found: ${Kokkos_DIR}")
 endif()
 
 # MPI support
@@ -155,6 +181,7 @@ endif()
 message(STATUS "--------------------")
 message(STATUS "muGrid configuration")
 message(STATUS "  Version        : ${MUGRID_VERSION_STRING}")
+message(STATUS "  Kokkos backend : ${MUGRID_KOKKOS_BACKEND}")
 message(STATUS "  MPI            : ${MUGRID_WITH_MPI}")
 if(MUGRID_WITH_MPI)
     message(STATUS "  Parallel NetCDF: ${MUGRID_WITH_NETCDF}")

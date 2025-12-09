@@ -45,69 +45,64 @@
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedFieldBase<T>::set_data_ptr(T * ptr) {
-    this->data_ptr = ptr;
+  template <typename T, typename MemorySpace>
+  void * TypedFieldBase<T, MemorySpace>::get_void_data_ptr() const {
+    static_assert(is_host_space_v<MemorySpace>,
+                  "get_void_data_ptr only available for host-space fields");
+    return static_cast<void *>(const_cast<T *>(this->values.data()));
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  T * TypedFieldBase<T>::data() const {
-    return this->data_ptr;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::operator=(const TypedField & other) {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::operator=(const TypedField & other) {
     Parent::operator=(other);
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void * TypedFieldBase<T>::get_void_data_ptr() const {
-    return static_cast<void *>(this->data_ptr);
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::operator=(const Parent & other) {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::operator=(const Parent & other) {
     Parent::operator=(other);
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::operator=(const Negative & other) {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::operator=(const Negative & other) {
     Parent::operator=(other);
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::operator=(const EigenRep_t & other) {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::operator=(const EigenRep_t & other) {
     Parent::operator=(other);
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::set_zero() {
-    std::fill(this->values.begin(), this->values.end(), T{});
+  template <typename T, typename MemorySpace>
+  void TypedField<T, MemorySpace>::set_zero() {
+    Kokkos::deep_copy(this->values, T{});
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::set_pad_size(const size_t & pad_size) {
+  template <typename T, typename MemorySpace>
+  void TypedField<T, MemorySpace>::set_pad_size(const size_t & pad_size) {
     this->pad_size = pad_size;
     this->resize();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::safe_cast(Field & other) {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::safe_cast(Field & other) {
     try {
-      return dynamic_cast<TypedField<T> &>(other);
+      return dynamic_cast<TypedField<T, MemorySpace> &>(other);
     } catch (const std::bad_cast &) {
       std::stringstream error{};
       error << "Can not cast field '" << other.get_name()
@@ -119,10 +114,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  const TypedField<T> & TypedField<T>::safe_cast(const Field & other) {
+  template <typename T, typename MemorySpace>
+  const TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::safe_cast(const Field & other) {
     try {
-      return dynamic_cast<const TypedField<T> &>(other);
+      return dynamic_cast<const TypedField<T, MemorySpace> &>(other);
     } catch (const std::bad_cast &) {
       std::stringstream error{};
       error << "Can not cast field '" << other.get_name()
@@ -134,10 +130,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::safe_cast(Field & other,
-                                           const Index_t & nb_components,
-                                           const std::string & sub_division) {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::safe_cast(Field & other,
+                                        const Index_t & nb_components,
+                                        const std::string & sub_division) {
     if (other.get_nb_components() != nb_components) {
       std::stringstream err_msg{};
       err_msg << "Can not cast field '" << other.get_name()
@@ -158,10 +155,11 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  const TypedField<T> &
-  TypedField<T>::safe_cast(const Field & other, const Index_t & nb_components,
-                           const std::string & sub_division) {
+  template <typename T, typename MemorySpace>
+  const TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::safe_cast(const Field & other,
+                                        const Index_t & nb_components,
+                                        const std::string & sub_division) {
     if (other.get_nb_components() != nb_components) {
       std::stringstream err_msg{};
       err_msg << "Can not cast field '" << other.get_name()
@@ -182,8 +180,8 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::resize() {
+  template <typename T, typename MemorySpace>
+  void TypedField<T, MemorySpace>::resize() {
     if (not this->has_nb_sub_pts()) {
       std::stringstream error_message{};
       error_message << "Can't compute the size of field '" << this->get_name()
@@ -195,23 +193,24 @@ namespace muGrid {
 
     auto && size{this->nb_sub_pts * this->get_nb_buffer_pixels()};
     const auto expected_size{size * this->get_nb_components() + this->pad_size};
-    if (this->values.size() != expected_size or
+    if (this->values.size() != static_cast<size_t>(expected_size) or
         static_cast<Index_t>(this->current_nb_entries) != size) {
       this->current_nb_entries = size;
-      this->values.resize(expected_size);
+      Kokkos::resize(this->values, expected_size);
     }
-    this->set_data_ptr(this->values.data());
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  size_t TypedField<T>::get_buffer_size() const {
+  template <typename T, typename MemorySpace>
+  size_t TypedField<T, MemorySpace>::get_buffer_size() const {
     return this->values.size();
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::push_back(const T & value) {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, void>
+  TypedField<T, MemorySpace>::push_back(const T & value) {
     if (this->is_global()) {
       throw FieldError("push_back() makes no sense on global fields (you can't "
                        "add individual pixels");
@@ -225,14 +224,19 @@ namespace muGrid {
     }
     const auto & nb_sub{this->get_nb_sub_pts()};
     this->current_nb_entries += nb_sub;
+    const auto old_size{static_cast<Index_t>(this->values.size())};
+    const auto new_size{old_size + nb_sub};
+    Kokkos::resize(this->values, new_size);
     for (Index_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
-      this->values.push_back(value);
+      this->values(old_size + sub_pt_id) = value;
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::push_back_single(const T & value) {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, void>
+  TypedField<T, MemorySpace>::push_back_single(const T & value) {
     if (this->is_global()) {
       throw FieldError("push_back_single() makes no sense on global fields "
                        "(you can't add individual pixels");
@@ -245,68 +249,82 @@ namespace muGrid {
       throw FieldError("This is not a scalar field. push_back an array.");
     }
     this->current_nb_entries += 1;
-    this->values.push_back(value);
+    const auto old_size{static_cast<Index_t>(this->values.size())};
+    const auto new_size{old_size + 1};
+    Kokkos::resize(this->values, new_size);
+    this->values(old_size) = value;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::push_back(
-      const Eigen::Ref<const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &
-          value) {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, void>
+  TypedField<T, MemorySpace>::push_back(
+      const Eigen::Ref<
+          const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value) {
     if (this->is_global()) {
       throw FieldError("push_back() makes no sense on global fields (you can't "
                        "add individual pixels");
     }
     if (not this->has_nb_sub_pts()) {
       throw FieldError("Can not push_back into a field before the number of "
-                       "sub-division points has bee set for.");
+                       "sub-division points has been set for it");
     }
     if (this->nb_components != value.size()) {
       std::stringstream error{};
       error << "You are trying to push an array with " << value.size()
-            << "components into a field with " << this->nb_components
+            << " components into a field with " << this->nb_components
             << " components.";
       throw FieldError(error.str());
     }
     const auto & nb_sub{this->get_nb_sub_pts()};
     this->current_nb_entries += nb_sub;
+    const auto old_size{static_cast<Index_t>(this->values.size())};
+    const auto new_size{old_size + this->nb_components * nb_sub};
+    Kokkos::resize(this->values, new_size);
     for (Index_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
       for (Index_t i{0}; i < this->nb_components; ++i) {
-        this->values.push_back(value.data()[i]);
+        this->values(old_size + sub_pt_id * this->nb_components + i) = value.data()[i];
       }
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  void TypedField<T>::push_back_single(
-      const Eigen::Ref<const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &
-          value) {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, void>
+  TypedField<T, MemorySpace>::push_back_single(
+      const Eigen::Ref<
+          const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> & value) {
     if (this->is_global()) {
       throw FieldError("push_back_single() makes no sense on global fields "
                        "(you can't add individual pixels");
     }
     if (not this->has_nb_sub_pts()) {
       throw FieldError("Can not push_back_single into a field before the number"
-                       " of sub-division points has bee set for.");
+                       " of sub-division points has been set for it");
     }
     if (this->nb_components != value.size()) {
       std::stringstream error{};
       error << "You are trying to push an array with " << value.size()
-            << "components into a field with " << this->nb_components
+            << " components into a field with " << this->nb_components
             << " components.";
       throw FieldError(error.str());
     }
     this->current_nb_entries += 1;
+    const auto old_size{static_cast<Index_t>(this->values.size())};
+    const auto new_size{old_size + this->nb_components};
+    Kokkos::resize(this->values, new_size);
     for (Index_t i{0}; i < this->nb_components; ++i) {
-      this->values.push_back(value.data()[i]);
+      this->values(old_size + i) = value.data()[i];
     }
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedField<T> & TypedField<T>::clone(const std::string & new_name,
-                                       const bool & allow_overwrite) const {
+  template <typename T, typename MemorySpace>
+  TypedField<T, MemorySpace> &
+  TypedField<T, MemorySpace>::clone(const std::string & new_name,
+                                    const bool & allow_overwrite) const {
     const bool field_exists{this->get_collection().field_exists(new_name)};
 
     if (field_exists and not allow_overwrite) {
@@ -317,7 +335,7 @@ namespace muGrid {
       throw FieldError{err_msg.str()};
     }
 
-    TypedField<T> & other{
+    TypedField<T, MemorySpace> & other{
         field_exists
             ? this->safe_cast(this->get_collection().get_field(new_name),
                               this->nb_components, this->sub_division_tag)
@@ -325,14 +343,17 @@ namespace muGrid {
                   new_name, this->nb_components, this->sub_division_tag,
                   this->unit)};
 
-    other = *this;
+    Kokkos::deep_copy(other.view(), this->view());
     return other;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_map(const Index_t & nb_rows,
-                                    const Index_t & nb_cols) -> Eigen_map {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_map>
+  TypedFieldBase<T, MemorySpace>::eigen_map(const Index_t & nb_rows,
+                                            const Index_t & nb_cols) {
     if (not this->collection.is_initialised()) {
       std::stringstream error{};
       error << "The FieldCollection for field '" << this->name
@@ -344,14 +365,16 @@ namespace muGrid {
       throw FieldError("Eigen representation is only available for fields with "
                        "contiguous storage.");
     }
-    return Eigen_map(this->data_ptr, nb_rows, nb_cols);
+    return Eigen_map(this->values.data(), nb_rows, nb_cols);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_map(const Index_t & nb_rows,
-                                    const Index_t & nb_cols) const
-      -> Eigen_cmap {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_cmap>
+  TypedFieldBase<T, MemorySpace>::eigen_map(const Index_t & nb_rows,
+                                            const Index_t & nb_cols) const {
     if (not this->collection.is_initialised()) {
       std::stringstream error{};
       error << "The FieldCollection for field '" << this->name
@@ -363,75 +386,71 @@ namespace muGrid {
       throw FieldError("Eigen representation is only available for fields with "
                        "contiguous storage.");
     }
-    return Eigen_cmap(this->data_ptr, nb_rows, nb_cols);
+    return Eigen_cmap(this->values.data(), nb_rows, nb_cols);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedFieldBase<T> &
-  TypedFieldBase<T>::operator=(const TypedFieldBase & other) {
-    // Dispatch based on domain type
-    auto domain = this->collection.get_domain();
-    if (domain == FieldCollection::ValidityDomain::Local) {
-      this->eigen_vec() = other.eigen_vec();
-    } else if (domain == FieldCollection::ValidityDomain::Global) {
-      auto && my_shape{this->get_shape(IterUnit::SubPt)};
-      auto && other_shape{other.get_shape(IterUnit::SubPt)};
-      if (my_shape != other_shape) {
-        std::stringstream s;
-        s << "Shape mismatch: Copying a field with shape " << other_shape
-          << " onto a field with shape " << my_shape << " is not supported.";
-        throw FieldError(s.str());
-      }
-      auto && my_strides{this->get_strides(IterUnit::SubPt)};
-      auto && other_strides{other.get_strides(IterUnit::SubPt)};
-      raw_mem_ops::strided_copy(my_shape, other_strides, my_strides,
-                                other.data(), this->data_ptr);
-    } else {
-      throw FieldError("Unknown ValidityDomain type");
-    }
+  template <typename T, typename MemorySpace>
+  TypedFieldBase<T, MemorySpace> &
+  TypedFieldBase<T, MemorySpace>::operator=(const TypedFieldBase & other) {
+    // For host space, use Kokkos deep_copy
+    Kokkos::deep_copy(this->values, other.values);
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedFieldBase<T> & TypedFieldBase<T>::operator=(const Negative & other) {
+  template <typename T, typename MemorySpace>
+  TypedFieldBase<T, MemorySpace> &
+  TypedFieldBase<T, MemorySpace>::operator=(const Negative & other) {
+    // This requires host access for Eigen operations
+    static_assert(is_host_space_v<MemorySpace>,
+                  "Negative assignment only available for host-space fields");
     this->eigen_vec() = -other.field.eigen_vec();
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedFieldBase<T> & TypedFieldBase<T>::operator=(const EigenRep_t & other) {
+  template <typename T, typename MemorySpace>
+  TypedFieldBase<T, MemorySpace> &
+  TypedFieldBase<T, MemorySpace>::operator=(const EigenRep_t & other) {
+    static_assert(is_host_space_v<MemorySpace>,
+                  "Eigen assignment only available for host-space fields");
     this->eigen_vec() = other;
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::operator-() const -> Negative {
+  template <typename T, typename MemorySpace>
+  auto TypedFieldBase<T, MemorySpace>::operator-() const -> Negative {
     return Negative{*this};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedFieldBase<T> &
-  TypedFieldBase<T>::operator+=(const TypedFieldBase & other) {
+  template <typename T, typename MemorySpace>
+  TypedFieldBase<T, MemorySpace> &
+  TypedFieldBase<T, MemorySpace>::operator+=(const TypedFieldBase & other) {
+    static_assert(is_host_space_v<MemorySpace>,
+                  "+= only available for host-space fields");
     this->eigen_vec() += other.eigen_vec();
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  TypedFieldBase<T> &
-  TypedFieldBase<T>::operator-=(const TypedFieldBase & other) {
+  template <typename T, typename MemorySpace>
+  TypedFieldBase<T, MemorySpace> &
+  TypedFieldBase<T, MemorySpace>::operator-=(const TypedFieldBase & other) {
+    static_assert(is_host_space_v<MemorySpace>,
+                  "-= only available for host-space fields");
     this->eigen_vec() -= other.eigen_vec();
     return *this;
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_vec() -> EigenVec_map {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::EigenVec_map>
+  TypedFieldBase<T, MemorySpace>::eigen_vec() {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
@@ -441,13 +460,16 @@ namespace muGrid {
             << "' has not been initialised";
       throw FieldError(error.str());
     }
-    return EigenVec_map(this->data_ptr,
+    return EigenVec_map(this->values.data(),
                         this->get_nb_entries() * this->nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_vec() const -> EigenVec_cmap {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::EigenVec_cmap>
+  TypedFieldBase<T, MemorySpace>::eigen_vec() const {
     if (not this->collection.is_initialised()) {
       std::stringstream error{};
       error << "The FieldCollection for field '" << this->name
@@ -457,99 +479,369 @@ namespace muGrid {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
-    return EigenVec_cmap(this->data_ptr,
+    return EigenVec_cmap(this->values.data(),
                          this->get_nb_entries() * this->nb_components);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_sub_pt() -> Eigen_map {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_map>
+  TypedFieldBase<T, MemorySpace>::eigen_sub_pt() {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
-    return this->eigen_map(this->nb_components, this->get_nb_entries());
+    return this->template eigen_map<M>(this->nb_components,
+                                       this->get_nb_entries());
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_sub_pt() const -> Eigen_cmap {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_cmap>
+  TypedFieldBase<T, MemorySpace>::eigen_sub_pt() const {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
-    return this->eigen_map(this->nb_components, this->get_nb_entries());
+    return this->template eigen_map<M>(this->nb_components,
+                                       this->get_nb_entries());
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_pixel() -> Eigen_map {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_map>
+  TypedFieldBase<T, MemorySpace>::eigen_pixel() {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
     const auto & nb_sub{this->get_nb_sub_pts()};
-    return this->eigen_map(this->nb_components * nb_sub,
-                           this->get_nb_entries() / nb_sub);
+    return this->template eigen_map<M>(this->nb_components * nb_sub,
+                                       this->get_nb_entries() / nb_sub);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::eigen_pixel() const -> Eigen_cmap {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_cmap>
+  TypedFieldBase<T, MemorySpace>::eigen_pixel() const {
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
     }
     const auto & nb_sub{this->get_nb_sub_pts()};
-    return this->eigen_map(this->nb_components * nb_sub,
-                           this->get_nb_entries() / nb_sub);
+    return this->template eigen_map<M>(this->nb_components * nb_sub,
+                                       this->get_nb_entries() / nb_sub);
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows)
-      -> FieldMap<T, Mapping::Mut> {
-    // std::cout << "MUT nb_rows=" << nb_rows << std::endl;
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_map>
+  TypedFieldBase<T, MemorySpace>::eigen_mat() {
+    return this->template eigen_map<M>(this->nb_components,
+                                       this->get_nb_entries());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>,
+                   typename TypedFieldBase<T, MemorySpace>::Eigen_cmap>
+  TypedFieldBase<T, MemorySpace>::eigen_mat() const {
+    return this->template eigen_map<M>(this->nb_components,
+                                       this->get_nb_entries());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Mut>>
+  TypedFieldBase<T, MemorySpace>::get_pixel_map(const Index_t & nb_rows) {
     return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Mut>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Mut>{*this, nb_rows, IterUnit::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::get_pixel_map(const Index_t & nb_rows) const
-      -> FieldMap<T, Mapping::Const> {
-    // std::cout << "CONST nb_rows=" << nb_rows << std::endl;
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Const>>
+  TypedFieldBase<T, MemorySpace>::get_pixel_map(const Index_t & nb_rows) const {
     return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::Pixel}
                : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::Pixel};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::get_sub_pt_map(const Index_t & nb_rows)
-      -> FieldMap<T, Mapping::Mut> {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Mut>>
+  TypedFieldBase<T, MemorySpace>::get_sub_pt_map(const Index_t & nb_rows) {
     return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Mut>{*this, IterUnit::SubPt}
                : FieldMap<T, Mapping::Mut>{*this, nb_rows, IterUnit::SubPt};
   }
 
   /* ---------------------------------------------------------------------- */
-  template <typename T>
-  auto TypedFieldBase<T>::get_sub_pt_map(const Index_t & nb_rows) const
-      -> FieldMap<T, Mapping::Const> {
+  template <typename T, typename MemorySpace>
+  template <typename M>
+  std::enable_if_t<is_host_space_v<M>, FieldMap<T, Mapping::Const>>
+  TypedFieldBase<T, MemorySpace>::get_sub_pt_map(
+      const Index_t & nb_rows) const {
     return (nb_rows == Unknown)
                ? FieldMap<T, Mapping::Const>{*this, IterUnit::SubPt}
                : FieldMap<T, Mapping::Const>{*this, nb_rows, IterUnit::SubPt};
   }
 
   /* ---------------------------------------------------------------------- */
-  template class TypedFieldBase<Real>;
-  template class TypedFieldBase<Complex>;
-  template class TypedFieldBase<Int>;
-  template class TypedFieldBase<Uint>;
-  template class TypedFieldBase<Index_t>;
+  template <typename T, typename MemorySpace>
+  template <typename OtherSpace>
+  void TypedFieldBase<T, MemorySpace>::deep_copy_from(
+      const TypedFieldBase<T, OtherSpace> & src) {
+    muGrid::deep_copy(*this, src);
+  }
 
-  template class TypedField<Real>;
-  template class TypedField<Complex>;
-  template class TypedField<Int>;
-  template class TypedField<Uint>;
-  template class TypedField<Index_t>;
+  /* ---------------------------------------------------------------------- */
+  // Explicit template instantiations for HostSpace only
+  template class TypedFieldBase<Real, HostSpace>;
+  template class TypedFieldBase<Complex, HostSpace>;
+  template class TypedFieldBase<Int, HostSpace>;
+  template class TypedFieldBase<Uint, HostSpace>;
+  template class TypedFieldBase<Index_t, HostSpace>;
+
+  template class TypedField<Real, HostSpace>;
+  template class TypedField<Complex, HostSpace>;
+  template class TypedField<Int, HostSpace>;
+  template class TypedField<Uint, HostSpace>;
+  template class TypedField<Index_t, HostSpace>;
+
+  // Explicit instantiation of template member functions for HostSpace
+  template TypedFieldBase<Real, HostSpace>::Eigen_map
+  TypedFieldBase<Real, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &);
+  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
+  TypedFieldBase<Real, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &) const;
+  template TypedFieldBase<Real, HostSpace>::EigenVec_map
+  TypedFieldBase<Real, HostSpace>::eigen_vec<HostSpace>();
+  template TypedFieldBase<Real, HostSpace>::EigenVec_cmap
+  TypedFieldBase<Real, HostSpace>::eigen_vec<HostSpace>() const;
+  template TypedFieldBase<Real, HostSpace>::Eigen_map
+  TypedFieldBase<Real, HostSpace>::eigen_sub_pt<HostSpace>();
+  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
+  TypedFieldBase<Real, HostSpace>::eigen_sub_pt<HostSpace>() const;
+  template TypedFieldBase<Real, HostSpace>::Eigen_map
+  TypedFieldBase<Real, HostSpace>::eigen_pixel<HostSpace>();
+  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
+  TypedFieldBase<Real, HostSpace>::eigen_pixel<HostSpace>() const;
+  template TypedFieldBase<Real, HostSpace>::Eigen_map
+  TypedFieldBase<Real, HostSpace>::eigen_mat<HostSpace>();
+  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
+  TypedFieldBase<Real, HostSpace>::eigen_mat<HostSpace>() const;
+  template FieldMap<Real, Mapping::Mut>
+  TypedFieldBase<Real, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
+  template FieldMap<Real, Mapping::Const>
+  TypedFieldBase<Real, HostSpace>::get_pixel_map<HostSpace>(
+      const Index_t &) const;
+  template FieldMap<Real, Mapping::Mut>
+  TypedFieldBase<Real, HostSpace>::get_sub_pt_map<HostSpace>(const Index_t &);
+  template FieldMap<Real, Mapping::Const>
+  TypedFieldBase<Real, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &) const;
+
+  template TypedFieldBase<Complex, HostSpace>::Eigen_map
+  TypedFieldBase<Complex, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &);
+  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
+  TypedFieldBase<Complex, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &) const;
+  template TypedFieldBase<Complex, HostSpace>::EigenVec_map
+  TypedFieldBase<Complex, HostSpace>::eigen_vec<HostSpace>();
+  template TypedFieldBase<Complex, HostSpace>::EigenVec_cmap
+  TypedFieldBase<Complex, HostSpace>::eigen_vec<HostSpace>() const;
+  template TypedFieldBase<Complex, HostSpace>::Eigen_map
+  TypedFieldBase<Complex, HostSpace>::eigen_sub_pt<HostSpace>();
+  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
+  TypedFieldBase<Complex, HostSpace>::eigen_sub_pt<HostSpace>() const;
+  template TypedFieldBase<Complex, HostSpace>::Eigen_map
+  TypedFieldBase<Complex, HostSpace>::eigen_pixel<HostSpace>();
+  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
+  TypedFieldBase<Complex, HostSpace>::eigen_pixel<HostSpace>() const;
+  template TypedFieldBase<Complex, HostSpace>::Eigen_map
+  TypedFieldBase<Complex, HostSpace>::eigen_mat<HostSpace>();
+  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
+  TypedFieldBase<Complex, HostSpace>::eigen_mat<HostSpace>() const;
+  template FieldMap<Complex, Mapping::Mut>
+  TypedFieldBase<Complex, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
+  template FieldMap<Complex, Mapping::Const>
+  TypedFieldBase<Complex, HostSpace>::get_pixel_map<HostSpace>(
+      const Index_t &) const;
+  template FieldMap<Complex, Mapping::Mut>
+  TypedFieldBase<Complex, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &);
+  template FieldMap<Complex, Mapping::Const>
+  TypedFieldBase<Complex, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &) const;
+
+  template TypedFieldBase<Int, HostSpace>::Eigen_map
+  TypedFieldBase<Int, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &);
+  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
+  TypedFieldBase<Int, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &) const;
+  template TypedFieldBase<Int, HostSpace>::EigenVec_map
+  TypedFieldBase<Int, HostSpace>::eigen_vec<HostSpace>();
+  template TypedFieldBase<Int, HostSpace>::EigenVec_cmap
+  TypedFieldBase<Int, HostSpace>::eigen_vec<HostSpace>() const;
+  template TypedFieldBase<Int, HostSpace>::Eigen_map
+  TypedFieldBase<Int, HostSpace>::eigen_sub_pt<HostSpace>();
+  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
+  TypedFieldBase<Int, HostSpace>::eigen_sub_pt<HostSpace>() const;
+  template TypedFieldBase<Int, HostSpace>::Eigen_map
+  TypedFieldBase<Int, HostSpace>::eigen_pixel<HostSpace>();
+  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
+  TypedFieldBase<Int, HostSpace>::eigen_pixel<HostSpace>() const;
+  template TypedFieldBase<Int, HostSpace>::Eigen_map
+  TypedFieldBase<Int, HostSpace>::eigen_mat<HostSpace>();
+  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
+  TypedFieldBase<Int, HostSpace>::eigen_mat<HostSpace>() const;
+  template FieldMap<Int, Mapping::Mut>
+  TypedFieldBase<Int, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
+  template FieldMap<Int, Mapping::Const>
+  TypedFieldBase<Int, HostSpace>::get_pixel_map<HostSpace>(
+      const Index_t &) const;
+  template FieldMap<Int, Mapping::Mut>
+  TypedFieldBase<Int, HostSpace>::get_sub_pt_map<HostSpace>(const Index_t &);
+  template FieldMap<Int, Mapping::Const>
+  TypedFieldBase<Int, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &) const;
+
+  template TypedFieldBase<Uint, HostSpace>::Eigen_map
+  TypedFieldBase<Uint, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &);
+  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
+  TypedFieldBase<Uint, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &) const;
+  template TypedFieldBase<Uint, HostSpace>::EigenVec_map
+  TypedFieldBase<Uint, HostSpace>::eigen_vec<HostSpace>();
+  template TypedFieldBase<Uint, HostSpace>::EigenVec_cmap
+  TypedFieldBase<Uint, HostSpace>::eigen_vec<HostSpace>() const;
+  template TypedFieldBase<Uint, HostSpace>::Eigen_map
+  TypedFieldBase<Uint, HostSpace>::eigen_sub_pt<HostSpace>();
+  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
+  TypedFieldBase<Uint, HostSpace>::eigen_sub_pt<HostSpace>() const;
+  template TypedFieldBase<Uint, HostSpace>::Eigen_map
+  TypedFieldBase<Uint, HostSpace>::eigen_pixel<HostSpace>();
+  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
+  TypedFieldBase<Uint, HostSpace>::eigen_pixel<HostSpace>() const;
+  template TypedFieldBase<Uint, HostSpace>::Eigen_map
+  TypedFieldBase<Uint, HostSpace>::eigen_mat<HostSpace>();
+  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
+  TypedFieldBase<Uint, HostSpace>::eigen_mat<HostSpace>() const;
+  template FieldMap<Uint, Mapping::Mut>
+  TypedFieldBase<Uint, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
+  template FieldMap<Uint, Mapping::Const>
+  TypedFieldBase<Uint, HostSpace>::get_pixel_map<HostSpace>(
+      const Index_t &) const;
+  template FieldMap<Uint, Mapping::Mut>
+  TypedFieldBase<Uint, HostSpace>::get_sub_pt_map<HostSpace>(const Index_t &);
+  template FieldMap<Uint, Mapping::Const>
+  TypedFieldBase<Uint, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &) const;
+
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
+  TypedFieldBase<Index_t, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &);
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
+  TypedFieldBase<Index_t, HostSpace>::eigen_map<HostSpace>(
+      const Index_t &, const Index_t &) const;
+  template TypedFieldBase<Index_t, HostSpace>::EigenVec_map
+  TypedFieldBase<Index_t, HostSpace>::eigen_vec<HostSpace>();
+  template TypedFieldBase<Index_t, HostSpace>::EigenVec_cmap
+  TypedFieldBase<Index_t, HostSpace>::eigen_vec<HostSpace>() const;
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
+  TypedFieldBase<Index_t, HostSpace>::eigen_sub_pt<HostSpace>();
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
+  TypedFieldBase<Index_t, HostSpace>::eigen_sub_pt<HostSpace>() const;
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
+  TypedFieldBase<Index_t, HostSpace>::eigen_pixel<HostSpace>();
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
+  TypedFieldBase<Index_t, HostSpace>::eigen_pixel<HostSpace>() const;
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
+  TypedFieldBase<Index_t, HostSpace>::eigen_mat<HostSpace>();
+  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
+  TypedFieldBase<Index_t, HostSpace>::eigen_mat<HostSpace>() const;
+  template FieldMap<Index_t, Mapping::Mut>
+  TypedFieldBase<Index_t, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
+  template FieldMap<Index_t, Mapping::Const>
+  TypedFieldBase<Index_t, HostSpace>::get_pixel_map<HostSpace>(
+      const Index_t &) const;
+  template FieldMap<Index_t, Mapping::Mut>
+  TypedFieldBase<Index_t, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &);
+  template FieldMap<Index_t, Mapping::Const>
+  TypedFieldBase<Index_t, HostSpace>::get_sub_pt_map<HostSpace>(
+      const Index_t &) const;
+
+  // Explicit instantiation of push_back template member functions
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Real, HostSpace>::push_back<HostSpace>(const Real &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Real, HostSpace>::push_back_single<HostSpace>(const Real &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Real, HostSpace>::push_back<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic>> &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Real, HostSpace>::push_back_single<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic>> &);
+
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Complex, HostSpace>::push_back<HostSpace>(const Complex &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Complex, HostSpace>::push_back_single<HostSpace>(const Complex &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Complex, HostSpace>::push_back<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>> &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Complex, HostSpace>::push_back_single<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>> &);
+
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Int, HostSpace>::push_back<HostSpace>(const Int &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Int, HostSpace>::push_back_single<HostSpace>(const Int &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Int, HostSpace>::push_back<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Int, Eigen::Dynamic, Eigen::Dynamic>> &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Int, HostSpace>::push_back_single<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Int, Eigen::Dynamic, Eigen::Dynamic>> &);
+
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Uint, HostSpace>::push_back<HostSpace>(const Uint &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Uint, HostSpace>::push_back_single<HostSpace>(const Uint &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Uint, HostSpace>::push_back<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Uint, Eigen::Dynamic, Eigen::Dynamic>> &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Uint, HostSpace>::push_back_single<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Uint, Eigen::Dynamic, Eigen::Dynamic>> &);
+
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Index_t, HostSpace>::push_back<HostSpace>(const Index_t &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Index_t, HostSpace>::push_back_single<HostSpace>(const Index_t &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Index_t, HostSpace>::push_back<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
+  template std::enable_if_t<is_host_space_v<HostSpace>, void>
+  TypedField<Index_t, HostSpace>::push_back_single<HostSpace>(
+      const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
 
 }  // namespace muGrid

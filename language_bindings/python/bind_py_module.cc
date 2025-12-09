@@ -36,6 +36,27 @@
 #include "bind_py_declarations.hh"
 
 #include <pybind11/pybind11.h>
+#include <Kokkos_Core.hpp>
+
+// RAII wrapper to manage Kokkos initialization/finalization
+namespace {
+  struct KokkosManager {
+    KokkosManager() {
+      if (!Kokkos::is_initialized()) {
+        Kokkos::initialize();
+      }
+    }
+    ~KokkosManager() {
+      if (Kokkos::is_initialized()) {
+        Kokkos::finalize();
+      }
+    }
+  };
+
+  // Static instance to ensure Kokkos is initialized on module load
+  // and finalized on Python exit
+  KokkosManager kokkos_manager;
+}
 
 PYBIND11_MODULE(_muGrid, mod) {
   mod.doc() = "Python bindings to the µGrid library";
