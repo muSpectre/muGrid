@@ -44,7 +44,7 @@ import numpy as np
 from scipy.sparse import coo_array
 
 import muGrid
-from muGrid import wrap_field
+from muGrid import real_field, wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 # Try to import pypapi for hardware counter access
@@ -507,10 +507,8 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
     x, y = decomposition.coords  # Domain-local coords for each pixel
     i, j = decomposition.icoords
 
-    rhs_cpp = fc.real_field("rhs")
-    solution_cpp = fc.real_field("solution")
-    rhs = wrap_field(rhs_cpp)
-    solution = wrap_field(solution_cpp)
+    rhs = real_field(decomposition, "rhs")
+    solution = real_field(decomposition, "solution")
 
     rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
     rhs.p[...] -= np.mean(rhs.p)
@@ -542,8 +540,8 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
         comm,
         fc,
         hessp_mugrid,  # linear operator
-        rhs_cpp,
-        solution_cpp,
+        rhs._cpp,
+        solution._cpp,
         tol=1e-6,
         maxiter=1000,
         # callback=callback,
@@ -601,8 +599,8 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
         comm,
         fc,
         hessp_scipy,  # linear operator
-        rhs_cpp,
-        solution_cpp,
+        rhs._cpp,
+        solution._cpp,
         tol=1e-6,
         maxiter=1000,
         # callback=callback,

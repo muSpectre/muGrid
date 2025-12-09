@@ -39,7 +39,7 @@ import unittest
 import numpy as np
 
 import muGrid
-from muGrid import wrap_field
+from muGrid import real_field, wrap_field
 
 
 class FieldCheck(unittest.TestCase):

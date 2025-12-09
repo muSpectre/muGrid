@@ -42,7 +42,7 @@ import pytest
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
-from muGrid import wrap_field
+from muGrid import real_field, wrap_field
 
 
 class ConvolutionOperatorCheck(unittest.TestCase):
@@ -130,8 +130,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         )
 
         # A nodal field with some sequence as values
-        nodal_cpp = fc.real_field("nodal-value", nb_field_components)
-        nodal = wrap_field(nodal_cpp)
+        nodal = real_field(fc, "nodal-value", nb_field_components)
         nodal_vals = (1 + np.arange(nb_field_components * nb_x_pts * nb_y_pts)).reshape(
             nb_field_components, nb_x_pts, nb_y_pts)
         # pad to mimic a periodic boundary
@@ -139,8 +138,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         nodal.pg[...] = np.pad(nodal_vals, pad_width, "wrap")
 
         # Create a quadrature field to store the result
-        quad_cpp = fc.real_field("quad-grad", (nb_field_components, nb_operators), "quad")
-        quad = wrap_field(quad_cpp)
+        quad = real_field(fc, "quad-grad", (nb_field_components, nb_operators), "quad")
 
         # Check that quadrature field has correct shape
         assert quad.s.shape == (
@@ -153,7 +151,7 @@ class ConvolutionOperatorCheck(unittest.TestCase):
 
         # Apply the gradient operator to the `nodal` field and write result to the
         # `quad` field
-        d_op.apply(nodal_cpp, quad_cpp)
+        d_op.apply(nodal._cpp, quad._cpp)
 
         # Compute the reference value
         # Create a pack of nodal values, each with a different offset

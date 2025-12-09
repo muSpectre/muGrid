@@ -8,7 +8,7 @@ except ModuleNotFoundError:
     plt = None
 import numpy as np
 import muGrid
-from muGrid import wrap_field
+from muGrid import real_field, wrap_field  # wrap_field still needed for hessp callback
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -31,7 +31,6 @@ nb_grid_pts = [int(x) for x in args.nb_grid_pts.split(",")]
 s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
 decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
-fc = decomposition.collection
 grid_spacing = 1 / np.array(nb_grid_pts)  # Grid spacing
 
 stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])  # FD-stencil for the Laplacian
@@ -39,10 +38,9 @@ laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
 
 x, y = decomposition.coords  # Domain-local coords for each pixel
 
-rhs_cpp = fc.real_field("rhs")
-solution_cpp = fc.real_field("solution")
-rhs = wrap_field(rhs_cpp)
-solution = wrap_field(solution_cpp)
+# Create fields using the helper function - works directly with CartesianDecomposition
+rhs = real_field(decomposition, "rhs")
+solution = real_field(decomposition, "solution")
 
 rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
 rhs.p[...] -= np.mean(rhs.p)
@@ -72,10 +70,10 @@ def hessp(x_field, Ax_field):
 
 conjugate_gradients(
     comm,
-    fc,
+    decomposition.collection,
     hessp,  # linear operator
-    rhs_cpp,
-    solution_cpp,
+    rhs._cpp,  # Pass the underlying C++ field
+    solution._cpp,
     tol=1e-6,
     callback=callback,
     maxiter=1000,

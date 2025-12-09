@@ -1,17 +1,12 @@
 import numpy as np
-from muGrid import GlobalFieldCollection, wrap_field
+from muGrid import GlobalFieldCollection, real_field
 
 # Two dimensional grid
 nb_grid_pts = (11, 12, 13)
 fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"element": 5})
 
 # Get a tensor-field (for example to represent the strain)
-strain_cpp = fc.real_field(
-    "strain",  # name of the field
-    (3, 3),  # shape of components
-    "element",  # sub-point type
-)
-strain = wrap_field(strain_cpp)
+strain = real_field(fc, "strain", (3, 3), "element")
 
 # Fill the field with random numbers
 strain.s[...] = np.random.rand(*((3, 3, 5) + nb_grid_pts))

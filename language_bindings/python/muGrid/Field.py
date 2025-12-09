@@ -147,3 +147,111 @@ def wrap_field(cpp_field):
         Wrapped field with numpy array access
     """
     return Field(cpp_field)
+
+
+def real_field(collection, name, components=(), sub_pt="pixel"):
+    """
+    Create a real-valued field and return it wrapped with numpy accessors.
+
+    Parameters
+    ----------
+    collection : FieldCollection or CartesianDecomposition
+        The field collection or decomposition to create the field in.
+        If a CartesianDecomposition is passed, uses its internal collection.
+    name : str
+        Name of the field
+    components : tuple, optional
+        Shape of the field components (default: scalar field)
+    sub_pt : str, optional
+        Sub-point type (default: "pixel")
+
+    Returns
+    -------
+    Field
+        Wrapped field with .s, .sg, .p, .pg accessors
+    """
+    # Handle CartesianDecomposition by getting its collection
+    fc = getattr(collection, 'collection', collection)
+    cpp_field = fc.real_field(name, components, sub_pt)
+    return Field(cpp_field)
+
+
+def int_field(collection, name, components=(), sub_pt="pixel"):
+    """
+    Create an integer field and return it wrapped with numpy accessors.
+
+    Parameters
+    ----------
+    collection : FieldCollection or CartesianDecomposition
+        The field collection or decomposition to create the field in.
+        If a CartesianDecomposition is passed, uses its internal collection.
+    name : str
+        Name of the field
+    components : tuple, optional
+        Shape of the field components (default: scalar field)
+    sub_pt : str, optional
+        Sub-point type (default: "pixel")
+
+    Returns
+    -------
+    Field
+        Wrapped field with .s, .sg, .p, .pg accessors
+    """
+    # Handle CartesianDecomposition by getting its collection
+    fc = getattr(collection, 'collection', collection)
+    cpp_field = fc.int_field(name, components, sub_pt)
+    return Field(cpp_field)
+
+
+def uint_field(collection, name, components=(), sub_pt="pixel"):
+    """
+    Create an unsigned integer field and return it wrapped with numpy accessors.
+
+    Parameters
+    ----------
+    collection : FieldCollection or CartesianDecomposition
+        The field collection or decomposition to create the field in.
+        If a CartesianDecomposition is passed, uses its internal collection.
+    name : str
+        Name of the field
+    components : tuple, optional
+        Shape of the field components (default: scalar field)
+    sub_pt : str, optional
+        Sub-point type (default: "pixel")
+
+    Returns
+    -------
+    Field
+        Wrapped field with .s, .sg, .p, .pg accessors
+    """
+    # Handle CartesianDecomposition by getting its collection
+    fc = getattr(collection, 'collection', collection)
+    cpp_field = fc.uint_field(name, components, sub_pt)
+    return Field(cpp_field)
+
+
+def complex_field(collection, name, components=(), sub_pt="pixel"):
+    """
+    Create a complex-valued field and return it wrapped with numpy accessors.
+
+    Parameters
+    ----------
+    collection : FieldCollection or CartesianDecomposition
+        The field collection or decomposition to create the field in.
+        If a CartesianDecomposition is passed, uses its internal collection.
+    name : str
+        Name of the field
+    components : tuple, optional
+        Shape of the field components (default: scalar field)
+    sub_pt : str, optional
+        Sub-point type (default: "pixel")
+
+    Returns
+    -------
+    Field
+        Wrapped field with .s, .sg, .p, .pg accessors
+    """
+    # Handle CartesianDecomposition by getting its collection
+    fc = getattr(collection, 'collection', collection)
+    cpp_field = fc.complex_field(name, components, sub_pt)
+    return Field(cpp_field)

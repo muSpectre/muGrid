@@ -37,7 +37,7 @@ import numpy as np
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
-from muGrid import wrap_field
+from muGrid import real_field, wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 
@@ -51,15 +51,13 @@ def test_fd_stencil():
 
     nb_ghosts = (1, 1)
     fc = muGrid.GlobalFieldCollection([3, 3], nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts)
-    ifield_cpp = fc.real_field("input-field")
-    ofield_cpp = fc.real_field("output-field")
-    ifield = wrap_field(ifield_cpp)
-    ofield = wrap_field(ofield_cpp)
+    ifield = real_field(fc, "input-field")
+    ofield = real_field(fc, "output-field")
     ifield.p[...] = 1
     ifield.p[1, 1] = 2
     # Manually correct a periodic boundary
     ifield.pg[...] = np.pad(ifield.p, tuple(zip(nb_ghosts, nb_ghosts)), mode="wrap")
-    laplace.apply(ifield_cpp, ofield_cpp)
+    laplace.apply(ifield._cpp, ofield._cpp)
     np.testing.assert_allclose(ofield.p, stencil)
     np.testing.assert_allclose(np.sum(ifield.p * ofield.p), -4)
 
@@ -83,16 +81,9 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     # np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
 
     x, y = decomposition.coords  # Domain-local coords for each pixel
-    # x, y = np.meshgrid(
-    #     np.arange(nb_grid_pts[0]) / nb_grid_pts[0],
-    #     np.arange(nb_grid_pts[1]) / nb_grid_pts[1],
-    #     indexing="ij",
-    # )
 
-    rhs_cpp = fc.real_field("rhs")
-    solution_cpp = fc.real_field("solution")
-    rhs = wrap_field(rhs_cpp)
-    solution = wrap_field(solution_cpp)
+    rhs = real_field(decomposition, "rhs")
+    solution = real_field(decomposition, "solution")
 
     rhs.p[...] = np.sin(2 * np.pi * x)
 
@@ -120,8 +111,8 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         comm,
         fc,
         hessp,  # linear operator
-        rhs_cpp,
-        solution_cpp,
+        rhs._cpp,
+        solution._cpp,
         tol=1e-6,
         callback=callback,
         maxiter=10,
