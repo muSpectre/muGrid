@@ -69,7 +69,7 @@ jobs:
               libboost-test-dev \
               libnetcdf-dev
           fi
-          python3 -m pip install build pytest NuMPI[test]
+          python3 -m pip install build pytest numpy NuMPI[test]
           python3 -m pip list
 
       - name: Compile with CMake
