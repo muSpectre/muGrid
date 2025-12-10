@@ -236,6 +236,7 @@ namespace muGrid {
         } else if (IsTen) {
           return fourthOrder;
         }
+        return zerothOrder;
       }
 
     }  // namespace internal

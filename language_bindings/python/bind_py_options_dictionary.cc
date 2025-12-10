@@ -98,11 +98,9 @@ void add_options_dictionary(py::module & mod) {
             switch (retval.get_value_type()) {
             case RuntimeValue::ValueType::Int: {
               return py::int_(retval.get_int());
-              break;
             }
             case RuntimeValue::ValueType::Real: {
               return py::float_(retval.get_real());
-              break;
             }
             case RuntimeValue::ValueType::Matrix: {
               // Return an Eigen matrix - pybind11/eigen.h handles conversion to numpy
@@ -112,11 +110,9 @@ void add_options_dictionary(py::module & mod) {
             case RuntimeValue::ValueType::Dictionary: {
               throw DictionaryError(
                   "nested dictionaries are not yet supported");
-              break;
             }
             default:
               throw DictionaryError("Unknown variable type");
-              break;
             }
           },
           "key"_a)

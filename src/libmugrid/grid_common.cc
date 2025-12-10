@@ -71,7 +71,6 @@ namespace muGrid {
     }
     default:
       throw RuntimeError("unknown pixel subdivision scheme");
-      break;
     }
     return os;
   }
@@ -93,7 +92,6 @@ namespace muGrid {
     }
     default:
       throw RuntimeError("unknown storage order specification");
-      break;
     }
     return os;
   }
