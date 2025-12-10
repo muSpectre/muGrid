@@ -118,11 +118,11 @@ namespace muGrid {
     virtual const std::type_info & get_typeid() const = 0;
 
     //! return the size of the elementary field entry in bytes
-    virtual const std::size_t get_element_size_in_bytes() const = 0;
+    virtual std::size_t get_element_size_in_bytes() const = 0;
 
 #ifdef WITH_MPI
     //! return the MPI representation of the stored type
-    virtual const MPI_Datatype get_mpi_type() const = 0;
+    virtual MPI_Datatype get_mpi_type() const = 0;
 #endif
 
     /**
@@ -257,11 +257,11 @@ namespace muGrid {
 
 #ifdef WITH_MPI
     //! return the MPI representation of the stored type
-    const MPI_Datatype get_mpi_type() const final;
+    MPI_Datatype get_mpi_type() const final;
 #endif
 
     //! return the size of the elementary field entry in bytes
-    const std::size_t get_element_size_in_bytes() const final;
+    std::size_t get_element_size_in_bytes() const final;
 
     //! return a reference to the current field
     TypedField<T> & current();

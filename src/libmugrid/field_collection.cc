@@ -573,7 +573,6 @@ namespace muGrid {
         throw FieldCollectionError(err_msg.str());
       }
       return correct_stride;
-      break;
     }
     case IterUnit::Pixel: {
       constexpr size_t correct_stride{OneNode};
@@ -584,11 +583,9 @@ namespace muGrid {
         throw FieldCollectionError(err_msg.str());
       }
       return correct_stride;
-      break;
     }
     default:
       throw FieldCollectionError("Unknown Subdivision type");
-      break;
     }
   }
 

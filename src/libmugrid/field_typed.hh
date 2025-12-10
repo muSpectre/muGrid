@@ -178,11 +178,11 @@ namespace muGrid {
 
 #ifdef WITH_MPI
     //! return the MPI representation of the stored type
-    const MPI_Datatype get_mpi_type() const final { return mpi_type<T>(); }
+    MPI_Datatype get_mpi_type() const final { return mpi_type<T>(); }
 #endif
 
     //! return the size of the elementary field entry in bytes
-    const std::size_t get_element_size_in_bytes() const final {
+    std::size_t get_element_size_in_bytes() const final {
       return sizeof(T);
     }
 

@@ -230,27 +230,22 @@ void add_file_io_netcdf(py::module & mod) {
                   file_io_object.read_global_attribute(g_att_name)
                       .get_typed_value_c()};
               return py::cast(std::string(char_vec.begin(), char_vec.end()));
-              break;
             }
             case muGrid::MU_NC_INT: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_i());
-              break;
             }
             case muGrid::MU_NC_UINT: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_ui());
-              break;
             }
             case muGrid::MU_NC_INDEX_T: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_l());
-              break;
             }
             case muGrid::MU_NC_REAL: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_d());
-              break;
             }
             default:
               throw muGrid::FileIOError(

@@ -360,7 +360,7 @@ namespace muGrid {
     return (iter_type == IterUnit::Pixel ? this->get_nb_sub_pts() : 1);
   }
   /* ---------------------------------------------------------------------- */
-  const size_t & Field::get_pad_size() const { return this->pad_size; }
+  size_t Field::get_pad_size() const { return this->pad_size; }
 
   /* ---------------------------------------------------------------------- */
   bool Field::is_global() const {
@@ -368,7 +368,7 @@ namespace muGrid {
            FieldCollection::ValidityDomain::Global;
   }
 
-  const Index_t & Field::get_spatial_dim() const {
+  Index_t Field::get_spatial_dim() const {
     return this->collection.get_spatial_dim();
   }
 
@@ -381,7 +381,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  const Unit & Field::get_physical_unit() const { return this->unit; }
+  Unit Field::get_physical_unit() const { return this->unit; }
 
   /* ---------------------------------------------------------------------- */
   void Field::set_nb_sub_pts(const Index_t & nb_sub_pts_per_pixel) {

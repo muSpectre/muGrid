@@ -96,7 +96,13 @@ if(EXECINFO_LIBRARY)
 endif()
 
 # Installation
-install(TARGETS muGrid
+# Build list of targets to export (muGrid + any FetchContent dependencies)
+set(_MUGRID_INSTALL_TARGETS muGrid)
+if(MUGRID_EIGEN_FROM_FETCHCONTENT)
+    list(APPEND _MUGRID_INSTALL_TARGETS eigen)
+endif()
+
+install(TARGETS ${_MUGRID_INSTALL_TARGETS}
     EXPORT muGridTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

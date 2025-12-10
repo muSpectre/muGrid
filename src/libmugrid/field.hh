@@ -52,14 +52,12 @@ namespace muGrid {
      * base class for field-related exceptions
      */
     class FieldError : public RuntimeError {
-    public:
+       public:
         //! constructor
-        explicit FieldError(const std::string &what) : RuntimeError(what) {
-        }
+        explicit FieldError(const std::string & what) : RuntimeError(what) {}
 
         //! constructor
-        explicit FieldError(const char *what) : RuntimeError(what) {
-        }
+        explicit FieldError(const char * what) : RuntimeError(what) {}
     };
 
     //! forward-declaration
@@ -69,8 +67,8 @@ namespace muGrid {
     class StateField;
 
     /**
-     * Abstract base class for all fields. A field provides storage discretising a
-     * mathematical (scalar, vectorial, tensorial) (real-valued,
+     * Abstract base class for all fields. A field provides storage discretising
+     * a mathematical (scalar, vectorial, tensorial) (real-valued,
      * integer-valued, complex-valued) field on a fixed number of quadrature
      * points per pixel/voxel of a regular grid.
      * Fields defined on the same domains are grouped within
@@ -80,13 +78,13 @@ namespace muGrid {
      * nomenclature:
      * - `Pixels` are the grid dimensions for global fields or a single linear
      * dimension for local fields
-     * - `SubPts` specify the number of (tensor) quantities held per pixel. These
-     * could for example be quadrature points.
+     * - `SubPts` specify the number of (tensor) quantities held per pixel.
+     * These could for example be quadrature points.
      * - `Components` are the components of the physical tensor quantity
      * represented by the field.
      */
     class Field {
-    protected:
+       protected:
         /**
          * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
          * held by a FieldCollection. The `Field` constructor is protected to
@@ -96,9 +94,9 @@ namespace muGrid {
          * @param nb_components number of components to store per sub-point
          * @param collection reference to the holding field collection.
          */
-        Field(const std::string &unique_name, FieldCollection &collection,
-              const Index_t &nb_components, const std::string &sub_div_tag,
-              const Unit &unit);
+        Field(const std::string & unique_name, FieldCollection & collection,
+              const Index_t & nb_components, const std::string & sub_div_tag,
+              const Unit & unit);
 
         /**
          * `Field`s are supposed to only exist in the form of `std::unique_ptr`s
@@ -110,40 +108,40 @@ namespace muGrid {
          * point
          * @param storage_oder in-memory storage order of the components
          */
-        Field(const std::string &unique_name, FieldCollection &collection,
-              const Shape_t &components_shape, const std::string &sub_div_tag,
-              const Unit &unit);
+        Field(const std::string & unique_name, FieldCollection & collection,
+              const Shape_t & components_shape, const std::string & sub_div_tag,
+              const Unit & unit);
 
-    public:
+       public:
         //! Default constructor
         Field() = delete;
 
         //! Copy constructor
-        Field(const Field &other) = delete;
+        Field(const Field & other) = delete;
 
         //! Move constructor
-        Field(Field &&other) = default;
+        Field(Field && other) = default;
 
         //! Destructor
         virtual ~Field() = default;
 
         //! Copy assignment operator
-        Field &operator=(const Field &other) = delete;
+        Field & operator=(const Field & other) = delete;
 
         //! Move assignment operator
-        Field &operator=(Field &&other) = delete;
+        Field & operator=(Field && other) = delete;
 
         //! return the field's unique name
-        const std::string &get_name() const;
+        const std::string & get_name() const;
 
         //! return a const reference to the field's collection
-        FieldCollection &get_collection() const;
+        FieldCollection & get_collection() const;
 
         //! return the number of components stored per sub-point point
-        const Index_t &get_nb_components() const;
+        const Index_t & get_nb_components() const;
 
         //! return the number of sub points per pixel
-        const Index_t &get_nb_sub_pts() const;
+        const Index_t & get_nb_sub_pts() const;
 
         //! return the number of components stored per pixel
         Index_t get_nb_dof_per_pixel() const;
@@ -155,30 +153,33 @@ namespace muGrid {
         Index_t get_nb_pixels_without_ghosts() const;
 
         /**
-         * return the number of pixels that are required for the buffer. This can
-         * be larger than get_nb_pixels if the buffer contains padding regions.
+         * return the number of pixels that are required for the buffer. This
+         * can be larger than get_nb_pixels if the buffer contains padding
+         * regions.
          */
         Index_t get_nb_buffer_pixels() const;
 
         /**
          * returns the number of entries held by this field. This corresponds to
-         * nb_pixels × nb_sub_pts, (I.e., a scalar field and a vector field sharing
-         * the the same collection and subdivision tag have the same number of
-         * entries, even though the vector field has more scalar values.)
+         * nb_pixels × nb_sub_pts, (I.e., a scalar field and a vector field
+         * sharing the the same collection and subdivision tag have the same
+         * number of entries, even though the vector field has more scalar
+         * values.)
          */
         Index_t get_nb_entries() const;
 
         /**
          * returns the number of entries held by the buffer of this field. This
-         * corresponds to nb_buffer_pixels × nb_sub_pts, (I.e., a scalar field and
-         * a vector field sharing the the same collection have the same number of
-         * entries, even though the vector field has more scalar values.)
+         * corresponds to nb_buffer_pixels × nb_sub_pts, (I.e., a scalar field
+         * and a vector field sharing the the same collection have the same
+         * number of entries, even though the vector field has more scalar
+         * values.)
          */
         Index_t get_nb_buffer_entries() const;
 
         /**
-         * evaluate and return the shape of the data contained in a single sub-point
-         * (e.g. quadrature point) (for passing the field to generic
+         * evaluate and return the shape of the data contained in a single
+         * sub-point (e.g. quadrature point) (for passing the field to generic
          * multidimensional array objects such as numpy.ndarray)
          */
         Shape_t get_components_shape() const;
@@ -187,33 +188,33 @@ namespace muGrid {
          * Reshape the components part of the field. The total number of degrees
          * of freedom per pixel must remain the same.
          */
-        void reshape(const Shape_t &components_shape);
+        void reshape(const Shape_t & components_shape);
 
         /**
-         * Reshape component and sub-point parts of the field. The total number of
-         * degrees of freedom per pixel must remain the same.
+         * Reshape component and sub-point parts of the field. The total number
+         * of degrees of freedom per pixel must remain the same.
          */
-        void reshape(const Shape_t &components_shape,
-                     const std::string &sub_div_tag);
+        void reshape(const Shape_t & components_shape,
+                     const std::string & sub_div_tag);
 
         /**
          * evaluate and return the shape of the data contained in a single pixel
-         * (for passing the field to generic multidimensional array objects such as
-         * numpy.ndarray)
+         * (for passing the field to generic multidimensional array objects such
+         * as numpy.ndarray)
          */
-        Shape_t get_sub_pt_shape(const IterUnit &iter_type) const;
+        Shape_t get_sub_pt_shape(const IterUnit & iter_type) const;
 
         /**
-         * evaluate and return the overall shape of the pixels portion of the field
-         * (for passing the field to generic multidimensional array objects such as
-         * numpy.ndarray)
+         * evaluate and return the overall shape of the pixels portion of the
+         * field (for passing the field to generic multidimensional array
+         * objects such as numpy.ndarray)
          */
         Shape_t get_pixels_shape() const;
 
         /**
-         * evaluate and return the overall shape of the pixels portion of the field
-         * without any potential ghost buffers (for passing the field to generic
-         * multidimensional array objects such as numpy.ndarray)
+         * evaluate and return the overall shape of the pixels portion of the
+         * field without any potential ghost buffers (for passing the field to
+         * generic multidimensional array objects such as numpy.ndarray)
          */
         Shape_t get_pixels_shape_without_ghosts() const;
 
@@ -224,32 +225,33 @@ namespace muGrid {
         Shape_t get_pixels_offset_without_ghosts() const;
 
         /**
-          * evaluate and return the overall shape of the field (for passing the
-          * field to generic multidimensional array objects such as numpy.ndarray)
-          */
-        Shape_t get_shape(const IterUnit &iter_type) const;
-
-        /**
-          * evaluate and return the overall shape of the field without any
-          * potential ghost buffers (for passing the field to generic
-          * multidimensional array objects such as numpy.ndarray)
-          */
-        Shape_t get_shape_without_ghosts(const IterUnit &iter_type) const;
-
-        /**
-          * evaluate and return the overall offset of the field without any
-          * potential ghost buffers (for passing the field to generic
-          * multidimensional array objects such as numpy.ndarray)
-          */
-        Shape_t get_offsets_without_ghosts(const IterUnit &iter_type) const;
-
-        /**
-         * evaluate and return the overall strides field (for passing the field to
-         * generic multidimensional array objects such as numpy.ndarray). The
-         * multiplier can be used e.g., if strides are needed in bytes, rather than
-         * in pointer offsets.
+         * evaluate and return the overall shape of the field (for passing the
+         * field to generic multidimensional array objects such as
+         * numpy.ndarray)
          */
-        virtual Shape_t get_strides(const IterUnit &iter_type,
+        Shape_t get_shape(const IterUnit & iter_type) const;
+
+        /**
+         * evaluate and return the overall shape of the field without any
+         * potential ghost buffers (for passing the field to generic
+         * multidimensional array objects such as numpy.ndarray)
+         */
+        Shape_t get_shape_without_ghosts(const IterUnit & iter_type) const;
+
+        /**
+         * evaluate and return the overall offset of the field without any
+         * potential ghost buffers (for passing the field to generic
+         * multidimensional array objects such as numpy.ndarray)
+         */
+        Shape_t get_offsets_without_ghosts(const IterUnit & iter_type) const;
+
+        /**
+         * evaluate and return the overall strides field (for passing the field
+         * to generic multidimensional array objects such as numpy.ndarray). The
+         * multiplier can be used e.g., if strides are needed in bytes, rather
+         * than in pointer offsets.
+         */
+        virtual Shape_t get_strides(const IterUnit & iter_type,
                                     Index_t element_size = 1) const;
 
         /**
@@ -258,57 +260,59 @@ namespace muGrid {
         virtual StorageOrder get_storage_order() const;
 
         /**
-         * evaluate and return the number of components in an iterate when iterating
-         * over this field
+         * evaluate and return the number of components in an iterate when
+         * iterating over this field
          */
-        Index_t get_stride(const IterUnit &iter_type) const;
+        Index_t get_stride(const IterUnit & iter_type) const;
 
         //! check whether two fields have the same memory layout
-        bool has_same_memory_layout(const Field &other) const;
+        bool has_same_memory_layout(const Field & other) const;
 
         /**
          * evaluate and return the number of rows of a default iterate over this
-         * field. Warning, this function does no sanity checks at all. It is assumed
-         * that the user called `get_stride` before, that all checks have been
-         * performed there, and that rechecking would be a waste of time)
+         * field. Warning, this function does no sanity checks at all. It is
+         * assumed that the user called `get_stride` before, that all checks
+         * have been performed there, and that rechecking would be a waste of
+         * time)
          */
-        Index_t get_default_nb_rows(const IterUnit &iter_type) const;
+        Index_t get_default_nb_rows(const IterUnit & iter_type) const;
 
         /**
          * evaluate and return the number of cols of a default iterate over this
-         * field. Warning, this function does no sanity checks at all. It is assumed
-         * that the user called `get_stride` before, that all checks have been
-         * performed there, and that rechecking would be a waste of time)
+         * field. Warning, this function does no sanity checks at all. It is
+         * assumed that the user called `get_stride` before, that all checks
+         * have been performed there, and that rechecking would be a waste of
+         * time)
          */
-        Index_t get_default_nb_cols(const IterUnit &iter_type) const;
+        Index_t get_default_nb_cols(const IterUnit & iter_type) const;
 
         /**
          * return the type information of the stored scalar (for compatibility
          * checking)
          */
-        virtual const std::type_info &get_typeid() const = 0;
+        virtual const std::type_info & get_typeid() const = 0;
 
 #ifdef WITH_MPI
         /**
          * return the MPI representation of the stored type
          */
-        virtual const MPI_Datatype get_mpi_type() const = 0;
+        virtual MPI_Datatype get_mpi_type() const = 0;
 #endif
 
         /**
          * return the size of the elementary field entry in bytes
          */
-        virtual const std::size_t get_element_size_in_bytes() const = 0;
+        virtual std::size_t get_element_size_in_bytes() const = 0;
 
         /**
          * assert that the stored type corresponds to the given type id
          */
-        void assert_typeid(const std::type_info &type) const;
+        void assert_typeid(const std::type_info & type) const;
 
         /**
          * return a pointer to the raw data
          **/
-        virtual void *get_void_data_ptr() const = 0;
+        virtual void * get_void_data_ptr() const = 0;
 
         //! number of entries in the field (= nb_pixel × nb_sub_pts)
         Index_t get_current_nb_entries() const;
@@ -317,13 +321,13 @@ namespace muGrid {
         virtual size_t get_buffer_size() const = 0;
 
         /**
-         * add a pad region to the end of the field buffer; required for using this
-         * as e.g. an FFT workspace
+         * add a pad region to the end of the field buffer; required for using
+         * this as e.g. an FFT workspace
          */
-        virtual void set_pad_size(const size_t &pad_size_) = 0;
+        virtual void set_pad_size(const size_t & pad_size_) = 0;
 
         //! pad region size
-        const size_t &get_pad_size() const;
+        size_t get_pad_size() const;
 
         /**
          * initialise field to zero (do more complicated initialisations through
@@ -339,16 +343,16 @@ namespace muGrid {
         /**
          * return the spatial dimension of the underlying discretisation grid
          */
-        const Index_t &get_spatial_dim() const;
+        Index_t get_spatial_dim() const;
 
         //! check wether the number of pixel sub-divisions has been set
         bool has_nb_sub_pts() const;
 
         //! returns a const ref to the field's pixel sub-division type
-        const std::string &get_sub_division_tag() const;
+        const std::string & get_sub_division_tag() const;
 
         //! returns the physical unit of the values stored in the field
-        const Unit &get_physical_unit() const;
+        Unit get_physical_unit() const;
 
         /**
          * Check if field resides on device (GPU) memory.
@@ -374,12 +378,12 @@ namespace muGrid {
          */
         virtual std::string get_device_string() const = 0;
 
-    protected:
+       protected:
         //! gives field collections the ability to resize() fields
         friend FieldCollection;
 
         //! sets the number of sub points per pixel
-        void set_nb_sub_pts(const Index_t &nb_quad_pts_per_pixel);
+        void set_nb_sub_pts(const Index_t & nb_quad_pts_per_pixel);
 
         /**
          * evaluate and return the strides of the sub-point portion of the field
@@ -390,16 +394,16 @@ namespace muGrid {
 
         /**
          * evaluate and return the strides of the pixels
-         * portion of the field (for passing the field to generic multidimensional
-         * array objects such as numpy.ndarray)
+         * portion of the field (for passing the field to generic
+         * multidimensional array objects such as numpy.ndarray)
          */
-        Shape_t get_sub_pt_strides(const IterUnit &iter_type,
+        Shape_t get_sub_pt_strides(const IterUnit & iter_type,
                                    Index_t element_size = 1) const;
 
         /**
          * evaluate and return the overall strides of the pixels portion of the
-         * field (for passing the field to generic multidimensional array objects
-         * such as numpy.ndarray)
+         * field (for passing the field to generic multidimensional array
+         * objects such as numpy.ndarray)
          */
         Shape_t get_pixels_strides(Index_t element_size = 1) const;
 
@@ -412,10 +416,10 @@ namespace muGrid {
         //! resizes the field to the given size
         virtual void resize() = 0;
 
-        const std::string name; //!< the field's unique name
+        const std::string name;  //!< the field's unique name
 
         //! reference to the collection this field belongs to
-        FieldCollection &collection;
+        FieldCollection & collection;
 
         /**
          * number of components stored per sub-point (e.g., 3 for a
@@ -449,6 +453,6 @@ namespace muGrid {
         //! Physical unit of the values stored in this field
         Unit unit;
     };
-} // namespace muGrid
+}  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_FIELD_HH_

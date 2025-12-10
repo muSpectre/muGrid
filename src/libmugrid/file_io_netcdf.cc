@@ -1274,7 +1274,6 @@ namespace muGrid {
     }
     throw FileIOError("The dimension with name '" + dim_name + "' and size '" +
                       std::to_string(dim_size) + "' was not found.");
-    return *(this->dim_vector.end());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1287,7 +1286,6 @@ namespace muGrid {
     }
     throw FileIOError("The dimension with name '" + dim_name +
                       "' was not found.");
-    return *(this->dim_vector.end());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1751,7 +1749,6 @@ namespace muGrid {
     throw FileIOError("The global attribute with name '" + global_att_name +
                       "' was not found. Maybe you forgot to register "
                       "the corresponding NetCDFGlobalAtt?");
-    return *global_att_vector.back();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1777,7 +1774,6 @@ namespace muGrid {
     throw FileIOError("The global attribute with name '" + global_att_name +
                       "' was not found. Maybe you forgot to register "
                       "the corresponding NetCDFGlobalAtt?");
-    return global_att_vector.back();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -3115,7 +3111,6 @@ namespace muGrid {
     throw FileIOError("The variable with name '" + var_name +
                       "' was not found. Maybe you forgot to register "
                       "the corresponding FieldCollection?");
-    return *var_vector.back();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -3128,7 +3123,6 @@ namespace muGrid {
     throw FileIOError("The variable with name '" + var_name +
                       "' was not found. Maybe you forgot to register "
                       "the corresponding FieldCollection?");
-    return *var_vector.back();
   }
 
 }  // namespace muGrid

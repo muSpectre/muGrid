@@ -53,19 +53,15 @@ namespace muGrid {
       switch (dir) {
       case 0: {
         return del_x;
-        break;
       }
       case 1: {
         return del_y;
-        break;
       }
       case 2: {
         return del_z;
-        break;
       }
       default:
         throw std::runtime_error("unknown dimension");
-        break;
       }
     }
   };
