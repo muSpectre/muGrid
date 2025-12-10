@@ -250,8 +250,10 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(apply_constant_field, Fix,
                                    ConvolutionFixtures, Fix) {
     // For a constant field, the gradient should be zero
-    auto & nodal = Fix::collection.register_real_field("nodal", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad", Fix::Dim, "quad"));
 
     // Set constant value everywhere (including ghosts)
     nodal.eigen_vec().setConstant(42.0);
@@ -268,8 +270,10 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(apply_linear_field, Fix, ConvolutionFixtures,
                                    Fix) {
     // For a linear field, the gradient should be constant
-    auto & nodal = Fix::collection.register_real_field("nodal_linear", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_linear", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_linear", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_linear", Fix::Dim, "quad"));
 
     // Fill with linear function: f(x,y) = ax + by (+ cz for 3D)
     const Real a = 1.5, b = 2.3, c = 3.1;
@@ -309,10 +313,14 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(transpose_adjoint_property, Fix,
                                    ConvolutionFixtures, Fix) {
     // Test that <Bu, v> = <u, B^T v> for random u, v
-    auto & u = Fix::collection.register_real_field("u", 1, PixelTag);
-    auto & v = Fix::collection.register_real_field("v", Fix::Dim, "quad");
-    auto & Bu = Fix::collection.register_real_field("Bu", Fix::Dim, "quad");
-    auto & BTv = Fix::collection.register_real_field("BTv", 1, PixelTag);
+    auto & u = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("u", 1, PixelTag));
+    auto & v = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("v", Fix::Dim, "quad"));
+    auto & Bu = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("Bu", Fix::Dim, "quad"));
+    auto & BTv = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("BTv", 1, PixelTag));
 
     // Initialize with random values
     std::mt19937 gen(42);
@@ -343,9 +351,12 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(apply_increment_test, Fix,
                                    ConvolutionFixtures, Fix) {
-    auto & nodal = Fix::collection.register_real_field("nodal_inc", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_inc", Fix::Dim, "quad");
-    auto & quad_ref = Fix::collection.register_real_field("quad_ref", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_inc", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_inc", Fix::Dim, "quad"));
+    auto & quad_ref = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_ref", Fix::Dim, "quad"));
 
     // Set random values
     std::mt19937 gen(123);
@@ -380,9 +391,12 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(transpose_increment_test, Fix,
                                    ConvolutionFixtures, Fix) {
-    auto & nodal = Fix::collection.register_real_field("nodal_tinc", 1, PixelTag);
-    auto & nodal_ref = Fix::collection.register_real_field("nodal_ref", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_tinc", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_tinc", 1, PixelTag));
+    auto & nodal_ref = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_ref", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_tinc", Fix::Dim, "quad"));
 
     // Set random values
     std::mt19937 gen(456);
@@ -411,9 +425,12 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(cache_consistency, Fix, ConvolutionFixtures,
                                    Fix) {
-    auto & nodal = Fix::collection.register_real_field("nodal_cache", 1, PixelTag);
-    auto & quad1 = Fix::collection.register_real_field("quad_cache1", Fix::Dim, "quad");
-    auto & quad2 = Fix::collection.register_real_field("quad_cache2", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_cache", 1, PixelTag));
+    auto & quad1 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_cache1", Fix::Dim, "quad"));
+    auto & quad2 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_cache2", Fix::Dim, "quad"));
 
     // Set random values
     std::mt19937 gen(789);
@@ -446,9 +463,11 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(multi_component_field, Fix,
                                    ConvolutionFixtures, Fix) {
     const Index_t nb_components = 3;
-    auto & nodal = Fix::collection.register_real_field("nodal_multi", nb_components, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_multi",
-                                                       nb_components * Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_multi", nb_components, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_multi",
+                                            nb_components * Fix::Dim, "quad"));
 
     // Set random values
     std::mt19937 gen(999);
@@ -461,9 +480,11 @@ namespace muGrid {
     Fix::op.apply(nodal, quad);
 
     // Check adjoint property
-    auto & nodal2 = Fix::collection.register_real_field("nodal_multi2", nb_components, PixelTag);
-    auto & quad2 = Fix::collection.register_real_field("quad_multi2",
-                                                        nb_components * Fix::Dim, "quad");
+    auto & nodal2 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_multi2", nb_components, PixelTag));
+    auto & quad2 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_multi2",
+                                            nb_components * Fix::Dim, "quad"));
     for (Index_t i = 0; i < quad2.eigen_vec().size(); ++i) {
       quad2.eigen_vec()(i) = dist(gen);
     }
@@ -505,8 +526,10 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(grid_traversal_params, Fix,
                                    ConvolutionFixtures, Fix) {
-    auto & nodal = Fix::collection.register_real_field("nodal_params", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_params", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_params", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_params", Fix::Dim, "quad"));
 
     // Just verify apply works (internally tests compute_traversal_params)
     nodal.eigen_vec().setRandom();
@@ -585,8 +608,10 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(large_grid_apply, Fix, LargeConvolutionFixtures,
                                    Fix) {
-    auto & nodal = Fix::collection.register_real_field("nodal_large", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_large", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_large", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_large", Fix::Dim, "quad"));
 
     // Set random values
     std::mt19937 gen(12345);
@@ -607,8 +632,10 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(large_grid_transpose, Fix,
                                    LargeConvolutionFixtures, Fix) {
-    auto & nodal = Fix::collection.register_real_field("nodal_large_t", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_large_t", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_large_t", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_large_t", Fix::Dim, "quad"));
 
     // Set random values in quad field
     std::mt19937 gen(54321);
@@ -665,9 +692,12 @@ namespace muGrid {
                                    ConvolutionFixtures, Fix) {
     // This test verifies that CPU apply produces consistent results
     // (GPU kernel tests would require access to private methods)
-    auto & nodal = Fix::collection.register_real_field("nodal_gpu", 1, PixelTag);
-    auto & quad1 = Fix::collection.register_real_field("quad_gpu1", Fix::Dim, "quad");
-    auto & quad2 = Fix::collection.register_real_field("quad_gpu2", Fix::Dim, "quad");
+    auto & nodal = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_gpu", 1, PixelTag));
+    auto & quad1 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_gpu1", Fix::Dim, "quad"));
+    auto & quad2 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_gpu2", Fix::Dim, "quad"));
 
     // Set random values
     std::mt19937 gen(11111);
@@ -688,9 +718,12 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(device_transpose_consistency, Fix,
                                    ConvolutionFixtures, Fix) {
     // Verify transpose produces consistent results
-    auto & nodal1 = Fix::collection.register_real_field("nodal_gpu_t1", 1, PixelTag);
-    auto & nodal2 = Fix::collection.register_real_field("nodal_gpu_t2", 1, PixelTag);
-    auto & quad = Fix::collection.register_real_field("quad_gpu_t", Fix::Dim, "quad");
+    auto & nodal1 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_gpu_t1", 1, PixelTag));
+    auto & nodal2 = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("nodal_gpu_t2", 1, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        Fix::collection.register_real_field("quad_gpu_t", Fix::Dim, "quad"));
 
     // Set random values in quad field
     std::mt19937 gen(22222);

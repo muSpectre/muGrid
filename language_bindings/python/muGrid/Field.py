@@ -7,7 +7,7 @@
 
 @date   09 Dec 2024
 
-@brief  Python wrapper for muGrid fields with numpy array views
+@brief  Python wrapper for muGrid fields with numpy/cupy array views
 
 Copyright © 2024 Lars Pastewka
 
@@ -36,21 +36,40 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 
+# CuPy is optional - only imported when GPU fields are used
+_cupy = None
+
+
+def _get_cupy():
+    """Lazy import of CuPy for GPU array support."""
+    global _cupy
+    if _cupy is None:
+        try:
+            import cupy
+            _cupy = cupy
+        except ImportError:
+            raise ImportError(
+                "CuPy is required for GPU field access. "
+                "Install it with: pip install cupy-cuda12x (or appropriate CUDA version)"
+            )
+    return _cupy
+
 
 class Field:
     """
-    Python wrapper for muGrid fields providing numpy array views.
+    Python wrapper for muGrid fields providing numpy/cupy array views.
 
     This class wraps a C++ muGrid field and provides the following properties
-    for accessing the underlying data as numpy arrays:
+    for accessing the underlying data as arrays:
 
     - `s`: SubPt layout, excluding ghost regions
     - `sg`: SubPt layout, including ghost regions
     - `p`: Pixel layout, excluding ghost regions
     - `pg`: Pixel layout, including ghost regions
 
-    The arrays are views into the underlying C++ data, so modifications
-    to the arrays will modify the field data directly (zero-copy).
+    For CPU fields, the arrays are numpy arrays. For GPU fields (CUDA),
+    the arrays are CuPy arrays. Both are views into the underlying C++ data,
+    so modifications to the arrays will modify the field data directly (zero-copy).
     """
 
     def __init__(self, cpp_field):
@@ -65,10 +84,24 @@ class Field:
         self._cpp = cpp_field
         self._buffer = None
 
+    @property
+    def is_on_gpu(self):
+        """Check if this field resides on GPU memory."""
+        return self._cpp.is_on_gpu
+
+    @property
+    def device(self):
+        """Get the device where this field resides ('cpu' or 'cuda:N')."""
+        return self._cpp.device
+
     def _get_buffer(self):
         """Lazy-load the full buffer via DLPack."""
         if self._buffer is None:
-            self._buffer = np.from_dlpack(self._cpp)
+            if self.is_on_gpu:
+                cp = _get_cupy()
+                self._buffer = cp.from_dlpack(self._cpp)
+            else:
+                self._buffer = np.from_dlpack(self._cpp)
         return self._buffer
 
     def _make_slice(self, offsets, shape):
@@ -151,7 +184,10 @@ def wrap_field(cpp_field):
 
 def real_field(collection, name, components=(), sub_pt="pixel"):
     """
-    Create a real-valued field and return it wrapped with numpy accessors.
+    Create a real-valued field and return it wrapped with array accessors.
+
+    The field is allocated in the collection's memory space (Host or Device).
+    To create GPU fields, create the collection with memory_location=Device.
 
     Parameters
     ----------
@@ -168,7 +204,8 @@ def real_field(collection, name, components=(), sub_pt="pixel"):
     Returns
     -------
     Field
-        Wrapped field with .s, .sg, .p, .pg accessors
+        Wrapped field with .s, .sg, .p, .pg accessors.
+        Returns numpy arrays for host fields, CuPy arrays for device fields.
     """
     # Handle CartesianDecomposition by getting its collection
     fc = getattr(collection, 'collection', collection)
@@ -178,7 +215,10 @@ def real_field(collection, name, components=(), sub_pt="pixel"):
 
 def int_field(collection, name, components=(), sub_pt="pixel"):
     """
-    Create an integer field and return it wrapped with numpy accessors.
+    Create an integer field and return it wrapped with array accessors.
+
+    The field is allocated in the collection's memory space (Host or Device).
+    To create GPU fields, create the collection with memory_location=Device.
 
     Parameters
     ----------
@@ -195,7 +235,8 @@ def int_field(collection, name, components=(), sub_pt="pixel"):
     Returns
     -------
     Field
-        Wrapped field with .s, .sg, .p, .pg accessors
+        Wrapped field with .s, .sg, .p, .pg accessors.
+        Returns numpy arrays for host fields, CuPy arrays for device fields.
     """
     # Handle CartesianDecomposition by getting its collection
     fc = getattr(collection, 'collection', collection)
@@ -205,7 +246,10 @@ def int_field(collection, name, components=(), sub_pt="pixel"):
 
 def uint_field(collection, name, components=(), sub_pt="pixel"):
     """
-    Create an unsigned integer field and return it wrapped with numpy accessors.
+    Create an unsigned integer field and return it wrapped with array accessors.
+
+    The field is allocated in the collection's memory space (Host or Device).
+    To create GPU fields, create the collection with memory_location=Device.
 
     Parameters
     ----------
@@ -222,7 +266,8 @@ def uint_field(collection, name, components=(), sub_pt="pixel"):
     Returns
     -------
     Field
-        Wrapped field with .s, .sg, .p, .pg accessors
+        Wrapped field with .s, .sg, .p, .pg accessors.
+        Returns numpy arrays for host fields, CuPy arrays for device fields.
     """
     # Handle CartesianDecomposition by getting its collection
     fc = getattr(collection, 'collection', collection)
@@ -232,7 +277,10 @@ def uint_field(collection, name, components=(), sub_pt="pixel"):
 
 def complex_field(collection, name, components=(), sub_pt="pixel"):
     """
-    Create a complex-valued field and return it wrapped with numpy accessors.
+    Create a complex-valued field and return it wrapped with array accessors.
+
+    The field is allocated in the collection's memory space (Host or Device).
+    To create GPU fields, create the collection with memory_location=Device.
 
     Parameters
     ----------
@@ -249,7 +297,8 @@ def complex_field(collection, name, components=(), sub_pt="pixel"):
     Returns
     -------
     Field
-        Wrapped field with .s, .sg, .p, .pg accessors
+        Wrapped field with .s, .sg, .p, .pg accessors.
+        Returns numpy arrays for host fields, CuPy arrays for device fields.
     """
     # Handle CartesianDecomposition by getting its collection
     fc = getattr(collection, 'collection', collection)

@@ -107,6 +107,9 @@ namespace muGrid {
         //! domain of validity of the managed fields
         enum class ValidityDomain { Global, Local };
 
+        //! memory location for all fields in this collection
+        enum class MemoryLocation { Host, Device };
+
         class IndexIterable;
         //! convenience alias
         class PixelIndexIterable;
@@ -136,7 +139,8 @@ namespace muGrid {
         FieldCollection(
             ValidityDomain domain, const Index_t &spatial_dimension,
             const SubPtMap_t &nb_sub_pts,
-            StorageOrder storage_order = StorageOrder::ArrayOfStructures);
+            StorageOrder storage_order = StorageOrder::ArrayOfStructures,
+            MemoryLocation memory_location = MemoryLocation::Host);
 
     public:
         //! Default constructor
@@ -168,7 +172,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          */
         template<typename T>
-        TypedField<T> &
+        Field &
         register_field(const std::string &unique_name,
                        const Index_t &nb_components,
                        const std::string &sub_division_tag = PixelTag,
@@ -191,7 +195,7 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         template<typename T>
-        TypedField<T> &
+        Field &
         register_field(const std::string &unique_name,
                        const Shape_t &components_shape,
                        const std::string &sub_division_tag = PixelTag,
@@ -220,7 +224,7 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         template<typename T>
-        std::unique_ptr<TypedField<T>, FieldDestructor<Field> >
+        Field_ptr
         detached_field(const std::string &unique_name,
                        const Shape_t &components_shape,
                        const std::string &sub_division_tag = PixelTag,
@@ -237,7 +241,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Real> &
+        Field &
         register_real_field(const std::string &unique_name,
                             const Index_t &nb_components,
                             const std::string &sub_division_tag = PixelTag,
@@ -253,7 +257,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Real> &
+        Field &
         register_real_field(const std::string &unique_name,
                             const Shape_t &components_shape,
                             const std::string &sub_division_tag = PixelTag,
@@ -270,7 +274,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Complex> &
+        Field &
         register_complex_field(const std::string &unique_name,
                                const Index_t &nb_components,
                                const std::string &sub_division_tag = PixelTag,
@@ -286,7 +290,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Complex> &
+        Field &
         register_complex_field(const std::string &unique_name,
                                const Shape_t &components_shape,
                                const std::string &sub_division_tag = PixelTag,
@@ -303,7 +307,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Int> &
+        Field &
         register_int_field(const std::string &unique_name,
                            const Index_t &nb_components,
                            const std::string &sub_division_tag = PixelTag,
@@ -319,7 +323,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Int> &
+        Field &
         register_int_field(const std::string &unique_name,
                            const Shape_t &components_shape,
                            const std::string &sub_division_tag = PixelTag,
@@ -336,7 +340,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Uint> &
+        Field &
         register_uint_field(const std::string &unique_name,
                             const Index_t &nb_components,
                             const std::string &sub_division_tag = PixelTag,
@@ -352,7 +356,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Uint> &
+        Field &
         register_uint_field(const std::string &unique_name,
                             const Shape_t &components_shape,
                             const std::string &sub_division_tag = PixelTag,
@@ -455,10 +459,10 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         template<typename T>
-        TypedField<T> &field(const std::string &unique_name,
-                             const Shape_t &components_shape,
-                             const std::string &sub_division_tag = PixelTag,
-                             const Unit &unit = Unit::unitless()) {
+        Field &field(const std::string &unique_name,
+                     const Shape_t &components_shape,
+                     const std::string &sub_division_tag = PixelTag,
+                     const Unit &unit = Unit::unitless()) {
             static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                           "You can only register fields templated with one of the "
                           "numeric types Real, Complex, Int, or Uint");
@@ -477,7 +481,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Real> &
+        Field &
         real_field(const std::string &unique_name, const Index_t &nb_components,
                    const std::string &sub_division_tag = PixelTag,
                    const Unit &unit = Unit::unitless());
@@ -492,7 +496,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Real> &
+        Field &
         real_field(const std::string &unique_name,
                    const Shape_t &components_shape,
                    const std::string &sub_division_tag = PixelTag,
@@ -509,7 +513,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Complex> &
+        Field &
         complex_field(const std::string &unique_name,
                       const Index_t &nb_components,
                       const std::string &sub_division_tag = PixelTag,
@@ -525,7 +529,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Complex> &
+        Field &
         complex_field(const std::string &unique_name,
                       const Shape_t &components_shape,
                       const std::string &sub_division_tag = PixelTag,
@@ -542,10 +546,10 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Int> &int_field(const std::string &unique_name,
-                                   const Index_t &nb_components,
-                                   const std::string &sub_division_tag = PixelTag,
-                                   const Unit &unit = Unit::unitless());
+        Field &int_field(const std::string &unique_name,
+                         const Index_t &nb_components,
+                         const std::string &sub_division_tag = PixelTag,
+                         const Unit &unit = Unit::unitless());
 
         /**
          * place a new field in the responsibility of this collection (Note, because
@@ -557,10 +561,10 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Int> &int_field(const std::string &unique_name,
-                                   const Shape_t &components_shape,
-                                   const std::string &sub_division_tag = PixelTag,
-                                   const Unit &unit = Unit::unitless());
+        Field &int_field(const std::string &unique_name,
+                         const Shape_t &components_shape,
+                         const std::string &sub_division_tag = PixelTag,
+                         const Unit &unit = Unit::unitless());
 
         /**
          * place a new unsigned integer-valued field  in the responsibility of this
@@ -573,7 +577,7 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        TypedField<Uint> &
+        Field &
         uint_field(const std::string &unique_name, const Index_t &nb_components,
                    const std::string &sub_division_tag = PixelTag,
                    const Unit &unit = Unit::unitless());
@@ -588,7 +592,7 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        TypedField<Uint> &
+        Field &
         uint_field(const std::string &unique_name,
                    const Shape_t &components_shape,
                    const std::string &sub_division_tag = PixelTag,
@@ -748,6 +752,12 @@ namespace muGrid {
         //! return the storage order of the pixels vs. subpoints
         const StorageOrder &get_storage_order() const;
 
+        //! return the memory location (host or device) of all fields
+        const MemoryLocation &get_memory_location() const;
+
+        //! check if fields in this collection are on a GPU device
+        bool is_on_device() const;
+
         //! check whether two field collections have the same memory layout
         bool has_same_memory_layout(const FieldCollection &other) const;
 
@@ -836,18 +846,26 @@ namespace muGrid {
          */
         std::string generate_unique_name() const;
 
-        //! internal worker function called by register_<T>_field
+        /**
+         * Internal worker function called by register_<T>_field.
+         * Creates a field in the collection's memory space (host or device).
+         * Returns Field& to allow runtime polymorphism.
+         */
         template<typename T>
-        TypedField<T, HostSpace> &register_field_helper(
+        Field &register_field_helper(
             const std::string &unique_name,
             const Index_t &nb_components,
             const std::string &sub_division_tag,
             const Unit &unit,
             bool allow_existing = false);
 
-        //! internal worker function called by register_<T>_field
+        /**
+         * Internal worker function called by register_<T>_field.
+         * Creates a field in the collection's memory space (host or device).
+         * Returns Field& to allow runtime polymorphism.
+         */
         template<typename T>
-        TypedField<T, HostSpace> &register_field_helper(
+        Field &register_field_helper(
             const std::string &unique_name,
             const Shape_t &components_shape,
             const std::string &sub_division_tag,
@@ -896,6 +914,9 @@ namespace muGrid {
 
         //! storage oder
         StorageOrder storage_order;
+
+        //! memory location (host or device) for all fields in this collection
+        MemoryLocation memory_location;
 
         //! keeps track of whether the collection has already been initialised
         bool initialised{false};
@@ -1088,21 +1109,14 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     template<typename T>
-    std::unique_ptr<TypedField<T>, FieldDestructor<Field> >
+    FieldCollection::Field_ptr
     FieldCollection::detached_field(const std::string &unique_name,
                                     const Shape_t &components_shape,
                                     const std::string &sub_division_tag,
                                     const Unit &unit) {
         this->register_field<T>(unique_name, components_shape, sub_division_tag,
                                 unit);
-        auto field_ptr{this->pop_field(unique_name)};
-        // static_cast is safe here, as the type is correct by construction
-        auto *raw_ptr{static_cast<TypedField<T> *>(field_ptr.get())};
-        std::unique_ptr<TypedField<T>, FieldDestructor<Field> > return_ptr{
-            raw_ptr, std::move(field_ptr.get_deleter())
-        };
-        field_ptr.release();
-        return return_ptr;
+        return this->pop_field(unique_name);
     }
 
     /* ---------------------------------------------------------------------- */

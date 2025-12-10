@@ -320,6 +320,52 @@ namespace muGrid {
     template <typename OtherSpace>
     void deep_copy_from(const TypedFieldBase<T, OtherSpace> & src);
 
+    /**
+     * Check if field resides on device (GPU) memory.
+     * Implementation uses compile-time type trait.
+     */
+    bool is_on_device() const final {
+      return is_device_space_v<MemorySpace>;
+    }
+
+    /**
+     * Get DLPack device type for this field's memory space.
+     */
+    int get_dlpack_device_type() const final {
+      return dlpack_device_type_v<MemorySpace>;
+    }
+
+    /**
+     * Get device ID for multi-GPU systems.
+     * Currently returns 0 as multi-GPU is not yet supported.
+     */
+    int get_device_id() const final {
+      return 0;  // TODO: Support multi-GPU
+    }
+
+    /**
+     * Get device string for Python interoperability.
+     * Returns "cpu", "cuda:N", or "rocm:N" where N is the device ID.
+     */
+    std::string get_device_string() const final {
+      std::string base{device_name<MemorySpace>()};
+      if constexpr (is_device_space_v<MemorySpace>) {
+        return base + ":" + std::to_string(this->get_device_id());
+      } else {
+        return base;
+      }
+    }
+
+    /**
+     * Get the raw data pointer in any memory space.
+     * This is used for DLPack interoperability where we need access
+     * to the pointer regardless of memory space.
+     */
+    void * get_data_ptr_any_space() const {
+      return const_cast<void *>(
+          static_cast<const void *>(this->values.data()));
+    }
+
    protected:
     //! Kokkos View storage for the raw field data
     View_t values{};
@@ -503,8 +549,32 @@ namespace muGrid {
   using IntField = TypedField<Int, HostSpace>;
   //! Alias for unsigned integer-valued host fields
   using UintField = TypedField<Uint, HostSpace>;
-  //! Alias for unsigned integer-valued host fields
+  //! Alias for index-valued host fields
   using IndexField = TypedField<Index_t, HostSpace>;
+
+  //! Alias for real-valued device fields (CUDA/HIP)
+  using RealFieldDevice = TypedField<Real, DefaultDeviceSpace>;
+  //! Alias for complex-valued device fields
+  using ComplexFieldDevice = TypedField<Complex, DefaultDeviceSpace>;
+  //! Alias for integer-valued device fields
+  using IntFieldDevice = TypedField<Int, DefaultDeviceSpace>;
+  //! Alias for unsigned integer-valued device fields
+  using UintFieldDevice = TypedField<Uint, DefaultDeviceSpace>;
+  //! Alias for index-valued device fields
+  using IndexFieldDevice = TypedField<Index_t, DefaultDeviceSpace>;
+
+  //! Alias for real-valued fields with configurable memory space
+  template <typename MemorySpace = HostSpace>
+  using RealFieldT = TypedField<Real, MemorySpace>;
+  //! Alias for complex-valued fields with configurable memory space
+  template <typename MemorySpace = HostSpace>
+  using ComplexFieldT = TypedField<Complex, MemorySpace>;
+  //! Alias for integer-valued fields with configurable memory space
+  template <typename MemorySpace = HostSpace>
+  using IntFieldT = TypedField<Int, MemorySpace>;
+  //! Alias for unsigned integer-valued fields with configurable memory space
+  template <typename MemorySpace = HostSpace>
+  using UintFieldT = TypedField<Uint, MemorySpace>;
 
   /**
    * Free function for deep copying between fields in different memory spaces.
@@ -520,7 +590,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedField<T, HostSpace> & FieldCollection::register_field_helper(
+  Field & FieldCollection::register_field_helper(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit,
       bool allow_existing) {
@@ -550,7 +620,7 @@ namespace muGrid {
               "You can't change the physical unit of a field "
               "by re-registering it.");
         }
-        return static_cast<TypedField<T, HostSpace> &>(field);
+        return field;
       } else {
         std::stringstream error{};
         error << "A Field of name '" << unique_name
@@ -568,9 +638,15 @@ namespace muGrid {
     //! If you get a compiler warning about narrowing conversion on the
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T, HostSpace> * raw_ptr{new TypedField<T, HostSpace>{
-        unique_name, *this, nb_components, sub_division_tag, unit}};
-    TypedField<T, HostSpace> & retref{*raw_ptr};
+    Field * raw_ptr{nullptr};
+    if (this->memory_location == MemoryLocation::Device) {
+      raw_ptr = new TypedField<T, DefaultDeviceSpace>{
+          unique_name, *this, nb_components, sub_division_tag, unit};
+    } else {
+      raw_ptr = new TypedField<T, HostSpace>{
+          unique_name, *this, nb_components, sub_division_tag, unit};
+    }
+    Field & retref{*raw_ptr};
     Field_ptr field{raw_ptr};
     if (this->initialised) {
       retref.resize();
@@ -581,7 +657,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  TypedField<T, HostSpace> & FieldCollection::register_field_helper(
+  Field & FieldCollection::register_field_helper(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit,
       bool allow_existing) {
@@ -606,7 +682,7 @@ namespace muGrid {
               "You can't change the physical unit of a field "
               "by re-registering it.");
         }
-        return static_cast<TypedField<T, HostSpace> &>(field);
+        return field;
       } else {
         std::stringstream error{};
         error << "A Field of name '" << unique_name
@@ -624,9 +700,15 @@ namespace muGrid {
     //! If you get a compiler warning about narrowing conversion on the
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
-    TypedField<T, HostSpace> * raw_ptr{new TypedField<T, HostSpace>{
-        unique_name, *this, components_shape, sub_division_tag, unit}};
-    TypedField<T, HostSpace> & retref{*raw_ptr};
+    Field * raw_ptr{nullptr};
+    if (this->memory_location == MemoryLocation::Device) {
+      raw_ptr = new TypedField<T, DefaultDeviceSpace>{
+          unique_name, *this, components_shape, sub_division_tag, unit};
+    } else {
+      raw_ptr = new TypedField<T, HostSpace>{
+          unique_name, *this, components_shape, sub_division_tag, unit};
+    }
+    Field & retref{*raw_ptr};
     Field_ptr field{raw_ptr};
     if (this->initialised) {
       retref.resize();

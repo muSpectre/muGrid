@@ -73,13 +73,13 @@ endif()
 include(FetchContent)
 
 # Find or fetch Eigen3
-find_package(Eigen3 3.4.0 QUIET)
+find_package(Eigen3 5.0.0 QUIET)
 if(NOT Eigen3_FOUND)
     message(STATUS "Eigen3 not found, fetching from GitLab...")
     FetchContent_Declare(
         eigen
         GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-        GIT_TAG 3.4.0
+        GIT_TAG 5.0.1
         GIT_SHALLOW TRUE
     )
     # Disable Eigen's tests and examples to avoid polluting our test suite

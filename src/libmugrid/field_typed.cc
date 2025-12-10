@@ -47,8 +47,9 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, typename MemorySpace>
   void * TypedFieldBase<T, MemorySpace>::get_void_data_ptr() const {
-    static_assert(is_host_space_v<MemorySpace>,
-                  "get_void_data_ptr only available for host-space fields");
+    if constexpr (!is_host_space_v<MemorySpace>) {
+      throw FieldError("get_void_data_ptr only available for host-space fields");
+    }
     return static_cast<void *>(const_cast<T *>(this->values.data()));
   }
 
@@ -339,9 +340,11 @@ namespace muGrid {
         field_exists
             ? this->safe_cast(this->get_collection().get_field(new_name),
                               this->nb_components, this->sub_division_tag)
-            : this->get_collection().template register_field<T>(
-                  new_name, this->nb_components, this->sub_division_tag,
-                  this->unit)};
+            : this->safe_cast(
+                  this->get_collection().template register_field<T>(
+                      new_name, this->nb_components, this->sub_division_tag,
+                      this->unit),
+                  this->nb_components, this->sub_division_tag)};
 
     Kokkos::deep_copy(other.view(), this->view());
     return other;
@@ -403,9 +406,11 @@ namespace muGrid {
   TypedFieldBase<T, MemorySpace> &
   TypedFieldBase<T, MemorySpace>::operator=(const Negative & other) {
     // This requires host access for Eigen operations
-    static_assert(is_host_space_v<MemorySpace>,
-                  "Negative assignment only available for host-space fields");
-    this->eigen_vec() = -other.field.eigen_vec();
+    if constexpr (!is_host_space_v<MemorySpace>) {
+      throw FieldError("Negative assignment only available for host-space fields");
+    } else {
+      this->eigen_vec() = -other.field.eigen_vec();
+    }
     return *this;
   }
 
@@ -413,9 +418,11 @@ namespace muGrid {
   template <typename T, typename MemorySpace>
   TypedFieldBase<T, MemorySpace> &
   TypedFieldBase<T, MemorySpace>::operator=(const EigenRep_t & other) {
-    static_assert(is_host_space_v<MemorySpace>,
-                  "Eigen assignment only available for host-space fields");
-    this->eigen_vec() = other;
+    if constexpr (!is_host_space_v<MemorySpace>) {
+      throw FieldError("Eigen assignment only available for host-space fields");
+    } else {
+      this->eigen_vec() = other;
+    }
     return *this;
   }
 
@@ -429,9 +436,11 @@ namespace muGrid {
   template <typename T, typename MemorySpace>
   TypedFieldBase<T, MemorySpace> &
   TypedFieldBase<T, MemorySpace>::operator+=(const TypedFieldBase & other) {
-    static_assert(is_host_space_v<MemorySpace>,
-                  "+= only available for host-space fields");
-    this->eigen_vec() += other.eigen_vec();
+    if constexpr (!is_host_space_v<MemorySpace>) {
+      throw FieldError("+= only available for host-space fields");
+    } else {
+      this->eigen_vec() += other.eigen_vec();
+    }
     return *this;
   }
 
@@ -439,9 +448,11 @@ namespace muGrid {
   template <typename T, typename MemorySpace>
   TypedFieldBase<T, MemorySpace> &
   TypedFieldBase<T, MemorySpace>::operator-=(const TypedFieldBase & other) {
-    static_assert(is_host_space_v<MemorySpace>,
-                  "-= only available for host-space fields");
-    this->eigen_vec() -= other.eigen_vec();
+    if constexpr (!is_host_space_v<MemorySpace>) {
+      throw FieldError("-= only available for host-space fields");
+    } else {
+      this->eigen_vec() -= other.eigen_vec();
+    }
     return *this;
   }
 
@@ -843,5 +854,46 @@ namespace muGrid {
   template std::enable_if_t<is_host_space_v<HostSpace>, void>
   TypedField<Index_t, HostSpace>::push_back_single<HostSpace>(
       const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
+
+  // Device-space explicit template instantiations (for CUDA/HIP builds)
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+  // Base class instantiations for device space
+  template class TypedFieldBase<Real, DefaultDeviceSpace>;
+  template class TypedFieldBase<Complex, DefaultDeviceSpace>;
+  template class TypedFieldBase<Int, DefaultDeviceSpace>;
+  template class TypedFieldBase<Uint, DefaultDeviceSpace>;
+  template class TypedFieldBase<Index_t, DefaultDeviceSpace>;
+
+  // Derived class instantiations for device space
+  template class TypedField<Real, DefaultDeviceSpace>;
+  template class TypedField<Complex, DefaultDeviceSpace>;
+  template class TypedField<Int, DefaultDeviceSpace>;
+  template class TypedField<Uint, DefaultDeviceSpace>;
+  template class TypedField<Index_t, DefaultDeviceSpace>;
+
+  // Cross-space deep_copy_from instantiations (host -> device)
+  template void TypedFieldBase<Real, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Real, HostSpace> &);
+  template void TypedFieldBase<Complex, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Complex, HostSpace> &);
+  template void TypedFieldBase<Int, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Int, HostSpace> &);
+  template void TypedFieldBase<Uint, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Uint, HostSpace> &);
+  template void TypedFieldBase<Index_t, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Index_t, HostSpace> &);
+
+  // Cross-space deep_copy_from instantiations (device -> host)
+  template void TypedFieldBase<Real, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Real, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Complex, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Complex, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Int, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Int, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Uint, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Uint, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Index_t, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Index_t, DefaultDeviceSpace> &);
+#endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
 
 }  // namespace muGrid

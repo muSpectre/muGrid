@@ -81,7 +81,8 @@ namespace muGrid {
     auto & collection{cart_decomp.get_collection()};
     const Index_t nb_components{1};
     const std::string field_name{"test_field"};
-    auto & field{collection.real_field(field_name, nb_components)};
+    auto & field{dynamic_cast<TypedFieldBase<Real, HostSpace> &>(
+        collection.real_field(field_name, nb_components))};
 
     // Fill the field with some values
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
@@ -190,7 +191,8 @@ namespace muGrid {
     auto & collection{cart_decomp.get_collection()};
     const Index_t nb_components{1};
     const std::string field_name{"multi_step_test_field"};
-    auto & field{collection.real_field(field_name, nb_components)};
+    auto & field{dynamic_cast<TypedFieldBase<Real, HostSpace> &>(
+        collection.real_field(field_name, nb_components))};
 
     // Fill the field with reference values
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
@@ -296,7 +298,8 @@ namespace muGrid {
     auto & collection{cart_decomp.get_collection()};
     const Index_t nb_components{1};
     const std::string field_name{"zero_grid_points_field"};
-    auto & field{collection.real_field(field_name, nb_components)};
+    auto & field{dynamic_cast<TypedFieldBase<Real, HostSpace> &>(
+        collection.real_field(field_name, nb_components))};
 
     // Fill the field
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};

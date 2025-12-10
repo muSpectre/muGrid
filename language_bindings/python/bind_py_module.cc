@@ -63,10 +63,10 @@ PYBIND11_MODULE(_muGrid, mod) {
 
   add_common_mugrid(mod);
   add_communicator(mod);
-  add_decomposition_classes(mod);
   add_field_classes(mod);
   add_state_field_classes(mod);
   add_field_collection_classes(mod);
+  add_decomposition_classes(mod);  // Must come after field_collection for MemoryLocation enum
   add_convolution_operator_classes(mod);
   add_options_dictionary(mod);
 #ifdef WITH_NETCDF_IO

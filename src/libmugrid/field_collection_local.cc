@@ -38,16 +38,20 @@
 namespace muGrid {
     /* ---------------------------------------------------------------------- */
     LocalFieldCollection::LocalFieldCollection(const Index_t &spatial_dimension,
-                                               const SubPtMap_t &nb_sub_pts)
-        : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts},
+                                               const SubPtMap_t &nb_sub_pts,
+                                               MemoryLocation memory_location)
+        : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts,
+                 StorageOrder::ArrayOfStructures, memory_location},
           name{std::string{"LocalFieldCollectionName"}} {
     }
 
     /* ---------------------------------------------------------------------- */
     LocalFieldCollection::LocalFieldCollection(const Index_t &spatial_dimension,
                                                const std::string &name,
-                                               const SubPtMap_t &nb_sub_pts)
-        : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts},
+                                               const SubPtMap_t &nb_sub_pts,
+                                               MemoryLocation memory_location)
+        : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts,
+                 StorageOrder::ArrayOfStructures, memory_location},
           name{name} {
     }
 
@@ -80,7 +84,7 @@ namespace muGrid {
         const std::string &new_name) const {
         LocalFieldCollection ret_val{
             this->get_spatial_dim(), new_name,
-            this->nb_sub_pts
+            this->nb_sub_pts, this->get_memory_location()
         };
         for (const auto &pixel_id: this->get_pixel_indices()) {
             ret_val.add_pixel(pixel_id);

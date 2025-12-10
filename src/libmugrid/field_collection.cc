@@ -55,14 +55,26 @@ namespace muGrid {
   FieldCollection::FieldCollection(ValidityDomain domain,
                                    const Index_t & spatial_dimension,
                                    const SubPtMap_t & nb_sub_pts,
-                                   StorageOrder storage_order)
+                                   StorageOrder storage_order,
+                                   MemoryLocation memory_location)
       : domain{domain}, spatial_dim{spatial_dimension}, nb_sub_pts{nb_sub_pts},
-        storage_order{storage_order} {
+        storage_order{storage_order}, memory_location{memory_location} {
     this->set_nb_sub_pts(PixelTag, 1);
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Real> & FieldCollection::register_real_field(
+  const FieldCollection::MemoryLocation &
+  FieldCollection::get_memory_location() const {
+    return this->memory_location;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool FieldCollection::is_on_device() const {
+    return this->memory_location == MemoryLocation::Device;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  Field & FieldCollection::register_real_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Real>(unique_name, nb_components,
@@ -70,7 +82,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Real> & FieldCollection::register_real_field(
+  Field & FieldCollection::register_real_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Real>(unique_name, components_shape,
@@ -78,7 +90,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Complex> & FieldCollection::register_complex_field(
+  Field & FieldCollection::register_complex_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Complex>(unique_name, nb_components,
@@ -86,7 +98,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Complex> & FieldCollection::register_complex_field(
+  Field & FieldCollection::register_complex_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Complex>(unique_name, components_shape,
@@ -94,7 +106,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Int> & FieldCollection::register_int_field(
+  Field & FieldCollection::register_int_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Int>(unique_name, nb_components,
@@ -102,7 +114,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Int> & FieldCollection::register_int_field(
+  Field & FieldCollection::register_int_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Int>(unique_name, components_shape,
@@ -110,7 +122,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Uint> & FieldCollection::register_uint_field(
+  Field & FieldCollection::register_uint_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Uint>(unique_name, nb_components,
@@ -118,7 +130,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Uint> & FieldCollection::register_uint_field(
+  Field & FieldCollection::register_uint_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Uint>(unique_name, components_shape,
@@ -162,7 +174,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Real> & FieldCollection::real_field(
+  Field & FieldCollection::real_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Real>(unique_name, nb_components,
@@ -170,7 +182,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Real> & FieldCollection::real_field(
+  Field & FieldCollection::real_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Real>(unique_name, components_shape,
@@ -178,7 +190,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Complex> & FieldCollection::complex_field(
+  Field & FieldCollection::complex_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Complex>(unique_name, nb_components,
@@ -186,7 +198,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Complex> & FieldCollection::complex_field(
+  Field & FieldCollection::complex_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Complex>(unique_name, components_shape,
@@ -194,7 +206,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Int> & FieldCollection::int_field(
+  Field & FieldCollection::int_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Int>(unique_name, nb_components,
@@ -202,7 +214,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Int> & FieldCollection::int_field(
+  Field & FieldCollection::int_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Int>(unique_name, components_shape,
@@ -210,7 +222,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Uint> & FieldCollection::uint_field(
+  Field & FieldCollection::uint_field(
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Uint>(unique_name, nb_components,
@@ -218,7 +230,7 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  TypedField<Uint> & FieldCollection::uint_field(
+  Field & FieldCollection::uint_field(
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit) {
     return this->register_field_helper<Uint>(unique_name, components_shape,
@@ -485,45 +497,45 @@ namespace muGrid {
    * implicitly instantiated when the register_<T>field(...) member functions
    * are compiled.
    */
-  template TypedField<Real> &
+  template Field &
   FieldCollection::register_field<Real>(const std::string &, const Index_t &,
                                         const std::string &, const Unit &);
 
-  template TypedField<Complex> &
+  template Field &
   FieldCollection::register_field<Complex>(const std::string &, const Index_t &,
                                            const std::string &, const Unit &);
 
-  template TypedField<Int> &
+  template Field &
   FieldCollection::register_field<Int>(const std::string &, const Index_t &,
                                        const std::string &, const Unit &);
 
-  template TypedField<Uint> &
+  template Field &
   FieldCollection::register_field<Uint>(const std::string &, const Index_t &,
                                         const std::string &, const Unit &);
 
-  template TypedField<Index_t> &
+  template Field &
   FieldCollection::register_field<Index_t>(const std::string &, const Index_t &,
                                            const std::string &, const Unit &);
 
-  template std::unique_ptr<TypedField<Real>, FieldDestructor<Field>>
-  FieldCollection::detached_field(const std::string &, const Shape_t &,
-                                  const std::string &, const Unit &);
+  template FieldCollection::Field_ptr
+  FieldCollection::detached_field<Real>(const std::string &, const Shape_t &,
+                                        const std::string &, const Unit &);
 
-  template std::unique_ptr<TypedField<Complex>, FieldDestructor<Field>>
-  FieldCollection::detached_field(const std::string &, const Shape_t &,
-                                  const std::string &, const Unit &);
+  template FieldCollection::Field_ptr
+  FieldCollection::detached_field<Complex>(const std::string &, const Shape_t &,
+                                           const std::string &, const Unit &);
 
-  template std::unique_ptr<TypedField<Int>, FieldDestructor<Field>>
-  FieldCollection::detached_field(const std::string &, const Shape_t &,
-                                  const std::string &, const Unit &);
+  template FieldCollection::Field_ptr
+  FieldCollection::detached_field<Int>(const std::string &, const Shape_t &,
+                                       const std::string &, const Unit &);
 
-  template std::unique_ptr<TypedField<Index_t>, FieldDestructor<Field>>
-  FieldCollection::detached_field(const std::string &, const Shape_t &,
-                                  const std::string &, const Unit &);
+  template FieldCollection::Field_ptr
+  FieldCollection::detached_field<Index_t>(const std::string &, const Shape_t &,
+                                           const std::string &, const Unit &);
 
-  template std::unique_ptr<TypedField<Uint>, FieldDestructor<Field>>
-  FieldCollection::detached_field(const std::string &, const Shape_t &,
-                                  const std::string &, const Unit &);
+  template FieldCollection::Field_ptr
+  FieldCollection::detached_field<Uint>(const std::string &, const Shape_t &,
+                                        const std::string &, const Unit &);
 
   /* ---------------------------------------------------------------------- */
   FieldCollection::PixelIndexIterable::PixelIndexIterable(

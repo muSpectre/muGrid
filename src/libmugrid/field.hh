@@ -350,6 +350,30 @@ namespace muGrid {
         //! returns the physical unit of the values stored in the field
         const Unit &get_physical_unit() const;
 
+        /**
+         * Check if field resides on device (GPU) memory.
+         * Returns true for CUDA and ROCm/HIP device memory spaces.
+         */
+        virtual bool is_on_device() const = 0;
+
+        /**
+         * Get DLPack device type for this field's memory space.
+         * Returns kDLCPU=1, kDLCUDA=2, kDLROCm=10, etc.
+         */
+        virtual int get_dlpack_device_type() const = 0;
+
+        /**
+         * Get device ID for multi-GPU systems.
+         * Returns 0 for single-GPU or CPU systems.
+         */
+        virtual int get_device_id() const = 0;
+
+        /**
+         * Get device string for Python interoperability.
+         * Returns "cpu", "cuda:N", or "rocm:N" where N is the device ID.
+         */
+        virtual std::string get_device_string() const = 0;
+
     protected:
         //! gives field collections the ability to resize() fields
         friend FieldCollection;

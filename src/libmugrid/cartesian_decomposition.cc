@@ -13,15 +13,19 @@
 namespace muGrid {
     CartesianDecomposition::CartesianDecomposition(
         const Communicator & comm, Index_t spatial_dimension,
-        const SubPtMap_t & nb_sub_pts)
-        : Parent_t{}, comm{comm}, collection(spatial_dimension, nb_sub_pts) {}
+        const SubPtMap_t & nb_sub_pts, MemoryLocation memory_location)
+        : Parent_t{}, comm{comm},
+          collection(spatial_dimension, nb_sub_pts,
+                     StorageOrder::ArrayOfStructures, memory_location) {}
 
     CartesianDecomposition::CartesianDecomposition(
         const Communicator & comm, const IntCoord_t & nb_domain_grid_pts,
         const IntCoord_t & nb_subdivisions, const IntCoord_t & nb_ghosts_left,
-        const IntCoord_t & nb_ghosts_right, const SubPtMap_t & nb_sub_pts)
+        const IntCoord_t & nb_ghosts_right, const SubPtMap_t & nb_sub_pts,
+        MemoryLocation memory_location)
         : Parent_t{}, comm{comm},
-          collection(nb_domain_grid_pts.size(), nb_sub_pts) {
+          collection(nb_domain_grid_pts.size(), nb_sub_pts,
+                     StorageOrder::ArrayOfStructures, memory_location) {
         this->initialise(nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left,
                          nb_ghosts_right);
     }

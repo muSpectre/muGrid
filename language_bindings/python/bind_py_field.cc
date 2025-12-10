@@ -148,10 +148,11 @@ DLDataType get_dlpack_dtype<std::complex<double>>() {
 }
 
 /**
- * Create a DLPack capsule for a typed field using the versioned protocol
+ * Create a DLPack capsule for a typed field using the versioned protocol.
+ * This version works for host-space fields only (uses field.data()).
  */
-template<typename T>
-py::capsule create_dlpack_capsule(TypedFieldBase<T>& field) {
+template<typename T, typename MemorySpace = muGrid::HostSpace>
+py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
     auto& coll = field.get_collection();
     if (!coll.is_initialised()) {
         throw RuntimeError("Field collection isn't initialised yet");
@@ -181,8 +182,16 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T>& field) {
 
     // Fill in tensor info
     auto& tensor = managed->dl_tensor;
-    tensor.data = field.data();
-    tensor.device = DLDevice{kDLCPU, 0};
+
+    // Get data pointer - use the virtual method that works for any memory space
+    tensor.data = field.get_data_ptr_any_space();
+
+    // Set device based on field's memory space using virtual methods
+    tensor.device = DLDevice{
+        static_cast<DLDeviceType>(field.get_dlpack_device_type()),
+        field.get_device_id()
+    };
+
     tensor.ndim = static_cast<int32_t>(shape.size());
     tensor.dtype = get_dlpack_dtype<T>();
     tensor.shape = ctx->shape.data();
@@ -268,16 +277,14 @@ void add_field(py::module &mod) {
             // Device introspection for GPU-aware interop
             .def_property_readonly(
                 "device",
-                [](const Field &) {
-                    // All fields are currently host-space only
-                    return std::string("cpu");
+                [](const Field &field) {
+                    return field.get_device_string();
                 },
                 "Returns the device where the field data resides ('cpu' or 'cuda:N' or 'rocm:N')")
             .def_property_readonly(
                 "is_on_gpu",
-                [](const Field &) {
-                    // All fields are currently host-space only
-                    return false;
+                [](const Field &field) {
+                    return field.is_on_device();
                 },
                 "Returns True if the field data resides on a GPU");
 }
@@ -310,10 +317,12 @@ void add_typed_field(py::module &mod, std::string name) {
                 "Export field data via DLPack for zero-copy interop with NumPy, PyTorch, JAX, CuPy, etc.")
             .def(
                 "__dlpack_device__",
-                [](TypedFieldBase<T> &) {
-                    // Return (device_type, device_id)
-                    // kDLCPU = 1, device_id = 0 for host memory
-                    return py::make_tuple(1, 0);
+                [](TypedFieldBase<T> &self) {
+                    // Return (device_type, device_id) using field's actual device info
+                    return py::make_tuple(
+                        self.get_dlpack_device_type(),
+                        self.get_device_id()
+                    );
                 },
                 "Return DLPack device tuple (device_type, device_id)");
 

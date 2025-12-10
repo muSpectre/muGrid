@@ -78,17 +78,21 @@ namespace muGrid {
   struct FieldMapFixture : public CollectionFixture {
     using type = T;
     FieldMapFixture()
-        : CollectionFixture{}, scalar_field{this->fc.template register_field<T>(
-                                   "scalar_field", 1,
-                                   this->sub_division_tag())},
-          vector_field{this->fc.template register_field<T>(
-              "vector_field", BaseFixture::Dim, this->sub_division_tag())},
-          matrix_field{this->fc.template register_field<T>(
-              "matrix_field", BaseFixture::Dim * BaseFixture::Dim,
-              this->sub_division_tag())},
-          T4_field{this->fc.template register_field<T>(
-              "tensor4_field", ipow(BaseFixture::Dim, 4),
-              this->sub_division_tag())},
+        : CollectionFixture{},
+          scalar_field{dynamic_cast<TypedField<T> &>(
+              this->fc.template register_field<T>(
+                  "scalar_field", 1, this->sub_division_tag()))},
+          vector_field{dynamic_cast<TypedField<T> &>(
+              this->fc.template register_field<T>(
+                  "vector_field", BaseFixture::Dim, this->sub_division_tag()))},
+          matrix_field{dynamic_cast<TypedField<T> &>(
+              this->fc.template register_field<T>(
+                  "matrix_field", BaseFixture::Dim * BaseFixture::Dim,
+                  this->sub_division_tag()))},
+          T4_field{dynamic_cast<TypedField<T> &>(
+              this->fc.template register_field<T>(
+                  "tensor4_field", ipow(BaseFixture::Dim, 4),
+                  this->sub_division_tag()))},
           scalar_quad{scalar_field, IterUnit::SubPt},
           scalar_pixel{scalar_field, IterUnit::Pixel},
           vector_quad{vector_field, IterUnit::SubPt},
@@ -114,10 +118,12 @@ namespace muGrid {
     constexpr static Dim_t NbComponent{2};
     SubDivisionFixture()
         : GlobalFieldCollectionFixture{},
-          pixel_field{this->fc.register_real_field("pixel_field", NbComponent,
-                                                   PixelTag)},
-          quad_pt_field{this->fc.register_real_field(
-              "quad_pt_field", NbComponent, sub_division_tag())},
+          pixel_field{dynamic_cast<RealField &>(
+              this->fc.register_real_field("pixel_field", NbComponent,
+                                           PixelTag))},
+          quad_pt_field{dynamic_cast<RealField &>(
+              this->fc.register_real_field(
+                  "quad_pt_field", NbComponent, sub_division_tag()))},
           pixel_map{pixel_field}, quad_pt_map{quad_pt_field},
           pixel_quad_pt_map{quad_pt_field, IterUnit::Pixel} {};
 

@@ -25,6 +25,7 @@ if(Boost_FOUND)
         test_convolution_operator.cc
         test_discrete_gradient_operator.cc
         test_field.cc
+        test_field_gpu.cc
         test_field_collection.cc
         test_field_map.cc
         test_goodies.cc
@@ -52,6 +53,9 @@ if(Boost_FOUND)
         Boost::unit_test_framework
         Kokkos::kokkos
     )
+    if(MUGRID_WITH_NETCDF)
+        target_link_libraries(mugrid_main_test_suite PRIVATE ${MUGRID_NETCDF_LIBRARIES})
+    endif()
     target_include_directories(mugrid_main_test_suite PRIVATE
         ${CMAKE_SOURCE_DIR}/src/libmugrid
         ${CMAKE_SOURCE_DIR}/src
@@ -81,6 +85,9 @@ if(Boost_FOUND)
         Boost::unit_test_framework
         Kokkos::kokkos
     )
+    if(MUGRID_WITH_NETCDF)
+        target_link_libraries(mpi_mugrid_main_test_suite PRIVATE ${MUGRID_NETCDF_LIBRARIES})
+    endif()
     target_include_directories(mpi_mugrid_main_test_suite PRIVATE
         ${CMAKE_SOURCE_DIR}/src/libmugrid
         ${CMAKE_SOURCE_DIR}/src

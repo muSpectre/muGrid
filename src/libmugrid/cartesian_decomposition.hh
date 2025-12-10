@@ -12,23 +12,37 @@ namespace muGrid {
        public:
         using Parent_t = Decomposition;
         using SubPtMap_t = FieldCollection::SubPtMap_t;
+        using MemoryLocation = FieldCollection::MemoryLocation;
 
         /*
          * Constructor with deferred initialization
+         * @param comm communicator
+         * @param spatial_dimension spatial dimension of the problem
+         * @param nb_sub_pts number of sub-points per pixel
+         * @param memory_location where to allocate field memory (Host or Device)
          */
         CartesianDecomposition(const Communicator & comm,
                                Index_t spatial_dimension,
-                               const SubPtMap_t & nb_sub_pts = {});
+                               const SubPtMap_t & nb_sub_pts = {},
+                               MemoryLocation memory_location = MemoryLocation::Host);
 
         /*
          * Constructor with immediate initialization
+         * @param comm communicator
+         * @param nb_domain_grid_pts number of grid points in the whole domain
+         * @param nb_subdivisions number of subdivisions in each direction
+         * @param nb_ghosts_left number of ghost cells on the left side
+         * @param nb_ghosts_right number of ghost cells on the right side
+         * @param nb_sub_pts number of sub-points per pixel
+         * @param memory_location where to allocate field memory (Host or Device)
          */
         CartesianDecomposition(const Communicator & comm,
                                const IntCoord_t & nb_domain_grid_pts,
                                const IntCoord_t & nb_subdivisions,
                                const IntCoord_t & nb_ghosts_left,
                                const IntCoord_t & nb_ghosts_right,
-                               const SubPtMap_t & nb_sub_pts = {});
+                               const SubPtMap_t & nb_sub_pts = {},
+                               MemoryLocation memory_location = MemoryLocation::Host);
 
         CartesianDecomposition() = delete;
 
@@ -92,6 +106,16 @@ namespace muGrid {
         //! get the number of ghost cells on the right side
         const IntCoord_t & get_nb_ghosts_right() const {
             return this->collection.get_nb_ghosts_right();
+        }
+
+        //! check if fields in this decomposition are on device (GPU) memory
+        bool is_on_device() const {
+            return this->collection.is_on_device();
+        }
+
+        //! get the memory location of the field collection
+        MemoryLocation get_memory_location() const {
+            return this->collection.get_memory_location();
         }
 
        protected:

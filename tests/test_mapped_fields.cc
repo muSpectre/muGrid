@@ -170,14 +170,14 @@ namespace muGrid {
     FieldFixture()
         : tensor_field{"TensorField", this->fc, subdivision_tag()},
           matrix_field{"MatrixField", this->fc, subdivision_tag()},
-          dynamic_field1{this->fc.register_real_field(
+          dynamic_field1{dynamic_cast<DField_t &>(this->fc.register_real_field(
               "Dynamically sized field with correct number of"
               " components",
-              NbComponents, subdivision_tag())},
-          dynamic_field2{this->fc.register_real_field(
+              NbComponents, subdivision_tag()))},
+          dynamic_field2{dynamic_cast<DField_t &>(this->fc.register_real_field(
               "Dynamically sized field with incorrect number"
               " of components",
-              NbComponents + 1, subdivision_tag())} {
+              NbComponents + 1, subdivision_tag()))} {
       fc.set_nb_sub_pts(subdivision_tag(), OneQuadPt);
     }
     ~FieldFixture() = default;

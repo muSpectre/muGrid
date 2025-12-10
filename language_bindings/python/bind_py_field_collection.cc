@@ -68,7 +68,7 @@ void add_field_collection(py::module & mod) {
             "register_real_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_real_field(
                     unique_name, nb_components, sub_division, unit);
             },
@@ -81,7 +81,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_real_field(
                     unique_name, components_shape, sub_division, unit);
             },
@@ -93,7 +93,7 @@ void add_field_collection(py::module & mod) {
             "register_complex_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_complex_field(
                     unique_name, nb_components, sub_division, unit);
             },
@@ -106,7 +106,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_complex_field(
                     unique_name, components_shape, sub_division, unit);
             },
@@ -118,7 +118,7 @@ void add_field_collection(py::module & mod) {
             "register_uint_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_uint_field(
                     unique_name, nb_components, sub_division, unit);
             },
@@ -131,7 +131,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_uint_field(
                     unique_name, components_shape, sub_division, unit);
             },
@@ -143,7 +143,7 @@ void add_field_collection(py::module & mod) {
             "register_int_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_int_field(unique_name, nb_components,
                                                      sub_division, unit);
             },
@@ -156,7 +156,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
+               const muGrid::Unit & unit) -> muGrid::Field & {
                 return collection.register_int_field(
                     unique_name, components_shape, sub_division, unit);
             },
@@ -225,8 +225,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
-                return collection.real_field(unique_name, nb_components,
-                                             sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Real> &>(
+                    collection.real_field(unique_name, nb_components,
+                                          sub_division, unit));
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -238,8 +239,9 @@ void add_field_collection(py::module & mod) {
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
-                return collection.real_field(unique_name, components_shape,
-                                             sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Real> &>(
+                    collection.real_field(unique_name, components_shape,
+                                          sub_division, unit));
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -250,8 +252,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
-                return collection.complex_field(unique_name, nb_components,
-                                                sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Complex> &>(
+                    collection.complex_field(unique_name, nb_components,
+                                             sub_division, unit));
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -263,8 +266,9 @@ void add_field_collection(py::module & mod) {
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
-                return collection.complex_field(unique_name, components_shape,
-                                                sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Complex> &>(
+                    collection.complex_field(unique_name, components_shape,
+                                             sub_division, unit));
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -275,8 +279,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
-                return collection.uint_field(unique_name, nb_components,
-                                             sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Uint> &>(
+                    collection.uint_field(unique_name, nb_components,
+                                          sub_division, unit));
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -288,8 +293,9 @@ void add_field_collection(py::module & mod) {
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
-                return collection.uint_field(unique_name, components_shape,
-                                             sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Uint> &>(
+                    collection.uint_field(unique_name, components_shape,
+                                          sub_division, unit));
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -300,8 +306,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
-                return collection.int_field(unique_name, nb_components,
-                                            sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Int> &>(
+                    collection.int_field(unique_name, nb_components,
+                                         sub_division, unit));
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -313,8 +320,9 @@ void add_field_collection(py::module & mod) {
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
                const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
-                return collection.int_field(unique_name, components_shape,
-                                            sub_division, unit);
+                return dynamic_cast<muGrid::TypedField<Int> &>(
+                    collection.int_field(unique_name, components_shape,
+                                         sub_division, unit));
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -435,7 +443,10 @@ void add_field_collection(py::module & mod) {
         .def("get_state_field", &FieldCollection::get_state_field,
              py::return_value_policy::reference_internal, "unique_prefix"_a)
         .def("keys", &FieldCollection::list_fields)
-        .def_property_readonly("field_names", &FieldCollection::list_fields);
+        .def_property_readonly("field_names", &FieldCollection::list_fields)
+        .def_property_readonly("is_on_device", &FieldCollection::is_on_device)
+        .def_property_readonly("memory_location",
+                               &FieldCollection::get_memory_location);
 
     py::class_<muGrid::FieldCollection::IndexIterable>(mod, "IndexIterable")
         .def("__len__", &muGrid::FieldCollection::IndexIterable::size)
@@ -456,43 +467,57 @@ void add_field_collection(py::module & mod) {
         .value("Global", FieldCollection::ValidityDomain::Global)
         .value("Local", FieldCollection::ValidityDomain::Local)
         .export_values();
+
+    py::enum_<FieldCollection::MemoryLocation>(field_collection,
+                                               "MemoryLocation")
+        .value("Host", FieldCollection::MemoryLocation::Host)
+        .value("Device", FieldCollection::MemoryLocation::Device)
+        .export_values();
 }
 
 void add_global_field_collection(py::module & mod) {
+    using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<GlobalFieldCollection, FieldCollection>(mod,
                                                        "GlobalFieldCollection")
-        .def(py::init<const Index_t &>(), "spatial_dimension"_a)
         .def(py::init<const Index_t &, const FieldCollection::SubPtMap_t &,
-                      StorageOrder>(),
-             "spatial_dimension"_a, "sub_pts"_a,
-             "storage_order"_a = StorageOrder::ColMajor)
+                      StorageOrder, MemoryLocation>(),
+             "spatial_dimension"_a,
+             "sub_pts"_a = FieldCollection::SubPtMap_t{},
+             "storage_order"_a = StorageOrder::ColMajor,
+             "memory_location"_a = MemoryLocation::Host)
         .def(py::init<const IntCoord_t &, const IntCoord_t &,
                       const IntCoord_t &, const FieldCollection::SubPtMap_t &,
-                      StorageOrder, const IntCoord_t &, const IntCoord_t &>(),
+                      StorageOrder, const IntCoord_t &, const IntCoord_t &,
+                      MemoryLocation>(),
              "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = IntCoord_t{},
              "subdomain_locations"_a = IntCoord_t{},
              "sub_pts"_a = FieldCollection::SubPtMap_t{},
              "storage_order"_a = StorageOrder::ColMajor,
              "nb_ghosts_left"_a = IntCoord_t{},
-             "nb_ghosts_right"_a = IntCoord_t{})
+             "nb_ghosts_right"_a = IntCoord_t{},
+             "memory_location"_a = MemoryLocation::Host)
         .def(
             py::init<const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
                      const IntCoord_t &, const FieldCollection::SubPtMap_t &,
-                     StorageOrder, const IntCoord_t &, const IntCoord_t &>(),
+                     StorageOrder, const IntCoord_t &, const IntCoord_t &,
+                     MemoryLocation>(),
             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
             "subdomain_locations"_a, "pixels_strides"_a, "sub_pts"_a,
             "storage_order"_a = StorageOrder::ColMajor,
             "nb_ghosts_left"_a = IntCoord_t{},
-            "nb_ghosts_right"_a = IntCoord_t{})
+            "nb_ghosts_right"_a = IntCoord_t{},
+            "memory_location"_a = MemoryLocation::Host)
         .def(
             py::init<const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
                      StorageOrder, const FieldCollection::SubPtMap_t &,
-                     StorageOrder, const IntCoord_t &, const IntCoord_t &>(),
+                     StorageOrder, const IntCoord_t &, const IntCoord_t &,
+                     MemoryLocation>(),
             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
             "subdomain_locations"_a, "pixels_storage_order"_a, "sub_pts"_a,
             "storage_order"_a = StorageOrder::ColMajor,
             "nb_ghosts_left"_a = IntCoord_t{},
-            "nb_ghosts_right"_a = IntCoord_t{})
+            "nb_ghosts_right"_a = IntCoord_t{},
+            "memory_location"_a = MemoryLocation::Host)
         .def("initialise",
              static_cast<void (GlobalFieldCollection::*)(
                  const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
@@ -516,17 +541,22 @@ void add_global_field_collection(py::module & mod) {
 }
 
 void add_local_field_collection(py::module & mod) {
+    using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<LocalFieldCollection, FieldCollection> fc_local(
         mod, "LocalFieldCollection");
     fc_local
         .def(py::init<const Index_t &,
-                      const muGrid::FieldCollection::SubPtMap_t &>(),
+                      const muGrid::FieldCollection::SubPtMap_t &,
+                      MemoryLocation>(),
              "spatial_dimension"_a,
-             "nb_sub_pts"_a = std::map<std::string, Index_t>{})
+             "nb_sub_pts"_a = std::map<std::string, Index_t>{},
+             "memory_location"_a = MemoryLocation::Host)
         .def(py::init<const Index_t &, const std::string &,
-                      const muGrid::FieldCollection::SubPtMap_t &>(),
+                      const muGrid::FieldCollection::SubPtMap_t &,
+                      MemoryLocation>(),
              "spatial_dimension"_a, "name"_a,
-             "nb_sub_pts"_a = std::map<std::string, Index_t>{})
+             "nb_sub_pts"_a = std::map<std::string, Index_t>{},
+             "memory_location"_a = MemoryLocation::Host)
         .def(
             "add_pixel",
             [](LocalFieldCollection & fc_local, const size_t & global_index) {
