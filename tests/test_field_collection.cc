@@ -79,16 +79,17 @@ namespace muGrid {
       this->fc.set_nb_sub_pts(sub_division_tag(), NbSubPts);
     }
 
-    RealField & t4_field{fc.register_real_field(
-        "Tensorfield real o4", ipow(SpatialDimension, 4), sub_division_tag())};
-    IntField & t2_field{fc.register_int_field("Tensorfield integer o2",
-                                              ipow(SpatialDimension, 2),
-                                              sub_division_tag())};
-    UintField & scalar_field{fc.register_uint_field("Scalar unsigned integer",
-                                                    1, sub_division_tag())};
-    ComplexField & matrix_field{fc.register_complex_field(
-        "Matrixfield Complex sdim × nb_quad_pts", SpatialDimension * NbSubPts,
-        sub_division_tag())};
+    RealField & t4_field{dynamic_cast<RealField &>(fc.register_real_field(
+        "Tensorfield real o4", ipow(SpatialDimension, 4), sub_division_tag()))};
+    IntField & t2_field{dynamic_cast<IntField &>(fc.register_int_field(
+        "Tensorfield integer o2", ipow(SpatialDimension, 2),
+        sub_division_tag()))};
+    UintField & scalar_field{dynamic_cast<UintField &>(fc.register_uint_field(
+        "Scalar unsigned integer", 1, sub_division_tag()))};
+    ComplexField & matrix_field{dynamic_cast<ComplexField &>(
+        fc.register_complex_field("Matrixfield Complex sdim × nb_quad_pts",
+                                  SpatialDimension * NbSubPts,
+                                  sub_division_tag()))};
   };
 
   /* ---------------------------------------------------------------------- */

@@ -157,14 +157,14 @@ namespace muGrid {
 #ifdef WITH_MPI
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  const MPI_Datatype TypedStateField<T>::get_mpi_type() const {
+  MPI_Datatype TypedStateField<T>::get_mpi_type() const {
     return mpi_type<T>();
   }
 #endif
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  const std::size_t TypedStateField<T>::get_element_size_in_bytes() const {
+  std::size_t TypedStateField<T>::get_element_size_in_bytes() const {
     return sizeof(T);
   }
 

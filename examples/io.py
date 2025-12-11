@@ -6,21 +6,17 @@ if not muGrid.has_mpi:
     print("IO example is skipped: muGrid has no OpenMode in serial build")
     exit(0)
 
-from muGrid import GlobalFieldCollection, FileIONetCDF, OpenMode
+from muGrid import GlobalFieldCollection, FileIONetCDF, OpenMode, real_field
 
 # Two dimensional grid
 nb_grid_pts = (11, 12, 13)
 fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"element": 5})
 
 # Get a tensor-field (for example to represent the strain)
-strain = fc.real_field(
-    "strain",  # name of the field
-    (3, 3),  # shape of components
-    "element",  # sub-point type
-)
+strain = real_field(fc, "strain", (3, 3), "element")
 
 # Fill the field with random numbers
-strain.s = np.random.rand(*((3, 3, 5) + nb_grid_pts))
+strain.s[...] = np.random.rand(*((3, 3, 5) + nb_grid_pts))
 
 # Initialize a file I/O object
 file = FileIONetCDF("example.nc", OpenMode.Overwrite)

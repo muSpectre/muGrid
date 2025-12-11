@@ -490,31 +490,26 @@ namespace muGrid {
             switch (rank) {
             case 0: {
                 return 1;
-                break;
             }
             case 1: {
                 // fall-through
             }
             case 2: {
                 return dim;
-                break;
             }
 #if defined(__llvm__) || __GNUC__ > 5
             case 3: {
                 throw RuntimeError("can't handle third-rank tensors");
-                break;
             }
 #endif
             case 4: {
                 return dim * dim;
-                break;
             }
             // old gcc fail to compile throw statements in constexpr, but new
             // clang requires all paths of execution to either return or throw
 #if defined(__llvm__) || __GNUC__ > 5
             default: {
                 throw RuntimeError("unknown rank");
-                break;
             }
 #endif
             }
@@ -531,22 +526,18 @@ namespace muGrid {
             }
             case 1: {
                 return 1;
-                break;
             }
             case 2: {
                 return dim;
-                break;
             }
             case 4: {
                 return dim * dim;
-                break;
             }
             // old gcc fail to compile throw statements in constexpr, but new
             // clang requires all paths of execution to either return or throw
 #if defined(__llvm__) || __GNUC__ > 5
             default: {
                 throw RuntimeError("unknown rank");
-                break;
             }
 #endif
             }

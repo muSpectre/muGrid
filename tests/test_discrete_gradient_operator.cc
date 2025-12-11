@@ -123,8 +123,9 @@ namespace muGrid {
       std::string quad_pt_tag{"quad_pt"};
       collection.set_nb_sub_pts(quad_pt_tag,
                                 Fix::NbElements * Fix::NbQuadPerELement);
-      auto & quad_pt_field{collection.register_real_field(
-          "quad_pt_field", ipow(Fix::Dim, grad_rank), quad_pt_tag)};
+      auto & quad_pt_field{dynamic_cast<TypedFieldBase<Real> &>(
+          collection.register_real_field(
+              "quad_pt_field", ipow(Fix::Dim, grad_rank), quad_pt_tag))};
 
       Fix::d_operator.apply(dynamic_cast<TypedFieldBase<Real> &>(
                                          collection.get_field("nodal_field")),
@@ -181,16 +182,21 @@ namespace muGrid {
       std::stringstream rank_{};
       rank_ << u_rank;
       auto rank_str{rank_.str()};
-      auto & u{collection.register_real_field(
-          "u" + rank_str, ipow(Fix::Dim, u_rank), nodal_pt_tag)};
-      auto & v{collection.register_real_field(
-          "v" + rank_str, ipow(Fix::Dim, u_rank), nodal_pt_tag)};
-      auto & BTBu{collection.register_real_field(
-          "BᵀB·u" + rank_str, ipow(Fix::Dim, u_rank), nodal_pt_tag)};
-      auto & Bu{collection.register_real_field(
-          "B·u" + rank_str, ipow(Fix::Dim, u_rank + 1), quad_pt_tag)};
-      auto & Bv{collection.register_real_field(
-          "B·v" + rank_str, ipow(Fix::Dim, u_rank + 1), quad_pt_tag)};
+      auto & u{dynamic_cast<TypedFieldBase<Real> &>(
+          collection.register_real_field(
+              "u" + rank_str, ipow(Fix::Dim, u_rank), nodal_pt_tag))};
+      auto & v{dynamic_cast<TypedFieldBase<Real> &>(
+          collection.register_real_field(
+              "v" + rank_str, ipow(Fix::Dim, u_rank), nodal_pt_tag))};
+      auto & BTBu{dynamic_cast<TypedFieldBase<Real> &>(
+          collection.register_real_field(
+              "BᵀB·u" + rank_str, ipow(Fix::Dim, u_rank), nodal_pt_tag))};
+      auto & Bu{dynamic_cast<TypedFieldBase<Real> &>(
+          collection.register_real_field(
+              "B·u" + rank_str, ipow(Fix::Dim, u_rank + 1), quad_pt_tag))};
+      auto & Bv{dynamic_cast<TypedFieldBase<Real> &>(
+          collection.register_real_field(
+              "B·v" + rank_str, ipow(Fix::Dim, u_rank + 1), quad_pt_tag))};
 
       // init with random values to avoid special cases
       u.eigen_vec().setRandom();

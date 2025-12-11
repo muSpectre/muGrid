@@ -60,9 +60,12 @@ namespace muGrid {
          * @param spatial_dimension spatial dimension of the field (can be
          *                    muGrid::Unknown, e.g., in the case of the local fields
          *                    for storing internal material variables)
+         * @param nb_sub_pts number of sub-points per pixel
+         * @param memory_location where to allocate field memory (Host or Device)
          */
         LocalFieldCollection(const Index_t &spatial_dimension,
-                             const SubPtMap_t &nb_sub_pts = {});
+                             const SubPtMap_t &nb_sub_pts = {},
+                             MemoryLocation memory_location = MemoryLocation::Host);
 
         /**
          * Constructor with explicit given name for the field collection. This name
@@ -71,10 +74,15 @@ namespace muGrid {
          * 'FileIONetCDF'. If you register two LocalFieldCollections with the same
          * name in a FileIONetCDF object you will get a
          * muGrid::FieldCollectionError.
+         * @param spatial_dimension spatial dimension of the field
+         * @param name unique name for the field collection
+         * @param nb_sub_pts number of sub-points per pixel
+         * @param memory_location where to allocate field memory (Host or Device)
          */
         LocalFieldCollection(const Index_t &spatial_dimension,
                              const std::string &name,
-                             const SubPtMap_t &nb_sub_pts = {});
+                             const SubPtMap_t &nb_sub_pts = {},
+                             MemoryLocation memory_location = MemoryLocation::Host);
 
         //! Copy constructor
         LocalFieldCollection(const LocalFieldCollection &other) = delete;

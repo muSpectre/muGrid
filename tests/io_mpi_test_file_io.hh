@@ -42,28 +42,43 @@
 #include "libmugrid/field_collection_local.hh"
 #include "libmugrid/field_collection_global.hh"
 #include "libmugrid/field_map_static.hh"
+#include "libmugrid/field_typed.hh"
 
 #include "libmugrid/communicator.hh"
 
 namespace muGrid {
   struct FileIOFixture {
+  private:
+    // Helper functions for NVCC compatibility in initializer lists
+    static IntCoord_t make_nb_domain_grid_pts(Index_t spatial_dim,
+                                               Index_t comm_size,
+                                               const IntCoord_t & subdomain_pts) {
+      return IntCoord_t{spatial_dim, comm_size * subdomain_pts[1]};
+    }
+    static IntCoord_t make_subdomain_locations(Index_t comm_rank,
+                                                const IntCoord_t & subdomain_pts) {
+      return IntCoord_t{0, comm_rank * subdomain_pts[1]};
+    }
+
+  public:
     FileIOFixture()
-        : nb_domain_grid_pts{this->spatial_dimension,
-                             this->comm.size() *
-                                 this->nb_subdomain_grid_pts[1]},
-          subdomain_locations{0, this->comm.rank() *
-                                     this->nb_subdomain_grid_pts[1]},
-          global_fc{this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
-                    this->subdomain_locations, this->nb_sub_pts},
-          nb_sub_pts_local{{this->quad, 3}},
-          local_fc{this->spatial_dimension, "local_FC", this->nb_sub_pts_local},
+        : nb_domain_grid_pts(make_nb_domain_grid_pts(
+              spatial_dimension, comm.size(), nb_subdomain_grid_pts)),
+          subdomain_locations(make_subdomain_locations(
+              comm.rank(), nb_subdomain_grid_pts)),
+          global_fc(nb_domain_grid_pts, nb_subdomain_grid_pts,
+                    subdomain_locations, nb_sub_pts),
+          nb_sub_pts_local{{quad, 3}},
+          local_fc(spatial_dimension, "local_FC", nb_sub_pts_local),
           names{"T4_test_field", "T2_test_field"}, //, "T1_int_field"},
-          t4_field{this->global_fc.register_real_field(
-              names[0], muGrid::ipow(this->spatial_dimension, 4), this->quad)},
-          t4_field_map{this->t4_field},
-          t2_field{this->global_fc.register_real_field(
-              names[1], muGrid::ipow(this->spatial_dimension, 2))},
-          t2_field_map{this->t2_field}
+          t4_field(dynamic_cast<muGrid::RealField &>(
+              global_fc.register_real_field(
+                  names[0], muGrid::ipow(spatial_dimension, 4), quad))),
+          t4_field_map(t4_field),
+          t2_field(dynamic_cast<muGrid::RealField &>(
+              global_fc.register_real_field(
+                  names[1], muGrid::ipow(spatial_dimension, 2)))),
+          t2_field_map(t2_field)
           /*,
           t1_field{this->local_fc.register_field<muGrid::Int>(
               names[2], muGrid::ipow(this->spatial_dimension, 1), this->quad)},
@@ -104,13 +119,13 @@ namespace muGrid {
     std::vector<std::string> names;  // names for the fields
 
     // A T4 test field
-    muGrid::TypedField<Real> & t4_field;
+    muGrid::RealField & t4_field;
     muGrid::T4FieldMap<Real, Mapping::Mut, FileIOFixture::spatial_dimension,
                        muGrid::IterUnit::SubPt>
         t4_field_map;
 
     // A T2 test field
-    muGrid::TypedField<Real> & t2_field;
+    muGrid::RealField & t2_field;
     muGrid::T2FieldMap<Real, Mapping::Mut, FileIOFixture::spatial_dimension,
                        muGrid::IterUnit::SubPt>
         t2_field_map;

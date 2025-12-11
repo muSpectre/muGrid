@@ -59,7 +59,7 @@ namespace muGrid {
     };
 
     // forward declaration
-    template <typename T>
+    template <typename T, typename MemorySpace>
     class TypedFieldBase;
 
     /**
@@ -75,10 +75,11 @@ namespace muGrid {
         //! stored scalar type
         using Scalar = T;
 
-        //! const-correct field depending on mapping mutability
+        //! const-correct field depending on mapping mutability (HostSpace only)
         using Field_t =
             std::conditional_t<Mutability == Mapping::Const,
-                               const TypedFieldBase<T>, TypedFieldBase<T>>;
+                               const TypedFieldBase<T, HostSpace>,
+                               TypedFieldBase<T, HostSpace>>;
 
         //! dynamically mapped eigen type
         using PlainType = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
@@ -344,7 +345,7 @@ namespace muGrid {
 
         //! return const reference to the mapped field
         const Field_t & get_field() const;
-        const Index_t get_stride() const;
+        Index_t get_stride() const;
 
        protected:
         //! mapped field. Needed for query at initialisations

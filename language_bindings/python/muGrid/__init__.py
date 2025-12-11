@@ -105,5 +105,7 @@ else:
 
 
 from .Parallel import Communicator  # noqa: E402
+from .Field import Field, wrap_field  # noqa: E402
+from .Field import real_field, int_field, uint_field, complex_field  # noqa: E402
 
 __version__ = _muGrid.version.description()

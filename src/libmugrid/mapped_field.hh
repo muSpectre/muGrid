@@ -79,8 +79,10 @@ namespace muGrid {
                     FieldCollection & collection,
                     const std::string & sub_division_tag,
                     const Unit & unit = Unit::unitless())
-            : field(collection.register_field<Scalar>(
-                  unique_name, FieldMapType::Stride(), sub_division_tag, unit)),
+            : field(dynamic_cast<TypedField<Scalar> &>(
+                  collection.register_field<Scalar>(
+                      unique_name, FieldMapType::Stride(), sub_division_tag,
+                      unit))),
               map{this->field} {
             static_assert(
                 StaticConstructor == IsStatic(),
@@ -106,8 +108,10 @@ namespace muGrid {
                     FieldCollection & collection,
                     const std::string & sub_division_tag,
                     const Unit & unit = Unit::unitless())
-            : field{collection.register_field<Scalar>(
-                  unique_name, {nb_rows, nb_cols}, sub_division_tag, unit)},
+            : field{dynamic_cast<TypedField<Scalar> &>(
+                  collection.register_field<Scalar>(
+                      unique_name, {nb_rows, nb_cols}, sub_division_tag,
+                      unit))},
               map{this->field, nb_rows, iter_type} {
             static_assert(
                 StaticConstructor == IsStatic(),

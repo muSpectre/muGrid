@@ -231,7 +231,6 @@ namespace muGrid {
       }
       default:
         throw RuntimeError("unknown character");
-        break;
       }
     }
     return super.str();

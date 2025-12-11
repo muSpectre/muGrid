@@ -279,27 +279,23 @@ namespace muGrid {
                     internal::compute_col_major_strides<oneD>(
                         nb_grid_pts.template get<oneD>(),
                         std::make_index_sequence<oneD>{})};
-                break;
             }
             case twoD: {
                 return DynCcoord<MaxDim>{
                     internal::compute_col_major_strides<twoD>(
                         nb_grid_pts.template get<twoD>(),
                         std::make_index_sequence<twoD>{})};
-                break;
             }
             case threeD: {
                 return DynCcoord<MaxDim>{
                     internal::compute_col_major_strides<threeD>(
                         nb_grid_pts.template get<threeD>(),
                         std::make_index_sequence<threeD>{})};
-                break;
             }
             default:
                 throw RuntimeError("unforeseen dimensionality, is it really "
                                    "necessary to have other "
                                    "dimensions than 1, 2, and 3?");
-                break;
             }
         }
 
@@ -325,27 +321,23 @@ namespace muGrid {
                     internal::compute_row_major_strides<oneD>(
                         nb_grid_pts.template get<oneD>(),
                         std::make_index_sequence<oneD>{})};
-                break;
             }
             case twoD: {
                 return DynCcoord<MaxDim>{
                     internal::compute_row_major_strides<twoD>(
                         nb_grid_pts.template get<twoD>(),
                         std::make_index_sequence<twoD>{})};
-                break;
             }
             case threeD: {
                 return DynCcoord<MaxDim>{
                     internal::compute_row_major_strides<threeD>(
                         nb_grid_pts.template get<threeD>(),
                         std::make_index_sequence<threeD>{})};
-                break;
             }
             default:
                 throw RuntimeError("unforeseen dimensionality, is it really "
                                    "necessary to have other "
                                    "dimensions than 1, 2, and 3?");
-                break;
             }
         }
 

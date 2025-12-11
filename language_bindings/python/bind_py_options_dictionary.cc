@@ -35,7 +35,6 @@
 #include "libmugrid/options_dictionary.hh"
 
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
 #include <pybind11/eigen.h>
 
 #include <string>
@@ -65,8 +64,8 @@ Dictionary convert(const py::dict & d) {
     } else if (py::isinstance<py::dict>(value)) {
       auto val{value.cast<py::dict>()};
       ret_dict.add(key, convert(val));
-    } else if (py::isinstance<py::array_t<Real>>(value)) {
-      ret_dict.add(key, value.cast<py::EigenDRef<Eigen::MatrixXd>>());
+    } else if (py::isinstance<py::array>(value)) {
+      ret_dict.add(key, value.cast<Eigen::MatrixXd>());
     } else {
       throw DictionaryError("Unknown python type used in dict");
     }
@@ -99,33 +98,21 @@ void add_options_dictionary(py::module & mod) {
             switch (retval.get_value_type()) {
             case RuntimeValue::ValueType::Int: {
               return py::int_(retval.get_int());
-              break;
             }
             case RuntimeValue::ValueType::Real: {
               return py::float_(retval.get_real());
-              break;
             }
             case RuntimeValue::ValueType::Matrix: {
-              auto && matrix{retval.get_matrix()};
-              std::array<muGrid::Index_t, 2> shape{matrix.rows(),
-                                                   matrix.cols()};
-              py::array_t<Real> retval(shape);
-              for (int i{0}; i < matrix.rows(); ++i) {
-                for (int j{0}; j < matrix.cols(); ++j) {
-                  retval.mutable_at(i, j) = matrix(i, j);
-                }
-              }
-              return std::move(retval);
-              break;
+              // Return an Eigen matrix - pybind11/eigen.h handles conversion to numpy
+              Eigen::MatrixXd matrix = retval.get_matrix();
+              return py::cast(matrix);
             }
             case RuntimeValue::ValueType::Dictionary: {
               throw DictionaryError(
                   "nested dictionaries are not yet supported");
-              break;
             }
             default:
               throw DictionaryError("Unknown variable type");
-              break;
             }
           },
           "key"_a)
@@ -157,8 +144,8 @@ void add_options_dictionary(py::module & mod) {
             } else if (py::isinstance<py::dict>(value)) {
               auto val{value.cast<py::dict>()};
               dict[key] = convert(val);
-            } else if (py::isinstance<py::array_t<Real>>(value)) {
-              dict[key] = value.cast<py::EigenDRef<Eigen::MatrixXd>>();
+            } else if (py::isinstance<py::array>(value)) {
+              dict[key] = value.cast<Eigen::MatrixXd>();
             } else {
               throw DictionaryError("Unknown python type used in dict");
             }

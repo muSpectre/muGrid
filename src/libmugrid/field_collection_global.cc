@@ -39,10 +39,10 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
         const Index_t &spatial_dimension, const SubPtMap_t &nb_sub_pts,
-        StorageOrder storage_order)
+        StorageOrder storage_order, MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, spatial_dimension, nb_sub_pts,
-              storage_order
+              storage_order, memory_location
           },
           nb_ghosts_left{IntCoord_t(spatial_dimension)},
           nb_ghosts_right{IntCoord_t(spatial_dimension)} {
@@ -54,10 +54,11 @@ namespace muGrid {
         const IntCoord_t &nb_subdomain_grid_pts_with_ghosts,
         const IntCoord_t &subdomain_locations_with_ghosts,
         const SubPtMap_t &nb_sub_pts, StorageOrder storage_order,
-        const IntCoord_t &nb_ghosts_left, const IntCoord_t &nb_ghosts_right)
+        const IntCoord_t &nb_ghosts_left, const IntCoord_t &nb_ghosts_right,
+        MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
-              nb_sub_pts, storage_order
+              nb_sub_pts, storage_order, memory_location
           } {
         this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts_with_ghosts,
                          subdomain_locations_with_ghosts, storage_order,
@@ -71,10 +72,10 @@ namespace muGrid {
         const IntCoord_t &subdomain_locations_with_ghosts,
         const IntCoord_t &pixels_strides, const SubPtMap_t &nb_sub_pts,
         StorageOrder storage_order, const IntCoord_t &nb_ghosts_left,
-        const IntCoord_t &nb_ghosts_right)
+        const IntCoord_t &nb_ghosts_right, MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
-              nb_sub_pts, storage_order
+              nb_sub_pts, storage_order, memory_location
           } {
         this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts_with_ghosts,
                          subdomain_locations_with_ghosts, pixels_strides,
@@ -88,10 +89,10 @@ namespace muGrid {
         const IntCoord_t &subdomain_locations_with_ghosts,
         StorageOrder pixels_storage_order, const SubPtMap_t &nb_sub_pts,
         StorageOrder storage_order, const IntCoord_t &nb_ghosts_left,
-        const IntCoord_t &nb_ghosts_right)
+        const IntCoord_t &nb_ghosts_right, MemoryLocation memory_location)
         : Parent{
             ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
-            nb_sub_pts, storage_order
+            nb_sub_pts, storage_order, memory_location
         } {
         this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts_with_ghosts,
                          subdomain_locations_with_ghosts, pixels_storage_order,
@@ -258,7 +259,9 @@ namespace muGrid {
     GlobalFieldCollection GlobalFieldCollection::get_empty_clone() const {
         GlobalFieldCollection ret_val{
             this->get_spatial_dim(),
-            this->nb_sub_pts
+            this->nb_sub_pts,
+            this->get_storage_order(),
+            this->get_memory_location()
         };
         ret_val.initialise(this->nb_domain_grid_pts,
                            this->pixels_with_ghosts.get_nb_subdomain_grid_pts(),

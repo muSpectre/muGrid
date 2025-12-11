@@ -37,7 +37,6 @@
 #include "libmugrid/field_typed.hh"
 #include "libmugrid/convolution_operator_base.hh"
 #include "libmugrid/convolution_operator.hh"
-#include "libmugrid/numpy_tools.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>

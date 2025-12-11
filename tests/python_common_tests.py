@@ -138,19 +138,5 @@ class OptionDictionaryCheck(unittest.TestCase):
         self.assertTrue(isinstance(option_dict["int"], np.ndarray))
 
 
-class NumpyCheck(unittest.TestCase):
-    def test_numpy_copy(self):
-        nb_grid_pts = (3, 4, 5)
-        fc = muGrid.GlobalFieldCollection(nb_grid_pts)
-        for component_shape in [(), (1,), (1, 1), (2, 3), (2, 3, 1), (1, 2, 3)]:
-            shape = component_shape + nb_grid_pts
-            a = np.random.random(shape)
-            b = _muGrid.test_numpy_copy(fc, a)
-            np.testing.assert_array_equal(b.shape, a.shape)
-            np.testing.assert_array_equal(a, b)
-            assert a.flags.owndata
-            assert b.flags.owndata  # Since this is a copy
-
-
 if __name__ == "__main__":
     unittest.main()

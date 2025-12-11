@@ -34,7 +34,6 @@
  *
  */
 #define BOOST_TEST_MODULE base_test test
-#define BOOST_TEST_MAIN
 
 // Meson defines this properly, CMake does not
 #ifndef BOOST_TEST_DYN_LINK
@@ -42,3 +41,20 @@
 #endif
 
 #include <boost/test/unit_test.hpp>
+
+namespace muGrid {
+  void initialize_kokkos();
+  void finalize_kokkos();
+}
+
+// Global fixture to initialize/finalize Kokkos before/after all tests
+struct KokkosInitializer {
+  KokkosInitializer() {
+    muGrid::initialize_kokkos();
+  }
+  ~KokkosInitializer() {
+    muGrid::finalize_kokkos();
+  }
+};
+
+BOOST_TEST_GLOBAL_FIXTURE(KokkosInitializer);

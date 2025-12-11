@@ -81,10 +81,12 @@ namespace muGrid {
                  ? this->nb_subdomain_grid_pts_empty
                  : this->nb_subdomain_grid_pts,
              this->subdomain_locations, this->nb_sub_pts},
-          pixel_field{this->fc.register_real_field("pixel_field", NbComponent,
-                                                   PixelTag)},
-          quad_pt_field{this->fc.register_real_field("quad_pt_field",
-                                                     NbComponent, "quad")},
+          pixel_field{dynamic_cast<RealField &>(
+              this->fc.register_real_field("pixel_field", NbComponent,
+                                           PixelTag))},
+          quad_pt_field{dynamic_cast<RealField &>(
+              this->fc.register_real_field("quad_pt_field",
+                                           NbComponent, "quad"))},
           pixel_map{pixel_field}, quad_pt_map{quad_pt_field},
           pixel_quad_pt_map{quad_pt_field, IterUnit::Pixel} {};
 
@@ -115,10 +117,12 @@ namespace muGrid {
               0, 0, this->comm.rank() * this->nb_subdomain_grid_pts[2]},
           fc{this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
              this->subdomain_locations, this->nb_sub_pts},
-          pixel_field{this->fc.register_real_field("pixel_field", NbComponent,
-                                                   PixelTag)},
-          quad_pt_field{this->fc.register_real_field("quad_pt_field",
-                                                     NbComponent, "quad")},
+          pixel_field{dynamic_cast<RealField &>(
+              this->fc.register_real_field("pixel_field", NbComponent,
+                                           PixelTag))},
+          quad_pt_field{dynamic_cast<RealField &>(
+              this->fc.register_real_field("quad_pt_field",
+                                           NbComponent, "quad"))},
           pixel_map{pixel_field}, quad_pt_map{quad_pt_field},
           pixel_quad_pt_map{quad_pt_field, IterUnit::Pixel} {};
 
