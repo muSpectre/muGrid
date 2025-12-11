@@ -37,12 +37,22 @@
 
 #include <pybind11/pybind11.h>
 
-// Note: Kokkos initialization/finalization is handled automatically by
-// libmuGrid via the KokkosLifetimeManager in kokkos_init.cc. This ensures
-// proper destruction order when using Kokkos Views in a shared library.
+namespace muGrid {
+  void initialize_kokkos();
+  void finalize_kokkos();
+}
 
 PYBIND11_MODULE(_muGrid, mod) {
   mod.doc() = "Python bindings to the µGrid library";
+
+  // Initialize Kokkos when the Python module is loaded
+  muGrid::initialize_kokkos();
+
+  // Register a cleanup callback to finalize Kokkos when Python exits
+  auto cleanup = []() {
+    muGrid::finalize_kokkos();
+  };
+  mod.add_object("_cleanup", pybind11::capsule(cleanup));
 
   add_common_mugrid(mod);
   add_communicator(mod);

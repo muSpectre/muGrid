@@ -42,6 +42,19 @@
 
 #include <boost/test/unit_test.hpp>
 
-// Note: Kokkos initialization/finalization is handled automatically by
-// libmuGrid via the KokkosLifetimeManager in kokkos_init.cc. This ensures
-// proper destruction order when using Kokkos Views in a shared library.
+namespace muGrid {
+  void initialize_kokkos();
+  void finalize_kokkos();
+}
+
+// Global fixture to initialize/finalize Kokkos before/after all tests
+struct KokkosInitializer {
+  KokkosInitializer() {
+    muGrid::initialize_kokkos();
+  }
+  ~KokkosInitializer() {
+    muGrid::finalize_kokkos();
+  }
+};
+
+BOOST_TEST_GLOBAL_FIXTURE(KokkosInitializer);

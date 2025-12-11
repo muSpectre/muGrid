@@ -5,12 +5,12 @@
  *
  * @date   11 Dec 2024
  *
- * @brief  Automatic Kokkos initialization/finalization for libmuGrid
+ * @brief  Kokkos initialization helpers for libmuGrid
  *
- * This file ensures Kokkos is initialized when libmuGrid is loaded and
- * finalized when it is unloaded. This is necessary because Kokkos has
- * internal static state that must be properly managed when used in a
- * shared library context.
+ * This file provides helper functions for Kokkos initialization/finalization
+ * to be called by applications and language bindings. Library-level automatic
+ * initialization is not used because it causes static initialization order
+ * issues with Kokkos 5.0's internal data structures.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -41,40 +41,29 @@
 #include <Kokkos_Core.hpp>
 
 namespace muGrid {
-namespace internal {
 
 /**
- * RAII class for Kokkos lifetime management within the shared library.
+ * Initialize Kokkos if not already initialized.
  *
- * This ensures that Kokkos is initialized before any Kokkos::View objects
- * are created and finalized after all Views are destroyed. The static
- * instance is constructed when the library loads and destroyed when
- * the library unloads.
+ * This should be called by applications before using muGrid functionality.
+ * For Python bindings, this is called automatically in the module init.
  */
-class KokkosLifetimeManager {
- public:
-  KokkosLifetimeManager() {
-    if (!Kokkos::is_initialized()) {
-      Kokkos::initialize();
-    }
+void initialize_kokkos() {
+  if (!Kokkos::is_initialized()) {
+    Kokkos::initialize();
   }
+}
 
-  ~KokkosLifetimeManager() {
-    if (Kokkos::is_initialized() && !Kokkos::is_finalized()) {
-      Kokkos::finalize();
-    }
+/**
+ * Finalize Kokkos if initialized and not already finalized.
+ *
+ * This should be called by applications when done using muGrid functionality.
+ * For Python bindings, this is called automatically in module cleanup.
+ */
+void finalize_kokkos() {
+  if (Kokkos::is_initialized() && !Kokkos::is_finalized()) {
+    Kokkos::finalize();
   }
+}
 
-  // Non-copyable, non-movable
-  KokkosLifetimeManager(const KokkosLifetimeManager &) = delete;
-  KokkosLifetimeManager & operator=(const KokkosLifetimeManager &) = delete;
-  KokkosLifetimeManager(KokkosLifetimeManager &&) = delete;
-  KokkosLifetimeManager & operator=(KokkosLifetimeManager &&) = delete;
-};
-
-// Static instance ensures Kokkos is initialized on library load
-// and finalized on library unload
-static KokkosLifetimeManager kokkos_lifetime_manager;
-
-}  // namespace internal
 }  // namespace muGrid
