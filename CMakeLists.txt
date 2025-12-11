@@ -47,8 +47,8 @@ project(muGrid
     DESCRIPTION "MPI-parallel regular grids"
 )
 
-# Require C++17
-set(CMAKE_CXX_STANDARD 17)
+# Require C++20
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -91,7 +91,7 @@ else()
 endif()
 
 # Find or fetch Kokkos (required dependency)
-find_package(Kokkos 4.0 QUIET)
+find_package(Kokkos 5.0 QUIET)
 if(NOT Kokkos_FOUND)
     message(STATUS "Kokkos not found, fetching from GitHub...")
     # Disable Kokkos tests
@@ -104,7 +104,7 @@ if(NOT Kokkos_FOUND)
     FetchContent_Declare(
         kokkos
         GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-        GIT_TAG 4.5.00
+        GIT_TAG 5.0.0
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(kokkos)
