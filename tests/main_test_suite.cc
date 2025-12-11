@@ -41,16 +41,7 @@
 #endif
 
 #include <boost/test/unit_test.hpp>
-#include <Kokkos_Core.hpp>
 
-// Global fixture to initialize/finalize Kokkos
-struct KokkosInitializer {
-  KokkosInitializer() {
-    Kokkos::initialize();
-  }
-  ~KokkosInitializer() {
-    Kokkos::finalize();
-  }
-};
-
-BOOST_TEST_GLOBAL_FIXTURE(KokkosInitializer);
+// Note: Kokkos initialization/finalization is handled automatically by
+// libmuGrid via the KokkosLifetimeManager in kokkos_init.cc. This ensures
+// proper destruction order when using Kokkos Views in a shared library.

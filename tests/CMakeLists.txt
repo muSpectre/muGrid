@@ -51,7 +51,6 @@ if(Boost_FOUND)
     target_link_libraries(mugrid_main_test_suite PRIVATE
         muGrid
         Boost::unit_test_framework
-        Kokkos::kokkos
     )
     if(MUGRID_WITH_NETCDF)
         target_link_libraries(mugrid_main_test_suite PRIVATE ${MUGRID_NETCDF_LIBRARIES})
@@ -83,7 +82,6 @@ if(Boost_FOUND)
     target_link_libraries(mpi_mugrid_main_test_suite PRIVATE
         muGrid
         Boost::unit_test_framework
-        Kokkos::kokkos
     )
     if(MUGRID_WITH_NETCDF)
         target_link_libraries(mpi_mugrid_main_test_suite PRIVATE ${MUGRID_NETCDF_LIBRARIES})

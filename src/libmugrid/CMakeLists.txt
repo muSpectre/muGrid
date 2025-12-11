@@ -19,6 +19,7 @@ configure_file(
 
 # Source files for libmuGrid
 set(MUGRID_SOURCES
+    kokkos_init.cc
     exception.cc
     grid_common.cc
     ccoord_operations.cc
