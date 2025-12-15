@@ -48,7 +48,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::ConvolutionOperator(
-        const Shape_t & pixel_offset, const Eigen::ArrayXd & pixel_operator,
+        const Shape_t & pixel_offset, const std::vector<Real> & pixel_operator,
         const Shape_t & conv_pts_shape, const Index_t & nb_pixelnodal_pts,
         const Index_t & nb_quad_pts, const Index_t & nb_operators)
         : Parent{}, pixel_offset{pixel_offset}, pixel_operator{pixel_operator},
@@ -57,21 +57,12 @@ namespace muGrid {
           spatial_dim{static_cast<Index_t>(conv_pts_shape.size())},
           nb_conv_pts{get_nb_from_shape(conv_pts_shape)} {
         // Check the dimension of the pixel operator
-        if (pixel_operator.cols() !=
-            this->nb_pixelnodal_pts * this->nb_conv_pts) {
+        if (pixel_operator.size() != this->nb_operators * this->nb_quad_pts * this->nb_pixelnodal_pts * this->nb_conv_pts) {
             std::stringstream err_msg{};
             err_msg << "Size mismatch: Expected the operator has "
-                    << this->nb_pixelnodal_pts * this->nb_conv_pts
-                    << " columns. but received an operator with "
-                    << pixel_operator.cols() << " columns";
-            throw RuntimeError{err_msg.str()};
-        }
-        if (pixel_operator.rows() != this->nb_operators * this->nb_quad_pts) {
-            std::stringstream err_msg{};
-            err_msg << "Size mismatch: Expected the operator has "
-                    << this->nb_operators * this->nb_quad_pts
-                    << " rows. but received an operator with "
-                    << pixel_operator.rows() << " rows";
+                    << this->nb_operators * this->nb_quad_pts * this->nb_pixelnodal_pts * this->nb_conv_pts
+                    << " entries. but received an operator with "
+                    << pixel_operator.size() << " entries";
             throw RuntimeError{err_msg.str()};
         }
     }
@@ -267,12 +258,9 @@ namespace muGrid {
 
         // First pass: count non-zero entries
         Index_t nnz = 0;
-        for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
-            for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
-                 ++i_col) {
-                if (std::abs(this->pixel_operator(i_row, i_col)) > this->zero_tolerance) {
-                    nnz += nb_nodal_components;
-                }
+        for (const Real& value: this->pixel_operator) {
+            if (std::abs(value) > this->zero_tolerance) {
+                nnz += nb_nodal_components;
             }
         }
 
@@ -298,7 +286,7 @@ namespace muGrid {
                         // FIXME(yizhen): should wrap this in a helper
                         const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
                                              * this->nb_operators + i_operator};
-                        const auto op_value{this->pixel_operator(op_index)};
+                        const auto op_value{this->pixel_operator[op_index]};
                         // If this is non-zero
                         if(std::abs(op_value) > this->zero_tolerance) {
                             // For each component
@@ -342,12 +330,9 @@ namespace muGrid {
 
         // First pass: count non-zero entries
         Index_t nnz = 0;
-        for (Index_t i_col = 0; i_col < this->pixel_operator.cols(); ++i_col) {
-            for (Index_t i_row = 0; i_row < this->pixel_operator.rows();
-                 ++i_row) {
-                if (std::abs(this->pixel_operator(i_row, i_col)) > this->zero_tolerance) {
-                    nnz += nb_nodal_components;
-                }
+        for (const Real& value: this->pixel_operator) {
+            if (std::abs(value) > this->zero_tolerance) {
+                nnz += nb_nodal_components;
             }
         }
 
@@ -373,7 +358,7 @@ namespace muGrid {
                         // FIXME(yizhen): should wrap this in a helper
                         const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
                                              * this->nb_operators + i_operator};
-                        const auto op_value{this->pixel_operator(op_index)};
+                        const auto op_value{this->pixel_operator[op_index]};
                         // If this is non-zero
                         if(std::abs(op_value) > this->zero_tolerance) {
                             // For each component
@@ -495,7 +480,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const Eigen::ArrayXd & ConvolutionOperator::get_pixel_operator() const {
+    const std::vector<Real> & ConvolutionOperator::get_pixel_operator() const {
         return this->pixel_operator;
     }
 

@@ -152,7 +152,7 @@ namespace muGrid {
          */
         ConvolutionOperator(
             const Shape_t &pixel_offset,
-            const Eigen::ArrayXd &pixel_operator,
+            const std::vector<Real> &pixel_operator,
             const Shape_t &conv_pts_shape,
             const Index_t &nb_pixelnodal_pts,
             const Index_t &nb_quad_pts,
@@ -235,7 +235,7 @@ namespace muGrid {
          * Return the operator array linking the nodal degrees of freedom to their
          * quadrature-point values.
          */
-        const Eigen::ArrayXd &get_pixel_operator() const;
+        const std::vector<Real> &get_pixel_operator() const;
 
         /**
          * returns the number of quadrature points are associated with any
@@ -275,7 +275,7 @@ namespace muGrid {
          * array linking the nodal degrees of freedom to their quadrature-point
          * values.
          */
-        Eigen::ArrayXd pixel_operator{};
+        std::vector<Real> pixel_operator{};
         /**
          * number of convolution points, i.e., number of nodal points that is
          * involved in the convolution of one pixel.
