@@ -278,7 +278,7 @@ namespace muGrid {
         Index_t entry_idx = 0;
         // The indices on quadrature field (to write) come first
         for (Index_t i_quad=0; i_quad < this->nb_quad_pts; ++i_quad) {
-            for (Index_t i_operator; i_operator < this->nb_operators; ++i_operator) {
+            for (Index_t i_operator=0; i_operator < this->nb_operators; ++i_operator) {
                 // The indices on nodal field (to read)
                 for (Index_t i_stencil=0; i_stencil < this->nb_conv_pts; ++i_stencil) {
                     for (Index_t i_node=0; i_node < this->nb_pixelnodal_pts; ++i_node) {
@@ -290,7 +290,7 @@ namespace muGrid {
                         // If this is non-zero
                         if(std::abs(op_value) > this->zero_tolerance) {
                             // For each component
-                            for (Index_t i_component=0; i_quad < nb_nodal_components; ++i_component) {
+                            for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to pixel (coordinate) offset
                                 const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
                                 // Then to pixel count on the field
@@ -362,7 +362,7 @@ namespace muGrid {
                         // If this is non-zero
                         if(std::abs(op_value) > this->zero_tolerance) {
                             // For each component
-                            for (Index_t i_component=0; i_quad < nb_nodal_components; ++i_component) {
+                            for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to coordinate offset
                                 const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
                                 // Then to pixel count on the field
