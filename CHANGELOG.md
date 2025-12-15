@@ -1,11 +1,12 @@
 Change log for µGrid
 ====================
 
-0.96.0 (not yet released)
--------------------------
+0.96.0 (15Dec25)
+----------------
 
 - ENH: Looping over strides fields
 - ENH: Ghost buffers larger than subdomains
+- BUG: Memory leak in `communicate_ghosts`
 
 0.95.0 (15Juli25)
 -----------------
