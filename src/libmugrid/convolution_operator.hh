@@ -46,6 +46,7 @@
 
 #include <vector>
 #include <optional>
+#include <span>
 
 namespace muGrid {
 
