@@ -90,6 +90,8 @@ namespace muGrid {
                      this->right_ranks[direction], 0, recv_addr, 1,
                      recv_buffer_mpi_t, this->left_ranks[direction], 0,
                      this->comm, &status);
+        MPI_Type_free(&send_buffer_mpi_t);
+        MPI_Type_free(&recv_buffer_mpi_t);
     }
 
     void CartesianCommunicator::sendrecv_left(
@@ -116,6 +118,8 @@ namespace muGrid {
                      this->left_ranks[direction], 0, recv_addr, 1,
                      recv_buffer_mpi_t, this->right_ranks[direction], 0,
                      this->comm, &status);
+        MPI_Type_free(&send_buffer_mpi_t);
+        MPI_Type_free(&recv_buffer_mpi_t);
     }
 #else   // not WITH_MPI
     CartesianCommunicator::CartesianCommunicator(
