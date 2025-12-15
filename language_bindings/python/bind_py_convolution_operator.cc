@@ -199,15 +199,8 @@ void add_convolution_operator_default(py::module &mod) {
                             std::accumulate(nb_stencil_pts.begin(),
                                             nb_stencil_pts.end(), 1,
                                             std::multiplies<Index_t>())};
-                        // return ConvolutionOperator(
-                        //      offset, Eigen::Map<const Eigen::ArrayXd>(array.data(), nb_entries),
-                        //      nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
-                         std::vector<Real> pixel_operator;
-                         pixel_operator.resize(nb_entries);
-                         std::copy(array.data(), array.data()+nb_entries, pixel_operator.begin());
-                         return ConvolutionOperator(
-                             offset, pixel_operator, nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators); 
-
+                         return ConvolutionOperator(offset, std::span<const Real>(array.data(), nb_entries), 
+                                                    nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
                     }),
                  "nb_spatial_dims"_a, "pixel_operator"_a)
             .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)

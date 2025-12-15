@@ -48,10 +48,10 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::ConvolutionOperator(
-        const Shape_t & pixel_offset, const std::vector<Real> & pixel_operator,
+        const Shape_t & pixel_offset, std::span<const Real> pixel_operator,
         const Shape_t & conv_pts_shape, const Index_t & nb_pixelnodal_pts,
         const Index_t & nb_quad_pts, const Index_t & nb_operators)
-        : Parent{}, pixel_offset{pixel_offset}, pixel_operator{pixel_operator},
+        : Parent{}, pixel_offset{pixel_offset}, pixel_operator{pixel_operator.begin(), pixel_operator.end()},
           conv_pts_shape{conv_pts_shape}, nb_pixelnodal_pts{nb_pixelnodal_pts},
           nb_quad_pts{nb_quad_pts}, nb_operators{nb_operators},
           spatial_dim{static_cast<Index_t>(conv_pts_shape.size())},

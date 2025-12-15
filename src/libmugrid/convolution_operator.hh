@@ -152,7 +152,7 @@ namespace muGrid {
          */
         ConvolutionOperator(
             const Shape_t &pixel_offset,
-            const std::vector<Real> &pixel_operator,
+            std::span<const Real> pixel_operator,
             const Shape_t &conv_pts_shape,
             const Index_t &nb_pixelnodal_pts,
             const Index_t &nb_quad_pts,
