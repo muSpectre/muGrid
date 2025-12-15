@@ -181,16 +181,26 @@ void add_convolution_operator_default(py::module &mod) {
                          // .shape() returns a pointer to dimension array
                          std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
                                    nb_stencil_pts.begin());
-                        // The operator is interpreted as a matrix (due to limit of Eigen),
-                        // with "operator x quad_pts" rows.
-                         const auto nb_rows{nb_operators * nb_quad_pts};
-                         const auto nb_cols{
-                             nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
-                                                            nb_stencil_pts.end(), 1,
-                                                            std::multiplies<Index_t>())
-                         };
-                         return ConvolutionOperator(
-                             offset, Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
+                        // // The operator is interpreted as a matrix (due to limit of Eigen),
+                        // // with "operator x quad_pts" rows.
+                        //  const auto nb_rows{nb_operators * nb_quad_pts};
+                        //  const auto nb_cols{
+                        //      nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
+                        //                                     nb_stencil_pts.end(), 1,
+                        //                                     std::multiplies<Index_t>())
+                        //  };
+                        //  return ConvolutionOperator(
+                        //      offset, Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
+                        //      nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
+
+                        // Number of enetries in the operator
+                         const auto nb_entries{
+                            nb_operators * nb_quad_pts * nb_nodal_pts * 
+                            std::accumulate(nb_stencil_pts.begin(),
+                                            nb_stencil_pts.end(), 1,
+                                            std::multiplies<Index_t>())};
+                        return ConvolutionOperator(
+                             offset, Eigen::Map<const Eigen::ArrayXd>(array.data(), nb_entries),
                              nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
                      }),
                  "nb_spatial_dims"_a, "pixel_operator"_a)

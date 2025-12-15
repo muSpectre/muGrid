@@ -144,7 +144,7 @@ namespace muGrid {
          * and necessary information to indicate its shape.
          *
          * @param pixel_offset Stencil offset in number of pixels
-         * @param pixel_operator The pixel-wise operator raveled as a matrix.
+         * @param pixel_operator The pixel-wise operator raveled as an array.
          * @param conv_pts_shape Shape of the stencil.
          * @param nb_pixelnodal_pts Number of nodal points per pixel.
          * @param nb_quad_pts Number of quadrature points per pixel.
@@ -152,7 +152,7 @@ namespace muGrid {
          */
         ConvolutionOperator(
             const Shape_t &pixel_offset,
-            const Eigen::MatrixXd &pixel_operator,
+            const Eigen::ArrayXd &pixel_operator,
             const Shape_t &conv_pts_shape,
             const Index_t &nb_pixelnodal_pts,
             const Index_t &nb_quad_pts,
@@ -232,10 +232,10 @@ namespace muGrid {
             const std::vector<Real> &weights = {}) const final;
 
         /**
-         * Return the operator matrix linking the nodal degrees of freedom to their
+         * Return the operator array linking the nodal degrees of freedom to their
          * quadrature-point values.
          */
-        const Eigen::MatrixXd &get_pixel_operator() const;
+        const Eigen::ArrayXd &get_pixel_operator() const;
 
         /**
          * returns the number of quadrature points are associated with any
@@ -272,10 +272,10 @@ namespace muGrid {
          */
         Shape_t pixel_offset{};
         /**
-         * matrix linking the nodal degrees of freedom to their quadrature-point
+         * array linking the nodal degrees of freedom to their quadrature-point
          * values.
          */
-        Eigen::MatrixXd pixel_operator{};
+        Eigen::ArrayXd pixel_operator{};
         /**
          * number of convolution points, i.e., number of nodal points that is
          * involved in the convolution of one pixel.

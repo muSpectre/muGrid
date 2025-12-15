@@ -48,7 +48,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     ConvolutionOperator::ConvolutionOperator(
-        const Shape_t & pixel_offset, const Eigen::MatrixXd & pixel_operator,
+        const Shape_t & pixel_offset, const Eigen::ArrayXd & pixel_operator,
         const Shape_t & conv_pts_shape, const Index_t & nb_pixelnodal_pts,
         const Index_t & nb_quad_pts, const Index_t & nb_operators)
         : Parent{}, pixel_offset{pixel_offset}, pixel_operator{pixel_operator},
@@ -259,7 +259,8 @@ namespace muGrid {
     ConvolutionOperator::create_apply_operator(
         const IntCoord_t & nb_grid_pts,
         const Index_t nb_nodal_components) const {
-        // Helpers for conversion between index and coordinates
+        // Helpers for conversion between col-major index and coordinate
+        // FIXME(yizhen): should wrap the specific functionality in a wrapper?
         const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
                                               IntCoord_t(this->pixel_offset)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
@@ -269,7 +270,7 @@ namespace muGrid {
         for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
             for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
                  ++i_col) {
-                if (std::abs(this->pixel_operator(i_row, i_col)) > zero_tolerance) {
+                if (std::abs(this->pixel_operator(i_row, i_col)) > this->zero_tolerance) {
                     nnz += nb_nodal_components;
                 }
             }
@@ -287,44 +288,45 @@ namespace muGrid {
         // Row-major order groups entries by quad index, providing write
         // locality for apply_increment (scatter to quad_data on GPU).
         Index_t entry_idx = 0;
-        for (Index_t i_row = 0; i_row < this->pixel_operator.rows(); ++i_row) {
-            for (Index_t i_col = 0; i_col < this->pixel_operator.cols();
-                 ++i_col) {
-                const Real op_value = this->pixel_operator(i_row, i_col);
-                if (std::abs(op_value) > zero_tolerance) {
-                    // Decompose column index into node, stencil indices.
-                    // (Given we know it is column-major flattened)
-                    const auto i_node{i_col % this->nb_pixelnodal_pts};
-                    const auto i_stencil{i_col / this->nb_pixelnodal_pts};
-
-                    // Stencil index in `pixel_operator` is not aware of
-                    // grid shape, so it must be decomposed to offset in
-                    // coordinates, and reconstructed to index difference
-                    // for the use of indexing pixels in the grid.
-                    const auto offset{kernel_pixels.get_coord(i_stencil)};
-                    const auto index_diff{grid_pixels.get_index(offset)};
-
-                    // Repeat for each component
-                    for (Index_t i_component = 0;
-                         i_component < nb_nodal_components; ++i_component) {
-                        // Get the index in quad field
-                        const auto index_diff_quad{i_row * nb_nodal_components +
-                                                   i_component};
-
-                        const auto index_diff_nodal{
-                            index_diff * nb_nodal_components *
-                                this->nb_pixelnodal_pts +
-                            i_node * nb_nodal_components + i_component};
-
-                        h_quad_indices(entry_idx) = index_diff_quad;
-                        h_nodal_indices(entry_idx) = index_diff_nodal;
-                        h_values(entry_idx) = op_value;
-                        ++entry_idx;
+        // The indices on quadrature field (to write) come first
+        for (Index_t i_quad=0; i_quad < this->nb_quad_pts; ++i_quad) {
+            for (Index_t i_operator; i_operator < this->nb_operators; ++i_operator) {
+                // The indices on nodal field (to read)
+                for (Index_t i_stencil=0; i_stencil < this->nb_conv_pts; ++i_stencil) {
+                    for (Index_t i_node=0; i_node < this->nb_pixelnodal_pts; ++i_node) {
+                        // Get the entry via col-major index
+                        // FIXME(yizhen): should wrap this in a helper
+                        const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
+                                             * this->nb_operators + i_operator};
+                        const auto op_value{this->pixel_operator(op_index)};
+                        // If this is non-zero
+                        if(std::abs(op_value) > this->zero_tolerance) {
+                            // For each component
+                            for (Index_t i_component=0; i_quad < nb_nodal_components; ++i_component) {
+                                // Convert from stencil index to pixel (coordinate) offset
+                                const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
+                                // Then to pixel count on the field
+                                const auto pixel_count{grid_pixels.get_index(pixel_offset)};
+                                // Combine pixel, nodal & component to get col-major index diff on nodal field (to read)
+                                // FIXME(yizhen): should wrap this in a helper
+                                const auto index_diff_nodal{(pixel_count * this->nb_pixelnodal_pts + i_node)
+                                                             * nb_nodal_components + i_component};
+                                // Combine quad-pt, operator & component to get col-major index diff on quadrature field 
+                                // (to write)
+                                // FIXME(yizhen): should wrap this in a helper
+                                const auto index_diff_quad{(i_quad * this->nb_operators + i_operator) 
+                                                            * nb_nodal_components + i_component};
+                                // Add the entry
+                                h_quad_indices(entry_idx) = index_diff_quad;
+                                h_nodal_indices(entry_idx) = index_diff_nodal;
+                                h_values(entry_idx) = op_value;
+                                ++entry_idx;
+                            }
+                        }
                     }
                 }
             }
         }
-
         return sparse_op;
     }
 
@@ -343,7 +345,7 @@ namespace muGrid {
         for (Index_t i_col = 0; i_col < this->pixel_operator.cols(); ++i_col) {
             for (Index_t i_row = 0; i_row < this->pixel_operator.rows();
                  ++i_row) {
-                if (std::abs(this->pixel_operator(i_row, i_col)) > zero_tolerance) {
+                if (std::abs(this->pixel_operator(i_row, i_col)) > this->zero_tolerance) {
                     nnz += nb_nodal_components;
                 }
             }
@@ -361,44 +363,44 @@ namespace muGrid {
         // Column-major order groups entries by nodal index, providing write
         // locality for transpose_increment (scatter to nodal_data on GPU).
         Index_t entry_idx = 0;
-        for (Index_t i_col = 0; i_col < this->pixel_operator.cols(); ++i_col) {
-            // Decompose column index into node, stencil indices.
-            // (Given we know it is column-major flattened)
-            const auto i_node{i_col % this->nb_pixelnodal_pts};
-            const auto i_stencil{i_col / this->nb_pixelnodal_pts};
-
-            // Stencil index in `pixel_operator` is not aware of
-            // grid shape, so it must be decomposed to offset in
-            // coordinates, and reconstructed to index difference
-            // for the use of indexing pixels in the grid.
-            const auto offset{kernel_pixels.get_coord(i_stencil)};
-            const auto index_diff{grid_pixels.get_index(offset)};
-
-            for (Index_t i_row = 0; i_row < this->pixel_operator.rows();
-                 ++i_row) {
-                const Real op_value = this->pixel_operator(i_row, i_col);
-                if (std::abs(op_value) > zero_tolerance) {
-                    // Repeat for each component
-                    for (Index_t i_component = 0;
-                         i_component < nb_nodal_components; ++i_component) {
-                        // Get the index in quad field
-                        const auto index_diff_quad{i_row * nb_nodal_components +
-                                                   i_component};
-
-                        const auto index_diff_nodal{
-                            index_diff * nb_nodal_components *
-                                this->nb_pixelnodal_pts +
-                            i_node * nb_nodal_components + i_component};
-
-                        h_quad_indices(entry_idx) = index_diff_quad;
-                        h_nodal_indices(entry_idx) = index_diff_nodal;
-                        h_values(entry_idx) = op_value;
-                        ++entry_idx;
+        // The indices on nodal field (to write) come first
+        for (Index_t i_node=0; i_node < this->nb_pixelnodal_pts; ++i_node) {
+            // The indices on quadrature field (to read)
+            for (Index_t i_stencil=0; i_stencil < this->nb_conv_pts; ++i_stencil) {
+                for (Index_t i_quad=0; i_quad < this->nb_quad_pts; ++i_quad) {
+                    for (Index_t i_operator=0; i_operator < this->nb_operators; ++i_operator) {
+                        // Get the entry via col-major index
+                        // FIXME(yizhen): should wrap this in a helper
+                        const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
+                                             * this->nb_operators + i_operator};
+                        const auto op_value{this->pixel_operator(op_index)};
+                        // If this is non-zero
+                        if(std::abs(op_value) > this->zero_tolerance) {
+                            // For each component
+                            for (Index_t i_component=0; i_quad < nb_nodal_components; ++i_component) {
+                                // Convert from stencil index to coordinate offset
+                                const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
+                                // Then to pixel count on the field
+                                const auto pixel_count{grid_pixels.get_index(pixel_offset)};
+                                // Combine pixel, quad-pt, operator & component to get col-major index diff on quadrature field 
+                                // (to read). NOTE: the pixel count is deducted because of inversed mapping direction.
+                                // FIXME(yizhen): should wrap this in a helper
+                                const auto index_diff_quad{((-pixel_count * this->nb_quad_pts + i_quad) * this->nb_operators 
+                                                            + i_operator) * nb_nodal_components + i_component};
+                                // Combine node & component to get col-major on nodal field (to write)
+                                // FIXME(yizhen): should wrap this in a helper
+                                const auto index_diff_nodal{i_node * nb_nodal_components + i_component};
+                                // Add the entry
+                                h_quad_indices(entry_idx) = index_diff_quad;
+                                h_nodal_indices(entry_idx) = index_diff_nodal;
+                                h_values(entry_idx) = op_value;
+                                ++entry_idx;
+                            }
+                        }
                     }
                 }
             }
         }
-
         return sparse_op;
     }
 
@@ -493,7 +495,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const Eigen::MatrixXd & ConvolutionOperator::get_pixel_operator() const {
+    const Eigen::ArrayXd & ConvolutionOperator::get_pixel_operator() const {
         return this->pixel_operator;
     }
 
