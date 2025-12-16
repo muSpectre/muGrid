@@ -29,7 +29,8 @@ dependencies = [
 test = [
     "pytest",
     "pytest-cov",
-    "NuMPI[test]>=0.7.3"
+    "NuMPI[test]>=0.7.3",
+    "netCDF4"
 ]
 
 [project.urls]

@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 from NuMPI import MPI
@@ -6,6 +8,12 @@ from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
 from muGrid import real_field, wrap_field
+
+try:
+    import netCDF4
+    HAS_NETCDF4 = True
+except ImportError:
+    HAS_NETCDF4 = False
 
 
 def get_nb_subdivisions(nb_processes: int):
@@ -186,3 +194,67 @@ def test_large_ghost_buffers(comm, nb_subdivisions):
         nb_ghosts_left.tolist(),
         nb_ghosts_right.tolist(),
     )
+
+
+@pytest.mark.skipif(not HAS_NETCDF4, reason="netCDF4 not available")
+@pytest.mark.skipif(not muGrid.has_mpi, reason="MPI build required for FileIONetCDF")
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_fileio_netcdf_ghost_offset(comm, nb_subdivisions):
+    """Test that FileIONetCDF writes interior data, not ghost-shifted data."""
+    spatial_dim = len(nb_subdivisions)
+    nb_domain_grid_pts = np.full(spatial_dim, 4)
+    nb_ghost_left = np.full(spatial_dim, 1)
+    nb_ghost_right = np.full(spatial_dim, 1)
+
+    cart_decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghost_left.tolist(),
+        nb_ghost_right.tolist(),
+    )
+
+    field = real_field(cart_decomp, "test_field")
+
+    # Fill pg with weighted coordinate sums to make shifts detectable
+    global_coords = cart_decomp.icoordsg
+    weights = np.array([100**i for i in range(spatial_dim)])
+    field.pg[...] = np.einsum("i, i...->...", weights, global_coords)
+
+    expected_interior = field.p.copy()
+
+    filename = "test_ghost_offset.nc"
+
+    try:
+        file_io = muGrid.FileIONetCDF(
+            filename, muGrid.OpenMode.Overwrite, communicator=comm
+        )
+        file_io.register_field_collection(
+            cart_decomp.collection, field_names=["test_field"]
+        )
+        file_io.append_frame().write()
+        file_io.close()
+
+        comm.barrier()
+
+        # Each rank reads full file and checks its own slice
+        with netCDF4.Dataset(filename, "r") as nc:
+            stored_data = np.asarray(nc.variables["test_field"][0])
+
+        # Build slice for this rank's subdomain in global array
+        slices = tuple(
+            slice(loc, loc + size)
+            for loc, size in zip(
+                cart_decomp.subdomain_locations,
+                cart_decomp.nb_subdomain_grid_pts,
+            )
+        )
+
+        np.testing.assert_array_equal(
+            stored_data[slices],
+            expected_interior
+        )
+    finally:
+        comm.barrier()
+        if comm.rank == 0 and os.path.exists(filename):
+            os.unlink(filename)

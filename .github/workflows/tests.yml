@@ -56,7 +56,8 @@ jobs:
               libboost-test-dev \
               openmpi-bin \
               libopenmpi-dev \
-              libpnetcdf-dev
+              libpnetcdf-dev \
+              libnetcdf-dev
             # Install mpi4py
             echo "Installing mpi4py${{ matrix.mpi4py-version }}"
             CC=mpicc python3 -m pip install -v \
@@ -69,7 +70,7 @@ jobs:
               libboost-test-dev \
               libnetcdf-dev
           fi
-          python3 -m pip install build pytest numpy NuMPI[test]
+          python3 -m pip install build pytest numpy NuMPI[test] netCDF4
           python3 -m pip list
 
       - name: Compile with CMake
