@@ -322,12 +322,15 @@ namespace muGrid {
          * @brief Validate that fields are compatible with this operator
          * @param nodal_field The nodal field
          * @param quad_field The quadrature point field
+         * @param is_transpose If true, swap ghost requirements (transpose reads
+         *        at negative offsets, so left/right ghost needs are flipped)
          * @return Reference to the GlobalFieldCollection
          * @throws RuntimeError if validation fails
          */
         const GlobalFieldCollection& validate_fields(
             const TypedFieldBase<Real> &nodal_field,
-            const TypedFieldBase<Real> &quad_field) const;
+            const TypedFieldBase<Real> &quad_field,
+            bool is_transpose = false) const;
 
         /**
          * @brief Get or create sparse operator for apply operation

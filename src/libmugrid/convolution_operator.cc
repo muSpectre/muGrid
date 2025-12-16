@@ -70,7 +70,8 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     const GlobalFieldCollection& ConvolutionOperator::validate_fields(
         const TypedFieldBase<Real> &nodal_field,
-        const TypedFieldBase<Real> &quad_field) const {
+        const TypedFieldBase<Real> &quad_field,
+        bool is_transpose) const {
         // Both fields must be from the same field collection to ensure
         // compatible internal structure for pixel mapping
         if (&nodal_field.get_collection() != &quad_field.get_collection()) {
@@ -102,17 +103,32 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
-        // Check that fields have enough ghost cells on the left
+        // Ghost requirements depend on operation direction:
+        // - Apply reads at (p + s), needs ghosts based on positive stencil offsets
+        // - Transpose reads at (p - s), needs ghosts based on negative stencil offsets
+        // For transpose, the left/right requirements are swapped.
         const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
-        const auto min_ghosts_left{IntCoord_t(this->spatial_dim, 0) -
+        const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
+
+        // Base requirements for apply operation
+        const auto apply_min_left{IntCoord_t(this->spatial_dim, 0) -
+                                  IntCoord_t(this->pixel_offset)};
+        const auto apply_min_right{IntCoord_t(this->conv_pts_shape) -
+                                   IntCoord_t(this->spatial_dim, 1) +
                                    IntCoord_t(this->pixel_offset)};
+
+        // For transpose, swap left/right requirements
+        const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
+        const auto min_ghosts_right{is_transpose ? apply_min_left : apply_min_right};
+
         for (Index_t direction = 0; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
                 std::stringstream err_msg{};
                 err_msg
                     << "Ambiguous field shape: on axis " << direction
-                    << ", the convolution expects a minimum of "
+                    << ", the " << (is_transpose ? "transpose" : "apply")
+                    << " operation expects a minimum of "
                     << min_ghosts_left[direction]
                     << " cells on the left, but the provided fields have only "
                     << nb_ghosts_left[direction] << " ghosts on the left.";
@@ -120,18 +136,14 @@ namespace muGrid {
             }
         }
 
-        // Check that fields have enough ghost cells on the right
-        const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
-        const auto min_ghosts_right{IntCoord_t(this->conv_pts_shape) -
-                                    IntCoord_t(this->spatial_dim, 1) +
-                                    IntCoord_t(this->pixel_offset)};
         for (Index_t direction = 0; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
                 std::stringstream err_msg{};
                 err_msg
                     << "Ambiguous field shape: on axis " << direction
-                    << ", the convolution expects a minimum of "
+                    << ", the " << (is_transpose ? "transpose" : "apply")
+                    << " operation expects a minimum of "
                     << min_ghosts_right[direction]
                     << " cells on the right, but the provided fields have only "
                     << nb_ghosts_right[direction] << " ghosts on the right.";
@@ -452,9 +464,10 @@ namespace muGrid {
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
-        // Validate fields and get collection
+        // Validate fields and get collection (is_transpose=true for correct ghost check)
         const auto & collection = this->validate_fields(nodal_field,
-                                                        quadrature_point_field);
+                                                        quadrature_point_field,
+                                                        true);
 
         // Get component counts
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
