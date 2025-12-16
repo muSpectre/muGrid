@@ -77,20 +77,23 @@ namespace muGrid {
       return shape;
     }
 
-    static Eigen::MatrixXd get_pixel_operator() {
+    static std::vector<Real> get_pixel_operator() {
       // Simple finite difference gradient operator
+      // Layout: column-major (Fortran order) to match original Eigen matrix
       // rows = NbOperators * NbQuadPts = Dim
       // cols = NbNodalPts * 2^Dim
       const Index_t nb_stencil_pts = static_cast<Index_t>(std::pow(2, Dim));
-      Eigen::MatrixXd op = Eigen::MatrixXd::Zero(Dim, nb_stencil_pts);
+      const Index_t nb_rows = Dim;
+      std::vector<Real> op(nb_rows * nb_stencil_pts, 0.0);
 
       if (Dim == 2) {
         // 2D gradient using bilinear interpolation
         // Stencil: (0,0), (1,0), (0,1), (1,1)
         // d/dx: [-1, 1, -1, 1] / 2
         // d/dy: [-1, -1, 1, 1] / 2
-        op(0, 0) = -0.5; op(0, 1) = 0.5; op(0, 2) = -0.5; op(0, 3) = 0.5;
-        op(1, 0) = -0.5; op(1, 1) = -0.5; op(1, 2) = 0.5; op(1, 3) = 0.5;
+        // Column-major: op[row + col * nb_rows]
+        op[0 + 0*nb_rows] = -0.5; op[0 + 1*nb_rows] = 0.5; op[0 + 2*nb_rows] = -0.5; op[0 + 3*nb_rows] = 0.5;
+        op[1 + 0*nb_rows] = -0.5; op[1 + 1*nb_rows] = -0.5; op[1 + 2*nb_rows] = 0.5; op[1 + 3*nb_rows] = 0.5;
       } else if (Dim == 3) {
         // 3D gradient using trilinear interpolation
         // Stencil: (0,0,0), (1,0,0), (0,1,0), (1,1,0), (0,0,1), (1,0,1), (0,1,1), (1,1,1)
@@ -98,9 +101,9 @@ namespace muGrid {
         // d/dy: [-1, -1, 1, 1, -1, -1, 1, 1] / 4
         // d/dz: [-1, -1, -1, -1, 1, 1, 1, 1] / 4
         for (Index_t i = 0; i < 8; ++i) {
-          op(0, i) = ((i & 1) ? 0.25 : -0.25);       // x-derivative
-          op(1, i) = ((i & 2) ? 0.25 : -0.25);       // y-derivative
-          op(2, i) = ((i & 4) ? 0.25 : -0.25);       // z-derivative
+          op[0 + i*nb_rows] = ((i & 1) ? 0.25 : -0.25);       // x-derivative
+          op[1 + i*nb_rows] = ((i & 2) ? 0.25 : -0.25);       // y-derivative
+          op[2 + i*nb_rows] = ((i & 4) ? 0.25 : -0.25);       // z-derivative
         }
       }
       return op;
@@ -114,10 +117,10 @@ namespace muGrid {
   struct Fixture2D : public ConvolutionFixtureBase<twoD> {
     static constexpr Index_t grid_size = 8;
     IntCoord_t nb_grid_pts{grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 1, grid_size + 1};  // +1 for ghost
+    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
     IntCoord_t subdomain_locations{0, 0};
-    IntCoord_t nb_ghosts_left{0, 0};
-    IntCoord_t nb_ghosts_right{1, 1};
+    IntCoord_t nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
+    IntCoord_t nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -141,10 +144,10 @@ namespace muGrid {
   struct Fixture3D : public ConvolutionFixtureBase<threeD> {
     static constexpr Index_t grid_size = 8;
     IntCoord_t nb_grid_pts{grid_size, grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 1, grid_size + 1, grid_size + 1};
+    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
     IntCoord_t subdomain_locations{0, 0, 0};
-    IntCoord_t nb_ghosts_left{0, 0, 0};
-    IntCoord_t nb_ghosts_right{1, 1, 1};
+    IntCoord_t nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
+    IntCoord_t nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -170,10 +173,10 @@ namespace muGrid {
   struct FixtureLarge2D : public ConvolutionFixtureBase<twoD> {
     static constexpr Index_t grid_size = 128;
     IntCoord_t nb_grid_pts{grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 1, grid_size + 1};
+    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
     IntCoord_t subdomain_locations{0, 0};
-    IntCoord_t nb_ghosts_left{0, 0};
-    IntCoord_t nb_ghosts_right{1, 1};
+    IntCoord_t nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
+    IntCoord_t nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -196,10 +199,10 @@ namespace muGrid {
   struct FixtureLarge3D : public ConvolutionFixtureBase<threeD> {
     static constexpr Index_t grid_size = 32;
     IntCoord_t nb_grid_pts{grid_size, grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 1, grid_size + 1, grid_size + 1};
+    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
     IntCoord_t subdomain_locations{0, 0, 0};
-    IntCoord_t nb_ghosts_left{0, 0, 0};
-    IntCoord_t nb_ghosts_right{1, 1, 1};
+    IntCoord_t nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
+    IntCoord_t nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -237,10 +240,10 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(Fix::op.get_nb_operators(), Fix::NbOperators);
 
     auto & pixel_op = Fix::op.get_pixel_operator();
-    BOOST_CHECK_EQUAL(pixel_op.rows(), Fix::NbOperators * Fix::NbQuadPts);
-    const Index_t expected_cols = Fix::NbNodalPts *
+    const Index_t expected_size = Fix::NbOperators * Fix::NbQuadPts *
+                                  Fix::NbNodalPts *
                                   static_cast<Index_t>(std::pow(2, Fix::Dim));
-    BOOST_CHECK_EQUAL(pixel_op.cols(), expected_cols);
+    BOOST_CHECK_EQUAL(pixel_op.size(), expected_size);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -278,30 +281,61 @@ namespace muGrid {
     // Fill with linear function: f(x,y) = ax + by (+ cz for 3D)
     const Real a = 1.5, b = 2.3, c = 3.1;
 
-    auto nodal_map = nodal.get_pixel_map();
-    for (auto && [id, ccoord] : Fix::collection.get_pixels_with_ghosts().enumerate()) {
+    // Use raw data access to set values, matching how the sparse operator indexes
+    Real* nodal_data = nodal.data();
+    const auto& pixels = Fix::collection.get_pixels_with_ghosts();
+    for (auto && [id, ccoord] : pixels.enumerate()) {
       Real val = a * ccoord[0] + b * ccoord[1];
       if (Fix::Dim == 3) {
         val += c * ccoord[2];
       }
-      nodal_map[id](0, 0) = val;
+      nodal_data[id] = val;
     }
 
     // Apply gradient
     Fix::op.apply(nodal, quad);
 
-    // Check gradient is [a, b] (or [a, b, c] for 3D) at interior points
-    auto quad_map = quad.get_pixel_map();
+    // Debug: check if any non-zero values were written
+    Real max_grad = quad.eigen_vec().cwiseAbs().maxCoeff();
+    BOOST_TEST_MESSAGE("Max gradient magnitude: " << max_grad);
+    BOOST_CHECK_GT(max_grad, 0.0);  // Should have non-zero gradient
 
-    for (auto && [id, ccoord] : Fix::collection.get_pixels_without_ghosts().enumerate()) {
-      auto grad = quad_map[id];
-      Real err_x = std::abs(grad(0, 0) - a);
-      Real err_y = std::abs(grad(1, 0) - b);
-      BOOST_CHECK_LE(err_x, tol);
-      BOOST_CHECK_LE(err_y, tol);
-      if (Fix::Dim == 3) {
-        Real err_z = std::abs(grad(2, 0) - c);
-        BOOST_CHECK_LE(err_z, tol);
+    // Check gradient is [a, b] (or [a, b, c] for 3D) at interior points
+    // Use raw data access with proper ghost offset calculation
+    const Real* quad_data = quad.data();
+    const Index_t nb_quad_components = Fix::Dim;
+    const Index_t start_idx = Fix::collection.get_pixels_index_diff();
+
+    // Compute stride (row width including ghosts) - must account for components per pixel
+    const auto& subdomain_pts = Fix::collection.get_nb_subdomain_grid_pts_with_ghosts();
+    const Index_t quad_stride_x = nb_quad_components;  // stride in x direction
+    const Index_t quad_stride_y = subdomain_pts[0] * nb_quad_components;  // stride in y direction
+    Index_t quad_stride_z = 1;
+    if (Fix::Dim == 3) {
+      quad_stride_z = subdomain_pts[0] * subdomain_pts[1] * nb_quad_components;
+    }
+
+    // Direct loop matching the kernel's iteration pattern
+    const Index_t nx = Fix::nb_grid_pts[0];
+    const Index_t ny = Fix::nb_grid_pts[1];
+    const Index_t nz = (Fix::Dim == 3) ? Fix::nb_grid_pts[2] : 1;
+    const Index_t quad_base = start_idx * nb_quad_components;
+
+    for (Index_t z = 0; z < nz; ++z) {
+      for (Index_t y = 0; y < ny; ++y) {
+        for (Index_t x = 0; x < nx; ++x) {
+          Index_t quad_offset = quad_base + z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
+          const Real* grad = quad_data + quad_offset;
+
+          Real err_x = std::abs(grad[0] - a);
+          Real err_y = std::abs(grad[1] - b);
+          BOOST_CHECK_LE(err_x, tol);
+          BOOST_CHECK_LE(err_y, tol);
+          if (Fix::Dim == 3) {
+            Real err_z = std::abs(grad[2] - c);
+            BOOST_CHECK_LE(err_z, tol);
+          }
+        }
       }
     }
   }
