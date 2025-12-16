@@ -347,6 +347,8 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(transpose_adjoint_property, Fix,
                                    ConvolutionFixtures, Fix) {
     // Test that <Bu, v> = <u, B^T v> for random u, v
+    // NOTE: Ghost pixels must be zero for the adjoint property to hold exactly,
+    // because Apply reads from right ghosts while Transpose reads from left ghosts.
     auto & u = dynamic_cast<RealField &>(
         Fix::collection.register_real_field("u", 1, PixelTag));
     auto & v = dynamic_cast<RealField &>(
@@ -356,15 +358,52 @@ namespace muGrid {
     auto & BTv = dynamic_cast<RealField &>(
         Fix::collection.register_real_field("BTv", 1, PixelTag));
 
-    // Initialize with random values
+    // Initialize all to zero first (including ghosts)
+    u.set_zero();
+    v.set_zero();
+
+    // Then set random values only for interior pixels
     std::mt19937 gen(42);
     std::uniform_real_distribution<Real> dist(-1.0, 1.0);
 
-    for (Index_t i = 0; i < u.eigen_vec().size(); ++i) {
-      u.eigen_vec()(i) = dist(gen);
+    // Set u (nodal field) interior values
+    Real* u_data = u.data();
+    const Index_t u_start = Fix::collection.get_pixels_index_diff();
+    const Index_t u_elems_per_pixel = 1;  // 1 component, 1 nodal pt
+    const auto& subdomain = Fix::collection.get_nb_subdomain_grid_pts_with_ghosts();
+    const Index_t u_stride_x = u_elems_per_pixel;
+    const Index_t u_stride_y = subdomain[0] * u_elems_per_pixel;
+    const Index_t u_stride_z = (Fix::Dim == 3) ? subdomain[0] * subdomain[1] * u_elems_per_pixel : 1;
+
+    const Index_t nx = Fix::nb_grid_pts[0];
+    const Index_t ny = Fix::nb_grid_pts[1];
+    const Index_t nz = (Fix::Dim == 3) ? Fix::nb_grid_pts[2] : 1;
+
+    for (Index_t z = 0; z < nz; ++z) {
+      for (Index_t y = 0; y < ny; ++y) {
+        for (Index_t x = 0; x < nx; ++x) {
+          Index_t idx = u_start * u_elems_per_pixel + z * u_stride_z + y * u_stride_y + x * u_stride_x;
+          u_data[idx] = dist(gen);
+        }
+      }
     }
-    for (Index_t i = 0; i < v.eigen_vec().size(); ++i) {
-      v.eigen_vec()(i) = dist(gen);
+
+    // Set v (quad field) interior values
+    Real* v_data = v.data();
+    const Index_t v_elems_per_pixel = Fix::Dim;  // Dim components, 1 quad pt
+    const Index_t v_stride_x = v_elems_per_pixel;
+    const Index_t v_stride_y = subdomain[0] * v_elems_per_pixel;
+    const Index_t v_stride_z = (Fix::Dim == 3) ? subdomain[0] * subdomain[1] * v_elems_per_pixel : 1;
+
+    for (Index_t z = 0; z < nz; ++z) {
+      for (Index_t y = 0; y < ny; ++y) {
+        for (Index_t x = 0; x < nx; ++x) {
+          Index_t idx = u_start * v_elems_per_pixel + z * v_stride_z + y * v_stride_y + x * v_stride_x;
+          for (Index_t c = 0; c < Fix::Dim; ++c) {
+            v_data[idx + c] = dist(gen);
+          }
+        }
+      }
     }
 
     // Compute Bu and B^T v
@@ -496,6 +535,8 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(multi_component_field, Fix,
                                    ConvolutionFixtures, Fix) {
+    // Test adjoint property with multi-component fields
+    // NOTE: Ghost pixels must be zero for the adjoint property to hold exactly.
     const Index_t nb_components = 3;
     auto & nodal = dynamic_cast<RealField &>(
         Fix::collection.register_real_field("nodal_multi", nb_components, PixelTag));
@@ -503,11 +544,34 @@ namespace muGrid {
         Fix::collection.register_real_field("quad_multi",
                                             nb_components * Fix::Dim, "quad"));
 
-    // Set random values
+    // Initialize all to zero first (including ghosts)
+    nodal.set_zero();
+
+    // Set random values only for interior pixels
     std::mt19937 gen(999);
     std::uniform_real_distribution<Real> dist(-1.0, 1.0);
-    for (Index_t i = 0; i < nodal.eigen_vec().size(); ++i) {
-      nodal.eigen_vec()(i) = dist(gen);
+
+    Real* nodal_data = nodal.data();
+    const Index_t start_idx = Fix::collection.get_pixels_index_diff();
+    const auto& subdomain = Fix::collection.get_nb_subdomain_grid_pts_with_ghosts();
+    const Index_t nodal_elems = nb_components;  // components per pixel
+    const Index_t nodal_stride_x = nodal_elems;
+    const Index_t nodal_stride_y = subdomain[0] * nodal_elems;
+    const Index_t nodal_stride_z = (Fix::Dim == 3) ? subdomain[0] * subdomain[1] * nodal_elems : 1;
+
+    const Index_t nx = Fix::nb_grid_pts[0];
+    const Index_t ny = Fix::nb_grid_pts[1];
+    const Index_t nz = (Fix::Dim == 3) ? Fix::nb_grid_pts[2] : 1;
+
+    for (Index_t z = 0; z < nz; ++z) {
+      for (Index_t y = 0; y < ny; ++y) {
+        for (Index_t x = 0; x < nx; ++x) {
+          Index_t idx = start_idx * nodal_elems + z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
+          for (Index_t c = 0; c < nb_components; ++c) {
+            nodal_data[idx + c] = dist(gen);
+          }
+        }
+      }
     }
 
     // Apply gradient
@@ -519,8 +583,24 @@ namespace muGrid {
     auto & quad2 = dynamic_cast<RealField &>(
         Fix::collection.register_real_field("quad_multi2",
                                             nb_components * Fix::Dim, "quad"));
-    for (Index_t i = 0; i < quad2.eigen_vec().size(); ++i) {
-      quad2.eigen_vec()(i) = dist(gen);
+
+    // Initialize quad2 with zeros, then set interior values
+    quad2.set_zero();
+    Real* quad2_data = quad2.data();
+    const Index_t quad_elems = nb_components * Fix::Dim;  // components per pixel
+    const Index_t quad_stride_x = quad_elems;
+    const Index_t quad_stride_y = subdomain[0] * quad_elems;
+    const Index_t quad_stride_z = (Fix::Dim == 3) ? subdomain[0] * subdomain[1] * quad_elems : 1;
+
+    for (Index_t z = 0; z < nz; ++z) {
+      for (Index_t y = 0; y < ny; ++y) {
+        for (Index_t x = 0; x < nx; ++x) {
+          Index_t idx = start_idx * quad_elems + z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
+          for (Index_t c = 0; c < quad_elems; ++c) {
+            quad2_data[idx + c] = dist(gen);
+          }
+        }
+      }
     }
 
     Fix::op.transpose(quad2, nodal2);
