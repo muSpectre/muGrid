@@ -50,7 +50,7 @@ if(MUGRID_WITH_NETCDF)
 endif()
 
 # Create shared library
-add_library(muGrid SHARED ${MUGRID_SOURCES})
+add_library(muGrid STATIC ${MUGRID_SOURCES})
 
 # Set library properties
 set_target_properties(muGrid PROPERTIES
