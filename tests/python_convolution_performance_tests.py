@@ -82,6 +82,25 @@ def gpu_backend_available():
 GPU_AVAILABLE = gpu_backend_available()
 
 
+def get_gpu_skip_reason():
+    """Get detailed skip reason for GPU tests."""
+    if not GPU_AVAILABLE:
+        return "GPU backend not available (Kokkos not compiled with CUDA/HIP)"
+    return None
+
+
+def get_gpu_cupy_skip_reason():
+    """Get detailed skip reason for GPU+CuPy tests."""
+    reasons = []
+    if not GPU_AVAILABLE:
+        reasons.append("GPU backend not available (Kokkos not compiled with CUDA/HIP)")
+    if not HAS_CUPY:
+        reasons.append("CuPy not installed (pip install cupy-cuda*)")
+    if reasons:
+        return "; ".join(reasons)
+    return None
+
+
 @dataclass
 class PerformanceMetrics:
     """Container for performance metrics"""
@@ -538,69 +557,126 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         print("=" * 90 + "\n")
 
 
-#@pytest.mark.skip("This needs to be triggered manually")
-def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
+def run_laplace_solver(nb_grid_pts, use_device=False):
+    """
+    Run Laplace solver using muGrid convolution operator.
+
+    Parameters
+    ----------
+    nb_grid_pts : tuple
+        Grid size (nx, ny)
+    use_device : bool
+        If True, use GPU memory; otherwise use CPU
+
+    Returns
+    -------
+    tuple
+        (solution array, elapsed time in seconds, device string)
+    """
     comm = muGrid.Communicator()
     subdivisions = (1, 1)
 
-    # For debug reporting
-    def callback(it, x, r, p):
-        """
-        Callback function to print the current solution, residual, and search direction.
-        """
-        print(f"{it:5} {np.dot(r.ravel(), r.ravel()):.5}")
+    # Determine memory location
+    if use_device:
+        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Device
+    else:
+        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Host
 
     # Setup problem
     decomposition = muGrid.CartesianDecomposition(
-        comm, nb_grid_pts, subdivisions, (1, 1), (1, 1)
+        comm, nb_grid_pts, subdivisions, (1, 1), (1, 1),
+        memory_location=memory_location
     )
     fc = decomposition.collection
-    grid_spacing = 1 / np.array(nb_grid_pts)  # Grid spacing
+    grid_spacing = 1 / np.array(nb_grid_pts)
 
-    x, y = decomposition.coords  # Domain-local coords for each pixel
+    x, y = decomposition.coords
     i, j = decomposition.icoords
 
     rhs = real_field(decomposition, "rhs")
     solution = real_field(decomposition, "solution")
 
-    rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
-    rhs.p[...] -= np.mean(rhs.p)
+    # Initialize RHS - need to handle device arrays differently
+    if use_device and HAS_CUPY:
+        x_cp = cp.asarray(x)
+        y_cp = cp.asarray(y)
+        rhs_data = (1 + cp.cos(2 * cp.pi * x_cp) * cp.cos(2 * cp.pi * y_cp)) ** 10
+        rhs_data -= cp.mean(rhs_data)
+        rhs.p[...] = rhs_data
+        solution.s[...] = 0
+    else:
+        rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
+        rhs.p[...] -= np.mean(rhs.p)
+        solution.s[...] = 0
 
-    solution.s[...] = 0
-
-    # muGrid solution
-    stencil = np.array(
-        [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
-    )  # FD-stencil for the Laplacian
+    # Create Laplace operator
+    stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
     laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
 
+    # Get device string for reporting
+    device_str = rhs._cpp.device
+
+    # Define Hessian-vector product
+    scale_factor = -np.mean(grid_spacing) ** 2
+
     def hessp_mugrid(x_field, Ax_field):
-        """
-        Function to compute the product of the Hessian matrix with a vector.
-        The Hessian is represented by the convolution operator.
-        """
         decomposition.communicate_ghosts(x_field)
         laplace.apply(x_field, Ax_field)
-        # We need the minus sign because the Laplace operator is negative
-        # definite, but the conjugate-gradients solver assumes a
-        # positive-definite operator.
         Ax = wrap_field(Ax_field)
-        Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        Ax.s[...] /= scale_factor
         return Ax_field
 
-    t_mugrid = -time.perf_counter()
+    # Time the solver
+    if use_device and HAS_CUPY:
+        cp.cuda.Device().synchronize()
+        start_event = cp.cuda.Event()
+        end_event = cp.cuda.Event()
+        start_event.record()
+
+    t_start = time.perf_counter()
     conjugate_gradients(
-        comm,
-        fc,
-        hessp_mugrid,  # linear operator
-        rhs._cpp,
-        solution._cpp,
-        tol=1e-6,
-        maxiter=1000,
-        # callback=callback,
+        comm, fc, hessp_mugrid,
+        rhs._cpp, solution._cpp,
+        tol=1e-6, maxiter=1000,
     )
-    t_mugrid += time.perf_counter()
-    mugrid_solution = solution.s.copy()
+    t_elapsed = time.perf_counter() - t_start
+
+    if use_device and HAS_CUPY:
+        end_event.record()
+        end_event.synchronize()
+        t_elapsed = cp.cuda.get_elapsed_time(start_event, end_event) / 1000.0
+
+    # Get solution back to host for comparison
+    if use_device and HAS_CUPY:
+        solution_arr = cp.asnumpy(solution.s)
+    else:
+        solution_arr = solution.s.copy()
+
+    return solution_arr, t_elapsed, device_str
+
+
+def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
+    """Test Laplace solver: muGrid convolution vs SciPy sparse matrix."""
+    comm = muGrid.Communicator()
+    subdivisions = (1, 1)
+
+    # Run muGrid solution on host
+    mugrid_solution, t_mugrid, device_str = run_laplace_solver(nb_grid_pts, use_device=False)
+
+    # Setup for scipy comparison
+    decomposition = muGrid.CartesianDecomposition(
+        comm, nb_grid_pts, subdivisions, (1, 1), (1, 1)
+    )
+    fc = decomposition.collection
+    grid_spacing = 1 / np.array(nb_grid_pts)
+    x, y = decomposition.coords
+    i, j = decomposition.icoords
+
+    solution = real_field(decomposition, "solution")
+    rhs = real_field(decomposition, "rhs")
+    rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
+    rhs.p[...] -= np.mean(rhs.p)
+    solution.s[...] = 0
 
     # scipy Laplace sparse matrix
     nb = np.prod(nb_grid_pts)
@@ -610,223 +686,357 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
             j % nb_grid_pts[1]
         ).reshape(-1)
 
-    laplace = (
-        coo_array(
-            (-4 * np.ones(nb), (grid_index(i, j), grid_index(i, j))), shape=(nb, nb)
-        )
-        + coo_array(
-            (np.ones(nb), (grid_index(i, j), grid_index(i + 1, j))), shape=(nb, nb)
-        )
-        + coo_array(
-            (np.ones(nb), (grid_index(i, j), grid_index(i - 1, j))), shape=(nb, nb)
-        )
-        + coo_array(
-            (np.ones(nb), (grid_index(i, j), grid_index(i, j + 1))), shape=(nb, nb)
-        )
-        + coo_array(
-            (np.ones(nb), (grid_index(i, j), grid_index(i, j - 1))), shape=(nb, nb)
-        )
-    )
-
-    laplace = laplace.tocsr()
-
-    # scipy solution
-    solution.s[...] = 0
+    laplace_sparse = (
+        coo_array((-4 * np.ones(nb), (grid_index(i, j), grid_index(i, j))), shape=(nb, nb))
+        + coo_array((np.ones(nb), (grid_index(i, j), grid_index(i + 1, j))), shape=(nb, nb))
+        + coo_array((np.ones(nb), (grid_index(i, j), grid_index(i - 1, j))), shape=(nb, nb))
+        + coo_array((np.ones(nb), (grid_index(i, j), grid_index(i, j + 1))), shape=(nb, nb))
+        + coo_array((np.ones(nb), (grid_index(i, j), grid_index(i, j - 1))), shape=(nb, nb))
+    ).tocsr()
 
     def hessp_scipy(x_field, Ax_field):
-        """
-        Function to compute the product of the Hessian matrix with a vector.
-        The Hessian is represented by the convolution operator.
-        """
-        x = wrap_field(x_field)
+        x_arr = wrap_field(x_field)
         Ax = wrap_field(Ax_field)
-        Ax.p[...] = (laplace @ x.p.reshape(-1)).reshape(nb_grid_pts)
-        # We need the minus sign because the Laplace operator is negative
-        # definite, but the conjugate-gradients solver assumes a
-        # positive-definite operator.
-        Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        Ax.p[...] = (laplace_sparse @ x_arr.p.reshape(-1)).reshape(nb_grid_pts)
+        Ax.s[...] /= -np.mean(grid_spacing) ** 2
         return Ax_field
 
     t_scipy = -time.perf_counter()
     conjugate_gradients(
-        comm,
-        fc,
-        hessp_scipy,  # linear operator
-        rhs._cpp,
-        solution._cpp,
-        tol=1e-6,
-        maxiter=1000,
-        # callback=callback,
+        comm, fc, hessp_scipy,
+        rhs._cpp, solution._cpp,
+        tol=1e-6, maxiter=1000,
     )
     t_scipy += time.perf_counter()
 
-    # Check that both solutions agree
+    # Check solutions agree
     np.testing.assert_allclose(solution.s, mugrid_solution)
 
     # Print timing result
-    print(f"muGrid operator time:  {t_mugrid:.6f} s")
+    print(f"muGrid operator time ({device_str}):  {t_mugrid:.6f} s")
     print(f"SciPy Sparse time:  {t_scipy:.6f} s")
 
     # Check that the speed is at least comparable
-    assert (t_mugrid) < 1.05 * (t_scipy), (
+    assert t_mugrid < 1.05 * t_scipy, (
         f"muGrid slower than SciPy sparse: "
         f"muGrid {t_mugrid:.6f}s vs. SciPy sparse {t_scipy:.6f}s"
     )
 
 
-#@pytest.mark.skip("This needs to be triggered manually")
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
+def test_laplace_device_vs_host():
+    """Compare Laplace solver performance between CPU and GPU."""
+    nb_grid_pts = (256, 256)
+
+    # Run on host
+    host_solution, t_host, host_device = run_laplace_solver(nb_grid_pts, use_device=False)
+
+    # Run on device
+    device_solution, t_device, device_str = run_laplace_solver(nb_grid_pts, use_device=True)
+
+    # Check solutions match
+    np.testing.assert_allclose(
+        device_solution, host_solution,
+        rtol=1e-5, atol=1e-10,
+        err_msg="Device and host Laplace solutions differ"
+    )
+
+    # Print timing comparison
+    speedup = t_host / t_device if t_device > 0 else 0
+    print(f"\nLaplace solver comparison ({nb_grid_pts[0]}x{nb_grid_pts[1]}):")
+    print(f"  Host ({host_device}):   {t_host:.6f} s")
+    print(f"  Device ({device_str}): {t_device:.6f} s")
+    print(f"  Speedup: {speedup:.2f}x")
+
+
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
+def test_laplace_device_scaling():
+    """Test Laplace solver scaling on GPU across different grid sizes."""
+    grid_sizes = [64, 128, 256, 512]
+    results = []
+
+    print("\n=== Laplace Solver GPU Scaling ===")
+    print(f"{'Grid':>10} {'Host (s)':>12} {'Device (s)':>12} {'Speedup':>10}")
+    print("-" * 50)
+
+    for size in grid_sizes:
+        nb_grid_pts = (size, size)
+
+        # Host timing
+        _, t_host, _ = run_laplace_solver(nb_grid_pts, use_device=False)
+
+        # Device timing
+        _, t_device, device_str = run_laplace_solver(nb_grid_pts, use_device=True)
+
+        speedup = t_host / t_device if t_device > 0 else 0
+        results.append((size, t_host, t_device, speedup))
+
+        print(f"{size}x{size:>4} {t_host:>12.6f} {t_device:>12.6f} {speedup:>10.2f}x")
+
+    print("-" * 50)
+    print(f"Device: {device_str}")
+
+
+def get_quad_triangle_kernel():
+    """Get the kernel for quadrature on triangles with 6 quadrature points."""
+    return np.array(
+        [
+            [  # operator 1
+                [  # quadrature point 1
+                    [[2/3, 1/6], [1/6, 0]]
+                ],
+                [  # quadrature point 2
+                    [[1/6, 1/6], [2/3, 0]]
+                ],
+                [  # quadrature point 3
+                    [[1/6, 2/3], [1/6, 0]]
+                ],
+                [  # quadrature point 4
+                    [[0, 1/6], [1/6, 2/3]]
+                ],
+                [  # quadrature point 5
+                    [[0, 2/3], [1/6, 1/6]]
+                ],
+                [  # quadrature point 6
+                    [[0, 1/6], [2/3, 1/6]]
+                ],
+            ]
+        ]
+    )
+
+
+def get_quad_triangle_manual_matrix():
+    """Get the manual matrix for quadrature on triangles."""
+    return np.array([
+        [2/3, 1/6, 1/6, 0],  # q1
+        [1/6, 2/3, 1/6, 0],  # q2
+        [1/6, 1/6, 2/3, 0],  # q3
+        [0, 1/6, 1/6, 2/3],  # q4
+        [0, 1/6, 2/3, 1/6],  # q5
+        [0, 2/3, 1/6, 1/6]   # q6
+    ])
+
+
+def run_quad_triangle_mugrid(nb_grid_pts, use_device=False):
+    """
+    Run quadrature triangle computation using muGrid convolution.
+
+    Parameters
+    ----------
+    nb_grid_pts : tuple
+        Grid size (Nx, Ny)
+    use_device : bool
+        If True, use GPU memory
+
+    Returns
+    -------
+    tuple
+        (result array on host, elapsed time, device string)
+    """
+    Nx, Ny = nb_grid_pts
+
+    # Determine memory location
+    if use_device:
+        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Device
+    else:
+        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Host
+
+    # Create field collection
+    fc = muGrid.GlobalFieldCollection(
+        nb_grid_pts,
+        sub_pts={"quad": 6},
+        nb_ghosts_right=(1, 1),
+        memory_location=memory_location
+    )
+    nodal_field_cpp = fc.real_field("nodal")
+    quad_field_cpp = fc.real_field("quad", 1, "quad")
+    nodal_field = wrap_field(nodal_field_cpp)
+
+    # Random nodal values
+    init_field = np.random.rand(Nx, Ny)
+    padded_field = np.pad(init_field, (0, 1), mode="wrap")
+
+    # Initialize field
+    if use_device and HAS_CUPY:
+        nodal_field.pg[...] = cp.asarray(padded_field)
+    else:
+        nodal_field.pg[...] = padded_field
+
+    # Create operator
+    kernel = get_quad_triangle_kernel()
+    op_mugrid = muGrid.ConvolutionOperator([0, 0], kernel)
+
+    device_str = nodal_field_cpp.device
+
+    # Time the operation
+    if use_device and HAS_CUPY:
+        cp.cuda.Device().synchronize()
+        start_event = cp.cuda.Event()
+        end_event = cp.cuda.Event()
+        start_event.record()
+
+    t_start = time.perf_counter()
+    op_mugrid.apply(nodal_field_cpp, quad_field_cpp)
+    t_elapsed = time.perf_counter() - t_start
+
+    if use_device and HAS_CUPY:
+        end_event.record()
+        end_event.synchronize()
+        t_elapsed = cp.cuda.get_elapsed_time(start_event, end_event) / 1000.0
+
+    # Get result back to host
+    quad_field = wrap_field(quad_field_cpp)
+    if use_device and HAS_CUPY:
+        result = cp.asnumpy(quad_field.p)
+    else:
+        result = quad_field.p.copy()
+
+    return result, t_elapsed, device_str, init_field
+
+
+def quad_manual_combined(a, Nx, Ny, m_quad):
+    """Compute quadrature manually using tensor-matrix multiplication."""
+    F = a.reshape((Nx, Ny))
+
+    # periodic wrap
+    F = np.vstack([F, F[0:1, :]])
+    F = np.hstack([F, F[:, 0:1]])
+
+    # stack square-adjacent nodal values
+    bl = F[:-1, :-1]
+    br = F[:-1, 1:]
+    tl = F[1:, :-1]
+    tr = F[1:, 1:]
+
+    stack = np.stack([bl, tl, br, tr], axis=-1)
+    res = np.einsum('ij,xyj->xyi', m_quad, stack)
+    return res  # shape (Nx, Ny, 6)
+
+
 def test_quad_triangle_3_mugrid_vs_manual():
     """
     Compares wall-clock time and correctness of computing quadrature points on
     triangles using muGrid convolution vs. 'manual' tensor-matrix multiplication.
     """
-
-    # prepare muGrid operator
-    def prepare_muGrid():
-        kernel_quad_triangle_3 = np.array(
-            [
-                [  # operator 1
-                    [  # quadrature point 1
-                        [
-                            [2/3, 1/6],
-                            [1/6, 0],
-                        ]
-                    ],
-                    [  # quadrature point 2
-                        [
-                            [1/6, 1/6],
-                            [2/3, 0],
-                        ]
-                    ],
-                    [  # quadrature point 3
-                        [
-                            [1/6, 2/3],
-                            [1/6, 0],
-                        ]
-                    ],
-                    [  # quadrature point 4
-                        [
-                            [0, 1/6],
-                            [1/6, 2/3],
-                        ]
-                    ],
-                    [  # quadrature point 5
-                        [
-                            [0, 2/3],
-                            [1/6, 1/6],
-                        ]
-                    ],
-                    [  # quadrature point 6
-                        [
-                            [0, 1/6],
-                            [2/3, 1/6],
-                        ]
-                    ],
-                ]
-            ]
-        )
-        return muGrid.ConvolutionOperator([0, 0], kernel_quad_triangle_3)
-
-    # prepare manual operator
-    def prepare_manual_combined():
-        return np.array([
-            [2/3, 1/6, 1/6, 0],  # q1
-            [1/6, 2/3, 1/6, 0],  # q2
-            [1/6, 1/6, 2/3, 0],  # q3
-            [0, 1/6, 1/6, 2/3],  # q4
-            [0, 1/6, 2/3, 1/6],  # q5
-            [0, 2/3, 1/6, 1/6]   # q6
-        ])
-
-    def quad_manual_combined(a, Nx, Ny, m_quad):
-        F = a.reshape((Nx, Ny))
-
-        # periodic wrap
-        F = np.vstack([F, F[0:1, :]])
-        F = np.hstack([F, F[:, 0:1]])
-
-        # stack square-adjacent nodal values
-        bl = F[:-1, :-1]
-        br = F[:-1, 1:]
-        tl = F[1:, :-1]
-        tr = F[1:, 1:]
-
-        stack = np.stack([bl, tl, br, tr], axis=-1)
-        res = np.einsum('ij,xyj->xyi', m_quad, stack)
-        return res  # shape (Nx, Ny, 6)
-
-    # setup
     Nx, Ny = 1000, 1000
     nb_grid_pts = (Nx, Ny)
 
-    fc = muGrid.GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 6}, nb_ghosts_right=(1, 1))
-    nodal_field_cpp = fc.real_field("nodal")
-    quad_field_cpp = fc.real_field("quad", 1, "quad")
-    nodal_field = wrap_field(nodal_field_cpp)
-    quad_field = wrap_field(quad_field_cpp)
+    # Run muGrid
+    quad_mugrid, t_mugrid, device_str, init_field = run_quad_triangle_mugrid(
+        nb_grid_pts, use_device=False
+    )
 
-    # random nodal values
-    init_field = np.random.rand(Nx, Ny)
-    # Padding to get a periodic boundary
-    nodal_field.pg[...] = np.pad(init_field, (0, 1), mode="wrap")
-
-    # prepare operators
-    op_mugrid = prepare_muGrid()
-    m_quad = prepare_manual_combined()
-
-    # run muGrid operator
-    t0 = time.perf_counter()
-    op_mugrid.apply(nodal_field_cpp, quad_field_cpp)
-    t1 = time.perf_counter()
-
-    quad_mugrid = quad_field.p.copy()
-
-    # reset for manual
-    quad_field.p.fill(0.0)
-
-    # run manual operator
-    t2 = time.perf_counter()
+    # Run manual
+    m_quad = get_quad_triangle_manual_matrix()
+    t_manual_start = time.perf_counter()
     quad_manual = quad_manual_combined(init_field, Nx, Ny, m_quad)
-    t3 = time.perf_counter()
+    t_manual = time.perf_counter() - t_manual_start
 
     quad_manual = quad_manual.transpose(2, 0, 1)  # -> shape (6, Nx, Ny)
 
-    # optional timing output
-    print(f"muGrid operator time:  {t1 - t0:.6f} s")
-    print(f"Manual operator time:  {t3 - t2:.6f} s")
+    # Print timing
+    print(f"muGrid operator time ({device_str}):  {t_mugrid:.6f} s")
+    print(f"Manual operator time:  {t_manual:.6f} s")
 
-    # correctness check
-    np.testing.assert_allclose(
-        quad_mugrid,
-        quad_manual,
-        rtol=1e-10,
-        atol=1e-12,
-    )
+    # Correctness check
+    np.testing.assert_allclose(quad_mugrid, quad_manual, rtol=1e-10, atol=1e-12)
 
-    # compare wall-clock time
-    assert (t1 - t0) < 1.05 * (t3 - t2), (
+    # Compare wall-clock time
+    assert t_mugrid < 1.05 * t_manual, (
         f"muGrid slower than manual quadrature: "
-        f"muGrid {t1-t0:.6f}s vs. tensor-matrix mul {t3-t2:.6f}s"
+        f"muGrid {t_mugrid:.6f}s vs. tensor-matrix mul {t_manual:.6f}s"
     )
 
 
-def get_gpu_skip_reason():
-    """Get detailed skip reason for GPU tests."""
-    if not GPU_AVAILABLE:
-        return "GPU backend not available (Kokkos not compiled with CUDA/HIP)"
-    return None
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
+def test_quad_triangle_device_vs_host():
+    """Compare quadrature triangle computation between CPU and GPU."""
+    Nx, Ny = 1000, 1000
+    nb_grid_pts = (Nx, Ny)
+
+    # We need to use the same random seed for both runs
+    np.random.seed(42)
+
+    # Run on host
+    host_result, t_host, host_device, init_field_host = run_quad_triangle_mugrid(
+        nb_grid_pts, use_device=False
+    )
+
+    # Run on device with same input
+    # Recreate the field collection and use same init_field
+    if HAS_CUPY:
+        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Device
+    else:
+        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Host
+
+    fc = muGrid.GlobalFieldCollection(
+        nb_grid_pts,
+        sub_pts={"quad": 6},
+        nb_ghosts_right=(1, 1),
+        memory_location=memory_location
+    )
+    nodal_field_cpp = fc.real_field("nodal")
+    quad_field_cpp = fc.real_field("quad", 1, "quad")
+    nodal_field = wrap_field(nodal_field_cpp)
+
+    padded_field = np.pad(init_field_host, (0, 1), mode="wrap")
+    nodal_field.pg[...] = cp.asarray(padded_field)
+
+    kernel = get_quad_triangle_kernel()
+    op_mugrid = muGrid.ConvolutionOperator([0, 0], kernel)
+    device_str = nodal_field_cpp.device
+
+    # Time device operation
+    cp.cuda.Device().synchronize()
+    start_event = cp.cuda.Event()
+    end_event = cp.cuda.Event()
+    start_event.record()
+    op_mugrid.apply(nodal_field_cpp, quad_field_cpp)
+    end_event.record()
+    end_event.synchronize()
+    t_device = cp.cuda.get_elapsed_time(start_event, end_event) / 1000.0
+
+    quad_field = wrap_field(quad_field_cpp)
+    device_result = cp.asnumpy(quad_field.p)
+
+    # Check results match
+    np.testing.assert_allclose(
+        device_result, host_result,
+        rtol=1e-10, atol=1e-12,
+        err_msg="Device and host quadrature results differ"
+    )
+
+    # Print comparison
+    speedup = t_host / t_device if t_device > 0 else 0
+    print(f"\nQuadrature triangle comparison ({Nx}x{Ny}):")
+    print(f"  Host ({host_device}):   {t_host:.6f} s")
+    print(f"  Device ({device_str}): {t_device:.6f} s")
+    print(f"  Speedup: {speedup:.2f}x")
 
 
-def get_gpu_cupy_skip_reason():
-    """Get detailed skip reason for GPU+CuPy tests."""
-    reasons = []
-    if not GPU_AVAILABLE:
-        reasons.append("GPU backend not available (Kokkos not compiled with CUDA/HIP)")
-    if not HAS_CUPY:
-        reasons.append("CuPy not installed (pip install cupy-cuda*)")
-    if reasons:
-        return "; ".join(reasons)
-    return None
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
+def test_quad_triangle_device_scaling():
+    """Test quadrature triangle scaling on GPU across different grid sizes."""
+    grid_sizes = [256, 512, 1000, 2000]
+
+    print("\n=== Quadrature Triangle GPU Scaling ===")
+    print(f"{'Grid':>12} {'Host (s)':>12} {'Device (s)':>12} {'Speedup':>10}")
+    print("-" * 50)
+
+    for size in grid_sizes:
+        nb_grid_pts = (size, size)
+
+        # Host timing
+        _, t_host, _, _ = run_quad_triangle_mugrid(nb_grid_pts, use_device=False)
+
+        # Device timing
+        _, t_device, device_str, _ = run_quad_triangle_mugrid(nb_grid_pts, use_device=True)
+
+        speedup = t_host / t_device if t_device > 0 else 0
+        print(f"{size}x{size:>5} {t_host:>12.6f} {t_device:>12.6f} {speedup:>10.2f}x")
+
+    print("-" * 50)
+    print(f"Device: {device_str}")
 
 
 @unittest.skipUnless(GPU_AVAILABLE, get_gpu_skip_reason() or "")
