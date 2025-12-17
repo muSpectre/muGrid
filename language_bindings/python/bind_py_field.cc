@@ -73,15 +73,16 @@ namespace py = pybind11;
 
 /**
  * Context for DLPack managed tensor - holds the field reference to prevent
- * deallocation while the tensor is in use
+ * deallocation while the tensor is in use.
+ * Templated on MemorySpace to support both Host and Device fields.
  */
-template<typename T>
+template<typename T, typename MemorySpace = muGrid::HostSpace>
 struct DLPackContext {
-    TypedFieldBase<T>* field;
+    TypedFieldBase<T, MemorySpace>* field;
     std::vector<int64_t> shape;
     std::vector<int64_t> strides;
 
-    DLPackContext(TypedFieldBase<T>* f, const Shape_t& s, const Shape_t& st)
+    DLPackContext(TypedFieldBase<T, MemorySpace>* f, const Shape_t& s, const Shape_t& st)
         : field(f), shape(s.begin(), s.end()) {
         // DLPack spec says strides are in elements, not bytes
         strides.reserve(st.size());
@@ -94,9 +95,9 @@ struct DLPackContext {
 /**
  * Deleter function for DLManagedTensorVersioned
  */
-template<typename T>
+template<typename T, typename MemorySpace = muGrid::HostSpace>
 void dlpack_deleter_versioned(DLManagedTensorVersioned* tensor) {
-    auto* ctx = static_cast<DLPackContext<T>*>(tensor->manager_ctx);
+    auto* ctx = static_cast<DLPackContext<T, MemorySpace>*>(tensor->manager_ctx);
     delete ctx;
     delete tensor;
 }
@@ -149,7 +150,7 @@ DLDataType get_dlpack_dtype<std::complex<double>>() {
 
 /**
  * Create a DLPack capsule for a typed field using the versioned protocol.
- * This version works for host-space fields only (uses field.data()).
+ * Works for both Host and Device (GPU) fields via the get_data_ptr_any_space() method.
  */
 template<typename T, typename MemorySpace = muGrid::HostSpace>
 py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
@@ -164,7 +165,7 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
     Shape_t strides = field.get_strides(iter_unit, 1);  // strides in elements
 
     // Create context to hold shape/stride data
-    auto* ctx = new DLPackContext<T>(&field, shape, strides);
+    auto* ctx = new DLPackContext<T, MemorySpace>(&field, shape, strides);
 
     // Create DLManagedTensorVersioned (the modern DLPack protocol)
     auto* managed = new DLManagedTensorVersioned();
@@ -175,7 +176,7 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
 
     // Set manager context and deleter
     managed->manager_ctx = ctx;
-    managed->deleter = dlpack_deleter_versioned<T>;
+    managed->deleter = dlpack_deleter_versioned<T, MemorySpace>;
 
     // Set flags - 0 means writable, not a copy
     managed->flags = 0;
@@ -331,6 +332,46 @@ void add_typed_field(py::module &mod, std::string name) {
                  py::return_value_policy::reference_internal);
 }
 
+/**
+ * Register device-space (GPU) typed field bindings.
+ * These inherit from the base Field class and provide DLPack support for GPU arrays.
+ * Only compiled when CUDA or HIP backends are enabled.
+ */
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+template<class T>
+void add_typed_field_device(py::module &mod, std::string name) {
+    using DeviceSpace = muGrid::DefaultDeviceSpace;
+
+    // Device-space TypedFieldBase - inherits from Field
+    // Note: get_pixel_map and get_sub_pt_map are host-only, so not exposed here
+    py::class_<TypedFieldBase<T, DeviceSpace>, Field>(mod, (name + "DeviceBase").c_str())
+            // DLPack support for GPU tensors
+            .def(
+                "__dlpack__",
+                [](TypedFieldBase<T, DeviceSpace> &self, py::object stream) {
+                    (void)stream;  // TODO: support CUDA stream for async transfers
+                    return create_dlpack_capsule(self);
+                },
+                "stream"_a = py::none(),
+                "Export GPU field data via DLPack for zero-copy interop with CuPy, PyTorch, JAX, etc.")
+            .def(
+                "__dlpack_device__",
+                [](TypedFieldBase<T, DeviceSpace> &self) {
+                    return py::make_tuple(
+                        self.get_dlpack_device_type(),
+                        self.get_device_id()
+                    );
+                },
+                "Return DLPack device tuple (device_type, device_id)");
+
+    // Device-space TypedField
+    py::class_<TypedField<T, DeviceSpace>, TypedFieldBase<T, DeviceSpace>>(
+            mod, (name + "Device").c_str())
+            .def("clone", &TypedField<T, DeviceSpace>::clone, "new_name"_a, "allow_overwrite"_a,
+                 py::return_value_policy::reference_internal);
+}
+#endif
+
 template<typename T, muGrid::Mapping Mutability>
 decltype(auto) add_field_map_const(py::module &mod, const std::string &name) {
     std::string full_name{
@@ -377,10 +418,19 @@ void add_mutable_mapped_field(py::module &mod, const std::string &name) {
 void add_field_classes(py::module &mod) {
     add_field(mod);
 
+    // Host-space typed fields
     add_typed_field<muGrid::Real>(mod, "RealField");
     add_typed_field<muGrid::Complex>(mod, "ComplexField");
     add_typed_field<muGrid::Int>(mod, "IntField");
     add_typed_field<muGrid::Uint>(mod, "UintField");
+
+    // Device-space (GPU) typed fields - only when CUDA/HIP is enabled
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+    add_typed_field_device<muGrid::Real>(mod, "RealField");
+    add_typed_field_device<muGrid::Complex>(mod, "ComplexField");
+    add_typed_field_device<muGrid::Int>(mod, "IntField");
+    add_typed_field_device<muGrid::Uint>(mod, "UintField");
+#endif
 
     add_field_map<muGrid::Real>(mod, "RealFieldMap");
     add_field_map<muGrid::Complex>(mod, "ComplexFieldMap");

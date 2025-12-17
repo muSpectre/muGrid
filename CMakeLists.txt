@@ -104,7 +104,7 @@ if(NOT Kokkos_FOUND)
     FetchContent_Declare(
         kokkos
         GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-        GIT_TAG 5.0.0
+        GIT_TAG 4.7.02
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(kokkos)

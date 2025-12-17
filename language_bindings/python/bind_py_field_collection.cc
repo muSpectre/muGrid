@@ -224,10 +224,9 @@ void add_field_collection(py::module & mod) {
             "real_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
-                return dynamic_cast<muGrid::TypedField<Real> &>(
-                    collection.real_field(unique_name, nb_components,
-                                          sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.real_field(unique_name, nb_components,
+                                             sub_division, unit);
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -238,10 +237,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Real> & {
-                return dynamic_cast<muGrid::TypedField<Real> &>(
-                    collection.real_field(unique_name, components_shape,
-                                          sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.real_field(unique_name, components_shape,
+                                             sub_division, unit);
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -251,10 +249,9 @@ void add_field_collection(py::module & mod) {
             "complex_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
-                return dynamic_cast<muGrid::TypedField<Complex> &>(
-                    collection.complex_field(unique_name, nb_components,
-                                             sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.complex_field(unique_name, nb_components,
+                                                sub_division, unit);
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -265,10 +262,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Complex> & {
-                return dynamic_cast<muGrid::TypedField<Complex> &>(
-                    collection.complex_field(unique_name, components_shape,
-                                             sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.complex_field(unique_name, components_shape,
+                                                sub_division, unit);
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -278,10 +274,9 @@ void add_field_collection(py::module & mod) {
             "uint_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
-                return dynamic_cast<muGrid::TypedField<Uint> &>(
-                    collection.uint_field(unique_name, nb_components,
-                                          sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.uint_field(unique_name, nb_components,
+                                             sub_division, unit);
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -292,10 +287,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Uint> & {
-                return dynamic_cast<muGrid::TypedField<Uint> &>(
-                    collection.uint_field(unique_name, components_shape,
-                                          sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.uint_field(unique_name, components_shape,
+                                             sub_division, unit);
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,
@@ -305,10 +299,9 @@ void add_field_collection(py::module & mod) {
             "int_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
-                return dynamic_cast<muGrid::TypedField<Int> &>(
-                    collection.int_field(unique_name, nb_components,
-                                         sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.int_field(unique_name, nb_components,
+                                            sub_division, unit);
             },
             "unique_name"_a, "nb_components"_a,
             "sub_division"_a = muGrid::PixelTag,
@@ -319,10 +312,9 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name,
                const muGrid::Shape_t & components_shape,
                const std::string & sub_division,
-               const muGrid::Unit & unit) -> muGrid::TypedField<Int> & {
-                return dynamic_cast<muGrid::TypedField<Int> &>(
-                    collection.int_field(unique_name, components_shape,
-                                         sub_division, unit));
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.int_field(unique_name, components_shape,
+                                            sub_division, unit);
             },
             "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
             "sub_division"_a = muGrid::PixelTag,

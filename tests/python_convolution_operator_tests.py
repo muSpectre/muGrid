@@ -449,3 +449,348 @@ def test_convolution_wrong_output_subpt_type_global():
     # This should raise an error about sub-point count mismatch
     with pytest.raises(RuntimeError):
         conv_op.apply(nodal_field, quad_field_wrong)
+
+
+# =============================================================================
+# GPU-specific convolution tests
+# =============================================================================
+
+def gpu_backend_available():
+    """Check if a GPU backend (CUDA/ROCm) is available."""
+    try:
+        fc = muGrid.GlobalFieldCollection(
+            2,  # spatial_dimension
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc.initialise((4, 4))
+        field = fc.register_real_field("gpu_test", 1)
+        return field.is_on_gpu
+    except (AttributeError, RuntimeError):
+        return False
+
+
+GPU_AVAILABLE = gpu_backend_available()
+
+# Try to import CuPy for GPU tests
+try:
+    import cupy as cp
+    HAS_CUPY = True
+except ImportError:
+    HAS_CUPY = False
+    cp = None
+
+
+class ConvolutionOperatorHostCheck(unittest.TestCase):
+    """Test suite for ConvolutionOperator on host memory.
+
+    These tests explicitly verify that host operations work correctly
+    and return numpy arrays.
+    """
+
+    def test_host_convolution_returns_numpy(self):
+        """Test that convolution on host fields returns numpy arrays."""
+        nb_x_pts = 5
+        nb_y_pts = 4
+        nb_quad_pts = 2
+
+        # Create stencil
+        stencil = np.array([
+            [
+                [[1, 0], [0, 0]],  # Operator 0, quad pt 0
+                [[0, 1], [0, 0]],  # Operator 0, quad pt 1
+            ]
+        ])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Create host field collection
+        fc = muGrid.GlobalFieldCollection(
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": nb_quad_pts},
+            nb_ghosts_right=(1, 1)
+        )
+
+        # Verify host collection
+        self.assertFalse(fc.is_on_device)
+        self.assertEqual(fc.memory_location,
+                         muGrid.GlobalFieldCollection.MemoryLocation.Host)
+
+        # Create fields
+        nodal = real_field(fc, "nodal", (2,))
+        quad = real_field(fc, "quad", (2, 1), "quad")
+
+        # Verify fields are on host
+        self.assertFalse(nodal.is_on_gpu)
+        self.assertFalse(quad.is_on_gpu)
+        self.assertEqual(nodal.device, "cpu")
+        self.assertEqual(quad.device, "cpu")
+
+        # Verify arrays are numpy
+        self.assertIsInstance(nodal.s, np.ndarray)
+        self.assertIsInstance(quad.s, np.ndarray)
+
+        # Initialize and apply
+        nodal.pg[...] = np.random.rand(*nodal.pg.shape)
+        conv_op.apply(nodal._cpp, quad._cpp)
+
+        # Result should still be numpy
+        self.assertIsInstance(quad.s, np.ndarray)
+
+    def test_host_convolution_correctness(self):
+        """Test that host convolution produces correct results."""
+        nb_x_pts = 4
+        nb_y_pts = 4
+
+        # Simple identity stencil
+        stencil = np.array([[[[1, 0], [0, 0]]]])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        fc = muGrid.GlobalFieldCollection(
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": 1},
+            nb_ghosts_right=(1, 1)
+        )
+
+        nodal = real_field(fc, "nodal", (1,))
+        quad = real_field(fc, "quad", (1,), "quad")
+
+        # Set input to known values
+        test_vals = np.arange(nb_x_pts * nb_y_pts, dtype=float).reshape(
+            1, nb_x_pts, nb_y_pts)
+        nodal.pg[...] = np.pad(test_vals, ((0, 0), (0, 1), (0, 1)), "wrap")
+
+        conv_op.apply(nodal._cpp, quad._cpp)
+
+        # With identity stencil, output should match input
+        np.testing.assert_allclose(quad.s.reshape(nb_x_pts, nb_y_pts),
+                                   test_vals.reshape(nb_x_pts, nb_y_pts))
+
+
+@unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
+class ConvolutionOperatorDeviceCheck(unittest.TestCase):
+    """Test suite for ConvolutionOperator on device (GPU) memory.
+
+    These tests verify that convolution operations work correctly
+    on GPU fields.
+    """
+
+    def setUp(self):
+        self.nb_x_pts = 5
+        self.nb_y_pts = 4
+        self.nb_quad_pts = 2
+
+    def test_device_collection_properties(self):
+        """Test that device collection has correct properties."""
+        fc = muGrid.GlobalFieldCollection(
+            2,  # spatial_dimension
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc.initialise((self.nb_x_pts, self.nb_y_pts))
+
+        self.assertTrue(fc.is_on_device)
+        self.assertEqual(fc.memory_location,
+                         muGrid.GlobalFieldCollection.MemoryLocation.Device)
+
+    def test_device_field_properties(self):
+        """Test that device fields have correct properties."""
+        fc = muGrid.GlobalFieldCollection(
+            2,
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc.initialise((self.nb_x_pts, self.nb_y_pts))
+
+        field = real_field(fc, "test", (3,))
+
+        self.assertTrue(field.is_on_gpu)
+        device = field.device
+        self.assertTrue(device.startswith("cuda:") or device.startswith("rocm:"))
+
+    def test_device_convolution_field_creation(self):
+        """Test creating fields for convolution on device."""
+        stencil = np.array([
+            [
+                [[1, 0], [0, 0]],
+                [[0, 1], [0, 0]],
+            ]
+        ])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        fc = muGrid.GlobalFieldCollection(
+            2,
+            sub_pts={"quad": self.nb_quad_pts},
+            nb_ghosts_right=(1, 1),
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc.initialise((self.nb_x_pts, self.nb_y_pts))
+
+        nodal = real_field(fc, "nodal", (2,))
+        quad = real_field(fc, "quad", (2, 1), "quad")
+
+        # Both fields should be on device
+        self.assertTrue(nodal.is_on_gpu)
+        self.assertTrue(quad.is_on_gpu)
+
+    def test_device_convolution_apply(self):
+        """Test that convolution can be applied on device fields."""
+        stencil = np.array([
+            [
+                [[1, 0], [0, 0]],
+                [[0, 1], [0, 0]],
+            ]
+        ])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        fc = muGrid.GlobalFieldCollection(
+            2,
+            sub_pts={"quad": self.nb_quad_pts},
+            nb_ghosts_right=(1, 1),
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc.initialise((self.nb_x_pts, self.nb_y_pts))
+
+        nodal = real_field(fc, "nodal", (2,))
+        quad = real_field(fc, "quad", (2, 1), "quad")
+
+        # Initialize (set_zero should work on device)
+        nodal._cpp.set_zero()
+        quad._cpp.set_zero()
+
+        # Apply should not raise
+        conv_op.apply(nodal._cpp, quad._cpp)
+
+
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU backend or CuPy not available")
+class ConvolutionOperatorCuPyCheck(unittest.TestCase):
+    """Test suite for ConvolutionOperator with CuPy arrays.
+
+    These tests verify that GPU convolution operations return CuPy arrays
+    and produce correct results that can be verified against numpy.
+    """
+
+    def setUp(self):
+        self.nb_x_pts = 5
+        self.nb_y_pts = 4
+        self.nb_quad_pts = 2
+
+    def test_device_convolution_returns_cupy(self):
+        """Test that convolution on device fields returns CuPy arrays."""
+        stencil = np.array([
+            [
+                [[1, 0], [0, 0]],
+                [[0, 1], [0, 0]],
+            ]
+        ])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        fc = muGrid.GlobalFieldCollection(
+            2,
+            sub_pts={"quad": self.nb_quad_pts},
+            nb_ghosts_right=(1, 1),
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc.initialise((self.nb_x_pts, self.nb_y_pts))
+
+        nodal = real_field(fc, "nodal", (2,))
+        quad = real_field(fc, "quad", (2, 1), "quad")
+
+        # Arrays should be CuPy
+        self.assertIsInstance(nodal.s, cp.ndarray)
+        self.assertIsInstance(quad.s, cp.ndarray)
+
+        # Apply convolution
+        conv_op.apply(nodal._cpp, quad._cpp)
+
+        # Result should still be CuPy
+        self.assertIsInstance(quad.s, cp.ndarray)
+
+    def test_device_convolution_correctness(self):
+        """Test that device convolution produces correct results.
+
+        Compare GPU convolution results against CPU reference.
+        """
+        nb_operators = 2
+        stencil = np.array([
+            [
+                [[1, 0], [0, 0]],
+                [[0, 1], [0, 0]],
+            ],
+            [
+                [[0, 0], [1, 0]],
+                [[0, 0], [0, 1]],
+            ],
+        ])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Create host reference
+        fc_host = muGrid.GlobalFieldCollection(
+            (self.nb_x_pts, self.nb_y_pts),
+            sub_pts={"quad": self.nb_quad_pts},
+            nb_ghosts_right=(1, 1)
+        )
+        nodal_host = real_field(fc_host, "nodal", (2,))
+        quad_host = real_field(fc_host, "quad", (2, nb_operators), "quad")
+
+        # Create device fields
+        fc_device = muGrid.GlobalFieldCollection(
+            2,
+            sub_pts={"quad": self.nb_quad_pts},
+            nb_ghosts_right=(1, 1),
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc_device.initialise((self.nb_x_pts, self.nb_y_pts))
+        nodal_device = real_field(fc_device, "nodal", (2,))
+        quad_device = real_field(fc_device, "quad", (2, nb_operators), "quad")
+
+        # Initialize with same random data
+        test_data = np.random.rand(*nodal_host.pg.shape)
+        nodal_host.pg[...] = test_data
+        nodal_device.pg[...] = cp.asarray(test_data)
+
+        # Apply on both
+        conv_op.apply(nodal_host._cpp, quad_host._cpp)
+        conv_op.apply(nodal_device._cpp, quad_device._cpp)
+
+        # Compare results
+        host_result = quad_host.s
+        device_result = cp.asnumpy(quad_device.s)
+
+        np.testing.assert_allclose(device_result, host_result, rtol=1e-10)
+
+    def test_host_device_mixed_workflow(self):
+        """Test workflow transferring data between host and device."""
+        stencil = np.array([[[[1, 0], [0, 0]]]])
+        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Create host collection for initial data
+        fc_host = muGrid.GlobalFieldCollection(
+            (self.nb_x_pts, self.nb_y_pts),
+            sub_pts={"quad": 1},
+            nb_ghosts_right=(1, 1)
+        )
+        nodal_host = real_field(fc_host, "nodal", (1,))
+
+        # Create device collection for computation
+        fc_device = muGrid.GlobalFieldCollection(
+            2,
+            sub_pts={"quad": 1},
+            nb_ghosts_right=(1, 1),
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        fc_device.initialise((self.nb_x_pts, self.nb_y_pts))
+        nodal_device = real_field(fc_device, "nodal", (1,))
+        quad_device = real_field(fc_device, "quad", (1,), "quad")
+
+        # Initialize host data
+        test_vals = np.random.rand(*nodal_host.pg.shape)
+        nodal_host.pg[...] = test_vals
+
+        # Transfer to device
+        nodal_device.pg[...] = cp.asarray(nodal_host.pg)
+
+        # Compute on device
+        conv_op.apply(nodal_device._cpp, quad_device._cpp)
+
+        # Transfer result back to host
+        result_on_host = cp.asnumpy(quad_device.s)
+
+        # Verify result is numpy array
+        self.assertIsInstance(result_on_host, np.ndarray)
