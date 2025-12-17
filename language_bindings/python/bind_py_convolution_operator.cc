@@ -35,6 +35,7 @@
 
 #include "libmugrid/grid_common.hh"
 #include "libmugrid/field_typed.hh"
+#include "libmugrid/kokkos_types.hh"
 #include "libmugrid/convolution_operator_base.hh"
 #include "libmugrid/convolution_operator.hh"
 
@@ -50,9 +51,18 @@ using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Index_t;
 using muGrid::Shape_t;
+using muGrid::HostSpace;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
+
+// Type aliases for host fields
+using RealFieldHost = TypedFieldBase<Real, HostSpace>;
+
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+using DeviceSpace = muGrid::DefaultDeviceSpace;
+using RealFieldDevice = TypedFieldBase<Real, DeviceSpace>;
+#endif
 
 
 // A helper class that bounces calls to virtual methods back to Python 
@@ -156,7 +166,13 @@ void add_convolution_operator_base(py::module &mod) {
 
 // Bind class ConvolutionOperator
 void add_convolution_operator_default(py::module &mod) {
-    py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (ConvolutionOperator::*)(
+        const RealFieldHost&, RealFieldHost&) const;
+    using TransposeHostFn = void (ConvolutionOperator::*)(
+        const RealFieldHost&, RealFieldHost&, const std::vector<Real>&) const;
+
+    auto conv_op = py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
             .def(py::init(
                      [](const Shape_t &offset, py::array_t<Real, py::array::f_style | py::array::forcecast> array) {
                          // Array should have shape (directions, quadrature-points, nodal-points, pixels)
@@ -181,36 +197,51 @@ void add_convolution_operator_default(py::module &mod) {
                          // .shape() returns a pointer to dimension array
                          std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
                                    nb_stencil_pts.begin());
-                        // // The operator is interpreted as a matrix (due to limit of Eigen),
-                        // // with "operator x quad_pts" rows.
-                        //  const auto nb_rows{nb_operators * nb_quad_pts};
-                        //  const auto nb_cols{
-                        //      nb_nodal_pts * std::accumulate(nb_stencil_pts.begin(),
-                        //                                     nb_stencil_pts.end(), 1,
-                        //                                     std::multiplies<Index_t>())
-                        //  };
-                        //  return ConvolutionOperator(
-                        //      offset, Eigen::Map<const Eigen::MatrixXd>(array.data(), nb_rows, nb_cols),
-                        //      nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
 
-                        // Number of enetries in the operator
+                        // Number of entries in the operator
                          const auto nb_entries{
-                            nb_operators * nb_quad_pts * nb_nodal_pts * 
+                            nb_operators * nb_quad_pts * nb_nodal_pts *
                             std::accumulate(nb_stencil_pts.begin(),
                                             nb_stencil_pts.end(), 1,
                                             std::multiplies<Index_t>())};
-                         return ConvolutionOperator(offset, std::span<const Real>(array.data(), nb_entries), 
+                         return ConvolutionOperator(offset, std::span<const Real>(array.data(), nb_entries),
                                                     nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
                     }),
                  "nb_spatial_dims"_a, "pixel_operator"_a)
-            .def("apply", &ConvolutionOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
-            .def("transpose", &ConvolutionOperator::transpose, "quadrature_point_field"_a,
-                 "nodal_field"_a, "weights"_a = std::vector<Real>{})
+            // Host field overloads (always available)
+            .def("apply",
+                 static_cast<ApplyHostFn>(&ConvolutionOperator::apply),
+                 "nodal_field"_a, "quadrature_point_field"_a,
+                 "Apply convolution to host (CPU) fields")
+            .def("transpose",
+                 static_cast<TransposeHostFn>(&ConvolutionOperator::transpose),
+                 "quadrature_point_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose convolution to host (CPU) fields")
             .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
             .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
             .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
             .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)
             .def_property_readonly("nb_operators", &ConvolutionOperator::get_nb_operators);
+
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+    // Device field overloads (only when GPU backend is enabled)
+    using ApplyDeviceFn = void (ConvolutionOperator::*)(
+        const RealFieldDevice&, RealFieldDevice&) const;
+    using TransposeDeviceFn = void (ConvolutionOperator::*)(
+        const RealFieldDevice&, RealFieldDevice&, const std::vector<Real>&) const;
+
+    conv_op
+        .def("apply",
+             static_cast<ApplyDeviceFn>(&ConvolutionOperator::apply),
+             "nodal_field"_a, "quadrature_point_field"_a,
+             "Apply convolution to device (GPU) fields")
+        .def("transpose",
+             static_cast<TransposeDeviceFn>(&ConvolutionOperator::transpose),
+             "quadrature_point_field"_a, "nodal_field"_a,
+             "weights"_a = std::vector<Real>{},
+             "Apply transpose convolution to device (GPU) fields");
+#endif
 }
 
 

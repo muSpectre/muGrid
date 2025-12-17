@@ -232,6 +232,60 @@ namespace muGrid {
             TypedFieldBase<Real> &nodal_field,
             const std::vector<Real> &weights = {}) const final;
 
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+        /**
+         * Evaluates the gradient of nodal_field into quadrature_point_field
+         * on device (GPU) memory.
+         *
+         * @param nodal_field input field in device memory
+         * @param quadrature_point_field output field in device memory
+         */
+        void
+        apply(const TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
+              TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field) const;
+
+        /**
+         * Evaluates the gradient of nodal_field and adds it to
+         * quadrature_point_field on device (GPU) memory.
+         *
+         * @param nodal_field input field in device memory
+         * @param alpha scaling factor for the increment
+         * @param quadrature_point_field output field in device memory
+         */
+        void apply_increment(
+            const TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
+            const Real &alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field) const;
+
+        /**
+         * Evaluates the discretised divergence of quadrature_point_field into
+         * nodal_field on device (GPU) memory.
+         *
+         * @param quadrature_point_field input field in device memory
+         * @param nodal_field output field in device memory
+         * @param weights Gaussian quadrature weights (currently ignored for device)
+         */
+        void transpose(
+            const TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field,
+            TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
+            const std::vector<Real> &weights = {}) const;
+
+        /**
+         * Evaluates the discretised divergence of quadrature_point_field and adds
+         * the result to nodal_field on device (GPU) memory.
+         *
+         * @param quadrature_point_field input field in device memory
+         * @param alpha scaling factor for the increment
+         * @param nodal_field output field in device memory
+         * @param weights Gaussian quadrature weights (currently ignored for device)
+         */
+        void transpose_increment(
+            const TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field,
+            const Real &alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
+            const std::vector<Real> &weights = {}) const;
+#endif
+
         /**
          * Return the operator array linking the nodal degrees of freedom to their
          * quadrature-point values.
@@ -330,6 +384,24 @@ namespace muGrid {
         const GlobalFieldCollection& validate_fields(
             const TypedFieldBase<Real> &nodal_field,
             const TypedFieldBase<Real> &quad_field,
+            bool is_transpose = false) const;
+
+        /**
+         * @brief Validate that fields are compatible with this operator (generic version)
+         *
+         * This version accepts base Field references and works for both host
+         * and device-space fields. It performs the same validation as the
+         * typed version but without requiring a specific memory space.
+         *
+         * @param nodal_field The nodal field (base class reference)
+         * @param quad_field The quadrature point field (base class reference)
+         * @param is_transpose If true, swap ghost requirements
+         * @return Reference to the GlobalFieldCollection
+         * @throws RuntimeError if validation fails
+         */
+        const GlobalFieldCollection& validate_fields_generic(
+            const Field &nodal_field,
+            const Field &quad_field,
             bool is_transpose = false) const;
 
         /**

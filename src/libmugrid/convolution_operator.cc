@@ -171,6 +171,106 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    const GlobalFieldCollection& ConvolutionOperator::validate_fields_generic(
+        const Field &nodal_field,
+        const Field &quad_field,
+        bool is_transpose) const {
+        // Both fields must be from the same field collection to ensure
+        // compatible internal structure for pixel mapping
+        if (&nodal_field.get_collection() != &quad_field.get_collection()) {
+            throw RuntimeError{
+                "Field collection mismatch: nodal_field and "
+                "quadrature_point_field must be from the same FieldCollection"};
+        }
+
+        // Get the collection object
+        const auto & collection{dynamic_cast<const GlobalFieldCollection &>(
+            quad_field.get_collection())};
+
+        // Check that fields are global
+        if (collection.get_domain() !=
+            FieldCollection::ValidityDomain::Global) {
+            throw RuntimeError{
+                "Field type error: nodal_field and quadrature_point_field "
+                "must be a global field (registered in a global FieldCollection)"};
+        }
+
+        // Check that fields have the same spatial dimensions as operator
+        if (collection.get_spatial_dim() != this->spatial_dim) {
+            std::stringstream err_msg{};
+            err_msg << "Spatial dimension mismatch: nodal_field and "
+                       "quadrature_point_field are defined in "
+                    << collection.get_spatial_dim()
+                    << "D space, but this convolution operator is defined in "
+                    << this->spatial_dim << "D space";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // Ghost requirements depend on operation direction
+        const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
+        const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
+
+        // Base requirements for apply operation
+        const auto apply_min_left{IntCoord_t(this->spatial_dim, 0) -
+                                  IntCoord_t(this->pixel_offset)};
+        const auto apply_min_right{IntCoord_t(this->conv_pts_shape) -
+                                   IntCoord_t(this->spatial_dim, 1) +
+                                   IntCoord_t(this->pixel_offset)};
+
+        // For transpose, swap left/right requirements
+        const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
+        const auto min_ghosts_right{is_transpose ? apply_min_left : apply_min_right};
+
+        for (Index_t direction = 0; direction < collection.get_spatial_dim();
+             ++direction) {
+            if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
+                std::stringstream err_msg{};
+                err_msg
+                    << "Ambiguous field shape: on axis " << direction
+                    << ", the " << (is_transpose ? "transpose" : "apply")
+                    << " operation expects a minimum of "
+                    << min_ghosts_left[direction]
+                    << " cells on the left, but the provided fields have only "
+                    << nb_ghosts_left[direction] << " ghosts on the left.";
+                throw RuntimeError{err_msg.str()};
+            }
+        }
+
+        for (Index_t direction = 0; direction < collection.get_spatial_dim();
+             ++direction) {
+            if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
+                std::stringstream err_msg{};
+                err_msg
+                    << "Ambiguous field shape: on axis " << direction
+                    << ", the " << (is_transpose ? "transpose" : "apply")
+                    << " operation expects a minimum of "
+                    << min_ghosts_right[direction]
+                    << " cells on the right, but the provided fields have only "
+                    << nb_ghosts_right[direction] << " ghosts on the right.";
+                throw RuntimeError{err_msg.str()};
+            }
+        }
+
+        // number of components in the fields
+        Index_t nb_nodal_components{nodal_field.get_nb_components()};
+        Index_t nb_quad_components{quad_field.get_nb_components()};
+
+        // check if they match
+        if (nb_quad_components != this->nb_operators * nb_nodal_components) {
+            std::stringstream err_msg{};
+            err_msg
+                << "Size mismatch: Expected a quadrature field with "
+                << this->nb_operators * nb_nodal_components << " components ("
+                << this->nb_operators << " operators × " << nb_nodal_components
+                << " components in the nodal field) but received a field with "
+                << nb_quad_components << " components.";
+            throw RuntimeError{err_msg.str()};
+        }
+
+        return collection;
+    }
+
+    /* ---------------------------------------------------------------------- */
     GridTraversalParams ConvolutionOperator::compute_traversal_params(
         const GlobalFieldCollection& collection,
         Index_t nb_nodal_components,
@@ -516,4 +616,92 @@ namespace muGrid {
     Index_t ConvolutionOperator::get_spatial_dim() const {
         return this->spatial_dim;
     }
+
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::apply(
+        const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+        TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field) const {
+        quadrature_point_field.set_zero();
+        this->apply_increment(nodal_field, 1., quadrature_point_field);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::apply_increment(
+        const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+        const Real & alpha,
+        TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field) const {
+        // Validate fields using generic version that works with base Field
+        const auto & collection = this->validate_fields_generic(nodal_field,
+                                                                quadrature_point_field);
+
+        // Get component counts
+        const Index_t nb_nodal_components = nodal_field.get_nb_components();
+        const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
+
+        // Compute traversal parameters
+        const auto params = this->compute_traversal_params(
+            collection, nb_nodal_components, nb_quad_components);
+
+        // Ensure device sparse operator is cached (copies from host if needed)
+        this->get_device_apply_operator<DefaultDeviceSpace>(
+            collection.get_nb_subdomain_grid_pts_with_ghosts(),
+            nb_nodal_components);
+
+        // Get raw data pointers from device fields
+        const Real* nodal_data = nodal_field.view().data();
+        Real* quad_data = quadrature_point_field.view().data();
+
+        // Use device kernel
+        this->apply_on_device<DefaultDeviceSpace>(
+            nodal_data, quad_data, alpha, params);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::transpose(
+        const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
+        TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+        const std::vector<Real> & weights) const {
+        // set nodal field to zero
+        nodal_field.set_zero();
+        this->transpose_increment(quadrature_point_field, 1., nodal_field, weights);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    void ConvolutionOperator::transpose_increment(
+        const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
+        const Real & alpha,
+        TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+        const std::vector<Real> & weights) const {
+        // Note: weights are currently ignored for device implementation
+        (void)weights;
+
+        // Validate fields using generic version
+        const auto & collection = this->validate_fields_generic(nodal_field,
+                                                                quadrature_point_field,
+                                                                true);
+
+        // Get component counts
+        const Index_t nb_nodal_components = nodal_field.get_nb_components();
+        const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
+
+        // Compute traversal parameters
+        const auto params = this->compute_traversal_params(
+            collection, nb_nodal_components, nb_quad_components);
+
+        // Ensure device sparse operator is cached (copies from host if needed)
+        this->get_device_transpose_operator<DefaultDeviceSpace>(
+            collection.get_nb_subdomain_grid_pts_with_ghosts(),
+            nb_nodal_components);
+
+        // Get raw data pointers from device fields
+        Real* nodal_data = nodal_field.view().data();
+        const Real* quad_data = quadrature_point_field.view().data();
+
+        // Use device kernel
+        this->transpose_on_device<DefaultDeviceSpace>(
+            quad_data, nodal_data, alpha, params);
+    }
+#endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
+
 }  // namespace muGrid
