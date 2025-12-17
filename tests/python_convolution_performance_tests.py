@@ -58,6 +58,29 @@ except ImportError:
     print("Warning: pypapi not available. Install with: pip install pypapi")
     print("Performance tests will run without hardware counters.")
 
+# Try to import CuPy for GPU tests
+try:
+    import cupy as cp
+    HAS_CUPY = True
+except ImportError:
+    HAS_CUPY = False
+
+
+def gpu_backend_available():
+    """Check if a GPU backend (CUDA/ROCm) is available."""
+    try:
+        fc = muGrid.GlobalFieldCollection(
+            (4, 4),
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        field = fc.register_real_field("gpu_test", 1)
+        return field.is_on_gpu
+    except (AttributeError, RuntimeError, TypeError):
+        return False
+
+
+GPU_AVAILABLE = gpu_backend_available()
+
 
 @dataclass
 class PerformanceMetrics:
@@ -70,6 +93,9 @@ class PerformanceMetrics:
     nb_components: int
     nb_operators: int
     nb_quad_pts: int
+
+    # Device info
+    device: str = "cpu"
 
     # Hardware counters (optional)
     papi_cycles: Optional[int] = None
@@ -124,6 +150,7 @@ class PerformanceMetrics:
         print("\n" + "=" * 70)
         print("PERFORMANCE METRICS")
         print("=" * 70)
+        print(f"Device:             {self.device}")
         print(
             f"Grid size:          {self.grid_size[0]} x {self.grid_size[1]} "
             f"= {np.prod(self.grid_size)} pixels"
@@ -213,6 +240,7 @@ def measure_convolution_performance(
     stencil_size,
     num_iterations=10,
     use_papi=True,
+    device="cpu",
 ):
     """
     Measure performance of convolution operator.
@@ -233,12 +261,15 @@ def measure_convolution_performance(
         Number of iterations for averaging
     use_papi : bool
         Whether to use PAPI hardware counters
+    device : str
+        Device string (e.g., "cpu", "cuda:0", "rocm:0")
 
     Returns
     -------
     PerformanceMetrics
         Container with all performance metrics
     """
+    is_on_device = nodal_field.is_on_gpu
 
     # Count theoretical FLOPs
     total_flops = count_theoretical_flops(conv_op, nodal_field, quad_field, grid_size)
@@ -246,9 +277,13 @@ def measure_convolution_performance(
     # Warm-up iteration
     conv_op.apply(nodal_field, quad_field)
 
-    # Initialize PAPI if available and requested
+    # Synchronize if on device to ensure warm-up is complete
+    if is_on_device and HAS_CUPY:
+        cp.cuda.Device().synchronize()
+
+    # Initialize PAPI if available, requested, and on host (PAPI doesn't work for GPU)
     papi_values = {}
-    if PAPI_AVAILABLE and use_papi:
+    if PAPI_AVAILABLE and use_papi and not is_on_device:
         try:
             # Define events to monitor
             papi_events_list = [
@@ -269,12 +304,29 @@ def measure_convolution_performance(
         papi_enabled = False
 
     # Time the operation
-    start_time = time.perf_counter()
+    if is_on_device and HAS_CUPY:
+        # Use CUDA events for accurate GPU timing
+        start_event = cp.cuda.Event()
+        end_event = cp.cuda.Event()
 
-    for _ in range(num_iterations):
-        conv_op.apply(nodal_field, quad_field)
+        start_event.record()
+        for _ in range(num_iterations):
+            conv_op.apply(nodal_field, quad_field)
+        end_event.record()
+        end_event.synchronize()
 
-    end_time = time.perf_counter()
+        # Get elapsed time in milliseconds
+        elapsed_ms = cp.cuda.get_elapsed_time(start_event, end_event)
+        wall_time_ms = elapsed_ms / num_iterations
+    else:
+        # Use wall-clock time for CPU
+        start_time = time.perf_counter()
+
+        for _ in range(num_iterations):
+            conv_op.apply(nodal_field, quad_field)
+
+        end_time = time.perf_counter()
+        wall_time_ms = ((end_time - start_time) / num_iterations) * 1000.0
 
     # Read PAPI counters
     if papi_enabled:
@@ -292,9 +344,6 @@ def measure_convolution_performance(
             print(f"Warning: Could not read PAPI counters: {e}")
             papi_values = {}
 
-    # Calculate average wall time
-    wall_time_ms = ((end_time - start_time) / num_iterations) * 1000.0
-
     # Create metrics object
     metrics = PerformanceMetrics(
         wall_time_ms=wall_time_ms,
@@ -304,6 +353,7 @@ def measure_convolution_performance(
         nb_components=nodal_field.nb_components,
         nb_operators=conv_op.nb_operators,
         nb_quad_pts=conv_op.nb_quad_pts,
+        device=device,
         papi_cycles=papi_values.get("cycles"),
         papi_instructions=papi_values.get("instructions"),
         papi_fp_ops=papi_values.get("fp_ops"),
@@ -758,3 +808,306 @@ def test_quad_triangle_3_mugrid_vs_manual():
         f"muGrid slower than manual quadrature: "
         f"muGrid {t1-t0:.6f}s vs. tensor-matrix mul {t3-t2:.6f}s"
     )
+
+
+def get_gpu_skip_reason():
+    """Get detailed skip reason for GPU tests."""
+    if not GPU_AVAILABLE:
+        return "GPU backend not available (Kokkos not compiled with CUDA/HIP)"
+    return None
+
+
+def get_gpu_cupy_skip_reason():
+    """Get detailed skip reason for GPU+CuPy tests."""
+    reasons = []
+    if not GPU_AVAILABLE:
+        reasons.append("GPU backend not available (Kokkos not compiled with CUDA/HIP)")
+    if not HAS_CUPY:
+        reasons.append("CuPy not installed (pip install cupy-cuda*)")
+    if reasons:
+        return "; ".join(reasons)
+    return None
+
+
+@unittest.skipUnless(GPU_AVAILABLE, get_gpu_skip_reason() or "")
+class DeviceConvolutionPerformanceTests(unittest.TestCase):
+    """Performance test suite for device (GPU) convolution operator"""
+
+    def test_device_performance_small_grid(self):
+        """Benchmark convolution on a small 32x32 grid on GPU"""
+        print("\n=== Testing 2D Device Convolution Performance (Small Grid) ===")
+
+        # Parameters
+        nb_x_pts = 32
+        nb_y_pts = 32
+        nb_stencil_x = 3
+        nb_stencil_y = 3
+        nb_operators = 2
+        nb_quad_pts = 4
+        nb_field_components = 3
+
+        # Create stencil
+        stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
+
+        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        # Create device field collection
+        nb_ghosts = (1, 1)
+        fc = muGrid.GlobalFieldCollection(
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": nb_quad_pts},
+            nb_ghosts_left=nb_ghosts,
+            nb_ghosts_right=nb_ghosts,
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+
+        # Create fields
+        nodal_cpp = fc.real_field("nodal", nb_field_components)
+        quad_cpp = fc.real_field("quad", (nb_field_components, nb_operators), "quad")
+
+        # Initialize with random data (transfer to device via CuPy if available)
+        if HAS_CUPY:
+            nodal_arr = cp.from_dlpack(nodal_cpp)
+            nodal_shape = nodal_arr.shape
+            # Create random data with correct shape
+            random_data = cp.random.rand(*nodal_shape).astype(cp.float64)
+            nodal_arr[...] = random_data
+
+        device_str = nodal_cpp.device
+
+        # Measure performance
+        metrics = measure_convolution_performance(
+            conv_op,
+            nodal_cpp,
+            quad_cpp,
+            grid_size=(nb_x_pts, nb_y_pts),
+            stencil_size=(nb_stencil_x, nb_stencil_y),
+            num_iterations=100,
+            device=device_str,
+        )
+
+        metrics.print_report()
+
+        # Sanity checks
+        self.assertGreater(metrics.total_flops, 0)
+        self.assertGreater(metrics.gflops, 0.0)
+
+    def test_device_performance_large_grid(self):
+        """Benchmark convolution on a large 256x256 grid on GPU"""
+        print("\n=== Testing 2D Device Convolution Performance (Large Grid) ===")
+
+        # Parameters
+        nb_x_pts = 256
+        nb_y_pts = 256
+        nb_stencil_x = 3
+        nb_stencil_y = 3
+        nb_operators = 2
+        nb_quad_pts = 4
+        nb_field_components = 3
+
+        # Create stencil
+        stencil = np.random.rand(nb_operators, nb_quad_pts, 1, nb_stencil_x, nb_stencil_y)
+
+        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        # Create device field collection
+        nb_ghosts = (1, 1)
+        fc = muGrid.GlobalFieldCollection(
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": nb_quad_pts},
+            nb_ghosts_left=nb_ghosts,
+            nb_ghosts_right=nb_ghosts,
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+
+        # Create fields
+        nodal_cpp = fc.real_field("nodal", nb_field_components)
+        quad_cpp = fc.real_field("quad", (nb_field_components, nb_operators), "quad")
+
+        # Initialize with random data
+        if HAS_CUPY:
+            nodal_arr = cp.from_dlpack(nodal_cpp)
+            nodal_arr[...] = cp.random.rand(*nodal_arr.shape).astype(cp.float64)
+
+        device_str = nodal_cpp.device
+
+        # Measure performance (fewer iterations for large grid)
+        metrics = measure_convolution_performance(
+            conv_op,
+            nodal_cpp,
+            quad_cpp,
+            grid_size=(nb_x_pts, nb_y_pts),
+            stencil_size=(nb_stencil_x, nb_stencil_y),
+            num_iterations=100,
+            device=device_str,
+        )
+
+        metrics.print_report()
+
+        # Sanity checks
+        self.assertGreater(metrics.total_flops, 0)
+        self.assertGreater(metrics.gflops, 0.0)
+
+
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
+class HostDeviceComparisonTests(unittest.TestCase):
+    """Compare performance between host and device convolution"""
+
+    def test_host_vs_device_performance(self):
+        """Compare convolution performance between CPU and GPU"""
+        print("\n=== Host vs Device Performance Comparison ===")
+
+        grid_sizes = [32, 64, 128, 256]
+        host_results = []
+        device_results = []
+
+        for grid_size in grid_sizes:
+            nb_stencil = 3
+            nb_operators = 2
+            nb_quad_pts = 4
+            nb_components = 3
+            nb_ghosts = (1, 1)
+
+            # Create stencil
+            stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
+            conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+            # Host field collection
+            fc_host = muGrid.GlobalFieldCollection(
+                (grid_size, grid_size),
+                sub_pts={"quad": nb_quad_pts},
+                nb_ghosts_left=nb_ghosts,
+                nb_ghosts_right=nb_ghosts,
+            )
+            nodal_host = fc_host.real_field("nodal", nb_components)
+            quad_host = fc_host.real_field("quad", (nb_components, nb_operators), "quad")
+
+            # Initialize host field
+            nodal_arr = np.from_dlpack(nodal_host)
+            nodal_arr[...] = np.random.rand(*nodal_arr.shape)
+
+            # Measure host performance
+            iterations = 100 if grid_size <= 64 else 50
+            host_metrics = measure_convolution_performance(
+                conv_op,
+                nodal_host,
+                quad_host,
+                grid_size=(grid_size, grid_size),
+                stencil_size=(nb_stencil, nb_stencil),
+                num_iterations=iterations,
+                device="cpu",
+            )
+            host_results.append(host_metrics)
+
+            # Device field collection
+            fc_device = muGrid.GlobalFieldCollection(
+                (grid_size, grid_size),
+                sub_pts={"quad": nb_quad_pts},
+                nb_ghosts_left=nb_ghosts,
+                nb_ghosts_right=nb_ghosts,
+                memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            )
+            nodal_device = fc_device.real_field("nodal", nb_components)
+            quad_device = fc_device.real_field("quad", (nb_components, nb_operators), "quad")
+
+            # Initialize device field
+            nodal_device_arr = cp.from_dlpack(nodal_device)
+            nodal_device_arr[...] = cp.random.rand(*nodal_device_arr.shape).astype(cp.float64)
+
+            device_str = nodal_device.device
+
+            # Measure device performance
+            device_metrics = measure_convolution_performance(
+                conv_op,
+                nodal_device,
+                quad_device,
+                grid_size=(grid_size, grid_size),
+                stencil_size=(nb_stencil, nb_stencil),
+                num_iterations=iterations,
+                device=device_str,
+            )
+            device_results.append(device_metrics)
+
+        # Print comparison table
+        print("\n" + "=" * 80)
+        print(f"{'Grid':>10} {'Host GFLOPS':>15} {'Device GFLOPS':>15} {'Speedup':>12}")
+        print("-" * 80)
+
+        for host_m, device_m in zip(host_results, device_results):
+            grid_pixels = np.prod(host_m.grid_size)
+            speedup = device_m.gflops / host_m.gflops if host_m.gflops > 0 else 0
+
+            print(
+                f"{grid_pixels:>10} {host_m.gflops:>15.3f} "
+                f"{device_m.gflops:>15.3f} {speedup:>12.2f}x"
+            )
+
+        print("=" * 80 + "\n")
+
+    def test_device_convolution_correctness(self):
+        """Verify that device convolution produces same results as host"""
+        print("\n=== Device Convolution Correctness Check ===")
+
+        # Parameters
+        nb_x_pts = 16
+        nb_y_pts = 16
+        nb_stencil = 3
+        nb_operators = 2
+        nb_quad_pts = 4
+        nb_components = 3
+        nb_ghosts = (1, 1)
+
+        # Create stencil
+        stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
+        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        # Create host fields
+        fc_host = muGrid.GlobalFieldCollection(
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": nb_quad_pts},
+            nb_ghosts_left=nb_ghosts,
+            nb_ghosts_right=nb_ghosts,
+        )
+        nodal_host = fc_host.real_field("nodal", nb_components)
+        quad_host = fc_host.real_field("quad", (nb_components, nb_operators), "quad")
+
+        # Initialize host nodal field with known values
+        nodal_host_arr = np.from_dlpack(nodal_host)
+        test_data = np.random.rand(*nodal_host_arr.shape)
+        nodal_host_arr[...] = test_data
+
+        # Apply on host
+        conv_op.apply(nodal_host, quad_host)
+        host_result = np.from_dlpack(quad_host).copy()
+
+        # Create device fields
+        fc_device = muGrid.GlobalFieldCollection(
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": nb_quad_pts},
+            nb_ghosts_left=nb_ghosts,
+            nb_ghosts_right=nb_ghosts,
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
+        nodal_device = fc_device.real_field("nodal", nb_components)
+        quad_device = fc_device.real_field("quad", (nb_components, nb_operators), "quad")
+
+        # Copy same data to device
+        nodal_device_arr = cp.from_dlpack(nodal_device)
+        nodal_device_arr[...] = cp.asarray(test_data)
+
+        # Apply on device
+        conv_op.apply(nodal_device, quad_device)
+
+        # Get device result back to host
+        quad_device_arr = cp.from_dlpack(quad_device)
+        device_result = cp.asnumpy(quad_device_arr)
+
+        # Compare results
+        np.testing.assert_allclose(
+            device_result,
+            host_result,
+            rtol=1e-10,
+            atol=1e-12,
+            err_msg="Device convolution result differs from host result"
+        )
+        print("Device and host results match!")
