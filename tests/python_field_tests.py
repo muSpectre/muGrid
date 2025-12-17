@@ -131,8 +131,7 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(f2.stride(muGrid.SubPt), 3)
 
     def test_buffer_access(self):
-        fc = muGrid.GlobalFieldCollection(len(self.nb_grid_pts), {'quad': 4})
-        fc.initialise(self.nb_grid_pts, self.nb_grid_pts)
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, sub_pts={'quad': 4})
         # Single component
         f_cpp = fc.register_real_field("test-field", 1, 'quad')
         f = wrap_field(f_cpp)

@@ -69,9 +69,9 @@ class FileIOTest(unittest.TestCase):
 
         # global field collection
         self.fc_glob = muGrid.GlobalFieldCollection(
-            len(self.nb_domain_grid_pts),
+            self.nb_domain_grid_pts,
+            nb_subdomain_grid_pts=self.nb_subdomain_grid_pts
         )
-        self.fc_glob.initialise(self.nb_domain_grid_pts, self.nb_subdomain_grid_pts)
 
         # local field collection
         self.local_pixels = [2, 15, 9, 7, 3]

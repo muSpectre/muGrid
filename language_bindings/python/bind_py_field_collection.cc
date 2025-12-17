@@ -471,12 +471,8 @@ void add_global_field_collection(py::module & mod) {
     using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<GlobalFieldCollection, FieldCollection>(mod,
                                                        "GlobalFieldCollection")
-        .def(py::init<const Index_t &, const FieldCollection::SubPtMap_t &,
-                      StorageOrder, MemoryLocation>(),
-             "spatial_dimension"_a,
-             "sub_pts"_a = FieldCollection::SubPtMap_t{},
-             "storage_order"_a = StorageOrder::ColMajor,
-             "memory_location"_a = MemoryLocation::Host)
+        // Primary constructor: creates and initializes the collection
+        // Following Python's "initialization is instantiation" idiom
         .def(py::init<const IntCoord_t &, const IntCoord_t &,
                       const IntCoord_t &, const FieldCollection::SubPtMap_t &,
                       StorageOrder, const IntCoord_t &, const IntCoord_t &,
@@ -488,6 +484,7 @@ void add_global_field_collection(py::module & mod) {
              "nb_ghosts_left"_a = IntCoord_t{},
              "nb_ghosts_right"_a = IntCoord_t{},
              "memory_location"_a = MemoryLocation::Host)
+        // Constructor with explicit pixel strides
         .def(
             py::init<const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
                      const IntCoord_t &, const FieldCollection::SubPtMap_t &,
@@ -499,6 +496,7 @@ void add_global_field_collection(py::module & mod) {
             "nb_ghosts_left"_a = IntCoord_t{},
             "nb_ghosts_right"_a = IntCoord_t{},
             "memory_location"_a = MemoryLocation::Host)
+        // Constructor with explicit pixel storage order
         .def(
             py::init<const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
                      StorageOrder, const FieldCollection::SubPtMap_t &,
@@ -510,25 +508,6 @@ void add_global_field_collection(py::module & mod) {
             "nb_ghosts_left"_a = IntCoord_t{},
             "nb_ghosts_right"_a = IntCoord_t{},
             "memory_location"_a = MemoryLocation::Host)
-        .def("initialise",
-             static_cast<void (GlobalFieldCollection::*)(
-                 const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
-                 const IntCoord_t &, const IntCoord_t &, const IntCoord_t &)>(
-                 &GlobalFieldCollection::initialise),
-             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
-             "subdomain_locations"_a, "pixels_strides"_a,
-             "nb_ghosts_left"_a = IntCoord_t{},
-             "nb_ghosts_right"_a = IntCoord_t{})
-        .def("initialise",
-             static_cast<void (GlobalFieldCollection::*)(
-                 const IntCoord_t &, const IntCoord_t &, const IntCoord_t &,
-                 StorageOrder, const IntCoord_t &, const IntCoord_t &)>(
-                 &GlobalFieldCollection::initialise),
-             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = IntCoord_t{},
-             "subdomain_locations"_a = IntCoord_t{},
-             "pixels_storage_order"_a = StorageOrder::Automatic,
-             "nb_ghosts_left"_a = IntCoord_t{},
-             "nb_ghosts_right"_a = IntCoord_t{})
         .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels_with_ghosts);
 }
 

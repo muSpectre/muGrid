@@ -54,14 +54,13 @@ def gpu_backend_available():
     # Create a device collection and check if fields are on device
     try:
         fc = muGrid.GlobalFieldCollection(
-            2,  # spatial_dimension
+            (4, 4),
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
         )
-        fc.initialise((4, 4))
         field = fc.register_real_field("gpu_test", 1)
         # Check if it's actually on device
         return field.is_on_gpu
-    except (AttributeError, RuntimeError):
+    except (AttributeError, RuntimeError, TypeError):
         return False
 
 
@@ -143,10 +142,9 @@ class DeviceCollectionTests(unittest.TestCase):
         self.nb_grid_pts = (8, 8)
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
-            2,  # spatial_dimension
+            self.nb_grid_pts,
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
         )
-        self.fc.initialise(self.nb_grid_pts)
 
     def test_device_collection_is_on_device(self):
         """Test that device collection reports is_on_device = True."""
@@ -202,10 +200,9 @@ class DeviceFieldFactoryTests(unittest.TestCase):
         self.nb_grid_pts = (8, 8)
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
-            2,  # spatial_dimension
+            self.nb_grid_pts,
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
         )
-        self.fc.initialise(self.nb_grid_pts)
 
     def test_real_field_on_device_collection(self):
         """Test creating real field on device collection."""
@@ -231,10 +228,9 @@ class CuPyIntegrationTests(unittest.TestCase):
         self.nb_grid_pts = (8, 8)
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
-            2,  # spatial_dimension
+            self.nb_grid_pts,
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
         )
-        self.fc.initialise(self.nb_grid_pts)
 
     def test_device_field_returns_cupy_array(self):
         """Test that device field accessors return CuPy arrays."""
@@ -308,10 +304,9 @@ class MixedHostDeviceTests(unittest.TestCase):
         self.fc_host = muGrid.GlobalFieldCollection(self.nb_grid_pts)
         # Create device collection
         self.fc_device = muGrid.GlobalFieldCollection(
-            2,  # spatial_dimension
+            self.nb_grid_pts,
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
         )
-        self.fc_device.initialise(self.nb_grid_pts)
 
     def test_host_and_device_collections(self):
         """Test that host and device collections can coexist."""

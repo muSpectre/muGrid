@@ -186,8 +186,11 @@ def count_theoretical_flops(conv_op, nodal_field, quad_field, grid_size):
     # Get stencil shape from the operator
     # This is a bit tricky - we need to compute nb_conv_pts from the stencil
     # For now, estimate from the operator matrix dimensions
-    operator_matrix = conv_op.pixel_operator
-    nb_conv_pts = operator_matrix.shape[1] // nb_nodal_pts
+    # pixel_operator returns a flat list, so we compute nb_conv_pts from total size
+    operator_list = conv_op.pixel_operator
+    total_elements = len(operator_list)
+    # Total elements = nb_operators * nb_quad_pts * nb_nodal_pts * nb_conv_pts
+    nb_conv_pts = total_elements // (nb_operators * nb_quad_pts * nb_nodal_pts)
 
     # Each convolution point contributes:
     # - nb_components values (from nodal field)
