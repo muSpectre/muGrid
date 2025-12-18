@@ -725,7 +725,10 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
 
 @unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
 def test_laplace_device_vs_host():
-    """Compare Laplace solver performance between CPU and GPU."""
+    """Compare Laplace solver performance between CPU and GPU.
+
+    This test uses CUDA-aware MPI for ghost communication on device fields.
+    """
     nb_grid_pts = (256, 256)
 
     # Run on host
@@ -751,7 +754,10 @@ def test_laplace_device_vs_host():
 
 @unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, get_gpu_cupy_skip_reason() or "")
 def test_laplace_device_scaling():
-    """Test Laplace solver scaling on GPU across different grid sizes."""
+    """Test Laplace solver scaling on GPU across different grid sizes.
+
+    This test uses CUDA-aware MPI for ghost communication on device fields.
+    """
     grid_sizes = [64, 128, 256, 512]
     results = []
 
