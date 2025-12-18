@@ -196,8 +196,8 @@ namespace muGrid {
             this->get_nb_subdomain_grid_pts_with_ghosts()[spatial_dims - 1]};
 
         // Get the begin address of the field data (cast into char * for pointer
-        // arithmetics)
-        auto * data{static_cast<char *>(field.get_void_data_ptr())};
+        // arithmetics). Pass false to allow device pointers for CUDA-aware MPI.
+        auto * data{static_cast<char *>(field.get_void_data_ptr(false))};
 
         // Get element size (only useful for pointer arithmetic in finding the
         // correct offset)

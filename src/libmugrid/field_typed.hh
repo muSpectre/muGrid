@@ -295,9 +295,13 @@ namespace muGrid {
 
     /**
      * return a pointer to the raw data. Don't use unless interfacing with
-     * external libs. Only available for host-space fields.
+     * external libs.
+     *
+     * @param assert_host_memory If true (default), throws an error if the
+     *        field is on device memory. Set to false only when passing the
+     *        pointer to CUDA-aware libraries (e.g., CUDA-aware MPI).
      **/
-    void * get_void_data_ptr() const final;
+    void * get_void_data_ptr(bool assert_host_memory = true) const final;
 
     //! non-const eigen_map with arbitrary sizes (host-space only)
     template <typename M = MemorySpace>

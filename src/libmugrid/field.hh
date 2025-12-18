@@ -311,8 +311,12 @@ namespace muGrid {
 
         /**
          * return a pointer to the raw data
+         *
+         * @param assert_host_memory If true (default), throws an error if the
+         *        field is on device memory. Set to false only when passing the
+         *        pointer to CUDA-aware libraries (e.g., CUDA-aware MPI).
          **/
-        virtual void * get_void_data_ptr() const = 0;
+        virtual void * get_void_data_ptr(bool assert_host_memory = true) const = 0;
 
         //! number of entries in the field (= nb_pixel × nb_sub_pts)
         Index_t get_current_nb_entries() const;

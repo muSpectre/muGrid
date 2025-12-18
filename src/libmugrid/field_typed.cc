@@ -46,9 +46,14 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, typename MemorySpace>
-  void * TypedFieldBase<T, MemorySpace>::get_void_data_ptr() const {
-    // For CUDA-aware MPI, device pointers can be used directly for
-    // communication, so we return the pointer regardless of memory space.
+  void * TypedFieldBase<T, MemorySpace>::get_void_data_ptr(
+      bool assert_host_memory) const {
+    if (assert_host_memory && !is_host_space_v<MemorySpace>) {
+      throw FieldError(
+          "get_void_data_ptr called on device-space field with "
+          "assert_host_memory=true. Set assert_host_memory=false only when "
+          "passing to CUDA-aware libraries (e.g., CUDA-aware MPI).");
+    }
     return static_cast<void *>(const_cast<T *>(this->values.data()));
   }
 

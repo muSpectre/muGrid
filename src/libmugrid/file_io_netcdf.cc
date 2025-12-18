@@ -1961,6 +1961,7 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   void * NetCDFVarBase::get_buf() const {
+    // Default assert_host_memory=true ensures device fields throw an error
     return this->get_field().get_void_data_ptr();
   }
 
