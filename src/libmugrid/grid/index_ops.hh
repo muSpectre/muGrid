@@ -1,0 +1,365 @@
+/**
+ * @file   grid/index_ops.hh
+ *
+ * @author Till Junge <till.junge@epfl.ch>
+ *
+ * @date   29 Sep 2017
+ *
+ * @brief  Index and coordinate conversion operations for grid addressing
+ *
+ * Copyright © 2017 Till Junge
+ *
+ * µGrid is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3, or (at
+ * your option) any later version.
+ *
+ * µGrid is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with µGrid; see the file COPYING. If not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * * Boston, MA 02111-1307, USA.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or combining it
+ * with proprietary FFT implementations or numerical libraries, containing parts
+ * covered by the terms of those libraries' licenses, the licensors of this
+ * Program grant you additional permission to convey the resulting work.
+ *
+ */
+
+#ifndef SRC_LIBMUGRID_GRID_INDEX_OPS_HH_
+#define SRC_LIBMUGRID_GRID_INDEX_OPS_HH_
+
+#include "../core/types.hh"
+#include "../core/coordinates.hh"
+#include "../exception.hh"
+#include "../iterators.hh"
+#include "strides.hh"
+
+#include "Eigen/Dense"
+
+#include <sstream>
+#include <vector>
+
+namespace muGrid {
+    namespace CcoordOps {
+        //! modulo operator that can handle negative values
+        template <typename T>
+        T modulo(const T & a, const T & b) {
+            return (b + (a % b)) % b;
+        }
+
+        //! return physical vector of a cell of cubic pixels
+        template <size_t Dim>
+        Eigen::Matrix<Real, Dim, 1> get_vector(const Ccoord_t<Dim> & ccoord,
+                                               Real pix_size = 1.) {
+            Eigen::Matrix<Real, Dim, 1> retval;
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = pix_size * ccoord[i];
+            }
+            return retval;
+        }
+
+        //! return physical vector of a cell of general pixels
+        template <size_t Dim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const Ccoord_t<Dim> & ccoord,
+                   Eigen::Matrix<T, Dim_t(Dim), 1> pix_size) {
+            Eigen::Matrix<T, Dim, 1> retval{pix_size};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] *= ccoord[i];
+            }
+            return retval;
+        }
+
+        //! return physical vector of a cell of general pixels
+        template <size_t Dim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const Ccoord_t<Dim> & ccoord,
+                   const std::array<T, Dim> & pix_size) {
+            Eigen::Matrix<T, Dim, 1> retval{};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = pix_size[i] * ccoord[i];
+            }
+            return retval;
+        }
+
+        //! return physical vector of a cell of general pixels
+        template <size_t Dim, size_t MaxDim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const Ccoord_t<Dim> & ccoord,
+                   const DynCcoord<MaxDim, T> & pix_size) {
+            assert(Dim == pix_size.get_dim());
+            Eigen::Matrix<T, Dim, 1> retval{};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = pix_size[i] * ccoord[i];
+            }
+            return retval;
+        }
+
+        /* ---------------------------------------------------------------------- */
+        //! return physical vector of a cell of cubic pixels
+        template <size_t Dim>
+        Eigen::Matrix<Real, Dim, 1> get_vector(const IntCoord_t & ccoord,
+                                               Real pix_size = 1.) {
+            assert(Dim == ccoord.get_dim());
+            Eigen::Matrix<Real, Dim, 1> retval;
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = pix_size * ccoord[i];
+            }
+            return retval;
+        }
+
+        /* ---------------------------------------------------------------------- */
+        //! return physical vector of a cell of general pixels
+        template <size_t Dim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const IntCoord_t ccoord,
+                   Eigen::Matrix<T, Dim_t(Dim), 1> pix_size) {
+            assert(Dim == ccoord.get_dim());
+            Eigen::Matrix<T, Dim, 1> retval = pix_size;
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] *= ccoord[i];
+            }
+            return retval;
+        }
+
+        /* ---------------------------------------------------------------------- */
+        //! return physical vector of a cell of general pixels
+        template <size_t Dim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const IntCoord_t ccoord,
+                   const std::array<T, Dim> & pix_size) {
+            assert(Dim == ccoord.get_dim());
+            Eigen::Matrix<T, Dim, 1> retval{};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = pix_size[i] * ccoord[i];
+            }
+            return retval;
+        }
+
+        /* ---------------------------------------------------------------------- */
+        //! return physical vector of a cell of general pixels
+        template <size_t Dim, size_t MaxDim, typename T>
+        Eigen::Matrix<T, Dim, 1>
+        get_vector(const IntCoord_t ccoord,
+                   const DynCcoord<MaxDim, T> & pix_size) {
+            assert(Dim == ccoord.get_dim());
+            assert(Dim == pix_size.get_dim());
+            Eigen::Matrix<T, Dim, 1> retval{};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = pix_size[i] * ccoord[i];
+            }
+            return retval;
+        }
+
+        //------------------------------------------------------------------------//
+        //! get the i-th pixel in a grid of size nb_grid_pts
+        template <size_t Dim>
+        constexpr Ccoord_t<Dim> get_coord(const Ccoord_t<Dim> & nb_grid_pts,
+                                          const Ccoord_t<Dim> & locations,
+                                          Index_t index) {
+            Ccoord_t<Dim> retval{{0}};
+            Index_t factor{1};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval[i] = index / factor % nb_grid_pts[i] + locations[i];
+                if (i != Dim - 1) {
+                    factor *= nb_grid_pts[i];
+                }
+            }
+            return retval;
+        }
+
+        //------------------------------------------------------------------------//
+        //! get the i-th pixel in a grid of size nb_grid_pts
+        template <size_t Dim, size_t... I>
+        constexpr Ccoord_t<Dim> get_coord(const Ccoord_t<Dim> & nb_grid_pts,
+                                          const Ccoord_t<Dim> & locations,
+                                          Index_t index,
+                                          std::index_sequence<I...>) {
+            Ccoord_t<Dim> ccoord{get_coord<Dim>(nb_grid_pts, locations, index)};
+            return Ccoord_t<Dim>({ccoord[I]...});
+        }
+
+        //------------------------------------------------------------------------//
+        //! get the i-th pixel in a grid of size nb_grid_pts - specialization
+        //! for one dimension
+        template <size_t... I>
+        constexpr Ccoord_t<1> get_coord(const Ccoord_t<1> & nb_grid_pts,
+                                        const Ccoord_t<1> & locations,
+                                        Index_t index,
+                                        std::index_sequence<I...>) {
+            return Ccoord_t<1>({get_coord<1>(nb_grid_pts, locations, index)});
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        template <size_t dim>
+        Ccoord_t<dim> get_coord_from_axes_order(
+            const Ccoord_t<dim> & nb_grid_pts, const Ccoord_t<dim> & locations,
+            const Ccoord_t<dim> & strides, const Ccoord_t<dim> & axes_order,
+            Index_t index) {
+            Ccoord_t<dim> retval{{nb_grid_pts[0]}};
+            for (Index_t i{dim - 1}; i >= 0; --i) {
+                Index_t cur_coord{index / strides[axes_order[i]]};
+                retval[axes_order[i]] = cur_coord;
+                index -= cur_coord * strides[axes_order[i]];
+            }
+            for (size_t i{0}; i < dim; ++i) {
+                retval[i] += locations[i];
+            }
+            return retval;
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with strides
+        template <size_t dim>
+        Ccoord_t<dim> get_coord_from_strides(const Ccoord_t<dim> & nb_grid_pts,
+                                             const Ccoord_t<dim> & locations,
+                                             const Ccoord_t<dim> & strides,
+                                             Index_t index) {
+            return get_coord_from_axes_order(
+                nb_grid_pts, locations, strides,
+                compute_axes_order(nb_grid_pts, strides), index);
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        //! and location
+        template <class T>
+        T get_coord0_from_axes_order(const T & nb_grid_pts, const T & strides,
+                                     const T & axes_order, Index_t index) {
+            auto dim{nb_grid_pts.get_dim()};
+            T retval(dim);
+            for (Index_t i{dim - 1}; i >= 0; --i) {
+                Index_t cur_coord{index / strides[axes_order[i]]};
+                retval[axes_order[i]] = cur_coord;
+                index -= cur_coord * strides[axes_order[i]];
+            }
+            return retval;
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        template <class T>
+        T get_coord_from_axes_order(const T & nb_grid_pts, const T & locations,
+                                    const T & strides, const T & axes_order,
+                                    Index_t index) {
+            auto dim{nb_grid_pts.get_dim()};
+            auto retval{get_coord0_from_axes_order(nb_grid_pts, strides,
+                                                   axes_order, index)};
+            for (Dim_t i{0}; i < dim; ++i) {
+                retval[i] += locations[i];
+            }
+            return retval;
+        }
+
+        //! get the i-th pixel in a grid of size nb_grid_pts, with strides
+        template <class T>
+        T get_coord_from_strides(const T & nb_grid_pts, const T & locations,
+                                 const T & strides, Index_t index) {
+            return get_coord_from_axes_order(
+                nb_grid_pts, locations, strides,
+                compute_axes_order(nb_grid_pts, strides), index);
+        }
+
+        //------------------------------------------------------------------------//
+        //! get the linear index of a pixel in a column-major grid
+        template <size_t Dim>
+        constexpr Dim_t get_index(const Ccoord_t<Dim> & nb_grid_pts,
+                                  const Ccoord_t<Dim> & locations,
+                                  const Ccoord_t<Dim> & ccoord) {
+            Dim_t retval{0};
+            Dim_t factor{1};
+            for (size_t i{0}; i < Dim; ++i) {
+                retval += (ccoord[i] - locations[i]) * factor;
+                if (i != Dim - 1) {
+                    factor *= nb_grid_pts[i];
+                }
+            }
+            return retval;
+        }
+
+        //! get the linear index of a pixel in a column-major grid
+        Dim_t get_index(const IntCoord_t & nb_grid_pts,
+                        const IntCoord_t & locations,
+                        const IntCoord_t & ccoord);
+
+        //-----------------------------------------------------------------------//
+        //! these functions can be used whenever it is necessary to calculate
+        //! the volume of a cell or each pixels of the cell
+        template <size_t MaxDim, typename T>
+        T compute_volume(const DynCcoord<MaxDim, T> & lengths) {
+            T vol{};
+            vol++;
+            for (auto && length : lengths) {
+                vol *= length;
+            }
+            return vol;
+        }
+
+        //! these functions can be used whenever it is necessary to calculate
+        //! the volume of a cell or each pixels of the cell
+        template <typename T>
+        T compute_volume(const std::vector<T> & lengths) {
+            T vol{};
+            vol++;
+            for (auto && length : lengths) {
+                vol *= length;
+            }
+            return vol;
+        }
+
+        Real compute_pixel_volume(const IntCoord_t & nb_grid_pts,
+                                  const RealCoord_t & lengths);
+
+        //! get the linear index of a pixel given a set of strides
+        template <size_t Dim>
+        constexpr Index_t
+        get_index_from_strides(const Ccoord_t<Dim> & strides,
+                               const Ccoord_t<Dim> & locations,
+                               const Ccoord_t<Dim> & ccoord) {
+            Index_t retval{0};
+            for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
+                const auto & stride{std::get<0>(tup)};
+                const auto & location{std::get<1>(tup)};
+                const auto & coord{std::get<2>(tup)};
+                retval += stride * (coord - location);
+            }
+            return retval;
+        }
+
+        //! get the linear index of a pixel given a set of strides
+        template <class T>
+        Index_t get_index_from_strides(const T & strides, const T & locations,
+                                       const T & ccoord) {
+            const auto dim{strides.size()};
+            if (locations.size() != dim) {
+                std::stringstream error{};
+                error << "Dimension mismatch between strides (dim = " << dim
+                      << ") and locations (dim = " << locations.get_dim()
+                      << ")";
+                throw RuntimeError(error.str());
+            }
+            if (ccoord.size() != dim) {
+                std::stringstream error{};
+                error << "Dimension mismatch between strides (dim = " << dim
+                      << ") and ccoord (dim = " << ccoord.get_dim() << ")";
+                throw RuntimeError(error.str());
+            }
+            Index_t retval{0};
+            for (const auto & tup : akantu::zip(strides, locations, ccoord)) {
+                const auto & stride{std::get<0>(tup)};
+                const auto & location{std::get<1>(tup)};
+                const auto & coord{std::get<2>(tup)};
+                retval += stride * (coord - location);
+            }
+            return retval;
+        }
+
+    }  // namespace CcoordOps
+}  // namespace muGrid
+
+#endif  // SRC_LIBMUGRID_GRID_INDEX_OPS_HH_

@@ -3,6 +3,7 @@ Collection of simple parallel solvers
 """
 
 import numpy as np
+from muGrid import real_field
 from _muGrid import Communicator, FieldCollection
 
 from .Field import Field as FieldWrapper, wrap_field
@@ -56,19 +57,17 @@ def conjugate_gradients(
     b_wrap = b if isinstance(b, FieldWrapper) else wrap_field(b)
     x_wrap = x if isinstance(x, FieldWrapper) else wrap_field(x)
 
-    p_cpp = fc.real_field("cg-search-direction")
-    Ap_cpp = fc.real_field("cg-hessian-product")
-    p_wrap = wrap_field(p_cpp)
-    Ap_wrap = wrap_field(Ap_cpp)
+    p_wrap = real_field(fc, "cg-search-direction")
+    Ap_wrap = real_field(fc, "cg-hessian-product")
 
     hessp(x, Ap_cpp)
     p_wrap.s[...] = b_wrap.s - Ap_wrap.s
-    r = np.copy(p_wrap.s)  # residual
+    r = p_wrap.s.copy()  # residual
 
     if callback:
         callback(0, x_wrap.s, r, p_wrap.s)
 
-    rr = comm.sum(np.dot(r.ravel(), r.ravel()))  # initial residual dot product
+    rr = comm.sum(r.ravel().dot(r.ravel()))  # initial residual dot product
     if rr < tol_sq:
         return x
 
@@ -77,7 +76,7 @@ def conjugate_gradients(
         hessp(p_cpp, Ap_cpp)
 
         # Update x (and residual)
-        pAp = comm.sum(np.dot(p_wrap.s.ravel(), Ap_wrap.s.ravel()))
+        pAp = comm.sum(p_wrap.s.ravel().dot(Ap_wrap.s.ravel()))
         if pAp <= 0:
             raise RuntimeError("Hessian is not positive definite")
 
@@ -89,7 +88,7 @@ def conjugate_gradients(
             callback(iteration + 1, x_wrap.s, r, p_wrap.s)
 
         # Check convergence
-        next_rr = comm.sum(np.dot(r.ravel(), r.ravel()))
+        next_rr = comm.sum(r.ravel().dot(r.ravel()))
         if next_rr < tol_sq:
             return x
 
