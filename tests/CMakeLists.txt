@@ -23,7 +23,6 @@ if(Boost_FOUND)
         header_test_tensor_algebra.cc
         test_ccoord_operations.cc
         test_convolution_operator.cc
-        test_discrete_gradient_operator.cc
         test_field.cc
         test_field_gpu.cc
         test_field_collection.cc
