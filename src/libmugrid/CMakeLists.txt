@@ -38,6 +38,11 @@ set(MUGRID_SOURCES
     state_field.cc
     state_field_map.cc
     units.cc
+    # FFT support
+    fft/pocketfft_backend.cc
+    fft/pencil_transpose.cc
+    fft/fft_utils.cc
+    fft/fft_engine.cc
     "${CMAKE_CURRENT_BINARY_DIR}/version.cc"
 )
 
@@ -61,6 +66,7 @@ target_include_directories(muGrid
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
         $<INSTALL_INTERFACE:include>
 )
 
@@ -112,4 +118,15 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
 file(GLOB MUGRID_HEADERS "*.hh")
 install(FILES ${MUGRID_HEADERS}
     DESTINATION include/libmugrid
+)
+
+# Install FFT headers
+file(GLOB MUGRID_FFT_HEADERS "fft/*.hh")
+install(FILES ${MUGRID_FFT_HEADERS}
+    DESTINATION include/libmugrid/fft
+)
+
+# Install pocketfft header
+install(FILES fft/pocketfft/pocketfft_hdronly.h
+    DESTINATION include/libmugrid/fft/pocketfft
 )

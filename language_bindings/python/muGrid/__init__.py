@@ -51,6 +51,7 @@ from _muGrid import ConvolutionOperatorBase  # noqa: F401, E402
 from _muGrid import Decomposition  # noqa: F401, E402
 from _muGrid import DynCcoord  # noqa: F401, E402
 from _muGrid import DynRcoord  # noqa: F401, E402
+from _muGrid import FFTEngine  # noqa: F401, E402
 from _muGrid import GlobalFieldCollection  # noqa: F401, E402
 from _muGrid import IterUnit  # noqa: F401, E402
 from _muGrid import LocalFieldCollection  # noqa: F401, E402
@@ -61,6 +62,13 @@ from _muGrid import Unit  # noqa: F401, E402
 from _muGrid import Verbosity  # noqa: F401, E402
 from _muGrid import get_domain_ccoord  # noqa: F401, E402
 from _muGrid import get_domain_index  # noqa: F401, E402
+# FFT utility functions
+from _muGrid import fft_freqind  # noqa: F401, E402
+from _muGrid import fft_freq  # noqa: F401, E402
+from _muGrid import rfft_freqind  # noqa: F401, E402
+from _muGrid import rfft_freq  # noqa: F401, E402
+from _muGrid import get_hermitian_grid_pts  # noqa: F401, E402
+from _muGrid import fft_normalization  # noqa: F401, E402
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 if hasattr(_muGrid, "FileIONetCDF"):
@@ -106,5 +114,6 @@ else:
 from .Parallel import Communicator  # noqa: E402
 from .Field import Field, wrap_field  # noqa: E402
 from .Field import real_field, int_field, uint_field, complex_field  # noqa: E402
+from .Field import fft_real_space_field, fft_fourier_space_field  # noqa: E402
 
 __version__ = _muGrid.version.description()

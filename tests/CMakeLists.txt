@@ -34,6 +34,7 @@ if(Boost_FOUND)
         test_state_field_maps.cc
         test_state_fields.cc
         test_units.cc
+        test_fft_engine.cc
     )
 
     # Add NetCDF tests if available
