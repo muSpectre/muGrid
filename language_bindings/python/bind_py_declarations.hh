@@ -48,6 +48,5 @@ void add_state_field_classes(py::module & mod);
 void add_field_collection_classes(py::module & mod);
 void add_convolution_operator_classes(py::module & mod);
 void add_file_io_classes(py::module & mod);
-void add_options_dictionary(py::module & mod);
 
 #endif  // LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_

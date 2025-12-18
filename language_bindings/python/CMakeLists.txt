@@ -9,7 +9,6 @@ set(MUGRID_PYTHON_SOURCES
     bind_py_state_field.cc
     bind_py_field_collection.cc
     bind_py_file_io.cc
-    bind_py_options_dictionary.cc
 )
 
 # Create Python module

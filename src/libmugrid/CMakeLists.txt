@@ -31,11 +31,9 @@ set(MUGRID_SOURCES
     field.cc
     field_typed.cc
     field_map.cc
-    physics_domain.cc
     communicator.cc
     cartesian_communicator.cc
     cartesian_decomposition.cc
-    options_dictionary.cc
     raw_memory_operations.cc
     state_field.cc
     state_field_map.cc
