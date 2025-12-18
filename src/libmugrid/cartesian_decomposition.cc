@@ -199,6 +199,9 @@ namespace muGrid {
         // arithmetics). Pass false to allow device pointers for CUDA-aware MPI.
         auto * data{static_cast<char *>(field.get_void_data_ptr(false))};
 
+        // Check if field is on device memory (needed for serial ghost comm)
+        bool is_device_memory{field.is_on_device()};
+
         // Get element size (only useful for pointer arithmetic in finding the
         // correct offset)
         auto element_size{
@@ -309,7 +312,9 @@ namespace muGrid {
                     // stride in send direction
                     block_len,
                     // type information
-                    element_size, mpi_type_ptr);
+                    element_size, mpi_type_ptr,
+                    // device memory flag for serial Kokkos copy
+                    is_device_memory);
 
                 // Perform send to the LEFT, receive from the RIGHT
                 this->cart_comm->sendrecv_left(
@@ -335,7 +340,9 @@ namespace muGrid {
                     // stride in send direction
                     block_len,
                     // type information
-                    element_size, mpi_type_ptr);
+                    element_size, mpi_type_ptr,
+                    // device memory flag for serial Kokkos copy
+                    is_device_memory);
 
                 // Update how many blocks we have already sent to the right/left
                 nb_cum_send_right += nb_send_right;

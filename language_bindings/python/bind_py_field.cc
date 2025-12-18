@@ -150,7 +150,7 @@ DLDataType get_dlpack_dtype<std::complex<double>>() {
 
 /**
  * Create a DLPack capsule for a typed field using the versioned protocol.
- * Works for both Host and Device (GPU) fields via the get_data_ptr_any_space() method.
+ * Works for both Host and Device (GPU) fields via get_void_data_ptr(false).
  */
 template<typename T, typename MemorySpace = muGrid::HostSpace>
 py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
@@ -184,8 +184,8 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
     // Fill in tensor info
     auto& tensor = managed->dl_tensor;
 
-    // Get data pointer - use the virtual method that works for any memory space
-    tensor.data = field.get_data_ptr_any_space();
+    // Get data pointer - pass false to skip host assertion (works for any memory space)
+    tensor.data = field.get_void_data_ptr(false);
 
     // Set device based on field's memory space using virtual methods
     tensor.device = DLDevice{

@@ -186,13 +186,16 @@ namespace muGrid {
          * @param elem_size_in_bytes Size of each element in bytes.
          * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
          *                   with MPI; ignored for serial mode.
+         * @param is_device_memory If true, data resides on GPU device memory.
+         *                         Used in serial mode to select appropriate
+         *                         memory copy method (Kokkos for GPU).
          */
         void sendrecv_right(int direction, int block_stride, int nb_send_blocks,
                             int send_block_len, Index_t send_offset,
                             int nb_recv_blocks, int recv_block_len,
                             Index_t recv_offset, char * data,
                             int stride_in_direction, int elem_size_in_bytes,
-                            void * elem_mpi_t) const;
+                            void * elem_mpi_t, bool is_device_memory = false) const;
 
         /**
          * @brief Send data to the left neighbor; receive from the right.
@@ -225,13 +228,16 @@ namespace muGrid {
          * @param elem_size_in_bytes Size of each element in bytes.
          * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
          *                   with MPI; ignored for serial mode.
+         * @param is_device_memory If true, data resides on GPU device memory.
+         *                         Used in serial mode to select appropriate
+         *                         memory copy method (Kokkos for GPU).
          */
         void sendrecv_left(int direction, int block_stride, int nb_send_blocks,
                            int send_block_len, Index_t send_offset,
                            int nb_recv_blocks, int recv_block_len,
                            Index_t recv_offset, char * data,
                            int stride_in_direction, int elem_size_in_bytes,
-                           void * elem_mpi_t) const;
+                           void * elem_mpi_t, bool is_device_memory = false) const;
 
         /**
          * @brief Template method for sending a scalar to the right neighbor and

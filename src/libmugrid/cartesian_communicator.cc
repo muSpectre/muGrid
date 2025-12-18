@@ -2,9 +2,12 @@
 #include <mpi.h>
 #endif
 
+#include <Kokkos_Core.hpp>
+
 #include "grid_common.hh"
 #include "communicator.hh"
 #include "cartesian_communicator.hh"
+#include "kokkos_types.hh"
 
 namespace muGrid {
 #ifdef WITH_MPI
@@ -70,7 +73,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t) const {
+        int elem_size_in_bytes, void * elem_mpi_t,
+        bool is_device_memory [[maybe_unused]]) const {
+        // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
+        // handles device pointers directly.
         // Cast void pointer to MPI_Datatype for MPI implementation
         MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
@@ -96,7 +102,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t) const {
+        int elem_size_in_bytes, void * elem_mpi_t,
+        bool is_device_memory [[maybe_unused]]) const {
+        // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
+        // handles device pointers directly.
         // Cast void pointer to MPI_Datatype for MPI implementation
         MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
@@ -123,13 +132,52 @@ namespace muGrid {
         : Parent_t{}, parent{parent}, nb_subdivisions{nb_subdivisions},
           coordinates(nb_subdivisions.size(), 0) {}
 
+    namespace {
+        /**
+         * @brief Copy memory block using appropriate method for memory space.
+         *
+         * Uses Kokkos::View with unmanaged memory to perform copies that work
+         * on both host and device memory. This is necessary because std::memcpy
+         * cannot access GPU device memory.
+         *
+         * @param dst Destination address
+         * @param src Source address
+         * @param size_in_bytes Number of bytes to copy
+         * @param is_device_memory If true, use Kokkos device copy
+         */
+        void kokkos_memcpy(void * dst, const void * src, size_t size_in_bytes,
+                           bool is_device_memory) {
+            if (is_device_memory) {
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+                // Create unmanaged Kokkos Views wrapping the raw pointers
+                // Use char (1 byte) as the element type for byte-wise copy
+                using DeviceView = Kokkos::View<char*, DefaultDeviceSpace,
+                                                Kokkos::MemoryUnmanaged>;
+                using ConstDeviceView = Kokkos::View<const char*, DefaultDeviceSpace,
+                                                     Kokkos::MemoryUnmanaged>;
+                DeviceView dst_view(static_cast<char*>(dst), size_in_bytes);
+                ConstDeviceView src_view(static_cast<const char*>(src), size_in_bytes);
+                Kokkos::deep_copy(dst_view, src_view);
+#else
+                // Fallback to memcpy if no GPU backend (shouldn't happen if
+                // is_device_memory is true, but handle gracefully)
+                std::memcpy(dst, src, size_in_bytes);
+#endif
+            } else {
+                std::memcpy(dst, src, size_in_bytes);
+            }
+        }
+    }  // anonymous namespace
+
     void CartesianCommunicator::sendrecv_right(
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t) const {
-        // Note: elem_mpi_t is not used in serial mode (ignored parameter)
-        (void)elem_mpi_t;  // Suppress unused parameter warning
+        int elem_size_in_bytes, void * elem_mpi_t,
+        bool is_device_memory) const {
+        // Note: elem_mpi_t and direction are not used in serial mode
+        (void)elem_mpi_t;
+        (void)direction;
         if (nb_send_blocks != nb_recv_blocks) {
             throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
         }
@@ -141,7 +189,8 @@ namespace muGrid {
                 data + recv_offset * stride_in_direction * elem_size_in_bytes)};
             auto send_addr{static_cast<void *>(
                 data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            std::memcpy(recv_addr, send_addr, send_block_len * elem_size_in_bytes);
+            kokkos_memcpy(recv_addr, send_addr,
+                          send_block_len * elem_size_in_bytes, is_device_memory);
             data += block_stride * elem_size_in_bytes;
         }
     }
@@ -150,9 +199,11 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t) const {
-        // Note: elem_mpi_t is not used in serial mode (ignored parameter)
-        (void)elem_mpi_t;  // Suppress unused parameter warning
+        int elem_size_in_bytes, void * elem_mpi_t,
+        bool is_device_memory) const {
+        // Note: elem_mpi_t and direction are not used in serial mode
+        (void)elem_mpi_t;
+        (void)direction;
         if (nb_send_blocks != nb_recv_blocks) {
             throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
         }
@@ -164,7 +215,8 @@ namespace muGrid {
                 data + recv_offset * stride_in_direction * elem_size_in_bytes)};
             auto send_addr{static_cast<void *>(
                 data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            std::memcpy(recv_addr, send_addr, send_block_len * elem_size_in_bytes);
+            kokkos_memcpy(recv_addr, send_addr,
+                          send_block_len * elem_size_in_bytes, is_device_memory);
             data += block_stride * elem_size_in_bytes;
         }
     }

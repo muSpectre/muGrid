@@ -360,16 +360,6 @@ namespace muGrid {
       }
     }
 
-    /**
-     * Get the raw data pointer in any memory space.
-     * This is used for DLPack interoperability where we need access
-     * to the pointer regardless of memory space.
-     */
-    void * get_data_ptr_any_space() const {
-      return const_cast<void *>(
-          static_cast<const void *>(this->values.data()));
-    }
-
    protected:
     //! Kokkos View storage for the raw field data
     View_t values{};
