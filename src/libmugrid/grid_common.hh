@@ -103,7 +103,7 @@ namespace muGrid {
     constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
     constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
     constexpr Index_t threeD{3};  //!< constant for a three-dimensional problem
-    constexpr Index_t fourD{3};   //!< constant for a four-dimensional problem
+    constexpr Index_t fourD{4};   //!< constant for a four-dimensional problem
     constexpr Index_t zerothOrder{0};  //!< constant for scalars
     constexpr Index_t firstOrder{1};   //!< constant for vectors
     constexpr Index_t secondOrder{2};  //!< constant second-order tensors
@@ -111,12 +111,7 @@ namespace muGrid {
     constexpr Index_t OneQuadPt{1};   //!< constant for 1 quadrature point/pixel
     constexpr Index_t TwoQuadPts{2};  //!< constant for 2 quadrature point/pixel
     constexpr Index_t FourQuadPts{
-        4};  //!< constant for 4 quadrature point/pixel
-    constexpr Index_t FiveQuadPts{
-        5};                           //!< constant for 5 quadrature point/pixel
-    constexpr Index_t SixQuadPts{6};  //!< constant for 6 quadrature point/pixel
-    constexpr Index_t EightQuadPts{
-        8};                        //!< constant for 8 quadrature point/pixel
+        4};                        //!< constant for 4 quadrature point/pixel
     constexpr Index_t OneNode{1};  //!< constant for 1 node per pixel
 
     /**
@@ -844,7 +839,5 @@ namespace muGrid {
     }  // namespace version
 
 }  // namespace muGrid
-
-#include "cpp_compliance.hh"
 
 #endif  // SRC_LIBMUGRID_GRID_COMMON_HH_

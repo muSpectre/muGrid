@@ -49,7 +49,6 @@ from _muGrid import CartesianDecomposition  # noqa: F401, E402
 from _muGrid import ConvolutionOperator  # noqa: F401, E402
 from _muGrid import ConvolutionOperatorBase  # noqa: F401, E402
 from _muGrid import Decomposition  # noqa: F401, E402
-from _muGrid import Dictionary  # noqa: F401, E402
 from _muGrid import DynCcoord  # noqa: F401, E402
 from _muGrid import DynRcoord  # noqa: F401, E402
 from _muGrid import GlobalFieldCollection  # noqa: F401, E402

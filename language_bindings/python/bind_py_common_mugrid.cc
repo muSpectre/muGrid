@@ -43,9 +43,9 @@
 #include "libmugrid/units.hh"
 
 using muGrid::DynCcoord;
+using muGrid::fourD;
 using muGrid::Index_t;
 using muGrid::Real;
-using muGrid::threeD;
 using muGrid::Verbosity;
 using pybind11::literals::operator""_a;
 
@@ -193,8 +193,8 @@ void add_common_mugrid(py::module & mod) {
 
     add_enums(mod);
 
-    add_dyn_ccoord_helper<threeD, Index_t>(mod, "DynCcoord");
-    add_dyn_ccoord_helper<threeD, Real>(mod, "DynRcoord");
+    add_dyn_ccoord_helper<fourD, Index_t>(mod, "DynCcoord");
+    add_dyn_ccoord_helper<fourD, Real>(mod, "DynRcoord");
 
     add_get_cube(mod);
 

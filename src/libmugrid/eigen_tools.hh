@@ -39,77 +39,10 @@
 #include "grid_common.hh"
 
 #include "Eigen/Dense"
-#include "unsupported/Eigen/CXX11/Tensor"
 
 #include <type_traits>
-#include <utility>
 
 namespace muGrid {
-
-  /* ---------------------------------------------------------------------- */
-  namespace internal {
-
-    //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
-    template <Dim_t order, Dim_t dim, Dim_t... dims>
-    struct SizesByOrderHelper {
-      //! type to use
-      using Sizes =
-          typename SizesByOrderHelper<order - 1, dim, dim, dims...>::Sizes;
-    };
-    //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
-    template <Dim_t dim, Dim_t... dims>
-    struct SizesByOrderHelper<0, dim, dims...> {
-      //! type to use
-      using Sizes = Eigen::Sizes<dims...>;
-    };
-
-  }  // namespace internal
-
-  //! Creates a Eigen::Sizes type for a Tensor defined by an order and dim
-  template <Dim_t order, Dim_t dim>
-  struct SizesByOrder {
-    static_assert(order > 0, "works only for order greater than zero");
-    //! `Eigen::Sizes`
-    using Sizes =
-        typename internal::SizesByOrderHelper<order - 1, dim, dim>::Sizes;
-  };
-
-  /* ---------------------------------------------------------------------- */
-  namespace internal {
-
-    /* ---------------------------------------------------------------------- */
-    //! Call a passed lambda with the unpacked sizes as arguments
-    template <Dim_t order, typename Fun_t, Dim_t dim, Dim_t... args>
-    struct CallSizesHelper {
-      //! applies the call
-      static decltype(auto) call(Fun_t && fun) {
-        static_assert(order > 0, "can't handle empty sizes b)");
-        return CallSizesHelper<order - 1, Fun_t, dim, dim, args...>::call(fun);
-      }
-    };
-
-    /* ---------------------------------------------------------------------- */
-    template <typename Fun_t, Dim_t dim, Dim_t... args>
-    //! Call a passed lambda with the unpacked sizes as arguments
-    struct CallSizesHelper<0, Fun_t, dim, args...> {
-      //! applies the call
-      static decltype(auto) call(Fun_t && fun) { return fun(args...); }
-    };
-
-  }  // namespace internal
-
-  /**
-   * takes a lambda and calls it with the proper `Eigen::Sizes`
-   * unpacked as arguments. Is used to call constructors of a
-   * `Eigen::Tensor` or map thereof in a context where the spatial
-   * dimension is templated
-   */
-  template <Dim_t order, Dim_t dim, typename Fun_t>
-  inline decltype(auto) call_sizes(Fun_t && fun) {
-    static_assert(order > 1, "can't handle empty sizes");
-    return internal::CallSizesHelper<order - 1, Fun_t, dim, dim>::call(
-        std::forward<Fun_t>(fun));
-  }
 
   // compile-time square root
   static constexpr Dim_t ct_sqrt(Dim_t res, Dim_t l, Dim_t r) {

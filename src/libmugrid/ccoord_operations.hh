@@ -62,14 +62,6 @@ namespace muGrid {
                 return std::array<T, Dim>{ret(val, I)...};
             }
 
-            //! computes hermitian size according to FFTW
-            template <Dim_t Dim, size_t... I>
-            constexpr Ccoord_t<Dim> herm(const Ccoord_t<Dim> & nb_grid_pts,
-                                         std::index_sequence<I...>) {
-                return Ccoord_t<Dim>{nb_grid_pts.front() / 2 + 1,
-                                     nb_grid_pts[I + 1]...};
-            }
-
             //! compute the stride in a direction of a column-major grid
             template <Dim_t Dim>
             constexpr Index_t
