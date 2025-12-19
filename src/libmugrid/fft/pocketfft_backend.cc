@@ -37,6 +37,8 @@
 
 #if defined(KOKKOS_ENABLE_CUDA)
 #include "cufft_backend.hh"
+#elif defined(KOKKOS_ENABLE_HIP)
+#include "hipfft_backend.hh"
 #endif
 
 // Disable pocketfft multithreading - we use MPI for parallelism
@@ -142,8 +144,7 @@ std::unique_ptr<FFT1DBackend> get_device_fft_backend() {
 #if defined(KOKKOS_ENABLE_CUDA)
   return std::make_unique<cuFFTBackend>();
 #elif defined(KOKKOS_ENABLE_HIP)
-  // TODO: Return rocFFT backend when implemented
-  return nullptr;
+  return std::make_unique<hipFFTBackend>();
 #else
   return nullptr;
 #endif

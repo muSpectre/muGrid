@@ -60,6 +60,17 @@ if(Kokkos_ENABLE_CUDA)
     endif()
 endif()
 
+# Enable HIP language if Kokkos_ENABLE_HIP is set
+# This must be after project() but before the first HIP target
+if(Kokkos_ENABLE_HIP)
+    enable_language(HIP)
+    # Set default HIP architecture if not specified
+    # gfx906 = MI50/MI60, gfx908 = MI100, gfx90a = MI200 series, gfx942 = MI300 series
+    if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+        set(CMAKE_HIP_ARCHITECTURES "gfx906;gfx908;gfx90a" CACHE STRING "HIP architectures to compile for")
+    endif()
+endif()
+
 # Require C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
