@@ -53,10 +53,11 @@ if(Kokkos_ENABLE_CUDA)
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     # Set default CUDA architecture if not specified
-    # 52 = Maxwell (TITAN X), 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100)
+    # Kokkos 5.0.0 requires compute_70+ for __grid_constant__ support
+    # 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100), 90 = Hopper (H100)
     # Use "native" on CMake 3.24+ to auto-detect, or set a default
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "52;70;80" CACHE STRING "CUDA architectures to compile for")
+        set(CMAKE_CUDA_ARCHITECTURES "70;80;90" CACHE STRING "CUDA architectures to compile for")
     endif()
 endif()
 
@@ -126,6 +127,7 @@ if(NOT Kokkos_FOUND)
     # Disable half-precision types - not needed by muGrid and avoids potential
     # CUDA compatibility issues with __half/__nv_bfloat16 conversions
     set(Kokkos_ENABLE_IMPL_HALF_TYPE OFF CACHE BOOL "" FORCE)
+    set(Kokkos_ENABLE_IMPL_BHALF_TYPE OFF CACHE BOOL "" FORCE)
     # Enable PIC for shared library linking
     set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
     FetchContent_Declare(
