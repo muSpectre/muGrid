@@ -80,7 +80,8 @@ jobs:
             export CXX=clang++
           fi
           source venv/bin/activate
-          cmake -B build -G Ninja
+          # Explicitly tell CMake to use the venv Python so pytest is found
+          cmake -B build -G Ninja -DPython_EXECUTABLE=$(which python3)
           cd build
           cmake --build .
 
