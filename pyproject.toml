@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.8", "pybind11>=2.11", "numpy>=1.20.0"]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.11", "numpy>=2.1"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -19,10 +19,10 @@ classifiers = [
     "Programming Language :: C++",
     "Programming Language :: Python"
 ]
-requires-python = ">=3.9.0"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "numpy"
+    "numpy>=2.1"
 ]
 
 [project.optional-dependencies]
@@ -70,7 +70,7 @@ before-all = [
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311", "py312", "py313", "py314"]
+target-version = ["py310", "py311", "py312", "py313", "py314"]
 
 [tool.isort]
 profile = "black"
