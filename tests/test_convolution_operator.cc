@@ -42,7 +42,6 @@
 #include "field/field_map.hh"
 #include "kokkos/kokkos_types.hh"
 
-#include <Kokkos_Core.hpp>
 #include <boost/mpl/list.hpp>
 
 #include <random>
@@ -663,9 +662,9 @@ namespace muGrid {
 
     // Fill with test data
     for (Index_t i = 0; i < size; ++i) {
-      src.quad_indices(i) = i;
-      src.nodal_indices(i) = size - i;
-      src.values(i) = static_cast<Real>(i) * 0.1;
+      src.quad_indices[i] = i;
+      src.nodal_indices[i] = size - i;
+      src.values[i] = static_cast<Real>(i) * 0.1;
     }
 
     // Deep copy (same space - should still work)
@@ -675,9 +674,9 @@ namespace muGrid {
 
     // Verify data was copied correctly
     for (Index_t i = 0; i < size; ++i) {
-      BOOST_CHECK_EQUAL(dst.quad_indices(i), src.quad_indices(i));
-      BOOST_CHECK_EQUAL(dst.nodal_indices(i), src.nodal_indices(i));
-      BOOST_CHECK_EQUAL(dst.values(i), src.values(i));
+      BOOST_CHECK_EQUAL(dst.quad_indices[i], src.quad_indices[i]);
+      BOOST_CHECK_EQUAL(dst.nodal_indices[i], src.nodal_indices[i]);
+      BOOST_CHECK_EQUAL(dst.values[i], src.values[i]);
     }
   }
 
@@ -858,37 +857,30 @@ namespace muGrid {
 #endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
 
   /* ---------------------------------------------------------------------- */
-  /* Test that verifies Kokkos execution spaces are configured correctly     */
+  /* Test that verifies memory spaces are configured correctly               */
   /* ---------------------------------------------------------------------- */
 
-  BOOST_AUTO_TEST_CASE(kokkos_configuration_test) {
-    // Print Kokkos configuration for debugging
-    std::cout << "Kokkos configuration:" << std::endl;
-    std::cout << "  Default execution space: "
-              << typeid(Kokkos::DefaultExecutionSpace).name() << std::endl;
-    std::cout << "  Default host execution space: "
-              << typeid(Kokkos::DefaultHostExecutionSpace).name() << std::endl;
+  BOOST_AUTO_TEST_CASE(memory_space_configuration_test) {
+    // Print memory space configuration for debugging
+    std::cout << "muGrid memory space configuration:" << std::endl;
     std::cout << "  HostSpace: " << typeid(HostSpace).name() << std::endl;
     std::cout << "  DefaultDeviceSpace: "
               << typeid(DefaultDeviceSpace).name() << std::endl;
 
-#if defined(KOKKOS_ENABLE_CUDA)
-    std::cout << "  CUDA enabled" << std::endl;
+#if defined(MUGRID_WITH_CUDA)
+    std::cout << "  CUDA backend enabled" << std::endl;
     BOOST_CHECK(true);
-#elif defined(KOKKOS_ENABLE_HIP)
-    std::cout << "  HIP enabled" << std::endl;
-    BOOST_CHECK(true);
-#elif defined(KOKKOS_ENABLE_OPENMP)
-    std::cout << "  OpenMP enabled" << std::endl;
-    BOOST_CHECK(true);
-#elif defined(KOKKOS_ENABLE_SERIAL)
-    std::cout << "  Serial backend" << std::endl;
+#elif defined(MUGRID_WITH_HIP)
+    std::cout << "  HIP backend enabled" << std::endl;
     BOOST_CHECK(true);
 #else
-    std::cout << "  Unknown backend" << std::endl;
+    std::cout << "  CPU-only (no GPU backend)" << std::endl;
+    BOOST_CHECK(true);
 #endif
 
-    BOOST_CHECK(Kokkos::is_initialized());
+    // Verify HostSpace is correctly identified
+    BOOST_CHECK(is_host_space_v<HostSpace>);
+    BOOST_CHECK(!is_device_space_v<HostSpace>);
   }
 
   BOOST_AUTO_TEST_SUITE_END();
