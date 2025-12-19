@@ -1962,7 +1962,21 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void * NetCDFVarBase::get_buf() const {
     // Default assert_host_memory=true ensures device fields throw an error
-    return this->get_field().get_void_data_ptr();
+    const Field & field{this->get_field()};
+    char * buf_ptr{static_cast<char *>(field.get_void_data_ptr())};
+
+    // Compute byte offset to skip ghost buffer and access interior data
+    // The offset is computed using pixel offsets and strides
+    auto pixel_offsets{field.get_pixels_offset_without_ghosts()};
+    auto pixel_strides{field.get_collection().get_pixels_strides(1)};
+    Index_t byte_offset{0};
+    for (size_t i = 0; i < pixel_offsets.size(); ++i) {
+      byte_offset += pixel_offsets[i] * pixel_strides[i];
+    }
+    // Multiply by degrees of freedom per pixel and element size
+    byte_offset *= field.get_nb_dof_per_pixel() * field.get_element_size_in_bytes();
+
+    return buf_ptr + byte_offset;
   }
 
   /* ---------------------------------------------------------------------- */
