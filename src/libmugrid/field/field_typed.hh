@@ -103,8 +103,8 @@ namespace muGrid {
     //! Memory space type
     using Memory_Space = MemorySpace;
 
-    //! Kokkos View type for storage
-    using View_t = FieldView<T, MemorySpace>;
+    //! DeviceArray type for storage (replaces Kokkos::View)
+    using View_t = DeviceArray<T, MemorySpace>;
 
     /**
      * Simple structure used to allow for lazy evaluation of the unary '-' sign.
@@ -579,7 +579,8 @@ namespace muGrid {
     if (dst.view().size() != src.view().size()) {
       throw FieldError("Size mismatch in deep_copy");
     }
-    Kokkos::deep_copy(dst.view(), src.view());
+    // Use muGrid::deep_copy from device_array.hh
+    muGrid::deep_copy(dst.view(), src.view());
   }
 
   /* ---------------------------------------------------------------------- */

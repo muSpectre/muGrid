@@ -39,10 +39,10 @@
 #define SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
 
 #include "operators/convolution_operator_base.hh"
+#include "operators/convolution_kernels.hh"
 #include "kokkos/kokkos_types.hh"
 
 #include "Eigen/Dense"
-#include <Kokkos_Core.hpp>
 
 #include <vector>
 #include <optional>
@@ -53,53 +53,7 @@ namespace muGrid {
     // Forward declaration
     class GlobalFieldCollection;
 
-    /**
-     * @brief Structure-of-Arrays representation of sparse operator for better
-     *        cache locality and GPU compatibility.
-     *
-     * @tparam MemorySpace Kokkos memory space (HostSpace, CudaSpace, etc.)
-     */
-    template<typename MemorySpace = HostSpace>
-    struct SparseOperatorSoA {
-        using ViewIndex = Kokkos::View<Index_t*, MemorySpace>;
-        using ViewReal = Kokkos::View<Real*, MemorySpace>;
-
-        ViewIndex quad_indices{};   ///< Output indices into quadrature field
-        ViewIndex nodal_indices{};  ///< Input indices into nodal field
-        ViewReal values{};          ///< Operator values
-        Index_t size{0};            ///< Number of non-zero entries
-
-        //! Default constructor
-        SparseOperatorSoA() = default;
-
-        //! Constructor with size allocation
-        explicit SparseOperatorSoA(Index_t n)
-            : quad_indices("quad_indices", n),
-              nodal_indices("nodal_indices", n),
-              values("values", n),
-              size(n) {}
-
-        //! Check if the operator is empty
-        bool empty() const { return size == 0; }
-    };
-
-    /**
-     * @brief Parameters for grid traversal, precomputed for efficiency
-     */
-    struct GridTraversalParams {
-        Index_t nx{1}, ny{1}, nz{1};           ///< Grid dimensions without ghosts
-        Index_t total_pixels{0};               ///< Total number of pixels
-        Index_t start_pixel_index{0};          ///< Index of first non-ghost pixel
-        Index_t nodal_elems_per_pixel{0};      ///< Elements per pixel in nodal field
-        Index_t quad_elems_per_pixel{0};       ///< Elements per pixel in quad field
-        Index_t nodal_stride_x{0};             ///< Stride in x for nodal field
-        Index_t nodal_stride_y{0};             ///< Stride in y for nodal field
-        Index_t nodal_stride_z{0};             ///< Stride in z for nodal field
-        Index_t quad_stride_x{0};              ///< Stride in x for quad field
-        Index_t quad_stride_y{0};              ///< Stride in y for quad field
-        Index_t quad_stride_z{0};              ///< Stride in z for quad field
-        Index_t row_width{0};                  ///< Full row width including ghosts
-    };
+    // SparseOperatorSoA and GridTraversalParams are defined in memory/kernels_cpu.hh
 
     /**
      * @brief Cache key for sparse operator memoization
@@ -232,7 +186,7 @@ namespace muGrid {
             TypedFieldBase<Real> &nodal_field,
             const std::vector<Real> &weights = {}) const final;
 
-#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
         /**
          * Evaluates the gradient of nodal_field into quadrature_point_field
          * on device (GPU) memory.
@@ -529,145 +483,7 @@ namespace muGrid {
                                       Index_t nb_nodal_components) const;
     };
 
-    /**
-     * @brief Apply convolution kernel - templated on execution space for GPU portability
-     *
-     * @tparam ExecutionSpace Kokkos execution space (Serial, OpenMP, Cuda, etc.)
-     * @param nodal_data Pointer to nodal field data
-     * @param quad_data Pointer to quadrature field data (output)
-     * @param alpha Scaling factor
-     * @param params Grid traversal parameters
-     * @param sparse_op Sparse operator (must be in compatible memory space)
-     */
-    template<typename ExecutionSpace, typename MemorySpace>
-    void apply_convolution_kernel(
-        const Real* nodal_data,
-        Real* quad_data,
-        const Real alpha,
-        const GridTraversalParams& params,
-        const SparseOperatorSoA<MemorySpace>& sparse_op) {
-        const Index_t nx = params.nx;
-        const Index_t ny = params.ny;
-        const Index_t nz = params.nz;
-        const Index_t nodal_base = params.start_pixel_index *
-                                   params.nodal_elems_per_pixel;
-        const Index_t quad_base = params.start_pixel_index *
-                                  params.quad_elems_per_pixel;
-        const Index_t nodal_stride_x = params.nodal_stride_x;
-        const Index_t nodal_stride_y = params.nodal_stride_y;
-        const Index_t nodal_stride_z = params.nodal_stride_z;
-        const Index_t quad_stride_x = params.quad_stride_x;
-        const Index_t quad_stride_y = params.quad_stride_y;
-        const Index_t quad_stride_z = params.quad_stride_z;
-        const Index_t nnz = sparse_op.size;
-
-        // Get raw pointers for kernel access
-        const Index_t* quad_indices = sparse_op.quad_indices.data();
-        const Index_t* nodal_indices = sparse_op.nodal_indices.data();
-        const Real* op_values = sparse_op.values.data();
-
-        using MDPolicy = Kokkos::MDRangePolicy<
-            ExecutionSpace,
-            Kokkos::Rank<3>,
-            Kokkos::IndexType<Index_t>>;
-
-        Kokkos::parallel_for(
-            "ConvolutionOperator::apply_kernel",
-            MDPolicy({0, 0, 0}, {nz, ny, nx}),
-            KOKKOS_LAMBDA(const Index_t z, const Index_t y, const Index_t x) {
-                const Index_t nodal_offset = nodal_base +
-                    z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
-                const Index_t quad_offset = quad_base +
-                    z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
-
-                for (Index_t i = 0; i < nnz; ++i) {
-                    quad_data[quad_offset + quad_indices[i]] +=
-                        alpha * nodal_data[nodal_offset + nodal_indices[i]] *
-                        op_values[i];
-                }
-            });
-    }
-
-    /**
-     * @brief Transpose convolution kernel - templated on execution space for GPU portability
-     *
-     * @tparam ExecutionSpace Kokkos execution space (Serial, OpenMP, Cuda, etc.)
-     * @param quad_data Pointer to quadrature field data (input)
-     * @param nodal_data Pointer to nodal field data (output)
-     * @param alpha Scaling factor
-     * @param params Grid traversal parameters
-     * @param sparse_op Sparse operator (must be in compatible memory space)
-     *
-     * @note Uses atomic operations for thread-safe accumulation since multiple
-     *       pixels may write to the same nodal DOF (overlapping stencils).
-     */
-    template<typename ExecutionSpace, typename MemorySpace>
-    void transpose_convolution_kernel(
-        const Real* quad_data,
-        Real* nodal_data,
-        const Real alpha,
-        const GridTraversalParams& params,
-        const SparseOperatorSoA<MemorySpace>& sparse_op) {
-        const Index_t nx = params.nx;
-        const Index_t ny = params.ny;
-        const Index_t nz = params.nz;
-        const Index_t nodal_base = params.start_pixel_index *
-                                   params.nodal_elems_per_pixel;
-        const Index_t quad_base = params.start_pixel_index *
-                                  params.quad_elems_per_pixel;
-        const Index_t nodal_stride_x = params.nodal_stride_x;
-        const Index_t nodal_stride_y = params.nodal_stride_y;
-        const Index_t nodal_stride_z = params.nodal_stride_z;
-        const Index_t quad_stride_x = params.quad_stride_x;
-        const Index_t quad_stride_y = params.quad_stride_y;
-        const Index_t quad_stride_z = params.quad_stride_z;
-        const Index_t nnz = sparse_op.size;
-
-        // Get raw pointers for kernel access
-        const Index_t* quad_indices = sparse_op.quad_indices.data();
-        const Index_t* nodal_indices = sparse_op.nodal_indices.data();
-        const Real* op_values = sparse_op.values.data();
-
-        using MDPolicy = Kokkos::MDRangePolicy<
-            ExecutionSpace,
-            Kokkos::Rank<3>,
-            Kokkos::IndexType<Index_t>>;
-
-        Kokkos::parallel_for(
-            "ConvolutionOperator::transpose_kernel",
-            MDPolicy({0, 0, 0}, {nz, ny, nx}),
-            KOKKOS_LAMBDA(const Index_t z, const Index_t y, const Index_t x) {
-                const Index_t nodal_offset = nodal_base +
-                    z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
-                const Index_t quad_offset = quad_base +
-                    z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
-
-                for (Index_t i = 0; i < nnz; ++i) {
-                    Kokkos::atomic_add(
-                        &nodal_data[nodal_offset + nodal_indices[i]],
-                        alpha * quad_data[quad_offset + quad_indices[i]] *
-                        op_values[i]);
-                }
-            });
-    }
-
-    /**
-     * @brief Deep copy sparse operator between memory spaces
-     *
-     * @tparam DstSpace Destination memory space
-     * @tparam SrcSpace Source memory space
-     * @param src Source sparse operator
-     * @return Copy in destination memory space
-     */
-    template<typename DstSpace, typename SrcSpace>
-    SparseOperatorSoA<DstSpace> deep_copy_sparse_operator(
-        const SparseOperatorSoA<SrcSpace>& src) {
-        SparseOperatorSoA<DstSpace> dst(src.size);
-        Kokkos::deep_copy(dst.quad_indices, src.quad_indices);
-        Kokkos::deep_copy(dst.nodal_indices, src.nodal_indices);
-        Kokkos::deep_copy(dst.values, src.values);
-        return dst;
-    }
+    // Kernel functions and deep_copy_sparse_operator are now in operators/convolution_kernels.hh
 
     /**
      * @brief Pad a shape vector to 3D by appending fill_value
@@ -709,14 +525,11 @@ namespace muGrid {
         Real* quad_data,
         const Real alpha,
         const GridTraversalParams& params) const {
-        // Get execution space type corresponding to memory space
-        using ExecutionSpace = typename DeviceSpace::execution_space;
-
         // Get device sparse operator (lazily copies from host if needed)
-        // Note: For non-default device spaces, this would need specialization
         const auto& sparse_op = this->cached_device_apply_op.value();
 
-        apply_convolution_kernel<ExecutionSpace, DeviceSpace>(
+        // Use the KernelDispatcher for backend-agnostic kernel execution
+        KernelDispatcher<DeviceSpace>::apply_convolution(
             nodal_data, quad_data, alpha, params, sparse_op);
     }
 
@@ -726,13 +539,11 @@ namespace muGrid {
         Real* nodal_data,
         const Real alpha,
         const GridTraversalParams& params) const {
-        // Get execution space type corresponding to memory space
-        using ExecutionSpace = typename DeviceSpace::execution_space;
-
         // Get device sparse operator (lazily copies from host if needed)
         const auto& sparse_op = this->cached_device_transpose_op.value();
 
-        transpose_convolution_kernel<ExecutionSpace, DeviceSpace>(
+        // Use the KernelDispatcher for backend-agnostic kernel execution
+        KernelDispatcher<DeviceSpace>::transpose_convolution(
             quad_data, nodal_data, alpha, params, sparse_op);
     }
 
@@ -746,8 +557,8 @@ namespace muGrid {
 
         // Check if device cache needs update
         if (!this->cached_device_apply_op.has_value()) {
-            // Copy from host to device
-            this->cached_device_apply_op = deep_copy_sparse_operator<
+            // Copy from host to device using our deep_copy_sparse_operator
+            this->cached_device_apply_op = muGrid::deep_copy_sparse_operator<
                 DeviceSpace, HostSpace>(this->cached_apply_op.value());
         }
 
@@ -764,8 +575,8 @@ namespace muGrid {
 
         // Check if device cache needs update
         if (!this->cached_device_transpose_op.has_value()) {
-            // Copy from host to device
-            this->cached_device_transpose_op = deep_copy_sparse_operator<
+            // Copy from host to device using our deep_copy_sparse_operator
+            this->cached_device_transpose_op = muGrid::deep_copy_sparse_operator<
                 DeviceSpace, HostSpace>(this->cached_transpose_op.value());
         }
 

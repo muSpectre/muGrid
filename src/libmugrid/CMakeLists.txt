@@ -62,12 +62,12 @@ if(MUGRID_WITH_NETCDF)
 endif()
 
 # Add cuFFT backend source if CUDA is available
-if(Kokkos_ENABLE_CUDA)
+if(MUGRID_WITH_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
 endif()
 
 # Add hipFFT backend source if HIP is available
-if(Kokkos_ENABLE_HIP)
+if(MUGRID_WITH_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
 endif()
 
@@ -95,17 +95,13 @@ target_include_directories(muGrid
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/kokkos>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/memory>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
         $<INSTALL_INTERFACE:include>
 )
 
 # Link Eigen3
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
-
-# Link Kokkos (required dependency)
-# Use the umbrella target which handles all internal dependencies correctly
-# Kokkos 5.0+ manages WHOLE_ARCHIVE linking internally
-target_link_libraries(muGrid PUBLIC Kokkos::kokkos)
 
 # Compile definitions
 if(MUGRID_WITH_MPI)
@@ -119,20 +115,23 @@ if(MUGRID_WITH_NETCDF)
     target_link_libraries(muGrid PRIVATE ${MUGRID_NETCDF_LIBRARIES})
 endif()
 
-# Link cuFFT if CUDA is available
-if(Kokkos_ENABLE_CUDA)
-    target_link_libraries(muGrid PRIVATE CUDA::cufft)
-    # Enable extended lambda support for CUDA (required by Kokkos)
+# CUDA support
+if(MUGRID_WITH_CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    target_compile_definitions(muGrid PUBLIC MUGRID_WITH_CUDA)
+    target_link_libraries(muGrid PRIVATE CUDA::cudart CUDA::cufft)
     target_compile_options(muGrid PRIVATE
         $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
     )
 endif()
 
-# Link hipFFT if HIP is available
-if(Kokkos_ENABLE_HIP)
+# HIP support
+if(MUGRID_WITH_HIP)
+    find_package(hip REQUIRED)
     find_package(hipfft REQUIRED)
-    target_link_libraries(muGrid PRIVATE hip::hipfft)
+    target_compile_definitions(muGrid PUBLIC MUGRID_WITH_HIP)
+    target_link_libraries(muGrid PRIVATE hip::host hip::hipfft)
 endif()
 
 # Optional libraries for some systems
@@ -162,7 +161,7 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
 )
 
 # Install header files for each subdirectory
-foreach(subdir core grid field collection mpi operators io util kokkos fft)
+foreach(subdir core grid field collection mpi operators io util kokkos memory fft)
     file(GLOB MUGRID_${subdir}_HEADERS "${subdir}/*.hh")
     install(FILES ${MUGRID_${subdir}_HEADERS}
         DESTINATION include/libmugrid/${subdir}

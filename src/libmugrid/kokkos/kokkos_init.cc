@@ -5,12 +5,11 @@
  *
  * @date   11 Dec 2024
  *
- * @brief  Kokkos initialization helpers for libmuGrid
+ * @brief  GPU runtime initialization helpers for libmuGrid
  *
- * This file provides helper functions for Kokkos initialization/finalization
- * to be called by applications and language bindings. Library-level automatic
- * initialization is not used because it causes static initialization order
- * issues with Kokkos 5.0's internal data structures.
+ * These functions are kept for API compatibility but are now no-ops
+ * since Kokkos has been removed. GPU initialization is handled
+ * automatically by the CUDA/HIP runtime.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -38,32 +37,20 @@
  *
  */
 
-#include <Kokkos_Core.hpp>
-
 namespace muGrid {
 
 /**
- * Initialize Kokkos if not already initialized.
- *
- * This should be called by applications before using muGrid functionality.
- * For Python bindings, this is called automatically in the module init.
+ * Initialize GPU runtime (no-op, kept for API compatibility).
  */
 void initialize_kokkos() {
-  if (!Kokkos::is_initialized()) {
-    Kokkos::initialize();
-  }
+    // No-op: CUDA/HIP runtime handles initialization automatically
 }
 
 /**
- * Finalize Kokkos if initialized and not already finalized.
- *
- * This should be called by applications when done using muGrid functionality.
- * For Python bindings, this is called automatically in module cleanup.
+ * Finalize GPU runtime (no-op, kept for API compatibility).
  */
 void finalize_kokkos() {
-  if (Kokkos::is_initialized() && !Kokkos::is_finalized()) {
-    Kokkos::finalize();
-  }
+    // No-op: CUDA/HIP runtime handles cleanup automatically
 }
 
 }  // namespace muGrid

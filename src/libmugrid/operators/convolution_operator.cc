@@ -377,12 +377,11 @@ namespace muGrid {
         }
 
         // Allocate SoA structure
-        SparseOperatorSoA<HostSpace> sparse_op(nnz);
-
-        // Get host-accessible views
-        auto h_quad_indices = sparse_op.quad_indices;
-        auto h_nodal_indices = sparse_op.nodal_indices;
-        auto h_values = sparse_op.values;
+        SparseOperatorSoA<HostSpace> sparse_op;
+        sparse_op.size = nnz;
+        sparse_op.quad_indices.resize(nnz);
+        sparse_op.nodal_indices.resize(nnz);
+        sparse_op.values.resize(nnz);
 
         // Second pass: fill the arrays
         // Row-major order groups entries by quad index, providing write
@@ -411,15 +410,15 @@ namespace muGrid {
                                 // FIXME(yizhen): should wrap this in a helper
                                 const auto index_diff_nodal{(pixel_count * this->nb_pixelnodal_pts + i_node)
                                                              * nb_nodal_components + i_component};
-                                // Combine quad-pt, operator & component to get col-major index diff on quadrature field 
+                                // Combine quad-pt, operator & component to get col-major index diff on quadrature field
                                 // (to write)
                                 // FIXME(yizhen): should wrap this in a helper
-                                const auto index_diff_quad{(i_quad * this->nb_operators + i_operator) 
+                                const auto index_diff_quad{(i_quad * this->nb_operators + i_operator)
                                                             * nb_nodal_components + i_component};
-                                // Add the entry
-                                h_quad_indices(entry_idx) = index_diff_quad;
-                                h_nodal_indices(entry_idx) = index_diff_nodal;
-                                h_values(entry_idx) = op_value;
+                                // Add the entry (use [] for DeviceArray access)
+                                sparse_op.quad_indices[entry_idx] = index_diff_quad;
+                                sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
+                                sparse_op.values[entry_idx] = op_value;
                                 ++entry_idx;
                             }
                         }
@@ -449,12 +448,11 @@ namespace muGrid {
         }
 
         // Allocate SoA structure
-        SparseOperatorSoA<HostSpace> sparse_op(nnz);
-
-        // Get host-accessible views
-        auto h_quad_indices = sparse_op.quad_indices;
-        auto h_nodal_indices = sparse_op.nodal_indices;
-        auto h_values = sparse_op.values;
+        SparseOperatorSoA<HostSpace> sparse_op;
+        sparse_op.size = nnz;
+        sparse_op.quad_indices.resize(nnz);
+        sparse_op.nodal_indices.resize(nnz);
+        sparse_op.values.resize(nnz);
 
         // Second pass: fill the arrays
         // Column-major order groups entries by nodal index, providing write
@@ -479,18 +477,18 @@ namespace muGrid {
                                 const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
                                 // Then to pixel count on the field
                                 const auto pixel_count{grid_pixels.get_index(pixel_offset)};
-                                // Combine pixel, quad-pt, operator & component to get col-major index diff on quadrature field 
+                                // Combine pixel, quad-pt, operator & component to get col-major index diff on quadrature field
                                 // (to read). NOTE: the pixel count is deducted because of inversed mapping direction.
                                 // FIXME(yizhen): should wrap this in a helper
-                                const auto index_diff_quad{((-pixel_count * this->nb_quad_pts + i_quad) * this->nb_operators 
+                                const auto index_diff_quad{((-pixel_count * this->nb_quad_pts + i_quad) * this->nb_operators
                                                             + i_operator) * nb_nodal_components + i_component};
                                 // Combine node & component to get col-major on nodal field (to write)
                                 // FIXME(yizhen): should wrap this in a helper
                                 const auto index_diff_nodal{i_node * nb_nodal_components + i_component};
-                                // Add the entry
-                                h_quad_indices(entry_idx) = index_diff_quad;
-                                h_nodal_indices(entry_idx) = index_diff_nodal;
-                                h_values(entry_idx) = op_value;
+                                // Add the entry (use [] for DeviceArray access)
+                                sparse_op.quad_indices[entry_idx] = index_diff_quad;
+                                sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
+                                sparse_op.values[entry_idx] = op_value;
                                 ++entry_idx;
                             }
                         }
@@ -543,8 +541,8 @@ namespace muGrid {
         const Real* nodal_data = nodal_field.data();
         Real* quad_data = quadrature_point_field.data();
 
-        // Use templated kernel for GPU portability
-        apply_convolution_kernel<HostExecutionSpace, HostSpace>(
+        // Use KernelDispatcher for backend-agnostic kernel execution
+        KernelDispatcher<HostSpace>::apply_convolution(
             nodal_data, quad_data, alpha, params, sparse_op);
     }
 
@@ -586,9 +584,8 @@ namespace muGrid {
         Real* nodal_data = nodal_field.data();
         const Real* quad_data = quadrature_point_field.data();
 
-        // Use templated kernel for GPU portability
-        // Note: transpose uses atomic_add for thread-safe accumulation
-        transpose_convolution_kernel<HostExecutionSpace, HostSpace>(
+        // Use KernelDispatcher for backend-agnostic kernel execution
+        KernelDispatcher<HostSpace>::transpose_convolution(
             quad_data, nodal_data, alpha, params, sparse_op);
     }
 
@@ -617,7 +614,7 @@ namespace muGrid {
         return this->spatial_dim;
     }
 
-#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
     /* ---------------------------------------------------------------------- */
     void ConvolutionOperator::apply(
         const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
@@ -702,6 +699,6 @@ namespace muGrid {
         this->transpose_on_device<DefaultDeviceSpace>(
             quad_data, nodal_data, alpha, params);
     }
-#endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
+#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
 
 }  // namespace muGrid

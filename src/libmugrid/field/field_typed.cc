@@ -92,7 +92,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, typename MemorySpace>
   void TypedField<T, MemorySpace>::set_zero() {
-    Kokkos::deep_copy(this->values, T{});
+    // Use our deep_copy that handles scalar fill
+    muGrid::deep_copy(this->values, T{});
   }
 
   /* ---------------------------------------------------------------------- */
@@ -201,7 +202,8 @@ namespace muGrid {
     if (this->values.size() != static_cast<size_t>(expected_size) or
         static_cast<Index_t>(this->current_nb_entries) != size) {
       this->current_nb_entries = size;
-      Kokkos::resize(this->values, expected_size);
+      // Use our resize function
+      muGrid::resize(this->values, expected_size);
     }
   }
 
@@ -231,9 +233,17 @@ namespace muGrid {
     this->current_nb_entries += nb_sub;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + nb_sub};
-    Kokkos::resize(this->values, new_size);
+    // DeviceArray resize doesn't preserve data, so we need a temp copy
+    DeviceArray<T, MemorySpace> old_values(old_size);
+    muGrid::deep_copy(old_values, this->values);
+    muGrid::resize(this->values, new_size);
+    // Copy old data back
+    for (Index_t i{0}; i < old_size; ++i) {
+      this->values[i] = old_values[i];
+    }
+    // Add new values
     for (Index_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
-      this->values(old_size + sub_pt_id) = value;
+      this->values[old_size + sub_pt_id] = value;
     }
   }
 
@@ -256,8 +266,15 @@ namespace muGrid {
     this->current_nb_entries += 1;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + 1};
-    Kokkos::resize(this->values, new_size);
-    this->values(old_size) = value;
+    // DeviceArray resize doesn't preserve data, so we need a temp copy
+    DeviceArray<T, MemorySpace> old_values(old_size);
+    muGrid::deep_copy(old_values, this->values);
+    muGrid::resize(this->values, new_size);
+    // Copy old data back
+    for (Index_t i{0}; i < old_size; ++i) {
+      this->values[i] = old_values[i];
+    }
+    this->values[old_size] = value;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -286,10 +303,18 @@ namespace muGrid {
     this->current_nb_entries += nb_sub;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + this->nb_components * nb_sub};
-    Kokkos::resize(this->values, new_size);
+    // DeviceArray resize doesn't preserve data, so we need a temp copy
+    DeviceArray<T, MemorySpace> old_values(old_size);
+    muGrid::deep_copy(old_values, this->values);
+    muGrid::resize(this->values, new_size);
+    // Copy old data back
+    for (Index_t i{0}; i < old_size; ++i) {
+      this->values[i] = old_values[i];
+    }
+    // Add new values
     for (Index_t sub_pt_id{0}; sub_pt_id < nb_sub; ++sub_pt_id) {
       for (Index_t i{0}; i < this->nb_components; ++i) {
-        this->values(old_size + sub_pt_id * this->nb_components + i) = value.data()[i];
+        this->values[old_size + sub_pt_id * this->nb_components + i] = value.data()[i];
       }
     }
   }
@@ -319,9 +344,17 @@ namespace muGrid {
     this->current_nb_entries += 1;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + this->nb_components};
-    Kokkos::resize(this->values, new_size);
+    // DeviceArray resize doesn't preserve data, so we need a temp copy
+    DeviceArray<T, MemorySpace> old_values(old_size);
+    muGrid::deep_copy(old_values, this->values);
+    muGrid::resize(this->values, new_size);
+    // Copy old data back
+    for (Index_t i{0}; i < old_size; ++i) {
+      this->values[i] = old_values[i];
+    }
+    // Add new values
     for (Index_t i{0}; i < this->nb_components; ++i) {
-      this->values(old_size + i) = value.data()[i];
+      this->values[old_size + i] = value.data()[i];
     }
   }
 
@@ -350,7 +383,7 @@ namespace muGrid {
                       this->unit),
                   this->nb_components, this->sub_division_tag)};
 
-    Kokkos::deep_copy(other.view(), this->view());
+    muGrid::deep_copy(other.view(), this->view());
     return other;
   }
 
@@ -400,8 +433,8 @@ namespace muGrid {
   template <typename T, typename MemorySpace>
   TypedFieldBase<T, MemorySpace> &
   TypedFieldBase<T, MemorySpace>::operator=(const TypedFieldBase & other) {
-    // For host space, use Kokkos deep_copy
-    Kokkos::deep_copy(this->values, other.values);
+    // Use our deep_copy function
+    muGrid::deep_copy(this->values, other.values);
     return *this;
   }
 
@@ -860,7 +893,7 @@ namespace muGrid {
       const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
 
   // Device-space explicit template instantiations (for CUDA/HIP builds)
-#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
   // Base class instantiations for device space
   template class TypedFieldBase<Real, DefaultDeviceSpace>;
   template class TypedFieldBase<Complex, DefaultDeviceSpace>;
@@ -898,6 +931,6 @@ namespace muGrid {
       const TypedFieldBase<Uint, DefaultDeviceSpace> &);
   template void TypedFieldBase<Index_t, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
       const TypedFieldBase<Index_t, DefaultDeviceSpace> &);
-#endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
+#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
 
 }  // namespace muGrid

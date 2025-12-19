@@ -1,0 +1,189 @@
+/**
+ * @file   convolution_kernels_cpu.hh
+ *
+ * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
+ *
+ * @date   19 Dec 2024
+ *
+ * @brief  CPU implementations of convolution kernels
+ *
+ * Copyright © 2024 Lars Pastewka
+ *
+ * µGrid is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3, or (at
+ * your option) any later version.
+ *
+ * µGrid is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with µGrid; see the file COPYING. If not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or combining it
+ * with proprietary FFT implementations or numerical libraries, containing parts
+ * covered by the terms of those libraries' licenses, the licensors of this
+ * Program grant you additional permission to convey the resulting work.
+ *
+ */
+
+#ifndef SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CPU_HH_
+#define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CPU_HH_
+
+#include "core/grid_common.hh"
+#include "memory/device_array.hh"
+
+namespace muGrid {
+
+    /**
+     * Parameters for grid traversal in convolution kernels
+     */
+    struct GridTraversalParams {
+        Index_t nx, ny, nz;                 // Grid dimensions (without ghosts)
+        Index_t total_pixels;               // nx * ny * nz
+        Index_t row_width;                  // nx + ghosts in x direction
+        Index_t start_pixel_index;          // Starting pixel offset
+        Index_t nodal_elems_per_pixel;      // DOFs per pixel for nodal field
+        Index_t quad_elems_per_pixel;       // DOFs per pixel for quad field
+        Index_t nodal_stride_x, nodal_stride_y, nodal_stride_z;
+        Index_t quad_stride_x, quad_stride_y, quad_stride_z;
+    };
+
+    /**
+     * Sparse operator in Structure-of-Arrays format
+     */
+    template<typename MemorySpace>
+    struct SparseOperatorSoA {
+        Index_t size{0};  // Number of non-zeros
+        DeviceArray<Index_t, MemorySpace> quad_indices;
+        DeviceArray<Index_t, MemorySpace> nodal_indices;
+        DeviceArray<Real, MemorySpace> values;
+
+        //! Default constructor - creates empty operator
+        SparseOperatorSoA() = default;
+
+        //! Constructor that allocates arrays of given size
+        explicit SparseOperatorSoA(Index_t n)
+            : size{n}, quad_indices(n), nodal_indices(n), values(n) {}
+
+        //! Check if operator is empty
+        bool empty() const { return size == 0; }
+    };
+
+    namespace cpu {
+
+        /**
+         * @brief Forward convolution kernel for CPU
+         *
+         * Applies: quad_data += alpha * Op * nodal_data
+         */
+        inline void apply_convolution_kernel(
+            const Real* nodal_data,
+            Real* quad_data,
+            const Real alpha,
+            const GridTraversalParams& params,
+            const Index_t* quad_indices,
+            const Index_t* nodal_indices,
+            const Real* op_values,
+            const Index_t nnz) {
+
+            const Index_t nx = params.nx;
+            const Index_t ny = params.ny;
+            const Index_t nz = params.nz;
+            const Index_t nodal_base = params.start_pixel_index *
+                                       params.nodal_elems_per_pixel;
+            const Index_t quad_base = params.start_pixel_index *
+                                      params.quad_elems_per_pixel;
+            const Index_t nodal_stride_x = params.nodal_stride_x;
+            const Index_t nodal_stride_y = params.nodal_stride_y;
+            const Index_t nodal_stride_z = params.nodal_stride_z;
+            const Index_t quad_stride_x = params.quad_stride_x;
+            const Index_t quad_stride_y = params.quad_stride_y;
+            const Index_t quad_stride_z = params.quad_stride_z;
+
+            // Simple triple nested loop for CPU
+            for (Index_t z = 0; z < nz; ++z) {
+                for (Index_t y = 0; y < ny; ++y) {
+                    for (Index_t x = 0; x < nx; ++x) {
+                        const Index_t nodal_offset = nodal_base +
+                            z * nodal_stride_z + y * nodal_stride_y +
+                            x * nodal_stride_x;
+                        const Index_t quad_offset = quad_base +
+                            z * quad_stride_z + y * quad_stride_y +
+                            x * quad_stride_x;
+
+                        for (Index_t i = 0; i < nnz; ++i) {
+                            quad_data[quad_offset + quad_indices[i]] +=
+                                alpha * nodal_data[nodal_offset + nodal_indices[i]] *
+                                op_values[i];
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * @brief Transpose convolution kernel for CPU
+         *
+         * Applies: nodal_data += alpha * Op^T * quad_data
+         *
+         * Note: This kernel accumulates to nodal_data, which may have
+         * overlapping writes if stencils overlap. For CPU, no atomics
+         * are needed since we process sequentially.
+         */
+        inline void transpose_convolution_kernel(
+            const Real* quad_data,
+            Real* nodal_data,
+            const Real alpha,
+            const GridTraversalParams& params,
+            const Index_t* quad_indices,
+            const Index_t* nodal_indices,
+            const Real* op_values,
+            const Index_t nnz) {
+
+            const Index_t nx = params.nx;
+            const Index_t ny = params.ny;
+            const Index_t nz = params.nz;
+            const Index_t nodal_base = params.start_pixel_index *
+                                       params.nodal_elems_per_pixel;
+            const Index_t quad_base = params.start_pixel_index *
+                                      params.quad_elems_per_pixel;
+            const Index_t nodal_stride_x = params.nodal_stride_x;
+            const Index_t nodal_stride_y = params.nodal_stride_y;
+            const Index_t nodal_stride_z = params.nodal_stride_z;
+            const Index_t quad_stride_x = params.quad_stride_x;
+            const Index_t quad_stride_y = params.quad_stride_y;
+            const Index_t quad_stride_z = params.quad_stride_z;
+
+            // Simple triple nested loop for CPU
+            for (Index_t z = 0; z < nz; ++z) {
+                for (Index_t y = 0; y < ny; ++y) {
+                    for (Index_t x = 0; x < nx; ++x) {
+                        const Index_t nodal_offset = nodal_base +
+                            z * nodal_stride_z + y * nodal_stride_y +
+                            x * nodal_stride_x;
+                        const Index_t quad_offset = quad_base +
+                            z * quad_stride_z + y * quad_stride_y +
+                            x * quad_stride_x;
+
+                        for (Index_t i = 0; i < nnz; ++i) {
+                            nodal_data[nodal_offset + nodal_indices[i]] +=
+                                alpha * quad_data[quad_offset + quad_indices[i]] *
+                                op_values[i];
+                        }
+                    }
+                }
+            }
+        }
+
+    }  // namespace cpu
+
+}  // namespace muGrid
+
+#endif  // SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CPU_HH_

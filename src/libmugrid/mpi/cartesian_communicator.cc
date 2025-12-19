@@ -2,12 +2,18 @@
 #include <mpi.h>
 #endif
 
-#include <Kokkos_Core.hpp>
-
 #include "core/grid_common.hh"
 #include "mpi/communicator.hh"
 #include "mpi/cartesian_communicator.hh"
 #include "kokkos/kokkos_types.hh"
+
+#if defined(MUGRID_WITH_CUDA)
+#include <cuda_runtime.h>
+#endif
+
+#if defined(MUGRID_WITH_HIP)
+#include <hip/hip_runtime.h>
+#endif
 
 namespace muGrid {
 #ifdef WITH_MPI
@@ -145,28 +151,21 @@ namespace muGrid {
         /**
          * @brief Copy memory block using appropriate method for memory space.
          *
-         * Uses Kokkos::View with unmanaged memory to perform copies that work
-         * on both host and device memory. This is necessary because std::memcpy
-         * cannot access GPU device memory.
+         * Uses CUDA/HIP runtime for device memory copies. This is necessary
+         * because std::memcpy cannot access GPU device memory.
          *
          * @param dst Destination address
          * @param src Source address
          * @param size_in_bytes Number of bytes to copy
-         * @param is_device_memory If true, use Kokkos device copy
+         * @param is_device_memory If true, use GPU device copy
          */
-        void kokkos_memcpy(void * dst, const void * src, size_t size_in_bytes,
+        void device_memcpy(void * dst, const void * src, size_t size_in_bytes,
                            bool is_device_memory) {
             if (is_device_memory) {
-#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
-                // Create unmanaged Kokkos Views wrapping the raw pointers
-                // Use char (1 byte) as the element type for byte-wise copy
-                using DeviceView = Kokkos::View<char*, DefaultDeviceSpace,
-                                                Kokkos::MemoryUnmanaged>;
-                using ConstDeviceView = Kokkos::View<const char*, DefaultDeviceSpace,
-                                                     Kokkos::MemoryUnmanaged>;
-                DeviceView dst_view(static_cast<char*>(dst), size_in_bytes);
-                ConstDeviceView src_view(static_cast<const char*>(src), size_in_bytes);
-                Kokkos::deep_copy(dst_view, src_view);
+#if defined(MUGRID_WITH_CUDA)
+                cudaMemcpy(dst, src, size_in_bytes, cudaMemcpyDeviceToDevice);
+#elif defined(MUGRID_WITH_HIP)
+                hipMemcpy(dst, src, size_in_bytes, hipMemcpyDeviceToDevice);
 #else
                 // Fallback to memcpy if no GPU backend (shouldn't happen if
                 // is_device_memory is true, but handle gracefully)
@@ -198,7 +197,7 @@ namespace muGrid {
                 data + recv_offset * stride_in_direction * elem_size_in_bytes)};
             auto send_addr{static_cast<void *>(
                 data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            kokkos_memcpy(recv_addr, send_addr,
+            device_memcpy(recv_addr, send_addr,
                           send_block_len * elem_size_in_bytes, is_device_memory);
             data += block_stride * elem_size_in_bytes;
         }
@@ -224,7 +223,7 @@ namespace muGrid {
                 data + recv_offset * stride_in_direction * elem_size_in_bytes)};
             auto send_addr{static_cast<void *>(
                 data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            kokkos_memcpy(recv_addr, send_addr,
+            device_memcpy(recv_addr, send_addr,
                           send_block_len * elem_size_in_bytes, is_device_memory);
             data += block_stride * elem_size_in_bytes;
         }
