@@ -102,11 +102,11 @@ class FFTEngine : public CartesianDecomposition {
 
   FFTEngine() = delete;
   FFTEngine(const FFTEngine &) = delete;
-  FFTEngine(FFTEngine &&) = default;
+  FFTEngine(FFTEngine &&) = delete;
   ~FFTEngine() override = default;
 
   FFTEngine & operator=(const FFTEngine &) = delete;
-  FFTEngine & operator=(FFTEngine &&) = default;
+  FFTEngine & operator=(FFTEngine &&) = delete;
 
   // === Transform operations ===
 
