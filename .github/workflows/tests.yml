@@ -81,7 +81,7 @@ jobs:
           fi
           source venv/bin/activate
           # Explicitly tell CMake to use the venv Python so pytest is found
-          cmake -B build -G Ninja -DPython_EXECUTABLE=$(which python3)
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE=$(which python3)
           cd build
           cmake --build .
 
