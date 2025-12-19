@@ -32,8 +32,9 @@ if(MUGRID_ENABLE_NETCDF)
 endif()
 
 # Install the Python module
+# Use relative path for scikit-build-core wheel compatibility
 install(TARGETS _muGrid
-    LIBRARY DESTINATION ${Python_SITEARCH}/muGrid
+    LIBRARY DESTINATION muGrid
     COMPONENT python
 )
 
@@ -43,6 +44,6 @@ install(FILES
     muGrid/Field.py
     muGrid/Parallel.py
     muGrid/Solvers.py
-    DESTINATION ${Python_SITEARCH}/muGrid
+    DESTINATION muGrid
     COMPONENT python
 )

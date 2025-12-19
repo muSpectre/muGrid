@@ -41,8 +41,6 @@ changelog = "https://github.com/muSpectre/muGrid/blob/main/CHANGELOG.md"
 [tool.scikit-build]
 cmake.minimum-version = "3.18"
 cmake.build-type = "Release"
-wheel.packages = ["language_bindings/python/muGrid"]
-wheel.install-dir = "muGrid"
 
 [tool.scikit-build.cmake.define]
 MUGRID_ENABLE_TESTS = "OFF"
