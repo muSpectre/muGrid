@@ -48,8 +48,11 @@ import time
 import numpy as np
 import pytest
 
+# Check if muGrid was built with NetCDF support
+HAS_MUGRID_NETCDF = hasattr(muGrid, 'OpenMode')
+
 pytestmark = pytest.mark.skipif(
-    not muGrid.has_mpi, reason="muGrid has no OpenMode in serial build"
+    not HAS_MUGRID_NETCDF, reason="muGrid built without NetCDF support"
 )
 
 

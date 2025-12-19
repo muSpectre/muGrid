@@ -47,6 +47,19 @@ project(muGrid
     DESCRIPTION "MPI-parallel regular grids"
 )
 
+# Enable CUDA language if Kokkos_ENABLE_CUDA is set
+# This must be after project() but before the first CUDA target
+if(Kokkos_ENABLE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    # Set default CUDA architecture if not specified
+    # 52 = Maxwell (TITAN X), 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100)
+    # Use "native" on CMake 3.24+ to auto-detect, or set a default
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES "52;70;80" CACHE STRING "CUDA architectures to compile for")
+    endif()
+endif()
+
 # Require C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
