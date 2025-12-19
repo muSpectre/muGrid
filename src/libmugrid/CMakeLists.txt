@@ -61,6 +61,16 @@ if(MUGRID_WITH_NETCDF)
     list(APPEND MUGRID_SOURCES io/file_io_netcdf.cc)
 endif()
 
+# Add cuFFT backend source if CUDA is available
+if(Kokkos_ENABLE_CUDA)
+    list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
+endif()
+
+# Add hipFFT backend source if HIP is available
+if(Kokkos_ENABLE_HIP)
+    list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
+endif()
+
 # Create shared library
 add_library(muGrid STATIC ${MUGRID_SOURCES})
 
@@ -113,6 +123,17 @@ if(MUGRID_WITH_NETCDF)
     target_compile_definitions(muGrid PUBLIC WITH_NETCDF_IO)
     target_include_directories(muGrid PRIVATE ${MUGRID_NETCDF_INCLUDE_DIRS})
     target_link_libraries(muGrid PRIVATE ${MUGRID_NETCDF_LIBRARIES})
+endif()
+
+# Link cuFFT if CUDA is available
+if(Kokkos_ENABLE_CUDA)
+    target_link_libraries(muGrid PRIVATE CUDA::cufft)
+endif()
+
+# Link hipFFT if HIP is available
+if(Kokkos_ENABLE_HIP)
+    find_package(hipfft REQUIRED)
+    target_link_libraries(muGrid PRIVATE hip::hipfft)
 endif()
 
 # Optional libraries for some systems

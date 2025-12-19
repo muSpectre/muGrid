@@ -47,6 +47,30 @@ project(muGrid
     DESCRIPTION "MPI-parallel regular grids"
 )
 
+# Enable CUDA language if Kokkos_ENABLE_CUDA is set
+# This must be after project() but before the first CUDA target
+if(Kokkos_ENABLE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    # Set default CUDA architecture if not specified
+    # 52 = Maxwell (TITAN X), 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100)
+    # Use "native" on CMake 3.24+ to auto-detect, or set a default
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES "52;70;80" CACHE STRING "CUDA architectures to compile for")
+    endif()
+endif()
+
+# Enable HIP language if Kokkos_ENABLE_HIP is set
+# This must be after project() but before the first HIP target
+if(Kokkos_ENABLE_HIP)
+    enable_language(HIP)
+    # Set default HIP architecture if not specified
+    # gfx906 = MI50/MI60, gfx908 = MI100, gfx90a = MI200 series, gfx942 = MI300 series
+    if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+        set(CMAKE_HIP_ARCHITECTURES "gfx906;gfx908;gfx90a" CACHE STRING "HIP architectures to compile for")
+    endif()
+endif()
+
 # Require C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -99,12 +123,15 @@ if(NOT Kokkos_FOUND)
     set(Kokkos_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
     set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
     set(Kokkos_ENABLE_CUDA_CONSTEXPR ON CACHE BOOL "" FORCE)
+    # Disable half-precision types - not needed by muGrid and avoids potential
+    # CUDA compatibility issues with __half/__nv_bfloat16 conversions
+    set(Kokkos_ENABLE_IMPL_HALF_TYPE OFF CACHE BOOL "" FORCE)
     # Enable PIC for shared library linking
     set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
     FetchContent_Declare(
         kokkos
         GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-        GIT_TAG 4.7.02
+        GIT_TAG 5.0.00
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(kokkos)

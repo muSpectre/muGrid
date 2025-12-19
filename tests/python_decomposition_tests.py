@@ -15,6 +15,9 @@ try:
 except ImportError:
     HAS_NETCDF4 = False
 
+# Check if muGrid was built with NetCDF support
+HAS_MUGRID_NETCDF = hasattr(muGrid, 'OpenMode')
+
 
 def get_nb_subdivisions(nb_processes: int):
     subdivision_setup = {
@@ -144,6 +147,7 @@ def test_field_accessors(comm, nb_grid_pts=(128, 128)):
     assert_all_allclose(MPI.COMM_WORLD, field.sg[..., 1:-1, 1:-1], field.s)
 
 
+@pytest.mark.skipif(not HAS_MUGRID_NETCDF, reason="muGrid built without NetCDF support")
 @pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
 def test_io(comm, nb_subdivisions):
     filename = "test_io_output.nc"
@@ -196,8 +200,8 @@ def test_large_ghost_buffers(comm, nb_subdivisions):
     )
 
 
+@pytest.mark.skipif(not HAS_MUGRID_NETCDF, reason="muGrid built without NetCDF support")
 @pytest.mark.skipif(not HAS_NETCDF4, reason="netCDF4 not available")
-@pytest.mark.skipif(not muGrid.has_mpi, reason="MPI build required for FileIONetCDF")
 @pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
 def test_fileio_netcdf_ghost_offset(comm, nb_subdivisions):
     """Test that FileIONetCDF writes interior data, not ghost-shifted data."""
