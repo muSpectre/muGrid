@@ -93,7 +93,7 @@ endif()
 include(FetchContent)
 
 # Find or fetch Eigen3
-find_package(Eigen3 5.0.0 QUIET)
+find_package(Eigen3 5.0.1 QUIET)
 if(NOT Eigen3_FOUND)
     message(STATUS "Eigen3 not found, fetching from GitLab...")
     FetchContent_Declare(
@@ -115,7 +115,7 @@ else()
 endif()
 
 # Find or fetch Kokkos (required dependency)
-find_package(Kokkos 5.0 QUIET)
+find_package(Kokkos 5.0.0 QUIET)
 if(NOT Kokkos_FOUND)
     message(STATUS "Kokkos not found, fetching from GitHub...")
     # Disable Kokkos tests
@@ -131,7 +131,7 @@ if(NOT Kokkos_FOUND)
     FetchContent_Declare(
         kokkos
         GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-        GIT_TAG 5.0.00
+        GIT_TAG 5.0.0
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(kokkos)

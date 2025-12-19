@@ -349,7 +349,14 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
   const IntCoord_t & local_with_ghosts =
       this->get_nb_subdomain_grid_pts_with_ghosts();
 
-  // Get work buffer field
+  // Get number of components (handle multi-component fields)
+  Index_t nb_components = input.get_nb_components();
+  if (output.get_nb_components() != nb_components) {
+    throw RuntimeError("Input and output fields must have the same number of "
+                       "components");
+  }
+
+  // Get work buffer field - ensure it has enough components
   Field & work = this->work_zpencil->get_field("work");
 
   // Get pointers
@@ -360,57 +367,63 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
   Complex * output_ptr =
       static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
-  // Step 1: r2c FFT along X for each Y row
-  // Input is strided due to ghosts
   Index_t Nx = nb_grid_pts[0];
   Index_t Fx = Nx / 2 + 1;
   Index_t Ny = nb_grid_pts[1];
 
-  // Input stride: elements are contiguous along X
-  Index_t in_stride = 1;
-  // Input distance between batches: stride to next Y (includes ghost padding)
-  Index_t in_dist = local_with_ghosts[0];
-  // Offset to start of core data
-  Index_t in_offset = ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0];
+  // For multi-component fields with Array-of-Structures layout,
+  // components are interleaved: [c0, c1, c0, c1, ...] for each pixel
+  // Input stride: nb_components (to skip to next X value for same component)
+  Index_t in_comp_stride = nb_components;
+  // Input distance between Y rows (includes ghost padding and component stride)
+  Index_t in_dist = local_with_ghosts[0] * nb_components;
+  // Offset to start of core data for component 0
+  Index_t in_base_offset =
+      (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) * nb_components;
 
-  // Output: zpencil layout [Fx, Ny_local], row-major (Y changes slowest)
-  // work_ptr[ix + iy * Fx]
+  // Output: zpencil layout [Fx, Ny_local] per component
+  // For single-component work buffer, we process one component at a time
   Index_t out_stride = 1;
   Index_t out_dist = Fx;
+  Index_t work_size = Fx * local_real[1];
 
-  backend->r2c(Nx, local_real[1], input_ptr + in_offset, in_stride, in_dist,
-               work_ptr, out_stride, out_dist);
+  // Process each component separately
+  for (Index_t comp = 0; comp < nb_components; ++comp) {
+    // Step 1: r2c FFT along X for this component
+    backend->r2c(Nx, local_real[1], input_ptr + in_base_offset + comp,
+                 in_comp_stride, in_dist, work_ptr, out_stride, out_dist);
 
-  // Step 2: In serial mode, no actual data redistribution needed
-  // In MPI mode, transpose X↔Y
+    // Step 2: Transpose (or copy for serial)
 #ifdef WITH_MPI
-  if (this->transpose_xz) {
-    this->transpose_xz->forward(work_ptr, output_ptr);
-  } else {
-    // Serial case: copy to output
-    Index_t total = Fx * local_real[1];
-    for (Index_t i = 0; i < total; ++i) {
-      output_ptr[i] = work_ptr[i];
+    if (this->transpose_xz) {
+      // For multi-component output, we need to place data at component offset
+      this->transpose_xz->forward(work_ptr, output_ptr + comp);
+    } else {
+      // Serial case: copy to output with component stride
+      for (Index_t i = 0; i < work_size; ++i) {
+        output_ptr[i * nb_components + comp] = work_ptr[i];
+      }
     }
-  }
 #else
-  // Serial case: copy to output
-  Index_t total = Fx * local_real[1];
-  for (Index_t i = 0; i < total; ++i) {
-    output_ptr[i] = work_ptr[i];
-  }
+    // Serial case: copy to output with component stride
+    for (Index_t i = 0; i < work_size; ++i) {
+      output_ptr[i * nb_components + comp] = work_ptr[i];
+    }
 #endif
+  }
 
-  // Step 3: c2c FFT along Y
-  // Data layout in output: [Fx, Ny] row-major
+  // Step 3: c2c FFT along Y for all components
+  // Data layout in output: interleaved components [Fx, Ny]
   // For each X frequency bin, FFT along Y
-  // Elements for Y: output[ix], output[ix + Fx], output[ix + 2*Fx], ...
-  // So stride between Y elements = Fx, and we have Fx independent transforms
-  Index_t y_stride = Fx;  // Stride between consecutive Y values
-  Index_t y_dist = 1;     // Distance between different X transforms
+  // Stride between Y values = Fx * nb_components
+  // Process each component with offset
+  Index_t y_stride = Fx * nb_components;  // Stride between consecutive Y values
+  Index_t y_dist = nb_components;         // Distance between different X
 
-  backend->c2c_forward(Ny, Fx, output_ptr, y_stride, y_dist, output_ptr,
-                       y_stride, y_dist);
+  for (Index_t comp = 0; comp < nb_components; ++comp) {
+    backend->c2c_forward(Ny, Fx, output_ptr + comp, y_stride, y_dist,
+                         output_ptr + comp, y_stride, y_dist);
+  }
 }
 
 void FFTEngine::fft_3d(const Field & input, Field & output) {
@@ -428,6 +441,13 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
   const IntCoord_t & local_with_ghosts =
       this->get_nb_subdomain_grid_pts_with_ghosts();
 
+  // Get number of components (handle multi-component fields)
+  Index_t nb_components = input.get_nb_components();
+  if (output.get_nb_components() != nb_components) {
+    throw RuntimeError("Input and output fields must have the same number of "
+                       "components");
+  }
+
   Index_t Nx = nb_grid_pts[0];
   Index_t Ny = nb_grid_pts[1];
   Index_t Nz = nb_grid_pts[2];
@@ -435,7 +455,12 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
 
 #ifdef WITH_MPI
   if (this->transpose_xz) {
-    // MPI path with transposes
+    // MPI path with transposes - TODO: implement multi-component support
+    if (nb_components > 1) {
+      throw RuntimeError(
+          "Multi-component 3D FFT not yet supported in MPI mode");
+    }
+
     Field & work_z = this->work_zpencil->get_field("work");
     Field & work_y = this->work_ypencil->get_field("work");
 
@@ -506,44 +531,54 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
     Complex * output_ptr =
         static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
-    Index_t stride_y = local_with_ghosts[0];
-    Index_t stride_z = stride_y * local_with_ghosts[1];
-    Index_t in_offset =
-        ghosts_left[0] + ghosts_left[1] * stride_y + ghosts_left[2] * stride_z;
+    // Input strides for multi-component interleaved data
+    Index_t in_comp_stride = nb_components;
+    Index_t in_stride_y = local_with_ghosts[0] * nb_components;
+    Index_t in_stride_z = in_stride_y * local_with_ghosts[1];
+    Index_t in_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
+        nb_components;
 
-    // Step 1: r2c FFT along X directly to output
-    // Output layout: [Fx, Ny, Nz] row-major
-    for (Index_t iz = 0; iz < Nz; ++iz) {
+    // Output strides for multi-component interleaved data
+    Index_t out_comp_stride = nb_components;
+    Index_t out_stride_y = Fx * nb_components;
+    Index_t out_stride_z = out_stride_y * Ny;
+
+    // Process each component separately
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      // Step 1: r2c FFT along X directly to output
+      // Output layout: [Fx, Ny, Nz] with interleaved components
+      for (Index_t iz = 0; iz < Nz; ++iz) {
+        for (Index_t iy = 0; iy < Ny; ++iy) {
+          Index_t in_idx =
+              in_base_offset + comp + iy * in_stride_y + iz * in_stride_z;
+          Index_t out_idx = comp + iy * out_stride_y + iz * out_stride_z;
+          backend->r2c(Nx, 1, input_ptr + in_idx, in_comp_stride, 0,
+                       output_ptr + out_idx, out_comp_stride, 0);
+        }
+      }
+
+      // Step 2: c2c FFT along Y
+      // For each (ix, iz), FFT the Y dimension
+      // Stride between Y elements = Fx * nb_components
+      for (Index_t iz = 0; iz < Nz; ++iz) {
+        for (Index_t ix = 0; ix < Fx; ++ix) {
+          Index_t idx = comp + ix * nb_components + iz * out_stride_z;
+          backend->c2c_forward(Ny, 1, output_ptr + idx, out_stride_y, 0,
+                               output_ptr + idx, out_stride_y, 0);
+        }
+      }
+
+      // Step 3: c2c FFT along Z
+      // For each (ix, iy), FFT the Z dimension
+      // Stride between Z elements = Fx * Ny * nb_components
       for (Index_t iy = 0; iy < Ny; ++iy) {
-        Index_t in_idx = in_offset + iy * stride_y + iz * stride_z;
-        Index_t out_idx = iy * Fx + iz * Fx * Ny;
-        backend->r2c(Nx, 1, input_ptr + in_idx, 1, 0, output_ptr + out_idx, 1,
-                     0);
-      }
-    }
-
-    // Step 2: c2c FFT along Y
-    // For each (ix, iz), FFT the Y dimension
-    // Elements: output[ix + iy*Fx + iz*Fx*Ny] for iy = 0..Ny-1
-    // Stride between Y elements = Fx
-    for (Index_t iz = 0; iz < Nz; ++iz) {
-      for (Index_t ix = 0; ix < Fx; ++ix) {
-        Index_t idx = ix + iz * Fx * Ny;
-        backend->c2c_forward(Ny, 1, output_ptr + idx, Fx, 0, output_ptr + idx,
-                             Fx, 0);
-      }
-    }
-
-    // Step 3: c2c FFT along Z
-    // For each (ix, iy), FFT the Z dimension
-    // Elements: output[ix + iy*Fx + iz*Fx*Ny] for iz = 0..Nz-1
-    // Stride between Z elements = Fx * Ny
-    for (Index_t iy = 0; iy < Ny; ++iy) {
-      for (Index_t ix = 0; ix < Fx; ++ix) {
-        Index_t idx = ix + iy * Fx;
-        Index_t stride = Fx * Ny;
-        backend->c2c_forward(Nz, 1, output_ptr + idx, stride, 0,
-                             output_ptr + idx, stride, 0);
+        for (Index_t ix = 0; ix < Fx; ++ix) {
+          Index_t idx = comp + ix * nb_components + iy * out_stride_y;
+          backend->c2c_forward(Nz, 1, output_ptr + idx, out_stride_z, 0,
+                               output_ptr + idx, out_stride_z, 0);
+        }
       }
     }
   }
@@ -564,6 +599,13 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
   const IntCoord_t & local_with_ghosts =
       this->get_nb_subdomain_grid_pts_with_ghosts();
 
+  // Get number of components (handle multi-component fields)
+  Index_t nb_components = input.get_nb_components();
+  if (output.get_nb_components() != nb_components) {
+    throw RuntimeError("Input and output fields must have the same number of "
+                       "components");
+  }
+
   // Get work buffer field
   Field & work = this->work_zpencil->get_field("work");
 
@@ -579,48 +621,54 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
   Index_t Fx = Nx / 2 + 1;
   Index_t Ny = nb_grid_pts[1];
 
-  // We need to copy input to a temp buffer since c2c is in-place here
+  // Size of Fourier data for one component
   Index_t fourier_size = Fx * Ny;
-  std::vector<Complex> temp(fourier_size);
-  for (Index_t i = 0; i < fourier_size; ++i) {
-    temp[i] = input_ptr[i];
-  }
 
-  // Step 1: c2c IFFT along Y
-  // Data layout: [Fx, Ny] row-major
-  // Elements for Y: temp[ix], temp[ix + Fx], temp[ix + 2*Fx], ...
-  Index_t y_stride = Fx;  // Stride between consecutive Y values
-  Index_t y_dist = 1;     // Distance between different X transforms
+  // Output strides for multi-component interleaved data
+  Index_t out_comp_stride = nb_components;
+  Index_t out_dist = local_with_ghosts[0] * nb_components;
+  Index_t out_base_offset =
+      (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) * nb_components;
 
-  backend->c2c_backward(Ny, Fx, temp.data(), y_stride, y_dist, temp.data(),
-                        y_stride, y_dist);
+  // Process each component separately
+  for (Index_t comp = 0; comp < nb_components; ++comp) {
+    // Copy this component's data to temp buffer
+    std::vector<Complex> temp(fourier_size);
+    for (Index_t i = 0; i < fourier_size; ++i) {
+      temp[i] = input_ptr[i * nb_components + comp];
+    }
 
-  // Step 2: Transpose Y↔X (backward)
+    // Step 1: c2c IFFT along Y
+    // Data layout: [Fx, Ny] row-major in temp
+    Index_t y_stride = Fx;  // Stride between consecutive Y values
+    Index_t y_dist = 1;     // Distance between different X transforms
+
+    backend->c2c_backward(Ny, Fx, temp.data(), y_stride, y_dist, temp.data(),
+                          y_stride, y_dist);
+
+    // Step 2: Transpose Y↔X (backward)
 #ifdef WITH_MPI
-  if (this->transpose_xz) {
-    this->transpose_xz->backward(temp.data(), work_ptr);
-  } else {
+    if (this->transpose_xz) {
+      this->transpose_xz->backward(temp.data(), work_ptr);
+    } else {
+      for (Index_t i = 0; i < fourier_size; ++i) {
+        work_ptr[i] = temp[i];
+      }
+    }
+#else
     for (Index_t i = 0; i < fourier_size; ++i) {
       work_ptr[i] = temp[i];
     }
-  }
-#else
-  for (Index_t i = 0; i < fourier_size; ++i) {
-    work_ptr[i] = temp[i];
-  }
 #endif
 
-  // Step 3: c2r IFFT along X
-  // work_ptr layout: [Fx, Ny_local] row-major
-  Index_t in_stride = 1;
-  Index_t in_dist = Fx;
+    // Step 3: c2r IFFT along X
+    // work_ptr layout: [Fx, Ny_local] row-major
+    Index_t in_stride = 1;
+    Index_t in_dist = Fx;
 
-  Index_t out_stride = 1;
-  Index_t out_dist = local_with_ghosts[0];
-  Index_t out_offset = ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0];
-
-  backend->c2r(Nx, local_real[1], work_ptr, in_stride, in_dist,
-               output_ptr + out_offset, out_stride, out_dist);
+    backend->c2r(Nx, local_real[1], work_ptr, in_stride, in_dist,
+                 output_ptr + out_base_offset + comp, out_comp_stride, out_dist);
+  }
 }
 
 void FFTEngine::ifft_3d(const Field & input, Field & output) {
@@ -638,6 +686,13 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
   const IntCoord_t & local_with_ghosts =
       this->get_nb_subdomain_grid_pts_with_ghosts();
 
+  // Get number of components (handle multi-component fields)
+  Index_t nb_components = input.get_nb_components();
+  if (output.get_nb_components() != nb_components) {
+    throw RuntimeError("Input and output fields must have the same number of "
+                       "components");
+  }
+
   Index_t Nx = nb_grid_pts[0];
   Index_t Ny = nb_grid_pts[1];
   Index_t Nz = nb_grid_pts[2];
@@ -645,7 +700,12 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
 
 #ifdef WITH_MPI
   if (this->transpose_xz) {
-    // MPI path with transposes
+    // MPI path with transposes - TODO: implement multi-component support
+    if (nb_components > 1) {
+      throw RuntimeError(
+          "Multi-component 3D FFT not yet supported in MPI mode");
+    }
+
     Field & work_z = this->work_zpencil->get_field("work");
     Field & work_y = this->work_ypencil->get_field("work");
 
@@ -724,48 +784,61 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
     Real * output_ptr =
         static_cast<Real *>(output.get_void_data_ptr(!is_device));
 
-    // Copy input to temp (we need to modify it)
+    // Input strides for multi-component interleaved data
+    Index_t in_comp_stride = nb_components;
+    Index_t in_stride_y = Fx * nb_components;
+    Index_t in_stride_z = in_stride_y * Ny;
+
+    // Output strides for multi-component interleaved data
+    Index_t out_comp_stride = nb_components;
+    Index_t out_stride_y = local_with_ghosts[0] * nb_components;
+    Index_t out_stride_z = out_stride_y * local_with_ghosts[1];
+    Index_t out_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
+        nb_components;
+
+    // Size of Fourier data for one component
     Index_t fourier_size = Fx * Ny * Nz;
-    std::vector<Complex> temp(fourier_size);
-    for (Index_t i = 0; i < fourier_size; ++i) {
-      temp[i] = input_ptr[i];
-    }
 
-    // Step 1: c2c IFFT along Z
-    // Elements: temp[ix + iy*Fx + iz*Fx*Ny] for iz = 0..Nz-1
-    // Stride = Fx * Ny
-    for (Index_t iy = 0; iy < Ny; ++iy) {
-      for (Index_t ix = 0; ix < Fx; ++ix) {
-        Index_t idx = ix + iy * Fx;
-        Index_t stride = Fx * Ny;
-        backend->c2c_backward(Nz, 1, temp.data() + idx, stride, 0,
-                              temp.data() + idx, stride, 0);
+    // Process each component separately
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      // Copy this component's data to temp buffer
+      std::vector<Complex> temp(fourier_size);
+      for (Index_t i = 0; i < fourier_size; ++i) {
+        temp[i] = input_ptr[i * nb_components + comp];
       }
-    }
 
-    // Step 2: c2c IFFT along Y
-    // Elements: temp[ix + iy*Fx + iz*Fx*Ny] for iy = 0..Ny-1
-    // Stride = Fx
-    for (Index_t iz = 0; iz < Nz; ++iz) {
-      for (Index_t ix = 0; ix < Fx; ++ix) {
-        Index_t idx = ix + iz * Fx * Ny;
-        backend->c2c_backward(Ny, 1, temp.data() + idx, Fx, 0,
-                              temp.data() + idx, Fx, 0);
-      }
-    }
-
-    // Step 3: c2r IFFT along X
-    Index_t stride_y = local_with_ghosts[0];
-    Index_t stride_z = stride_y * local_with_ghosts[1];
-    Index_t out_offset =
-        ghosts_left[0] + ghosts_left[1] * stride_y + ghosts_left[2] * stride_z;
-
-    for (Index_t iz = 0; iz < Nz; ++iz) {
+      // Step 1: c2c IFFT along Z
+      // Stride = Fx * Ny (in temp, which has no component interleaving)
       for (Index_t iy = 0; iy < Ny; ++iy) {
-        Index_t in_idx = iy * Fx + iz * Fx * Ny;
-        Index_t out_idx = out_offset + iy * stride_y + iz * stride_z;
-        backend->c2r(Nx, 1, temp.data() + in_idx, 1, 0, output_ptr + out_idx, 1,
-                     0);
+        for (Index_t ix = 0; ix < Fx; ++ix) {
+          Index_t idx = ix + iy * Fx;
+          Index_t stride = Fx * Ny;
+          backend->c2c_backward(Nz, 1, temp.data() + idx, stride, 0,
+                                temp.data() + idx, stride, 0);
+        }
+      }
+
+      // Step 2: c2c IFFT along Y
+      // Stride = Fx (in temp)
+      for (Index_t iz = 0; iz < Nz; ++iz) {
+        for (Index_t ix = 0; ix < Fx; ++ix) {
+          Index_t idx = ix + iz * Fx * Ny;
+          backend->c2c_backward(Ny, 1, temp.data() + idx, Fx, 0,
+                                temp.data() + idx, Fx, 0);
+        }
+      }
+
+      // Step 3: c2r IFFT along X
+      for (Index_t iz = 0; iz < Nz; ++iz) {
+        for (Index_t iy = 0; iy < Ny; ++iy) {
+          Index_t in_idx = iy * Fx + iz * Fx * Ny;
+          Index_t out_idx =
+              out_base_offset + comp + iy * out_stride_y + iz * out_stride_z;
+          backend->c2r(Nx, 1, temp.data() + in_idx, 1, 0, output_ptr + out_idx,
+                       out_comp_stride, 0);
+        }
       }
     }
   }

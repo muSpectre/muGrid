@@ -151,6 +151,7 @@ DLDataType get_dlpack_dtype<std::complex<double>>() {
 /**
  * Create a DLPack capsule for a typed field using the versioned protocol.
  * Works for both Host and Device (GPU) fields via get_void_data_ptr(false).
+ * Requires NumPy >= 2.1 for proper versioned DLPack support.
  */
 template<typename T, typename MemorySpace = muGrid::HostSpace>
 py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
