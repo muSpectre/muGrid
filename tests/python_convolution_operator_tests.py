@@ -458,19 +458,8 @@ def test_convolution_wrong_output_subpt_type_global():
 # =============================================================================
 
 
-def gpu_backend_available():
-    """Check if a GPU backend (CUDA/ROCm) is available."""
-    try:
-        fc = muGrid.GlobalFieldCollection(
-            (4, 4), memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
-        )
-        field = fc.register_real_field("gpu_test", 1)
-        return field.is_on_gpu
-    except (AttributeError, RuntimeError, TypeError):
-        return False
-
-
-GPU_AVAILABLE = gpu_backend_available()
+# Use compile-time feature flag for GPU availability
+GPU_AVAILABLE = muGrid.has_gpu
 
 # Try to import CuPy for GPU tests
 try:

@@ -39,7 +39,7 @@ import unittest
 import numpy as np
 
 import muGrid
-from muGrid import real_field, complex_field, int_field, uint_field, wrap_field
+from muGrid import complex_field, int_field, real_field, uint_field
 
 # Try to import CuPy for GPU tests
 try:
@@ -49,23 +49,8 @@ except ImportError:
     HAS_CUPY = False
 
 
-def gpu_backend_available():
-    """Check if a GPU backend (CUDA/ROCm) is available."""
-    # Create a device collection and check if fields are on device
-    try:
-        fc = muGrid.GlobalFieldCollection(
-            (4, 4),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
-        )
-        field = fc.register_real_field("gpu_test", 1)
-        # Check if it's actually on device
-        return field.is_on_gpu
-    except (AttributeError, RuntimeError, TypeError):
-        return False
-
-
-# Skip all GPU tests if no GPU backend is available
-GPU_AVAILABLE = gpu_backend_available()
+# Use compile-time feature flag for GPU availability
+GPU_AVAILABLE = muGrid.has_gpu
 
 
 class HostFieldDeviceInfoTests(unittest.TestCase):

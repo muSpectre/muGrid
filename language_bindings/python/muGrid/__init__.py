@@ -45,6 +45,8 @@ has_mpi = _muGrid.Communicator.has_mpi
 if has_mpi and MPI is None:
     raise RuntimeError("MPI support is enabled for muGrid but mpi4py is not available.")
 
+# Feature flags for compile-time configuration
+# FFT utility functions
 from _muGrid import CartesianDecomposition  # noqa: F401, E402
 from _muGrid import ConvolutionOperator  # noqa: F401, E402
 from _muGrid import ConvolutionOperatorBase  # noqa: F401, E402
@@ -60,15 +62,20 @@ from _muGrid import StorageOrder  # noqa: F401, E402
 from _muGrid import SubPt  # noqa: F401, E402
 from _muGrid import Unit  # noqa: F401, E402
 from _muGrid import Verbosity  # noqa: F401, E402
+from _muGrid import fft_freq  # noqa: F401, E402
+from _muGrid import fft_freqind  # noqa: F401, E402
+from _muGrid import fft_normalization  # noqa: F401, E402
 from _muGrid import get_domain_ccoord  # noqa: F401, E402
 from _muGrid import get_domain_index  # noqa: F401, E402
-# FFT utility functions
-from _muGrid import fft_freqind  # noqa: F401, E402
-from _muGrid import fft_freq  # noqa: F401, E402
-from _muGrid import rfft_freqind  # noqa: F401, E402
-from _muGrid import rfft_freq  # noqa: F401, E402
 from _muGrid import get_hermitian_grid_pts  # noqa: F401, E402
-from _muGrid import fft_normalization  # noqa: F401, E402
+from _muGrid import has_cuda  # noqa: F401, E402
+from _muGrid import has_gpu  # noqa: F401, E402
+from _muGrid import has_netcdf  # noqa: F401, E402
+from _muGrid import has_rocm  # noqa: F401, E402
+from _muGrid import rfft_freq  # noqa: F401, E402
+from _muGrid import rfft_freqind  # noqa: F401, E402
+
+has_mpi = _muGrid.Communicator.has_mpi
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 if hasattr(_muGrid, "FileIONetCDF"):
@@ -111,9 +118,14 @@ else:
         raise ModuleNotFoundError("muGrid was installed without netCDF support")
 
 
-from .Parallel import Communicator  # noqa: E402
-from .Field import Field, wrap_field  # noqa: E402
-from .Field import real_field, int_field, uint_field, complex_field  # noqa: E402
-from .Field import fft_real_space_field, fft_fourier_space_field  # noqa: E402
+from .Field import Field  # noqa: F401, E402
+from .Field import complex_field  # noqa: F401, E402
+from .Field import fft_fourier_space_field  # noqa: F401, E402
+from .Field import fft_real_space_field  # noqa: F401, E402
+from .Field import int_field  # noqa: F401, E402
+from .Field import real_field  # noqa: F401, E402
+from .Field import uint_field  # noqa: F401, E402
+from .Field import wrap_field  # noqa: F401, E402
+from .Parallel import Communicator  # noqa: F401, E402
 
 __version__ = _muGrid.version.description()

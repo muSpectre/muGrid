@@ -188,10 +188,42 @@ void add_unit(py::module & mod) {
         .def("amount", &muGrid::Unit::amount);
 }
 
+void add_feature_flags(py::module & mod) {
+    // CUDA support
+#ifdef MUGRID_WITH_CUDA
+    mod.attr("has_cuda") = true;
+#else
+    mod.attr("has_cuda") = false;
+#endif
+
+    // ROCm/HIP support
+#ifdef MUGRID_WITH_HIP
+    mod.attr("has_rocm") = true;
+#else
+    mod.attr("has_rocm") = false;
+#endif
+
+    // Any GPU backend available
+#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+    mod.attr("has_gpu") = true;
+#else
+    mod.attr("has_gpu") = false;
+#endif
+
+    // NetCDF I/O support
+#ifdef WITH_NETCDF_IO
+    mod.attr("has_netcdf") = true;
+#else
+    mod.attr("has_netcdf") = false;
+#endif
+}
+
 void add_common_mugrid(py::module & mod) {
     add_version(mod);
 
     add_enums(mod);
+
+    add_feature_flags(mod);
 
     add_dyn_ccoord_helper<fourD, Index_t>(mod, "DynCcoord");
     add_dyn_ccoord_helper<fourD, Real>(mod, "DynRcoord");
