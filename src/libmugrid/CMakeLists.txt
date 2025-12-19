@@ -128,6 +128,11 @@ endif()
 # Link cuFFT if CUDA is available
 if(Kokkos_ENABLE_CUDA)
     target_link_libraries(muGrid PRIVATE CUDA::cufft)
+    # Enable extended lambda support for CUDA (required by Kokkos)
+    target_compile_options(muGrid PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+    )
 endif()
 
 # Link hipFFT if HIP is available
