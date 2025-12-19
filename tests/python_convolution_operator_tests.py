@@ -42,7 +42,7 @@ import pytest
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
-from muGrid import real_field, wrap_field
+from muGrid import real_field
 
 
 class ConvolutionOperatorCheck(unittest.TestCase):
@@ -126,13 +126,16 @@ class ConvolutionOperatorCheck(unittest.TestCase):
         # Create the grid
         nb_ghosts_right = (nb_stencil_x - 1, nb_stencil_y - 1)
         fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}, nb_ghosts_right=nb_ghosts_right
+            (nb_x_pts, nb_y_pts),
+            sub_pts={"quad": nb_quad_pts},
+            nb_ghosts_right=nb_ghosts_right,
         )
 
         # A nodal field with some sequence as values
         nodal = real_field(fc, "nodal-value", nb_field_components)
         nodal_vals = (1 + np.arange(nb_field_components * nb_x_pts * nb_y_pts)).reshape(
-            nb_field_components, nb_x_pts, nb_y_pts)
+            nb_field_components, nb_x_pts, nb_y_pts
+        )
         # pad to mimic a periodic boundary
         pad_width = ((0, 0), (0, nb_stencil_x - 1), (0, nb_stencil_y - 1))
         nodal.pg[...] = np.pad(nodal_vals, pad_width, "wrap")
@@ -228,7 +231,8 @@ def test_malformed_convolution_input(comm):
         nb_domain_grid_pts,
         suggest_subdivisions(2, comm.size),
         left_ghosts,
-        right_ghosts)
+        right_ghosts,
+    )
 
     fc = decomp.collection
 
@@ -294,12 +298,14 @@ def test_convolution_component_mismatch_global():
     nb_y_pts = 3
 
     # Create a simple stencil with 1 operator and 1 quadrature point
-    stencil = np.array([
+    stencil = np.array(
         [
-            [1, 0],  # First row of stencil points
-            [0, 1],
+            [
+                [1, 0],  # First row of stencil points
+                [0, 1],
+            ]
         ]
-    ])
+    )
 
     conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
@@ -392,9 +398,7 @@ def test_convolution_wrong_input_subpt_type_global():
 
     # Create field collection with different sub-point counts
     fc_nodal = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts))
-    fc_quad = muGrid.GlobalFieldCollection(
-        (nb_x_pts, nb_y_pts), sub_pts={"quad": 2}
-    )
+    fc_quad = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={"quad": 2})
 
     # Input field with 2 sub-points (from quad collection)
     nodal_field_wrong = fc_quad.real_field("quad-field", (1,), "quad")
@@ -436,9 +440,7 @@ def test_convolution_wrong_output_subpt_type_global():
 
     # Create field collections with different sub-point counts
     fc_nodal = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts))
-    fc_quad = muGrid.GlobalFieldCollection(
-        (nb_x_pts, nb_y_pts), sub_pts={"quad": 2}
-    )
+    fc_quad = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={"quad": 2})
 
     # Input field with 1 sub-point (from nodal collection)
     nodal_field = fc_nodal.real_field("nodal", (1,))
@@ -455,12 +457,12 @@ def test_convolution_wrong_output_subpt_type_global():
 # GPU-specific convolution tests
 # =============================================================================
 
+
 def gpu_backend_available():
     """Check if a GPU backend (CUDA/ROCm) is available."""
     try:
         fc = muGrid.GlobalFieldCollection(
-            (4, 4),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            (4, 4), memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
         )
         field = fc.register_real_field("gpu_test", 1)
         return field.is_on_gpu
@@ -473,6 +475,7 @@ GPU_AVAILABLE = gpu_backend_available()
 # Try to import CuPy for GPU tests
 try:
     import cupy as cp
+
     HAS_CUPY = True
 except ImportError:
     HAS_CUPY = False
@@ -493,25 +496,26 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
         nb_quad_pts = 2
 
         # Create stencil
-        stencil = np.array([
+        stencil = np.array(
             [
-                [[1, 0], [0, 0]],  # Operator 0, quad pt 0
-                [[0, 1], [0, 0]],  # Operator 0, quad pt 1
+                [
+                    [[1, 0], [0, 0]],  # Operator 0, quad pt 0
+                    [[0, 1], [0, 0]],  # Operator 0, quad pt 1
+                ]
             ]
-        ])
+        )
         conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
         # Create host field collection
         fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts),
-            sub_pts={"quad": nb_quad_pts},
-            nb_ghosts_right=(1, 1)
+            (nb_x_pts, nb_y_pts), sub_pts={"quad": nb_quad_pts}, nb_ghosts_right=(1, 1)
         )
 
         # Verify host collection
         self.assertFalse(fc.is_on_device)
-        self.assertEqual(fc.memory_location,
-                         muGrid.GlobalFieldCollection.MemoryLocation.Host)
+        self.assertEqual(
+            fc.memory_location, muGrid.GlobalFieldCollection.MemoryLocation.Host
+        )
 
         # Create fields
         nodal = real_field(fc, "nodal", (2,))
@@ -544,9 +548,7 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
         conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
         fc = muGrid.GlobalFieldCollection(
-            (nb_x_pts, nb_y_pts),
-            sub_pts={"quad": 1},
-            nb_ghosts_right=(1, 1)
+            (nb_x_pts, nb_y_pts), sub_pts={"quad": 1}, nb_ghosts_right=(1, 1)
         )
 
         nodal = real_field(fc, "nodal", (1,))
@@ -554,14 +556,16 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
 
         # Set input to known values
         test_vals = np.arange(nb_x_pts * nb_y_pts, dtype=float).reshape(
-            1, nb_x_pts, nb_y_pts)
+            1, nb_x_pts, nb_y_pts
+        )
         nodal.pg[...] = np.pad(test_vals, ((0, 0), (0, 1), (0, 1)), "wrap")
 
         conv_op.apply(nodal._cpp, quad._cpp)
 
         # With identity stencil, output should match input
-        np.testing.assert_allclose(quad.s.reshape(nb_x_pts, nb_y_pts),
-                                   test_vals.reshape(nb_x_pts, nb_y_pts))
+        np.testing.assert_allclose(
+            quad.s.reshape(nb_x_pts, nb_y_pts), test_vals.reshape(nb_x_pts, nb_y_pts)
+        )
 
 
 @unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
@@ -581,18 +585,19 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
         """Test that device collection has correct properties."""
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
         self.assertTrue(fc.is_on_device)
-        self.assertEqual(fc.memory_location,
-                         muGrid.GlobalFieldCollection.MemoryLocation.Device)
+        self.assertEqual(
+            fc.memory_location, muGrid.GlobalFieldCollection.MemoryLocation.Device
+        )
 
     def test_device_field_properties(self):
         """Test that device fields have correct properties."""
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
         field = real_field(fc, "test", (3,))
@@ -603,21 +608,13 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
 
     def test_device_convolution_field_creation(self):
         """Test creating fields for convolution on device."""
-        stencil = np.array([
-            [
-                [[1, 0], [0, 0]],
-                [[0, 1], [0, 0]],
-            ]
-        ])
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
-
         # Use the constructor that accepts nb_domain_grid_pts (tuple) as first arg
         # to enable nb_ghosts_right parameter
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
         nodal = real_field(fc, "nodal", (2,))
@@ -629,12 +626,14 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
 
     def test_device_convolution_apply(self):
         """Test that convolution can be applied on device fields."""
-        stencil = np.array([
+        stencil = np.array(
             [
-                [[1, 0], [0, 0]],
-                [[0, 1], [0, 0]],
+                [
+                    [[1, 0], [0, 0]],
+                    [[0, 1], [0, 0]],
+                ]
             ]
-        ])
+        )
         conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
         # Use the constructor that accepts nb_domain_grid_pts (tuple) as first arg
@@ -643,7 +642,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
         nodal = real_field(fc, "nodal", (2,))
@@ -672,12 +671,14 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
 
     def test_device_convolution_returns_cupy(self):
         """Test that convolution on device fields returns CuPy arrays."""
-        stencil = np.array([
+        stencil = np.array(
             [
-                [[1, 0], [0, 0]],
-                [[0, 1], [0, 0]],
+                [
+                    [[1, 0], [0, 0]],
+                    [[0, 1], [0, 0]],
+                ]
             ]
-        ])
+        )
         conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
         # Use the constructor that accepts nb_domain_grid_pts (tuple) as first arg
@@ -686,7 +687,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
         nodal = real_field(fc, "nodal", (2,))
@@ -708,23 +709,25 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
         Compare GPU convolution results against CPU reference.
         """
         nb_operators = 2
-        stencil = np.array([
+        stencil = np.array(
             [
-                [[1, 0], [0, 0]],
-                [[0, 1], [0, 0]],
-            ],
-            [
-                [[0, 0], [1, 0]],
-                [[0, 0], [0, 1]],
-            ],
-        ])
+                [
+                    [[1, 0], [0, 0]],
+                    [[0, 1], [0, 0]],
+                ],
+                [
+                    [[0, 0], [1, 0]],
+                    [[0, 0], [0, 1]],
+                ],
+            ]
+        )
         conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
-            nb_ghosts_right=(1, 1)
+            nb_ghosts_right=(1, 1),
         )
         nodal_host = real_field(fc_host, "nodal", (2,))
         quad_host = real_field(fc_host, "quad", (2, nb_operators), "quad")
@@ -736,7 +739,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
         nodal_device = real_field(fc_device, "nodal", (2,))
         quad_device = real_field(fc_device, "quad", (2, nb_operators), "quad")
@@ -763,9 +766,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
 
         # Create host collection for initial data
         fc_host = muGrid.GlobalFieldCollection(
-            (self.nb_x_pts, self.nb_y_pts),
-            sub_pts={"quad": 1},
-            nb_ghosts_right=(1, 1)
+            (self.nb_x_pts, self.nb_y_pts), sub_pts={"quad": 1}, nb_ghosts_right=(1, 1)
         )
         nodal_host = real_field(fc_host, "nodal", (1,))
 
@@ -776,7 +777,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": 1},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
         nodal_device = real_field(fc_device, "nodal", (1,))
         quad_device = real_field(fc_device, "quad", (1,), "quad")
