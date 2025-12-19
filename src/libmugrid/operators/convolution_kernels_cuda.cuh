@@ -48,25 +48,6 @@ namespace cuda {
 // CUDA kernel implementations - only compiled when using nvcc (__CUDACC__)
 #ifdef __CUDACC__
 
-    // atomicAdd for double is only natively available on sm_60 and higher
-    // For older architectures, provide a fallback using atomicCAS
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ < 600
-    __device__ __forceinline__ double atomicAddDouble(double* address, double val) {
-        unsigned long long int* address_as_ull = (unsigned long long int*)address;
-        unsigned long long int old = *address_as_ull, assumed;
-        do {
-            assumed = old;
-            old = atomicCAS(address_as_ull, assumed,
-                           __double_as_longlong(val + __longlong_as_double(assumed)));
-        } while (assumed != old);
-        return __longlong_as_double(old);
-    }
-#else
-    __device__ __forceinline__ double atomicAddDouble(double* address, double val) {
-        return atomicAdd(address, val);
-    }
-#endif
-
     /**
      * @brief CUDA kernel for forward convolution
      */
@@ -104,7 +85,7 @@ namespace cuda {
     }
 
     /**
-     * @brief CUDA kernel for transpose convolution (with atomics)
+     * @brief CUDA kernel for transpose convolution
      */
     __global__ void transpose_convolution_kernel_impl(
         const Real* __restrict__ quad_data,
@@ -132,9 +113,9 @@ namespace cuda {
                 z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
 
             for (Index_t i = 0; i < nnz; ++i) {
-                atomicAddDouble(&nodal_data[nodal_offset + nodal_indices[i]],
-                               alpha * quad_data[quad_offset + quad_indices[i]] *
-                               op_values[i]);
+                nodal_data[nodal_offset + nodal_indices[i]] +=
+                    alpha * quad_data[quad_offset + quad_indices[i]] *
+                    op_values[i];
             }
         }
     }
