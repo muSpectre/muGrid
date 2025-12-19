@@ -151,13 +151,13 @@ components (which we will refer to as operators in the following), meaning that 
 
 .. code-block:: Python
 
-    (operators, components, quadrature-points, pixels)
+    (components, operators, quadrature-points, pixels)
 
 In mathematical notation, the convolution operation can be written as
 
 .. math::
 
-    f_{o,c,q,p} = \sum_{n} \sum_{k} s_{o,q,n,k} g_{c,n,p-k}
+    f_{c,o,q,p} = \sum_{n} \sum_{k} s_{o,q,n,k} g_{c,n,p-k}
 
 where :math:`f` is the output field, :math:`g` is the input field, :math:`s` is the stencil, :math:`o` are the operators, :math:`c` are the components,
 :math:`q` are the quadrature points, :math:`n` are the nodal points, :math:`p` are the pixels and :math:`k` runs over the stencil width
@@ -168,7 +168,7 @@ In mathematical notation, the transpose convolution is written as
 
 .. math::
 
-    g_{c,n,p} = \sum_{o} \sum_{q} \sum_{k} s_{o,q,n,k} f_{o,c,q,p-k}
+    g_{c,n,p} = \sum_{o} \sum_{q} \sum_{k} s_{o,q,n,k} f_{c,o,q,p-k}
 
 with the same stencil :math:`s` as above.
 
