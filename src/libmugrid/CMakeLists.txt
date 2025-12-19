@@ -47,6 +47,7 @@ set(MUGRID_SOURCES
     util/raw_memory_operations.cc
     # kokkos/
     kokkos/kokkos_init.cc
+    kokkos/kokkos_profiling_workaround.cc
     # fft/
     fft/pocketfft_backend.cc
     fft/pencil_transpose.cc
@@ -92,7 +93,15 @@ target_include_directories(muGrid
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
 # Link Kokkos (required dependency)
-target_link_libraries(muGrid PUBLIC Kokkos::kokkos)
+# Use WHOLE_ARCHIVE to resolve internal circular dependencies in Kokkos static libs
+# This is needed because libkokkoscore.a has objects that depend on each other,
+# and macOS linker doesn't rescan archives
+target_link_libraries(muGrid PUBLIC
+    $<LINK_LIBRARY:WHOLE_ARCHIVE,Kokkos::kokkoscore>
+    Kokkos::kokkoscontainers
+    Kokkos::kokkosalgorithms
+    Kokkos::kokkossimd
+)
 
 # Compile definitions
 if(MUGRID_WITH_MPI)
