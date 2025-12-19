@@ -14,6 +14,8 @@
  * This file provides wrapper functions that forward from by-value to
  * by-reference versions.
  *
+ * This issue affects both Kokkos 4.7.x and 5.0.x.
+ *
  * Copyright © 2024 Lars Pastewka
  *
  * µGrid is free software; you can redistribute it and/or
@@ -68,6 +70,14 @@ void beginDeepCopy(const SpaceHandle dst_space, std::string dst_label,
 }
 
 }  // namespace Tools
+
+// Kokkos 5.0 also has an issue with Serial::impl_is_initialized()
+// The library provides impl_is_initialized() but code expects is_initialized()
+// or vice versa. This wrapper provides the missing symbol.
+#if KOKKOS_VERSION >= 50000
+bool Serial::impl_is_initialized() { return Serial::is_initialized(); }
+#endif
+
 }  // namespace Kokkos
 
 #endif  // __APPLE__
