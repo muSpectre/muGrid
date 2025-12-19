@@ -34,7 +34,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import _muGrid
+from . import _muGrid
 
 try:
     from mpi4py import MPI

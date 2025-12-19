@@ -2,11 +2,11 @@
 Collection of simple parallel solvers
 """
 
-import numpy as np
 from muGrid import real_field
-from _muGrid import Communicator, FieldCollection
 
-from .Field import Field as FieldWrapper, wrap_field
+from ._muGrid import Communicator, FieldCollection
+from .Field import Field as FieldWrapper
+from .Field import wrap_field
 
 
 def conjugate_gradients(
