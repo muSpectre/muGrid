@@ -45,6 +45,9 @@
 namespace muGrid {
 namespace cuda {
 
+// CUDA kernel implementations - only compiled when using nvcc (__CUDACC__)
+#ifdef __CUDACC__
+
     /**
      * @brief CUDA kernel for forward convolution
      */
@@ -190,6 +193,8 @@ namespace cuda {
             quad_indices, nodal_indices, op_values, nnz
         );
     }
+
+#endif  // __CUDACC__
 
 }  // namespace cuda
 }  // namespace muGrid

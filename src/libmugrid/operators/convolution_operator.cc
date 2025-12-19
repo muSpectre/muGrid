@@ -614,7 +614,8 @@ namespace muGrid {
         return this->spatial_dim;
     }
 
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+// Device-space functions are only compiled when using the appropriate GPU compiler
+#if (defined(MUGRID_WITH_CUDA) && defined(__CUDACC__)) || (defined(MUGRID_WITH_HIP) && defined(__HIPCC__))
     /* ---------------------------------------------------------------------- */
     void ConvolutionOperator::apply(
         const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
@@ -699,6 +700,6 @@ namespace muGrid {
         this->transpose_on_device<DefaultDeviceSpace>(
             quad_data, nodal_data, alpha, params);
     }
-#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
+#endif  // (MUGRID_WITH_CUDA && __CUDACC__) || (MUGRID_WITH_HIP && __HIPCC__)
 
 }  // namespace muGrid

@@ -40,6 +40,7 @@
 #include "grid/iterators.hh"
 #include "collection/field_collection.hh"
 
+#include <cassert>
 #include <type_traits>
 #include <memory>
 #include <functional>

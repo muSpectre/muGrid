@@ -45,6 +45,9 @@
 namespace muGrid {
 namespace hip {
 
+// HIP kernel implementations - only compiled when using hipcc (__HIPCC__)
+#ifdef __HIPCC__
+
     /**
      * @brief HIP kernel for forward convolution
      */
@@ -192,6 +195,8 @@ namespace hip {
             quad_indices, nodal_indices, op_values, nnz
         );
     }
+
+#endif  // __HIPCC__
 
 }  // namespace hip
 }  // namespace muGrid

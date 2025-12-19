@@ -191,7 +191,7 @@ namespace muGrid {
     // Initialize host field with some values
     host_field.set_zero();
     auto * host_data = host_field.data();
-    for (size_t i = 0; i < host_field.buffer_size(); ++i) {
+    for (size_t i = 0; i < host_field.get_buffer_size(); ++i) {
       host_data[i] = static_cast<Real>(i);
     }
 
@@ -206,7 +206,7 @@ namespace muGrid {
     // Check that values match
     auto * check_data = host_check.data();
     bool all_match = true;
-    for (size_t i = 0; i < host_field.buffer_size(); ++i) {
+    for (size_t i = 0; i < host_field.get_buffer_size(); ++i) {
       if (host_data[i] != check_data[i]) {
         all_match = false;
         break;

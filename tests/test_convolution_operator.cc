@@ -794,9 +794,9 @@ namespace muGrid {
 
     // Verify data round-tripped correctly
     for (Index_t i = 0; i < size; ++i) {
-      BOOST_CHECK_EQUAL(host_copy.quad_indices(i), host_op.quad_indices(i));
-      BOOST_CHECK_EQUAL(host_copy.nodal_indices(i), host_op.nodal_indices(i));
-      BOOST_CHECK_EQUAL(host_copy.values(i), host_op.values(i));
+      BOOST_CHECK_EQUAL(host_copy.quad_indices[i], host_op.quad_indices[i]);
+      BOOST_CHECK_EQUAL(host_copy.nodal_indices[i], host_op.nodal_indices[i]);
+      BOOST_CHECK_EQUAL(host_copy.values[i], host_op.values[i]);
     }
   }
 

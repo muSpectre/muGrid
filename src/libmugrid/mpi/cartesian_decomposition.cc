@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iterator>
 
 #ifdef WITH_MPI
