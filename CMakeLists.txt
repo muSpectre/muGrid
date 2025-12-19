@@ -123,12 +123,15 @@ if(NOT Kokkos_FOUND)
     set(Kokkos_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
     set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
     set(Kokkos_ENABLE_CUDA_CONSTEXPR ON CACHE BOOL "" FORCE)
+    # Disable half-precision types - not needed by muGrid and avoids potential
+    # CUDA compatibility issues with __half/__nv_bfloat16 conversions
+    set(Kokkos_ENABLE_IMPL_HALF_TYPE OFF CACHE BOOL "" FORCE)
     # Enable PIC for shared library linking
     set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
     FetchContent_Declare(
         kokkos
         GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-        GIT_TAG 4.7.02
+        GIT_TAG 5.0.00
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(kokkos)
