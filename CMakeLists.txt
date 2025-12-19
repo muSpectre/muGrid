@@ -81,11 +81,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Build options
-option(MUGRID_USE_MPI "Enable MPI support" ON)
-option(MUGRID_USE_NETCDF "Enable NetCDF I/O" ON)
-option(MUGRID_BUILD_PYTHON "Build Python bindings" ON)
-option(MUGRID_BUILD_TESTS "Build tests" ON)
-option(MUGRID_BUILD_EXAMPLES "Build examples" ON)
+option(MUGRID_ENABLE_MPI "Enable MPI support" ON)
+option(MUGRID_ENABLE_NETCDF "Enable NetCDF I/O" ON)
+option(MUGRID_ENABLE_PYTHON "Enable Python bindings" ON)
+option(MUGRID_ENABLE_TESTS "Enable tests" ON)
+option(MUGRID_ENABLE_EXAMPLES "Enable examples" ON)
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -120,7 +120,7 @@ endif()
 
 # MPI support
 set(MUGRID_WITH_MPI OFF)
-if(MUGRID_USE_MPI)
+if(MUGRID_ENABLE_MPI)
     find_package(MPI)
     if(MPI_FOUND)
         set(MUGRID_WITH_MPI ON)
@@ -132,7 +132,7 @@ endif()
 
 # NetCDF support
 set(MUGRID_WITH_NETCDF OFF)
-if(MUGRID_USE_NETCDF)
+if(MUGRID_ENABLE_NETCDF)
     if(MUGRID_WITH_MPI)
         # Look for parallel NetCDF (PnetCDF)
         find_package(PkgConfig QUIET)
@@ -165,7 +165,7 @@ if(MUGRID_USE_NETCDF)
 endif()
 
 # Python bindings dependencies
-if(MUGRID_BUILD_PYTHON)
+if(MUGRID_ENABLE_PYTHON)
     find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
     # Find or fetch pybind11
@@ -205,24 +205,24 @@ if(MUGRID_WITH_MPI)
 else()
     message(STATUS "  Unidata NetCDF : ${MUGRID_WITH_NETCDF}")
 endif()
-message(STATUS "  Python bindings: ${MUGRID_BUILD_PYTHON}")
-message(STATUS "  Tests          : ${MUGRID_BUILD_TESTS}")
-message(STATUS "  Examples       : ${MUGRID_BUILD_EXAMPLES}")
+message(STATUS "  Python bindings: ${MUGRID_ENABLE_PYTHON}")
+message(STATUS "  Tests          : ${MUGRID_ENABLE_TESTS}")
+message(STATUS "  Examples       : ${MUGRID_ENABLE_EXAMPLES}")
 message(STATUS "--------------------")
 
 # Add subdirectories
 add_subdirectory(src)
 
-if(MUGRID_BUILD_PYTHON)
+if(MUGRID_ENABLE_PYTHON)
     add_subdirectory(language_bindings)
 endif()
 
-if(MUGRID_BUILD_TESTS)
+if(MUGRID_ENABLE_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-if(MUGRID_BUILD_EXAMPLES)
+if(MUGRID_ENABLE_EXAMPLES)
     add_subdirectory(examples)
 endif()
 

@@ -45,8 +45,8 @@ wheel.packages = ["language_bindings/python/muGrid"]
 wheel.install-dir = "muGrid"
 
 [tool.scikit-build.cmake.define]
-MUGRID_BUILD_TESTS = "OFF"
-MUGRID_BUILD_EXAMPLES = "OFF"
+MUGRID_ENABLE_TESTS = "OFF"
+MUGRID_ENABLE_EXAMPLES = "OFF"
 
 [[tool.cibuildwheel.overrides]]
 select = "*manylinux*"

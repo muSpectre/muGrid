@@ -110,7 +110,7 @@ When device-space fields are added to the FieldCollection:
 Build and test the migration:
 ```bash
 mkdir build && cd build
-cmake .. -DMUGRID_BUILD_PYTHON=ON
+cmake .. -DMUGRID_ENABLE_PYTHON=ON
 make -j
 ctest -V
 ```

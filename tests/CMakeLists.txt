@@ -117,7 +117,7 @@ else()
 endif()
 
 # Python tests
-if(MUGRID_BUILD_PYTHON)
+if(MUGRID_ENABLE_PYTHON)
     # Use the Python interpreter that was found during configuration
     # Users should ensure CMake is configured with the correct Python
     # (e.g., by activating venv before running cmake, or by setting -DPython_EXECUTABLE)
