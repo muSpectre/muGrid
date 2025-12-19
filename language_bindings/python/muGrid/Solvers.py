@@ -54,18 +54,18 @@ def conjugate_gradients(
     tol_sq = tol * tol
 
     # Wrap fields for array access if they are not already wrapped
-    b_wrap = b if isinstance(b, FieldWrapper) else wrap_field(b)
-    x_wrap = x if isinstance(x, FieldWrapper) else wrap_field(x)
+    b = b if isinstance(b, FieldWrapper) else wrap_field(b)
+    x = x if isinstance(x, FieldWrapper) else wrap_field(x)
 
-    p_wrap = real_field(fc, "cg-search-direction")
-    Ap_wrap = real_field(fc, "cg-hessian-product")
+    p = real_field(fc, "cg-search-direction")
+    Ap = real_field(fc, "cg-hessian-product")
 
-    hessp(x, Ap_cpp)
-    p_wrap.s[...] = b_wrap.s - Ap_wrap.s
-    r = p_wrap.s.copy()  # residual
+    hessp(x, Ap)
+    p.s[...] = b.s - Ap.s
+    r = p.s.copy()  # residual
 
     if callback:
-        callback(0, x_wrap.s, r, p_wrap.s)
+        callback(0, x.s, r, p.s)
 
     rr = comm.sum(r.ravel().dot(r.ravel()))  # initial residual dot product
     if rr < tol_sq:
@@ -73,19 +73,19 @@ def conjugate_gradients(
 
     for iteration in range(maxiter):
         # Compute Hessian product
-        hessp(p_cpp, Ap_cpp)
+        hessp(p, Ap)
 
         # Update x (and residual)
-        pAp = comm.sum(p_wrap.s.ravel().dot(Ap_wrap.s.ravel()))
+        pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
         if pAp <= 0:
             raise RuntimeError("Hessian is not positive definite")
 
         alpha = rr / pAp
-        x_wrap.s[...] += alpha * p_wrap.s
-        r -= alpha * Ap_wrap.s
+        x.s[...] += alpha * p.s
+        r -= alpha * Ap.s
 
         if callback:
-            callback(iteration + 1, x_wrap.s, r, p_wrap.s)
+            callback(iteration + 1, x.s, r, p.s)
 
         # Check convergence
         next_rr = comm.sum(r.ravel().dot(r.ravel()))
@@ -95,7 +95,7 @@ def conjugate_gradients(
         # Update search direction
         beta = next_rr / rr
         rr = next_rr
-        p_wrap.s[...] *= beta
-        p_wrap.s[...] += r
+        p.s[...] *= beta
+        p.s[...] += r
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")

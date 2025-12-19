@@ -6,8 +6,8 @@ try:
     import matplotlib.pyplot as plt
 except ModuleNotFoundError:
     plt = None
-import numpy as np
 import muGrid
+import numpy as np
 from muGrid import real_field, wrap_field  # wrap_field still needed for hessp callback
 from muGrid.Solvers import conjugate_gradients
 
@@ -21,17 +21,42 @@ except ImportError:
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 parser = argparse.ArgumentParser(
-    prog="Poisson", description="Solve the Poisson equation"
+    prog="Poisson",
+    description="Solve the Poisson equation"
 )
-parser.add_argument("-n", "--nb-grid-pts", default="32,32")
+
+parser.add_argument(
+    "-n", "--nb-grid-pts",
+    default=[32, 32],
+    type=lambda s: [int(x) for x in s.split(",")],
+    help="Grid points as nx,ny (default: 32,32)"
+)
+
+_memory_locations = {
+    "host": muGrid.GlobalFieldCollection.MemoryLocation.Host,
+    "device": muGrid.GlobalFieldCollection.MemoryLocation.Device,
+}
+
+parser.add_argument(
+    "-m", "--memory",
+    choices=_memory_locations,
+    default="host",
+    help="Memory space for allocation (default: host)"
+)
+
 args = parser.parse_args()
 
-nb_grid_pts = [int(x) for x in args.nb_grid_pts.split(",")]
+if args.memory == "host":
+    import numpy as arr
+else:
+    import cupy as arr
 
-s = suggest_subdivisions(len(nb_grid_pts), comm.size)
+args.memory = _memory_locations[args.memory]
 
-decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
-grid_spacing = 1 / np.array(nb_grid_pts)  # Grid spacing
+s = suggest_subdivisions(len(args.nb_grid_pts), comm.size)
+
+decomposition = muGrid.CartesianDecomposition(comm, args.nb_grid_pts, s, (1, 1), (1, 1), memory_location=args.memory)
+grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])  # FD-stencil for the Laplacian
 laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
@@ -42,30 +67,29 @@ x, y = decomposition.coords  # Domain-local coords for each pixel
 rhs = real_field(decomposition, "rhs")
 solution = real_field(decomposition, "solution")
 
-rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
-rhs.p[...] -= np.mean(rhs.p)
+rhs.p[...] = arr.asarray((1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10)
+rhs.p[...] -= arr.mean(rhs.p)
 
 
 def callback(it, x, r, p):
     """
     Callback function to print the current solution, residual, and search direction.
     """
-    print(f"{it:5} {np.dot(r.ravel(), r.ravel()):.5}")
+    print(f"{it:5} {arr.dot(r.ravel(), r.ravel()):.5}")
 
 
-def hessp(x_field, Ax_field):
+def hessp(x, Ax):
     """
     Function to compute the product of the Hessian matrix with a vector.
     The Hessian is represented by the convolution operator.
     """
-    decomposition.communicate_ghosts(x_field)
-    laplace.apply(x_field, Ax_field)
+    decomposition.communicate_ghosts(x._cpp)
+    laplace.apply(x._cpp, Ax._cpp)
     # We need the minus sign because the Laplace operator is negative
     # definite, but the conjugate-gradients solver assumes a
     # positive-definite operator.
-    Ax = wrap_field(Ax_field)
     Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-    return Ax_field
+    return Ax
 
 
 conjugate_gradients(
