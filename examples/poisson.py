@@ -1,14 +1,16 @@
 # Solver for the Poisson equation
 
 import argparse
+import time
 
 try:
     import matplotlib.pyplot as plt
 except ModuleNotFoundError:
     plt = None
-import muGrid
 import numpy as np
-from muGrid import real_field, wrap_field  # wrap_field still needed for hessp callback
+
+import muGrid
+from muGrid import real_field
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -44,6 +46,13 @@ parser.add_argument(
     help="Memory space for allocation (default: host)"
 )
 
+parser.add_argument(
+    "-i", "--maxiter",
+    type=int,
+    default=1000,
+    help="Maximum number of CG iterations (default: 1000)"
+)
+
 args = parser.parse_args()
 
 if args.memory == "host":
@@ -55,7 +64,8 @@ args.memory = _memory_locations[args.memory]
 
 s = suggest_subdivisions(len(args.nb_grid_pts), comm.size)
 
-decomposition = muGrid.CartesianDecomposition(comm, args.nb_grid_pts, s, (1, 1), (1, 1), memory_location=args.memory)
+decomposition = muGrid.CartesianDecomposition(comm, args.nb_grid_pts, s, (1, 1), (1, 1),
+                                              memory_location=args.memory)
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])  # FD-stencil for the Laplacian
@@ -92,6 +102,7 @@ def hessp(x, Ax):
     return Ax
 
 
+start_time = time.perf_counter()
 conjugate_gradients(
     comm,
     decomposition.collection,
@@ -100,8 +111,10 @@ conjugate_gradients(
     solution._cpp,
     tol=1e-6,
     callback=callback,
-    maxiter=1000,
+    maxiter=args.maxiter,
 )
+elapsed_time = time.perf_counter() - start_time
+print(f"CG solver completed in {elapsed_time:.4f} seconds")
 
 if plt is not None:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
