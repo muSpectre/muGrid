@@ -38,12 +38,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "libmugrid/field.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_collection.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/field_collection_local.hh"
-#include "libmugrid/state_field.hh"
+#include "field/field.hh"
+#include "field/field_typed.hh"
+#include "collection/field_collection.hh"
+#include "collection/field_collection_global.hh"
+#include "collection/field_collection_local.hh"
+#include "field/state_field.hh"
 
 #include <map>
 

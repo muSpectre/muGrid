@@ -35,10 +35,10 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "libmugrid/fft/fft_engine.hh"
-#include "libmugrid/fft/fft_utils.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_map.hh"
+#include "fft/fft_engine.hh"
+#include "fft/fft_utils.hh"
+#include "field/field_typed.hh"
+#include "field/field_map.hh"
 
 #include <cmath>
 
@@ -131,6 +131,45 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_3d_creation) {
   BOOST_CHECK_EQUAL(engine.get_nb_fourier_grid_pts()[2], 12);
 
   BOOST_CHECK_CLOSE(engine.normalisation(), 1.0 / (8 * 10 * 12), 1e-10);
+}
+
+BOOST_AUTO_TEST_CASE(test_fft_engine_2d_small_roundtrip) {
+  // Small grid test to catch edge cases
+  IntCoord_t nb_grid_pts{4, 5};
+  FFTEngine engine(nb_grid_pts);
+
+  Field & real_field = engine.register_real_space_field("test_real");
+  Field & fourier_field = engine.register_fourier_space_field("test_fourier");
+
+  TypedField<Real> & real_typed =
+      dynamic_cast<TypedField<Real> &>(real_field);
+
+  // Initialize with sin pattern
+  auto real_data = real_typed.data();
+  for (Index_t i = 0; i < real_typed.get_buffer_size(); ++i) {
+    real_data[i] = std::sin(2 * M_PI * i / 20.0);
+  }
+
+  // Store original values
+  std::vector<Real> original(real_data, real_data + real_typed.get_buffer_size());
+
+  // Forward FFT
+  engine.fft(real_field, fourier_field);
+
+  // Inverse FFT
+  engine.ifft(fourier_field, real_field);
+
+  // Apply normalization and compare
+  Real norm = engine.normalisation();
+  for (Index_t j = 0; j < static_cast<Index_t>(original.size()); ++j) {
+    Real result = real_data[j] * norm;
+    Real expected = original[j];
+    if (std::abs(expected) < 1e-14) {
+      BOOST_CHECK_SMALL(result, 1e-10);
+    } else {
+      BOOST_CHECK_CLOSE(result, expected, 1e-8);
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_roundtrip) {

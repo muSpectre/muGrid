@@ -34,8 +34,8 @@
  */
 
 #include "fft_engine.hh"
-#include "libmugrid/exception.hh"
-#include "libmugrid/field_typed.hh"
+#include "core/exception.hh"
+#include "field/field_typed.hh"
 
 #ifdef WITH_MPI
 #include <mpi.h>
@@ -231,27 +231,36 @@ void FFTEngine::initialise_fft() {
 
     // Set up Y↔Z transpose operations (within row communicator)
 #ifdef WITH_MPI
-    this->transpose_yz_forward = std::make_unique<PencilTranspose>(
-        this->row_comm, zpencil_shape, ypencil_shape,
-        nb_grid_pts[1], nb_grid_pts[2], 1, 2);
+    // Only create transpose if we have multiple ranks that need data exchange
+    if (this->row_comm.size() > 1) {
+      this->transpose_yz_forward = std::make_unique<PencilTranspose>(
+          this->row_comm, zpencil_shape, ypencil_shape,
+          nb_grid_pts[1], nb_grid_pts[2], 1, 2);
 
-    this->transpose_yz_backward = std::make_unique<PencilTranspose>(
-        this->row_comm, ypencil_shape, zpencil_shape,
-        nb_grid_pts[2], nb_grid_pts[1], 2, 1);
+      this->transpose_yz_backward = std::make_unique<PencilTranspose>(
+          this->row_comm, ypencil_shape, zpencil_shape,
+          nb_grid_pts[2], nb_grid_pts[1], 2, 1);
+    }
 #endif
 
     // Set up X↔Z transpose (within column communicator)
 #ifdef WITH_MPI
-    this->transpose_xz = std::make_unique<PencilTranspose>(
-        this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
-        this->nb_fourier_grid_pts[0], nb_grid_pts[2], 2, 0);
+    // Only create transpose if we have multiple ranks that need data exchange
+    if (this->col_comm.size() > 1) {
+      this->transpose_xz = std::make_unique<PencilTranspose>(
+          this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
+          this->nb_fourier_grid_pts[0], nb_grid_pts[2], 2, 0);
+    }
 #endif
   } else {
     // 2D case: simpler, just one transpose
 #ifdef WITH_MPI
-    this->transpose_xz = std::make_unique<PencilTranspose>(
-        this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
-        this->nb_fourier_grid_pts[0], nb_grid_pts[1], 1, 0);
+    // Only create transpose if we have multiple ranks that need data exchange
+    if (this->col_comm.size() > 1) {
+      this->transpose_xz = std::make_unique<PencilTranspose>(
+          this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
+          this->nb_fourier_grid_pts[0], nb_grid_pts[1], 1, 0);
+    }
 #endif
   }
 

@@ -34,7 +34,7 @@
  */
 
 #include "pencil_transpose.hh"
-#include "libmugrid/exception.hh"
+#include "core/exception.hh"
 
 #include <algorithm>
 #include <numeric>

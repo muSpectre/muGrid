@@ -36,9 +36,9 @@
 #ifndef SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 #define SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 
-#include "libmugrid/cartesian_decomposition.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/communicator.hh"
+#include "mpi/cartesian_decomposition.hh"
+#include "collection/field_collection_global.hh"
+#include "mpi/communicator.hh"
 
 #include "fft_1d_backend.hh"
 #include "pencil_transpose.hh"

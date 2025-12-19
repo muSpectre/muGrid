@@ -36,11 +36,11 @@
 #include "mpi_context.hh"
 #include "tests.hh"
 
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_map.hh"
-#include "libmugrid/ccoord_operations.hh"
-#include "libmugrid/communicator.hh"
-#include "libmugrid/cartesian_decomposition.hh"
+#include "field/field_typed.hh"
+#include "field/field_map.hh"
+#include "grid/ccoord_operations.hh"
+#include "mpi/communicator.hh"
+#include "mpi/cartesian_decomposition.hh"
 
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(mpi_communicator_test);

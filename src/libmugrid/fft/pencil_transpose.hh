@@ -36,8 +36,8 @@
 #ifndef SRC_LIBMUGRID_FFT_PENCIL_TRANSPOSE_HH_
 #define SRC_LIBMUGRID_FFT_PENCIL_TRANSPOSE_HH_
 
-#include "libmugrid/grid_common.hh"
-#include "libmugrid/communicator.hh"
+#include "core/grid_common.hh"
+#include "mpi/communicator.hh"
 
 #include <vector>
 

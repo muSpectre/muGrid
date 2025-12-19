@@ -33,14 +33,14 @@
  *
  */
 
-#include "libmugrid/grid_common.hh"
-#include "libmugrid/exception.hh"
-#include "libmugrid/field.hh"
-#include "libmugrid/field_map.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_collection.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/mapped_field.hh"
+#include "core/grid_common.hh"
+#include "core/exception.hh"
+#include "field/field.hh"
+#include "field/field_map.hh"
+#include "field/field_typed.hh"
+#include "collection/field_collection.hh"
+#include "collection/field_collection_global.hh"
+#include "field/mapped_field.hh"
 
 #include <dlpack/dlpack.h>
 

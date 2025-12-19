@@ -35,11 +35,11 @@
 
 #include "bind_py_declarations.hh"
 
-#include "libmugrid/fft/fft_engine.hh"
-#include "libmugrid/fft/fft_utils.hh"
-#include "libmugrid/field.hh"
-#include "libmugrid/field_collection.hh"
-#include "libmugrid/python_helpers.hh"
+#include "fft/fft_engine.hh"
+#include "fft/fft_utils.hh"
+#include "field/field.hh"
+#include "collection/field_collection.hh"
+#include "util/python_helpers.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>

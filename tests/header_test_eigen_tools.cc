@@ -34,7 +34,7 @@
  */
 
 #include "tests.hh"
-#include "libmugrid/eigen_tools.hh"
+#include "util/eigen_tools.hh"
 #include <iostream>
 
 namespace muGrid {

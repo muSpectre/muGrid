@@ -35,12 +35,12 @@
 
 #include "tests.hh"
 
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/field_collection_local.hh"
-#include "libmugrid/field_map_static.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/iterators.hh"
-#include "libmugrid/ccoord_operations.hh"
+#include "collection/field_collection_global.hh"
+#include "collection/field_collection_local.hh"
+#include "field/field_map_static.hh"
+#include "field/field_typed.hh"
+#include "grid/iterators.hh"
+#include "grid/ccoord_operations.hh"
 
 #include "test_goodies.hh"
 

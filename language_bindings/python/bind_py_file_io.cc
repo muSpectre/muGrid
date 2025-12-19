@@ -33,11 +33,11 @@
  *
  */
 
-#include "libmugrid/file_io_base.hh"
+#include "io/file_io_base.hh"
 #ifdef WITH_NETCDF_IO
-#include "libmugrid/file_io_netcdf.hh"
+#include "io/file_io_netcdf.hh"
 #endif
-#include "libmugrid/communicator.hh"
+#include "mpi/communicator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>

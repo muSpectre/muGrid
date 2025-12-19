@@ -33,11 +33,11 @@
 *
 */
 
-#include "libmugrid/grid_common.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/kokkos_types.hh"
-#include "libmugrid/convolution_operator_base.hh"
-#include "libmugrid/convolution_operator.hh"
+#include "core/grid_common.hh"
+#include "field/field_typed.hh"
+#include "kokkos/kokkos_types.hh"
+#include "operators/convolution_operator_base.hh"
+#include "operators/convolution_operator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>

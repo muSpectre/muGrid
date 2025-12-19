@@ -36,11 +36,11 @@
 #include "tests.hh"
 #include "test_goodies.hh"
 
-#include "libmugrid/convolution_operator.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_map.hh"
-#include "libmugrid/kokkos_types.hh"
+#include "operators/convolution_operator.hh"
+#include "collection/field_collection_global.hh"
+#include "field/field_typed.hh"
+#include "field/field_map.hh"
+#include "kokkos/kokkos_types.hh"
 
 #include <Kokkos_Core.hpp>
 #include <boost/mpl/list.hpp>

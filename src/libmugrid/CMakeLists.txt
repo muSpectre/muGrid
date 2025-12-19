@@ -19,26 +19,35 @@ configure_file(
 
 # Source files for libmuGrid
 set(MUGRID_SOURCES
-    kokkos_init.cc
-    exception.cc
-    grid_common.cc
-    ccoord_operations.cc
-    convolution_operator.cc
-    field_collection.cc
-    field_collection_global.cc
-    field_collection_local.cc
-    file_io_base.cc
-    field.cc
-    field_typed.cc
-    field_map.cc
-    communicator.cc
-    cartesian_communicator.cc
-    cartesian_decomposition.cc
-    raw_memory_operations.cc
-    state_field.cc
-    state_field_map.cc
-    units.cc
-    # FFT support
+    # core/
+    core/exception.cc
+    core/grid_common.cc
+    core/units.cc
+    # grid/
+    grid/ccoord_operations.cc
+    # field/
+    field/field.cc
+    field/field_typed.cc
+    field/field_map.cc
+    field/state_field.cc
+    field/state_field_map.cc
+    # collection/
+    collection/field_collection.cc
+    collection/field_collection_global.cc
+    collection/field_collection_local.cc
+    # mpi/
+    mpi/communicator.cc
+    mpi/cartesian_communicator.cc
+    mpi/cartesian_decomposition.cc
+    # operators/
+    operators/convolution_operator.cc
+    # io/
+    io/file_io_base.cc
+    # util/
+    util/raw_memory_operations.cc
+    # kokkos/
+    kokkos/kokkos_init.cc
+    # fft/
     fft/pocketfft_backend.cc
     fft/pencil_transpose.cc
     fft/fft_utils.cc
@@ -48,7 +57,7 @@ set(MUGRID_SOURCES
 
 # Add NetCDF source if available
 if(MUGRID_WITH_NETCDF)
-    list(APPEND MUGRID_SOURCES file_io_netcdf.cc)
+    list(APPEND MUGRID_SOURCES io/file_io_netcdf.cc)
 endif()
 
 # Create shared library
@@ -66,6 +75,15 @@ target_include_directories(muGrid
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/core>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/grid>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/field>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/collection>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mpi>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/operators>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/kokkos>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
         $<INSTALL_INTERFACE:include>
 )
@@ -114,17 +132,13 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
     INCLUDES DESTINATION include
 )
 
-# Install header files
-file(GLOB MUGRID_HEADERS "*.hh")
-install(FILES ${MUGRID_HEADERS}
-    DESTINATION include/libmugrid
-)
-
-# Install FFT headers
-file(GLOB MUGRID_FFT_HEADERS "fft/*.hh")
-install(FILES ${MUGRID_FFT_HEADERS}
-    DESTINATION include/libmugrid/fft
-)
+# Install header files for each subdirectory
+foreach(subdir core grid field collection mpi operators io util kokkos fft)
+    file(GLOB MUGRID_${subdir}_HEADERS "${subdir}/*.hh")
+    install(FILES ${MUGRID_${subdir}_HEADERS}
+        DESTINATION include/libmugrid/${subdir}
+    )
+endforeach()
 
 # Install pocketfft header
 install(FILES fft/pocketfft/pocketfft_hdronly.h

@@ -41,11 +41,11 @@
 
 #include "io_mpi_test_file_io.hh"
 
-#include "libmugrid/file_io_netcdf.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_map_static.hh"
-#include "libmugrid/grid_common.hh"
+#include "io/file_io_netcdf.hh"
+#include "collection/field_collection_global.hh"
+#include "field/field_typed.hh"
+#include "field/field_map_static.hh"
+#include "core/grid_common.hh"
 
 using muGrid::operator<<;
 
