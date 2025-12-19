@@ -304,3 +304,55 @@ def complex_field(collection, name, components=(), sub_pt="pixel"):
     fc = getattr(collection, 'collection', collection)
     cpp_field = fc.complex_field(name, components, sub_pt)
     return Field(cpp_field)
+
+
+# FFT-specific field creation functions
+
+def fft_real_space_field(engine, name, nb_components=1):
+    """
+    Create a real-space field for FFT operations.
+
+    This function creates a field in the FFT engine's real-space collection
+    and returns it wrapped with array accessors.
+
+    Parameters
+    ----------
+    engine : FFTEngine
+        The FFT engine to create the field in
+    name : str
+        Name of the field
+    nb_components : int, optional
+        Number of field components (default: 1 for scalar field)
+
+    Returns
+    -------
+    Field
+        Wrapped real-valued field with .s, .sg, .p, .pg accessors
+    """
+    cpp_field = engine.real_space_field(name, nb_components)
+    return Field(cpp_field)
+
+
+def fft_fourier_space_field(engine, name, nb_components=1):
+    """
+    Create a Fourier-space field for FFT operations.
+
+    This function creates a field in the FFT engine's Fourier-space collection
+    and returns it wrapped with array accessors.
+
+    Parameters
+    ----------
+    engine : FFTEngine
+        The FFT engine to create the field in
+    name : str
+        Name of the field
+    nb_components : int, optional
+        Number of field components (default: 1 for scalar field)
+
+    Returns
+    -------
+    Field
+        Wrapped complex-valued field with .s, .sg, .p, .pg accessors
+    """
+    cpp_field = engine.fourier_space_field(name, nb_components)
+    return Field(cpp_field)
