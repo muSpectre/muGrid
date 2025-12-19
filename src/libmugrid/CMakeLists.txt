@@ -61,6 +61,7 @@ endif()
 # Add cuFFT backend source if CUDA is available
 if(MUGRID_WITH_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
+    list(APPEND MUGRID_SOURCES operators/convolution_operator.cu)
 endif()
 
 # Add hipFFT backend source if HIP is available

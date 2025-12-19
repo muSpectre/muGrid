@@ -204,6 +204,8 @@ namespace muGrid {
       this->current_nb_entries = size;
       // Use our resize function
       muGrid::resize(this->values, expected_size);
+      // Zero-initialize the new memory
+      this->values.fill_zero();
     }
   }
 
