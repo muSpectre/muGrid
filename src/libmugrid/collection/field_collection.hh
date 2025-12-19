@@ -39,7 +39,7 @@
 #include "core/exception.hh"
 #include "core/grid_common.hh"
 #include "core/units.hh"
-#include "kokkos/kokkos_types.hh"
+#include "memory/memory_space.hh"
 
 #include <map>
 #include <string>

@@ -35,7 +35,6 @@
 
 #include "core/exception.hh"
 #include "grid/iterators.hh"
-#include "kokkos/kokkos_types.hh"
 
 #include "Eigen/Dense"
 

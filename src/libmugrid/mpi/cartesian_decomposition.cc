@@ -313,7 +313,7 @@ namespace muGrid {
                     block_len,
                     // type information
                     element_size, mpi_type_ptr,
-                    // device memory flag for serial Kokkos copy
+                    // device memory flag for serial GPU memory copy
                     is_device_memory);
 
                 // Perform send to the LEFT, receive from the RIGHT
@@ -341,7 +341,7 @@ namespace muGrid {
                     block_len,
                     // type information
                     element_size, mpi_type_ptr,
-                    // device memory flag for serial Kokkos copy
+                    // device memory flag for serial GPU memory copy
                     is_device_memory);
 
                 // Update how many blocks we have already sent to the right/left

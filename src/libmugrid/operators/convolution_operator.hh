@@ -40,7 +40,6 @@
 
 #include "operators/convolution_operator_base.hh"
 #include "operators/convolution_kernels.hh"
-#include "kokkos/kokkos_types.hh"
 
 #include "Eigen/Dense"
 
@@ -79,9 +78,10 @@ namespace muGrid {
      * defined on nodal points and quadrature points, facilitating the evaluation
      * of gradients and the discretised divergence.
      *
-     * The implementation uses Kokkos for portable parallelization across CPU
-     * and GPU architectures. The sparse operator representation uses a
-     * Structure-of-Arrays (SoA) layout for optimal memory access patterns.
+     * The implementation supports portable execution across CPU and GPU (CUDA/HIP)
+     * architectures through backend-specific kernel implementations. The sparse
+     * operator representation uses a Structure-of-Arrays (SoA) layout for optimal
+     * memory access patterns on both CPU and GPU.
      *
      * @note This class cannot be instantiated directly and does not support copy
      *       construction or copy assignment.

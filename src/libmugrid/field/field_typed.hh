@@ -39,7 +39,7 @@
 #include "field/field.hh"
 #include "collection/field_collection.hh"
 #include "core/grid_common.hh"
-#include "kokkos/kokkos_types.hh"
+#include "memory/device_array.hh"
 
 #include "Eigen/Dense"
 
@@ -103,7 +103,7 @@ namespace muGrid {
     //! Memory space type
     using Memory_Space = MemorySpace;
 
-    //! DeviceArray type for storage (replaces Kokkos::View)
+    //! DeviceArray type for storage
     using View_t = DeviceArray<T, MemorySpace>;
 
     /**
@@ -312,9 +312,9 @@ namespace muGrid {
     std::enable_if_t<is_host_space_v<M>, Eigen_cmap>
     eigen_map(const Index_t & nb_rows, const Index_t & nb_cols) const;
 
-    //! Get the underlying Kokkos View for use in kernels
+    //! Get the underlying DeviceArray for use in kernels
     View_t & view() { return this->values; }
-    //! Get the underlying Kokkos View (const) for use in kernels
+    //! Get the underlying DeviceArray (const) for use in kernels
     const View_t & view() const { return this->values; }
 
     /**
@@ -361,7 +361,7 @@ namespace muGrid {
     }
 
    protected:
-    //! Kokkos View storage for the raw field data
+    //! DeviceArray storage for the raw field data
     View_t values{};
   };
 
@@ -375,7 +375,7 @@ namespace muGrid {
    *
    * @tparam T type of scalar to hold. Must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`.
-   * @tparam MemorySpace Kokkos memory space (HostSpace by default)
+   * @tparam MemorySpace Memory space (HostSpace by default, or CudaSpace/HIPSpace for GPU)
    */
   template <typename T, typename MemorySpace>
   class TypedField : public TypedFieldBase<T, MemorySpace> {

@@ -37,22 +37,8 @@
 
 #include <pybind11/pybind11.h>
 
-namespace muGrid {
-  void initialize_kokkos();
-  void finalize_kokkos();
-}
-
 PYBIND11_MODULE(_muGrid, mod) {
   mod.doc() = "Python bindings to the µGrid library";
-
-  // Initialize Kokkos when the Python module is loaded
-  muGrid::initialize_kokkos();
-
-  // Register a cleanup callback to finalize Kokkos when Python exits
-  auto cleanup = []() {
-    muGrid::finalize_kokkos();
-  };
-  mod.add_object("_cleanup", pybind11::capsule(cleanup));
 
   add_common_mugrid(mod);
   add_communicator(mod);

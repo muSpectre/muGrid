@@ -40,7 +40,6 @@
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "field/field_map.hh"
-#include "kokkos/kokkos_types.hh"
 
 #include <boost/mpl/list.hpp>
 
@@ -771,7 +770,7 @@ namespace muGrid {
   /* GPU-specific tests (only run when GPU backend is available)             */
   /* ---------------------------------------------------------------------- */
 
-#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
 
   BOOST_AUTO_TEST_CASE(device_sparse_operator_copy) {
     // Create host sparse operator
@@ -780,9 +779,9 @@ namespace muGrid {
 
     // Fill with test data
     for (Index_t i = 0; i < size; ++i) {
-      host_op.quad_indices(i) = i * 2;
-      host_op.nodal_indices(i) = i * 3;
-      host_op.values(i) = static_cast<Real>(i) * 0.5;
+      host_op.quad_indices[i] = i * 2;
+      host_op.nodal_indices[i] = i * 3;
+      host_op.values[i] = static_cast<Real>(i) * 0.5;
     }
 
     // Copy to device
@@ -854,7 +853,7 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(error, 0.0);
   }
 
-#endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
+#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
 
   /* ---------------------------------------------------------------------- */
   /* Test that verifies memory spaces are configured correctly               */

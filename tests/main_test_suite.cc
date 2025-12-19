@@ -41,20 +41,3 @@
 #endif
 
 #include <boost/test/unit_test.hpp>
-
-namespace muGrid {
-  void initialize_kokkos();
-  void finalize_kokkos();
-}
-
-// Global fixture to initialize/finalize Kokkos before/after all tests
-struct KokkosInitializer {
-  KokkosInitializer() {
-    muGrid::initialize_kokkos();
-  }
-  ~KokkosInitializer() {
-    muGrid::finalize_kokkos();
-  }
-};
-
-BOOST_TEST_GLOBAL_FIXTURE(KokkosInitializer);

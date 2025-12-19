@@ -47,13 +47,16 @@ project(muGrid
     DESCRIPTION "MPI-parallel regular grids"
 )
 
-# Enable CUDA language if Kokkos_ENABLE_CUDA is set
+# GPU backend options
+option(MUGRID_WITH_CUDA "Enable CUDA GPU support" OFF)
+option(MUGRID_WITH_HIP "Enable HIP GPU support (AMD ROCm)" OFF)
+
+# Enable CUDA language if requested
 # This must be after project() but before the first CUDA target
-if(Kokkos_ENABLE_CUDA)
+if(MUGRID_WITH_CUDA)
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     # Set default CUDA architecture if not specified
-    # Kokkos 5.0.0 requires compute_70+ for __grid_constant__ support
     # 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100), 90 = Hopper (H100)
     # Use "native" on CMake 3.24+ to auto-detect, or set a default
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
@@ -61,9 +64,9 @@ if(Kokkos_ENABLE_CUDA)
     endif()
 endif()
 
-# Enable HIP language if Kokkos_ENABLE_HIP is set
+# Enable HIP language if requested
 # This must be after project() but before the first HIP target
-if(Kokkos_ENABLE_HIP)
+if(MUGRID_WITH_HIP)
     enable_language(HIP)
     # Set default HIP architecture if not specified
     # gfx906 = MI50/MI60, gfx908 = MI100, gfx90a = MI200 series, gfx942 = MI300 series
@@ -113,34 +116,6 @@ if(NOT Eigen3_FOUND)
     set(MUGRID_EIGEN_FROM_FETCHCONTENT TRUE)
 else()
     set(MUGRID_EIGEN_FROM_FETCHCONTENT FALSE)
-endif()
-
-# Find or fetch Kokkos (required dependency)
-find_package(Kokkos 5.0.0 QUIET)
-if(NOT Kokkos_FOUND)
-    message(STATUS "Kokkos not found, fetching from GitHub...")
-    # Disable Kokkos tests
-    set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-    set(Kokkos_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
-    set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
-    set(Kokkos_ENABLE_CUDA_CONSTEXPR ON CACHE BOOL "" FORCE)
-    # Disable half-precision types - not needed by muGrid and avoids potential
-    # CUDA compatibility issues with __half/__nv_bfloat16 conversions
-    set(Kokkos_ENABLE_IMPL_HALF_TYPE OFF CACHE BOOL "" FORCE)
-    set(Kokkos_ENABLE_IMPL_BHALF_TYPE OFF CACHE BOOL "" FORCE)
-    # Enable PIC for shared library linking
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-        kokkos
-        GIT_REPOSITORY https://github.com/kokkos/kokkos.git
-        GIT_TAG 5.0.0
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(kokkos)
-    set(MUGRID_KOKKOS_FROM_FETCHCONTENT TRUE)
-else()
-    message(STATUS "Kokkos found: ${Kokkos_DIR}")
-    set(MUGRID_KOKKOS_FROM_FETCHCONTENT FALSE)
 endif()
 
 # MPI support
@@ -222,35 +197,8 @@ endif()
 message(STATUS "--------------------")
 message(STATUS "muGrid configuration")
 message(STATUS "  Version        : ${MUGRID_VERSION_STRING}")
-# Kokkos_DEVICES is set when using find_package; for FetchContent, build from Kokkos_ENABLE_* variables
-if(Kokkos_DEVICES)
-    set(_MUGRID_KOKKOS_BACKENDS "${Kokkos_DEVICES}")
-else()
-    set(_MUGRID_KOKKOS_BACKENDS "")
-    if(Kokkos_ENABLE_SERIAL)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "SERIAL")
-    endif()
-    if(Kokkos_ENABLE_OPENMP)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "OPENMP")
-    endif()
-    if(Kokkos_ENABLE_THREADS)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "THREADS")
-    endif()
-    if(Kokkos_ENABLE_CUDA)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "CUDA")
-    endif()
-    if(Kokkos_ENABLE_HIP)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "HIP")
-    endif()
-    if(Kokkos_ENABLE_SYCL)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "SYCL")
-    endif()
-    if(Kokkos_ENABLE_OPENMPTARGET)
-        list(APPEND _MUGRID_KOKKOS_BACKENDS "OPENMPTARGET")
-    endif()
-    string(REPLACE ";" " " _MUGRID_KOKKOS_BACKENDS "${_MUGRID_KOKKOS_BACKENDS}")
-endif()
-message(STATUS "  Kokkos backends: ${_MUGRID_KOKKOS_BACKENDS}")
+message(STATUS "  CUDA           : ${MUGRID_WITH_CUDA}")
+message(STATUS "  HIP            : ${MUGRID_WITH_HIP}")
 message(STATUS "  MPI            : ${MUGRID_WITH_MPI}")
 if(MUGRID_WITH_MPI)
     message(STATUS "  Parallel NetCDF: ${MUGRID_WITH_NETCDF}")

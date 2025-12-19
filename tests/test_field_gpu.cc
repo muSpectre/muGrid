@@ -36,7 +36,7 @@
 #include "tests.hh"
 #include "field/field_typed.hh"
 #include "collection/field_collection_global.hh"
-#include "kokkos/kokkos_types.hh"
+#include "memory/memory_space.hh"
 
 namespace muGrid {
 
@@ -53,37 +53,33 @@ namespace muGrid {
     // Test DLPack device type for host
     BOOST_CHECK_EQUAL(dlpack_device_type_v<HostSpace>, DLPackDeviceType::CPU);
 
-#if defined(KOKKOS_ENABLE_CUDA)
+#if defined(MUGRID_WITH_CUDA)
     // Test is_device_space trait for CUDA
-    BOOST_CHECK(!is_host_space_v<Kokkos::CudaSpace>);
-    BOOST_CHECK(is_device_space_v<Kokkos::CudaSpace>);
+    BOOST_CHECK(!is_host_space_v<CudaSpace>);
+    BOOST_CHECK(is_device_space_v<CudaSpace>);
 
     // Test DLPack device type for CUDA
-    BOOST_CHECK_EQUAL(dlpack_device_type_v<Kokkos::CudaSpace>,
-                      DLPackDeviceType::CUDA);
-    BOOST_CHECK_EQUAL(dlpack_device_type_v<Kokkos::CudaUVMSpace>,
-                      DLPackDeviceType::CUDAManaged);
+    BOOST_CHECK_EQUAL(dlpack_device_type_v<CudaSpace>, DLPackDeviceType::CUDA);
 #endif
 
-#if defined(KOKKOS_ENABLE_HIP)
+#if defined(MUGRID_WITH_HIP)
     // Test is_device_space trait for HIP/ROCm
-    BOOST_CHECK(!is_host_space_v<Kokkos::HIPSpace>);
-    BOOST_CHECK(is_device_space_v<Kokkos::HIPSpace>);
+    BOOST_CHECK(!is_host_space_v<HIPSpace>);
+    BOOST_CHECK(is_device_space_v<HIPSpace>);
 
     // Test DLPack device type for HIP/ROCm
-    BOOST_CHECK_EQUAL(dlpack_device_type_v<Kokkos::HIPSpace>,
-                      DLPackDeviceType::ROCm);
+    BOOST_CHECK_EQUAL(dlpack_device_type_v<HIPSpace>, DLPackDeviceType::ROCm);
 #endif
 
     // Test device_name function
     BOOST_CHECK_EQUAL(std::string(device_name<HostSpace>()), "cpu");
 
-#if defined(KOKKOS_ENABLE_CUDA)
-    BOOST_CHECK_EQUAL(std::string(device_name<Kokkos::CudaSpace>()), "cuda");
+#if defined(MUGRID_WITH_CUDA)
+    BOOST_CHECK_EQUAL(std::string(device_name<CudaSpace>()), "cuda");
 #endif
 
-#if defined(KOKKOS_ENABLE_HIP)
-    BOOST_CHECK_EQUAL(std::string(device_name<Kokkos::HIPSpace>()), "rocm");
+#if defined(MUGRID_WITH_HIP)
+    BOOST_CHECK_EQUAL(std::string(device_name<HIPSpace>()), "rocm");
 #endif
   }
 
@@ -116,7 +112,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   /* Test device field creation (only when GPU backend is enabled) */
   /* ---------------------------------------------------------------------- */
-#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
   BOOST_AUTO_TEST_CASE(device_field_creation) {
     constexpr Index_t SDim{twoD};
     constexpr Index_t len{4};
@@ -140,11 +136,11 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(device_field.get_device_id(), 0);
 
     // Check correct DLPack device type
-#if defined(KOKKOS_ENABLE_CUDA)
+#if defined(MUGRID_WITH_CUDA)
     BOOST_CHECK_EQUAL(device_field.get_dlpack_device_type(),
                       DLPackDeviceType::CUDA);
     BOOST_CHECK_EQUAL(device_field.get_device_string(), "cuda:0");
-#elif defined(KOKKOS_ENABLE_HIP)
+#elif defined(MUGRID_WITH_HIP)
     BOOST_CHECK_EQUAL(device_field.get_dlpack_device_type(),
                       DLPackDeviceType::ROCm);
     BOOST_CHECK_EQUAL(device_field.get_device_string(), "rocm:0");
@@ -186,7 +182,7 @@ namespace muGrid {
     fc_device.initialise(CcoordOps::get_cube<SDim>(len),
                          CcoordOps::get_cube<SDim>(len), {});
 
-    // Cast to typed fields to access view() and deep_copy_from() methods
+    // Cast to typed fields to access deep_copy_from() methods
     auto & host_field{dynamic_cast<RealField &>(
         fc_host.register_real_field("host_src", 2))};
     auto & device_field{dynamic_cast<RealFieldDevice &>(
@@ -194,14 +190,10 @@ namespace muGrid {
 
     // Initialize host field with some values
     host_field.set_zero();
-    auto host_view = host_field.view();
-    Kokkos::parallel_for(
-        "init_host",
-        Kokkos::RangePolicy<Kokkos::DefaultHostExecutionSpace>(0, host_view.size()),
-        KOKKOS_LAMBDA(const int i) {
-          host_view(i) = static_cast<Real>(i);
-        });
-    Kokkos::fence();
+    auto * host_data = host_field.data();
+    for (size_t i = 0; i < host_field.buffer_size(); ++i) {
+      host_data[i] = static_cast<Real>(i);
+    }
 
     // Deep copy from host to device
     device_field.deep_copy_from(host_field);
@@ -212,10 +204,10 @@ namespace muGrid {
     host_check.deep_copy_from(device_field);
 
     // Check that values match
-    auto check_view = host_check.view();
+    auto * check_data = host_check.data();
     bool all_match = true;
-    for (size_t i = 0; i < host_view.size(); ++i) {
-      if (host_view(i) != check_view(i)) {
+    for (size_t i = 0; i < host_field.buffer_size(); ++i) {
+      if (host_data[i] != check_data[i]) {
         all_match = false;
         break;
       }
@@ -258,19 +250,19 @@ namespace muGrid {
     BOOST_CHECK_NO_THROW(int_device.set_zero());
     BOOST_CHECK_NO_THROW(uint_device.set_zero());
   }
-#endif  // KOKKOS_ENABLE_CUDA || KOKKOS_ENABLE_HIP
+#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
 
   /* ---------------------------------------------------------------------- */
   /* Test that DefaultDeviceSpace resolves correctly */
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(default_device_space_resolution) {
-#if defined(KOKKOS_ENABLE_CUDA)
+#if defined(MUGRID_WITH_CUDA)
     // When CUDA is enabled, DefaultDeviceSpace should be CudaSpace
-    bool is_cuda = std::is_same_v<DefaultDeviceSpace, Kokkos::CudaSpace>;
+    bool is_cuda = std::is_same_v<DefaultDeviceSpace, CudaSpace>;
     BOOST_CHECK(is_cuda);
-#elif defined(KOKKOS_ENABLE_HIP)
+#elif defined(MUGRID_WITH_HIP)
     // When HIP is enabled, DefaultDeviceSpace should be HIPSpace
-    bool is_hip = std::is_same_v<DefaultDeviceSpace, Kokkos::HIPSpace>;
+    bool is_hip = std::is_same_v<DefaultDeviceSpace, HIPSpace>;
     BOOST_CHECK(is_hip);
 #else
     // Without GPU backend, DefaultDeviceSpace is HostSpace

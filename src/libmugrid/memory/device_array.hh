@@ -5,7 +5,7 @@
  *
  * @date   19 Dec 2024
  *
- * @brief  GPU-portable array class replacing Kokkos::View
+ * @brief  GPU-portable array class
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -167,8 +167,7 @@ namespace muGrid {
      * @brief GPU-portable 1D array class
      *
      * This class provides a simple interface for managing arrays in different
-     * memory spaces (host, CUDA, HIP). It replaces Kokkos::View for muGrid's
-     * field storage needs.
+     * memory spaces (host, CUDA, HIP).
      *
      * @tparam T Element type
      * @tparam MemorySpace Memory space tag (HostSpace, CudaSpace, HIPSpace, etc.)

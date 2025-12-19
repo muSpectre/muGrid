@@ -84,7 +84,7 @@ GPU_AVAILABLE = gpu_backend_available()
 def get_gpu_skip_reason():
     """Get detailed skip reason for GPU tests."""
     if not GPU_AVAILABLE:
-        return "GPU backend not available (Kokkos not compiled with CUDA/HIP)"
+        return "GPU backend not available (muGrid not compiled with CUDA/HIP)"
     return None
 
 
@@ -92,7 +92,7 @@ def get_gpu_cupy_skip_reason():
     """Get detailed skip reason for GPU+CuPy tests."""
     reasons = []
     if not GPU_AVAILABLE:
-        reasons.append("GPU backend not available (Kokkos not compiled with CUDA/HIP)")
+        reasons.append("GPU backend not available (muGrid not compiled with CUDA/HIP)")
     if not HAS_CUPY:
         reasons.append("CuPy not installed (pip install cupy-cuda*)")
     if reasons:

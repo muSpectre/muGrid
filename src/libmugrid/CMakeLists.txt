@@ -45,9 +45,6 @@ set(MUGRID_SOURCES
     io/file_io_base.cc
     # util/
     util/raw_memory_operations.cc
-    # kokkos/
-    kokkos/kokkos_init.cc
-    kokkos/kokkos_profiling_workaround.cc
     # fft/
     fft/pocketfft_backend.cc
     fft/pencil_transpose.cc
@@ -94,7 +91,6 @@ target_include_directories(muGrid
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/operators>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/kokkos>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/memory>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
         $<INSTALL_INTERFACE:include>
@@ -161,7 +157,7 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
 )
 
 # Install header files for each subdirectory
-foreach(subdir core grid field collection mpi operators io util kokkos memory fft)
+foreach(subdir core grid field collection mpi operators io util memory fft)
     file(GLOB MUGRID_${subdir}_HEADERS "${subdir}/*.hh")
     install(FILES ${MUGRID_${subdir}_HEADERS}
         DESTINATION include/libmugrid/${subdir}

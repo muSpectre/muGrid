@@ -188,7 +188,7 @@ namespace muGrid {
          *                   with MPI; ignored for serial mode.
          * @param is_device_memory If true, data resides on GPU device memory.
          *                         Used in serial mode to select appropriate
-         *                         memory copy method (Kokkos for GPU).
+         *                         memory copy method (CUDA/HIP for GPU).
          */
         void sendrecv_right(int direction, int block_stride, int nb_send_blocks,
                             int send_block_len, Index_t send_offset,
@@ -230,7 +230,7 @@ namespace muGrid {
          *                   with MPI; ignored for serial mode.
          * @param is_device_memory If true, data resides on GPU device memory.
          *                         Used in serial mode to select appropriate
-         *                         memory copy method (Kokkos for GPU).
+         *                         memory copy method (CUDA/HIP for GPU).
          */
         void sendrecv_left(int direction, int block_stride, int nb_send_blocks,
                            int send_block_len, Index_t send_offset,

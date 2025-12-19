@@ -5,7 +5,6 @@
 #include "core/grid_common.hh"
 #include "mpi/communicator.hh"
 #include "mpi/cartesian_communicator.hh"
-#include "kokkos/kokkos_types.hh"
 
 #if defined(MUGRID_WITH_CUDA)
 #include <cuda_runtime.h>
