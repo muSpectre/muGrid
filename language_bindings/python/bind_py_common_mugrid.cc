@@ -190,21 +190,21 @@ void add_unit(py::module & mod) {
 
 void add_feature_flags(py::module & mod) {
     // CUDA support
-#ifdef MUGRID_WITH_CUDA
+#ifdef MUGRID_ENABLE_CUDA
     mod.attr("has_cuda") = true;
 #else
     mod.attr("has_cuda") = false;
 #endif
 
     // ROCm/HIP support
-#ifdef MUGRID_WITH_HIP
+#ifdef MUGRID_ENABLE_HIP
     mod.attr("has_rocm") = true;
 #else
     mod.attr("has_rocm") = false;
 #endif
 
     // Any GPU backend available
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     mod.attr("has_gpu") = true;
 #else
     mod.attr("has_gpu") = false;

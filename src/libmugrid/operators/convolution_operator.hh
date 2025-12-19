@@ -186,7 +186,7 @@ namespace muGrid {
             TypedFieldBase<Real> &nodal_field,
             const std::vector<Real> &weights = {}) const final;
 
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
          * Evaluates the gradient of nodal_field into quadrature_point_field
          * on device (GPU) memory.

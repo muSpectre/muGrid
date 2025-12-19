@@ -58,7 +58,7 @@ namespace py = pybind11;
 // Type aliases for host fields
 using RealFieldHost = TypedFieldBase<Real, HostSpace>;
 
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 using DeviceSpace = muGrid::DefaultDeviceSpace;
 using RealFieldDevice = TypedFieldBase<Real, DeviceSpace>;
 #endif
@@ -223,7 +223,7 @@ void add_convolution_operator_default(py::module &mod) {
             .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)
             .def_property_readonly("nb_operators", &ConvolutionOperator::get_nb_operators);
 
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device field overloads (only when GPU backend is enabled)
     using ApplyDeviceFn = void (ConvolutionOperator::*)(
         const RealFieldDevice&, RealFieldDevice&) const;

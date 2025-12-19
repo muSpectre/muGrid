@@ -6,11 +6,11 @@
 #include "mpi/communicator.hh"
 #include "mpi/cartesian_communicator.hh"
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
 #include <cuda_runtime.h>
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
 #include <hip/hip_runtime.h>
 #endif
 
@@ -161,9 +161,9 @@ namespace muGrid {
         void device_memcpy(void * dst, const void * src, size_t size_in_bytes,
                            bool is_device_memory) {
             if (is_device_memory) {
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
                 cudaMemcpy(dst, src, size_in_bytes, cudaMemcpyDeviceToDevice);
-#elif defined(MUGRID_WITH_HIP)
+#elif defined(MUGRID_ENABLE_HIP)
                 hipMemcpy(dst, src, size_in_bytes, hipMemcpyDeviceToDevice);
 #else
                 // Fallback to memcpy if no GPU backend (shouldn't happen if

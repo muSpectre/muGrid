@@ -48,7 +48,7 @@ namespace muGrid {
         static constexpr const char* name = "Host";
     };
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
     /**
      * Tag type for CUDA device memory space.
      */
@@ -57,7 +57,7 @@ namespace muGrid {
     };
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
     /**
      * Tag type for HIP device memory space.
      */
@@ -67,9 +67,9 @@ namespace muGrid {
 #endif
 
     // Default device space based on backend
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
     using DefaultDeviceSpace = CudaSpace;
-#elif defined(MUGRID_WITH_HIP)
+#elif defined(MUGRID_ENABLE_HIP)
     using DefaultDeviceSpace = HIPSpace;
 #else
     using DefaultDeviceSpace = HostSpace;
@@ -90,12 +90,12 @@ namespace muGrid {
     template<typename MemorySpace>
     struct is_device_space : std::false_type {};
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
     template<>
     struct is_device_space<CudaSpace> : std::true_type {};
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
     template<>
     struct is_device_space<HIPSpace> : std::true_type {};
 #endif
@@ -122,14 +122,14 @@ namespace muGrid {
         static constexpr int value = DLPackDeviceType::CPU;
     };
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
     template<>
     struct dlpack_device_type<CudaSpace> {
         static constexpr int value = DLPackDeviceType::CUDA;
     };
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
     template<>
     struct dlpack_device_type<HIPSpace> {
         static constexpr int value = DLPackDeviceType::ROCm;
@@ -147,12 +147,12 @@ namespace muGrid {
         if constexpr (is_host_space_v<MemorySpace>) {
             return "cpu";
         }
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
         else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
             return "cuda";
         }
 #endif
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
         else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
             return "rocm";
         }

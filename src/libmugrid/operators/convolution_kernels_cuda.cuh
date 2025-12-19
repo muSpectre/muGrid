@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CUDA_CUH_
 #define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CUDA_CUH_
 
-#ifdef MUGRID_WITH_CUDA
+#ifdef MUGRID_ENABLE_CUDA
 
 #include <cuda_runtime.h>
 #include "core/grid_common.hh"
@@ -199,6 +199,6 @@ namespace cuda {
 }  // namespace cuda
 }  // namespace muGrid
 
-#endif  // MUGRID_WITH_CUDA
+#endif  // MUGRID_ENABLE_CUDA
 
 #endif  // SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CUDA_CUH_

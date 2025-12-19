@@ -35,9 +35,9 @@
 
 #include "pocketfft_backend.hh"
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
 #include "cufft_backend.hh"
-#elif defined(MUGRID_WITH_HIP)
+#elif defined(MUGRID_ENABLE_HIP)
 #include "hipfft_backend.hh"
 #endif
 
@@ -141,9 +141,9 @@ std::unique_ptr<FFT1DBackend> get_host_fft_backend() {
 }
 
 std::unique_ptr<FFT1DBackend> get_device_fft_backend() {
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
   return std::make_unique<cuFFTBackend>();
-#elif defined(MUGRID_WITH_HIP)
+#elif defined(MUGRID_ENABLE_HIP)
   return std::make_unique<hipFFTBackend>();
 #else
   return nullptr;

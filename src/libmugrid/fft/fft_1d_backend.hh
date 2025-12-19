@@ -46,7 +46,7 @@ namespace muGrid {
  * Abstract interface for 1D FFT operations.
  *
  * Implementations are selected at compile time based on GPU backend configuration
- * (MUGRID_WITH_CUDA or MUGRID_WITH_HIP). The backend operates on raw pointers -
+ * (MUGRID_ENABLE_CUDA or MUGRID_ENABLE_HIP). The backend operates on raw pointers -
  * the caller is responsible for ensuring the pointers are valid for the
  * backend's memory space.
  */

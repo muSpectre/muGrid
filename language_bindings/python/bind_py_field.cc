@@ -338,7 +338,7 @@ void add_typed_field(py::module &mod, std::string name) {
  * These inherit from the base Field class and provide DLPack support for GPU arrays.
  * Only compiled when CUDA or HIP backends are enabled.
  */
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 template<class T>
 void add_typed_field_device(py::module &mod, std::string name) {
     using DeviceSpace = muGrid::DefaultDeviceSpace;
@@ -426,7 +426,7 @@ void add_field_classes(py::module &mod) {
     add_typed_field<muGrid::Uint>(mod, "UintField");
 
     // Device-space (GPU) typed fields - only when CUDA/HIP is enabled
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     add_typed_field_device<muGrid::Real>(mod, "RealField");
     add_typed_field_device<muGrid::Complex>(mod, "ComplexField");
     add_typed_field_device<muGrid::Int>(mod, "IntField");

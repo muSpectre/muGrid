@@ -770,7 +770,7 @@ namespace muGrid {
   /* GPU-specific tests (only run when GPU backend is available)             */
   /* ---------------------------------------------------------------------- */
 
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 
   BOOST_AUTO_TEST_CASE(device_sparse_operator_copy) {
     // Create host sparse operator
@@ -853,7 +853,7 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(error, 0.0);
   }
 
-#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 
   /* ---------------------------------------------------------------------- */
   /* Test that verifies memory spaces are configured correctly               */
@@ -866,10 +866,10 @@ namespace muGrid {
     std::cout << "  DefaultDeviceSpace: "
               << typeid(DefaultDeviceSpace).name() << std::endl;
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
     std::cout << "  CUDA backend enabled" << std::endl;
     BOOST_CHECK(true);
-#elif defined(MUGRID_WITH_HIP)
+#elif defined(MUGRID_ENABLE_HIP)
     std::cout << "  HIP backend enabled" << std::endl;
     BOOST_CHECK(true);
 #else

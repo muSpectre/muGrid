@@ -38,7 +38,7 @@ if(Boost_FOUND)
     )
 
     # Add NetCDF tests if available
-    if(MUGRID_WITH_NETCDF)
+    if(MUGRID_ENABLE_NETCDF)
         list(APPEND MUGRID_TEST_SOURCES
             io_test_file_io_base.cc
             io_test_file_io_netcdf.cc
@@ -51,7 +51,7 @@ if(Boost_FOUND)
         muGrid
         Boost::unit_test_framework
     )
-    if(MUGRID_WITH_NETCDF)
+    if(MUGRID_ENABLE_NETCDF)
         target_link_libraries(mugrid_main_test_suite PRIVATE ${MUGRID_NETCDF_LIBRARIES})
     endif()
     target_include_directories(mugrid_main_test_suite PRIVATE
@@ -72,7 +72,7 @@ if(Boost_FOUND)
     )
 
     # Add MPI NetCDF test if both MPI and NetCDF are available
-    if(MUGRID_WITH_MPI AND MUGRID_WITH_NETCDF)
+    if(MUGRID_ENABLE_MPI AND MUGRID_ENABLE_NETCDF)
         list(APPEND MUGRID_MPI_TEST_SOURCES io_mpi_test_file_io_netcdf.cc)
     endif()
 
@@ -82,7 +82,7 @@ if(Boost_FOUND)
         muGrid
         Boost::unit_test_framework
     )
-    if(MUGRID_WITH_NETCDF)
+    if(MUGRID_ENABLE_NETCDF)
         target_link_libraries(mpi_mugrid_main_test_suite PRIVATE ${MUGRID_NETCDF_LIBRARIES})
     endif()
     target_include_directories(mpi_mugrid_main_test_suite PRIVATE
@@ -91,7 +91,7 @@ if(Boost_FOUND)
     )
 
     # Register MPI tests
-    if(MUGRID_WITH_MPI)
+    if(MUGRID_ENABLE_MPI)
         find_program(MPIEXEC_EXECUTABLE mpiexec)
         if(MPIEXEC_EXECUTABLE)
             foreach(NP 1 2 4 8)
@@ -149,7 +149,7 @@ if(MUGRID_ENABLE_PYTHON)
         )
 
         # MPI Python tests
-        if(MUGRID_WITH_MPI AND MPIEXEC_EXECUTABLE)
+        if(MUGRID_ENABLE_MPI AND MPIEXEC_EXECUTABLE)
             foreach(NP 1 2 4 8)
                 add_test(
                     NAME mpi_mugrid_python_binding_tests-np_${NP}

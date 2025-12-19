@@ -40,11 +40,11 @@
 #include "memory/device_array.hh"
 #include "convolution_kernels_cpu.hh"
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
 #include "convolution_kernels_cuda.cuh"
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
 #include "convolution_kernels_hip.hpp"
 #endif
 
@@ -75,7 +75,7 @@ namespace muGrid {
                     sparse_op.values.data(),
                     sparse_op.size);
             }
-#if defined(MUGRID_WITH_CUDA) && defined(__CUDACC__)
+#if defined(MUGRID_ENABLE_CUDA) && defined(__CUDACC__)
             else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
                 cuda::apply_convolution_kernel(
                     nodal_data, quad_data, alpha, params,
@@ -85,7 +85,7 @@ namespace muGrid {
                     sparse_op.size);
             }
 #endif
-#if defined(MUGRID_WITH_HIP) && defined(__HIPCC__)
+#if defined(MUGRID_ENABLE_HIP) && defined(__HIPCC__)
             else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
                 hip::apply_convolution_kernel(
                     nodal_data, quad_data, alpha, params,
@@ -119,7 +119,7 @@ namespace muGrid {
                     sparse_op.values.data(),
                     sparse_op.size);
             }
-#if defined(MUGRID_WITH_CUDA) && defined(__CUDACC__)
+#if defined(MUGRID_ENABLE_CUDA) && defined(__CUDACC__)
             else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
                 cuda::transpose_convolution_kernel(
                     quad_data, nodal_data, alpha, params,
@@ -129,7 +129,7 @@ namespace muGrid {
                     sparse_op.size);
             }
 #endif
-#if defined(MUGRID_WITH_HIP) && defined(__HIPCC__)
+#if defined(MUGRID_ENABLE_HIP) && defined(__HIPCC__)
             else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
                 hip::transpose_convolution_kernel(
                     quad_data, nodal_data, alpha, params,
@@ -171,9 +171,9 @@ namespace muGrid {
      * @brief Synchronize device (no-op for CPU)
      */
     inline void device_synchronize() {
-#if defined(MUGRID_WITH_CUDA) && defined(__CUDACC__)
+#if defined(MUGRID_ENABLE_CUDA) && defined(__CUDACC__)
         cudaDeviceSynchronize();
-#elif defined(MUGRID_WITH_HIP) && defined(__HIPCC__)
+#elif defined(MUGRID_ENABLE_HIP) && defined(__HIPCC__)
         hipDeviceSynchronize();
 #endif
         // No-op for CPU

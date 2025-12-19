@@ -895,7 +895,7 @@ namespace muGrid {
       const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
 
   // Device-space explicit template instantiations (for CUDA/HIP builds)
-#if defined(MUGRID_WITH_CUDA) || defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
   // Base class instantiations for device space
   template class TypedFieldBase<Real, DefaultDeviceSpace>;
   template class TypedFieldBase<Complex, DefaultDeviceSpace>;
@@ -933,6 +933,6 @@ namespace muGrid {
       const TypedFieldBase<Uint, DefaultDeviceSpace> &);
   template void TypedFieldBase<Index_t, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
       const TypedFieldBase<Index_t, DefaultDeviceSpace> &);
-#endif  // MUGRID_WITH_CUDA || MUGRID_WITH_HIP
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 
 }  // namespace muGrid

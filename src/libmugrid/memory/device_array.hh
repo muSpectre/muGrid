@@ -43,11 +43,11 @@
 
 #include "memory_space.hh"
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
 #include <cuda_runtime.h>
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
 #include <hip/hip_runtime.h>
 #endif
 
@@ -78,7 +78,7 @@ namespace muGrid {
             }
         };
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
         /**
          * Memory allocator for CUDA device space
          */
@@ -105,9 +105,9 @@ namespace muGrid {
             }
         };
 
-#endif  // MUGRID_WITH_CUDA
+#endif  // MUGRID_ENABLE_CUDA
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
         /**
          * Memory allocator for HIP device space
          */
@@ -134,7 +134,7 @@ namespace muGrid {
             }
         };
 
-#endif  // MUGRID_WITH_HIP
+#endif  // MUGRID_ENABLE_HIP
 
         /**
          * Type trait to select the correct allocator for a memory space
@@ -144,14 +144,14 @@ namespace muGrid {
             using type = HostAllocator<T>;
         };
 
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
         template<typename T>
         struct AllocatorSelector<T, CudaSpace> {
             using type = CudaAllocator<T>;
         };
 #endif
 
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
         template<typename T>
         struct AllocatorSelector<T, HIPSpace> {
             using type = HIPAllocator<T>;
@@ -324,7 +324,7 @@ namespace muGrid {
         if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
             std::memcpy(dst.data(), src.data(), src.size() * sizeof(T));
         }
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
         // Host to CUDA
         else if constexpr (is_host_space_v<SrcSpace> &&
                           std::is_same_v<DstSpace, CudaSpace>) {
@@ -344,7 +344,7 @@ namespace muGrid {
                       cudaMemcpyDeviceToDevice);
         }
 #endif
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
         // Host to HIP
         else if constexpr (is_host_space_v<SrcSpace> &&
                           std::is_same_v<DstSpace, HIPSpace>) {
@@ -381,7 +381,7 @@ namespace muGrid {
                 dst[i] = value;
             }
         }
-#if defined(MUGRID_WITH_CUDA)
+#if defined(MUGRID_ENABLE_CUDA)
         else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
             // For CUDA, we need a kernel (or use thrust)
             // For now, copy via host for scalar fill
@@ -394,7 +394,7 @@ namespace muGrid {
             }
         }
 #endif
-#if defined(MUGRID_WITH_HIP)
+#if defined(MUGRID_ENABLE_HIP)
         else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
             // Same approach for HIP
             if (dst.size() > 0) {

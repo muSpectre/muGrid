@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_HIP_HPP_
 #define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_HIP_HPP_
 
-#ifdef MUGRID_WITH_HIP
+#ifdef MUGRID_ENABLE_HIP
 
 #include <hip/hip_runtime.h>
 #include "core/grid_common.hh"
@@ -201,6 +201,6 @@ namespace hip {
 }  // namespace hip
 }  // namespace muGrid
 
-#endif  // MUGRID_WITH_HIP
+#endif  // MUGRID_ENABLE_HIP
 
 #endif  // SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_HIP_HPP_

@@ -54,18 +54,18 @@ set(MUGRID_SOURCES
 )
 
 # Add NetCDF source if available
-if(MUGRID_WITH_NETCDF)
+if(MUGRID_ENABLE_NETCDF)
     list(APPEND MUGRID_SOURCES io/file_io_netcdf.cc)
 endif()
 
 # Add cuFFT backend source if CUDA is available
-if(MUGRID_WITH_CUDA)
+if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
     list(APPEND MUGRID_SOURCES operators/convolution_operator.cu)
 endif()
 
 # Add hipFFT backend source if HIP is available
-if(MUGRID_WITH_HIP)
+if(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
 endif()
 
@@ -101,21 +101,21 @@ target_include_directories(muGrid
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
 # Compile definitions
-if(MUGRID_WITH_MPI)
+if(MUGRID_ENABLE_MPI)
     target_compile_definitions(muGrid PUBLIC WITH_MPI)
     target_link_libraries(muGrid PUBLIC MPI::MPI_CXX)
 endif()
 
-if(MUGRID_WITH_NETCDF)
+if(MUGRID_ENABLE_NETCDF)
     target_compile_definitions(muGrid PUBLIC WITH_NETCDF_IO)
     target_include_directories(muGrid PRIVATE ${MUGRID_NETCDF_INCLUDE_DIRS})
     target_link_libraries(muGrid PRIVATE ${MUGRID_NETCDF_LIBRARIES})
 endif()
 
 # CUDA support
-if(MUGRID_WITH_CUDA)
+if(MUGRID_ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
-    target_compile_definitions(muGrid PUBLIC MUGRID_WITH_CUDA)
+    target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_CUDA)
     target_link_libraries(muGrid PRIVATE CUDA::cudart CUDA::cufft)
     target_compile_options(muGrid PRIVATE
         $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
@@ -124,10 +124,10 @@ if(MUGRID_WITH_CUDA)
 endif()
 
 # HIP support
-if(MUGRID_WITH_HIP)
+if(MUGRID_ENABLE_HIP)
     find_package(hip REQUIRED)
     find_package(hipfft REQUIRED)
-    target_compile_definitions(muGrid PUBLIC MUGRID_WITH_HIP)
+    target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_HIP)
     target_link_libraries(muGrid PRIVATE hip::host hip::hipfft)
 endif()
 

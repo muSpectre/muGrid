@@ -27,7 +27,7 @@ target_include_directories(_muGrid PRIVATE
 )
 
 # Compile definitions
-if(MUGRID_WITH_NETCDF)
+if(MUGRID_ENABLE_NETCDF)
     target_compile_definitions(_muGrid PRIVATE WITH_NETCDF_IO)
 endif()
 

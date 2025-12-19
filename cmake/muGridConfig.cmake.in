@@ -6,10 +6,10 @@ include(CMakeFindDependencyMacro)
 find_dependency(Eigen3 3.4.0)
 
 # Optional dependencies based on build configuration
-set(MUGRID_WITH_MPI @MUGRID_WITH_MPI@)
-set(MUGRID_WITH_NETCDF @MUGRID_WITH_NETCDF@)
+set(MUGRID_ENABLE_MPI @MUGRID_ENABLE_MPI@)
+set(MUGRID_ENABLE_NETCDF @MUGRID_ENABLE_NETCDF@)
 
-if(MUGRID_WITH_MPI)
+if(MUGRID_ENABLE_MPI)
     find_dependency(MPI)
 endif()
 
