@@ -34,7 +34,13 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-from . import _muGrid
+# Import the C++ extension module
+# Try relative import first (for installed wheels),
+# fall back to absolute (for development)
+try:
+    from . import _muGrid
+except ImportError:
+    import _muGrid
 
 try:
     from mpi4py import MPI

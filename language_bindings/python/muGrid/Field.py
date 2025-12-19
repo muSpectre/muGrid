@@ -50,7 +50,8 @@ def _get_cupy():
         except ImportError:
             raise ImportError(
                 "CuPy is required for GPU field access. "
-                "Install it with: pip install cupy-cuda12x (or appropriate CUDA version)"
+                "Install it with: pip install cupy-cuda12x "
+                "(or appropriate CUDA or ROCm version)"
             )
     return _cupy
 
@@ -165,13 +166,13 @@ class Field:
         return f"Field({self._cpp.name!r}, shape={self._cpp.shape})"
 
 
-def wrap_field(cpp_field):
+def wrap_field(field):
     """
     Wrap a C++ field in a Python Field object.
 
     Parameters
     ----------
-    cpp_field : _muGrid field object
+    field : _muGrid field object
         The underlying C++ field
 
     Returns
@@ -179,7 +180,9 @@ def wrap_field(cpp_field):
     Field
         Wrapped field with numpy array access
     """
-    return Field(cpp_field)
+    if isinstance(field, Field):
+        return field
+    return Field(field)
 
 
 def real_field(collection, name, components=(), sub_pt="pixel"):

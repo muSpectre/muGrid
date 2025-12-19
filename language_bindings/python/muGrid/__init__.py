@@ -39,7 +39,13 @@ try:
 except ModuleNotFoundError:
     MPI = None
 
-from . import _muGrid
+# Import the C++ extension module
+# Try relative import first (for installed wheels where _muGrid.so is in the package)
+# Fall back to absolute import (for development where _muGrid.so is in build directory)
+try:
+    from . import _muGrid
+except ImportError:
+    import _muGrid
 
 has_mpi = _muGrid.Communicator.has_mpi
 if has_mpi and MPI is None:
@@ -47,35 +53,33 @@ if has_mpi and MPI is None:
 
 # Feature flags for compile-time configuration
 # FFT utility functions
-from ._muGrid import CartesianDecomposition  # noqa: F401, E402
-from ._muGrid import ConvolutionOperator  # noqa: F401, E402
-from ._muGrid import ConvolutionOperatorBase  # noqa: F401, E402
-from ._muGrid import Decomposition  # noqa: F401, E402
-from ._muGrid import DynCcoord  # noqa: F401, E402
-from ._muGrid import DynRcoord  # noqa: F401, E402
-from ._muGrid import FFTEngine  # noqa: F401, E402
-from ._muGrid import GlobalFieldCollection  # noqa: F401, E402
-from ._muGrid import IterUnit  # noqa: F401, E402
-from ._muGrid import LocalFieldCollection  # noqa: F401, E402
-from ._muGrid import Pixel  # noqa: F401, E402
-from ._muGrid import StorageOrder  # noqa: F401, E402
-from ._muGrid import SubPt  # noqa: F401, E402
-from ._muGrid import Unit  # noqa: F401, E402
-from ._muGrid import Verbosity  # noqa: F401, E402
-from ._muGrid import fft_freq  # noqa: F401, E402
-from ._muGrid import fft_freqind  # noqa: F401, E402
-from ._muGrid import fft_normalization  # noqa: F401, E402
-from ._muGrid import get_domain_ccoord  # noqa: F401, E402
-from ._muGrid import get_domain_index  # noqa: F401, E402
-from ._muGrid import get_hermitian_grid_pts  # noqa: F401, E402
-from ._muGrid import has_cuda  # noqa: F401, E402
-from ._muGrid import has_gpu  # noqa: F401, E402
-from ._muGrid import has_netcdf  # noqa: F401, E402
-from ._muGrid import has_rocm  # noqa: F401, E402
-from ._muGrid import rfft_freq  # noqa: F401, E402
-from ._muGrid import rfft_freqind  # noqa: F401, E402
-
-has_mpi = _muGrid.Communicator.has_mpi
+CartesianDecomposition = _muGrid.CartesianDecomposition
+ConvolutionOperator = _muGrid.ConvolutionOperator
+ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
+Decomposition = _muGrid.Decomposition
+DynCcoord = _muGrid.DynCcoord
+DynRcoord = _muGrid.DynRcoord
+FFTEngine = _muGrid.FFTEngine
+GlobalFieldCollection = _muGrid.GlobalFieldCollection
+IterUnit = _muGrid.IterUnit
+LocalFieldCollection = _muGrid.LocalFieldCollection
+Pixel = _muGrid.Pixel
+StorageOrder = _muGrid.StorageOrder
+SubPt = _muGrid.SubPt
+Unit = _muGrid.Unit
+Verbosity = _muGrid.Verbosity
+fft_freq = _muGrid.fft_freq
+fft_freqind = _muGrid.fft_freqind
+fft_normalization = _muGrid.fft_normalization
+get_domain_ccoord = _muGrid.get_domain_ccoord
+get_domain_index = _muGrid.get_domain_index
+get_hermitian_grid_pts = _muGrid.get_hermitian_grid_pts
+has_cuda = _muGrid.has_cuda
+has_gpu = _muGrid.has_gpu
+has_netcdf = _muGrid.has_netcdf
+has_rocm = _muGrid.has_rocm
+rfft_freq = _muGrid.rfft_freq
+rfft_freqind = _muGrid.rfft_freqind
 
 # FileIONetCDF is only compiled into the library if NetCDF libraries exist
 if hasattr(_muGrid, "FileIONetCDF"):

@@ -4,8 +4,14 @@ Collection of simple parallel solvers
 
 from muGrid import real_field
 
-from ._muGrid import Communicator, FieldCollection
-from .Field import Field as FieldWrapper
+# Import the C++ extension module
+# Try relative import first (for installed wheels),
+# fall back to absolute (for development)
+try:
+    from ._muGrid import Communicator, FieldCollection
+except ImportError:
+    from _muGrid import Communicator, FieldCollection
+
 from .Field import wrap_field
 
 
@@ -54,8 +60,8 @@ def conjugate_gradients(
     tol_sq = tol * tol
 
     # Wrap fields for array access if they are not already wrapped
-    b = b if isinstance(b, FieldWrapper) else wrap_field(b)
-    x = x if isinstance(x, FieldWrapper) else wrap_field(x)
+    b = wrap_field(b)
+    x = wrap_field(x)
 
     p = real_field(fc, "cg-search-direction")
     Ap = real_field(fc, "cg-hessian-product")
