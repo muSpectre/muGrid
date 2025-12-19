@@ -103,15 +103,9 @@ target_include_directories(muGrid
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
 # Link Kokkos (required dependency)
-# Use WHOLE_ARCHIVE to resolve internal circular dependencies in Kokkos static libs
-# This is needed because libkokkoscore.a has objects that depend on each other,
-# and macOS linker doesn't rescan archives
-target_link_libraries(muGrid PUBLIC
-    $<LINK_LIBRARY:WHOLE_ARCHIVE,Kokkos::kokkoscore>
-    Kokkos::kokkoscontainers
-    Kokkos::kokkosalgorithms
-    Kokkos::kokkossimd
-)
+# Use the umbrella target which handles all internal dependencies correctly
+# Kokkos 5.0+ manages WHOLE_ARCHIVE linking internally
+target_link_libraries(muGrid PUBLIC Kokkos::kokkos)
 
 # Compile definitions
 if(MUGRID_WITH_MPI)
