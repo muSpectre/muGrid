@@ -35,12 +35,6 @@
 
 #include "pocketfft_backend.hh"
 
-#if defined(MUGRID_ENABLE_CUDA)
-#include "cufft_backend.hh"
-#elif defined(MUGRID_ENABLE_HIP)
-#include "hipfft_backend.hh"
-#endif
-
 // Disable pocketfft multithreading - we use MPI for parallelism
 #define POCKETFFT_NO_MULTITHREADING
 #include "pocketfft/pocketfft_hdronly.h"
@@ -132,22 +126,6 @@ void PocketFFTBackend::c2c_backward(Index_t n, Index_t batch,
         1.0  // scale factor
     );
   }
-}
-
-// Backend factory functions
-
-std::unique_ptr<FFT1DBackend> get_host_fft_backend() {
-  return std::make_unique<PocketFFTBackend>();
-}
-
-std::unique_ptr<FFT1DBackend> get_device_fft_backend() {
-#if defined(MUGRID_ENABLE_CUDA)
-  return std::make_unique<cuFFTBackend>();
-#elif defined(MUGRID_ENABLE_HIP)
-  return std::make_unique<hipFFTBackend>();
-#else
-  return nullptr;
-#endif
 }
 
 }  // namespace muGrid
