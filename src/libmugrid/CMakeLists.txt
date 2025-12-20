@@ -128,7 +128,11 @@ if(MUGRID_ENABLE_HIP)
     find_package(hip REQUIRED)
     find_package(hipfft REQUIRED)
     target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_HIP)
-    target_link_libraries(muGrid PRIVATE hip::host hip::hipfft)
+    target_link_libraries(muGrid PRIVATE hip::host hipfft::hipfft)
+    # Some ROCm installations don't properly set include dirs on the hip::host target
+    # Derive ROCm root from hip_DIR and add include path explicitly
+    get_filename_component(ROCM_PATH "${hip_DIR}/../../.." ABSOLUTE)
+    target_include_directories(muGrid PUBLIC ${ROCM_PATH}/include)
 endif()
 
 # Optional libraries for some systems

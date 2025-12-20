@@ -29,7 +29,7 @@ target_include_directories(_muGrid PRIVATE
 # NetCDF support
 if(MUGRID_ENABLE_NETCDF)
     target_compile_definitions(_muGrid PRIVATE WITH_NETCDF_IO)
-    taret_include_directories(_muGrid PRIVATE ${MUGRID_NETCDF_INCLUDE_DIRS})
+    target_include_directories(_muGrid PRIVATE ${MUGRID_NETCDF_INCLUDE_DIRS})
 endif()
 
 # Install the Python module
