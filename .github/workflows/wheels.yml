@@ -55,6 +55,9 @@ jobs:
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENVIRONMENT_PASS_LINUX: RUNNER_OS
+          # Ensure pkg-config can find NetCDF (installed by before-all or before-build)
+          CIBW_ENVIRONMENT_LINUX: PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/local/lib/pkgconfig
+          CIBW_ENVIRONMENT_MACOS: PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:/usr/local/lib/pkgconfig
           CIBW_TEST_COMMAND: python3 -c "import muGrid; print(muGrid.__version__); from muGrid._muGrid import FileIONetCDF"
 
       - uses: actions/upload-artifact@v5
