@@ -139,7 +139,7 @@ if(MUGRID_ENABLE_HIP)
     target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_HIP)
     # HIP headers require the platform to be defined when not using hipcc
     target_compile_definitions(muGrid PUBLIC __HIP_PLATFORM_AMD__)
-    target_link_libraries(muGrid PRIVATE hip::host hipfft::hipfft)
+    target_link_libraries(muGrid PRIVATE hip::host hip::hipfft)
     # Some ROCm installations don't properly set include dirs on the hip::host target
     # Derive ROCm root from hip_DIR and add include path explicitly
     get_filename_component(ROCM_PATH "${hip_DIR}/../../.." ABSOLUTE)
