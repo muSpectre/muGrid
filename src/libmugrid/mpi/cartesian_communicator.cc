@@ -162,9 +162,9 @@ namespace muGrid {
                            bool is_device_memory) {
             if (is_device_memory) {
 #if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(dst, src, size_in_bytes, cudaMemcpyDeviceToDevice);
+                (void)cudaMemcpy(dst, src, size_in_bytes, cudaMemcpyDeviceToDevice);
 #elif defined(MUGRID_ENABLE_HIP)
-                hipMemcpy(dst, src, size_in_bytes, hipMemcpyDeviceToDevice);
+                (void)hipMemcpy(dst, src, size_in_bytes, hipMemcpyDeviceToDevice);
 #else
                 // Fallback to memcpy if no GPU backend (shouldn't happen if
                 // is_device_memory is true, but handle gracefully)

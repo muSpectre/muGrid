@@ -97,11 +97,11 @@ namespace muGrid {
             }
 
             static void deallocate(T* ptr) {
-                if (ptr) cudaFree(ptr);
+                if (ptr) (void)cudaFree(ptr);
             }
 
             static void memset(T* ptr, int value, std::size_t n) {
-                cudaMemset(ptr, value, n * sizeof(T));
+                (void)cudaMemset(ptr, value, n * sizeof(T));
             }
         };
 
@@ -126,11 +126,11 @@ namespace muGrid {
             }
 
             static void deallocate(T* ptr) {
-                if (ptr) hipFree(ptr);
+                if (ptr) (void)hipFree(ptr);
             }
 
             static void memset(T* ptr, int value, std::size_t n) {
-                hipMemset(ptr, value, n * sizeof(T));
+                (void)hipMemset(ptr, value, n * sizeof(T));
             }
         };
 
@@ -328,40 +328,40 @@ namespace muGrid {
         // Host to CUDA
         else if constexpr (is_host_space_v<SrcSpace> &&
                           std::is_same_v<DstSpace, CudaSpace>) {
-            cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                      cudaMemcpyHostToDevice);
+            (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
+                            cudaMemcpyHostToDevice);
         }
         // CUDA to Host
         else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
                           is_host_space_v<DstSpace>) {
-            cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                      cudaMemcpyDeviceToHost);
+            (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
+                            cudaMemcpyDeviceToHost);
         }
         // CUDA to CUDA
         else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
                           std::is_same_v<DstSpace, CudaSpace>) {
-            cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                      cudaMemcpyDeviceToDevice);
+            (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
+                            cudaMemcpyDeviceToDevice);
         }
 #endif
 #if defined(MUGRID_ENABLE_HIP)
         // Host to HIP
         else if constexpr (is_host_space_v<SrcSpace> &&
                           std::is_same_v<DstSpace, HIPSpace>) {
-            hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                     hipMemcpyHostToDevice);
+            (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
+                           hipMemcpyHostToDevice);
         }
         // HIP to Host
         else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
                           is_host_space_v<DstSpace>) {
-            hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                     hipMemcpyDeviceToHost);
+            (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
+                           hipMemcpyDeviceToHost);
         }
         // HIP to HIP
         else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
                           std::is_same_v<DstSpace, HIPSpace>) {
-            hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                     hipMemcpyDeviceToDevice);
+            (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
+                           hipMemcpyDeviceToDevice);
         }
 #endif
         else {
