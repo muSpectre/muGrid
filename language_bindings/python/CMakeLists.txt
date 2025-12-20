@@ -32,6 +32,17 @@ if(MUGRID_ENABLE_NETCDF)
     target_include_directories(_muGrid PRIVATE ${MUGRID_NETCDF_INCLUDE_DIRS})
 endif()
 
+# Pass device architecture information to Python bindings
+if(MUGRID_ENABLE_CUDA AND CMAKE_CUDA_ARCHITECTURES)
+    # Convert list to semicolon-separated string for display
+    string(REPLACE ";" "," MUGRID_DEVICE_ARCH_STR "${CMAKE_CUDA_ARCHITECTURES}")
+    target_compile_definitions(_muGrid PRIVATE MUGRID_DEVICE_ARCH=${MUGRID_DEVICE_ARCH_STR})
+elseif(MUGRID_ENABLE_HIP AND CMAKE_HIP_ARCHITECTURES)
+    # Convert list to semicolon-separated string for display
+    string(REPLACE ";" "," MUGRID_DEVICE_ARCH_STR "${CMAKE_HIP_ARCHITECTURES}")
+    target_compile_definitions(_muGrid PRIVATE MUGRID_DEVICE_ARCH=${MUGRID_DEVICE_ARCH_STR})
+endif()
+
 # Install the Python module
 # Use relative path for scikit-build-core wheel compatibility
 install(TARGETS _muGrid

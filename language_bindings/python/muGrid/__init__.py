@@ -78,6 +78,8 @@ has_cuda = _muGrid.has_cuda
 has_gpu = _muGrid.has_gpu
 has_netcdf = _muGrid.has_netcdf
 has_rocm = _muGrid.has_rocm
+host_arch = _muGrid.host_arch
+device_arch = _muGrid.device_arch
 rfft_freq = _muGrid.rfft_freq
 rfft_freqind = _muGrid.rfft_freqind
 

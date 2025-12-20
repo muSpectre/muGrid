@@ -188,6 +188,10 @@ void add_unit(py::module & mod) {
         .def("amount", &muGrid::Unit::amount);
 }
 
+// Helper to stringify macro values
+#define MUGRID_STRINGIFY_HELPER(x) #x
+#define MUGRID_STRINGIFY(x) MUGRID_STRINGIFY_HELPER(x)
+
 void add_feature_flags(py::module & mod) {
     // CUDA support
 #ifdef MUGRID_ENABLE_CUDA
@@ -215,6 +219,30 @@ void add_feature_flags(py::module & mod) {
     mod.attr("has_netcdf") = true;
 #else
     mod.attr("has_netcdf") = false;
+#endif
+
+    // Host architecture detection
+#if defined(__x86_64__) || defined(_M_X64)
+    mod.attr("host_arch") = "x86_64";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    mod.attr("host_arch") = "arm64";
+#elif defined(__i386__) || defined(_M_IX86)
+    mod.attr("host_arch") = "x86";
+#elif defined(__arm__) || defined(_M_ARM)
+    mod.attr("host_arch") = "arm";
+#elif defined(__powerpc64__)
+    mod.attr("host_arch") = "ppc64";
+#elif defined(__powerpc__)
+    mod.attr("host_arch") = "ppc";
+#else
+    mod.attr("host_arch") = "unknown";
+#endif
+
+    // Device architecture (passed from CMake at compile time)
+#ifdef MUGRID_DEVICE_ARCH
+    mod.attr("device_arch") = MUGRID_STRINGIFY(MUGRID_DEVICE_ARCH);
+#else
+    mod.attr("device_arch") = "";
 #endif
 }
 
