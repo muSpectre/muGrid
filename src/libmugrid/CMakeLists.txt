@@ -59,16 +59,23 @@ if(MUGRID_ENABLE_NETCDF)
     list(APPEND MUGRID_SOURCES io/file_io_netcdf.cc)
 endif()
 
-# Add cuFFT backend source if CUDA is available
+# Add GPU backend sources if CUDA or HIP is available
 if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
-    list(APPEND MUGRID_SOURCES operators/convolution_operator.cu)
-endif()
-
-# Add hipFFT backend source if HIP is available
-if(MUGRID_ENABLE_HIP)
+    list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
+    # Mark the .cc file to be compiled as CUDA
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
+        PROPERTIES LANGUAGE CUDA
+    )
+elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
-    list(APPEND MUGRID_SOURCES operators/convolution_operator_hip.cpp)
+    list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
+    # Mark the .cc file to be compiled as HIP
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
+        PROPERTIES LANGUAGE HIP
+    )
 endif()
 
 # Create shared library
