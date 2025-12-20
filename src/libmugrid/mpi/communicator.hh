@@ -36,6 +36,7 @@
 #ifndef SRC_LIBMUGRID_COMMUNICATOR_HH_
 #define SRC_LIBMUGRID_COMMUNICATOR_HH_
 
+#include <cassert>
 #include <type_traits>
 
 #ifdef WITH_MPI
