@@ -46,6 +46,7 @@ set(MUGRID_SOURCES
     # util/
     util/raw_memory_operations.cc
     # fft/
+    fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
     fft/pencil_transpose.cc
     fft/fft_utils.cc
@@ -67,6 +68,7 @@ endif()
 # Add hipFFT backend source if HIP is available
 if(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
+    list(APPEND MUGRID_SOURCES operators/convolution_operator_hip.cpp)
 endif()
 
 # Create shared library
