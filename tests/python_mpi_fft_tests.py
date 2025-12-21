@@ -370,10 +370,6 @@ class TestMPIFFTMultipleComponents:
 
     def test_tensor_field_3d(self, comm):
         """Test FFT of 3x3 tensor field in 3D."""
-        # Skip for MPI parallel runs - 3D multi-component not yet implemented
-        if comm.size > 1:
-            pytest.skip("3D multi-component FFT not yet supported in MPI path")
-
         nb_grid_pts = [8, 8, 8]
         engine = FFTEngine(nb_grid_pts, comm)
 

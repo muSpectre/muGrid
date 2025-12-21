@@ -562,41 +562,45 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
   bool need_mpi_path = (transpose_xz != nullptr || transpose_yz_fwd != nullptr);
 
   if (need_mpi_path) {
-    // MPI path with transposes - TODO: implement multi-component support
-    if (nb_components > 1) {
-      throw RuntimeError(
-          "Multi-component 3D FFT not yet supported in MPI mode");
-    }
-
+    // MPI path with transposes - supports multi-component fields with AoS layout
     const Real * input_ptr =
         static_cast<const Real *>(input.get_void_data_ptr(!is_device));
     Complex * output_ptr =
         static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
-    Index_t stride_y = local_with_ghosts[0];
-    Index_t stride_z = stride_y * local_with_ghosts[1];
-    Index_t in_offset =
-        ghosts_left[0] + ghosts_left[1] * stride_y + ghosts_left[2] * stride_z;
+    // Input strides for multi-component interleaved data (AoS layout)
+    Index_t in_comp_stride = nb_components;
+    Index_t in_stride_y = local_with_ghosts[0] * nb_components;
+    Index_t in_stride_z = in_stride_y * local_with_ghosts[1];
+    Index_t in_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
+        nb_components;
 
-    // Z-pencil work buffer
-    Index_t zpencil_size = Fx * local_real[1] * local_real[2];
+    // Z-pencil work buffer: [Fx, Ny_local, Nz_local] with AoS components
+    Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
     std::vector<Complex> work_z(zpencil_size);
     Complex * work_z_ptr = work_z.data();
 
-    // Step 1: r2c FFT along X
-    for (Index_t iz = 0; iz < local_real[2]; ++iz) {
-      for (Index_t iy = 0; iy < local_real[1]; ++iy) {
-        Index_t in_idx = in_offset + iy * stride_y + iz * stride_z;
-        Index_t out_idx = iy * Fx + iz * Fx * local_real[1];
-        backend->r2c(Nx, 1, input_ptr + in_idx, 1, 0, work_z_ptr + out_idx, 1,
-                     0);
+    // Step 1: r2c FFT along X for each component
+    // Output to work_z in AoS layout: components interleaved
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      for (Index_t iz = 0; iz < local_real[2]; ++iz) {
+        for (Index_t iy = 0; iy < local_real[1]; ++iy) {
+          Index_t in_idx =
+              in_base_offset + comp + iy * in_stride_y + iz * in_stride_z;
+          Index_t out_idx =
+              comp + iy * Fx * nb_components + iz * Fx * local_real[1] * nb_components;
+          backend->r2c(Nx, 1, input_ptr + in_idx, in_comp_stride, 0,
+                       work_z_ptr + out_idx, nb_components, 0);
+        }
       }
     }
 
-    // Step 2a: Transpose Y↔Z
+    // Step 2a: Transpose Y↔Z (all components at once)
     const IntCoord_t & ypencil_shape =
         this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t ypencil_size = Fx * Ny * ypencil_shape[2];
+    Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
     std::vector<Complex> work_y(ypencil_size);
     Complex * work_y_ptr = work_y.data();
 
@@ -604,16 +608,21 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
       transpose_yz_fwd->forward(work_z_ptr, work_y_ptr);
     }
 
-    // Step 2b: c2c FFT along Y
-    for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
-      for (Index_t ix = 0; ix < Fx; ++ix) {
-        Index_t idx = ix + iz * Fx * Ny;
-        backend->c2c_forward(Ny, 1, work_y_ptr + idx, Fx, 0, work_y_ptr + idx,
-                             Fx, 0);
+    // Step 2b: c2c FFT along Y for each component
+    // work_y layout: [Fx, Ny, Nz_local] with AoS components
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
+        for (Index_t ix = 0; ix < Fx; ++ix) {
+          Index_t idx =
+              comp + ix * nb_components + iz * Fx * Ny * nb_components;
+          Index_t y_stride = Fx * nb_components;
+          backend->c2c_forward(Ny, 1, work_y_ptr + idx, y_stride, 0,
+                               work_y_ptr + idx, y_stride, 0);
+        }
       }
     }
 
-    // Step 2c: Transpose Z↔Y
+    // Step 2c: Transpose Z↔Y (all components at once)
     if (transpose_yz_bwd != nullptr) {
       transpose_yz_bwd->forward(work_y_ptr, work_z_ptr);
     }
@@ -624,19 +633,22 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
       transpose_xz->forward(work_z_ptr, output_ptr);
     } else {
       // No X↔Z transpose needed (P1=1), just copy from work_z to output
-      // work_z layout: [Fx, Ny_local, Nz] = fourier_local
       Index_t fourier_size =
-          fourier_local[0] * fourier_local[1] * fourier_local[2];
+          fourier_local[0] * fourier_local[1] * fourier_local[2] * nb_components;
       std::copy(work_z_ptr, work_z_ptr + fourier_size, output_ptr);
     }
 
-    // Step 4: c2c FFT along Z
-    for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
-      for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
-        Index_t idx = ix + iy * fourier_local[0];
-        Index_t stride = fourier_local[0] * fourier_local[1];
-        backend->c2c_forward(Nz, 1, output_ptr + idx, stride, 0,
-                             output_ptr + idx, stride, 0);
+    // Step 4: c2c FFT along Z for each component
+    // Output layout: [Fx_local, Ny_local, Nz] with AoS components
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
+        for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
+          Index_t idx =
+              comp + ix * nb_components + iy * fourier_local[0] * nb_components;
+          Index_t z_stride = fourier_local[0] * fourier_local[1] * nb_components;
+          backend->c2c_forward(Nz, 1, output_ptr + idx, z_stride, 0,
+                               output_ptr + idx, z_stride, 0);
+        }
       }
     }
   } else
@@ -835,36 +847,35 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
   bool need_mpi_path = (transpose_xz != nullptr || transpose_yz_fwd != nullptr);
 
   if (need_mpi_path) {
-    // MPI path with transposes - TODO: implement multi-component support
-    if (nb_components > 1) {
-      throw RuntimeError(
-          "Multi-component 3D FFT not yet supported in MPI mode");
-    }
-
+    // MPI path with transposes - supports multi-component fields with AoS layout
     const Complex * input_ptr =
         static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
     Real * output_ptr =
         static_cast<Real *>(output.get_void_data_ptr(!is_device));
 
-    // Copy input to temp
+    // Copy input to temp (preserving AoS layout)
     const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
     Index_t fourier_size =
-        fourier_local[0] * fourier_local[1] * fourier_local[2];
+        fourier_local[0] * fourier_local[1] * fourier_local[2] * nb_components;
     std::vector<Complex> temp(fourier_size);
     std::copy(input_ptr, input_ptr + fourier_size, temp.data());
 
-    // Step 1: c2c IFFT along Z
-    for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
-      for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
-        Index_t idx = ix + iy * fourier_local[0];
-        Index_t stride = fourier_local[0] * fourier_local[1];
-        backend->c2c_backward(Nz, 1, temp.data() + idx, stride, 0,
-                              temp.data() + idx, stride, 0);
+    // Step 1: c2c IFFT along Z for each component
+    // Input layout: [Fx_local, Ny_local, Nz] with AoS components
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
+        for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
+          Index_t idx =
+              comp + ix * nb_components + iy * fourier_local[0] * nb_components;
+          Index_t z_stride = fourier_local[0] * fourier_local[1] * nb_components;
+          backend->c2c_backward(Nz, 1, temp.data() + idx, z_stride, 0,
+                                temp.data() + idx, z_stride, 0);
+        }
       }
     }
 
-    // Z-pencil work buffer
-    Index_t zpencil_size = Fx * local_real[1] * local_real[2];
+    // Z-pencil work buffer: [Fx, Ny_local, Nz_local] with AoS components
+    Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
     std::vector<Complex> work_z(zpencil_size);
     Complex * work_z_ptr = work_z.data();
 
@@ -876,44 +887,57 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
       std::copy(temp.data(), temp.data() + zpencil_size, work_z_ptr);
     }
 
-    // Y-pencil work buffer
+    // Y-pencil work buffer: [Fx, Ny, Nz_local] with AoS components
     const IntCoord_t & ypencil_shape =
         this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t ypencil_size = Fx * Ny * ypencil_shape[2];
+    Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
     std::vector<Complex> work_y(ypencil_size);
     Complex * work_y_ptr = work_y.data();
 
-    // Step 3a: Transpose Y↔Z (backward)
+    // Step 3a: Transpose Y↔Z (backward) - all components at once
     if (transpose_yz_bwd != nullptr) {
       transpose_yz_bwd->backward(work_z_ptr, work_y_ptr);
     }
 
-    // Step 3b: c2c IFFT along Y
-    for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
-      for (Index_t ix = 0; ix < Fx; ++ix) {
-        Index_t idx = ix + iz * Fx * Ny;
-        backend->c2c_backward(Ny, 1, work_y_ptr + idx, Fx, 0, work_y_ptr + idx,
-                              Fx, 0);
+    // Step 3b: c2c IFFT along Y for each component
+    // work_y layout: [Fx, Ny, Nz_local] with AoS components
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
+        for (Index_t ix = 0; ix < Fx; ++ix) {
+          Index_t idx =
+              comp + ix * nb_components + iz * Fx * Ny * nb_components;
+          Index_t y_stride = Fx * nb_components;
+          backend->c2c_backward(Ny, 1, work_y_ptr + idx, y_stride, 0,
+                                work_y_ptr + idx, y_stride, 0);
+        }
       }
     }
 
-    // Step 3c: Transpose Z↔Y (backward)
+    // Step 3c: Transpose Z↔Y (backward) - all components at once
     if (transpose_yz_fwd != nullptr) {
       transpose_yz_fwd->backward(work_y_ptr, work_z_ptr);
     }
 
-    // Step 4: c2r IFFT along X
-    Index_t stride_y = local_with_ghosts[0];
-    Index_t stride_z = stride_y * local_with_ghosts[1];
-    Index_t out_offset =
-        ghosts_left[0] + ghosts_left[1] * stride_y + ghosts_left[2] * stride_z;
+    // Step 4: c2r IFFT along X for each component
+    // Output strides for multi-component interleaved data (AoS layout)
+    Index_t out_comp_stride = nb_components;
+    Index_t out_stride_y = local_with_ghosts[0] * nb_components;
+    Index_t out_stride_z = out_stride_y * local_with_ghosts[1];
+    Index_t out_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
+        nb_components;
 
-    for (Index_t iz = 0; iz < local_real[2]; ++iz) {
-      for (Index_t iy = 0; iy < local_real[1]; ++iy) {
-        Index_t in_idx = iy * Fx + iz * Fx * local_real[1];
-        Index_t out_idx = out_offset + iy * stride_y + iz * stride_z;
-        backend->c2r(Nx, 1, work_z_ptr + in_idx, 1, 0, output_ptr + out_idx, 1,
-                     0);
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      for (Index_t iz = 0; iz < local_real[2]; ++iz) {
+        for (Index_t iy = 0; iy < local_real[1]; ++iy) {
+          Index_t in_idx =
+              comp + iy * Fx * nb_components + iz * Fx * local_real[1] * nb_components;
+          Index_t out_idx =
+              out_base_offset + comp + iy * out_stride_y + iz * out_stride_z;
+          backend->c2r(Nx, 1, work_z_ptr + in_idx, nb_components, 0,
+                       output_ptr + out_idx, out_comp_stride, 0);
+        }
       }
     }
   } else
