@@ -7,20 +7,20 @@
  *
  * @brief  Distributed FFT engine with pencil decomposition
  *
- * Copyright © 2024 Lars Pastewka
+ * Copyright (c) 2024 Lars Pastewka
  *
- * µGrid is free software; you can redistribute it and/or
+ * muGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3, or (at
  * your option) any later version.
  *
- * µGrid is distributed in the hope that it will be useful, but
+ * muGrid is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with µGrid; see the file COPYING. If not, write to the
+ * along with muGrid; see the file COPYING. If not, write to the
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
@@ -36,18 +36,11 @@
 #ifndef SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 #define SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 
-#include "mpi/cartesian_decomposition.hh"
-#include "collection/field_collection_global.hh"
-#include "mpi/communicator.hh"
-
-#include "fft_1d_backend.hh"
-#include "datatype_transpose.hh"
-#include "fft_utils.hh"
-
-#include <memory>
-#include <array>
-#include <string>
-#include <map>
+#include "fft_engine_base.hh"
+#include "fft_backend_traits.hh"
+#include "memory/device_array.hh"
+#include "field/field_typed.hh"
+#include "core/exception.hh"
 
 namespace muGrid {
 
@@ -62,27 +55,20 @@ namespace muGrid {
  * - Supports 2D and 3D grids
  * - Handles arbitrary ghost buffer configurations in real space
  * - No ghosts in Fourier space (hard assumption)
- * - Supports host and device (GPU) memory
+ * - Compile-time memory space selection (Host, CUDA, HIP)
  * - Unnormalized transforms (like FFTW)
  *
  * The engine owns field collections for both real and Fourier space, and
  * work buffers for intermediate results during the distributed FFT.
  *
- * For 2D grids:
- * - Uses 1D decomposition (P ranks)
- * - 1 transpose operation
- * - 2 work buffers
- *
- * For 3D grids:
- * - Uses 2D decomposition (P1 × P2 = P ranks)
- * - 3 transpose operations
- * - 3 work buffers
+ * @tparam MemorySpace The memory space for work buffers (HostSpace, CudaSpace,
+ * HIPSpace)
  */
-class FFTEngine : public CartesianDecomposition {
+template <typename MemorySpace>
+class FFTEngine : public FFTEngineBase {
  public:
-  using Parent_t = CartesianDecomposition;
-  using SubPtMap_t = FieldCollection::SubPtMap_t;
-  using MemoryLocation = FieldCollection::MemoryLocation;
+  using Parent_t = FFTEngineBase;
+  using WorkBuffer = DeviceArray<Complex, MemorySpace>;
 
   /**
    * Construct an FFT engine with pencil decomposition.
@@ -92,14 +78,15 @@ class FFTEngine : public CartesianDecomposition {
    * @param nb_ghosts_left      Ghost cells on low-index side of each dimension
    * @param nb_ghosts_right     Ghost cells on high-index side of each dimension
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
-   * @param memory_location     Where to allocate field memory (Host or Device)
    */
   FFTEngine(const IntCoord_t & nb_domain_grid_pts,
             const Communicator & comm = Communicator(),
             const IntCoord_t & nb_ghosts_left = IntCoord_t{},
             const IntCoord_t & nb_ghosts_right = IntCoord_t{},
-            const SubPtMap_t & nb_sub_pts = {},
-            MemoryLocation memory_location = MemoryLocation::Host);
+            const SubPtMap_t & nb_sub_pts = {})
+      : Parent_t{nb_domain_grid_pts, comm, nb_ghosts_left, nb_ghosts_right,
+                 nb_sub_pts, memory_location<MemorySpace>()},
+        backend{create_fft_backend<MemorySpace>()} {}
 
   FFTEngine() = delete;
   FFTEngine(const FFTEngine &) = delete;
@@ -111,241 +98,573 @@ class FFTEngine : public CartesianDecomposition {
 
   // === Transform operations ===
 
-  /**
-   * Forward FFT: real space → Fourier space.
-   *
-   * The transform is unnormalized. To recover the original data after
-   * ifft(fft(x)), multiply by normalisation().
-   *
-   * @param input   Real-space field (must be in this engine's real collection)
-   * @param output  Fourier-space field (must be in this engine's Fourier
-   * collection)
-   */
-  void fft(const Field & input, Field & output);
+  void fft(const Field & input, Field & output) override {
+    // Verify fields belong to correct collections
+    if (&input.get_collection() != &this->get_collection()) {
+      throw RuntimeError(
+          "Input field must belong to the real-space collection");
+    }
+    if (&output.get_collection() != &this->get_fourier_space_collection()) {
+      throw RuntimeError(
+          "Output field must belong to the Fourier-space collection");
+    }
 
-  /**
-   * Inverse FFT: Fourier space → real space.
-   *
-   * The transform is unnormalized. To recover the original data after
-   * ifft(fft(x)), multiply by normalisation().
-   *
-   * @param input   Fourier-space field (must be in this engine's Fourier
-   * collection)
-   * @param output  Real-space field (must be in this engine's real collection)
-   */
-  void ifft(const Field & input, Field & output);
+    // Verify field is in correct memory space
+    bool input_on_device = input.is_on_device();
+    bool output_on_device = output.is_on_device();
+    if (input_on_device != output_on_device) {
+      throw RuntimeError("Input and output must be in the same memory space");
+    }
+    if constexpr (is_device_space_v<MemorySpace>) {
+      if (!input_on_device) {
+        throw RuntimeError(
+            "FFTEngine<DeviceSpace> requires fields on device memory");
+      }
+    } else {
+      if (input_on_device) {
+        throw RuntimeError(
+            "FFTEngine<HostSpace> requires fields on host memory");
+      }
+    }
 
-  // === Field registration ===
-
-  /**
-   * Register a real-space scalar field.
-   *
-   * @param name        Unique field name
-   * @param nb_components  Number of components (default 1)
-   * @return Reference to the created field
-   */
-  Field & register_real_space_field(const std::string & name,
-                                    Index_t nb_components = 1);
-
-  /**
-   * Register a real-space field with shaped components.
-   *
-   * @param name        Unique field name
-   * @param components  Component shape (e.g., {3,3} for a tensor)
-   * @return Reference to the created field
-   */
-  Field & register_real_space_field(const std::string & name,
-                                    const Shape_t & components);
-
-  /**
-   * Register a Fourier-space field.
-   *
-   * @param name        Unique field name
-   * @param nb_components  Number of components (default 1)
-   * @return Reference to the created field
-   */
-  Field & register_fourier_space_field(const std::string & name,
-                                       Index_t nb_components = 1);
-
-  /**
-   * Register a Fourier-space field with shaped components.
-   *
-   * @param name        Unique field name
-   * @param components  Component shape (e.g., {3,3} for a tensor)
-   * @return Reference to the created field
-   */
-  Field & register_fourier_space_field(const std::string & name,
-                                       const Shape_t & components);
-
-  // === Collection access ===
-
-  /**
-   * Get the real-space field collection.
-   * This is the same as get_collection() from CartesianDecomposition.
-   */
-  GlobalFieldCollection & get_real_space_collection();
-  const GlobalFieldCollection & get_real_space_collection() const;
-
-  /**
-   * Get the Fourier-space field collection.
-   */
-  GlobalFieldCollection & get_fourier_space_collection();
-  const GlobalFieldCollection & get_fourier_space_collection() const;
-
-  // === Geometry queries ===
-
-  /**
-   * Get the normalization factor for FFT roundtrip.
-   * Multiply ifft output by this to recover original values.
-   */
-  Real normalisation() const { return this->norm_factor; }
-
-  /**
-   * Get the global Fourier grid dimensions.
-   * For r2c transform: [Nx/2+1, Ny, Nz]
-   */
-  const IntCoord_t & get_nb_fourier_grid_pts() const {
-    return this->nb_fourier_grid_pts;
+    if (this->spatial_dim == 2) {
+      fft_2d(input, output);
+    } else {
+      fft_3d(input, output);
+    }
   }
 
-  /**
-   * Get the local Fourier grid dimensions on this rank.
-   */
-  const IntCoord_t & get_nb_fourier_subdomain_grid_pts() const {
-    return this->nb_fourier_subdomain_grid_pts;
+  void ifft(const Field & input, Field & output) override {
+    // Verify fields belong to correct collections
+    if (&input.get_collection() != &this->get_fourier_space_collection()) {
+      throw RuntimeError(
+          "Input field must belong to the Fourier-space collection");
+    }
+    if (&output.get_collection() != &this->get_collection()) {
+      throw RuntimeError(
+          "Output field must belong to the real-space collection");
+    }
+
+    // Verify field is in correct memory space
+    bool input_on_device = input.is_on_device();
+    bool output_on_device = output.is_on_device();
+    if (input_on_device != output_on_device) {
+      throw RuntimeError("Input and output must be in the same memory space");
+    }
+    if constexpr (is_device_space_v<MemorySpace>) {
+      if (!input_on_device) {
+        throw RuntimeError(
+            "FFTEngine<DeviceSpace> requires fields on device memory");
+      }
+    } else {
+      if (input_on_device) {
+        throw RuntimeError(
+            "FFTEngine<HostSpace> requires fields on host memory");
+      }
+    }
+
+    if (this->spatial_dim == 2) {
+      ifft_2d(input, output);
+    } else {
+      ifft_3d(input, output);
+    }
   }
 
-  /**
-   * Get the starting location of this rank's Fourier subdomain.
-   */
-  const IntCoord_t & get_fourier_subdomain_locations() const {
-    return this->fourier_subdomain_locations;
+  const char * get_backend_name() const override {
+    return fft_backend_name<MemorySpace>();
   }
-
-  /**
-   * Get the 2D process grid dimensions [P1, P2].
-   * For 2D problems, P1=1.
-   */
-  std::array<int, 2> get_process_grid() const {
-    return {this->proc_grid_p1, this->proc_grid_p2};
-  }
-
-  /**
-   * Get this rank's coordinates in the process grid [p1, p2].
-   */
-  std::array<int, 2> get_process_coords() const {
-    return {this->proc_coord_p1, this->proc_coord_p2};
-  }
-
-  /**
-   * Get the name of the FFT backend being used.
-   */
-  const char * get_backend_name() const;
 
  protected:
-  /**
-   * Initialize the FFT engine after construction.
-   * Sets up work buffers and transpose operations.
-   */
-  void initialise_fft();
+  void fft_2d(const Field & input, Field & output) {
+    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
+    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
+    const IntCoord_t & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
 
-  /**
-   * Perform 2D forward FFT.
-   */
-  void fft_2d(const Field & input, Field & output);
+    Index_t nb_components = input.get_nb_components();
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
 
-  /**
-   * Perform 3D forward FFT.
-   */
-  void fft_3d(const Field & input, Field & output);
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Real * input_ptr =
+        static_cast<const Real *>(input.get_void_data_ptr(!is_device));
+    Complex * output_ptr =
+        static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
-  /**
-   * Perform 2D inverse FFT.
-   */
-  void ifft_2d(const Field & input, Field & output);
+    Index_t Nx = nb_grid_pts[0];
+    Index_t Fx = Nx / 2 + 1;
+    Index_t Ny = nb_grid_pts[1];
 
-  /**
-   * Perform 3D inverse FFT.
-   */
-  void ifft_3d(const Field & input, Field & output);
+    Index_t in_comp_stride = nb_components;
+    Index_t in_dist = local_with_ghosts[0] * nb_components;
+    Index_t in_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) *
+        nb_components;
 
-  /**
-   * Select the appropriate FFT backend based on field memory location.
-   */
-  FFT1DBackend * select_backend(bool is_device_memory) const;
+    Index_t work_size = Fx * local_real[1] * nb_components;
+    WorkBuffer work_buffer(work_size);
+    Complex * work_ptr = work_buffer.data();
 
-  // === Process grid ===
-  int proc_grid_p1{1};   //!< First dimension of process grid
-  int proc_grid_p2{1};   //!< Second dimension of process grid
-  int proc_coord_p1{0};  //!< This rank's p1 coordinate
-  int proc_coord_p2{0};  //!< This rank's p2 coordinate
+    // Step 1: r2c FFT along X for each component
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      backend->r2c(Nx, local_real[1], input_ptr + in_base_offset + comp,
+                   in_comp_stride, in_dist, work_ptr + comp, nb_components,
+                   Fx * nb_components);
+    }
 
-  // === Subcommunicators ===
-#ifdef WITH_MPI
-  Communicator row_comm;  //!< Communicator for ranks with same p1 (3D only)
-  Communicator col_comm;  //!< Communicator for ranks with same p2
-#endif
+    // Step 2: Transpose (or copy for serial)
+    DatatypeTranspose * transpose = this->get_transpose_xz(nb_components);
+    if (transpose != nullptr) {
+      transpose->forward(work_ptr, output_ptr);
+    } else {
+      deep_copy<Complex, MemorySpace>(output_ptr, work_ptr, work_size);
+    }
 
-  // === FFT backends ===
-  std::unique_ptr<FFT1DBackend> host_backend;    //!< Host (CPU) FFT backend
-  std::unique_ptr<FFT1DBackend> device_backend;  //!< Device (GPU) FFT backend
+    // Step 3: c2c FFT along Y for all components
+    if (transpose != nullptr) {
+      Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
+      Index_t y_stride = local_fx * nb_components;
+      Index_t y_dist = nb_components;
 
-  // === Transpose operations ===
-  /**
-   * Configuration for creating transposes with different nb_components.
-   */
-  struct TransposeConfig {
-    IntCoord_t local_in;
-    IntCoord_t local_out;
-    Index_t global_in;
-    Index_t global_out;
-    Index_t axis_in;
-    Index_t axis_out;
-    bool use_row_comm;  //!< true = row_comm, false = col_comm
-  };
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2c_forward(Ny, local_fx, output_ptr + comp, y_stride, y_dist,
+                             output_ptr + comp, y_stride, y_dist);
+      }
+    } else {
+      Index_t local_fy = local_real[1];
+      Index_t y_stride = Fx * nb_components;
+      Index_t y_dist = nb_components;
 
-  /**
-   * Get or create a transpose for the given nb_components.
-   */
-  DatatypeTranspose * get_transpose_xz(Index_t nb_components);
-  DatatypeTranspose * get_transpose_yz_forward(Index_t nb_components);
-  DatatypeTranspose * get_transpose_yz_backward(Index_t nb_components);
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2c_forward(local_fy, Fx, output_ptr + comp, y_stride, y_dist,
+                             output_ptr + comp, y_stride, y_dist);
+      }
+    }
+  }
 
-  //! Configuration for X↔Z transpose (2D: Y↔X)
-  TransposeConfig transpose_xz_config;
+  void fft_3d(const Field & input, Field & output) {
+    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
+    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
+    const IntCoord_t & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
 
-  //! Configuration for Y↔Z forward transpose (3D only)
-  TransposeConfig transpose_yz_fwd_config;
+    Index_t nb_components = input.get_nb_components();
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
 
-  //! Configuration for Y↔Z backward transpose (3D only)
-  TransposeConfig transpose_yz_bwd_config;
+    Index_t Nx = nb_grid_pts[0];
+    Index_t Ny = nb_grid_pts[1];
+    Index_t Nz = nb_grid_pts[2];
+    Index_t Fx = Nx / 2 + 1;
 
-  //! Cached transposes by nb_components
-  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_xz_cache;
-  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_yz_fwd_cache;
-  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_yz_bwd_cache;
+    DatatypeTranspose * transpose_xz = this->get_transpose_xz(nb_components);
+    DatatypeTranspose * transpose_yz_fwd =
+        this->get_transpose_yz_forward(nb_components);
+    DatatypeTranspose * transpose_yz_bwd =
+        this->get_transpose_yz_backward(nb_components);
 
-  //! Flag indicating if transpose is needed (comm.size() > 1)
-  bool need_transpose_xz{false};
-  bool need_transpose_yz{false};
+    bool need_mpi_path =
+        (transpose_xz != nullptr || transpose_yz_fwd != nullptr);
 
-  // === Work buffers ===
-  //! Fourier-space field collection (final X-pencil layout)
-  std::unique_ptr<GlobalFieldCollection> fourier_collection;
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Real * input_ptr =
+        static_cast<const Real *>(input.get_void_data_ptr(!is_device));
+    Complex * output_ptr =
+        static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
-  //! Work buffer after first FFT (Z-pencils, no ghosts)
-  std::unique_ptr<GlobalFieldCollection> work_zpencil;
+    Index_t in_comp_stride = nb_components;
+    Index_t in_stride_y = local_with_ghosts[0] * nb_components;
+    Index_t in_stride_z = in_stride_y * local_with_ghosts[1];
+    Index_t in_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
+        nb_components;
 
-  //! Work buffer after Y-FFT (3D only, Y-pencils)
-  std::unique_ptr<GlobalFieldCollection> work_ypencil;
+    if (need_mpi_path) {
+      // MPI path with transposes
+      Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
+      WorkBuffer work_z(zpencil_size);
+      Complex * work_z_ptr = work_z.data();
 
-  // === Geometry ===
-  IntCoord_t nb_fourier_grid_pts;           //!< Global Fourier grid size
-  IntCoord_t nb_fourier_subdomain_grid_pts; //!< Local Fourier grid size
-  IntCoord_t fourier_subdomain_locations;   //!< Fourier subdomain start
-  Real norm_factor;                          //!< 1 / (Nx * Ny * Nz)
-  Dim_t spatial_dim;                         //!< 2 or 3
+      // Step 1: r2c FFT along X for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        for (Index_t iz = 0; iz < local_real[2]; ++iz) {
+          for (Index_t iy = 0; iy < local_real[1]; ++iy) {
+            Index_t in_idx =
+                in_base_offset + comp + iy * in_stride_y + iz * in_stride_z;
+            Index_t out_idx = comp + iy * Fx * nb_components +
+                              iz * Fx * local_real[1] * nb_components;
+            backend->r2c(Nx, 1, input_ptr + in_idx, in_comp_stride, 0,
+                         work_z_ptr + out_idx, nb_components, 0);
+          }
+        }
+      }
+
+      // Step 2a: Transpose Y<->Z
+      const IntCoord_t & ypencil_shape =
+          this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
+      Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
+      WorkBuffer work_y(ypencil_size);
+      Complex * work_y_ptr = work_y.data();
+
+      if (transpose_yz_fwd != nullptr) {
+        transpose_yz_fwd->forward(work_z_ptr, work_y_ptr);
+      }
+
+      // Step 2b: c2c FFT along Y for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
+          for (Index_t ix = 0; ix < Fx; ++ix) {
+            Index_t idx =
+                comp + ix * nb_components + iz * Fx * Ny * nb_components;
+            Index_t y_stride = Fx * nb_components;
+            backend->c2c_forward(Ny, 1, work_y_ptr + idx, y_stride, 0,
+                                 work_y_ptr + idx, y_stride, 0);
+          }
+        }
+      }
+
+      // Step 2c: Transpose Z<->Y
+      if (transpose_yz_bwd != nullptr) {
+        transpose_yz_bwd->forward(work_y_ptr, work_z_ptr);
+      }
+
+      // Step 3: Transpose X<->Z (or copy if no transpose needed)
+      const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
+      if (transpose_xz != nullptr) {
+        transpose_xz->forward(work_z_ptr, output_ptr);
+      } else {
+        Index_t fourier_size =
+            fourier_local[0] * fourier_local[1] * fourier_local[2] *
+            nb_components;
+        deep_copy<Complex, MemorySpace>(output_ptr, work_z_ptr, fourier_size);
+      }
+
+      // Step 4: c2c FFT along Z for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
+          for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
+            Index_t idx = comp + ix * nb_components +
+                          iy * fourier_local[0] * nb_components;
+            Index_t z_stride =
+                fourier_local[0] * fourier_local[1] * nb_components;
+            backend->c2c_forward(Nz, 1, output_ptr + idx, z_stride, 0,
+                                 output_ptr + idx, z_stride, 0);
+          }
+        }
+      }
+    } else {
+      // Serial path: all dimensions are local
+      Index_t out_comp_stride = nb_components;
+      Index_t out_stride_y = Fx * nb_components;
+      Index_t out_stride_z = out_stride_y * Ny;
+
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        // Step 1: r2c FFT along X
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          for (Index_t iy = 0; iy < Ny; ++iy) {
+            Index_t in_idx =
+                in_base_offset + comp + iy * in_stride_y + iz * in_stride_z;
+            Index_t out_idx = comp + iy * out_stride_y + iz * out_stride_z;
+            backend->r2c(Nx, 1, input_ptr + in_idx, in_comp_stride, 0,
+                         output_ptr + out_idx, out_comp_stride, 0);
+          }
+        }
+
+        // Step 2: c2c FFT along Y
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          for (Index_t ix = 0; ix < Fx; ++ix) {
+            Index_t idx = comp + ix * nb_components + iz * out_stride_z;
+            backend->c2c_forward(Ny, 1, output_ptr + idx, out_stride_y, 0,
+                                 output_ptr + idx, out_stride_y, 0);
+          }
+        }
+
+        // Step 3: c2c FFT along Z
+        for (Index_t iy = 0; iy < Ny; ++iy) {
+          for (Index_t ix = 0; ix < Fx; ++ix) {
+            Index_t idx = comp + ix * nb_components + iy * out_stride_y;
+            backend->c2c_forward(Nz, 1, output_ptr + idx, out_stride_z, 0,
+                                 output_ptr + idx, out_stride_z, 0);
+          }
+        }
+      }
+    }
+  }
+
+  void ifft_2d(const Field & input, Field & output) {
+    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
+    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
+    const IntCoord_t & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
+
+    Index_t nb_components = input.get_nb_components();
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
+
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Complex * input_ptr =
+        static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
+    Real * output_ptr =
+        static_cast<Real *>(output.get_void_data_ptr(!is_device));
+
+    Index_t Nx = nb_grid_pts[0];
+    Index_t Fx = Nx / 2 + 1;
+    Index_t Ny = nb_grid_pts[1];
+
+    Index_t out_comp_stride = nb_components;
+    Index_t out_dist = local_with_ghosts[0] * nb_components;
+    Index_t out_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) *
+        nb_components;
+
+    DatatypeTranspose * transpose = this->get_transpose_xz(nb_components);
+    if (transpose != nullptr) {
+      Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
+      Index_t local_fourier_size = local_fx * Ny * nb_components;
+
+      WorkBuffer temp(local_fourier_size);
+      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr,
+                                      local_fourier_size);
+
+      // Step 1: c2c IFFT along Y for each component
+      Index_t y_stride = local_fx * nb_components;
+      Index_t y_dist = nb_components;
+
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2c_backward(Ny, local_fx, temp.data() + comp, y_stride,
+                              y_dist, temp.data() + comp, y_stride, y_dist);
+      }
+
+      // Step 2: Transpose X<->Y backward
+      Index_t work_size = Fx * local_real[1] * nb_components;
+      WorkBuffer work_buffer(work_size);
+      transpose->backward(temp.data(), work_buffer.data());
+
+      // Step 3: c2r IFFT along X for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2r(Nx, local_real[1], work_buffer.data() + comp,
+                     nb_components, Fx * nb_components,
+                     output_ptr + out_base_offset + comp, out_comp_stride,
+                     out_dist);
+      }
+    } else {
+      Index_t local_fy = local_real[1];
+      Index_t fourier_size = Fx * local_fy * nb_components;
+
+      WorkBuffer temp(fourier_size);
+      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
+
+      // Step 1: c2c IFFT along Y for each component
+      Index_t y_stride = Fx * nb_components;
+      Index_t y_dist = nb_components;
+
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2c_backward(local_fy, Fx, temp.data() + comp, y_stride,
+                              y_dist, temp.data() + comp, y_stride, y_dist);
+      }
+
+      // Step 2: c2r IFFT along X for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2r(Nx, local_fy, temp.data() + comp, nb_components,
+                     Fx * nb_components, output_ptr + out_base_offset + comp,
+                     out_comp_stride, out_dist);
+      }
+    }
+  }
+
+  void ifft_3d(const Field & input, Field & output) {
+    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
+    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
+    const IntCoord_t & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
+
+    Index_t nb_components = input.get_nb_components();
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
+
+    Index_t Nx = nb_grid_pts[0];
+    Index_t Ny = nb_grid_pts[1];
+    Index_t Nz = nb_grid_pts[2];
+    Index_t Fx = Nx / 2 + 1;
+
+    DatatypeTranspose * transpose_xz = this->get_transpose_xz(nb_components);
+    DatatypeTranspose * transpose_yz_fwd =
+        this->get_transpose_yz_forward(nb_components);
+    DatatypeTranspose * transpose_yz_bwd =
+        this->get_transpose_yz_backward(nb_components);
+
+    bool need_mpi_path =
+        (transpose_xz != nullptr || transpose_yz_fwd != nullptr);
+
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Complex * input_ptr =
+        static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
+    Real * output_ptr =
+        static_cast<Real *>(output.get_void_data_ptr(!is_device));
+
+    Index_t out_comp_stride = nb_components;
+    Index_t out_stride_y = local_with_ghosts[0] * nb_components;
+    Index_t out_stride_z = out_stride_y * local_with_ghosts[1];
+    Index_t out_base_offset =
+        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
+        nb_components;
+
+    if (need_mpi_path) {
+      // MPI path with transposes
+      const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
+      Index_t fourier_size =
+          fourier_local[0] * fourier_local[1] * fourier_local[2] *
+          nb_components;
+      WorkBuffer temp(fourier_size);
+      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
+
+      // Step 1: c2c IFFT along Z for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
+          for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
+            Index_t idx = comp + ix * nb_components +
+                          iy * fourier_local[0] * nb_components;
+            Index_t z_stride =
+                fourier_local[0] * fourier_local[1] * nb_components;
+            backend->c2c_backward(Nz, 1, temp.data() + idx, z_stride, 0,
+                                  temp.data() + idx, z_stride, 0);
+          }
+        }
+      }
+
+      // Z-pencil work buffer
+      Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
+      WorkBuffer work_z(zpencil_size);
+      Complex * work_z_ptr = work_z.data();
+
+      // Step 2: Transpose Z<->X backward (or copy)
+      if (transpose_xz != nullptr) {
+        transpose_xz->backward(temp.data(), work_z_ptr);
+      } else {
+        deep_copy<Complex, MemorySpace>(work_z_ptr, temp.data(), zpencil_size);
+      }
+
+      // Y-pencil work buffer
+      const IntCoord_t & ypencil_shape =
+          this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
+      Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
+      WorkBuffer work_y(ypencil_size);
+      Complex * work_y_ptr = work_y.data();
+
+      // Step 3a: Transpose Y<->Z backward
+      if (transpose_yz_bwd != nullptr) {
+        transpose_yz_bwd->backward(work_z_ptr, work_y_ptr);
+      }
+
+      // Step 3b: c2c IFFT along Y for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
+          for (Index_t ix = 0; ix < Fx; ++ix) {
+            Index_t idx =
+                comp + ix * nb_components + iz * Fx * Ny * nb_components;
+            Index_t y_stride = Fx * nb_components;
+            backend->c2c_backward(Ny, 1, work_y_ptr + idx, y_stride, 0,
+                                  work_y_ptr + idx, y_stride, 0);
+          }
+        }
+      }
+
+      // Step 3c: Transpose Z<->Y backward
+      if (transpose_yz_fwd != nullptr) {
+        transpose_yz_fwd->backward(work_y_ptr, work_z_ptr);
+      }
+
+      // Step 4: c2r IFFT along X for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        for (Index_t iz = 0; iz < local_real[2]; ++iz) {
+          for (Index_t iy = 0; iy < local_real[1]; ++iy) {
+            Index_t in_idx = comp + iy * Fx * nb_components +
+                             iz * Fx * local_real[1] * nb_components;
+            Index_t out_idx =
+                out_base_offset + comp + iy * out_stride_y + iz * out_stride_z;
+            backend->c2r(Nx, 1, work_z_ptr + in_idx, nb_components, 0,
+                         output_ptr + out_idx, out_comp_stride, 0);
+          }
+        }
+      }
+    } else {
+      // Serial path: all dimensions are local
+      Index_t fourier_size = Fx * Ny * Nz;
+
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        // Copy this component's data to temp buffer
+        WorkBuffer temp(fourier_size);
+        if constexpr (is_host_space_v<MemorySpace>) {
+          for (Index_t i = 0; i < fourier_size; ++i) {
+            temp.data()[i] = input_ptr[i * nb_components + comp];
+          }
+        } else {
+          // For device memory, we need a different approach
+          // This is a limitation - strided copy on device requires a kernel
+          throw RuntimeError(
+              "Multi-component 3D serial IFFT on device memory not "
+              "yet supported");
+        }
+
+        // Step 1: c2c IFFT along Z
+        for (Index_t iy = 0; iy < Ny; ++iy) {
+          for (Index_t ix = 0; ix < Fx; ++ix) {
+            Index_t idx = ix + iy * Fx;
+            Index_t stride = Fx * Ny;
+            backend->c2c_backward(Nz, 1, temp.data() + idx, stride, 0,
+                                  temp.data() + idx, stride, 0);
+          }
+        }
+
+        // Step 2: c2c IFFT along Y
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          for (Index_t ix = 0; ix < Fx; ++ix) {
+            Index_t idx = ix + iz * Fx * Ny;
+            backend->c2c_backward(Ny, 1, temp.data() + idx, Fx, 0,
+                                  temp.data() + idx, Fx, 0);
+          }
+        }
+
+        // Step 3: c2r IFFT along X
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          for (Index_t iy = 0; iy < Ny; ++iy) {
+            Index_t in_idx = iy * Fx + iz * Fx * Ny;
+            Index_t out_idx =
+                out_base_offset + comp + iy * out_stride_y + iz * out_stride_z;
+            backend->c2r(Nx, 1, temp.data() + in_idx, 1, 0,
+                         output_ptr + out_idx, out_comp_stride, 0);
+          }
+        }
+      }
+    }
+  }
+
+  //! FFT backend for this memory space
+  std::unique_ptr<FFT1DBackend> backend;
 };
+
+// Explicit template instantiation declarations for common memory spaces
+extern template class FFTEngine<HostSpace>;
+#if defined(MUGRID_ENABLE_CUDA)
+extern template class FFTEngine<CudaSpace>;
+#endif
+#if defined(MUGRID_ENABLE_HIP)
+extern template class FFTEngine<HIPSpace>;
+#endif
 
 }  // namespace muGrid
 

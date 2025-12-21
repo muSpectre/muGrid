@@ -50,6 +50,7 @@ set(MUGRID_SOURCES
     fft/pocketfft_backend.cc
     fft/datatype_transpose.cc
     fft/fft_utils.cc
+    fft/fft_engine_base.cc
     fft/fft_engine.cc
     "${CMAKE_CURRENT_BINARY_DIR}/version.cc"
 )

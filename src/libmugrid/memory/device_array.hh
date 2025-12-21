@@ -408,6 +408,107 @@ namespace muGrid {
 #endif
     }
 
+/**
+ * @brief Deep copy between raw pointers in different memory spaces.
+ *
+ * This overload allows copying between raw pointers when the memory
+ * spaces are known at compile time. Useful for FFT work buffers.
+ *
+ * @tparam T Element type
+ * @tparam DstSpace Destination memory space
+ * @tparam SrcSpace Source memory space
+ * @param dst Destination pointer
+ * @param src Source pointer
+ * @param count Number of elements to copy
+ */
+template <typename T, typename DstSpace, typename SrcSpace>
+void deep_copy(T * dst, const T * src, std::size_t count) {
+  if (count == 0) return;
+
+  // Host to Host
+  if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
+    std::memcpy(dst, src, count * sizeof(T));
+  }
+#if defined(MUGRID_ENABLE_CUDA)
+  // Host to CUDA
+  else if constexpr (is_host_space_v<SrcSpace> &&
+                     std::is_same_v<DstSpace, CudaSpace>) {
+    cudaError_t err =
+        cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+      throw std::runtime_error(std::string("CUDA memcpy H2D failed: ") +
+                               cudaGetErrorString(err));
+    }
+  }
+  // CUDA to Host
+  else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
+                     is_host_space_v<DstSpace>) {
+    cudaError_t err =
+        cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+      throw std::runtime_error(std::string("CUDA memcpy D2H failed: ") +
+                               cudaGetErrorString(err));
+    }
+  }
+  // CUDA to CUDA
+  else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
+                     std::is_same_v<DstSpace, CudaSpace>) {
+    cudaError_t err =
+        cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      throw std::runtime_error(std::string("CUDA memcpy D2D failed: ") +
+                               cudaGetErrorString(err));
+    }
+  }
+#endif
+#if defined(MUGRID_ENABLE_HIP)
+  // Host to HIP
+  else if constexpr (is_host_space_v<SrcSpace> &&
+                     std::is_same_v<DstSpace, HIPSpace>) {
+    hipError_t err =
+        hipMemcpy(dst, src, count * sizeof(T), hipMemcpyHostToDevice);
+    if (err != hipSuccess) {
+      throw std::runtime_error(std::string("HIP memcpy H2D failed: ") +
+                               hipGetErrorString(err));
+    }
+  }
+  // HIP to Host
+  else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
+                     is_host_space_v<DstSpace>) {
+    hipError_t err =
+        hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToHost);
+    if (err != hipSuccess) {
+      throw std::runtime_error(std::string("HIP memcpy D2H failed: ") +
+                               hipGetErrorString(err));
+    }
+  }
+  // HIP to HIP
+  else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
+                     std::is_same_v<DstSpace, HIPSpace>) {
+    hipError_t err =
+        hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToDevice);
+    if (err != hipSuccess) {
+      throw std::runtime_error(std::string("HIP memcpy D2D failed: ") +
+                               hipGetErrorString(err));
+    }
+  }
+#endif
+  else {
+    static_assert(is_host_space_v<DstSpace> || is_host_space_v<SrcSpace>,
+                  "Unsupported memory space combination for deep_copy");
+  }
+}
+
+/**
+ * @brief Deep copy within the same memory space (raw pointers).
+ *
+ * Convenience overload when source and destination are in the same space.
+ */
+template <typename T, typename MemorySpace>
+void deep_copy(T * dst, const T * src, std::size_t count) {
+  deep_copy<T, MemorySpace, MemorySpace>(dst, src, count);
+}
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_DEVICE_ARRAY_HH_

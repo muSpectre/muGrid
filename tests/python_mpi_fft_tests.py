@@ -134,8 +134,8 @@ class TestMPIFFTEngineConstruction:
         """Test that backend name is reported."""
         nb_grid_pts = [16, 20]
         engine = FFTEngine(nb_grid_pts, comm)
-        # Should be pocketfft for serial or MPI version
-        assert engine.backend_name in ["pocketfft", "mpi_pocketfft"]
+        # Should be PocketFFT for serial or MPI version
+        assert engine.backend_name in ["PocketFFT", "pocketfft"]
 
 
 class TestMPIFFTForwardTransform:

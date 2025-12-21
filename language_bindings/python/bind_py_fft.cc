@@ -45,8 +45,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
+using muGrid::FFTEngineBase;
 using muGrid::FFTEngine;
+using muGrid::HostSpace;
 using muGrid::Communicator;
+
+// Alias for Python binding - use HostSpace specialization
+using PyFFTEngine = FFTEngine<HostSpace>;
 using muGrid::Int;
 using muGrid::Index_t;
 using muGrid::IntCoord_t;
@@ -210,7 +215,7 @@ void add_fft_engine(py::module & mod) {
   using MemoryLocation = muGrid::FieldCollection::MemoryLocation;
   using SubPtMap_t = muGrid::FieldCollection::SubPtMap_t;
 
-  py::class_<FFTEngine, muGrid::CartesianDecomposition>(mod, "FFTEngine",
+  py::class_<PyFFTEngine, muGrid::CartesianDecomposition>(mod, "FFTEngine",
       R"(
       Distributed FFT engine using pencil (2D) decomposition.
 
@@ -238,13 +243,12 @@ void add_fft_engine(py::module & mod) {
       >>> real_field.s[:] *= engine.normalisation
       )")
       .def(py::init<const IntCoord_t &, const Communicator &, const IntCoord_t &,
-                    const IntCoord_t &, const SubPtMap_t &, MemoryLocation>(),
+                    const IntCoord_t &, const SubPtMap_t &>(),
            "nb_domain_grid_pts"_a,
            "comm"_a = Communicator(),
            "nb_ghosts_left"_a = IntCoord_t{},
            "nb_ghosts_right"_a = IntCoord_t{},
            "nb_sub_pts"_a = SubPtMap_t{},
-           "memory_location"_a = MemoryLocation::Host,
            R"(
            Construct an FFT engine with pencil decomposition.
 
@@ -260,13 +264,11 @@ void add_fft_engine(py::module & mod) {
                Ghost cells on high-index side of each dimension
            nb_sub_pts : dict, optional
                Number of sub-points per pixel
-           memory_location : MemoryLocation, optional
-               Where to allocate field memory (Host or Device)
            )")
 
       // Transform operations
       .def("fft",
-           [](FFTEngine & self, const Field & input, Field & output) {
+           [](PyFFTEngine & self, const Field & input, Field & output) {
              self.fft(input, output);
            },
            "input"_a, "output"_a,
@@ -285,7 +287,7 @@ void add_fft_engine(py::module & mod) {
            )")
 
       .def("ifft",
-           [](FFTEngine & self, const Field & input, Field & output) {
+           [](PyFFTEngine & self, const Field & input, Field & output) {
              self.ifft(input, output);
            },
            "input"_a, "output"_a,
@@ -306,7 +308,7 @@ void add_fft_engine(py::module & mod) {
       // Field registration
       .def("real_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &FFTEngine::register_real_space_field),
+               &PyFFTEngine::register_real_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            R"(
@@ -327,7 +329,7 @@ void add_fft_engine(py::module & mod) {
 
       .def("fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &FFTEngine::register_fourier_space_field),
+               &PyFFTEngine::register_fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            R"(
@@ -348,53 +350,53 @@ void add_fft_engine(py::module & mod) {
 
       // Collection access
       .def_property_readonly("real_space_collection",
-           py::overload_cast<>(&FFTEngine::get_real_space_collection),
+           py::overload_cast<>(&PyFFTEngine::get_real_space_collection),
            py::return_value_policy::reference_internal,
            "Get the real-space field collection.")
 
       .def_property_readonly("fourier_space_collection",
-           py::overload_cast<>(&FFTEngine::get_fourier_space_collection),
+           py::overload_cast<>(&PyFFTEngine::get_fourier_space_collection),
            py::return_value_policy::reference_internal,
            "Get the Fourier-space field collection.")
 
       // Geometry queries
-      .def_property_readonly("normalisation", &FFTEngine::normalisation,
+      .def_property_readonly("normalisation", &PyFFTEngine::normalisation,
            R"(
            Get the normalization factor for FFT roundtrip.
            Multiply ifft output by this to recover original values.
            )")
 
       .def_property_readonly("nb_fourier_grid_pts",
-           &FFTEngine::get_nb_fourier_grid_pts,
+           &PyFFTEngine::get_nb_fourier_grid_pts,
            R"(
            Get the global Fourier grid dimensions.
            For r2c transform: [Nx/2+1, Ny, Nz]
            )")
 
       .def_property_readonly("nb_fourier_subdomain_grid_pts",
-           &FFTEngine::get_nb_fourier_subdomain_grid_pts,
+           &PyFFTEngine::get_nb_fourier_subdomain_grid_pts,
            "Get the local Fourier grid dimensions on this rank.")
 
       .def_property_readonly("fourier_subdomain_locations",
-           &FFTEngine::get_fourier_subdomain_locations,
+           &PyFFTEngine::get_fourier_subdomain_locations,
            "Get the starting location of this rank's Fourier subdomain.")
 
       .def_property_readonly("process_grid",
-           [](const FFTEngine & self) {
+           [](const PyFFTEngine & self) {
              auto grid = self.get_process_grid();
              return py::make_tuple(grid[0], grid[1]);
            },
            "Get the 2D process grid dimensions (P1, P2).")
 
       .def_property_readonly("process_coords",
-           [](const FFTEngine & self) {
+           [](const PyFFTEngine & self) {
              auto coords = self.get_process_coords();
              return py::make_tuple(coords[0], coords[1]);
            },
            "Get this rank's coordinates in the process grid (p1, p2).")
 
       .def_property_readonly("backend_name",
-           &FFTEngine::get_backend_name,
+           &PyFFTEngine::get_backend_name,
            "Get the name of the FFT backend being used.");
 }
 

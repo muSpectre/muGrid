@@ -39,10 +39,14 @@
 #include "fft/fft_utils.hh"
 #include "field/field_typed.hh"
 #include "field/field_map.hh"
+#include "memory/memory_space.hh"
 
 #include <cmath>
 
 namespace muGrid {
+
+// Use HostSpace FFTEngine for all tests
+using FFTEngineHost = FFTEngine<HostSpace>;
 
 BOOST_AUTO_TEST_SUITE(fft_engine_tests)
 
@@ -106,7 +110,7 @@ BOOST_AUTO_TEST_CASE(test_hermitian_grid_pts) {
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_creation) {
   IntCoord_t nb_grid_pts{8, 10};
 
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   BOOST_CHECK_EQUAL(engine.get_nb_domain_grid_pts()[0], 8);
   BOOST_CHECK_EQUAL(engine.get_nb_domain_grid_pts()[1], 10);
@@ -120,7 +124,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_creation) {
 BOOST_AUTO_TEST_CASE(test_fft_engine_3d_creation) {
   IntCoord_t nb_grid_pts{8, 10, 12};
 
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   BOOST_CHECK_EQUAL(engine.get_nb_domain_grid_pts()[0], 8);
   BOOST_CHECK_EQUAL(engine.get_nb_domain_grid_pts()[1], 10);
@@ -136,7 +140,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_3d_creation) {
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_small_roundtrip) {
   // Small grid test to catch edge cases
   IntCoord_t nb_grid_pts{4, 5};
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   Field & real_field = engine.register_real_space_field("test_real");
   Field & fourier_field = engine.register_fourier_space_field("test_fourier");
@@ -175,7 +179,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_small_roundtrip) {
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_roundtrip) {
   IntCoord_t nb_grid_pts{16, 20};
 
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   // Register fields
   Field & real_field = engine.register_real_space_field("test_real");
@@ -223,7 +227,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_roundtrip) {
 BOOST_AUTO_TEST_CASE(test_fft_engine_3d_roundtrip) {
   IntCoord_t nb_grid_pts{8, 10, 12};
 
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   // Register fields
   Field & real_field = engine.register_real_space_field("test_real");
@@ -330,7 +334,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_with_ghosts) {
 BOOST_AUTO_TEST_CASE(test_fft_engine_vector_field) {
   IntCoord_t nb_grid_pts{8, 10};
 
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   // Register vector fields (2 components)
   Field & real_field = engine.register_real_space_field("test_vector", 2);
@@ -376,11 +380,11 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_vector_field) {
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_backend_name) {
   IntCoord_t nb_grid_pts{8, 10};
-  FFTEngine engine(nb_grid_pts);
+  FFTEngineHost engine(nb_grid_pts);
 
   const char * name = engine.get_backend_name();
   BOOST_CHECK(name != nullptr);
-  BOOST_CHECK(std::string(name) == "pocketfft");
+  BOOST_CHECK(std::string(name) == "PocketFFT");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
