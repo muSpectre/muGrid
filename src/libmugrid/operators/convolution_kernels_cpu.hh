@@ -53,6 +53,10 @@ namespace muGrid {
         Index_t quad_elems_per_pixel;       // DOFs per pixel for quad field
         Index_t nodal_stride_x, nodal_stride_y, nodal_stride_z;
         Index_t quad_stride_x, quad_stride_y, quad_stride_z;
+
+        // Total elements in fields (needed for SoA indexing)
+        Index_t total_nodal_elements;       // Total nodal elements in buffer
+        Index_t total_quad_elements;        // Total quad elements in buffer
     };
 
     /**

@@ -271,6 +271,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    template<StorageOrder storage_order>
     GridTraversalParams ConvolutionOperator::compute_traversal_params(
         const GlobalFieldCollection& collection,
         Index_t nb_nodal_components,
@@ -293,7 +294,7 @@ namespace muGrid {
         // Starting pixel index (skip ghosts)
         params.start_pixel_index = collection.get_pixels_index_diff();
 
-        // Ghost counts (pad to 2D for x,y strides)
+        // Ghost counts (pad to 3D)
         auto ghosts_count = pad_shape_to_3d(
             collection.get_nb_ghosts_left() + collection.get_nb_ghosts_right(),
             0);
@@ -301,19 +302,52 @@ namespace muGrid {
         // Row width including ghosts
         params.row_width = params.nx + ghosts_count[0];
 
-        // Strides for navigation
-        params.nodal_stride_x = params.nodal_elems_per_pixel;
-        params.nodal_stride_y = params.row_width * params.nodal_elems_per_pixel;
-        params.nodal_stride_z = params.nodal_stride_y *
-                                (params.ny + ghosts_count[1]);
+        // Total buffer pixels (including ghosts)
+        Index_t buffer_nx = params.nx + ghosts_count[0];
+        Index_t buffer_ny = params.ny + ghosts_count[1];
+        Index_t buffer_nz = params.nz + ghosts_count[2];
+        Index_t total_buffer_pixels = buffer_nx * buffer_ny * buffer_nz;
 
-        params.quad_stride_x = params.quad_elems_per_pixel;
-        params.quad_stride_y = params.row_width * params.quad_elems_per_pixel;
-        params.quad_stride_z = params.quad_stride_y *
-                               (params.ny + ghosts_count[1]);
+        // Total elements in buffers (for SoA indexing)
+        params.total_nodal_elements = total_buffer_pixels *
+                                      this->nb_pixelnodal_pts;
+        params.total_quad_elements = total_buffer_pixels *
+                                     this->nb_quad_pts * this->nb_operators;
+
+        // Strides depend on storage order
+        if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
+            // AoS: components are consecutive within each pixel
+            // offset = pixel_index * elems_per_pixel + elem_within_pixel
+            params.nodal_stride_x = params.nodal_elems_per_pixel;
+            params.nodal_stride_y = buffer_nx * params.nodal_elems_per_pixel;
+            params.nodal_stride_z = params.nodal_stride_y * buffer_ny;
+
+            params.quad_stride_x = params.quad_elems_per_pixel;
+            params.quad_stride_y = buffer_nx * params.quad_elems_per_pixel;
+            params.quad_stride_z = params.quad_stride_y * buffer_ny;
+        } else {
+            // SoA: pixels are consecutive for each component
+            // offset = component * total_pixels * pts_per_pixel + pixel_index * pts_per_pixel + pt
+            // For the base offset (component 0), stride is just 1 pixel
+            params.nodal_stride_x = this->nb_pixelnodal_pts;
+            params.nodal_stride_y = buffer_nx * this->nb_pixelnodal_pts;
+            params.nodal_stride_z = params.nodal_stride_y * buffer_ny;
+
+            params.quad_stride_x = this->nb_quad_pts * this->nb_operators;
+            params.quad_stride_y = buffer_nx * this->nb_quad_pts * this->nb_operators;
+            params.quad_stride_z = params.quad_stride_y * buffer_ny;
+        }
 
         return params;
     }
+
+    // Explicit template instantiations
+    template GridTraversalParams ConvolutionOperator::compute_traversal_params<
+        StorageOrder::ArrayOfStructures>(
+        const GlobalFieldCollection&, Index_t, Index_t) const;
+    template GridTraversalParams ConvolutionOperator::compute_traversal_params<
+        StorageOrder::StructureOfArrays>(
+        const GlobalFieldCollection&, Index_t, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
@@ -329,8 +363,9 @@ namespace muGrid {
         }
 
         // Cache invalidated - clear both operators and rebuild
-        this->cached_apply_op = this->create_apply_operator(nb_grid_pts,
-                                                            nb_nodal_components);
+        // Use HostSpace::storage_order (ArrayOfStructures) for host operators
+        this->cached_apply_op = this->create_apply_operator<HostSpace::storage_order>(
+            nb_grid_pts, nb_nodal_components);
         this->cached_transpose_op.reset();
         this->cached_key = key;
         return this->cached_apply_op.value();
@@ -350,7 +385,8 @@ namespace muGrid {
         }
 
         // Cache invalidated - clear both operators and rebuild
-        this->cached_transpose_op = this->create_transpose_operator(
+        // Use HostSpace::storage_order (ArrayOfStructures) for host operators
+        this->cached_transpose_op = this->create_transpose_operator<HostSpace::storage_order>(
             nb_grid_pts, nb_nodal_components);
         this->cached_apply_op.reset();
         this->cached_key = key;
@@ -358,15 +394,25 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_apply_operator(
         const IntCoord_t & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between col-major index and coordinate
-        // FIXME(yizhen): should wrap the specific functionality in a wrapper?
         const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
                                               IntCoord_t(this->pixel_offset)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
+
+        // For SoA storage order, we need total element counts
+        Index_t total_pixels = 1;
+        for (auto dim : nb_grid_pts) {
+            total_pixels *= dim;
+        }
+        const Index_t total_nodal_elements = total_pixels *
+                                             this->nb_pixelnodal_pts;
+        const Index_t total_quad_elements = total_pixels *
+                                            this->nb_quad_pts * this->nb_operators;
 
         // First pass: count non-zero entries
         Index_t nnz = 0;
@@ -394,7 +440,6 @@ namespace muGrid {
                 for (Index_t i_stencil=0; i_stencil < this->nb_conv_pts; ++i_stencil) {
                     for (Index_t i_node=0; i_node < this->nb_pixelnodal_pts; ++i_node) {
                         // Get the entry via col-major index
-                        // FIXME(yizhen): should wrap this in a helper
                         const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
                                              * this->nb_operators + i_operator};
                         const auto op_value{this->pixel_operator[op_index]};
@@ -403,18 +448,25 @@ namespace muGrid {
                             // For each component
                             for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to pixel (coordinate) offset
-                                const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
+                                const auto stencil_offset{kernel_pixels.get_coord(i_stencil)};
                                 // Then to pixel count on the field
-                                const auto pixel_count{grid_pixels.get_index(pixel_offset)};
-                                // Combine pixel, nodal & component to get col-major index diff on nodal field (to read)
-                                // FIXME(yizhen): should wrap this in a helper
-                                const auto index_diff_nodal{(pixel_count * this->nb_pixelnodal_pts + i_node)
-                                                             * nb_nodal_components + i_component};
-                                // Combine quad-pt, operator & component to get col-major index diff on quadrature field
-                                // (to write)
-                                // FIXME(yizhen): should wrap this in a helper
-                                const auto index_diff_quad{(i_quad * this->nb_operators + i_operator)
-                                                            * nb_nodal_components + i_component};
+                                const auto pixel_count{grid_pixels.get_index(stencil_offset)};
+
+                                Index_t index_diff_nodal, index_diff_quad;
+                                if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
+                                    // AoS: (pixel_offset * pts + pt) * comps + comp
+                                    index_diff_nodal = (pixel_count * this->nb_pixelnodal_pts + i_node)
+                                                       * nb_nodal_components + i_component;
+                                    index_diff_quad = (i_quad * this->nb_operators + i_operator)
+                                                      * nb_nodal_components + i_component;
+                                } else {
+                                    // SoA: comp * total_elements + pixel_offset * pts + pt
+                                    index_diff_nodal = i_component * total_nodal_elements
+                                                       + pixel_count * this->nb_pixelnodal_pts + i_node;
+                                    index_diff_quad = i_component * total_quad_elements
+                                                      + i_quad * this->nb_operators + i_operator;
+                                }
+
                                 // Add the entry (use [] for DeviceArray access)
                                 sparse_op.quad_indices[entry_idx] = index_diff_quad;
                                 sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
@@ -429,7 +481,16 @@ namespace muGrid {
         return sparse_op;
     }
 
+    // Explicit template instantiations for create_apply_operator
+    template SparseOperatorSoA<HostSpace>
+    ConvolutionOperator::create_apply_operator<StorageOrder::ArrayOfStructures>(
+        const IntCoord_t&, Index_t) const;
+    template SparseOperatorSoA<HostSpace>
+    ConvolutionOperator::create_apply_operator<StorageOrder::StructureOfArrays>(
+        const IntCoord_t&, Index_t) const;
+
     /* ---------------------------------------------------------------------- */
+    template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_transpose_operator(
         const IntCoord_t & nb_grid_pts,
@@ -438,6 +499,16 @@ namespace muGrid {
         const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
                                               IntCoord_t(this->pixel_offset)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
+
+        // For SoA storage order, we need total element counts
+        Index_t total_pixels = 1;
+        for (auto dim : nb_grid_pts) {
+            total_pixels *= dim;
+        }
+        const Index_t total_nodal_elements = total_pixels *
+                                             this->nb_pixelnodal_pts;
+        const Index_t total_quad_elements = total_pixels *
+                                            this->nb_quad_pts * this->nb_operators;
 
         // First pass: count non-zero entries
         Index_t nnz = 0;
@@ -465,7 +536,6 @@ namespace muGrid {
                 for (Index_t i_quad=0; i_quad < this->nb_quad_pts; ++i_quad) {
                     for (Index_t i_operator=0; i_operator < this->nb_operators; ++i_operator) {
                         // Get the entry via col-major index
-                        // FIXME(yizhen): should wrap this in a helper
                         const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
                                              * this->nb_operators + i_operator};
                         const auto op_value{this->pixel_operator[op_index]};
@@ -474,17 +544,27 @@ namespace muGrid {
                             // For each component
                             for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to coordinate offset
-                                const auto pixel_offset{kernel_pixels.get_coord(i_stencil)};
+                                const auto stencil_offset{kernel_pixels.get_coord(i_stencil)};
                                 // Then to pixel count on the field
-                                const auto pixel_count{grid_pixels.get_index(pixel_offset)};
-                                // Combine pixel, quad-pt, operator & component to get col-major index diff on quadrature field
-                                // (to read). NOTE: the pixel count is deducted because of inversed mapping direction.
-                                // FIXME(yizhen): should wrap this in a helper
-                                const auto index_diff_quad{((-pixel_count * this->nb_quad_pts + i_quad) * this->nb_operators
-                                                            + i_operator) * nb_nodal_components + i_component};
-                                // Combine node & component to get col-major on nodal field (to write)
-                                // FIXME(yizhen): should wrap this in a helper
-                                const auto index_diff_nodal{i_node * nb_nodal_components + i_component};
+                                const auto pixel_count{grid_pixels.get_index(stencil_offset)};
+
+                                Index_t index_diff_nodal, index_diff_quad;
+                                if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
+                                    // AoS: (pixel_offset * pts + pt) * comps + comp
+                                    // NOTE: pixel_count is negated for transpose (inverse mapping)
+                                    index_diff_quad = ((-pixel_count * this->nb_quad_pts + i_quad) *
+                                                       this->nb_operators + i_operator) *
+                                                      nb_nodal_components + i_component;
+                                    index_diff_nodal = i_node * nb_nodal_components + i_component;
+                                } else {
+                                    // SoA: comp * total_elements + pixel_offset * pts + pt
+                                    // NOTE: pixel_count is negated for transpose (inverse mapping)
+                                    index_diff_quad = i_component * total_quad_elements
+                                                      - pixel_count * this->nb_quad_pts * this->nb_operators
+                                                      + i_quad * this->nb_operators + i_operator;
+                                    index_diff_nodal = i_component * total_nodal_elements + i_node;
+                                }
+
                                 // Add the entry (use [] for DeviceArray access)
                                 sparse_op.quad_indices[entry_idx] = index_diff_quad;
                                 sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
@@ -498,6 +578,14 @@ namespace muGrid {
         }
         return sparse_op;
     }
+
+    // Explicit template instantiations for create_transpose_operator
+    template SparseOperatorSoA<HostSpace>
+    ConvolutionOperator::create_transpose_operator<StorageOrder::ArrayOfStructures>(
+        const IntCoord_t&, Index_t) const;
+    template SparseOperatorSoA<HostSpace>
+    ConvolutionOperator::create_transpose_operator<StorageOrder::StructureOfArrays>(
+        const IntCoord_t&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     void ConvolutionOperator::clear_cache() const {
@@ -528,8 +616,8 @@ namespace muGrid {
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
         const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
-        // Compute traversal parameters
-        const auto params = this->compute_traversal_params(
+        // Compute traversal parameters (use HostSpace storage order)
+        const auto params = this->compute_traversal_params<HostSpace::storage_order>(
             collection, nb_nodal_components, nb_quad_components);
 
         // Get cached sparse operator (row-major for write locality to quad_data)
@@ -571,8 +659,8 @@ namespace muGrid {
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
         const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
-        // Compute traversal parameters
-        const auto params = this->compute_traversal_params(
+        // Compute traversal parameters (use HostSpace storage order)
+        const auto params = this->compute_traversal_params<HostSpace::storage_order>(
             collection, nb_nodal_components, nb_quad_components);
 
         // Get cached sparse operator (col-major for write locality to nodal_data)

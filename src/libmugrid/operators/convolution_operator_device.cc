@@ -66,8 +66,8 @@ namespace muGrid {
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
         const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
-        // Compute traversal parameters
-        const auto params = this->compute_traversal_params(
+        // Compute traversal parameters (use device storage order)
+        const auto params = this->compute_traversal_params<DefaultDeviceSpace::storage_order>(
             collection, nb_nodal_components, nb_quad_components);
 
         // Ensure device sparse operator is cached (copies from host if needed)
@@ -112,8 +112,8 @@ namespace muGrid {
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
         const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
-        // Compute traversal parameters
-        const auto params = this->compute_traversal_params(
+        // Compute traversal parameters (use device storage order)
+        const auto params = this->compute_traversal_params<DefaultDeviceSpace::storage_order>(
             collection, nb_nodal_components, nb_quad_components);
 
         // Ensure device sparse operator is cached (copies from host if needed)

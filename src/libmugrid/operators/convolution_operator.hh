@@ -382,6 +382,7 @@ namespace muGrid {
 
         /**
          * @brief Create sparse operator with row-major ordering
+         * @tparam storage_order Storage order for index computation
          * @param nb_grid_pts number of process-local (subdomain) grid points
          * with ghosts
          * @param nb_nodal_components number of components in nodal field
@@ -389,13 +390,20 @@ namespace muGrid {
          *
          * Row-major order groups entries by quad index, providing write
          * locality for apply_increment (scatter to quad_data).
+         *
+         * The storage_order template parameter determines how indices are
+         * computed:
+         * - ArrayOfStructures: indices = (pixel_offset * pts + pt) * comps + comp
+         * - StructureOfArrays: indices = comp * total_elements + pixel_offset * pts + pt
          */
+        template<StorageOrder storage_order>
         SparseOperatorSoA<HostSpace>
         create_apply_operator(const IntCoord_t & nb_grid_pts,
                               const Index_t nb_nodal_components) const;
 
         /**
          * @brief Create sparse operator with column-major ordering
+         * @tparam storage_order Storage order for index computation
          * @param nb_grid_pts number of process-local (subdomain) grid points
          * with ghosts
          * @param nb_nodal_components number of components in nodal field
@@ -403,18 +411,29 @@ namespace muGrid {
          *
          * Column-major order groups entries by nodal index, providing write
          * locality for transpose_increment (scatter to nodal_data).
+         *
+         * The storage_order template parameter determines how indices are
+         * computed:
+         * - ArrayOfStructures: indices = (pixel_offset * pts + pt) * comps + comp
+         * - StructureOfArrays: indices = comp * total_elements + pixel_offset * pts + pt
          */
+        template<StorageOrder storage_order>
         SparseOperatorSoA<HostSpace>
         create_transpose_operator(const IntCoord_t & nb_grid_pts,
                                   const Index_t nb_nodal_components) const;
 
         /**
          * @brief Compute grid traversal parameters
+         * @tparam storage_order Storage order for stride computation
          * @param collection The field collection
          * @param nb_nodal_components Number of nodal components
          * @param nb_quad_components Number of quadrature components
          * @return GridTraversalParams structure with all computed values
+         *
+         * For ArrayOfStructures: stride_x = elems_per_pixel
+         * For StructureOfArrays: stride_x = 1 (pixels consecutive per component)
          */
+        template<StorageOrder storage_order>
         GridTraversalParams compute_traversal_params(
             const GlobalFieldCollection& collection,
             Index_t nb_nodal_components,
@@ -552,14 +571,14 @@ namespace muGrid {
     ConvolutionOperator::get_device_apply_operator(
         const IntCoord_t& nb_grid_pts,
         Index_t nb_nodal_components) const {
-        // Ensure host operator is cached first
-        this->get_apply_operator(nb_grid_pts, nb_nodal_components);
-
         // Check if device cache needs update
         if (!this->cached_device_apply_op.has_value()) {
-            // Copy from host to device using our deep_copy_sparse_operator
+            // Create operator with SoA indices (device storage order) and copy to device
+            // Device spaces use StructureOfArrays for optimal memory coalescence
+            auto host_soa_op = this->create_apply_operator<DeviceSpace::storage_order>(
+                nb_grid_pts, nb_nodal_components);
             this->cached_device_apply_op = muGrid::deep_copy_sparse_operator<
-                DeviceSpace, HostSpace>(this->cached_apply_op.value());
+                DeviceSpace, HostSpace>(host_soa_op);
         }
 
         return this->cached_device_apply_op.value();
@@ -570,14 +589,14 @@ namespace muGrid {
     ConvolutionOperator::get_device_transpose_operator(
         const IntCoord_t& nb_grid_pts,
         Index_t nb_nodal_components) const {
-        // Ensure host operator is cached first
-        this->get_transpose_operator(nb_grid_pts, nb_nodal_components);
-
         // Check if device cache needs update
         if (!this->cached_device_transpose_op.has_value()) {
-            // Copy from host to device using our deep_copy_sparse_operator
+            // Create operator with SoA indices (device storage order) and copy to device
+            // Device spaces use StructureOfArrays for optimal memory coalescence
+            auto host_soa_op = this->create_transpose_operator<DeviceSpace::storage_order>(
+                nb_grid_pts, nb_nodal_components);
             this->cached_device_transpose_op = muGrid::deep_copy_sparse_operator<
-                DeviceSpace, HostSpace>(this->cached_transpose_op.value());
+                DeviceSpace, HostSpace>(host_soa_op);
         }
 
         return this->cached_device_transpose_op.value();
