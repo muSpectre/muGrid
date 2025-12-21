@@ -556,7 +556,12 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
   DatatypeTranspose * transpose_yz_bwd =
       this->get_transpose_yz_backward(nb_components);
 
-  if (transpose_xz != nullptr) {
+  // MPI path: needed if any transpose is required (comm.size > 1)
+  // With 2D process grid (P1, P2), we may need Y↔Z transposes (row_comm)
+  // and/or X↔Z transpose (col_comm) depending on rank count.
+  bool need_mpi_path = (transpose_xz != nullptr || transpose_yz_fwd != nullptr);
+
+  if (need_mpi_path) {
     // MPI path with transposes - TODO: implement multi-component support
     if (nb_components > 1) {
       throw RuntimeError(
@@ -613,11 +618,19 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
       transpose_yz_bwd->forward(work_y_ptr, work_z_ptr);
     }
 
-    // Step 3: Transpose X↔Z
-    transpose_xz->forward(work_z_ptr, output_ptr);
+    // Step 3: Transpose X↔Z (or copy if no transpose needed)
+    const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
+    if (transpose_xz != nullptr) {
+      transpose_xz->forward(work_z_ptr, output_ptr);
+    } else {
+      // No X↔Z transpose needed (P1=1), just copy from work_z to output
+      // work_z layout: [Fx, Ny_local, Nz] = fourier_local
+      Index_t fourier_size =
+          fourier_local[0] * fourier_local[1] * fourier_local[2];
+      std::copy(work_z_ptr, work_z_ptr + fourier_size, output_ptr);
+    }
 
     // Step 4: c2c FFT along Z
-    const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
     for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
       for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
         Index_t idx = ix + iy * fourier_local[0];
@@ -818,7 +831,10 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
   DatatypeTranspose * transpose_yz_bwd =
       this->get_transpose_yz_backward(nb_components);
 
-  if (transpose_xz != nullptr) {
+  // MPI path: needed if any transpose is required (comm.size > 1)
+  bool need_mpi_path = (transpose_xz != nullptr || transpose_yz_fwd != nullptr);
+
+  if (need_mpi_path) {
     // MPI path with transposes - TODO: implement multi-component support
     if (nb_components > 1) {
       throw RuntimeError(
@@ -852,8 +868,13 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
     std::vector<Complex> work_z(zpencil_size);
     Complex * work_z_ptr = work_z.data();
 
-    // Step 2: Transpose Z↔X (backward)
-    transpose_xz->backward(temp.data(), work_z_ptr);
+    // Step 2: Transpose Z↔X (backward) or copy if no transpose needed
+    if (transpose_xz != nullptr) {
+      transpose_xz->backward(temp.data(), work_z_ptr);
+    } else {
+      // No X↔Z transpose needed (P1=1), just copy from temp to work_z
+      std::copy(temp.data(), temp.data() + zpencil_size, work_z_ptr);
+    }
 
     // Y-pencil work buffer
     const IntCoord_t & ypencil_shape =
