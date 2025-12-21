@@ -75,6 +75,18 @@ DatatypeTranspose::DatatypeTranspose(const Communicator & comm,
 
   int comm_size = comm.size();
 
+  // Check if this is an allgather operation (no scatter needed)
+  // This happens when the "scatter" dimension is already full locally
+  // in BOTH input and output (i.e., axis_out is not being redistributed)
+  this->is_allgather = (local_in[axis_out] == global_out) &&
+                       (local_out[axis_out] == global_out);
+
+  // Check if this is a scatter-only operation (no gather needed)
+  // This happens when the "gather" dimension is already full locally
+  // in BOTH input and output (i.e., axis_in is not being redistributed)
+  this->is_scatter_only = (local_in[axis_in] == global_in) &&
+                          (local_out[axis_in] == global_in);
+
   // Compute how the distributed dimensions are split across ranks
   compute_distribution(global_in, comm_size, this->in_counts, this->in_displs);
   compute_distribution(global_out, comm_size, this->out_counts,
@@ -122,7 +134,9 @@ DatatypeTranspose::DatatypeTranspose(DatatypeTranspose && other) noexcept
       recv_displs{std::move(other.recv_displs)}
 #endif
       ,
-      types_initialized{other.types_initialized} {
+      types_initialized{other.types_initialized},
+      is_allgather{other.is_allgather},
+      is_scatter_only{other.is_scatter_only} {
   other.types_initialized = false;  // Prevent double-free
 }
 
@@ -156,6 +170,8 @@ DatatypeTranspose::operator=(DatatypeTranspose && other) noexcept {
     recv_displs = std::move(other.recv_displs);
 #endif
     types_initialized = other.types_initialized;
+    is_allgather = other.is_allgather;
+    is_scatter_only = other.is_scatter_only;
     other.types_initialized = false;
   }
   return *this;
@@ -313,53 +329,130 @@ void DatatypeTranspose::init_forward_types() {
   int comm_size = this->comm.size();
   Dim_t dim = this->local_in.get_dim();
 
-  for (int r = 0; r < comm_size; ++r) {
-    // For forward transpose:
-    // - We send a block from our input to rank r
-    // - The block covers out_counts[r] elements along axis_out
-    //   (the dimension that becomes distributed after transpose)
-    // - And all of our local elements along axis_in
-    //   (the dimension that is distributed in input)
+  if (this->is_allgather) {
+    // Allgather mode: send same data to all peers, receive at different offsets
+    // Build one send type (full local input) used for all peers
+    IntCoord_t send_block_shape = this->local_in;
+    IntCoord_t send_block_start(dim, 0);
 
-    // Build send type: extract block from input
-    IntCoord_t send_block_shape(dim);
-    IntCoord_t send_block_start(dim);
-
-    for (Dim_t d = 0; d < dim; ++d) {
-      if (d == this->axis_out) {
-        // This dimension gets distributed after transpose
-        // Send only the portion that will belong to rank r
-        send_block_shape[d] = this->out_counts[r];
-        send_block_start[d] = this->out_displs[r];
-      } else {
-        // Other dimensions: send all our local data
-        send_block_shape[d] = this->local_in[d];
-        send_block_start[d] = 0;
-      }
-    }
-
-    this->send_types_fwd[r] =
+    MPI_Datatype send_type =
         build_block_type(this->local_in, send_block_shape, send_block_start);
 
-    // Build recv type: place block into output
-    IntCoord_t recv_block_shape(dim);
-    IntCoord_t recv_block_start(dim);
-
-    for (Dim_t d = 0; d < dim; ++d) {
-      if (d == this->axis_in) {
-        // This dimension becomes local after transpose
-        // Receive the portion that rank r owned before
-        recv_block_shape[d] = this->in_counts[r];
-        recv_block_start[d] = this->in_displs[r];
+    for (int r = 0; r < comm_size; ++r) {
+      // All ranks get the same send type (our full local data)
+      if (r == 0) {
+        this->send_types_fwd[r] = send_type;
       } else {
-        // Other dimensions: receive all data
-        recv_block_shape[d] = this->local_out[d];
-        recv_block_start[d] = 0;
+        MPI_Type_dup(send_type, &this->send_types_fwd[r]);
+      }
+
+      // Build recv type: place incoming data at the correct position
+      IntCoord_t recv_block_shape(dim);
+      IntCoord_t recv_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_in) {
+          // This dimension is gathered - place each rank's portion at its offset
+          recv_block_shape[d] = this->in_counts[r];
+          recv_block_start[d] = this->in_displs[r];
+        } else {
+          // Other dimensions: same as output (axis_out is unchanged in allgather)
+          recv_block_shape[d] = this->local_out[d];
+          recv_block_start[d] = 0;
+        }
+      }
+
+      this->recv_types_fwd[r] =
+          build_block_type(this->local_out, recv_block_shape, recv_block_start);
+    }
+  } else if (this->is_scatter_only) {
+    // Scatter-only mode: send different portions to different peers,
+    // receive our own portion from all peers (they all send the same)
+
+    // Build one recv type (full local output) used for all peers
+    IntCoord_t recv_block_shape = this->local_out;
+    IntCoord_t recv_block_start(dim, 0);
+
+    MPI_Datatype recv_type =
+        build_block_type(this->local_out, recv_block_shape, recv_block_start);
+
+    for (int r = 0; r < comm_size; ++r) {
+      // Build send type: extract rank r's portion along axis_out
+      IntCoord_t send_block_shape(dim);
+      IntCoord_t send_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_out) {
+          // This dimension is scattered - send the portion for rank r
+          send_block_shape[d] = this->out_counts[r];
+          send_block_start[d] = this->out_displs[r];
+        } else {
+          // Other dimensions: same as input (axis_in is unchanged in scatter-only)
+          send_block_shape[d] = this->local_in[d];
+          send_block_start[d] = 0;
+        }
+      }
+
+      this->send_types_fwd[r] =
+          build_block_type(this->local_in, send_block_shape, send_block_start);
+
+      // All ranks use the same recv type (our full local output)
+      if (r == 0) {
+        this->recv_types_fwd[r] = recv_type;
+      } else {
+        MPI_Type_dup(recv_type, &this->recv_types_fwd[r]);
       }
     }
+  } else {
+    // Standard transpose mode: scatter-gather
+    for (int r = 0; r < comm_size; ++r) {
+      // For forward transpose:
+      // - We send a block from our input to rank r
+      // - The block covers out_counts[r] elements along axis_out
+      //   (the dimension that becomes distributed after transpose)
+      // - And all of our local elements along axis_in
+      //   (the dimension that is distributed in input)
 
-    this->recv_types_fwd[r] =
-        build_block_type(this->local_out, recv_block_shape, recv_block_start);
+      // Build send type: extract block from input
+      IntCoord_t send_block_shape(dim);
+      IntCoord_t send_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_out) {
+          // This dimension gets distributed after transpose
+          // Send only the portion that will belong to rank r
+          send_block_shape[d] = this->out_counts[r];
+          send_block_start[d] = this->out_displs[r];
+        } else {
+          // Other dimensions: send all our local data
+          send_block_shape[d] = this->local_in[d];
+          send_block_start[d] = 0;
+        }
+      }
+
+      this->send_types_fwd[r] =
+          build_block_type(this->local_in, send_block_shape, send_block_start);
+
+      // Build recv type: place block into output
+      IntCoord_t recv_block_shape(dim);
+      IntCoord_t recv_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_in) {
+          // This dimension becomes local after transpose
+          // Receive the portion that rank r owned before
+          recv_block_shape[d] = this->in_counts[r];
+          recv_block_start[d] = this->in_displs[r];
+        } else {
+          // Other dimensions: receive all data
+          recv_block_shape[d] = this->local_out[d];
+          recv_block_start[d] = 0;
+        }
+      }
+
+      this->recv_types_fwd[r] =
+          build_block_type(this->local_out, recv_block_shape, recv_block_start);
+    }
   }
 }
 
@@ -367,46 +460,127 @@ void DatatypeTranspose::init_backward_types() {
   int comm_size = this->comm.size();
   Dim_t dim = this->local_out.get_dim();
 
-  // Backward is the reverse of forward:
-  // - Send from output layout (X-distributed) to input layout (Y-distributed)
+  if (this->is_allgather) {
+    // Scatter mode (reverse of allgather):
+    // Each rank sends different portions to different peers,
+    // receives the same data from all peers (but from different positions)
 
-  for (int r = 0; r < comm_size; ++r) {
-    // Build send type: extract block from output (backward input)
-    IntCoord_t send_block_shape(dim);
-    IntCoord_t send_block_start(dim);
+    // Build one recv type (full local output) used for all peers
+    IntCoord_t recv_block_shape = this->local_in;
+    IntCoord_t recv_block_start(dim, 0);
 
-    for (Dim_t d = 0; d < dim; ++d) {
-      if (d == this->axis_in) {
-        // In backward, axis_in is now local (was distributed)
-        // Send the portion that will belong to rank r
-        send_block_shape[d] = this->in_counts[r];
-        send_block_start[d] = this->in_displs[r];
+    MPI_Datatype recv_type =
+        build_block_type(this->local_in, recv_block_shape, recv_block_start);
+
+    for (int r = 0; r < comm_size; ++r) {
+      // Build send type: extract rank r's portion from our gathered data
+      IntCoord_t send_block_shape(dim);
+      IntCoord_t send_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_in) {
+          // Send the portion that belongs to rank r
+          send_block_shape[d] = this->in_counts[r];
+          send_block_start[d] = this->in_displs[r];
+        } else {
+          // Other dimensions: same as output (axis_out is unchanged in allgather)
+          send_block_shape[d] = this->local_out[d];
+          send_block_start[d] = 0;
+        }
+      }
+
+      this->send_types_bwd[r] =
+          build_block_type(this->local_out, send_block_shape, send_block_start);
+
+      // All ranks use the same recv type (our full local data)
+      if (r == 0) {
+        this->recv_types_bwd[r] = recv_type;
       } else {
-        send_block_shape[d] = this->local_out[d];
-        send_block_start[d] = 0;
+        MPI_Type_dup(recv_type, &this->recv_types_bwd[r]);
       }
     }
+  } else if (this->is_scatter_only) {
+    // Allgather mode (reverse of scatter-only):
+    // Each rank sends same data to all peers,
+    // receives different portions at different positions
 
-    this->send_types_bwd[r] =
+    // Build one send type (full local output) used for all peers
+    IntCoord_t send_block_shape = this->local_out;
+    IntCoord_t send_block_start(dim, 0);
+
+    MPI_Datatype send_type =
         build_block_type(this->local_out, send_block_shape, send_block_start);
 
-    // Build recv type: place block into input (backward output)
-    IntCoord_t recv_block_shape(dim);
-    IntCoord_t recv_block_start(dim);
-
-    for (Dim_t d = 0; d < dim; ++d) {
-      if (d == this->axis_out) {
-        // In backward, axis_out becomes local again
-        recv_block_shape[d] = this->out_counts[r];
-        recv_block_start[d] = this->out_displs[r];
+    for (int r = 0; r < comm_size; ++r) {
+      // All ranks use the same send type (our full local data)
+      if (r == 0) {
+        this->send_types_bwd[r] = send_type;
       } else {
-        recv_block_shape[d] = this->local_in[d];
-        recv_block_start[d] = 0;
+        MPI_Type_dup(send_type, &this->send_types_bwd[r]);
       }
-    }
 
-    this->recv_types_bwd[r] =
-        build_block_type(this->local_in, recv_block_shape, recv_block_start);
+      // Build recv type: place rank r's data at the correct position
+      IntCoord_t recv_block_shape(dim);
+      IntCoord_t recv_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_out) {
+          // This dimension is gathered back - place at the original position
+          recv_block_shape[d] = this->out_counts[r];
+          recv_block_start[d] = this->out_displs[r];
+        } else {
+          // Other dimensions: same as input (axis_in is unchanged in scatter-only)
+          recv_block_shape[d] = this->local_in[d];
+          recv_block_start[d] = 0;
+        }
+      }
+
+      this->recv_types_bwd[r] =
+          build_block_type(this->local_in, recv_block_shape, recv_block_start);
+    }
+  } else {
+    // Standard transpose mode (reverse of scatter-gather)
+    // Backward is the reverse of forward:
+    // - Send from output layout (X-distributed) to input layout (Y-distributed)
+
+    for (int r = 0; r < comm_size; ++r) {
+      // Build send type: extract block from output (backward input)
+      IntCoord_t send_block_shape(dim);
+      IntCoord_t send_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_in) {
+          // In backward, axis_in is now local (was distributed)
+          // Send the portion that will belong to rank r
+          send_block_shape[d] = this->in_counts[r];
+          send_block_start[d] = this->in_displs[r];
+        } else {
+          send_block_shape[d] = this->local_out[d];
+          send_block_start[d] = 0;
+        }
+      }
+
+      this->send_types_bwd[r] =
+          build_block_type(this->local_out, send_block_shape, send_block_start);
+
+      // Build recv type: place block into input (backward output)
+      IntCoord_t recv_block_shape(dim);
+      IntCoord_t recv_block_start(dim);
+
+      for (Dim_t d = 0; d < dim; ++d) {
+        if (d == this->axis_out) {
+          // In backward, axis_out becomes local again
+          recv_block_shape[d] = this->out_counts[r];
+          recv_block_start[d] = this->out_displs[r];
+        } else {
+          recv_block_shape[d] = this->local_in[d];
+          recv_block_start[d] = 0;
+        }
+      }
+
+      this->recv_types_bwd[r] =
+          build_block_type(this->local_in, recv_block_shape, recv_block_start);
+    }
   }
 }
 #endif  // WITH_MPI

@@ -61,9 +61,11 @@ FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
                       this->proc_grid_p2);
 
   // Compute this rank's position in the process grid
+  // The CartesianDecomposition uses subdivisions [1, P2, P1], which means
+  // Z varies fastest in the rank ordering: rank = Y_idx * P1 + Z_idx
   int rank = comm.rank();
-  this->proc_coord_p2 = rank % this->proc_grid_p2;
-  this->proc_coord_p1 = rank / this->proc_grid_p2;
+  this->proc_coord_p1 = rank % this->proc_grid_p1;  // Z index (varies fastest)
+  this->proc_coord_p2 = rank / this->proc_grid_p1;  // Y index
 
 #ifdef WITH_MPI
   // Create row and column subcommunicators
@@ -195,19 +197,18 @@ void FFTEngineBase::initialise_fft_base() {
   if (this->spatial_dim == 3) {
     // For 3D, we need additional work buffers for the Y-FFT step
 
-    // After Y<->Z transpose: [Nx/2+1, Ny, Nz/(P1*P2)]
-    // This gives us full Y for the Y-FFT
+    // After Y-gather transpose: [Nx/2+1, Ny, Nz/P1]
+    // This gives us full Y for the Y-FFT, Z remains distributed across P1
+    // Note: The YZ transpose within row_comm only gathers Y; Z stays the same
+    // because all ranks in a row have the same Z portion.
     IntCoord_t ypencil_global(3);
     ypencil_global[0] = nb_grid_pts[0] / 2 + 1;
     ypencil_global[1] = nb_grid_pts[1];
     ypencil_global[2] = nb_grid_pts[2];
 
-    Index_t local_z_ypencil, offset_z_ypencil;
-    int total_ranks = this->proc_grid_p1 * this->proc_grid_p2;
-    int linear_rank = this->proc_coord_p1 * this->proc_grid_p2 +
-                      this->proc_coord_p2;
-    distribute_dimension(nb_grid_pts[2], total_ranks, linear_rank,
-                         local_z_ypencil, offset_z_ypencil);
+    // Z in Y-pencil layout is the same as in Z-pencil (distributed across P1)
+    Index_t local_z_ypencil = local_real[2];  // Nz/P1
+    Index_t offset_z_ypencil = zpencil_loc[2];  // Same offset as Z-pencil
 
     IntCoord_t ypencil_shape(3);
     ypencil_shape[0] = nb_grid_pts[0] / 2 + 1;
@@ -224,28 +225,37 @@ void FFTEngineBase::initialise_fft_base() {
         StorageOrder::ArrayOfStructures, no_ghosts,
         no_ghosts, memory_location);
 
-    // Set up Y<->Z transpose configuration (within row communicator)
+    // Set up Y-gather transpose configuration (within row communicator)
+    // Note: This is a Y-gather operation. Within a row, all ranks have the
+    // same Z portion (Z is distributed across P1, not P2). We only need to
+    // gather Y across the P2 ranks in the row.
+    // We use axis_out=0 (X) with global_out=Fx as a "dummy" scatter dimension
+    // that doesn't actually redistribute X (since all ranks have full Fx).
 #ifdef WITH_MPI
     if (this->row_comm.size() > 1) {
       this->need_transpose_yz = true;
+      // Y gather: axis_in=1 (Y gathered), axis_out=0 (X as dummy scatter)
       this->transpose_yz_fwd_config = {
-          zpencil_shape, ypencil_shape, nb_grid_pts[1], nb_grid_pts[2], 1, 2,
+          zpencil_shape, ypencil_shape, nb_grid_pts[1], zpencil_shape[0], 1, 0,
           true  // use row_comm
       };
+      // Y scatter: reverse of gather
       this->transpose_yz_bwd_config = {
-          ypencil_shape, zpencil_shape, nb_grid_pts[2], nb_grid_pts[1], 2, 1,
+          ypencil_shape, zpencil_shape, zpencil_shape[0], nb_grid_pts[1], 0, 1,
           true  // use row_comm
       };
     }
 #endif
 
     // Set up X<->Z transpose configuration (within column communicator)
+    // Z is gathered (from Nz/P1 to full Nz), X is scattered (from full Fx to Fx/P1)
 #ifdef WITH_MPI
     if (this->col_comm.size() > 1) {
       this->need_transpose_xz = true;
+      // Note: global_in = size of gathered dim, global_out = size of scattered dim
       this->transpose_xz_config = {
           zpencil_shape, this->nb_fourier_subdomain_grid_pts,
-          this->nb_fourier_grid_pts[0], nb_grid_pts[2], 2, 0,
+          nb_grid_pts[2], this->nb_fourier_grid_pts[0], 2, 0,
           false  // use col_comm
       };
     }

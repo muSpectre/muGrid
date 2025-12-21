@@ -260,6 +260,12 @@ class DatatypeTranspose {
 
   //! Flag indicating if datatypes have been initialized
   bool types_initialized{false};
+
+  //! Flag indicating if this is an allgather (no scatter) operation
+  bool is_allgather{false};
+
+  //! Flag indicating if this is a scatter-only (no gather) operation
+  bool is_scatter_only{false};
 };
 
 }  // namespace muGrid
