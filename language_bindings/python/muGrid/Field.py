@@ -96,7 +96,7 @@ class Field:
         return self._cpp.device
 
     def _get_buffer(self):
-        """Lazy-load the full buffer via DLPack."""
+        """Lazy-load the full buffer via DLPack (requires numpy >= 2.1)."""
         if self._buffer is None:
             if self.is_on_gpu:
                 cp = _get_cupy()

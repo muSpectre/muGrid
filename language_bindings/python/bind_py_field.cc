@@ -96,7 +96,7 @@ struct DLPackContext {
  * Deleter function for DLManagedTensorVersioned
  */
 template<typename T, typename MemorySpace = muGrid::HostSpace>
-void dlpack_deleter_versioned(DLManagedTensorVersioned* tensor) {
+void dlpack_deleter(DLManagedTensorVersioned* tensor) {
     auto* ctx = static_cast<DLPackContext<T, MemorySpace>*>(tensor->manager_ctx);
     delete ctx;
     delete tensor;
@@ -151,7 +151,8 @@ DLDataType get_dlpack_dtype<std::complex<double>>() {
 /**
  * Create a DLPack capsule for a typed field using the versioned protocol.
  * Works for both Host and Device (GPU) fields via get_void_data_ptr(false).
- * Requires NumPy >= 2.1 for proper versioned DLPack support.
+ * Uses DLManagedTensorVersioned with flags for proper writeable support.
+ * Requires numpy >= 2.1 or other consumers that support versioned dlpack.
  */
 template<typename T, typename MemorySpace = muGrid::HostSpace>
 py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
@@ -177,7 +178,7 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
 
     // Set manager context and deleter
     managed->manager_ctx = ctx;
-    managed->deleter = dlpack_deleter_versioned<T, MemorySpace>;
+    managed->deleter = dlpack_deleter<T, MemorySpace>;
 
     // Set flags - 0 means writable, not a copy
     managed->flags = 0;
@@ -201,8 +202,6 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
     tensor.byte_offset = 0;
 
     // Create PyCapsule with the versioned name for DLPack protocol.
-    // The DLPack consumer (e.g., numpy) will rename the capsule to "used_dltensor_versioned"
-    // and call the deleter when done.
     auto capsule = py::capsule(managed, "dltensor_versioned");
 
     // Set up a destructor that only cleans up if the capsule was NOT consumed
@@ -308,7 +307,7 @@ void add_typed_field(py::module &mod, std::string name) {
                 },
                 "nb_rows"_a = muGrid::Unknown,
                 py::return_value_policy::reference_internal)
-            // DLPack support: native implementation without numpy
+            // DLPack support: versioned protocol for numpy >= 2.1
             .def(
                 "__dlpack__",
                 [](TypedFieldBase<T> &self, py::object stream) {
@@ -346,7 +345,7 @@ void add_typed_field_device(py::module &mod, std::string name) {
     // Device-space TypedFieldBase - inherits from Field
     // Note: get_pixel_map and get_sub_pt_map are host-only, so not exposed here
     py::class_<TypedFieldBase<T, DeviceSpace>, Field>(mod, (name + "DeviceBase").c_str())
-            // DLPack support for GPU tensors
+            // DLPack support: versioned protocol for numpy >= 2.1
             .def(
                 "__dlpack__",
                 [](TypedFieldBase<T, DeviceSpace> &self, py::object stream) {
