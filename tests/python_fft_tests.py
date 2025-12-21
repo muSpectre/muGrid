@@ -37,10 +37,10 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_equal, assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 
 import muGrid
-from muGrid import fft_real_space_field, fft_fourier_space_field
+from muGrid import fft_fourier_space_field, fft_real_space_field
 
 
 class FFTUtilsTest(unittest.TestCase):
@@ -155,7 +155,7 @@ class FFTEngineCreationTest(unittest.TestCase):
     def test_backend_name(self):
         """Test backend name is reported."""
         engine = muGrid.FFTEngine([8, 10])
-        self.assertEqual(engine.backend_name, "pocketfft")
+        self.assertEqual(engine.backend_name, "PocketFFT")
 
 
 class FFTFieldTest(unittest.TestCase):

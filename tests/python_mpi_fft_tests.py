@@ -135,7 +135,7 @@ class TestMPIFFTEngineConstruction:
         nb_grid_pts = [16, 20]
         engine = FFTEngine(nb_grid_pts, comm)
         # Should be PocketFFT for serial or MPI version
-        assert engine.backend_name in ["PocketFFT", "pocketfft"]
+        assert engine.backend_name == "PocketFFT"
 
 
 class TestMPIFFTForwardTransform:
