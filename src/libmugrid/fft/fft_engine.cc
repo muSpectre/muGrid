@@ -34,6 +34,7 @@
  */
 
 #include "fft_engine.hh"
+#include "fft_work_buffer.hh"
 #include "core/exception.hh"
 #include "field/field_typed.hh"
 
@@ -473,7 +474,8 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
   Index_t work_size = Fx * local_real[1] * nb_components;
 
   // Allocate work buffer for all components (AoS layout)
-  std::vector<Complex> work_buffer(work_size);
+  // Use RuntimeWorkBuffer to match input/output memory location
+  RuntimeWorkBuffer<Complex> work_buffer(work_size, is_device);
   Complex * work_ptr = work_buffer.data();
 
   // Step 1: r2c FFT along X for each component
@@ -493,7 +495,7 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
     transpose->forward(work_ptr, output_ptr);
   } else {
     // Serial case: copy to output (same layout, just copy)
-    std::copy(work_ptr, work_ptr + work_size, output_ptr);
+    runtime_memcpy(output_ptr, work_ptr, work_size, is_device, is_device);
   }
 
   // Step 3: c2c FFT along Y for all components
@@ -579,7 +581,7 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
 
     // Z-pencil work buffer: [Fx, Ny_local, Nz_local] with AoS components
     Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
-    std::vector<Complex> work_z(zpencil_size);
+    RuntimeWorkBuffer<Complex> work_z(zpencil_size, is_device);
     Complex * work_z_ptr = work_z.data();
 
     // Step 1: r2c FFT along X for each component
@@ -601,7 +603,7 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
     const IntCoord_t & ypencil_shape =
         this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
     Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
-    std::vector<Complex> work_y(ypencil_size);
+    RuntimeWorkBuffer<Complex> work_y(ypencil_size, is_device);
     Complex * work_y_ptr = work_y.data();
 
     if (transpose_yz_fwd != nullptr) {
@@ -635,7 +637,7 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
       // No X↔Z transpose needed (P1=1), just copy from work_z to output
       Index_t fourier_size =
           fourier_local[0] * fourier_local[1] * fourier_local[2] * nb_components;
-      std::copy(work_z_ptr, work_z_ptr + fourier_size, output_ptr);
+      runtime_memcpy(output_ptr, work_z_ptr, fourier_size, is_device, is_device);
     }
 
     // Step 4: c2c FFT along Z for each component
@@ -757,8 +759,9 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
     Index_t local_fourier_size = local_fx * Ny * nb_components;
 
     // Allocate temp buffer for IFFT (we need to preserve input)
-    std::vector<Complex> temp(local_fourier_size);
-    std::copy(input_ptr, input_ptr + local_fourier_size, temp.data());
+    RuntimeWorkBuffer<Complex> temp(local_fourier_size, is_device);
+    runtime_memcpy(temp.data(), input_ptr, local_fourier_size, is_device,
+                   is_device);
 
     // Step 1: c2c IFFT along Y for each component
     // Input layout: [Fx_local, Ny] × nb_components in AoS
@@ -773,7 +776,7 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
     // Step 2: Transpose X↔Y (backward) to get zpencil layout [Fx, Ny_local]
     // Work buffer for transposed data
     Index_t work_size = Fx * local_real[1] * nb_components;
-    std::vector<Complex> work_buffer(work_size);
+    RuntimeWorkBuffer<Complex> work_buffer(work_size, is_device);
     transpose->backward(temp.data(), work_buffer.data());
 
     // Step 3: c2r IFFT along X for each component
@@ -789,8 +792,8 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
     Index_t fourier_size = Fx * local_fy * nb_components;
 
     // Allocate temp buffer for IFFT (we need to preserve input)
-    std::vector<Complex> temp(fourier_size);
-    std::copy(input_ptr, input_ptr + fourier_size, temp.data());
+    RuntimeWorkBuffer<Complex> temp(fourier_size, is_device);
+    runtime_memcpy(temp.data(), input_ptr, fourier_size, is_device, is_device);
 
     // Step 1: c2c IFFT along Y for each component
     Index_t y_stride = Fx * nb_components;
@@ -857,8 +860,8 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
     const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
     Index_t fourier_size =
         fourier_local[0] * fourier_local[1] * fourier_local[2] * nb_components;
-    std::vector<Complex> temp(fourier_size);
-    std::copy(input_ptr, input_ptr + fourier_size, temp.data());
+    RuntimeWorkBuffer<Complex> temp(fourier_size, is_device);
+    runtime_memcpy(temp.data(), input_ptr, fourier_size, is_device, is_device);
 
     // Step 1: c2c IFFT along Z for each component
     // Input layout: [Fx_local, Ny_local, Nz] with AoS components
@@ -876,7 +879,7 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
 
     // Z-pencil work buffer: [Fx, Ny_local, Nz_local] with AoS components
     Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
-    std::vector<Complex> work_z(zpencil_size);
+    RuntimeWorkBuffer<Complex> work_z(zpencil_size, is_device);
     Complex * work_z_ptr = work_z.data();
 
     // Step 2: Transpose Z↔X (backward) or copy if no transpose needed
@@ -884,14 +887,15 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
       transpose_xz->backward(temp.data(), work_z_ptr);
     } else {
       // No X↔Z transpose needed (P1=1), just copy from temp to work_z
-      std::copy(temp.data(), temp.data() + zpencil_size, work_z_ptr);
+      runtime_memcpy(work_z_ptr, temp.data(), zpencil_size, is_device,
+                     is_device);
     }
 
     // Y-pencil work buffer: [Fx, Ny, Nz_local] with AoS components
     const IntCoord_t & ypencil_shape =
         this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
     Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
-    std::vector<Complex> work_y(ypencil_size);
+    RuntimeWorkBuffer<Complex> work_y(ypencil_size, is_device);
     Complex * work_y_ptr = work_y.data();
 
     // Step 3a: Transpose Y↔Z (backward) - all components at once
@@ -943,15 +947,17 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
   } else
   {
     // Serial path: all dimensions are local
+    // Note: Multi-component serial path uses strided element access which
+    // requires host-accessible memory. Device memory not currently supported.
+    if (is_device && nb_components > 1) {
+      throw RuntimeError(
+          "Multi-component 3D serial IFFT on device memory not yet supported");
+    }
+
     const Complex * input_ptr =
         static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
     Real * output_ptr =
         static_cast<Real *>(output.get_void_data_ptr(!is_device));
-
-    // Input strides for multi-component interleaved data
-    Index_t in_comp_stride = nb_components;
-    Index_t in_stride_y = Fx * nb_components;
-    Index_t in_stride_z = in_stride_y * Ny;
 
     // Output strides for multi-component interleaved data
     Index_t out_comp_stride = nb_components;
@@ -967,10 +973,10 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
 
     // Process each component separately
     for (Index_t comp = 0; comp < nb_components; ++comp) {
-      // Copy this component's data to temp buffer
-      std::vector<Complex> temp(fourier_size);
+      // Copy this component's data to temp buffer (requires host memory)
+      RuntimeWorkBuffer<Complex> temp(fourier_size, false);  // Always host
       for (Index_t i = 0; i < fourier_size; ++i) {
-        temp[i] = input_ptr[i * nb_components + comp];
+        temp.data()[i] = input_ptr[i * nb_components + comp];
       }
 
       // Step 1: c2c IFFT along Z
