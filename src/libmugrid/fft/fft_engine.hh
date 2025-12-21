@@ -41,7 +41,7 @@
 #include "mpi/communicator.hh"
 
 #include "fft_1d_backend.hh"
-#include "pencil_transpose.hh"
+#include "datatype_transpose.hh"
 #include "fft_utils.hh"
 
 #include <memory>
@@ -290,9 +290,9 @@ class FFTEngine : public CartesianDecomposition {
   std::unique_ptr<FFT1DBackend> device_backend;  //!< Device (GPU) FFT backend
 
   // === Transpose operations ===
-  std::unique_ptr<PencilTranspose> transpose_yz_forward;   //!< Y↔Z (3D only)
-  std::unique_ptr<PencilTranspose> transpose_yz_backward;  //!< Z↔Y (3D only)
-  std::unique_ptr<PencilTranspose> transpose_xz;           //!< X↔Z
+  std::unique_ptr<DatatypeTranspose> transpose_yz_forward;   //!< Y↔Z (3D only)
+  std::unique_ptr<DatatypeTranspose> transpose_yz_backward;  //!< Z↔Y (3D only)
+  std::unique_ptr<DatatypeTranspose> transpose_xz;           //!< X↔Z
 
   // === Work buffers ===
   //! Fourier-space field collection (final X-pencil layout)

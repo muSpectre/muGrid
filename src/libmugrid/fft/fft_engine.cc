@@ -236,11 +236,11 @@ void FFTEngine::initialise_fft() {
 #ifdef WITH_MPI
     // Only create transpose if we have multiple ranks that need data exchange
     if (this->row_comm.size() > 1) {
-      this->transpose_yz_forward = std::make_unique<PencilTranspose>(
+      this->transpose_yz_forward = std::make_unique<DatatypeTranspose>(
           this->row_comm, zpencil_shape, ypencil_shape,
           nb_grid_pts[1], nb_grid_pts[2], 1, 2);
 
-      this->transpose_yz_backward = std::make_unique<PencilTranspose>(
+      this->transpose_yz_backward = std::make_unique<DatatypeTranspose>(
           this->row_comm, ypencil_shape, zpencil_shape,
           nb_grid_pts[2], nb_grid_pts[1], 2, 1);
     }
@@ -250,7 +250,7 @@ void FFTEngine::initialise_fft() {
 #ifdef WITH_MPI
     // Only create transpose if we have multiple ranks that need data exchange
     if (this->col_comm.size() > 1) {
-      this->transpose_xz = std::make_unique<PencilTranspose>(
+      this->transpose_xz = std::make_unique<DatatypeTranspose>(
           this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
           this->nb_fourier_grid_pts[0], nb_grid_pts[2], 2, 0);
     }
@@ -263,7 +263,7 @@ void FFTEngine::initialise_fft() {
     if (this->row_comm.size() > 1) {
       // global_in = Ny (distributed in input, becomes local in output)
       // global_out = Fx (local in input, becomes distributed in output)
-      this->transpose_xz = std::make_unique<PencilTranspose>(
+      this->transpose_xz = std::make_unique<DatatypeTranspose>(
           this->row_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
           nb_grid_pts[1], this->nb_fourier_grid_pts[0], 1, 0);
     }
