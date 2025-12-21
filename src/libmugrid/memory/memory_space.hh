@@ -39,30 +39,47 @@
 #include <cstddef>
 #include <type_traits>
 
+#include "core/grid_common.hh"
+
 namespace muGrid {
 
     /**
      * Tag type for host (CPU) memory space.
+     *
+     * Uses ArrayOfStructures (ColMajor) storage order for optimal CPU cache
+     * locality when iterating over components within a pixel.
      */
     struct HostSpace {
         static constexpr const char* name = "Host";
+        static constexpr StorageOrder storage_order =
+            StorageOrder::ArrayOfStructures;
     };
 
 #if defined(MUGRID_ENABLE_CUDA)
     /**
      * Tag type for CUDA device memory space.
+     *
+     * Uses StructureOfArrays (RowMajor) storage order for optimal GPU memory
+     * coalescence when threads in a warp access adjacent pixels.
      */
     struct CudaSpace {
         static constexpr const char* name = "Cuda";
+        static constexpr StorageOrder storage_order =
+            StorageOrder::StructureOfArrays;
     };
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
     /**
      * Tag type for HIP device memory space.
+     *
+     * Uses StructureOfArrays (RowMajor) storage order for optimal GPU memory
+     * coalescence when threads in a warp access adjacent pixels.
      */
     struct HIPSpace {
         static constexpr const char* name = "HIP";
+        static constexpr StorageOrder storage_order =
+            StorageOrder::StructureOfArrays;
     };
 #endif
 
