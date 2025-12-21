@@ -37,7 +37,7 @@
 #define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_HH_
 
 #include "memory/memory_space.hh"
-#include "memory/device_array.hh"
+#include "memory/array.hh"
 #include "convolution_kernels_cpu.hh"
 
 #if defined(MUGRID_ENABLE_CUDA)

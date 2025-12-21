@@ -235,8 +235,8 @@ namespace muGrid {
     this->current_nb_entries += nb_sub;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + nb_sub};
-    // DeviceArray resize doesn't preserve data, so we need a temp copy
-    DeviceArray<T, MemorySpace> old_values(old_size);
+    // Array resize doesn't preserve data, so we need a temp copy
+    Array<T, MemorySpace> old_values(old_size);
     muGrid::deep_copy(old_values, this->values);
     muGrid::resize(this->values, new_size);
     // Copy old data back
@@ -268,8 +268,8 @@ namespace muGrid {
     this->current_nb_entries += 1;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + 1};
-    // DeviceArray resize doesn't preserve data, so we need a temp copy
-    DeviceArray<T, MemorySpace> old_values(old_size);
+    // Array resize doesn't preserve data, so we need a temp copy
+    Array<T, MemorySpace> old_values(old_size);
     muGrid::deep_copy(old_values, this->values);
     muGrid::resize(this->values, new_size);
     // Copy old data back
@@ -305,8 +305,8 @@ namespace muGrid {
     this->current_nb_entries += nb_sub;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + this->nb_components * nb_sub};
-    // DeviceArray resize doesn't preserve data, so we need a temp copy
-    DeviceArray<T, MemorySpace> old_values(old_size);
+    // Array resize doesn't preserve data, so we need a temp copy
+    Array<T, MemorySpace> old_values(old_size);
     muGrid::deep_copy(old_values, this->values);
     muGrid::resize(this->values, new_size);
     // Copy old data back
@@ -346,8 +346,8 @@ namespace muGrid {
     this->current_nb_entries += 1;
     const auto old_size{static_cast<Index_t>(this->values.size())};
     const auto new_size{old_size + this->nb_components};
-    // DeviceArray resize doesn't preserve data, so we need a temp copy
-    DeviceArray<T, MemorySpace> old_values(old_size);
+    // Array resize doesn't preserve data, so we need a temp copy
+    Array<T, MemorySpace> old_values(old_size);
     muGrid::deep_copy(old_values, this->values);
     muGrid::resize(this->values, new_size);
     // Copy old data back

@@ -467,7 +467,7 @@ namespace muGrid {
                                                       + i_quad * this->nb_operators + i_operator;
                                 }
 
-                                // Add the entry (use [] for DeviceArray access)
+                                // Add the entry (use [] for Array access)
                                 sparse_op.quad_indices[entry_idx] = index_diff_quad;
                                 sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
                                 sparse_op.values[entry_idx] = op_value;
@@ -565,7 +565,7 @@ namespace muGrid {
                                     index_diff_nodal = i_component * total_nodal_elements + i_node;
                                 }
 
-                                // Add the entry (use [] for DeviceArray access)
+                                // Add the entry (use [] for Array access)
                                 sparse_op.quad_indices[entry_idx] = index_diff_quad;
                                 sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
                                 sparse_op.values[entry_idx] = op_value;

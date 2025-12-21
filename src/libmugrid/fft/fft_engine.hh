@@ -38,7 +38,7 @@
 
 #include "fft_engine_base.hh"
 #include "fft_backend_traits.hh"
-#include "memory/device_array.hh"
+#include "memory/array.hh"
 #include "field/field_typed.hh"
 #include "core/exception.hh"
 
@@ -68,7 +68,7 @@ template <typename MemorySpace>
 class FFTEngine : public FFTEngineBase {
  public:
   using Parent_t = FFTEngineBase;
-  using WorkBuffer = DeviceArray<Complex, MemorySpace>;
+  using WorkBuffer = Array<Complex, MemorySpace>;
 
   /**
    * Construct an FFT engine with pencil decomposition.

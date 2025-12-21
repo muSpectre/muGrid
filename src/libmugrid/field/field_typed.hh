@@ -39,7 +39,7 @@
 #include "field/field.hh"
 #include "collection/field_collection.hh"
 #include "core/grid_common.hh"
-#include "memory/device_array.hh"
+#include "memory/array.hh"
 
 #include "Eigen/Dense"
 
@@ -103,8 +103,8 @@ namespace muGrid {
     //! Memory space type
     using Memory_Space = MemorySpace;
 
-    //! DeviceArray type for storage
-    using View_t = DeviceArray<T, MemorySpace>;
+    //! Array type for storage
+    using View_t = Array<T, MemorySpace>;
 
     /**
      * Simple structure used to allow for lazy evaluation of the unary '-' sign.
@@ -312,9 +312,9 @@ namespace muGrid {
     std::enable_if_t<is_host_space_v<M>, Eigen_cmap>
     eigen_map(const Index_t & nb_rows, const Index_t & nb_cols) const;
 
-    //! Get the underlying DeviceArray for use in kernels
+    //! Get the underlying Array for use in kernels
     View_t & view() { return this->values; }
-    //! Get the underlying DeviceArray (const) for use in kernels
+    //! Get the underlying Array (const) for use in kernels
     const View_t & view() const { return this->values; }
 
     /**
@@ -361,7 +361,7 @@ namespace muGrid {
     }
 
    protected:
-    //! DeviceArray storage for the raw field data
+    //! Array storage for the raw field data
     View_t values{};
   };
 
@@ -579,7 +579,7 @@ namespace muGrid {
     if (dst.view().size() != src.view().size()) {
       throw FieldError("Size mismatch in deep_copy");
     }
-    // Use muGrid::deep_copy from device_array.hh
+    // Use muGrid::deep_copy from array.hh
     muGrid::deep_copy(dst.view(), src.view());
   }
 

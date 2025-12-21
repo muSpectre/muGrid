@@ -1,5 +1,5 @@
 /**
- * @file   device_array.hh
+ * @file   array.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -55,7 +55,7 @@ namespace muGrid {
 
     // Forward declaration
     template<typename T, typename MemorySpace>
-    class DeviceArray;
+    class Array;
 
     namespace detail {
 
@@ -173,7 +173,7 @@ namespace muGrid {
      * @tparam MemorySpace Memory space tag (HostSpace, CudaSpace, HIPSpace, etc.)
      */
     template<typename T, typename MemorySpace = HostSpace>
-    class DeviceArray {
+    class Array {
     public:
         using value_type = T;
         using memory_space = MemorySpace;
@@ -182,47 +182,47 @@ namespace muGrid {
         /**
          * Default constructor - creates empty array
          */
-        DeviceArray() : data_(nullptr), size_(0) {}
+        Array() : data_(nullptr), size_(0) {}
 
         /**
          * Constructor with label (for debugging) - creates empty array
          */
-        explicit DeviceArray(const std::string& /* label */)
+        explicit Array(const std::string& /* label */)
             : data_(nullptr), size_(0) {}
 
         /**
          * Constructor that allocates n elements
          */
-        explicit DeviceArray(std::size_t n)
+        explicit Array(std::size_t n)
             : data_(allocator_type::allocate(n)), size_(n) {}
 
         /**
          * Constructor with label and size
          */
-        DeviceArray(const std::string& /* label */, std::size_t n)
+        Array(const std::string& /* label */, std::size_t n)
             : data_(allocator_type::allocate(n)), size_(n) {}
 
         /**
          * Destructor - frees memory
          */
-        ~DeviceArray() {
+        ~Array() {
             if (data_) {
                 allocator_type::deallocate(data_);
             }
         }
 
         // Non-copyable (to avoid accidental expensive copies)
-        DeviceArray(const DeviceArray&) = delete;
-        DeviceArray& operator=(const DeviceArray&) = delete;
+        Array(const Array&) = delete;
+        Array& operator=(const Array&) = delete;
 
         // Movable
-        DeviceArray(DeviceArray&& other) noexcept
+        Array(Array&& other) noexcept
             : data_(other.data_), size_(other.size_) {
             other.data_ = nullptr;
             other.size_ = 0;
         }
 
-        DeviceArray& operator=(DeviceArray&& other) noexcept {
+        Array& operator=(Array&& other) noexcept {
             if (this != &other) {
                 if (data_) {
                     allocator_type::deallocate(data_);
@@ -295,10 +295,10 @@ namespace muGrid {
     };
 
     /**
-     * @brief Resize a DeviceArray (free function for compatibility)
+     * @brief Resize a Array (free function for compatibility)
      */
     template<typename T, typename MemorySpace>
-    void resize(DeviceArray<T, MemorySpace>& arr, std::size_t new_size) {
+    void resize(Array<T, MemorySpace>& arr, std::size_t new_size) {
         arr.resize(new_size);
     }
 
@@ -306,8 +306,8 @@ namespace muGrid {
      * @brief Deep copy between arrays, potentially in different memory spaces
      */
     template<typename T, typename DstSpace, typename SrcSpace>
-    void deep_copy(DeviceArray<T, DstSpace>& dst,
-                   const DeviceArray<T, SrcSpace>& src) {
+    void deep_copy(Array<T, DstSpace>& dst,
+                   const Array<T, SrcSpace>& src) {
         if (dst.size() != src.size()) {
             throw std::runtime_error(
                 "deep_copy: destination and source sizes must match");
@@ -368,7 +368,7 @@ namespace muGrid {
      * @brief Fill array with a scalar value
      */
     template<typename T, typename MemorySpace>
-    void deep_copy(DeviceArray<T, MemorySpace>& dst, const T& value) {
+    void deep_copy(Array<T, MemorySpace>& dst, const T& value) {
         if constexpr (is_host_space_v<MemorySpace>) {
             // Host: simple loop
             for (std::size_t i = 0; i < dst.size(); ++i) {
@@ -380,7 +380,7 @@ namespace muGrid {
             // For CUDA, we need a kernel (or use thrust)
             // For now, copy via host for scalar fill
             if (dst.size() > 0) {
-                DeviceArray<T, HostSpace> tmp(dst.size());
+                Array<T, HostSpace> tmp(dst.size());
                 for (std::size_t i = 0; i < tmp.size(); ++i) {
                     tmp[i] = value;
                 }
@@ -392,7 +392,7 @@ namespace muGrid {
         else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
             // Same approach for HIP
             if (dst.size() > 0) {
-                DeviceArray<T, HostSpace> tmp(dst.size());
+                Array<T, HostSpace> tmp(dst.size());
                 for (std::size_t i = 0; i < tmp.size(); ++i) {
                     tmp[i] = value;
                 }

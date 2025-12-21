@@ -37,7 +37,7 @@
 #define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CPU_HH_
 
 #include "core/grid_common.hh"
-#include "memory/device_array.hh"
+#include "memory/array.hh"
 
 namespace muGrid {
 
@@ -65,9 +65,9 @@ namespace muGrid {
     template<typename MemorySpace>
     struct SparseOperatorSoA {
         Index_t size{0};  // Number of non-zeros
-        DeviceArray<Index_t, MemorySpace> quad_indices;
-        DeviceArray<Index_t, MemorySpace> nodal_indices;
-        DeviceArray<Real, MemorySpace> values;
+        Array<Index_t, MemorySpace> quad_indices;
+        Array<Index_t, MemorySpace> nodal_indices;
+        Array<Real, MemorySpace> values;
 
         //! Default constructor - creates empty operator
         SparseOperatorSoA() = default;
