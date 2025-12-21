@@ -413,16 +413,32 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
   }
 
   // Step 3: c2c FFT along Y for all components
-  // Data layout in output: interleaved components [Fx, Ny]
-  // For each X frequency bin, FFT along Y
-  // Stride between Y values = Fx * nb_components
-  // Process each component with offset
-  Index_t y_stride = Fx * nb_components;  // Stride between consecutive Y values
-  Index_t y_dist = nb_components;         // Distance between different X
+  // Data layout depends on whether we did a transpose:
+  // - MPI with transpose: X-pencil layout [Fx_local, Ny_full] with Y fully local
+  // - Serial: zpencil layout [Fx_full, Ny_local] with X fully local
+#ifdef WITH_MPI
+  if (this->transpose_xz) {
+    // MPI case: after transpose, X is distributed, Y is full
+    Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
+    Index_t y_stride = local_fx * nb_components;
+    Index_t y_dist = nb_components;
 
-  for (Index_t comp = 0; comp < nb_components; ++comp) {
-    backend->c2c_forward(Ny, Fx, output_ptr + comp, y_stride, y_dist,
-                         output_ptr + comp, y_stride, y_dist);
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      backend->c2c_forward(Ny, local_fx, output_ptr + comp, y_stride, y_dist,
+                           output_ptr + comp, y_stride, y_dist);
+    }
+  } else
+#endif
+  {
+    // Serial case: X is full, Y is local (same as real space distribution)
+    Index_t local_fy = local_real[1];
+    Index_t y_stride = Fx * nb_components;
+    Index_t y_dist = nb_components;
+
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      backend->c2c_forward(local_fy, Fx, output_ptr + comp, y_stride, y_dist,
+                           output_ptr + comp, y_stride, y_dist);
+    }
   }
 }
 
@@ -621,53 +637,81 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
   Index_t Fx = Nx / 2 + 1;
   Index_t Ny = nb_grid_pts[1];
 
-  // Size of Fourier data for one component
-  Index_t fourier_size = Fx * Ny;
-
   // Output strides for multi-component interleaved data
   Index_t out_comp_stride = nb_components;
   Index_t out_dist = local_with_ghosts[0] * nb_components;
   Index_t out_base_offset =
       (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) * nb_components;
 
-  // Process each component separately
-  for (Index_t comp = 0; comp < nb_components; ++comp) {
-    // Copy this component's data to temp buffer
-    std::vector<Complex> temp(fourier_size);
-    for (Index_t i = 0; i < fourier_size; ++i) {
-      temp[i] = input_ptr[i * nb_components + comp];
-    }
-
-    // Step 1: c2c IFFT along Y
-    // Data layout: [Fx, Ny] row-major in temp
-    Index_t y_stride = Fx;  // Stride between consecutive Y values
-    Index_t y_dist = 1;     // Distance between different X transforms
-
-    backend->c2c_backward(Ny, Fx, temp.data(), y_stride, y_dist, temp.data(),
-                          y_stride, y_dist);
-
-    // Step 2: Transpose Y↔X (backward)
 #ifdef WITH_MPI
-    if (this->transpose_xz) {
+  if (this->transpose_xz) {
+    // MPI case: input is in X-pencil layout [Fx_local, Ny]
+    Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
+    Index_t local_fourier_size = local_fx * Ny;
+
+    // Process each component separately
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      // Copy this component's data to temp buffer
+      std::vector<Complex> temp(local_fourier_size);
+      for (Index_t i = 0; i < local_fourier_size; ++i) {
+        temp[i] = input_ptr[i * nb_components + comp];
+      }
+
+      // Step 1: c2c IFFT along Y (Y is full in X-pencil layout)
+      Index_t y_stride = local_fx;  // Stride between consecutive Y values
+      Index_t y_dist = 1;           // Distance between different X transforms
+
+      backend->c2c_backward(Ny, local_fx, temp.data(), y_stride, y_dist,
+                            temp.data(), y_stride, y_dist);
+
+      // Step 2: Transpose X↔Y (backward) to get zpencil layout [Fx, Ny_local]
       this->transpose_xz->backward(temp.data(), work_ptr);
-    } else {
+
+      // Step 3: c2r IFFT along X
+      // work_ptr layout: [Fx, Ny_local] row-major
+      Index_t in_stride = 1;
+      Index_t in_dist = Fx;
+
+      backend->c2r(Nx, local_real[1], work_ptr, in_stride, in_dist,
+                   output_ptr + out_base_offset + comp, out_comp_stride,
+                   out_dist);
+    }
+  } else
+#endif
+  {
+    // Serial case: input is in zpencil layout [Fx, Ny_local]
+    Index_t local_fy = local_real[1];
+    Index_t fourier_size = Fx * local_fy;
+
+    // Process each component separately
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      // Copy this component's data to temp buffer
+      std::vector<Complex> temp(fourier_size);
+      for (Index_t i = 0; i < fourier_size; ++i) {
+        temp[i] = input_ptr[i * nb_components + comp];
+      }
+
+      // Step 1: c2c IFFT along Y (Y is local in serial case)
+      Index_t y_stride = Fx;  // Stride between consecutive Y values
+      Index_t y_dist = 1;     // Distance between different X transforms
+
+      backend->c2c_backward(local_fy, Fx, temp.data(), y_stride, y_dist,
+                            temp.data(), y_stride, y_dist);
+
+      // Copy to work buffer
       for (Index_t i = 0; i < fourier_size; ++i) {
         work_ptr[i] = temp[i];
       }
-    }
-#else
-    for (Index_t i = 0; i < fourier_size; ++i) {
-      work_ptr[i] = temp[i];
-    }
-#endif
 
-    // Step 3: c2r IFFT along X
-    // work_ptr layout: [Fx, Ny_local] row-major
-    Index_t in_stride = 1;
-    Index_t in_dist = Fx;
+      // Step 2: c2r IFFT along X
+      // work_ptr layout: [Fx, Ny_local] row-major
+      Index_t in_stride = 1;
+      Index_t in_dist = Fx;
 
-    backend->c2r(Nx, local_real[1], work_ptr, in_stride, in_dist,
-                 output_ptr + out_base_offset + comp, out_comp_stride, out_dist);
+      backend->c2r(Nx, local_fy, work_ptr, in_stride, in_dist,
+                   output_ptr + out_base_offset + comp, out_comp_stride,
+                   out_dist);
+    }
   }
 }
 
