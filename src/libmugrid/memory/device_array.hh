@@ -295,12 +295,6 @@ namespace muGrid {
     };
 
     /**
-     * Alias for field storage view (compatible with old naming)
-     */
-    template<typename T, typename MemorySpace = HostSpace>
-    using FieldView = DeviceArray<T, MemorySpace>;
-
-    /**
      * @brief Resize a DeviceArray (free function for compatibility)
      */
     template<typename T, typename MemorySpace>
