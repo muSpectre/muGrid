@@ -1,5 +1,5 @@
 /**
- * @file   fft/datatype_transpose.hh
+ * @file   fft/transpose.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -78,7 +78,7 @@ enum class MemoryLayout {
  * - Input: Data distributed along axis_in, full along axis_out
  * - Output: Data distributed along axis_out, full along axis_in
  */
-class DatatypeTranspose {
+class Transpose {
  public:
   /**
    * Configure a transpose operation between two pencil orientations.
@@ -96,19 +96,19 @@ class DatatypeTranspose {
    * @param nb_components  Number of field components (default: 1)
    * @param layout         Memory layout for multi-component fields
    */
-  DatatypeTranspose(const Communicator & comm, const IntCoord_t & local_in,
+  Transpose(const Communicator & comm, const IntCoord_t & local_in,
                     const IntCoord_t & local_out, Index_t global_in,
                     Index_t global_out, Index_t axis_in, Index_t axis_out,
                     Index_t nb_components = 1,
                     MemoryLayout layout = MemoryLayout::ArrayOfStructures);
 
-  DatatypeTranspose() = delete;
-  DatatypeTranspose(const DatatypeTranspose & other) = delete;
-  DatatypeTranspose(DatatypeTranspose && other) noexcept;
-  ~DatatypeTranspose();
+  Transpose() = delete;
+  Transpose(const Transpose & other) = delete;
+  Transpose(Transpose && other) noexcept;
+  ~Transpose();
 
-  DatatypeTranspose & operator=(const DatatypeTranspose & other) = delete;
-  DatatypeTranspose & operator=(DatatypeTranspose && other) noexcept;
+  Transpose & operator=(const Transpose & other) = delete;
+  Transpose & operator=(Transpose && other) noexcept;
 
   /**
    * Perform forward transpose (gather axis_in, scatter axis_out).

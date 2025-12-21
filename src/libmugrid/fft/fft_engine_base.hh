@@ -40,7 +40,7 @@
 #include "collection/field_collection_global.hh"
 #include "mpi/communicator.hh"
 #include "fft_1d_backend.hh"
-#include "datatype_transpose.hh"
+#include "transpose.hh"
 #include "fft_utils.hh"
 
 #include <memory>
@@ -175,9 +175,9 @@ class FFTEngineBase : public CartesianDecomposition {
   /**
    * Get or create a transpose for the given nb_components.
    */
-  DatatypeTranspose * get_transpose_xz(Index_t nb_components);
-  DatatypeTranspose * get_transpose_yz_forward(Index_t nb_components);
-  DatatypeTranspose * get_transpose_yz_backward(Index_t nb_components);
+  Transpose * get_transpose_xz(Index_t nb_components);
+  Transpose * get_transpose_yz_forward(Index_t nb_components);
+  Transpose * get_transpose_yz_backward(Index_t nb_components);
 
   // === Process grid ===
   int proc_grid_p1{1};   //!< First dimension of process grid
@@ -196,9 +196,9 @@ class FFTEngineBase : public CartesianDecomposition {
   TransposeConfig transpose_yz_fwd_config;
   TransposeConfig transpose_yz_bwd_config;
 
-  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_xz_cache;
-  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_yz_fwd_cache;
-  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_yz_bwd_cache;
+  std::map<Index_t, std::unique_ptr<Transpose>> transpose_xz_cache;
+  std::map<Index_t, std::unique_ptr<Transpose>> transpose_yz_fwd_cache;
+  std::map<Index_t, std::unique_ptr<Transpose>> transpose_yz_bwd_cache;
 
   bool need_transpose_xz{false};
   bool need_transpose_yz{false};

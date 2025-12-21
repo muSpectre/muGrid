@@ -48,7 +48,7 @@ set(MUGRID_SOURCES
     # fft/
     fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
-    fft/datatype_transpose.cc
+        fft/transpose.cc
     fft/fft_utils.cc
     fft/fft_engine_base.cc
     fft/fft_engine.cc

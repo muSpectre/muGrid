@@ -216,7 +216,7 @@ class FFTEngine : public FFTEngineBase {
     }
 
     // Step 2: Transpose (or copy for serial)
-    DatatypeTranspose * transpose = this->get_transpose_xz(nb_components);
+    Transpose * transpose = this->get_transpose_xz(nb_components);
     if (transpose != nullptr) {
       transpose->forward(work_ptr, output_ptr);
     } else {
@@ -263,10 +263,10 @@ class FFTEngine : public FFTEngineBase {
     Index_t Nz = nb_grid_pts[2];
     Index_t Fx = Nx / 2 + 1;
 
-    DatatypeTranspose * transpose_xz = this->get_transpose_xz(nb_components);
-    DatatypeTranspose * transpose_yz_fwd =
+    Transpose * transpose_xz = this->get_transpose_xz(nb_components);
+    Transpose * transpose_yz_fwd =
         this->get_transpose_yz_forward(nb_components);
-    DatatypeTranspose * transpose_yz_bwd =
+    Transpose * transpose_yz_bwd =
         this->get_transpose_yz_backward(nb_components);
 
     bool need_mpi_path =
@@ -427,7 +427,7 @@ class FFTEngine : public FFTEngineBase {
         (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) *
         nb_components;
 
-    DatatypeTranspose * transpose = this->get_transpose_xz(nb_components);
+    Transpose * transpose = this->get_transpose_xz(nb_components);
     if (transpose != nullptr) {
       Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
       Index_t local_fourier_size = local_fx * Ny * nb_components;
@@ -500,10 +500,10 @@ class FFTEngine : public FFTEngineBase {
     Index_t Nz = nb_grid_pts[2];
     Index_t Fx = Nx / 2 + 1;
 
-    DatatypeTranspose * transpose_xz = this->get_transpose_xz(nb_components);
-    DatatypeTranspose * transpose_yz_fwd =
+    Transpose * transpose_xz = this->get_transpose_xz(nb_components);
+    Transpose * transpose_yz_fwd =
         this->get_transpose_yz_forward(nb_components);
-    DatatypeTranspose * transpose_yz_bwd =
+    Transpose * transpose_yz_bwd =
         this->get_transpose_yz_backward(nb_components);
 
     bool need_mpi_path =

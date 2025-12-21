@@ -282,7 +282,7 @@ void FFTEngineBase::initialise_fft_base() {
 }
 
 #ifdef WITH_MPI
-DatatypeTranspose * FFTEngineBase::get_transpose_xz(Index_t nb_components) {
+Transpose * FFTEngineBase::get_transpose_xz(Index_t nb_components) {
   if (!this->need_transpose_xz) {
     return nullptr;
   }
@@ -296,7 +296,7 @@ DatatypeTranspose * FFTEngineBase::get_transpose_xz(Index_t nb_components) {
   const Communicator & comm =
       cfg.use_row_comm ? this->row_comm : this->col_comm;
 
-  auto transpose = std::make_unique<DatatypeTranspose>(
+  auto transpose = std::make_unique<Transpose>(
       comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
       cfg.axis_in, cfg.axis_out, nb_components);
 
@@ -305,7 +305,7 @@ DatatypeTranspose * FFTEngineBase::get_transpose_xz(Index_t nb_components) {
   return ptr;
 }
 
-DatatypeTranspose * FFTEngineBase::get_transpose_yz_forward(
+Transpose * FFTEngineBase::get_transpose_yz_forward(
     Index_t nb_components) {
   if (!this->need_transpose_yz) {
     return nullptr;
@@ -318,7 +318,7 @@ DatatypeTranspose * FFTEngineBase::get_transpose_yz_forward(
 
   const auto & cfg = this->transpose_yz_fwd_config;
 
-  auto transpose = std::make_unique<DatatypeTranspose>(
+  auto transpose = std::make_unique<Transpose>(
       this->row_comm, cfg.local_in, cfg.local_out, cfg.global_in,
       cfg.global_out, cfg.axis_in, cfg.axis_out, nb_components);
 
@@ -327,7 +327,7 @@ DatatypeTranspose * FFTEngineBase::get_transpose_yz_forward(
   return ptr;
 }
 
-DatatypeTranspose * FFTEngineBase::get_transpose_yz_backward(
+Transpose * FFTEngineBase::get_transpose_yz_backward(
     Index_t nb_components) {
   if (!this->need_transpose_yz) {
     return nullptr;
@@ -340,7 +340,7 @@ DatatypeTranspose * FFTEngineBase::get_transpose_yz_backward(
 
   const auto & cfg = this->transpose_yz_bwd_config;
 
-  auto transpose = std::make_unique<DatatypeTranspose>(
+  auto transpose = std::make_unique<Transpose>(
       this->row_comm, cfg.local_in, cfg.local_out, cfg.global_in,
       cfg.global_out, cfg.axis_in, cfg.axis_out, nb_components);
 
@@ -350,13 +350,13 @@ DatatypeTranspose * FFTEngineBase::get_transpose_yz_backward(
 }
 #else
 // Non-MPI stubs
-DatatypeTranspose * FFTEngineBase::get_transpose_xz(Index_t) {
+Transpose * FFTEngineBase::get_transpose_xz(Index_t) {
   return nullptr;
 }
-DatatypeTranspose * FFTEngineBase::get_transpose_yz_forward(Index_t) {
+Transpose * FFTEngineBase::get_transpose_yz_forward(Index_t) {
   return nullptr;
 }
-DatatypeTranspose * FFTEngineBase::get_transpose_yz_backward(Index_t) {
+Transpose * FFTEngineBase::get_transpose_yz_backward(Index_t) {
   return nullptr;
 }
 #endif

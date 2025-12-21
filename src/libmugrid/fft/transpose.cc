@@ -1,5 +1,5 @@
 /**
- * @file   fft/datatype_transpose.cc
+ * @file   fft/transpose.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -33,7 +33,7 @@
  *
  */
 
-#include "datatype_transpose.hh"
+#include "transpose.hh"
 #include "core/exception.hh"
 
 #include <algorithm>
@@ -41,7 +41,7 @@
 
 namespace muGrid {
 
-void DatatypeTranspose::compute_distribution(Index_t global_size, int comm_size,
+void Transpose::compute_distribution(Index_t global_size, int comm_size,
                                              std::vector<Index_t> & counts,
                                              std::vector<Index_t> & displs) {
   counts.resize(comm_size);
@@ -60,7 +60,7 @@ void DatatypeTranspose::compute_distribution(Index_t global_size, int comm_size,
   }
 }
 
-DatatypeTranspose::DatatypeTranspose(const Communicator & comm,
+Transpose::Transpose(const Communicator & comm,
                                      const IntCoord_t & local_in,
                                      const IntCoord_t & local_out,
                                      Index_t global_in, Index_t global_out,
@@ -113,7 +113,7 @@ DatatypeTranspose::DatatypeTranspose(const Communicator & comm,
 #endif
 }
 
-DatatypeTranspose::DatatypeTranspose(DatatypeTranspose && other) noexcept
+Transpose::Transpose(Transpose && other) noexcept
     : comm{std::move(other.comm)}, local_in{std::move(other.local_in)},
       local_out{std::move(other.local_out)}, global_in{other.global_in},
       global_out{other.global_out}, axis_in{other.axis_in},
@@ -140,8 +140,8 @@ DatatypeTranspose::DatatypeTranspose(DatatypeTranspose && other) noexcept
   other.types_initialized = false;  // Prevent double-free
 }
 
-DatatypeTranspose &
-DatatypeTranspose::operator=(DatatypeTranspose && other) noexcept {
+Transpose &
+Transpose::operator=(Transpose && other) noexcept {
   if (this != &other) {
 #ifdef WITH_MPI
     free_datatypes();
@@ -177,14 +177,14 @@ DatatypeTranspose::operator=(DatatypeTranspose && other) noexcept {
   return *this;
 }
 
-DatatypeTranspose::~DatatypeTranspose() {
+Transpose::~Transpose() {
 #ifdef WITH_MPI
   free_datatypes();
 #endif
 }
 
 #ifdef WITH_MPI
-void DatatypeTranspose::free_datatypes() {
+void Transpose::free_datatypes() {
   if (!types_initialized) {
     return;
   }
@@ -218,7 +218,7 @@ void DatatypeTranspose::free_datatypes() {
 }
 
 MPI_Datatype
-DatatypeTranspose::build_block_type(const IntCoord_t & local_shape,
+Transpose::build_block_type(const IntCoord_t & local_shape,
                                     const IntCoord_t & block_shape,
                                     const IntCoord_t & block_start) const {
   Dim_t dim = local_shape.get_dim();
@@ -269,7 +269,7 @@ DatatypeTranspose::build_block_type(const IntCoord_t & local_shape,
                                element_type, &result);
     } else {
       MPI_Type_free(&element_type);
-      throw RuntimeError("DatatypeTranspose only supports 2D and 3D");
+      throw RuntimeError("Transpose only supports 2D and 3D");
     }
 
     MPI_Type_commit(&result);
@@ -304,7 +304,7 @@ DatatypeTranspose::build_block_type(const IntCoord_t & local_shape,
       MPI_Type_create_subarray(3, sizes, subsizes, starts, MPI_ORDER_FORTRAN,
                                mpi_type<Complex>(), &spatial_type);
     } else {
-      throw RuntimeError("DatatypeTranspose only supports 2D and 3D");
+      throw RuntimeError("Transpose only supports 2D and 3D");
     }
     MPI_Type_commit(&spatial_type);
 
@@ -325,7 +325,7 @@ DatatypeTranspose::build_block_type(const IntCoord_t & local_shape,
   return result;
 }
 
-void DatatypeTranspose::init_forward_types() {
+void Transpose::init_forward_types() {
   int comm_size = this->comm.size();
   Dim_t dim = this->local_in.get_dim();
 
@@ -456,7 +456,7 @@ void DatatypeTranspose::init_forward_types() {
   }
 }
 
-void DatatypeTranspose::init_backward_types() {
+void Transpose::init_backward_types() {
   int comm_size = this->comm.size();
   Dim_t dim = this->local_out.get_dim();
 
@@ -585,7 +585,7 @@ void DatatypeTranspose::init_backward_types() {
 }
 #endif  // WITH_MPI
 
-void DatatypeTranspose::forward(const Complex * input, Complex * output) const {
+void Transpose::forward(const Complex * input, Complex * output) const {
 #ifdef WITH_MPI
   MPI_Comm mpi_comm = this->comm.get_mpi_comm();
 
@@ -618,7 +618,7 @@ void DatatypeTranspose::forward(const Complex * input, Complex * output) const {
 #endif  // WITH_MPI
 }
 
-void DatatypeTranspose::backward(const Complex * input,
+void Transpose::backward(const Complex * input,
                                  Complex * output) const {
 #ifdef WITH_MPI
   MPI_Comm mpi_comm = this->comm.get_mpi_comm();
