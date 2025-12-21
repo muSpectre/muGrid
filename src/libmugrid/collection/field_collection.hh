@@ -42,11 +42,11 @@
 #include "core/units.hh"
 #include "memory/memory_space.hh"
 
+#include <functional>
 #include <map>
-#include <string>
 #include <memory>
+#include <string>
 #include <sstream>
-#include <stdexcept>
 #include <vector>
 
 namespace muGrid {
