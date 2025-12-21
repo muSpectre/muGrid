@@ -3,12 +3,12 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ Bindings" href="Cplusplus.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Fast Fourier Transform" href="FFT.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>Python Bindings - µGrid 0.95.0-171-geb492de7 documentation</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>Python Bindings - µGrid 0.95.0-313-g6d5975b7 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
     
     
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-171-geb492de7
+      <a href="index.html"><div class="brand">µGrid 0.95.0-313-g6d5975b7
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-171-geb492de7
+  <span class="sidebar-brand-text">µGrid 0.95.0-313-g6d5975b7
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -197,6 +197,8 @@
 <li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Python Bindings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GPU.html">GPU Computing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
@@ -301,7 +303,7 @@ certain locations in the domain.</p></li>
 </ul>
 <p>The following example shows how to initialize a field collection and create scalar fields:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">real_field</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
@@ -309,19 +311,19 @@ certain locations in the domain.</p></li>
 
 <span class="c1"># Get a scalar (real-valued) field</span>
 <span class="c1"># This call creates a new field if it does not exist.</span>
-<span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check the registered fields</span>
 <span class="k">assert</span> <span class="n">fc</span><span class="o">.</span><span class="n">field_names</span> <span class="o">==</span> <span class="p">[</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">]</span>
 
 <span class="c1"># Fill the field with random numbers</span>
-<span class="n">field</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+<span class="n">field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">)</span>
 
 <span class="c1"># Set a specific value</span>
 <span class="n">field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mi">42</span>
 
 <span class="c1"># Get the field, but now into a different variable</span>
-<span class="n">field2</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
+<span class="n">field2</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check that the value is the same</span>
 <span class="k">assert</span> <span class="n">field2</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
@@ -344,17 +346,17 @@ tensor-valued field can be defined by specifying either simply a number of compo
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">real_field</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
 <span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
 
 <span class="c1"># Fill the field with random numbers</span>
-<span class="n">strain</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>Note that there is a difference between a scalar field and a field with a single component.
@@ -389,24 +391,20 @@ is created.</p>
 <p>The following example initializes a three-dimension grid with
 a sub-division of each pixel into five elements:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">real_field</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
 <span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span>
-    <span class="s2">&quot;strain&quot;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
-    <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># shape of components</span>
-    <span class="s2">&quot;element&quot;</span><span class="p">,</span>  <span class="c1"># sub-point type</span>
-<span class="p">)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;element&quot;</span><span class="p">)</span>
 
 <span class="c1"># Fill the field with random numbers</span>
-<span class="n">strain</span><span class="o">.</span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
 
-<span class="c1"># Note that the covenience accessor `p` yields the same field but a different shape</span>
-<span class="n">strain</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span> <span class="o">*</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+<span class="c1"># Note that the convenience accessor `p` yields the same field but a different shape</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span> <span class="o">*</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>The example demonstrates two ways of accessing the field. The convenience accessor <cite>p</cite> (that
@@ -435,7 +433,7 @@ components (which we will refer to as operators in the following), meaning that 
 <p>In mathematical notation, the convolution operation can be written as</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[f_{c,o,q,p} = \sum_{n} \sum_{k} s_{o,q,n,k} g_{c,n,p-k}\]</div>
+\[f_{c,o,q,p} = \sum_{n} \sum_{k} s_{o,q,n,k} g_{c,n,p+k}\]</div>
 </div>
 <p>where <span class="math notranslate nohighlight">\(f\)</span> is the output field, <span class="math notranslate nohighlight">\(g\)</span> is the input field, <span class="math notranslate nohighlight">\(s\)</span> is the stencil, <span class="math notranslate nohighlight">\(o\)</span> are the operators, <span class="math notranslate nohighlight">\(c\)</span> are the components,
 <span class="math notranslate nohighlight">\(q\)</span> are the quadrature points, <span class="math notranslate nohighlight">\(n\)</span> are the nodal points, <span class="math notranslate nohighlight">\(p\)</span> are the pixels and <span class="math notranslate nohighlight">\(k\)</span> runs over the stencil width
@@ -464,7 +462,7 @@ be unity. It is assumed that first <cite>nodel-points</cite>, then <cite>quadrat
 missing. This means we can represent a simple forward-differences gradient operator in two dimensions as</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConvolutionOperator</span><span class="p">,</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">CartesianDecomposition</span><span class="p">,</span> <span class="n">Communicator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConvolutionOperator</span><span class="p">,</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">CartesianDecomposition</span><span class="p">,</span> <span class="n">Communicator</span><span class="p">,</span> <span class="n">real_field</span>
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
     <span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
@@ -480,16 +478,17 @@ missing. This means we can represent a simple forward-differences gradient opera
                            <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="n">nb_ghosts_right</span><span class="p">)</span>
 
 <span class="c1"># Get nodal field</span>
-<span class="n">nodal_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;nodal-field&quot;</span><span class="p">)</span>
+<span class="n">nodal_field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;nodal-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Get quadrature field of shape (2, quad, nx, ny)</span>
-<span class="n">quad_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;quad-field&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span> <span class="s2">&quot;quad&quot;</span><span class="p">)</span>
+<span class="n">quad_field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;quad-field&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span> <span class="s2">&quot;quad&quot;</span><span class="p">)</span>
 
 <span class="c1"># Fill nodal field with a sine-wave</span>
-<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">nodal_field</span><span class="o">.</span><span class="n">icoords</span>
-<span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span>
+<span class="c1"># Generate grid coordinates</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nx</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ny</span><span class="p">),</span> <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span><span class="p">)</span>
+<span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span>
 <span class="c1"># Padding to mimic periodic boundary (sine wave is also periodic)</span>
-<span class="n">nodal_field</span><span class="o">.</span><span class="n">pg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wrap&quot;</span><span class="p">)</span>
+<span class="n">nodal_field</span><span class="o">.</span><span class="n">pg</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wrap&quot;</span><span class="p">)</span>
 
 <span class="c1"># Derivative stencil of shape (2, quad, 2, 2)</span>
 <span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
@@ -507,7 +506,7 @@ missing. This means we can represent a simple forward-differences gradient opera
 <span class="n">op</span> <span class="o">=</span> <span class="n">ConvolutionOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
 
 <span class="c1"># Apply the gradient operator to the nodal field and write result to the quad field</span>
-<span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="p">,</span> <span class="n">quad_field</span><span class="p">)</span>
+<span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">quad_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
 
 <span class="c1"># Check that the quadrature field has the correct derivative</span>
 <span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
@@ -575,21 +574,17 @@ from a field collection to disk:</p>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;IO example is skipped: muGrid has no OpenMode in serial build&quot;</span><span class="p">)</span>
     <span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">FileIONetCDF</span><span class="p">,</span> <span class="n">OpenMode</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">FileIONetCDF</span><span class="p">,</span> <span class="n">OpenMode</span><span class="p">,</span> <span class="n">real_field</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
 <span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span>
-    <span class="s2">&quot;strain&quot;</span><span class="p">,</span>  <span class="c1"># name of the field</span>
-    <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># shape of components</span>
-    <span class="s2">&quot;element&quot;</span><span class="p">,</span>  <span class="c1"># sub-point type</span>
-<span class="p">)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;element&quot;</span><span class="p">)</span>
 
 <span class="c1"># Fill the field with random numbers</span>
-<span class="n">strain</span><span class="o">.</span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
+<span class="n">strain</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
 
 <span class="c1"># Initialize a file I/O object</span>
 <span class="n">file</span> <span class="o">=</span> <span class="n">FileIONetCDF</span><span class="p">(</span><span class="s2">&quot;example.nc&quot;</span><span class="p">,</span> <span class="n">OpenMode</span><span class="o">.</span><span class="n">Overwrite</span><span class="p">)</span>
@@ -632,12 +627,12 @@ from a field collection to disk:</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="Cplusplus.html">
+          <a class="next-page" href="FFT.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">C++ Bindings</div>
+                <div class="title">Fast Fourier Transform</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -702,10 +697,10 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=becca874"></script>
-    <script src="_static/doctools.js?v=9bcbadda"></script>
-    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+</div><script src="_static/documentation_options.js?v=7cc908e0"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>
 </html>

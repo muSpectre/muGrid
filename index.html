@@ -5,10 +5,10 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Summary" href="Summary.html">
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>µGrid 0.95.0-171-geb492de7 documentation</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>µGrid 0.95.0-313-g6d5975b7 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
     
     
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="#"><div class="brand">µGrid 0.95.0-171-geb492de7
+      <a href="#"><div class="brand">µGrid 0.95.0-313-g6d5975b7
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-171-geb492de7
+  <span class="sidebar-brand-text">µGrid 0.95.0-313-g6d5975b7
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -197,6 +197,8 @@
 <li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GPU.html">GPU Computing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
@@ -265,6 +267,30 @@
 <li class="toctree-l2"><a class="reference internal" href="Python.html#i-o">I/O</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#the-fftengine-class">The FFTEngine class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#creating-fft-fields">Creating FFT fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#forward-and-inverse-transforms">Forward and inverse transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#normalization">Normalization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#wavevector-utilities">Wavevector utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#hermitian-grid-dimensions">Hermitian grid dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#fft-normalization-factor">FFT normalization factor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#example-fourier-derivative">Example: Fourier derivative</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#multi-component-fields">Multi-component fields</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="GPU.html">GPU Computing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#checking-gpu-availability">Checking GPU availability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#memory-locations">Memory locations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#working-with-gpu-arrays">Working with GPU arrays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#zero-copy-data-exchange">Zero-copy data exchange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#cartesiandecomposition-with-gpu">CartesianDecomposition with GPU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#installing-cupy">Installing CuPy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#convolution-operators-on-gpu">Convolution operators on GPU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#performance-considerations">Performance considerations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPU.html#building-with-gpu-support">Building with GPU support</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="Cplusplus.html#common-type-aliases">Common Type Aliases</a></li>
 <li class="toctree-l2"><a class="reference internal" href="Cplusplus.html#field-types">Field Types</a></li>
@@ -286,26 +312,35 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7add_vecE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::add_vec</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7add_vecI5cmplxI1TEEE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::add_vec&lt;</span> <span class="pre">cmplx&lt;</span> <span class="pre">T</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9threading17aligned_allocatorE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::threading::aligned_allocator</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00EN6muGrid6detail17AllocatorSelectorE"><code class="docutils literal notranslate"><span class="pre">muGrid::detail::AllocatorSelector</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6akantu10containers15ArangeContainerE"><code class="docutils literal notranslate"><span class="pre">akantu::containers::ArangeContainer</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6akantu9iterators14ArangeIteratorE"><code class="docutils literal notranslate"><span class="pre">akantu::iterators::ArangeIterator</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3arrE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::arr</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8arr_infoE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::arr_info</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00EN6muGrid5ArrayE"><code class="docutils literal notranslate"><span class="pre">muGrid::Array</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid8Matrices8internal15AxisTransformerE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::AxisTransformer</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid8Matrices8internal15AxisTransformerI10firstOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::AxisTransformer&lt;</span> <span class="pre">firstOrder</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid8Matrices8internal15AxisTransformerI11fourthOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::AxisTransformer&lt;</span> <span class="pre">fourthOrder</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid8Matrices8internal15AxisTransformerI11secondOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::AxisTransformer&lt;</span> <span class="pre">secondOrder</span> <span class="pre">&gt;</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t0_5Dim_t_Dp5Dim_tEN6muGrid8internal15CallSizesHelperE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::CallSizesHelper</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0_5Dim_t_Dp5Dim_tEN6muGrid8internal15CallSizesHelperIXL0EE5Fun_t3dimDp4argsEE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::CallSizesHelper&lt;</span> <span class="pre">0,</span> <span class="pre">Fun_t,</span> <span class="pre">dim,</span> <span class="pre">args...</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid21CartesianCommunicatorE"><code class="docutils literal notranslate"><span class="pre">muGrid::CartesianCommunicator</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid11raw_mem_ops18CartesianContainerE"><code class="docutils literal notranslate"><span class="pre">muGrid::raw_mem_ops::CartesianContainer</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecompositionE"><code class="docutils literal notranslate"><span class="pre">muGrid::CartesianDecomposition</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cfftpE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::cfftp</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cmplxE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::cmplx</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail6cndarrE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::cndarr</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12CommunicatorE"><code class="docutils literal notranslate"><span class="pre">muGrid::Communicator</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9threading16concurrent_queueE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::threading::concurrent_queue</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperatorE"><code class="docutils literal notranslate"><span class="pre">muGrid::ConvolutionOperator</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid23ConvolutionOperatorBaseE"><code class="docutils literal notranslate"><span class="pre">muGrid::ConvolutionOperatorBase</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackendE"><code class="docutils literal notranslate"><span class="pre">muGrid::cuFFTBackend</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13DecompositionE"><code class="docutils literal notranslate"><span class="pre">muGrid::Decomposition</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryE"><code class="docutils literal notranslate"><span class="pre">muGrid::Dictionary</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid15DictionaryErrorE"><code class="docutils literal notranslate"><span class="pre">muGrid::DictionaryError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10DimCounterE"><code class="docutils literal notranslate"><span class="pre">muGrid::DimCounter</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10DimCounterIN5Eigen10MatrixBaseI7DerivedEEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::DimCounter&lt;</span> <span class="pre">Eigen::MatrixBase&lt;</span> <span class="pre">Derived</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13NetCDFVarBase19DimensionStartValueE"><code class="docutils literal notranslate"><span class="pre">muGrid::NetCDFVarBase::DimensionStartValue</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid18dlpack_device_typeE"><code class="docutils literal notranslate"><span class="pre">muGrid::dlpack_device_type</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_t_5Dim_tEN6muGrid8Matrices8internal6DotterE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::Dotter</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid8Matrices8internal6DotterI3Dim11fourthOrder11fourthOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::Dotter&lt;</span> <span class="pre">Dim,</span> <span class="pre">fourthOrder,</span> <span class="pre">fourthOrder</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid8Matrices8internal6DotterI3Dim11fourthOrder11secondOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::Dotter&lt;</span> <span class="pre">Dim,</span> <span class="pre">fourthOrder,</span> <span class="pre">secondOrder</span> <span class="pre">&gt;</span></code></a></li>
@@ -315,6 +350,18 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00EN6muGrid8internal8EigenMapE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::EigenMap</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9CcoordOps6Pixels10EnumeratorE"><code class="docutils literal notranslate"><span class="pre">muGrid::CcoordOps::Pixels::Enumerator</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid22ExceptionWithTracebackE"><code class="docutils literal notranslate"><span class="pre">muGrid::ExceptionWithTraceback</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecC2CE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::ExecC2C</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8ExecDcstE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::ExecDcst</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11ExecHartleyE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::ExecHartley</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecR2RE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::ExecR2R</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp7fctdataE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::cfftp::fctdata</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp7fctdataE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::rfftp::fctdata</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackendE"><code class="docutils literal notranslate"><span class="pre">muGrid::FFT1DBackend</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid18FFTBackendSelectorE"><code class="docutils literal notranslate"><span class="pre">muGrid::FFTBackendSelector</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid18FFTBackendSelectorI9HostSpaceEE"><code class="docutils literal notranslate"><span class="pre">muGrid::FFTBackendSelector&lt;</span> <span class="pre">HostSpace</span> <span class="pre">&gt;</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7fftblueE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::fftblue</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid9FFTEngineE"><code class="docutils literal notranslate"><span class="pre">muGrid::FFTEngine</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBaseE"><code class="docutils literal notranslate"><span class="pre">muGrid::FFTEngineBase</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid5FieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::Field</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollectionE"><code class="docutils literal notranslate"><span class="pre">muGrid::FieldCollection</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid20FieldCollectionErrorE"><code class="docutils literal notranslate"><span class="pre">muGrid::FieldCollectionError</span></code></a></li>
@@ -329,15 +376,18 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_6size_tEN6akantu5tuple7details7ForeachE"><code class="docutils literal notranslate"><span class="pre">akantu::tuple::details::Foreach</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6akantu5tuple7details7ForeachIXL0EEEE"><code class="docutils literal notranslate"><span class="pre">akantu::tuple::details::Foreach&lt;</span> <span class="pre">0</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollectionE"><code class="docutils literal notranslate"><span class="pre">muGrid::GlobalFieldCollection</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperatorE"><code class="docutils literal notranslate"><span class="pre">muGrid::GradientOperator</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParamsE"><code class="docutils literal notranslate"><span class="pre">muGrid::GridTraversalParams</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackendE"><code class="docutils literal notranslate"><span class="pre">muGrid::hipFFTBackend</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid6detail13HostAllocatorE"><code class="docutils literal notranslate"><span class="pre">muGrid::detail::HostAllocator</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9HostSpaceE"><code class="docutils literal notranslate"><span class="pre">muGrid::HostSpace</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection13IndexIterableE"><code class="docutils literal notranslate"><span class="pre">muGrid::FieldCollection::IndexIterable</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid15is_device_spaceE"><code class="docutils literal notranslate"><span class="pre">muGrid::is_device_space</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck8is_fixedE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::is_fixed</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid13is_host_spaceE"><code class="docutils literal notranslate"><span class="pre">muGrid::is_host_space</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_matrixE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::is_matrix</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_matrixIN5Eigen3MapI7DerivedEEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::is_matrix&lt;</span> <span class="pre">Eigen::Map&lt;</span> <span class="pre">Derived</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_matrixIN5Eigen10MatrixBaseIN5Eigen3MapI7DerivedEEEEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::is_matrix&lt;</span> <span class="pre">Eigen::MatrixBase&lt;</span> <span class="pre">Eigen::Map&lt;</span> <span class="pre">Derived</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_matrixIN5Eigen3RefI7DerivedEEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::is_matrix&lt;</span> <span class="pre">Eigen::Ref&lt;</span> <span class="pre">Derived</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN15std_replacement6detail20is_reference_wrapperE"><code class="docutils literal notranslate"><span class="pre">std_replacement::detail::is_reference_wrapper</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN15std_replacement6detail20is_reference_wrapperINSt17reference_wrapperI1UEEEE"><code class="docutils literal notranslate"><span class="pre">std_replacement::detail::is_reference_wrapper&lt;</span> <span class="pre">std::reference_wrapper&lt;</span> <span class="pre">U</span> <span class="pre">&gt;</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_squareE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::is_square</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0_5Dim_tEN6muGrid7Tensors9is_tensorE"><code class="docutils literal notranslate"><span class="pre">muGrid::Tensors::is_tensor</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9CcoordOps6Pixels10Enumerator8iteratorE"><code class="docutils literal notranslate"><span class="pre">muGrid::CcoordOps::Pixels::Enumerator::iterator</span></code></a></li>
@@ -350,10 +400,13 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid13StateFieldMap8IteratorE"><code class="docutils literal notranslate"><span class="pre">muGrid::StateFieldMap::Iterator</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid14StaticFieldMap8IteratorE"><code class="docutils literal notranslate"><span class="pre">muGrid::StaticFieldMap::Iterator</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid19StaticStateFieldMap8IteratorE"><code class="docutils literal notranslate"><span class="pre">muGrid::StaticStateFieldMap::Iterator</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid8KeyErrorE"><code class="docutils literal notranslate"><span class="pre">muGrid::KeyError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid16KernelDispatcherE"><code class="docutils literal notranslate"><span class="pre">muGrid::KernelDispatcher</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latchE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::threading::latch</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollectionE"><code class="docutils literal notranslate"><span class="pre">muGrid::LocalFieldCollection</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid11MappedFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::MappedField</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid16MappedStateFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::MappedStateField</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_6size_tEN9pocketfft6detail10multi_iterE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::multi_iter</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5ndarrE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::ndarr</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase8NegativeE"><code class="docutils literal notranslate"><span class="pre">muGrid::TypedFieldBase::Negative</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9NetCDFAttE"><code class="docutils literal notranslate"><span class="pre">muGrid::NetCDFAtt</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9NetCDFDimE"><code class="docutils literal notranslate"><span class="pre">muGrid::NetCDFDim</span></code></a></li>
@@ -364,12 +417,14 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid14NetCDFVarFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::NetCDFVarField</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid15NetCDFVariablesE"><code class="docutils literal notranslate"><span class="pre">muGrid::NetCDFVariables</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid19NetCDFVarStateFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::NetCDFVarStateField</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyErrorE"><code class="docutils literal notranslate"><span class="pre">muGrid::NumpyError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0_i0EN6muGrid10NumpyProxyE"><code class="docutils literal notranslate"><span class="pre">muGrid::NumpyProxy</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid19OptionalMappedFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::OptionalMappedField</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomainE"><code class="docutils literal notranslate"><span class="pre">muGrid::PhysicsDomain</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection18PixelIndexIterableE"><code class="docutils literal notranslate"><span class="pre">muGrid::FieldCollection::PixelIndexIterable</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9CcoordOps6PixelsE"><code class="docutils literal notranslate"><span class="pre">muGrid::CcoordOps::Pixels</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend11PlanKeyHashE"><code class="docutils literal notranslate"><span class="pre">muGrid::cuFFTBackend::PlanKeyHash</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend11PlanKeyHashE"><code class="docutils literal notranslate"><span class="pre">muGrid::hipFFTBackend::PlanKeyHash</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail11pocketfft_cE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::pocketfft_c</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail11pocketfft_rE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::pocketfft_r</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackendE"><code class="docutils literal notranslate"><span class="pre">muGrid::PocketFFTBackend</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_t_5Dim_tEN6muGrid8log_comp4ProjE"><code class="docutils literal notranslate"><span class="pre">muGrid::log_comp::Proj</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid8log_comp4ProjIXL1EEXL0EEXL0EEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::log_comp::Proj&lt;</span> <span class="pre">1,</span> <span class="pre">0,</span> <span class="pre">0</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid8log_comp4ProjI3DimXL0EEXL1EEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::log_comp::Proj&lt;</span> <span class="pre">Dim,</span> <span class="pre">0,</span> <span class="pre">1</span> <span class="pre">&gt;</span></code></a></li>
@@ -377,11 +432,14 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_tEN6muGrid8log_comp4ProjI3Dim5Other5OtherEE"><code class="docutils literal notranslate"><span class="pre">muGrid::log_comp::Proj&lt;</span> <span class="pre">Dim,</span> <span class="pre">Other,</span> <span class="pre">Other</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0_6size_tEN6muGrid8RefArrayE"><code class="docutils literal notranslate"><span class="pre">muGrid::RefArray</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid9RefVectorE"><code class="docutils literal notranslate"><span class="pre">muGrid::RefVector</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueE"><code class="docutils literal notranslate"><span class="pre">muGrid::RuntimeValue</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iterE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::rev_iter</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5rfftpE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::rfftp</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid17RuntimeWorkBufferE"><code class="docutils literal notranslate"><span class="pre">muGrid::RuntimeWorkBuffer</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid8internal9ScalarMapE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::ScalarMap</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_tEN6muGrid12SizesByOrderE"><code class="docutils literal notranslate"><span class="pre">muGrid::SizesByOrder</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_t_Dp5Dim_tEN6muGrid8internal18SizesByOrderHelperE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::SizesByOrderHelper</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_Dp5Dim_tEN6muGrid8internal18SizesByOrderHelperIXL0EE3dimDp4dimsEE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::SizesByOrderHelper&lt;</span> <span class="pre">0,</span> <span class="pre">dim,</span> <span class="pre">dims...</span> <span class="pre">&gt;</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iterE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::simple_iter</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail13sincos_2pibynE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::sincos_2pibyn</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid22SparseOperatorCacheKeyE"><code class="docutils literal notranslate"><span class="pre">muGrid::SparseOperatorCacheKey</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid17SparseOperatorSoAE"><code class="docutils literal notranslate"><span class="pre">muGrid::SparseOperatorSoA</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid10StateFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::StateField</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0_7MappingEN6muGrid13StateFieldMapE"><code class="docutils literal notranslate"><span class="pre">muGrid::StateFieldMap</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid13StateFieldMap12StateWrapperE"><code class="docutils literal notranslate"><span class="pre">muGrid::StateFieldMap::StateWrapper</span></code></a></li>
@@ -390,6 +448,10 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid19StaticStateFieldMap18StaticStateWrapperE"><code class="docutils literal notranslate"><span class="pre">muGrid::StaticStateFieldMap::StaticStateWrapper</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_tEN6muGrid8log_comp7SummandE"><code class="docutils literal notranslate"><span class="pre">muGrid::log_comp::Summand</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid8log_comp7SummandI3DimXL0EEEE"><code class="docutils literal notranslate"><span class="pre">muGrid::log_comp::Summand&lt;</span> <span class="pre">Dim,</span> <span class="pre">0</span> <span class="pre">&gt;</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail8T_dcst23E"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::T_dcst23</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7T_dcst4E"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::T_dcst4</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail6T_dct1E"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::T_dct1</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail6T_dst1E"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::T_dst1</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck12tensor_4_dimE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::tensor_4_dim</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck10tensor_dimE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::tensor_dim</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0_5Dim_tEN6muGrid10EigenCheck11tensor_rankE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::tensor_rank</span></code></a></li>
@@ -398,19 +460,23 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid8Matrices8internal28TensorMultiplicationProviderI3Dim11secondOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::TensorMultiplicationProvider&lt;</span> <span class="pre">Dim,</span> <span class="pre">secondOrder</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid8Matrices8internal28TensorMultiplicationProviderI4oneD10firstOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::TensorMultiplicationProvider&lt;</span> <span class="pre">oneD,</span> <span class="pre">firstOrder</span> <span class="pre">&gt;</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IEN6muGrid8Matrices8internal28TensorMultiplicationProviderI4oneD11secondOrderEE"><code class="docutils literal notranslate"><span class="pre">muGrid::Matrices::internal::TensorMultiplicationProvider&lt;</span> <span class="pre">oneD,</span> <span class="pre">secondOrder</span> <span class="pre">&gt;</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_poolE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::threading::thread_pool</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9TracebackE"><code class="docutils literal notranslate"><span class="pre">muGrid::Traceback</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid14TracebackEntryE"><code class="docutils literal notranslate"><span class="pre">muGrid::TracebackEntry</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9TransposeE"><code class="docutils literal notranslate"><span class="pre">muGrid::Transpose</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfigE"><code class="docutils literal notranslate"><span class="pre">muGrid::FFTEngineBase::TransposeConfig</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00DpEN6muGrid8internal11TypeCheckerE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::TypeChecker</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00EN6muGrid8internal11TypeCheckerE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal::TypeChecker&lt;</span> <span class="pre">T,</span> <span class="pre">OnlyVal</span> <span class="pre">&gt;</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid10TypedFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::TypedField</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBaseE"><code class="docutils literal notranslate"><span class="pre">muGrid::TypedFieldBase</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00EN6muGrid10TypedFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::TypedField</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I00EN6muGrid14TypedFieldBaseE"><code class="docutils literal notranslate"><span class="pre">muGrid::TypedFieldBase</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid15TypedStateFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::TypedStateField</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid4UnitE"><code class="docutils literal notranslate"><span class="pre">muGrid::Unit</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9UnitErrorE"><code class="docutils literal notranslate"><span class="pre">muGrid::UnitError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12UnitExponentE"><code class="docutils literal notranslate"><span class="pre">muGrid::UnitExponent</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid10ValueErrorE"><code class="docutils literal notranslate"><span class="pre">muGrid::ValueError</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7VariantE"><code class="docutils literal notranslate"><span class="pre">muGrid::RuntimeValue::Variant</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN6muGrid12WrappedFieldE"><code class="docutils literal notranslate"><span class="pre">muGrid::WrappedField</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail4utilE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::util</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail4VLENE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::VLEN</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5VTYPEE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::VTYPE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6workerE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::threading::thread_pool::worker</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IDpEN6akantu10containers12ZipContainerE"><code class="docutils literal notranslate"><span class="pre">akantu::containers::ZipContainer</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4IDpEN6akantu9iterators11ZipIteratorE"><code class="docutils literal notranslate"><span class="pre">akantu::iterators::ZipIterator</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv46akantu"><code class="docutils literal notranslate"><span class="pre">akantu</span></code></a></li>
@@ -421,6 +487,9 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv46muGrid"><code class="docutils literal notranslate"><span class="pre">muGrid</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9CcoordOpsE"><code class="docutils literal notranslate"><span class="pre">muGrid::CcoordOps</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid9CcoordOps8internalE"><code class="docutils literal notranslate"><span class="pre">muGrid::CcoordOps::internal</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid3cpuE"><code class="docutils literal notranslate"><span class="pre">muGrid::cpu</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid6detailE"><code class="docutils literal notranslate"><span class="pre">muGrid::detail</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceTypeE"><code class="docutils literal notranslate"><span class="pre">muGrid::DLPackDeviceType</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheckE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck8internalE"><code class="docutils literal notranslate"><span class="pre">muGrid::EigenCheck::internal</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid8internalE"><code class="docutils literal notranslate"><span class="pre">muGrid::internal</span></code></a></li>
@@ -431,10 +500,31 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid11raw_mem_opsE"><code class="docutils literal notranslate"><span class="pre">muGrid::raw_mem_ops</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid7TensorsE"><code class="docutils literal notranslate"><span class="pre">muGrid::Tensors</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N6muGrid7versionE"><code class="docutils literal notranslate"><span class="pre">muGrid::version</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv49pocketfft"><code class="docutils literal notranslate"><span class="pre">pocketfft</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detailE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threadingE"><code class="docutils literal notranslate"><span class="pre">pocketfft::detail::threading</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4St"><code class="docutils literal notranslate"><span class="pre">std</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv415std_replacement"><code class="docutils literal notranslate"><span class="pre">std_replacement</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv4N15std_replacement6detailE"><code class="docutils literal notranslate"><span class="pre">std_replacement::detail</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv49MAX_DEPTH"><code class="docutils literal notranslate"><span class="pre">MAX_DEPTH</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_CACHE_SIZE"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_CACHE_SIZE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_NOINLINE"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_NOINLINE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_RESTRICT"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_RESTRICT</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_NO_VECTORS"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_NO_VECTORS</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PREP3"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PREP3</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP3a"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP3a</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP3b"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP3b</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PREP5"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PREP5</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP5a"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP5a</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP5b"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP5b</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PREP7"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PREP7</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP7a0"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP7a0</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP7a"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP7a</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP7"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP7</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PREP11"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PREP11</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP11a0"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP11a0</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP11a"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP11a</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP11"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_PARTSTEP11</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_REARRANGE"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_REARRANGE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#c.POCKETFFT_NO_MULTITHREADING"><code class="docutils literal notranslate"><span class="pre">POCKETFFT_NO_MULTITHREADING</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv46Size_t"><code class="docutils literal notranslate"><span class="pre">Size_t</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv410Datatype_t"><code class="docutils literal notranslate"><span class="pre">Datatype_t</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv48IOSize_t"><code class="docutils literal notranslate"><span class="pre">IOSize_t</span></code></a></li>
@@ -466,14 +556,14 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv417ncmu_put_att_text"><code class="docutils literal notranslate"><span class="pre">ncmu_put_att_text</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv412ncmu_put_att"><code class="docutils literal notranslate"><span class="pre">ncmu_put_att</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv415ncmu_rename_att"><code class="docutils literal notranslate"><span class="pre">ncmu_rename_att</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv48Ccoord_t"><code class="docutils literal notranslate"><span class="pre">Ccoord_t</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv48Rcoord_t"><code class="docutils literal notranslate"><span class="pre">Rcoord_t</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv45Dim_t"><code class="docutils literal notranslate"><span class="pre">Dim_t</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv47Index_t"><code class="docutils literal notranslate"><span class="pre">Index_t</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv44Uint"><code class="docutils literal notranslate"><span class="pre">Uint</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv43Int"><code class="docutils literal notranslate"><span class="pre">Int</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv44Real"><code class="docutils literal notranslate"><span class="pre">Real</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv47Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv48Ccoord_t"><code class="docutils literal notranslate"><span class="pre">Ccoord_t</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#_CPPv48Rcoord_t"><code class="docutils literal notranslate"><span class="pre">Rcoord_t</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -539,9 +629,9 @@ Boston, MA 02111-1307, USA.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=becca874"></script>
-    <script src="_static/doctools.js?v=9bcbadda"></script>
-    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+</div><script src="_static/documentation_options.js?v=7cc908e0"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
     </body>
 </html>

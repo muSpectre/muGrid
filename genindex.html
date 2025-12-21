@@ -4,9 +4,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#"><link rel="search" title="Search" href="search.html">
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 --><title>Index - µGrid 0.95.0-171-geb492de7 documentation</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 --><title>Index - µGrid 0.95.0-313-g6d5975b7 documentation</title>
 <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
     
     
@@ -159,7 +159,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-171-geb492de7
+      <a href="index.html"><div class="brand">µGrid 0.95.0-313-g6d5975b7
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-171-geb492de7
+  <span class="sidebar-brand-text">µGrid 0.95.0-313-g6d5975b7
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -195,6 +195,8 @@
 <li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GPU.html">GPU Computing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
@@ -233,7 +235,7 @@
           
 <section class="genindex-section">
   <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#U"><strong>U</strong></a></div>
+  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#U"><strong>U</strong></a></div>
 </section>
 <section id="A" class="genindex-section">
   <h2>A</h2>
@@ -409,13 +411,41 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="CplusplusAPI.html#_CPPv49MAX_DEPTH">MAX_DEPTH (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv46muGrid">muGrid (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv46muGrid">muGrid (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv46muGrid">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid5ArrayE">muGrid::Array (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array14allocator_typeE">muGrid::Array::allocator_type (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5ArrayENSt6size_tE">muGrid::Array::Array (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5ArrayERK5Array">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5ArrayERKNSt6stringE">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5ArrayERKNSt6stringENSt6size_tE">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5ArrayERR5Array">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5ArrayEv">[5]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array4dataEv">muGrid::Array::data (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid5Array4dataEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5data_E">muGrid::Array::data_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Array5emptyEv">muGrid::Array::empty (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array9fill_zeroEv">muGrid::Array::fill_zero (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array12memory_spaceE">muGrid::Array::memory_space (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5ArrayaSERK5Array">muGrid::Array::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid5ArrayaSERR5Array">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid5ArrayixENSt11enable_if_tI15is_host_space_vI1MER1TEENSt6size_tE">muGrid::Array::operator[] (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid5ArrayixENSt11enable_if_tI15is_host_space_vI1MERK1TEENSt6size_tE">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array6resizeENSt6size_tE">muGrid::Array::resize (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Array4sizeEv">muGrid::Array::size (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array5size_E">muGrid::Array::size_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Array10value_typeE">muGrid::Array::value_type (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5ArrayD0Ev">muGrid::Array::~Array (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_5Dim_t_5Dim_t_8IterUnitEN6muGrid13ArrayFieldMapE">muGrid::ArrayFieldMap (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_5Dim_t_5Dim_t_6size_t_8IterUnitEN6muGrid18ArrayStateFieldMapE">muGrid::ArrayStateFieldMap (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_t0EN6muGrid10call_sizesEDcRR5Fun_t">muGrid::call_sizes (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid21CartesianCommunicatorE">muGrid::CartesianCommunicator (C++ class)</a>
 </li>
@@ -435,9 +465,9 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid21CartesianCommunicator8Parent_tE">muGrid::CartesianCommunicator::Parent_t (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid21CartesianCommunicator13sendrecv_leftE1Ti1T">muGrid::CartesianCommunicator::sendrecv_left (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid21CartesianCommunicator13sendrecv_leftEiiii7Index_tii7Index_tPciiPv">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid21CartesianCommunicator13sendrecv_leftE1Ti1T">muGrid::CartesianCommunicator::sendrecv_left (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid21CartesianCommunicator13sendrecv_leftEiiii7Index_tii7Index_tPciiPvb">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid21CartesianCommunicator14sendrecv_rightE1Ti1T">muGrid::CartesianCommunicator::sendrecv_right (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid21CartesianCommunicator14sendrecv_rightEiiii7Index_tii7Index_tPciiPv">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid21CartesianCommunicator14sendrecv_rightE1Ti1T">muGrid::CartesianCommunicator::sendrecv_right (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid21CartesianCommunicator14sendrecv_rightEiiii7Index_tii7Index_tPciiPvb">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid21CartesianCommunicatorD0Ev">muGrid::CartesianCommunicator::~CartesianCommunicator (C++ function)</a>
 </li>
@@ -445,7 +475,7 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition9cart_commE">muGrid::CartesianDecomposition::cart_comm (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition22CartesianDecompositionERK12Communicator7Index_tRK10SubPtMap_t">muGrid::CartesianDecomposition::CartesianDecomposition (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition22CartesianDecompositionERK12CommunicatorRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition22CartesianDecompositionEv">[2]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition22CartesianDecompositionERK12Communicator7Index_tRK10SubPtMap_t14MemoryLocation">muGrid::CartesianDecomposition::CartesianDecomposition (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition22CartesianDecompositionERK12CommunicatorRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t14MemoryLocation">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition22CartesianDecompositionEv">[2]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition15check_dimensionERK10IntCoord_tRKNSt6stringE">muGrid::CartesianDecomposition::check_dimension (C++ function)</a>
 </li>
@@ -456,6 +486,8 @@
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition18communicate_ghostsERK5Field">muGrid::CartesianDecomposition::communicate_ghosts (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition18communicate_ghostsERKNSt6stringE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition14get_collectionEv">muGrid::CartesianDecomposition::get_collection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition14get_collectionEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition19get_memory_locationEv">muGrid::CartesianDecomposition::get_memory_location (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition22get_nb_domain_grid_ptsEv">muGrid::CartesianDecomposition::get_nb_domain_grid_pts (C++ function)</a>
 </li>
@@ -476,6 +508,10 @@
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition38get_subdomain_locations_without_ghostsEv">muGrid::CartesianDecomposition::get_subdomain_locations_without_ghosts (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition10initialiseERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_t">muGrid::CartesianDecomposition::initialise (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition10initialiseERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22CartesianDecomposition12is_on_deviceEv">muGrid::CartesianDecomposition::is_on_device (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition14MemoryLocationE">muGrid::CartesianDecomposition::MemoryLocation (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22CartesianDecomposition17nb_sendrecv_stepsE">muGrid::CartesianDecomposition::nb_sendrecv_steps (C++ member)</a>
 </li>
@@ -530,8 +566,6 @@
         <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t_Dp6size_tEN6muGrid9CcoordOps8internal25compute_row_major_stridesE8Ccoord_tI3DimERK8Ccoord_tI3DimENSt14index_sequenceIDp1IEE">muGrid::CcoordOps::internal::compute_row_major_strides (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t0_Dp6size_tEN6muGrid9CcoordOps8internal8cube_funENSt5arrayI1T3DimEE1TNSt14index_sequenceIDp1IEE">muGrid::CcoordOps::internal::cube_fun (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t_Dp6size_tEN6muGrid9CcoordOps8internal4hermE8Ccoord_tI3DimERK8Ccoord_tI3DimENSt14index_sequenceIDp1IEE">muGrid::CcoordOps::internal::herm (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid9CcoordOps8internal3retE1T1T6size_t">muGrid::CcoordOps::internal::ret (C++ function)</a>
 </li>
@@ -671,6 +705,10 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12ComplexFieldE">muGrid::ComplexField (C++ type)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18ComplexFieldDeviceE">muGrid::ComplexFieldDevice (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid13ComplexFieldTE">muGrid::ComplexFieldT (C++ type)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17ComplexStateFieldE">muGrid::ComplexStateField (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11compute_gcdERK3IntRK3Int">muGrid::compute_gcd (C++ function)</a>
@@ -683,11 +721,35 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator15apply_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealE">muGrid::ConvolutionOperator::apply_increment (C++ function)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid19ConvolutionOperator15apply_on_deviceEvPK4RealP4RealK4RealRK19GridTraversalParams">muGrid::ConvolutionOperator::apply_on_device (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator15cached_apply_opE">muGrid::ConvolutionOperator::cached_apply_op (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator22cached_device_apply_opE">muGrid::ConvolutionOperator::cached_device_apply_op (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator26cached_device_transpose_opE">muGrid::ConvolutionOperator::cached_device_transpose_op (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator10cached_keyE">muGrid::ConvolutionOperator::cached_key (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19cached_transpose_opE">muGrid::ConvolutionOperator::cached_transpose_op (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator11clear_cacheEv">muGrid::ConvolutionOperator::clear_cache (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_12StorageOrderENK6muGrid19ConvolutionOperator24compute_traversal_paramsE19GridTraversalParamsRK21GlobalFieldCollection7Index_t7Index_t">muGrid::ConvolutionOperator::compute_traversal_params (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator14conv_pts_shapeE">muGrid::ConvolutionOperator::conv_pts_shape (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorERK19ConvolutionOperator">muGrid::ConvolutionOperator::ConvolutionOperator (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorERK7Shape_tRKN5Eigen8MatrixXdERK7Shape_tRK7Index_tRK7Index_tRK7Index_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorERR19ConvolutionOperator">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorEv">[3]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorERK19ConvolutionOperator">muGrid::ConvolutionOperator::ConvolutionOperator (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorERK7Shape_tNSt4spanIK4RealEERK7Shape_tRK7Index_tRK7Index_tRK7Index_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorERR19ConvolutionOperator">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator19ConvolutionOperatorEv">[3]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator22create_sparse_operatorERK10IntCoord_tK7Index_t">muGrid::ConvolutionOperator::create_sparse_operator (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I_12StorageOrderENK6muGrid19ConvolutionOperator21create_apply_operatorE17SparseOperatorSoAI9HostSpaceERK10IntCoord_tK7Index_t">muGrid::ConvolutionOperator::create_apply_operator (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_12StorageOrderENK6muGrid19ConvolutionOperator25create_transpose_operatorE17SparseOperatorSoAI9HostSpaceERK10IntCoord_tK7Index_t">muGrid::ConvolutionOperator::create_transpose_operator (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator18get_apply_operatorERK10IntCoord_tK7Index_t">muGrid::ConvolutionOperator::get_apply_operator (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid19ConvolutionOperator25get_device_apply_operatorERK17SparseOperatorSoAI11DeviceSpaceERK10IntCoord_t7Index_t">muGrid::ConvolutionOperator::get_device_apply_operator (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid19ConvolutionOperator29get_device_transpose_operatorERK17SparseOperatorSoAI11DeviceSpaceERK10IntCoord_t7Index_t">muGrid::ConvolutionOperator::get_device_transpose_operator (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator16get_nb_nodal_ptsEv">muGrid::ConvolutionOperator::get_nb_nodal_pts (C++ function)</a>
 </li>
@@ -698,6 +760,8 @@
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator18get_pixel_operatorEv">muGrid::ConvolutionOperator::get_pixel_operator (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator15get_spatial_dimEv">muGrid::ConvolutionOperator::get_spatial_dim (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator22get_transpose_operatorERK10IntCoord_tK7Index_t">muGrid::ConvolutionOperator::get_transpose_operator (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator11nb_conv_ptsE">muGrid::ConvolutionOperator::nb_conv_pts (C++ member)</a>
 </li>
@@ -715,13 +779,19 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator14pixel_operatorE">muGrid::ConvolutionOperator::pixel_operator (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator14SparseOperatorE">muGrid::ConvolutionOperator::SparseOperator (C++ type)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator11spatial_dimE">muGrid::ConvolutionOperator::spatial_dim (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator9transposeERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealERKNSt6vectorI4RealEE">muGrid::ConvolutionOperator::transpose (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator19transpose_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealERKNSt6vectorI4RealEE">muGrid::ConvolutionOperator::transpose_increment (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid19ConvolutionOperator19transpose_on_deviceEvPK4RealP4RealK4RealRK19GridTraversalParams">muGrid::ConvolutionOperator::transpose_on_device (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator15validate_fieldsERK14TypedFieldBaseI4RealERK14TypedFieldBaseI4RealEb">muGrid::ConvolutionOperator::validate_fields (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid19ConvolutionOperator23validate_fields_genericERK5FieldRK5Fieldb">muGrid::ConvolutionOperator::validate_fields_generic (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperator14zero_toleranceE">muGrid::ConvolutionOperator::zero_tolerance (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19ConvolutionOperatorD0Ev">muGrid::ConvolutionOperator::~ConvolutionOperator (C++ function)</a>
 </li>
@@ -749,7 +819,53 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid23ConvolutionOperatorBaseD0Ev">muGrid::ConvolutionOperatorBase::~ConvolutionOperatorBase (C++ function)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid3cpuE">muGrid::cpu (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid3cpu24apply_convolution_kernelEPK4RealP4RealK4RealRK19GridTraversalParamsPK7Index_tPK7Index_tPK4RealK7Index_t">muGrid::cpu::apply_convolution_kernel (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid3cpu28transpose_convolution_kernelEPK4RealP4RealK4RealRK19GridTraversalParamsPK7Index_tPK7Index_tPK4RealK7Index_t">muGrid::cpu::transpose_convolution_kernel (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid18create_fft_backendENSt10unique_ptrI12FFT1DBackendEEv">muGrid::create_fft_backend (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7ct_sqrtE5Dim_t">muGrid::ct_sqrt (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid7ct_sqrtE5Dim_t5Dim_t5Dim_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackendE">muGrid::cuFFTBackend (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend12c2c_backwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::cuFFTBackend::c2c_backward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend11c2c_forwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::cuFFTBackend::c2c_forward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend3c2rE7Index_t7Index_tPK7Complex7Index_t7Index_tP4Real7Index_t7Index_t">muGrid::cuFFTBackend::c2r (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend18check_cufft_resultE11cufftResultPKc">muGrid::cuFFTBackend::check_cufft_result (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend12cuFFTBackendEv">muGrid::cuFFTBackend::cuFFTBackend (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend8get_planE13TransformType7Index_t7Index_t7Index_t7Index_t7Index_t7Index_t">muGrid::cuFFTBackend::get_plan (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12cuFFTBackend4nameEv">muGrid::cuFFTBackend::name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend10plan_cacheE">muGrid::cuFFTBackend::plan_cache (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend7PlanKeyE">muGrid::cuFFTBackend::PlanKey (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend11PlanKeyHashE">muGrid::cuFFTBackend::PlanKeyHash (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12cuFFTBackend11PlanKeyHashclERK7PlanKey">muGrid::cuFFTBackend::PlanKeyHash::operator() (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend3r2cE7Index_t7Index_tPK4Real7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::cuFFTBackend::r2c (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12cuFFTBackend22supports_device_memoryEv">muGrid::cuFFTBackend::supports_device_memory (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend13TransformTypeE">muGrid::cuFFTBackend::TransformType (C++ enum)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend13TransformType3C2CE">muGrid::cuFFTBackend::TransformType::C2C (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend13TransformType3C2RE">muGrid::cuFFTBackend::TransformType::C2R (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackend13TransformType3R2CE">muGrid::cuFFTBackend::TransformType::R2C (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12cuFFTBackendD0Ev">muGrid::cuFFTBackend::~cuFFTBackend (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13DecompositionE">muGrid::Decomposition (C++ class)</a>
 </li>
@@ -759,33 +875,35 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13DecompositionD0Ev">muGrid::Decomposition::~Decomposition (C++ function)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4I000EN6muGrid9deep_copyEvP1TPK1TNSt6size_tE">muGrid::deep_copy (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I000EN6muGrid9deep_copyEvR14TypedFieldBaseI1T8DstSpaceERK14TypedFieldBaseI1T8SrcSpaceE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I000EN6muGrid9deep_copyEvR5ArrayI1T8DstSpaceERK5ArrayI1T8SrcSpaceE">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I00EN6muGrid9deep_copyEvP1TPK1TNSt6size_tE">[3]</a>, <a href="CplusplusAPI.html#_CPPv4I00EN6muGrid9deep_copyEvR5ArrayI1T11MemorySpaceERK1T">[4]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid25deep_copy_sparse_operatorE17SparseOperatorSoAI8DstSpaceERK17SparseOperatorSoAI8SrcSpaceE">muGrid::deep_copy_sparse_operator (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20DEFAULT_NETCDFDIM_IDE">muGrid::DEFAULT_NETCDFDIM_ID (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20DEFAULT_NETCDFVAR_IDE">muGrid::DEFAULT_NETCDFVAR_ID (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryE">muGrid::Dictionary (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18DefaultDeviceSpaceE">muGrid::DefaultDeviceSpace (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary3addERKNSt6stringERK10Dictionary">muGrid::Dictionary::add (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary3addERKNSt6stringERK3Int">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary3addERKNSt6stringERK4Real">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary3addERKNSt6stringERKN5Eigen3RefIKN5Eigen8MatrixXdEEE">[3]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6detailE">muGrid::detail (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryENSt10shared_ptrI12RuntimeValueEE">muGrid::Dictionary::Dictionary (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryERK10Dictionary">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryERKNSt6stringERK3Int">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryERKNSt6stringERK4Real">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryERKNSt6stringERKN5Eigen3RefIKN5Eigen8MatrixXdEEE">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryERR10Dictionary">[5]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary10DictionaryEv">[6]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid6detail9AllocatorE">muGrid::detail::Allocator (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10Dictionary7get_intEv">muGrid::Dictionary::get_int (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid6detail17AllocatorSelectorE">muGrid::detail::AllocatorSelector (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10Dictionary10get_matrixEv">muGrid::Dictionary::get_matrix (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6detail17AllocatorSelector4typeE">muGrid::detail::AllocatorSelector::type (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10Dictionary8get_realEv">muGrid::Dictionary::get_real (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid6detail13HostAllocatorE">muGrid::detail::HostAllocator (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10Dictionary14get_value_typeEv">muGrid::Dictionary::get_value_type (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6detail13HostAllocator8allocateENSt6size_tE">muGrid::detail::HostAllocator::allocate (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryaSERK10Dictionary">muGrid::Dictionary::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryaSERK3Int">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryaSERK4Real">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryaSERKN5Eigen3RefIKN5Eigen8MatrixXdEEE">[3]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6detail13HostAllocator10deallocateEP1T">muGrid::detail::HostAllocator::deallocate (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10DictionaryixERKNSt6stringE">muGrid::Dictionary::operator[] (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6detail13HostAllocator6memsetEP1TiNSt6size_tE">muGrid::detail::HostAllocator::memset (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10Dictionary3ptrE">muGrid::Dictionary::ptr (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid11device_nameEPKcv">muGrid::device_name (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10DictionaryD0Ev">muGrid::Dictionary::~Dictionary (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15DictionaryErrorE">muGrid::DictionaryError (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18device_synchronizeEv">muGrid::device_synchronize (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10DimCounterE">muGrid::DimCounter (C++ struct)</a>
 </li>
@@ -796,6 +914,26 @@
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10DimCounterIN5Eigen10MatrixBaseI7DerivedEEE4TypeE">muGrid::DimCounter&lt;Eigen::MatrixBase&lt;Derived&gt;&gt;::Type (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10DimCounterIN5Eigen10MatrixBaseI7DerivedEEE5valueE">muGrid::DimCounter&lt;Eigen::MatrixBase&lt;Derived&gt;&gt;::value (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20distribute_dimensionE7Index_tiiR7Index_tR7Index_t">muGrid::distribute_dimension (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid18dlpack_device_typeE">muGrid::dlpack_device_type (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18dlpack_device_type5valueE">muGrid::dlpack_device_type::value (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid20dlpack_device_type_vE">muGrid::dlpack_device_type_v (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceTypeE">muGrid::DLPackDeviceType (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceType3CPUE">muGrid::DLPackDeviceType::CPU (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceType4CUDAE">muGrid::DLPackDeviceType::CUDA (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceType8CUDAHostE">muGrid::DLPackDeviceType::CUDAHost (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceType4ROCmE">muGrid::DLPackDeviceType::ROCm (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16DLPackDeviceType8ROCmHostE">muGrid::DLPackDeviceType::ROCmHost (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I_6size_t0EN6muGrid9DynCcoordE">muGrid::DynCcoord (C++ class)</a>
 </li>
@@ -871,13 +1009,13 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck8is_fixedE">muGrid::EigenCheck::is_fixed (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck8is_fixed1TE">muGrid::EigenCheck::is_fixed::T (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck8is_fixed1TE">muGrid::EigenCheck::is_fixed::T (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck8is_fixed1TE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck8is_fixed5valueE">muGrid::EigenCheck::is_fixed::value (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_matrixE">muGrid::EigenCheck::is_matrix (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_matrix1TE">muGrid::EigenCheck::is_matrix::T (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_matrix1TE">muGrid::EigenCheck::is_matrix::T (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_matrix1TE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_matrix5valueE">muGrid::EigenCheck::is_matrix::value (C++ member)</a>
 </li>
@@ -895,31 +1033,29 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck9is_squareE">muGrid::EigenCheck::is_square (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_square1TE">muGrid::EigenCheck::is_square::T (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_square1TE">muGrid::EigenCheck::is_square::T (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_square1TE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck9is_square5valueE">muGrid::EigenCheck::is_square::value (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck12tensor_4_dimE">muGrid::EigenCheck::tensor_4_dim (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck12tensor_4_dim1TE">muGrid::EigenCheck::tensor_4_dim::T (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck12tensor_4_dim1TE">muGrid::EigenCheck::tensor_4_dim::T (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck12tensor_4_dim1TE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck12tensor_4_dim5valueE">muGrid::EigenCheck::tensor_4_dim::value (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10EigenCheck10tensor_dimE">muGrid::EigenCheck::tensor_dim (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck10tensor_dim1TE">muGrid::EigenCheck::tensor_dim::T (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck10tensor_dim1TE">muGrid::EigenCheck::tensor_dim::T (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck10tensor_dim1TE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck10tensor_dim5valueE">muGrid::EigenCheck::tensor_dim::value (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_5Dim_tEN6muGrid10EigenCheck11tensor_rankE">muGrid::EigenCheck::tensor_rank (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck11tensor_rank1TE">muGrid::EigenCheck::tensor_rank::T (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck11tensor_rank1TE">muGrid::EigenCheck::tensor_rank::T (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck11tensor_rank1TE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10EigenCheck11tensor_rank5valueE">muGrid::EigenCheck::tensor_rank::value (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_8IterUnitEN6muGrid13EigenFieldMapE">muGrid::EigenFieldMap (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12EightQuadPtsE">muGrid::EightQuadPts (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid22ExceptionWithTracebackE">muGrid::ExceptionWithTraceback (C++ class)</a>
 </li>
@@ -936,6 +1072,174 @@
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid4expmEDcRKN5Eigen10MatrixBaseI7DerivedEE">muGrid::expm (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_tI0E0EN6muGrid13expm_spectralEDcRK10DecompTypeI8Matrix_tI3DimEE">muGrid::expm_spectral (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackendE">muGrid::FFT1DBackend (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackend12c2c_backwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::FFT1DBackend::c2c_backward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackend11c2c_forwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::FFT1DBackend::c2c_forward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackend3c2rE7Index_t7Index_tPK7Complex7Index_t7Index_tP4Real7Index_t7Index_t">muGrid::FFT1DBackend::c2r (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12FFT1DBackend4nameEv">muGrid::FFT1DBackend::name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackend3r2cE7Index_t7Index_tPK4Real7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::FFT1DBackend::r2c (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12FFT1DBackend22supports_device_memoryEv">muGrid::FFT1DBackend::supports_device_memory (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12FFT1DBackendD0Ev">muGrid::FFT1DBackend::~FFT1DBackend (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid16fft_backend_nameEPKcv">muGrid::fft_backend_name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8fft_freqE7Index_t4Real">muGrid::fft_freq (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t">muGrid::fft_freqind (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17fft_normalizationERK10IntCoord_t">muGrid::fft_normalization (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid12FFTBackend_tE">muGrid::FFTBackend_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid18FFTBackendSelectorE">muGrid::FFTBackendSelector (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4IEN6muGrid18FFTBackendSelectorI9HostSpaceEE">muGrid::FFTBackendSelector&lt;HostSpace&gt; (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18FFTBackendSelectorI9HostSpaceE6createEv">muGrid::FFTBackendSelector&lt;HostSpace&gt;::create (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18FFTBackendSelectorI9HostSpaceE4nameEv">muGrid::FFTBackendSelector&lt;HostSpace&gt;::name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid18FFTBackendSelectorI9HostSpaceE4typeE">muGrid::FFTBackendSelector&lt;HostSpace&gt;::type (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid9FFTEngineE">muGrid::FFTEngine (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine7backendE">muGrid::FFTEngine::backend (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine3fftERK5FieldR5Field">muGrid::FFTEngine::fft (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine6fft_2dERK5FieldR5Field">muGrid::FFTEngine::fft_2d (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine6fft_3dERK5FieldR5Field">muGrid::FFTEngine::fft_3d (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine9FFTEngineERK10IntCoord_tRK12CommunicatorRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t">muGrid::FFTEngine::FFTEngine (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine9FFTEngineERK9FFTEngine">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine9FFTEngineERR9FFTEngine">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine9FFTEngineEv">[3]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9FFTEngine16get_backend_nameEv">muGrid::FFTEngine::get_backend_name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine4ifftERK5FieldR5Field">muGrid::FFTEngine::ifft (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine7ifft_2dERK5FieldR5Field">muGrid::FFTEngine::ifft_2d (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine7ifft_3dERK5FieldR5Field">muGrid::FFTEngine::ifft_3d (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngineaSERK9FFTEngine">muGrid::FFTEngine::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngineaSERR9FFTEngine">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine8Parent_tE">muGrid::FFTEngine::Parent_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngine10WorkBufferE">muGrid::FFTEngine::WorkBuffer (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9FFTEngineD0Ev">muGrid::FFTEngine::~FFTEngine (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBaseE">muGrid::FFTEngineBase (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase3fftERK5FieldR5Field">muGrid::FFTEngineBase::fft (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase13FFTEngineBaseERK10IntCoord_tRK12CommunicatorRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t14MemoryLocation">muGrid::FFTEngineBase::FFTEngineBase (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase13FFTEngineBaseERK13FFTEngineBase">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase13FFTEngineBaseERR13FFTEngineBase">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase13FFTEngineBaseEv">[3]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase18fourier_collectionE">muGrid::FFTEngineBase::fourier_collection (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase27fourier_subdomain_locationsE">muGrid::FFTEngineBase::fourier_subdomain_locations (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase16get_backend_nameEv">muGrid::FFTEngineBase::get_backend_name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase28get_fourier_space_collectionEv">muGrid::FFTEngineBase::get_fourier_space_collection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase28get_fourier_space_collectionEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase31get_fourier_subdomain_locationsEv">muGrid::FFTEngineBase::get_fourier_subdomain_locations (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase23get_nb_fourier_grid_ptsEv">muGrid::FFTEngineBase::get_nb_fourier_grid_pts (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase33get_nb_fourier_subdomain_grid_ptsEv">muGrid::FFTEngineBase::get_nb_fourier_subdomain_grid_pts (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase18get_process_coordsEv">muGrid::FFTEngineBase::get_process_coords (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase16get_process_gridEv">muGrid::FFTEngineBase::get_process_grid (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase25get_real_space_collectionEv">muGrid::FFTEngineBase::get_real_space_collection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase25get_real_space_collectionEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase16get_transpose_xzE7Index_t">muGrid::FFTEngineBase::get_transpose_xz (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase25get_transpose_yz_backwardE7Index_t">muGrid::FFTEngineBase::get_transpose_yz_backward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase24get_transpose_yz_forwardE7Index_t">muGrid::FFTEngineBase::get_transpose_yz_forward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase4ifftERK5FieldR5Field">muGrid::FFTEngineBase::ifft (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase19initialise_fft_baseEv">muGrid::FFTEngineBase::initialise_fft_base (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase14MemoryLocationE">muGrid::FFTEngineBase::MemoryLocation (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase19nb_fourier_grid_ptsE">muGrid::FFTEngineBase::nb_fourier_grid_pts (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase29nb_fourier_subdomain_grid_ptsE">muGrid::FFTEngineBase::nb_fourier_subdomain_grid_pts (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase17need_transpose_xzE">muGrid::FFTEngineBase::need_transpose_xz (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase17need_transpose_yzE">muGrid::FFTEngineBase::need_transpose_yz (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase11norm_factorE">muGrid::FFTEngineBase::norm_factor (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13FFTEngineBase13normalisationEv">muGrid::FFTEngineBase::normalisation (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBaseaSERK13FFTEngineBase">muGrid::FFTEngineBase::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBaseaSERR13FFTEngineBase">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase8Parent_tE">muGrid::FFTEngineBase::Parent_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase13proc_coord_p1E">muGrid::FFTEngineBase::proc_coord_p1 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase13proc_coord_p2E">muGrid::FFTEngineBase::proc_coord_p2 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase12proc_grid_p1E">muGrid::FFTEngineBase::proc_grid_p1 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase12proc_grid_p2E">muGrid::FFTEngineBase::proc_grid_p2 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase28register_fourier_space_fieldERKNSt6stringE7Index_t">muGrid::FFTEngineBase::register_fourier_space_field (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase28register_fourier_space_fieldERKNSt6stringERK7Shape_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase25register_real_space_fieldERKNSt6stringE7Index_t">muGrid::FFTEngineBase::register_real_space_field (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase25register_real_space_fieldERKNSt6stringERK7Shape_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase11spatial_dimE">muGrid::FFTEngineBase::spatial_dim (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase10SubPtMap_tE">muGrid::FFTEngineBase::SubPtMap_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase18transpose_xz_cacheE">muGrid::FFTEngineBase::transpose_xz_cache (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase19transpose_xz_configE">muGrid::FFTEngineBase::transpose_xz_config (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase22transpose_yz_bwd_cacheE">muGrid::FFTEngineBase::transpose_yz_bwd_cache (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase23transpose_yz_bwd_configE">muGrid::FFTEngineBase::transpose_yz_bwd_config (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase22transpose_yz_fwd_cacheE">muGrid::FFTEngineBase::transpose_yz_fwd_cache (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase23transpose_yz_fwd_configE">muGrid::FFTEngineBase::transpose_yz_fwd_config (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfigE">muGrid::FFTEngineBase::TransposeConfig (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig7axis_inE">muGrid::FFTEngineBase::TransposeConfig::axis_in (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig8axis_outE">muGrid::FFTEngineBase::TransposeConfig::axis_out (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig9global_inE">muGrid::FFTEngineBase::TransposeConfig::global_in (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig10global_outE">muGrid::FFTEngineBase::TransposeConfig::global_out (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig8local_inE">muGrid::FFTEngineBase::TransposeConfig::local_in (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig9local_outE">muGrid::FFTEngineBase::TransposeConfig::local_out (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase15TransposeConfig12use_row_commE">muGrid::FFTEngineBase::TransposeConfig::use_row_comm (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase12work_ypencilE">muGrid::FFTEngineBase::work_ypencil (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBase12work_zpencilE">muGrid::FFTEngineBase::work_zpencil (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13FFTEngineBaseD0Ev">muGrid::FFTEngineBase::~FFTEngineBase (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5FieldE">muGrid::Field (C++ class)</a>
 </li>
@@ -962,6 +1266,12 @@
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field19get_default_nb_colsERK8IterUnit">muGrid::Field::get_default_nb_cols (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field19get_default_nb_rowsERK8IterUnit">muGrid::Field::get_default_nb_rows (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field13get_device_idEv">muGrid::Field::get_device_id (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field17get_device_stringEv">muGrid::Field::get_device_string (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field22get_dlpack_device_typeEv">muGrid::Field::get_dlpack_device_type (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field25get_element_size_in_bytesEv">muGrid::Field::get_element_size_in_bytes (C++ function)</a>
 </li>
@@ -1017,13 +1327,15 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field10get_typeidEv">muGrid::Field::get_typeid (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field17get_void_data_ptrEv">muGrid::Field::get_void_data_ptr (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field17get_void_data_ptrEb">muGrid::Field::get_void_data_ptr (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field14has_nb_sub_ptsEv">muGrid::Field::has_nb_sub_pts (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field22has_same_memory_layoutERK5Field">muGrid::Field::has_same_memory_layout (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field9is_globalEv">muGrid::Field::is_global (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid5Field12is_on_deviceEv">muGrid::Field::is_on_device (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5Field4nameE">muGrid::Field::name (C++ member)</a>
 </li>
@@ -1063,17 +1375,17 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection19complex_state_fieldERKNSt6stringERK7Index_tRK7Index_tRKNSt6stringERK4Unit">muGrid::FieldCollection::complex_state_field (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection14detached_fieldENSt10unique_ptrI10TypedFieldI1TE15FieldDestructorI5FieldEEERKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">muGrid::FieldCollection::detached_field (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection14detached_fieldE9Field_ptrRKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">muGrid::FieldCollection::detached_field (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection6domainE">muGrid::FieldCollection::domain (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection5fieldER10TypedFieldI1TERKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">muGrid::FieldCollection::field (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection5fieldER5FieldRKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">muGrid::FieldCollection::field (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection12field_existsERKNSt6stringE">muGrid::FieldCollection::field_exists (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection9Field_ptrE">muGrid::FieldCollection::Field_ptr (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionE14ValidityDomainRK7Index_tRK10SubPtMap_t12StorageOrder">muGrid::FieldCollection::FieldCollection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionERK15FieldCollection">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionERR15FieldCollection">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionEv">[3]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionE14ValidityDomainRK7Index_tRK10SubPtMap_t12StorageOrder14MemoryLocation">muGrid::FieldCollection::FieldCollection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionERK15FieldCollection">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionERR15FieldCollection">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15FieldCollectionEv">[3]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection6fieldsE">muGrid::FieldCollection::fields (C++ member)</a>
 </li>
@@ -1082,6 +1394,8 @@
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection10get_domainEv">muGrid::FieldCollection::get_domain (C++ function)</a>
 </li>
         <li><a href="Cplusplus.html#_CPPv4N6muGrid15FieldCollection9get_fieldERKNSt6stringE">muGrid::FieldCollection::get_field (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection9get_fieldERKNSt6stringE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection9get_fieldERKNSt6stringE">[2]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection19get_memory_locationEv">muGrid::FieldCollection::get_memory_location (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection20get_nb_buffer_pixelsEv">muGrid::FieldCollection::get_nb_buffer_pixels (C++ function)</a>
 </li>
@@ -1169,9 +1483,19 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection14is_initialisedEv">muGrid::FieldCollection::is_initialised (C++ function)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection12is_on_deviceEv">muGrid::FieldCollection::is_on_device (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection11list_fieldsEv">muGrid::FieldCollection::list_fields (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid15FieldCollection32list_state_field_unique_prefixesEv">muGrid::FieldCollection::list_state_field_unique_prefixes (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection15memory_locationE">muGrid::FieldCollection::memory_location (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection14MemoryLocationE">muGrid::FieldCollection::MemoryLocation (C++ enum)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection14MemoryLocation6DeviceE">muGrid::FieldCollection::MemoryLocation::Device (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection14MemoryLocation4HostE">muGrid::FieldCollection::MemoryLocation::Host (C++ enumerator)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection16nb_buffer_pixelsE">muGrid::FieldCollection::nb_buffer_pixels (C++ member)</a>
 </li>
@@ -1213,9 +1537,9 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection28register_complex_state_fieldERKNSt6stringERK7Index_tRK7Index_tRKNSt6stringERK4Unit">muGrid::FieldCollection::register_complex_state_field (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection14register_fieldER10TypedFieldI1TERKNSt6stringERK7Index_tRKNSt6stringERK4Unit">muGrid::FieldCollection::register_field (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection14register_fieldER10TypedFieldI1TERKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection14register_fieldER5FieldRKNSt6stringERK7Index_tRKNSt6stringERK4Unit">muGrid::FieldCollection::register_field (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection14register_fieldER5FieldRKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection21register_field_helperER10TypedFieldI1TERKNSt6stringERK7Index_tRKNSt6stringERK4Unitb">muGrid::FieldCollection::register_field_helper (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection21register_field_helperER10TypedFieldI1TERKNSt6stringERK7Shape_tRKNSt6stringERK4Unitb">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection21register_field_helperER5FieldRKNSt6stringERK7Index_tRKNSt6stringERK4Unitb">muGrid::FieldCollection::register_field_helper (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15FieldCollection21register_field_helperER5FieldRKNSt6stringERK7Shape_tRKNSt6stringERK4Unitb">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection18register_int_fieldERKNSt6stringERK7Index_tRKNSt6stringERK4Unit">muGrid::FieldCollection::register_int_field (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15FieldCollection18register_int_fieldERKNSt6stringERK7Shape_tRKNSt6stringERK4Unit">[1]</a>
 </li>
@@ -1599,8 +1923,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10firstOrderE">muGrid::firstOrder (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11FiveQuadPtsE">muGrid::FiveQuadPts (C++ member)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid5fourDE">muGrid::fourD (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11FourQuadPtsE">muGrid::FourQuadPts (C++ member)</a>
@@ -1608,6 +1930,12 @@
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11fourthOrderE">muGrid::fourthOrder (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid3getEDTcldt2t48coeffRef1i1jEERN5Eigen10MatrixBaseI2T4EE5Dim_t5Dim_t5Dim_t5Dim_t">muGrid::get (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid3getEDcRKN5Eigen10MatrixBaseI2T4EE5Dim_t5Dim_t5Dim_t5Dim_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22get_device_fft_backendEv">muGrid::get_device_fft_backend (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22get_hermitian_grid_ptsERK10IntCoord_t7Index_t">muGrid::get_hermitian_grid_pts (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20get_host_fft_backendEv">muGrid::get_host_fft_backend (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid17get_nb_from_shapeE7Index_tRK1T">muGrid::get_nb_from_shape (C++ function)</a>
 </li>
@@ -1651,7 +1979,7 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid21GlobalFieldCollection38get_subdomain_locations_without_ghostsEv">muGrid::GlobalFieldCollection::get_subdomain_locations_without_ghosts (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK10IntCoord_tRK10IntCoord_tRK10IntCoord_t12StorageOrderRK10SubPtMap_t12StorageOrderRK10IntCoord_tRK10IntCoord_t">muGrid::GlobalFieldCollection::GlobalFieldCollection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t12StorageOrderRK10IntCoord_tRK10IntCoord_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t12StorageOrderRK10IntCoord_tRK10IntCoord_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK21GlobalFieldCollection">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK7Index_tRK10SubPtMap_t12StorageOrder">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERR21GlobalFieldCollection">[5]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionEv">[6]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK10IntCoord_tRK10IntCoord_tRK10IntCoord_t12StorageOrderRK10SubPtMap_t12StorageOrderRK10IntCoord_tRK10IntCoord_t14MemoryLocation">muGrid::GlobalFieldCollection::GlobalFieldCollection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t12StorageOrderRK10IntCoord_tRK10IntCoord_t14MemoryLocation">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10SubPtMap_t12StorageOrderRK10IntCoord_tRK10IntCoord_t14MemoryLocation">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK21GlobalFieldCollection">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERK7Index_tRK10SubPtMap_t12StorageOrder14MemoryLocation">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionERR21GlobalFieldCollection">[5]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection21GlobalFieldCollectionEv">[6]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I_6size_tEN6muGrid21GlobalFieldCollection10initialiseEvRK8Ccoord_tI3DimERK8Ccoord_tI3DimERK8Ccoord_tI3DimE12StorageOrderRK8Ccoord_tI3DimERK8Ccoord_tI3DimE">muGrid::GlobalFieldCollection::initialise (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I_6size_tEN6muGrid21GlobalFieldCollection10initialiseEvRK8Ccoord_tI3DimERK8Ccoord_tI3DimERK8Ccoord_tI3DimERK8Ccoord_tI3DimERK8Ccoord_tI3DimERK8Ccoord_tI3DimE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection10initialiseERK10IntCoord_tRK10IntCoord_tRK10IntCoord_t12StorageOrderRK10IntCoord_tRK10IntCoord_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollection10initialiseERK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_tRK10IntCoord_t">[3]</a>
 </li>
@@ -1675,63 +2003,93 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid21GlobalFieldCollectionD0Ev">muGrid::GlobalFieldCollection::~GlobalFieldCollection (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperatorE">muGrid::GradientOperator (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParamsE">muGrid::GridTraversalParams (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator5applyERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealE">muGrid::GradientOperator::apply (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams21nodal_elems_per_pixelE">muGrid::GridTraversalParams::nodal_elems_per_pixel (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator15apply_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealE">muGrid::GradientOperator::apply_increment (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams14nodal_stride_xE">muGrid::GridTraversalParams::nodal_stride_x (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator16get_nb_nodal_ptsEv">muGrid::GradientOperator::get_nb_nodal_pts (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams14nodal_stride_yE">muGrid::GridTraversalParams::nodal_stride_y (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator16get_nb_operatorsEv">muGrid::GradientOperator::get_nb_operators (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams14nodal_stride_zE">muGrid::GridTraversalParams::nodal_stride_z (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator15get_nb_quad_ptsEv">muGrid::GradientOperator::get_nb_quad_pts (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams2nxE">muGrid::GridTraversalParams::nx (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator18get_pixel_operatorEv">muGrid::GradientOperator::get_pixel_operator (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams2nyE">muGrid::GridTraversalParams::ny (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator15get_spatial_dimEv">muGrid::GradientOperator::get_spatial_dim (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams2nzE">muGrid::GridTraversalParams::nz (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator16GradientOperatorERK16GradientOperator">muGrid::GradientOperator::GradientOperator (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator16GradientOperatorERK7Index_tRK7Index_tRK7Index_tRK7Index_tRK7Index_tRKNSt6vectorINSt6vectorIN5Eigen8MatrixXdEEEEERKNSt6vectorINSt5tupleIN5Eigen8VectorXiEN5Eigen8MatrixXiEEEEE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator16GradientOperatorERKN5Eigen8MatrixXdERK7Index_tRK7Index_tRK7Index_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator16GradientOperatorERR16GradientOperator">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator16GradientOperatorEv">[4]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams20quad_elems_per_pixelE">muGrid::GridTraversalParams::quad_elems_per_pixel (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator27nb_grad_component_per_pixelE">muGrid::GradientOperator::nb_grad_component_per_pixel (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams13quad_stride_xE">muGrid::GridTraversalParams::quad_stride_x (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator17nb_pixelnodal_ptsE">muGrid::GradientOperator::nb_pixelnodal_pts (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams13quad_stride_yE">muGrid::GridTraversalParams::quad_stride_y (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator30nb_possible_nodal_contributionE">muGrid::GradientOperator::nb_possible_nodal_contribution (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams13quad_stride_zE">muGrid::GridTraversalParams::quad_stride_z (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator11nb_quad_ptsE">muGrid::GradientOperator::nb_quad_pts (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams9row_widthE">muGrid::GridTraversalParams::row_width (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperatoraSERK16GradientOperator">muGrid::GradientOperator::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperatoraSERR16GradientOperator">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams17start_pixel_indexE">muGrid::GridTraversalParams::start_pixel_index (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator6ParentE">muGrid::GradientOperator::Parent (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams20total_nodal_elementsE">muGrid::GridTraversalParams::total_nodal_elements (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator14pixel_operatorE">muGrid::GradientOperator::pixel_operator (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams12total_pixelsE">muGrid::GridTraversalParams::total_pixels (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperator11spatial_dimE">muGrid::GradientOperator::spatial_dim (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams19total_quad_elementsE">muGrid::GridTraversalParams::total_quad_elements (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator9transposeERK14TypedFieldBaseI4RealER14TypedFieldBaseI4RealERKNSt6vectorI4RealEE">muGrid::GradientOperator::transpose (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackendE">muGrid::hipFFTBackend (C++ class)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16GradientOperator19transpose_incrementERK14TypedFieldBaseI4RealERK4RealR14TypedFieldBaseI4RealERKNSt6vectorI4RealEE">muGrid::GradientOperator::transpose_increment (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend12c2c_backwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::hipFFTBackend::c2c_backward (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16GradientOperatorD0Ev">muGrid::GradientOperator::~GradientOperator (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend11c2c_forwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::hipFFTBackend::c2c_forward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend3c2rE7Index_t7Index_tPK7Complex7Index_t7Index_tP4Real7Index_t7Index_t">muGrid::hipFFTBackend::c2r (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend19check_hipfft_resultE12hipfftResultPKc">muGrid::hipFFTBackend::check_hipfft_result (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend8get_planE13TransformType7Index_t7Index_t7Index_t7Index_t7Index_t7Index_t">muGrid::hipFFTBackend::get_plan (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend13hipFFTBackendEv">muGrid::hipFFTBackend::hipFFTBackend (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13hipFFTBackend4nameEv">muGrid::hipFFTBackend::name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend10plan_cacheE">muGrid::hipFFTBackend::plan_cache (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend7PlanKeyE">muGrid::hipFFTBackend::PlanKey (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend11PlanKeyHashE">muGrid::hipFFTBackend::PlanKeyHash (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13hipFFTBackend11PlanKeyHashclERK7PlanKey">muGrid::hipFFTBackend::PlanKeyHash::operator() (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend3r2cE7Index_t7Index_tPK4Real7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::hipFFTBackend::r2c (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13hipFFTBackend22supports_device_memoryEv">muGrid::hipFFTBackend::supports_device_memory (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend13TransformTypeE">muGrid::hipFFTBackend::TransformType (C++ enum)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend13TransformType3C2CE">muGrid::hipFFTBackend::TransformType::C2C (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend13TransformType3C2RE">muGrid::hipFFTBackend::TransformType::C2R (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend13TransformType3R2CE">muGrid::hipFFTBackend::TransformType::R2C (C++ enumerator)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackendD0Ev">muGrid::hipFFTBackend::~hipFFTBackend (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9HostSpaceE">muGrid::HostSpace (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9HostSpace4nameE">muGrid::HostSpace::name (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9HostSpace13storage_orderE">muGrid::HostSpace::storage_order (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10IndexFieldE">muGrid::IndexField (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16IndexFieldDeviceE">muGrid::IndexFieldDevice (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10IntCoord_tE">muGrid::IntCoord_t (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internalE">muGrid::internal (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_5Dim_t_5Dim_tEN6muGrid8internal8ArrayMapE">muGrid::internal::ArrayMap (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t0_5Dim_t_Dp5Dim_tEN6muGrid8internal15CallSizesHelperE">muGrid::internal::CallSizesHelper (C++ struct)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internal15CallSizesHelper4callERR5Fun_t">muGrid::internal::CallSizesHelper::call (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0_5Dim_t_Dp5Dim_tEN6muGrid8internal15CallSizesHelperIXL0EE5Fun_t3dimDp4argsEE">muGrid::internal::CallSizesHelper&lt;0, Fun_t, dim, args...&gt; (C++ struct)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internal15CallSizesHelperIXL0EE5Fun_t3dimDp4argsE4callERR5Fun_t">muGrid::internal::CallSizesHelper&lt;0, Fun_t, dim, args...&gt;::call (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0_iEN6muGrid8internal20detect_storage_orderENSt5tupleI12StorageOrder10IntCoord_t7Shape_tEERK10IntCoord_tRK7Shape_t7Index_tRN2py7array_tI1T5flagsEE">muGrid::internal::detect_storage_order (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid8internal8EigenMapE">muGrid::internal::EigenMap (C++ struct)</a>
 </li>
@@ -1795,17 +2153,11 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internal9ScalarMap6strideEv">muGrid::internal::ScalarMap::stride (C++ function)</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid8internal9ScalarMap10to_storageE12storage_typeI7MutIterE8ref_typeI7MutIterE">muGrid::internal::ScalarMap::to_storage (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I_7MappingEN6muGrid8internal9ScalarMap10value_typeE">muGrid::internal::ScalarMap::value_type (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_t_Dp5Dim_tEN6muGrid8internal18SizesByOrderHelperE">muGrid::internal::SizesByOrderHelper (C++ struct)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internal18SizesByOrderHelper5SizesE">muGrid::internal::SizesByOrderHelper::Sizes (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t_Dp5Dim_tEN6muGrid8internal18SizesByOrderHelperIXL0EE3dimDp4dimsEE">muGrid::internal::SizesByOrderHelper&lt;0, dim, dims...&gt; (C++ struct)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internal18SizesByOrderHelperIXL0EE3dimDp4dimsE5SizesE">muGrid::internal::SizesByOrderHelper&lt;0, dim, dims...&gt;::Sizes (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8internal10TensorColsE5Dim_t5Dim_t">muGrid::internal::TensorCols (C++ function)</a>
 </li>
@@ -1819,9 +2171,21 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8IntFieldE">muGrid::IntField (C++ type)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14IntFieldDeviceE">muGrid::IntFieldDevice (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid9IntFieldTE">muGrid::IntFieldT (C++ type)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13IntStateFieldE">muGrid::IntStateField (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid4ipowE1R1R1I">muGrid::ipow (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15is_device_spaceE">muGrid::is_device_space (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid17is_device_space_vE">muGrid::is_device_space_v (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid13is_host_spaceE">muGrid::is_host_space (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15is_host_space_vE">muGrid::is_host_space_v (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8IterUnitE">muGrid::IterUnit (C++ enum)</a>
 </li>
@@ -1829,7 +2193,11 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8IterUnit5SubPtE">muGrid::IterUnit::SubPt (C++ enumerator)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8KeyErrorE">muGrid::KeyError (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid16KernelDispatcherE">muGrid::KernelDispatcher (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16KernelDispatcher17apply_convolutionEPK4RealP4RealK4RealRK19GridTraversalParamsRK17SparseOperatorSoAI11MemorySpaceE">muGrid::KernelDispatcher::apply_convolution (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16KernelDispatcher21transpose_convolutionEPK4RealP4RealK4RealRK19GridTraversalParamsRK17SparseOperatorSoAI11MemorySpaceE">muGrid::KernelDispatcher::transpose_convolution (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollectionE">muGrid::LocalFieldCollection (C++ class)</a>
 </li>
@@ -1855,7 +2223,7 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection10initialiseEv">muGrid::LocalFieldCollection::initialise (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERK20LocalFieldCollection">muGrid::LocalFieldCollection::LocalFieldCollection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERK7Index_tRK10SubPtMap_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERK7Index_tRKNSt6stringERK10SubPtMap_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERR20LocalFieldCollection">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionEv">[4]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERK20LocalFieldCollection">muGrid::LocalFieldCollection::LocalFieldCollection (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERK7Index_tRK10SubPtMap_t14MemoryLocation">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERK7Index_tRKNSt6stringERK10SubPtMap_t14MemoryLocation">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionERR20LocalFieldCollection">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection20LocalFieldCollectionEv">[4]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20LocalFieldCollection4nameE">muGrid::LocalFieldCollection::name (C++ member)</a>
 </li>
@@ -1973,8 +2341,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_8IterUnit_6size_tEN6muGrid22MappedScalarStateFieldE">muGrid::MappedScalarStateField (C++ type)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid16MappedStateFieldE">muGrid::MappedStateField (C++ class)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16MappedStateField5beginEv">muGrid::MappedStateField::begin (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid16MappedStateField5beginEv">[1]</a>
@@ -2128,6 +2494,8 @@
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_5Dim_t_5Dim_t_8IterUnitEN6muGrid14MatrixFieldMapE">muGrid::MatrixFieldMap (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_5Dim_t_5Dim_t_6size_t_8IterUnitEN6muGrid19MatrixStateFieldMapE">muGrid::MatrixStateFieldMap (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid15memory_locationEN15FieldCollection14MemoryLocationEv">muGrid::memory_location (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10MU_NC_CHARE">muGrid::MU_NC_CHAR (C++ member)</a>
 </li>
@@ -2547,38 +2915,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4IEN6muGrid15normalize_coordI3IntEE3Int3Int3Int">muGrid::normalize_coord&lt;Int&gt; (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7nulloptE">muGrid::nullopt (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9nullopt_tE">muGrid::nullopt_t (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10numpy_copyEN2py7array_tI1TN2py5array7f_styleEEERK14TypedFieldBaseI1TE8IterUnit">muGrid::numpy_copy (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10numpy_wrapEN2py7array_tI1TN2py5array7f_styleEEERK14TypedFieldBaseI1TE8IterUnit7Shape_t7Shape_t">muGrid::numpy_wrap (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyErrorE">muGrid::NumpyError (C++ class)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyError10NumpyErrorEPKc">muGrid::NumpyError::NumpyError (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyError10NumpyErrorERKNSt6stringE">[1]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0_i0EN6muGrid10NumpyProxyE">muGrid::NumpyProxy (C++ class)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy10collectionE">muGrid::NumpyProxy::collection (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy5fieldE">muGrid::NumpyProxy::field (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy14get_collectionEv">muGrid::NumpyProxy::get_collection (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10NumpyProxy20get_components_shapeEv">muGrid::NumpyProxy::get_components_shape (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy9get_fieldEv">muGrid::NumpyProxy::get_field (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10NumpyProxy13get_iter_typeEv">muGrid::NumpyProxy::get_iter_type (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10NumpyProxy16get_sub_pt_shapeEv">muGrid::NumpyProxy::get_sub_pt_shape (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy9iter_typeE">muGrid::NumpyProxy::iter_type (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy10NumpyProxyE10IntCoord_t10IntCoord_t10IntCoord_t7Index_t7Shape_tRN2py7array_tI1T5flagsEERK4Unit">muGrid::NumpyProxy::NumpyProxy (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy10NumpyProxyE10IntCoord_t10IntCoord_t10IntCoord_t7Index_tRN2py7array_tI1T5flagsEERK4Unit">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10NumpyProxy10NumpyProxyERR10NumpyProxy">[2]</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid4oneDE">muGrid::oneD (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7OneNodeE">muGrid::OneNode (C++ member)</a>
@@ -2589,15 +2925,13 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGridltE9Verbosity9Verbosity">muGrid::operator&lt; (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGridlsERNSt7ostreamERNSt7ostreamERKNSt6vectorI1TEE">muGrid::operator&lt;&lt; (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0_6size_tEN6muGridlsERNSt7ostreamERNSt7ostreamERKNSt5arrayI1T3dimEE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I_6size_t0EN6muGridlsERNSt7ostreamERNSt7ostreamERK9DynCcoordI6MaxDim1TE">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK12StorageOrder">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK12UnitExponent">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK13PhysicsDomain">[5]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK4Unit">[6]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK8IterUnit">[7]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERKN6muGrid15FieldCollection14ValidityDomainE">[8]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGridlsERNSt7ostreamERNSt7ostreamERKNSt6vectorI1TEE">muGrid::operator&lt;&lt; (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0_6size_tEN6muGridlsERNSt7ostreamERNSt7ostreamERKNSt5arrayI1T3dimEE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I_6size_t0EN6muGridlsERNSt7ostreamERNSt7ostreamERK9DynCcoordI6MaxDim1TE">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK12StorageOrder">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK12UnitExponent">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK4Unit">[5]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERK8IterUnit">[6]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGridlsERNSt7ostreamERKN6muGrid15FieldCollection14ValidityDomainE">[7]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGridleE9Verbosity9Verbosity">muGrid::operator&lt;= (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGridgtE9Verbosity9Verbosity">muGrid::operator&gt; (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGridgeE9Verbosity9Verbosity">muGrid::operator&gt;= (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid8optionalE">muGrid::optional (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid19OptionalMappedFieldE">muGrid::OptionalMappedField (C++ class)</a>
 </li>
@@ -2619,41 +2953,29 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19OptionalMappedFieldD0Ev">muGrid::OptionalMappedField::~OptionalMappedField (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11permutationERKN5Eigen8VectorXiERKN5Eigen8MatrixXiERK7Index_t">muGrid::permutation (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomainE">muGrid::PhysicsDomain (C++ class)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain11domain_nameE">muGrid::PhysicsDomain::domain_name (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13PhysicsDomain8get_nameEv">muGrid::PhysicsDomain::get_name (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain4heatERK3Int">muGrid::PhysicsDomain::heat (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13PhysicsDomain5inputEv">muGrid::PhysicsDomain::input (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain9mechanicsERK3Int">muGrid::PhysicsDomain::mechanics (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13PhysicsDomainltERK13PhysicsDomain">muGrid::PhysicsDomain::operator&lt; (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomainlsERNSt7ostreamERK13PhysicsDomain">muGrid::PhysicsDomain::operator&lt;&lt; (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomainaSERK13PhysicsDomain">muGrid::PhysicsDomain::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomainaSERR13PhysicsDomain">[1]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13PhysicsDomaineqERK13PhysicsDomain">muGrid::PhysicsDomain::operator== (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13PhysicsDomain6outputEv">muGrid::PhysicsDomain::output (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain6ParentE">muGrid::PhysicsDomain::Parent (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain13PhysicsDomainERK13PhysicsDomain">muGrid::PhysicsDomain::PhysicsDomain (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain13PhysicsDomainERK4UintRK4UnitRK4UnitRKNSt6stringE">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain13PhysicsDomainERR13PhysicsDomain">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomain13PhysicsDomainEv">[3]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid13PhysicsDomain4rankEv">muGrid::PhysicsDomain::rank (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13PhysicsDomainD0Ev">muGrid::PhysicsDomain::~PhysicsDomain (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I_6size_t0EN6muGrid15pad_shape_to_3dE7Shape_tRK9DynCcoordI6MaxDim1TE7Index_t">muGrid::pad_shape_to_3d (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid15pad_shape_to_3dERK7Shape_t7Index_t">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid2piE">muGrid::pi (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8PixelTagE">muGrid::PixelTag (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackendE">muGrid::PocketFFTBackend (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackend12c2c_backwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::PocketFFTBackend::c2c_backward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackend11c2c_forwardE7Index_t7Index_tPK7Complex7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::PocketFFTBackend::c2c_forward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackend3c2rE7Index_t7Index_tPK7Complex7Index_t7Index_tP4Real7Index_t7Index_t">muGrid::PocketFFTBackend::c2r (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16PocketFFTBackend4nameEv">muGrid::PocketFFTBackend::name (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackend16PocketFFTBackendEv">muGrid::PocketFFTBackend::PocketFFTBackend (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackend3r2cE7Index_t7Index_tPK4Real7Index_t7Index_tP7Complex7Index_t7Index_t">muGrid::PocketFFTBackend::r2c (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid16PocketFFTBackend22supports_device_memoryEv">muGrid::PocketFFTBackend::supports_device_memory (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackendD0Ev">muGrid::PocketFFTBackend::~PocketFFTBackend (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_b0EN6muGrid9py_coordsEDaRK1C">muGrid::py_coords (C++ function)</a>
 </li>
@@ -2705,6 +3027,10 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9RealFieldE">muGrid::RealField (C++ type)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15RealFieldDeviceE">muGrid::RealFieldDevice (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10RealFieldTE">muGrid::RealFieldT (C++ type)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14RealStateFieldE">muGrid::RealStateField (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_6size_tEN6muGrid8RefArrayE">muGrid::RefArray (C++ class)</a>
@@ -2751,59 +3077,39 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid25REGISTER_ALL_STATE_FIELDSE">muGrid::REGISTER_ALL_STATE_FIELDS (C++ member)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid6resizeEvR5ArrayI1T11MemorySpaceENSt6size_tE">muGrid::resize (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9rfft_freqE7Index_t4Real">muGrid::rfft_freq (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12rfft_freqindE7Index_t">muGrid::rfft_freqind (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14runtime_memcpyEvP1TPK1TNSt6size_tEbb">muGrid::runtime_memcpy (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeErrorE">muGrid::RuntimeError (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueE">muGrid::RuntimeValue (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid17RuntimeWorkBufferE">muGrid::RuntimeWorkBuffer (C++ class)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid12RuntimeValue3addEvRKNSt6stringE1T">muGrid::RuntimeValue::add (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue3addERKNSt6stringENSt10shared_ptrI12RuntimeValueEE">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer9copy_fromEPK1TNSt6size_tEb">muGrid::RuntimeWorkBuffer::copy_from (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12RuntimeValue7get_intEv">muGrid::RuntimeValue::get_int (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid17RuntimeWorkBuffer7copy_toEP1TNSt6size_tEb">muGrid::RuntimeWorkBuffer::copy_to (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12RuntimeValue10get_matrixEv">muGrid::RuntimeValue::get_matrix (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer4dataEv">muGrid::RuntimeWorkBuffer::data (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid17RuntimeWorkBuffer4dataEv">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12RuntimeValue8get_realEv">muGrid::RuntimeValue::get_real (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer5data_E">muGrid::RuntimeWorkBuffer::data_ (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue9get_valueERKNSt6stringE">muGrid::RuntimeValue::get_value (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid17RuntimeWorkBuffer12is_on_deviceEv">muGrid::RuntimeWorkBuffer::is_on_device (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12RuntimeValue14get_value_typeEv">muGrid::RuntimeValue::get_value_type (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer10on_device_E">muGrid::RuntimeWorkBuffer::on_device_ (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue5Map_tE">muGrid::RuntimeValue::Map_t (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBufferaSERK17RuntimeWorkBuffer">muGrid::RuntimeWorkBuffer::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBufferaSERR17RuntimeWorkBuffer">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueaSERK12RuntimeValue">muGrid::RuntimeValue::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueaSERK3Int">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueaSERK4Real">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueaSERK5Map_t">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueaSERKN5Eigen3RefIKN5Eigen8MatrixXdEEE">[4]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer17RuntimeWorkBufferENSt6size_tEb">muGrid::RuntimeWorkBuffer::RuntimeWorkBuffer (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer17RuntimeWorkBufferERK17RuntimeWorkBuffer">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer17RuntimeWorkBufferERR17RuntimeWorkBuffer">[2]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue38potentially_destroy_non_trivial_memberEv">muGrid::RuntimeValue::potentially_destroy_non_trivial_member (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid17RuntimeWorkBuffer4sizeEv">muGrid::RuntimeWorkBuffer::size (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue12RuntimeValueERK12RuntimeValue">muGrid::RuntimeValue::RuntimeValue (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue12RuntimeValueERK3Int">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue12RuntimeValueERK4Real">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue12RuntimeValueERK5Map_t">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue12RuntimeValueERKN5Eigen3RefIKN5Eigen8MatrixXdEEE">[4]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBuffer5size_E">muGrid::RuntimeWorkBuffer::size_ (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue10value_typeE">muGrid::RuntimeValue::value_type (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue9ValueTypeE">muGrid::RuntimeValue::ValueType (C++ enum)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue9ValueType10DictionaryE">muGrid::RuntimeValue::ValueType::Dictionary (C++ enumerator)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue9ValueType3IntE">muGrid::RuntimeValue::ValueType::Int (C++ enumerator)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue9ValueType6MatrixE">muGrid::RuntimeValue::ValueType::Matrix (C++ enumerator)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue9ValueType4RealE">muGrid::RuntimeValue::ValueType::Real (C++ enumerator)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7variantE">muGrid::RuntimeValue::variant (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7VariantE">muGrid::RuntimeValue::Variant (C++ union)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant10dictionaryE">muGrid::RuntimeValue::Variant::dictionary (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant13integer_valueE">muGrid::RuntimeValue::Variant::integer_value (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant12matrix_valueE">muGrid::RuntimeValue::Variant::matrix_value (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant10real_valueE">muGrid::RuntimeValue::Variant::real_value (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK3Int">muGrid::RuntimeValue::Variant::Variant (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK4Real">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERK5Map_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7Variant7VariantERKN5Eigen3RefIKN5Eigen8MatrixXdEEE">[3]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValue7VariantD0Ev">muGrid::RuntimeValue::Variant::~Variant (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12RuntimeValueD0Ev">muGrid::RuntimeValue::~RuntimeValue (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17RuntimeWorkBufferD0Ev">muGrid::RuntimeWorkBuffer::~RuntimeWorkBuffer (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_8IterUnitEN6muGrid14ScalarFieldMapE">muGrid::ScalarFieldMap (C++ type)</a>
 </li>
@@ -2811,15 +3117,33 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11secondOrderE">muGrid::secondOrder (C++ member)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19select_process_gridEiRK10IntCoord_tRiRi">muGrid::select_process_grid (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_tEN6muGrid19SelfAdjointDecomp_tE">muGrid::SelfAdjointDecomp_t (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7Shape_tE">muGrid::Shape_t (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10SixQuadPtsE">muGrid::SixQuadPts (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22SparseOperatorCacheKeyE">muGrid::SparseOperatorCacheKey (C++ struct)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I_5Dim_t_5Dim_tEN6muGrid12SizesByOrderE">muGrid::SizesByOrder (C++ struct)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22SparseOperatorCacheKey11nb_grid_ptsE">muGrid::SparseOperatorCacheKey::nb_grid_pts (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12SizesByOrder5SizesE">muGrid::SizesByOrder::Sizes (C++ type)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22SparseOperatorCacheKey19nb_nodal_componentsE">muGrid::SparseOperatorCacheKey::nb_nodal_components (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid22SparseOperatorCacheKeyeqERK22SparseOperatorCacheKey">muGrid::SparseOperatorCacheKey::operator== (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid17SparseOperatorSoAE">muGrid::SparseOperatorSoA (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid17SparseOperatorSoA5emptyEv">muGrid::SparseOperatorSoA::empty (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17SparseOperatorSoA13nodal_indicesE">muGrid::SparseOperatorSoA::nodal_indices (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17SparseOperatorSoA12quad_indicesE">muGrid::SparseOperatorSoA::quad_indices (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17SparseOperatorSoA4sizeE">muGrid::SparseOperatorSoA::size (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17SparseOperatorSoA17SparseOperatorSoAE7Index_t">muGrid::SparseOperatorSoA::SparseOperatorSoA (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid17SparseOperatorSoA17SparseOperatorSoAEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17SparseOperatorSoA6valuesE">muGrid::SparseOperatorSoA::values (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0I0E0EN6muGrid22spectral_decompositionEDcRKN5Eigen10MatrixBaseI7DerivedEE">muGrid::spectral_decomposition (C++ function)</a>
 </li>
@@ -3161,8 +3485,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12StorageOrder17StructureOfArraysE">muGrid::StorageOrder::StructureOfArrays (C++ enumerator)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12StorageOrder7UnknownE">muGrid::StorageOrder::Unknown (C++ enumerator)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11superscriptERKi">muGrid::superscript (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_5Dim_t_8IterUnitEN6muGrid10T1FieldMapE">muGrid::T1FieldMap (C++ type)</a>
@@ -3207,8 +3529,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6threeDE">muGrid::threeD (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid8to_tupleEN2py5tupleE1T">muGrid::to_tuple (C++ function)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9TracebackE">muGrid::Traceback (C++ class)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Traceback9get_stackEv">muGrid::Traceback::get_stack (C++ function)</a>
@@ -3251,11 +3571,67 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TracebackEntryD0Ev">muGrid::TracebackEntry::~TracebackEntry (C++ function)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9TransposeE">muGrid::Transpose (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose7axis_inE">muGrid::Transpose::axis_in (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose8axis_outE">muGrid::Transpose::axis_out (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose8backwardEPK7ComplexP7Complex">muGrid::Transpose::backward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose4commE">muGrid::Transpose::comm (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose20compute_distributionE7Index_tiRNSt6vectorI7Index_tEERNSt6vectorI7Index_tEE">muGrid::Transpose::compute_distribution (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose7forwardEPK7ComplexP7Complex">muGrid::Transpose::forward (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose11get_axis_inEv">muGrid::Transpose::get_axis_in (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose12get_axis_outEv">muGrid::Transpose::get_axis_out (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose12get_local_inEv">muGrid::Transpose::get_local_in (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose13get_local_outEv">muGrid::Transpose::get_local_out (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid9Transpose17get_nb_componentsEv">muGrid::Transpose::get_nb_components (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9global_inE">muGrid::Transpose::global_in (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose10global_outE">muGrid::Transpose::global_out (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9in_countsE">muGrid::Transpose::in_counts (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9in_displsE">muGrid::Transpose::in_displs (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose12is_allgatherE">muGrid::Transpose::is_allgather (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose15is_scatter_onlyE">muGrid::Transpose::is_scatter_only (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose6layoutE">muGrid::Transpose::layout (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose8local_inE">muGrid::Transpose::local_in (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9local_outE">muGrid::Transpose::local_out (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose13nb_componentsE">muGrid::Transpose::nb_components (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9TransposeaSERK9Transpose">muGrid::Transpose::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9TransposeaSERR9Transpose">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose10out_countsE">muGrid::Transpose::out_counts (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose10out_displsE">muGrid::Transpose::out_displs (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9TransposeERK12CommunicatorRK10IntCoord_tRK10IntCoord_t7Index_t7Index_t7Index_t7Index_t7Index_t12StorageOrder">muGrid::Transpose::Transpose (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9TransposeERK9Transpose">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9TransposeERR9Transpose">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose9TransposeEv">[3]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Transpose17types_initializedE">muGrid::Transpose::types_initialized (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9TransposeD0Ev">muGrid::Transpose::~Transpose (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid4twoDE">muGrid::twoD (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TwoQuadPtsE">muGrid::TwoQuadPts (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10TypedFieldE">muGrid::TypedField (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid10TypedFieldE">muGrid::TypedField (C++ class)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10TypedField5cloneERKNSt6stringERKb">muGrid::TypedField::clone (C++ function)</a>
 </li>
@@ -3263,19 +3639,15 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10TypedField15get_buffer_sizeEv">muGrid::TypedField::get_buffer_size (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid10TypedField16get_const_valuesEv">muGrid::TypedField::get_const_values (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField10get_valuesEv">muGrid::TypedField::get_values (C++ function)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField8NegativeE">muGrid::TypedField::Negative (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedFieldaSERK10EigenRep_t">muGrid::TypedField::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedFieldaSERK10TypedField">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedFieldaSERK6Parent">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedFieldaSERK8Negative">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedFieldaSERR10TypedField">[4]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField6ParentE">muGrid::TypedField::Parent (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField9push_backERK1T">muGrid::TypedField::push_back (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField9push_backERKN5Eigen3RefIKN5Eigen5ArrayI1TN5Eigen7DynamicEN5Eigen7DynamicEEEEE">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10TypedField9push_backENSt11enable_if_tI15is_host_space_vI1MEvEERK1T">muGrid::TypedField::push_back (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10TypedField9push_backENSt11enable_if_tI15is_host_space_vI1MEvEERKN5Eigen3RefIKN5Eigen5ArrayI1TN5Eigen7DynamicEN5Eigen7DynamicEEEEE">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField16push_back_singleERK1T">muGrid::TypedField::push_back_single (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField16push_back_singleERKN5Eigen3RefIKN5Eigen5ArrayI1TN5Eigen7DynamicEN5Eigen7DynamicEEEEE">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10TypedField16push_back_singleENSt11enable_if_tI15is_host_space_vI1MEvEERK1T">muGrid::TypedField::push_back_single (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10TypedField16push_back_singleENSt11enable_if_tI15is_host_space_vI1MEvEERKN5Eigen3RefIKN5Eigen5ArrayI1TN5Eigen7DynamicEN5Eigen7DynamicEEEEE">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField6resizeEv">muGrid::TypedField::resize (C++ function)</a>
 </li>
@@ -3287,29 +3659,27 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField10TypedFieldERK10TypedField">muGrid::TypedField::TypedField (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField10TypedFieldERKNSt6stringER15FieldCollectionRK7Index_tRKNSt6stringERK4Unit">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField10TypedFieldERKNSt6stringER15FieldCollectionRK7Shape_tRKNSt6stringERK4Unit">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField10TypedFieldERR10TypedField">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField10TypedFieldEv">[4]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedField6valuesE">muGrid::TypedField::values (C++ member)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10TypedFieldD0Ev">muGrid::TypedField::~TypedField (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBaseE">muGrid::TypedFieldBase (C++ class)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid14TypedFieldBaseE">muGrid::TypedFieldBase (C++ class)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase4dataEv">muGrid::TypedFieldBase::data (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase4dataENSt11enable_if_tI15is_host_space_vI1MEP1TEEv">muGrid::TypedFieldBase::data (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase4dataENSt11enable_if_tI15is_host_space_vI1MEPK1TEEv">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase8data_ptrE">muGrid::TypedFieldBase::data_ptr (C++ member)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase14deep_copy_fromEvRK14TypedFieldBaseI1T10OtherSpaceE">muGrid::TypedFieldBase::deep_copy_from (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase10Eigen_cmapE">muGrid::TypedFieldBase::Eigen_cmap (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase9eigen_mapERK7Index_tRK7Index_t">muGrid::TypedFieldBase::eigen_map (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase9eigen_mapERK7Index_tRK7Index_t">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase9eigen_mapENSt11enable_if_tI15is_host_space_vI1ME9Eigen_mapEERK7Index_tRK7Index_t">muGrid::TypedFieldBase::eigen_map (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase9eigen_mapENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE9Eigen_mapEEERK7Index_tRK7Index_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase9eigen_mapENSt11enable_if_tI15is_host_space_vI1ME10Eigen_cmapEERK7Index_tRK7Index_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase9eigen_mapENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE10Eigen_cmapEEERK7Index_tRK7Index_t">[3]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase9Eigen_mapE">muGrid::TypedFieldBase::Eigen_map (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase9eigen_matEv">muGrid::TypedFieldBase::eigen_mat (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase9eigen_matEv">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase9eigen_matENSt11enable_if_tI15is_host_space_vI1ME9Eigen_mapEEv">muGrid::TypedFieldBase::eigen_mat (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase9eigen_matENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE9Eigen_mapEEEv">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase9eigen_matENSt11enable_if_tI15is_host_space_vI1ME10Eigen_cmapEEv">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase9eigen_matENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE10Eigen_cmapEEEv">[3]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase11eigen_pixelEv">muGrid::TypedFieldBase::eigen_pixel (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase11eigen_pixelEv">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase11eigen_pixelENSt11enable_if_tI15is_host_space_vI1ME9Eigen_mapEEv">muGrid::TypedFieldBase::eigen_pixel (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase11eigen_pixelENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE9Eigen_mapEEEv">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase11eigen_pixelENSt11enable_if_tI15is_host_space_vI1ME10Eigen_cmapEEv">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase11eigen_pixelENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE10Eigen_cmapEEEv">[3]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase12eigen_sub_ptEv">muGrid::TypedFieldBase::eigen_sub_pt (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase12eigen_sub_ptEv">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase12eigen_sub_ptENSt11enable_if_tI15is_host_space_vI1ME9Eigen_mapEEv">muGrid::TypedFieldBase::eigen_sub_pt (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase12eigen_sub_ptENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE9Eigen_mapEEEv">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase12eigen_sub_ptENSt11enable_if_tI15is_host_space_vI1ME10Eigen_cmapEEv">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase12eigen_sub_ptENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE10Eigen_cmapEEEv">[3]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase9eigen_vecEv">muGrid::TypedFieldBase::eigen_vec (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase9eigen_vecEv">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase9eigen_vecENSt11enable_if_tI15is_host_space_vI1ME12EigenVec_mapEEv">muGrid::TypedFieldBase::eigen_vec (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase9eigen_vecENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE12EigenVec_mapEEEv">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase9eigen_vecENSt11enable_if_tI15is_host_space_vI1ME13EigenVec_cmapEEv">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase9eigen_vecENSt11enable_if_tI15is_host_space_vI1MEN14TypedFieldBaseI1T11MemorySpaceE13EigenVec_cmapEEEv">[3]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase10EigenRep_tE">muGrid::TypedFieldBase::EigenRep_t (C++ type)</a>
 </li>
@@ -3319,15 +3689,25 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase13EigenVecRep_tE">muGrid::TypedFieldBase::EigenVecRep_t (C++ type)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase13get_device_idEv">muGrid::TypedFieldBase::get_device_id (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase17get_device_stringEv">muGrid::TypedFieldBase::get_device_string (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase22get_dlpack_device_typeEv">muGrid::TypedFieldBase::get_dlpack_device_type (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase25get_element_size_in_bytesEv">muGrid::TypedFieldBase::get_element_size_in_bytes (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase13get_pixel_mapERK7Index_t">muGrid::TypedFieldBase::get_pixel_map (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase13get_pixel_mapERK7Index_t">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase13get_pixel_mapENSt11enable_if_tI15is_host_space_vI1ME8FieldMapI1TN7Mapping3MutEEEERK7Index_t">muGrid::TypedFieldBase::get_pixel_map (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase13get_pixel_mapENSt11enable_if_tI15is_host_space_vI1ME8FieldMapI1TN7Mapping5ConstEEEERK7Index_t">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase14get_sub_pt_mapERK7Index_t">muGrid::TypedFieldBase::get_sub_pt_map (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase14get_sub_pt_mapERK7Index_t">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid14TypedFieldBase14get_sub_pt_mapENSt11enable_if_tI15is_host_space_vI1ME8FieldMapI1TN7Mapping3MutEEEERK7Index_t">muGrid::TypedFieldBase::get_sub_pt_map (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK6muGrid14TypedFieldBase14get_sub_pt_mapENSt11enable_if_tI15is_host_space_vI1ME8FieldMapI1TN7Mapping5ConstEEEERK7Index_t">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase10get_typeidEv">muGrid::TypedFieldBase::get_typeid (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase17get_void_data_ptrEv">muGrid::TypedFieldBase::get_void_data_ptr (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase17get_void_data_ptrEb">muGrid::TypedFieldBase::get_void_data_ptr (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase12is_on_deviceEv">muGrid::TypedFieldBase::is_on_device (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase12Memory_SpaceE">muGrid::TypedFieldBase::Memory_Space (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase8NegativeE">muGrid::TypedFieldBase::Negative (C++ struct)</a>
 </li>
@@ -3345,9 +3725,13 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase6ScalarE">muGrid::TypedFieldBase::Scalar (C++ type)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase12set_data_ptrEP1T">muGrid::TypedFieldBase::set_data_ptr (C++ function)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase14TypedFieldBaseERK14TypedFieldBase">muGrid::TypedFieldBase::TypedFieldBase (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase14TypedFieldBaseERKNSt6stringER15FieldCollection7Index_tRKNSt6stringERK4Unit">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase14TypedFieldBaseERKNSt6stringER15FieldCollectionRK7Shape_tRKNSt6stringERK4Unit">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase14TypedFieldBaseERR14TypedFieldBase">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase14TypedFieldBaseEv">[4]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase6valuesE">muGrid::TypedFieldBase::values (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase4viewEv">muGrid::TypedFieldBase::view (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK6muGrid14TypedFieldBase4viewEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBase6View_tE">muGrid::TypedFieldBase::View_t (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid14TypedFieldBaseD0Ev">muGrid::TypedFieldBase::~TypedFieldBase (C++ function)</a>
 </li>
@@ -3374,6 +3758,10 @@
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9UintFieldE">muGrid::UintField (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9UintfieldE">muGrid::Uintfield (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid15UintFieldDeviceE">muGrid::UintFieldDevice (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid10UintFieldTE">muGrid::UintFieldT (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid4UnitE">muGrid::Unit (C++ class)</a>
 </li>
@@ -3489,8 +3877,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7UnknownE">muGrid::Unknown (C++ member)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid10ValueErrorE">muGrid::ValueError (C++ class)</a>
-</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9VerbosityE">muGrid::Verbosity (C++ enum)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9Verbosity8DetailedE">muGrid::Verbosity::Detailed (C++ enumerator)</a>
@@ -3510,36 +3896,6 @@
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7version4infoEv">muGrid::version::info (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7version8is_dirtyEv">muGrid::version::is_dirty (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid12WrappedFieldE">muGrid::WrappedField (C++ class)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField10EigenRep_tE">muGrid::WrappedField::EigenRep_t (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12WrappedField15get_buffer_sizeEv">muGrid::WrappedField::get_buffer_size (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12WrappedField17get_storage_orderEv">muGrid::WrappedField::get_storage_order (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4NK6muGrid12WrappedField11get_stridesERK8IterUnit7Index_t">muGrid::WrappedField::get_strides (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField10make_constERKNSt6stringER15FieldCollectionRK7Index_tKN5Eigen3RefIK10EigenRep_tEERKNSt6stringERK4UnitRK7Shape_t">muGrid::WrappedField::make_const (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedFieldaSERK6Parent">muGrid::WrappedField::operator= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedFieldaSERR12WrappedField">[1]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField6ParentE">muGrid::WrappedField::Parent (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField6resizeEv">muGrid::WrappedField::resize (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12set_pad_sizeERK6size_t">muGrid::WrappedField::set_pad_size (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField8set_zeroEv">muGrid::WrappedField::set_zero (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField4sizeE">muGrid::WrappedField::size (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField7stridesE">muGrid::WrappedField::strides (C++ member)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldERK12WrappedField">muGrid::WrappedField::WrappedField (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldERKNSt6stringER15FieldCollectionRK7Index_tN5Eigen3RefI10EigenRep_tEERKNSt6stringERK4UnitRK7Shape_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldERKNSt6stringER15FieldCollectionRK7Index_tRK6size_tP1TRKNSt6stringERK4UnitRK7Shape_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldERKNSt6stringER15FieldCollectionRK7Shape_tN5Eigen3RefI10EigenRep_tEERKNSt6stringERK4UnitRK7Shape_t">[3]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldERKNSt6stringER15FieldCollectionRK7Shape_tRK6size_tP1TRKNSt6stringERK4UnitRK7Shape_t">[4]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldERR12WrappedField">[5]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedField12WrappedFieldEv">[6]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid12WrappedFieldD0Ev">muGrid::WrappedField::~WrappedField (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11zerothOrderE">muGrid::zerothOrder (C++ member)</a>
 </li>
@@ -3611,6 +3967,604 @@
   </tr></table>
 </section>
 
+<section id="P" class="genindex-section">
+  <h2>P</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="CplusplusAPI.html#_CPPv49pocketfft">pocketfft (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detailE">pocketfft::detail (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7add_vecE">pocketfft::detail::add_vec (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7add_vec4typeE">pocketfft::detail::add_vec::type (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7add_vecI5cmplxI1TEEE">pocketfft::detail::add_vec&lt;cmplx&lt;T&gt;&gt; (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7add_vecI5cmplxI1TEE4typeE">pocketfft::detail::add_vec&lt;cmplx&lt;T&gt;&gt;::type (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9add_vec_tE">pocketfft::detail::add_vec_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13aligned_allocE6size_t6size_t">pocketfft::detail::aligned_alloc (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail15aligned_deallocEPv">pocketfft::detail::aligned_dealloc (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9alloc_tmpE3arrIcERK7shape_t6size_t6size_t">pocketfft::detail::alloc_tmp (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9alloc_tmpE3arrIcERK7shape_tRK7shape_t6size_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3arrE">pocketfft::detail::arr (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr3arrE6size_t">pocketfft::detail::arr::arr (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr3arrERR3arr">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr3arrEv">[2]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr4dataEv">pocketfft::detail::arr::data (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail3arr4dataEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr7deallocEP1T">pocketfft::detail::arr::dealloc (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arrixE6size_t">pocketfft::detail::arr::operator[] (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail3arrixE6size_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr1pE">pocketfft::detail::arr::p (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr6rallocE6size_t">pocketfft::detail::arr::ralloc (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr6resizeE6size_t">pocketfft::detail::arr::resize (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail3arr4sizeEv">pocketfft::detail::arr::size (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arr2szE">pocketfft::detail::arr::sz (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail3arrD0Ev">pocketfft::detail::arr::~arr (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8arr_infoE">pocketfft::detail::arr_info (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8arr_info8arr_infoERK7shape_tRK8stride_t">pocketfft::detail::arr_info::arr_info (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8arr_info4ndimEv">pocketfft::detail::arr_info::ndim (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8arr_info5shapeE6size_t">pocketfft::detail::arr_info::shape (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8arr_info5shapeEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8arr_info3shpE">pocketfft::detail::arr_info::shp (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8arr_info4sizeEv">pocketfft::detail::arr_info::size (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8arr_info3strE">pocketfft::detail::arr_info::str (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8arr_info6strideE6size_t">pocketfft::detail::arr_info::stride (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8arr_info6strideEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8BACKWARDE">pocketfft::detail::BACKWARD (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3c2cEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tbPKNSt7complexI1TEEPNSt7complexI1TEE1T6size_t">pocketfft::detail::c2c (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3c2rEvRK7shape_tRK8stride_tRK8stride_t6size_tbPKNSt7complexI1TEEP1T1T6size_t">pocketfft::detail::c2r (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3c2rEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tbPKNSt7complexI1TEEP1T1T6size_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cfftpE">pocketfft::detail::cfftp (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp10add_factorE6size_t">pocketfft::detail::cfftp::add_factor (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp5cfftpE6size_t">pocketfft::detail::cfftp::cfftp (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp12comp_twiddleEv">pocketfft::detail::cfftp::comp_twiddle (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5cfftp4execEvA_1T2T0b">pocketfft::detail::cfftp::exec (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp4factE">pocketfft::detail::cfftp::fact (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp7fctdataE">pocketfft::detail::cfftp::fctdata (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp7fctdata3fctE">pocketfft::detail::cfftp::fctdata::fct (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp7fctdata2twE">pocketfft::detail::cfftp::fctdata::tw (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp7fctdata3twsE">pocketfft::detail::cfftp::fctdata::tws (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp6lengthE">pocketfft::detail::cfftp::length (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cfftp3memE">pocketfft::detail::cfftp::mem (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b0ENK9pocketfft6detail5cfftp8pass_allEvA_1T2T0">pocketfft::detail::cfftp::pass_all (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b0ENK9pocketfft6detail5cfftp7ROTX135EvR1T">pocketfft::detail::cfftp::ROTX135 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b0ENK9pocketfft6detail5cfftp6ROTX45EvR1T">pocketfft::detail::cfftp::ROTX45 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail5cfftp6twsizeEv">pocketfft::detail::cfftp::twsize (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cmplxE">pocketfft::detail::cmplx (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplx5cmplxE1T1T">pocketfft::detail::cmplx::cmplx (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplx5cmplxEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplx1iE">pocketfft::detail::cmplx::i (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5cmplxmlE5cmplxIDTml1r5otherEERK2T2">pocketfft::detail::cmplx::operator* (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5cmplxmlE5cmplxIDTpl1rdt5other1rEERK5cmplxI2T2E">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cmplxmLER5cmplx2T2">pocketfft::detail::cmplx::operator*= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cmplxmLER5cmplxRK5cmplxI2T2E">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5cmplxplE5cmplxIDTpl1rdt5other1rEERK5cmplxI2T2E">pocketfft::detail::cmplx::operator+ (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cmplxpLER5cmplxRK5cmplxI2T2E">pocketfft::detail::cmplx::operator+= (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplxpLERK5cmplx">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5cmplxmiE5cmplxIDTpl1rdt5other1rEERK5cmplxI2T2E">pocketfft::detail::cmplx::operator- (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5cmplxmIER5cmplxRK5cmplxI2T2E">pocketfft::detail::cmplx::operator-= (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplx1rE">pocketfft::detail::cmplx::r (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplx3SetE1T">pocketfft::detail::cmplx::Set (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5cmplx3SetE1T1T">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b0ENK9pocketfft6detail5cmplx11special_mulE5cmplxIDTpl1rdt5other1rEERK5cmplxI2T2E">pocketfft::detail::cmplx::special_mul (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail6cndarrE">pocketfft::detail::cndarr (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail6cndarr6cndarrEPKvRK7shape_tRK8stride_t">pocketfft::detail::cndarr::cndarr (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail6cndarr1dE">pocketfft::detail::cndarr::d (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail6cndarrixE9ptrdiff_t">pocketfft::detail::cndarr::operator[] (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail4conjE5cmplxI1TERK5cmplxI1TE">pocketfft::detail::conj (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3cosE1T1T">pocketfft::detail::cos (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3dctEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tiPK1TP1T1Tb6size_t">pocketfft::detail::dct (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3dstEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tiPK1TP1T1Tb6size_t">pocketfft::detail::dst (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecC2CE">pocketfft::detail::ExecC2C (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecC2C7forwardE">pocketfft::detail::ExecC2C::forward (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00_6size_tENK9pocketfft6detail7ExecC2CclEvRK10multi_iterI4vlenERK6cndarrI5cmplxI2T0EER5ndarrI5cmplxI2T0EEP1TRK11pocketfft_cI2T0E2T0">pocketfft::detail::ExecC2C::operator() (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8ExecDcstE">pocketfft::detail::ExecDcst (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8ExecDcst6cosineE">pocketfft::detail::ExecDcst::cosine (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I000_6size_tENK9pocketfft6detail8ExecDcstclEvRK10multi_iterI4vlenERK6cndarrI2T0ER5ndarrI2T0EP1TRK5Tplan2T0">pocketfft::detail::ExecDcst::operator() (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8ExecDcst5orthoE">pocketfft::detail::ExecDcst::ortho (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8ExecDcst4typeE">pocketfft::detail::ExecDcst::type (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11ExecHartleyE">pocketfft::detail::ExecHartley (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00_6size_tENK9pocketfft6detail11ExecHartleyclEvRK10multi_iterI4vlenERK6cndarrI2T0ER5ndarrI2T0EP1TRK11pocketfft_rI2T0E2T0">pocketfft::detail::ExecHartley::operator() (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecR2RE">pocketfft::detail::ExecR2R (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecR2R7forwardE">pocketfft::detail::ExecR2R::forward (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00_6size_tENK9pocketfft6detail7ExecR2RclEvRK10multi_iterI4vlenERK6cndarrI2T0ER5ndarrI2T0EP1TRK11pocketfft_rI2T0E2T0">pocketfft::detail::ExecR2R::operator() (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7ExecR2R3r2hE">pocketfft::detail::ExecR2R::r2h (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7fftblueE">pocketfft::detail::fftblue (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue2bkE">pocketfft::detail::fftblue::bk (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue3bkfE">pocketfft::detail::fftblue::bkf (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail7fftblue4execEvA_5cmplxI1TE2T0b">pocketfft::detail::fftblue::exec (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7fftblue6exec_rEvA_1T2T0b">pocketfft::detail::fftblue::exec_r (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b0ENK9pocketfft6detail7fftblue3fftEvA_5cmplxI1TE2T0">pocketfft::detail::fftblue::fft (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue7fftblueE6size_t">pocketfft::detail::fftblue::fftblue (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue3memE">pocketfft::detail::fftblue::mem (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue1nE">pocketfft::detail::fftblue::n (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue2n2E">pocketfft::detail::fftblue::n2 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7fftblue4planE">pocketfft::detail::fftblue::plan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7FORWARDE">pocketfft::detail::FORWARD (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail8get_planENSt10shared_ptrI1TEE6size_t">pocketfft::detail::get_plan (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9MPINPLACEEvR1TR1T">pocketfft::detail::MPINPLACE (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_6size_tEN9pocketfft6detail10multi_iterE">pocketfft::detail::multi_iter (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter7advanceE6size_t">pocketfft::detail::multi_iter::advance (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter9advance_iEv">pocketfft::detail::multi_iter::advance_i (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter4iarrE">pocketfft::detail::multi_iter::iarr (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter4idimE">pocketfft::detail::multi_iter::idim (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter4iofsE6size_t">pocketfft::detail::multi_iter::iofs (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter4iofsE6size_t6size_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter9length_inEv">pocketfft::detail::multi_iter::length_in (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter10length_outEv">pocketfft::detail::multi_iter::length_out (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter10multi_iterERK8arr_infoRK8arr_info6size_t">pocketfft::detail::multi_iter::multi_iter (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter4oarrE">pocketfft::detail::multi_iter::oarr (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter4oofsE6size_t">pocketfft::detail::multi_iter::oofs (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter4oofsE6size_t6size_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter3p_iE">pocketfft::detail::multi_iter::p_i (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter4p_iiE">pocketfft::detail::multi_iter::p_ii (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter3p_oE">pocketfft::detail::multi_iter::p_o (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter4p_oiE">pocketfft::detail::multi_iter::p_oi (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter3posE">pocketfft::detail::multi_iter::pos (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter3remE">pocketfft::detail::multi_iter::rem (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter9remainingEv">pocketfft::detail::multi_iter::remaining (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter5str_iE">pocketfft::detail::multi_iter::str_i (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail10multi_iter5str_oE">pocketfft::detail::multi_iter::str_o (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter9stride_inEv">pocketfft::detail::multi_iter::stride_in (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail10multi_iter10stride_outEv">pocketfft::detail::multi_iter::stride_out (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5ndarrE">pocketfft::detail::ndarr (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5ndarr5ndarrEPvRK7shape_tRK8stride_t">pocketfft::detail::ndarr::ndarr (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5ndarrixE9ptrdiff_t">pocketfft::detail::ndarr::operator[] (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail2PMEvR1TR1T1T1T">pocketfft::detail::PM (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9PMINPLACEEvR1TR1T">pocketfft::detail::PMINPLACE (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail11pocketfft_cE">pocketfft::detail::pocketfft_c (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_c8blueplanE">pocketfft::detail::pocketfft_c::blueplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_c3lenE">pocketfft::detail::pocketfft_c::len (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail11pocketfft_c6lengthEv">pocketfft::detail::pocketfft_c::length (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_c8packplanE">pocketfft::detail::pocketfft_c::packplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_c11pocketfft_cE6size_t">pocketfft::detail::pocketfft_c::pocketfft_c (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail11pocketfft_rE">pocketfft::detail::pocketfft_r (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_r8blueplanE">pocketfft::detail::pocketfft_r::blueplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_r3lenE">pocketfft::detail::pocketfft_r::len (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail11pocketfft_r6lengthEv">pocketfft::detail::pocketfft_r::length (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_r8packplanE">pocketfft::detail::pocketfft_r::packplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11pocketfft_r11pocketfft_rE6size_t">pocketfft::detail::pocketfft_r::pocketfft_r (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3r2cEvRK7shape_tRK8stride_tRK8stride_t6size_tbPK1TPNSt7complexI1TEE1T6size_t">pocketfft::detail::r2c (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3r2cEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tbPK1TPNSt7complexI1TEE1T6size_t">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail11r2r_fftpackEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tbbPK1TP1T1T6size_t">pocketfft::detail::r2r_fftpack (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail19r2r_genuine_hartleyEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tPK1TP1T1T6size_t">pocketfft::detail::r2r_genuine_hartley (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail21r2r_separable_hartleyEvRK7shape_tRK8stride_tRK8stride_tRK7shape_tPK1TP1T1T6size_t">pocketfft::detail::r2r_separable_hartley (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iterE">pocketfft::detail::rev_iter (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter7advanceEv">pocketfft::detail::rev_iter::advance (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter3arrE">pocketfft::detail::rev_iter::arr (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter9last_axisE">pocketfft::detail::rev_iter::last_axis (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter9last_sizeE">pocketfft::detail::rev_iter::last_size (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8rev_iter3ofsEv">pocketfft::detail::rev_iter::ofs (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter1pE">pocketfft::detail::rev_iter::p (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter3posE">pocketfft::detail::rev_iter::pos (C++ member)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter3remE">pocketfft::detail::rev_iter::rem (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8rev_iter9remainingEv">pocketfft::detail::rev_iter::remaining (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter8rev_axisE">pocketfft::detail::rev_iter::rev_axis (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter8rev_iterERK8arr_infoRK7shape_t">pocketfft::detail::rev_iter::rev_iter (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter8rev_jumpE">pocketfft::detail::rev_iter::rev_jump (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8rev_iter7rev_ofsEv">pocketfft::detail::rev_iter::rev_ofs (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter2rpE">pocketfft::detail::rev_iter::rp (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8rev_iter3shpE">pocketfft::detail::rev_iter::shp (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5rfftpE">pocketfft::detail::rfftp (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp10add_factorE6size_t">pocketfft::detail::rfftp::add_factor (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp12comp_twiddleEv">pocketfft::detail::rfftp::comp_twiddle (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5rfftp13copy_and_normEvP1TP1T2T0">pocketfft::detail::rfftp::copy_and_norm (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0ENK9pocketfft6detail5rfftp4execEvA_1T2T0b">pocketfft::detail::rfftp::exec (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp4factE">pocketfft::detail::rfftp::fact (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp9factorizeEv">pocketfft::detail::rfftp::factorize (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp7fctdataE">pocketfft::detail::rfftp::fctdata (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp7fctdata3fctE">pocketfft::detail::rfftp::fctdata::fct (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp7fctdata2twE">pocketfft::detail::rfftp::fctdata::tw (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp7fctdata3twsE">pocketfft::detail::rfftp::fctdata::tws (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp6lengthE">pocketfft::detail::rfftp::length (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp3memE">pocketfft::detail::rfftp::mem (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I000ENK9pocketfft6detail5rfftp5MULPMEvR2T1R2T12T22T22T32T3">pocketfft::detail::rfftp::MULPM (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail5rfftp5rfftpE6size_t">pocketfft::detail::rfftp::rfftp (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail5rfftp6twsizeEv">pocketfft::detail::rfftp::twsize (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5ROT90EvR5cmplxI1TE">pocketfft::detail::ROT90 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b0EN9pocketfft6detail6ROTX90EvR5cmplxI1TE">pocketfft::detail::ROTX90 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7shape_tE">pocketfft::detail::shape_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iterE">pocketfft::detail::simple_iter (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iter7advanceEv">pocketfft::detail::simple_iter::advance (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iter3arrE">pocketfft::detail::simple_iter::arr (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail11simple_iter3ofsEv">pocketfft::detail::simple_iter::ofs (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iter1pE">pocketfft::detail::simple_iter::p (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iter3posE">pocketfft::detail::simple_iter::pos (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iter3remE">pocketfft::detail::simple_iter::rem (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail11simple_iter9remainingEv">pocketfft::detail::simple_iter::remaining (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail11simple_iter11simple_iterERK8arr_info">pocketfft::detail::simple_iter::simple_iter (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail3sinE1T1T">pocketfft::detail::sin (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail13sincos_2pibynE">pocketfft::detail::sincos_2pibyn (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn4calcE6size_t6size_t5Thigh">pocketfft::detail::sincos_2pibyn::calc (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn4maskE">pocketfft::detail::sincos_2pibyn::mask (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn1NE">pocketfft::detail::sincos_2pibyn::N (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail13sincos_2pibynixE6size_t">pocketfft::detail::sincos_2pibyn::operator[] (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn5shiftE">pocketfft::detail::sincos_2pibyn::shift (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn13sincos_2pibynE6size_t">pocketfft::detail::sincos_2pibyn::sincos_2pibyn (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn5ThighE">pocketfft::detail::sincos_2pibyn::Thigh (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn2v1E">pocketfft::detail::sincos_2pibyn::v1 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail13sincos_2pibyn2v2E">pocketfft::detail::sincos_2pibyn::v2 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I_b00EN9pocketfft6detail11special_mulEvRK5cmplxI1TERK5cmplxI2T2ER5cmplxI1TE">pocketfft::detail::special_mul (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail4sqrtE1T1T">pocketfft::detail::sqrt (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8stride_tE">pocketfft::detail::stride_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail8T_dcst23E">pocketfft::detail::T_dcst23 (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8T_dcst237fftplanE">pocketfft::detail::T_dcst23::fftplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail8T_dcst236lengthEv">pocketfft::detail::T_dcst23::length (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8T_dcst238T_dcst23E6size_t">pocketfft::detail::T_dcst23::T_dcst23 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail8T_dcst237twiddleE">pocketfft::detail::T_dcst23::twiddle (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7T_dcst4E">pocketfft::detail::T_dcst4 (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7T_dcst42C2E">pocketfft::detail::T_dcst4::C2 (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7T_dcst43fftE">pocketfft::detail::T_dcst4::fft (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail7T_dcst46lengthEv">pocketfft::detail::T_dcst4::length (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7T_dcst41NE">pocketfft::detail::T_dcst4::N (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7T_dcst44rfftE">pocketfft::detail::T_dcst4::rfft (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail7T_dcst47T_dcst4E6size_t">pocketfft::detail::T_dcst4::T_dcst4 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail6T_dct1E">pocketfft::detail::T_dct1 (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail6T_dct17fftplanE">pocketfft::detail::T_dct1::fftplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail6T_dct16lengthEv">pocketfft::detail::T_dct1::length (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail6T_dct16T_dct1E6size_t">pocketfft::detail::T_dct1::T_dct1 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail6T_dst1E">pocketfft::detail::T_dst1 (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail6T_dst17fftplanE">pocketfft::detail::T_dst1::fftplan (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail6T_dst16lengthEv">pocketfft::detail::T_dst1::length (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail6T_dst16T_dst1E6size_t">pocketfft::detail::T_dst1::T_dst1 (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threadingE">pocketfft::detail::threading (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9threading17aligned_allocatorE">pocketfft::detail::threading::aligned_allocator (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9threading17aligned_allocator17aligned_allocatorERK17aligned_allocatorI1UE">pocketfft::detail::threading::aligned_allocator::aligned_allocator (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading17aligned_allocator17aligned_allocatorEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading17aligned_allocator8allocateE6size_t">pocketfft::detail::threading::aligned_allocator::allocate (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading17aligned_allocator10deallocateEP1T6size_t">pocketfft::detail::threading::aligned_allocator::deallocate (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading17aligned_allocator10value_typeE">pocketfft::detail::threading::aligned_allocator::value_type (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9threading16concurrent_queueE">pocketfft::detail::threading::concurrent_queue (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4NK9pocketfft6detail9threading16concurrent_queue5emptyEv">pocketfft::detail::threading::concurrent_queue::empty (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading16concurrent_queue6lock_tE">pocketfft::detail::threading::concurrent_queue::lock_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading16concurrent_queue4mut_E">pocketfft::detail::threading::concurrent_queue::mut_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading16concurrent_queue4pushE1T">pocketfft::detail::threading::concurrent_queue::push (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading16concurrent_queue2q_E">pocketfft::detail::threading::concurrent_queue::q_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading16concurrent_queue5size_E">pocketfft::detail::threading::concurrent_queue::size_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading16concurrent_queue7try_popER1T">pocketfft::detail::threading::concurrent_queue::try_pop (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading8get_poolEv">pocketfft::detail::threading::get_pool (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latchE">pocketfft::detail::threading::latch (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch10completed_E">pocketfft::detail::threading::latch::completed_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch10count_downEv">pocketfft::detail::threading::latch::count_down (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch8is_readyEv">pocketfft::detail::threading::latch::is_ready (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch5latchE6size_t">pocketfft::detail::threading::latch::latch (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch6lock_tE">pocketfft::detail::threading::latch::lock_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch4mut_E">pocketfft::detail::threading::latch::mut_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch9num_left_E">pocketfft::detail::threading::latch::num_left_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading5latch4waitEv">pocketfft::detail::threading::latch::wait (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11max_threadsE">pocketfft::detail::threading::max_threads (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11num_threadsEv">pocketfft::detail::threading::num_threads (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading9thread_idEv">pocketfft::detail::threading::thread_id (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail9threading10thread_mapEv6size_t4Func">pocketfft::detail::threading::thread_map (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_poolE">pocketfft::detail::threading::thread_pool (C++ class)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool15cache_line_sizeE">pocketfft::detail::threading::thread_pool::cache_line_size (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool14create_threadsEv">pocketfft::detail::threading::thread_pool::create_threads (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6lock_tE">pocketfft::detail::threading::thread_pool::lock_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool4mut_E">pocketfft::detail::threading::thread_pool::mut_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool14overflow_work_E">pocketfft::detail::threading::thread_pool::overflow_work_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool7restartEv">pocketfft::detail::threading::thread_pool::restart (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool8shutdownEv">pocketfft::detail::threading::thread_pool::shutdown (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool9shutdown_E">pocketfft::detail::threading::thread_pool::shutdown_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool15shutdown_lockedEv">pocketfft::detail::threading::thread_pool::shutdown_locked (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6submitENSt8functionIFvvEEE">pocketfft::detail::threading::thread_pool::submit (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool11thread_poolE6size_t">pocketfft::detail::threading::thread_pool::thread_pool (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool11thread_poolEv">[1]</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool18unscheduled_tasks_E">pocketfft::detail::threading::thread_pool::unscheduled_tasks_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6workerE">pocketfft::detail::threading::thread_pool::worker (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6worker9busy_flagE">pocketfft::detail::threading::thread_pool::worker::busy_flag (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6worker3mutE">pocketfft::detail::threading::thread_pool::worker::mut (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6worker6threadE">pocketfft::detail::threading::thread_pool::worker::thread (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6worker4workE">pocketfft::detail::threading::thread_pool::worker::work (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6worker10work_readyE">pocketfft::detail::threading::thread_pool::worker::work_ready (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool6worker11worker_mainERNSt6atomicIbEERNSt6atomicI6size_tEER16concurrent_queueINSt8functionIFvvEEEE">pocketfft::detail::threading::thread_pool::worker::worker_main (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_pool8workers_E">pocketfft::detail::threading::thread_pool::workers_ (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail9threading11thread_poolD0Ev">pocketfft::detail::threading::thread_pool::~thread_pool (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail4utilE">pocketfft::detail::util (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail4util4prodERK7shape_t">pocketfft::detail::util::prod (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail4util12thread_countE6size_tRK7shape_t6size_t6size_t">pocketfft::detail::util::thread_count (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail4VLENE">pocketfft::detail::VLEN (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4N9pocketfft6detail4VLEN3valE">pocketfft::detail::VLEN::val (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail5VTYPEE">pocketfft::detail::VTYPE (C++ struct)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN9pocketfft6detail7vtype_tE">pocketfft::detail::vtype_t (C++ type)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_CACHE_SIZE">POCKETFFT_CACHE_SIZE (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_NO_MULTITHREADING">POCKETFFT_NO_MULTITHREADING (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_NO_VECTORS">POCKETFFT_NO_VECTORS (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_NOINLINE">POCKETFFT_NOINLINE (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP11">POCKETFFT_PARTSTEP11 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP11a">POCKETFFT_PARTSTEP11a (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP11a0">POCKETFFT_PARTSTEP11a0 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP3a">POCKETFFT_PARTSTEP3a (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP3b">POCKETFFT_PARTSTEP3b (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP5a">POCKETFFT_PARTSTEP5a (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP5b">POCKETFFT_PARTSTEP5b (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP7">POCKETFFT_PARTSTEP7 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP7a">POCKETFFT_PARTSTEP7a (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PARTSTEP7a0">POCKETFFT_PARTSTEP7a0 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PREP11">POCKETFFT_PREP11 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PREP3">POCKETFFT_PREP3 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PREP5">POCKETFFT_PREP5 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_PREP7">POCKETFFT_PREP7 (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_REARRANGE">POCKETFFT_REARRANGE (C macro)</a>
+</li>
+        <li><a href="CplusplusAPI.html#c.POCKETFFT_RESTRICT">POCKETFFT_RESTRICT (C macro)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
 <section id="R" class="genindex-section">
   <h2>R</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
@@ -3631,25 +4585,9 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="Cplusplus.html#_CPPv46Size_t">Size_t (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv46Size_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv46Size_t">[2]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4St">std (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv415std_replacement">std_replacement (C++ type)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I00EN15std_replacement5applyEDcRR1FRR5Tuple">std_replacement::apply (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4N15std_replacement6detailE">std_replacement::detail (C++ type)</a>
-</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="CplusplusAPI.html#_CPPv4I00_DpNSt6size_tEEN15std_replacement6detail10apply_implEDcRR1FRR5TupleNSt14index_sequenceIDp1IEE">std_replacement::detail::apply_impl (C++ function)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I000DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXaaNSt11is_functionI1TE5valueEN20is_reference_wrapperINSt7decay_tI7RefWrapEEE5valueEEDTcldscldt3ref3getE3pmfspclNSt7forwardI4ArgsEE4argsEEEEEM4Base1TRR7RefWrapDpRR4Args">std_replacement::detail::INVOKE (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4I000DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXaaNSt11is_functionI1TE5valueENSt10is_base_ofI4BaseNSt7decay_tI7DerivedEEE5valueEEDTcldsclNSt7forwardI7DerivedEE3refE3pmfspclNSt7forwardI4ArgsEE4argsEEEEEM4Base1TRR7DerivedDpRR4Args">[1]</a>, <a href="CplusplusAPI.html#_CPPv4I000DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXaaNSt11is_functionI1TE5valueEaantN20is_reference_wrapperINSt7decay_tI7PointerEEE5valueEntNSt10is_base_ofI4BaseNSt7decay_tI7PointerEEE5valueEEDTcldsdeclNSt7forwardI7PointerEE3ptrE3pmfspclNSt7forwardI4ArgsEE4argsEEEEEM4Base1TRR7PointerDpRR4Args">[2]</a>, <a href="CplusplusAPI.html#_CPPv4I000EN15std_replacement6detail6INVOKEENSt11enable_if_tIXaantNSt11is_functionI1TE5valueEN20is_reference_wrapperINSt7decay_tI7RefWrapEEE5valueEEDTdscldt3ref3getE3pmdEEEM4Base1TRR7RefWrap">[3]</a>, <a href="CplusplusAPI.html#_CPPv4I000EN15std_replacement6detail6INVOKEENSt11enable_if_tIXaantNSt11is_functionI1TE5valueENSt10is_base_ofI4BaseNSt7decay_tI7DerivedEEE5valueEEDTdsclNSt7forwardI7DerivedEE3refE3pmdEEEM4Base1TRR7Derived">[4]</a>, <a href="CplusplusAPI.html#_CPPv4I000EN15std_replacement6detail6INVOKEENSt11enable_if_tIXaantNSt11is_functionI1TE5valueEaantN20is_reference_wrapperINSt7decay_tI7PointerEEE5valueEntNSt10is_base_ofI4BaseNSt7decay_tI7PointerEEE5valueEEDTdsdeclNSt7forwardI7PointerEE3ptrE3pmdEEEM4Base1TRR7Pointer">[5]</a>, <a href="CplusplusAPI.html#_CPPv4I0DpEN15std_replacement6detail6INVOKEENSt11enable_if_tIXntNSt17is_member_pointerINSt7decay_tI1FEEE5valueEEDTclclNSt7forwardI1FEE1fEspclNSt7forwardI4ArgsEE4argsEEEEERR1FDpRR4Args">[6]</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN15std_replacement6detail20is_reference_wrapperE">std_replacement::detail::is_reference_wrapper (C++ struct)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0EN15std_replacement6detail20is_reference_wrapperINSt17reference_wrapperI1UEEEE">std_replacement::detail::is_reference_wrapper&lt;std::reference_wrapper&lt;U&gt;&gt; (C++ struct)</a>
-</li>
-        <li><a href="CplusplusAPI.html#_CPPv4I0DpEN15std_replacement6invokeEDTclN6detail6INVOKEEclNSt7forwardI1FEE1fEspclNSt7forwardI8ArgTypesEE4argsEEERR1FDpRR8ArgTypes">std_replacement::invoke (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4St">std (C++ type)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -3697,9 +4635,9 @@
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=becca874"></script>
-    <script src="_static/doctools.js?v=9bcbadda"></script>
-    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+</div><script src="_static/documentation_options.js?v=7cc908e0"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
     </body>
 </html>
