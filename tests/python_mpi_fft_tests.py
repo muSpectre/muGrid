@@ -457,12 +457,16 @@ class TestMPIFFTProcessGrid:
         engine = FFTEngine(nb_grid_pts, comm)
 
         # Gather all process coordinates
-        local_coords = engine.process_coords
+        local_coords = np.array(engine.process_coords, dtype=np.int32).reshape(1, -1)
         all_coords = comm.gather(local_coords)
 
         if comm.rank == 0:
             # Check all coordinates are unique
-            coord_set = set(all_coords)
+            # all_coords is concatenated to [comm.size * 2] array after gather
+            # Reshape to [comm.size, 2]
+            all_coords = all_coords.reshape(comm.size, 2)
+            coord_tuples = [tuple(row) for row in all_coords]
+            coord_set = set(coord_tuples)
             assert len(coord_set) == comm.size
 
 
@@ -492,7 +496,8 @@ class TestMPIFFTEdgeCases:
             engine.ifft(fourier_field._cpp, real_field._cpp)
             real_field.p[0, ...] *= engine.normalisation
 
-            assert_allclose(real_field.p.squeeze(), original, atol=1e-14)
+            # Compare without squeeze to handle subdomains with size-1 dimensions
+            assert_allclose(real_field.p[0, ...], original, atol=1e-14)
 
     def test_non_power_of_two_grid(self, comm):
         """Test FFT with non-power-of-two grid sizes."""

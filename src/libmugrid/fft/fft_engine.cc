@@ -125,15 +125,18 @@ FFTEngine::FFTEngine(const IntCoord_t & nb_domain_grid_pts,
   Index_t local_fy, offset_fy;
   Index_t local_fz = 1, offset_fz = 0;
 
-  // X is distributed across P1 in Fourier space
-  distribute_dimension(this->nb_fourier_grid_pts[0], this->proc_grid_p1,
-                       this->proc_coord_p1, local_fx, offset_fx);
-
-  // Y is distributed across P2 in Fourier space (same as real space)
-  distribute_dimension(nb_domain_grid_pts[1], this->proc_grid_p2,
-                       this->proc_coord_p2, local_fy, offset_fy);
-
-  if (spatial_dim == 3) {
+  if (spatial_dim == 2) {
+    // 2D: After transpose, X is distributed across P2, Y is full
+    distribute_dimension(this->nb_fourier_grid_pts[0], this->proc_grid_p2,
+                         this->proc_coord_p2, local_fx, offset_fx);
+    local_fy = nb_domain_grid_pts[1];  // Full Y
+    offset_fy = 0;
+  } else {
+    // 3D: X distributed across P1, Y distributed across P2
+    distribute_dimension(this->nb_fourier_grid_pts[0], this->proc_grid_p1,
+                         this->proc_coord_p1, local_fx, offset_fx);
+    distribute_dimension(nb_domain_grid_pts[1], this->proc_grid_p2,
+                         this->proc_coord_p2, local_fy, offset_fy);
     // Z is fully local in Fourier space (X-pencils)
     local_fz = nb_domain_grid_pts[2];
     offset_fz = 0;
@@ -255,11 +258,14 @@ void FFTEngine::initialise_fft() {
   } else {
     // 2D case: simpler, just one transpose
 #ifdef WITH_MPI
-    // Only create transpose if we have multiple ranks that need data exchange
-    if (this->col_comm.size() > 1) {
+    // For 2D, use row_comm (ranks with same P1 coordinate) to transpose Y↔X
+    // With process grid (1, P2), all ranks have P1=0, so row_comm contains all ranks
+    if (this->row_comm.size() > 1) {
+      // global_in = Ny (distributed in input, becomes local in output)
+      // global_out = Fx (local in input, becomes distributed in output)
       this->transpose_xz = std::make_unique<PencilTranspose>(
-          this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
-          this->nb_fourier_grid_pts[0], nb_grid_pts[1], 1, 0);
+          this->row_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
+          nb_grid_pts[1], this->nb_fourier_grid_pts[0], 1, 0);
     }
 #endif
   }
