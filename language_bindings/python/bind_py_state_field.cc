@@ -39,10 +39,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "libmugrid/state_field.hh"
-#include "libmugrid/field.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_collection.hh"
+#include "field/state_field.hh"
+#include "field/field.hh"
+#include "field/field_typed.hh"
+#include "collection/field_collection.hh"
 
 using muGrid::StateField;
 using muGrid::Field;

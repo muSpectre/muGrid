@@ -41,11 +41,11 @@
 
 #include "io_mpi_test_file_io.hh"
 
-#include "libmugrid/file_io_netcdf.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_map_static.hh"
-#include "libmugrid/grid_common.hh"
+#include "io/file_io_netcdf.hh"
+#include "collection/field_collection_global.hh"
+#include "field/field_typed.hh"
+#include "field/field_map_static.hh"
+#include "core/coordinates.hh"
 
 using muGrid::operator<<;
 
@@ -53,7 +53,10 @@ namespace muGrid {
   BOOST_AUTO_TEST_SUITE(file_io_netcdf);
 
   BOOST_FIXTURE_TEST_CASE(FileIONetCDFCWrite, FileIOFixture) {
-    const std::string file_name{"test_parallel_file.nc"};
+    // Use unique filename based on MPI size to avoid race conditions when
+    // tests run in parallel with different process counts
+    const std::string file_name{"test_parallel_file_np" +
+                                std::to_string(this->comm.size()) + ".nc"};
     remove(file_name.c_str());  // remove test_file if it already exists
 
     // fill the fields with values
@@ -121,8 +124,9 @@ namespace muGrid {
   };
 
   BOOST_FIXTURE_TEST_CASE(FileIONetCDFRead, FileIOFixture) {
-    // test reading of NetCDF file "test_file.nc"
-    const std::string file_name{"test_parallel_file.nc"};
+    // test reading of NetCDF file (use unique filename based on MPI size)
+    const std::string file_name{"test_parallel_file_np" +
+                                std::to_string(this->comm.size()) + ".nc"};
     auto open_mode_r = muGrid::FileIOBase::OpenMode::Read;
     MPI_Offset frame{0};
     FileIONetCDF file_io_netcdf_r(file_name, open_mode_r, this->comm);
@@ -216,8 +220,9 @@ namespace muGrid {
     }
     */
 
-    // test appending of NetCDF file "test_parallel_file.nc"
-    const std::string file_name{"test_parallel_file.nc"};
+    // test appending of NetCDF file (use unique filename based on MPI size)
+    const std::string file_name{"test_parallel_file_np" +
+                                std::to_string(this->comm.size()) + ".nc"};
     auto open_mode_a = muGrid::FileIOBase::OpenMode::Append;
     FileIONetCDF file_io_netcdf_a(file_name, open_mode_a, this->comm);
     file_io_netcdf_a.register_field_collection(this->global_fc);

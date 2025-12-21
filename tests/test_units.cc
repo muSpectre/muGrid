@@ -36,8 +36,8 @@
 #include "tests.hh"
 #include "test_goodies.hh"
 
-#include "libmugrid/units.hh"
-#include "libmugrid/iterators.hh"
+#include "core/units.hh"
+#include "grid/iterators.hh"
 
 #include <map>
 

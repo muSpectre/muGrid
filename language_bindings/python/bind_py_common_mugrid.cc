@@ -39,13 +39,16 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "libmugrid/ccoord_operations.hh"
-#include "libmugrid/units.hh"
+#include "grid/index_ops.hh"
+#include "grid/pixels.hh"
+#include "core/units.hh"
+#include "core/enums.hh"
+#include "core/version.hh"
 
 using muGrid::DynCcoord;
+using muGrid::fourD;
 using muGrid::Index_t;
 using muGrid::Real;
-using muGrid::threeD;
 using muGrid::Verbosity;
 using pybind11::literals::operator""_a;
 
@@ -188,13 +191,73 @@ void add_unit(py::module & mod) {
         .def("amount", &muGrid::Unit::amount);
 }
 
+// Helper to stringify macro values
+#define MUGRID_STRINGIFY_HELPER(x) #x
+#define MUGRID_STRINGIFY(x) MUGRID_STRINGIFY_HELPER(x)
+
+void add_feature_flags(py::module & mod) {
+    // CUDA support
+#ifdef MUGRID_ENABLE_CUDA
+    mod.attr("has_cuda") = true;
+#else
+    mod.attr("has_cuda") = false;
+#endif
+
+    // ROCm/HIP support
+#ifdef MUGRID_ENABLE_HIP
+    mod.attr("has_rocm") = true;
+#else
+    mod.attr("has_rocm") = false;
+#endif
+
+    // Any GPU backend available
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    mod.attr("has_gpu") = true;
+#else
+    mod.attr("has_gpu") = false;
+#endif
+
+    // NetCDF I/O support
+#ifdef WITH_NETCDF_IO
+    mod.attr("has_netcdf") = true;
+#else
+    mod.attr("has_netcdf") = false;
+#endif
+
+    // Host architecture detection
+#if defined(__x86_64__) || defined(_M_X64)
+    mod.attr("host_arch") = "x86_64";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    mod.attr("host_arch") = "arm64";
+#elif defined(__i386__) || defined(_M_IX86)
+    mod.attr("host_arch") = "x86";
+#elif defined(__arm__) || defined(_M_ARM)
+    mod.attr("host_arch") = "arm";
+#elif defined(__powerpc64__)
+    mod.attr("host_arch") = "ppc64";
+#elif defined(__powerpc__)
+    mod.attr("host_arch") = "ppc";
+#else
+    mod.attr("host_arch") = "unknown";
+#endif
+
+    // Device architecture (passed from CMake at compile time)
+#ifdef MUGRID_DEVICE_ARCH
+    mod.attr("device_arch") = MUGRID_STRINGIFY(MUGRID_DEVICE_ARCH);
+#else
+    mod.attr("device_arch") = "";
+#endif
+}
+
 void add_common_mugrid(py::module & mod) {
     add_version(mod);
 
     add_enums(mod);
 
-    add_dyn_ccoord_helper<threeD, Index_t>(mod, "DynCcoord");
-    add_dyn_ccoord_helper<threeD, Real>(mod, "DynRcoord");
+    add_feature_flags(mod);
+
+    add_dyn_ccoord_helper<fourD, Index_t>(mod, "DynCcoord");
+    add_dyn_ccoord_helper<fourD, Real>(mod, "DynRcoord");
 
     add_get_cube(mod);
 

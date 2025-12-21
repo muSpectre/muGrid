@@ -20,8 +20,8 @@ jobs:
       matrix:
         mpi: [ 'no', 'yes' ]
         compiler: [ 'gcc', 'clang' ]
-        python-version: [ '3.9', '3.14' ]
-        numpy-version: [ '>=2.0.0' ]
+        python-version: [ '3.10', '3.14' ]
+        numpy-version: [ '>=2.1.0' ]
         mpi4py-version: [ '==4.0.3' ]
         exclude:
           - mpi: 'yes'
@@ -51,11 +51,13 @@ jobs:
           pip install -v "numpy${{ matrix.numpy-version }}"
           if [ "${{ matrix.mpi }}" == "yes" ]; then
             sudo apt-get install -y \
+              cmake \
               ninja-build \
               libboost-test-dev \
               openmpi-bin \
               libopenmpi-dev \
-              libpnetcdf-dev
+              libpnetcdf-dev \
+              libnetcdf-dev
             # Install mpi4py
             echo "Installing mpi4py${{ matrix.mpi4py-version }}"
             CC=mpicc python3 -m pip install -v \
@@ -63,29 +65,31 @@ jobs:
               "mpi4py${{ matrix.mpi4py-version }}"
           else
             sudo apt-get install -y \
+              cmake \
               ninja-build \
               libboost-test-dev \
               libnetcdf-dev
           fi
-          python3 -m pip install build meson pytest NuMPI[test]
+          python3 -m pip install build pytest numpy NuMPI[test] netCDF4
           python3 -m pip list
 
-      - name: Compile with Meson
+      - name: Compile with CMake
         run: |
           if [ "${{ matrix.compiler }}" == "clang" ]; then
             export CC=clang
             export CXX=clang++
           fi
           source venv/bin/activate
-          meson setup builddir
-          cd builddir
-          meson compile
+          # Explicitly tell CMake to use the venv Python so pytest is found
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE=$(which python3)
+          cd build
+          cmake --build .
 
       - name: Run tests
         run: |
           source venv/bin/activate
-          cd builddir
-          meson test -v
+          cd build
+          ctest --output-on-failure
 
       - name: Test installation of Python extension module
         run: |

@@ -35,9 +35,9 @@
 
 #include "tests.hh"
 #include "test_goodies.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_collection_local.hh"
-#include "libmugrid/field_collection_global.hh"
+#include "field/field_typed.hh"
+#include "collection/field_collection_local.hh"
+#include "collection/field_collection_global.hh"
 
 namespace muGrid {
 
@@ -89,7 +89,8 @@ namespace muGrid {
     FC_t fc{SDim};
     fc.set_nb_sub_pts("quad", OneQuadPt);
 
-    auto & field{fc.register_real_field("TensorField 1", MDim * MDim, "quad")};
+    auto & field{dynamic_cast<RealField &>(
+        fc.register_real_field("TensorField 1", MDim * MDim, "quad"))};
 
     constexpr Index_t len{2};
     fc.initialise(CcoordOps::get_cube<SDim>(len),
@@ -124,14 +125,16 @@ namespace muGrid {
                   CcoordOps::get_cube<SDim>(Len), {});
     Shape_t component_shape{MDim, MDim};
 
-    auto & field{fc.register_real_field(field_name, component_shape, quad_tag)};
-    auto & copy{fc.register_real_field(copy_name, component_shape, quad_tag)};
+    auto & field{dynamic_cast<RealField &>(
+        fc.register_real_field(field_name, component_shape, quad_tag))};
+    auto & copy{dynamic_cast<RealField &>(
+        fc.register_real_field(copy_name, component_shape, quad_tag))};
     auto detached{fc.template detached_field<Real>(detached_name,
                                                    component_shape, quad_tag)};
 
     field.eigen_vec().setRandom();
     copy = field;
-    *detached = field;
+    dynamic_cast<RealField &>(*detached) = field;
 
     BOOST_TEST_CHECKPOINT("after copies");
     BOOST_CHECK(fc.field_exists(field_name));
@@ -143,7 +146,8 @@ namespace muGrid {
     auto && error{
         testGoodies::rel_error(free_field.eigen_vec(), copy.eigen_vec())};
     BOOST_CHECK_EQUAL(error, 0.);
-    error = testGoodies::rel_error(detached->eigen_vec(), copy.eigen_vec());
+    error = testGoodies::rel_error(
+        dynamic_cast<RealField &>(*detached).eigen_vec(), copy.eigen_vec());
     BOOST_CHECK_EQUAL(error, 0.);
   }
 
@@ -264,9 +268,10 @@ namespace muGrid {
     static const std::string nodal{"nodal"};
     LocalFieldCollection fc{Unknown};
     constexpr Dim_t NbComponents{3}, NbQuadPts{4};
-    auto & scalar_field{fc.register_field<Real>("scalar_field", 1, quad)};
-    auto & vector_field{
-        fc.register_field<Real>("vector_field", NbComponents, quad)};
+    auto & scalar_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("scalar_field", 1, quad))};
+    auto & vector_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("vector_field", NbComponents, quad))};
     const bool is_same_type{scalar_field.get_typeid() == typeid(Real)};
     BOOST_CHECK(is_same_type);
 
@@ -300,9 +305,10 @@ namespace muGrid {
     GlobalFieldCollection fc{twoD};
     const std::string quad{"quad"};
     constexpr Dim_t NbComponents{3};
-    auto & scalar_field{fc.register_field<Real>("scalar_field", 1, quad)};
-    auto & vector_field{
-        fc.register_field<Real>("vector_field", NbComponents, quad)};
+    auto & scalar_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("scalar_field", 1, quad))};
+    auto & vector_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("vector_field", NbComponents, quad))};
 
     BOOST_CHECK_THROW(scalar_field.push_back(3.7), FieldError);
     Eigen::Matrix<Real, NbComponents, 1> vector_mat{};
@@ -313,10 +319,10 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE(set_zero, LocalFieldBasicFixture) {
     constexpr Dim_t NbSubPts{3}, NbComponents{4};
     fc.set_nb_sub_pts(SubDivision(), NbSubPts);
-    auto & scalar_field{
-        fc.register_field<Real>("scalar_field", 1, SubDivision())};
-    auto & vector_field{
-        fc.register_field<Real>("vector_field", NbComponents, SubDivision())};
+    auto & scalar_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("scalar_field", 1, SubDivision()))};
+    auto & vector_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("vector_field", NbComponents, SubDivision()))};
     scalar_field.push_back(1);
     vector_field.push_back(Eigen::Array<Real, NbComponents, 1>::Ones());
     fc.add_pixel(24);
@@ -353,8 +359,8 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE(eigen_maps, LocalFieldBasicFixture) {
     constexpr Dim_t NbSubPts{2}, NbComponents{3};
     fc.set_nb_sub_pts(SubDivision(), NbSubPts);
-    auto & vector_field{
-        fc.register_field<Real>("vector_field", NbComponents, SubDivision())};
+    auto & vector_field{dynamic_cast<TypedField<Real> &>(
+        fc.register_field<Real>("vector_field", NbComponents, SubDivision()))};
     const auto & cvector_field{vector_field};
     fc.add_pixel(0);
     fc.add_pixel(1);

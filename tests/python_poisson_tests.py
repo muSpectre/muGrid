@@ -37,6 +37,7 @@ import numpy as np
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
+from muGrid import real_field, wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 
@@ -50,13 +51,13 @@ def test_fd_stencil():
 
     nb_ghosts = (1, 1)
     fc = muGrid.GlobalFieldCollection([3, 3], nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts)
-    ifield = fc.real_field("input-field")
-    ofield = fc.real_field("output-field")
+    ifield = real_field(fc, "input-field")
+    ofield = real_field(fc, "output-field")
     ifield.p[...] = 1
     ifield.p[1, 1] = 2
     # Manually correct a periodic boundary
-    ifield.pg = np.pad(ifield.p, tuple(zip(nb_ghosts, nb_ghosts)), mode="wrap")
-    laplace.apply(ifield, ofield)
+    ifield.pg[...] = np.pad(ifield.p, tuple(zip(nb_ghosts, nb_ghosts)), mode="wrap")
+    laplace.apply(ifield._cpp, ofield._cpp)
     np.testing.assert_allclose(ofield.p, stencil)
     np.testing.assert_allclose(np.sum(ifield.p * ofield.p), -4)
 
@@ -80,16 +81,11 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     # np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
 
     x, y = decomposition.coords  # Domain-local coords for each pixel
-    # x, y = np.meshgrid(
-    #     np.arange(nb_grid_pts[0]) / nb_grid_pts[0],
-    #     np.arange(nb_grid_pts[1]) / nb_grid_pts[1],
-    #     indexing="ij",
-    # )
 
-    rhs = fc.real_field("rhs")
-    solution = fc.real_field("solution")
+    rhs = real_field(decomposition, "rhs")
+    solution = real_field(decomposition, "solution")
 
-    rhs.p = np.sin(2 * np.pi * x)
+    rhs.p[...] = np.sin(2 * np.pi * x)
 
     def callback(it, x, r, p):
         """
@@ -97,25 +93,26 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         """
         print(it, np.dot(r.ravel(), r.ravel()))
 
-    def hessp(x, Ax):
+    def hessp(x_field, Ax_field):
         """
         Function to compute the product of the Hessian matrix with a vector.
         The Hessian is represented by the convolution operator.
         """
-        decomposition.communicate_ghosts(x)
-        laplace.apply(x, Ax)
+        decomposition.communicate_ghosts(x_field)
+        laplace.apply(x_field, Ax_field)
         # We need the minus sign because the Laplace operator is negative
         # definite, but the conjugate-gradients solver assumes a
         # positive-definite operator.
-        Ax.s /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-        return Ax
+        Ax = wrap_field(Ax_field)
+        Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        return Ax_field
 
     conjugate_gradients(
         comm,
         fc,
         hessp,  # linear operator
-        rhs,
-        solution,
+        rhs._cpp,
+        solution._cpp,
         tol=1e-6,
         callback=callback,
         maxiter=10,
@@ -151,11 +148,13 @@ def test_unit_impulse(comm, ):
     gradient_op = muGrid.ConvolutionOperator([0, 0], gradient)
 
     # Get nodal field
-    nodal_field = fc.real_field("nodal-field", (1,), "nodal_points")
-    impuls_response_field = fc.real_field("impuls_response_field", (1,), "nodal_points")
+    nodal_field_cpp = fc.real_field("nodal-field", (1,), "nodal_points")
+    impuls_response_field_cpp = fc.real_field("impuls_response_field", (1,), "nodal_points")
+    nodal_field = wrap_field(nodal_field_cpp)
+    impuls_response_field = wrap_field(impuls_response_field_cpp)
 
     # Get quadrature field of shape (2, quad, nx, ny)
-    quad_field = fc.real_field("quad-field", (2,), "quad_points")
+    quad_field_cpp = fc.real_field("quad-field", (2,), "quad_points")
 
     # set up impulse
     impuls_locations = (impuls_response_field.icoordsg[0] == 0) & (impuls_response_field.icoordsg[1] == 0)
@@ -172,22 +171,22 @@ def test_unit_impulse(comm, ):
     impuls_response_field.sg[0, 0, top_location] = -1
     impuls_response_field.sg[0, 0, bottom_location] = -1
 
-    decomposition.communicate_ghosts(nodal_field)
+    decomposition.communicate_ghosts(nodal_field_cpp)
     print(f'unit impuls: nodal field with buffers in rank {comm.rank} \n ' + f'{nodal_field.sg}')
     print(f'impuls_response_field: nodal field with buffers in rank {comm.rank} \n ' + f'{impuls_response_field.sg}')
 
     # Apply the gradient operator to the nodal field and write result to the quad field
-    gradient_op.apply(nodal_field, quad_field)
+    gradient_op.apply(nodal_field_cpp, quad_field_cpp)
 
-    decomposition.communicate_ghosts(quad_field)
+    decomposition.communicate_ghosts(quad_field_cpp)
 
     # Apply the gradient transposed operator to the quad field and write result to the nodal field
-    gradient_op.transpose(quadrature_point_field=quad_field,
-                          nodal_field=nodal_field,
+    gradient_op.transpose(quadrature_point_field=quad_field_cpp,
+                          nodal_field=nodal_field_cpp,
                           weights=[1 / 2, 1 / 2]  # size of the element is half of the pixel. Pixel size is 1
                           )
 
-    decomposition.communicate_ghosts(nodal_field)
+    decomposition.communicate_ghosts(nodal_field_cpp)
     print(f'computed unit impuls response: nodal field with buffers in rank {comm.rank} \n ' + f'{nodal_field.sg}')
 
     print(f'local sum on core (nodal_field.s) = {np.sum(nodal_field.s)}')  # does not have to be zero

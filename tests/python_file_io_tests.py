@@ -48,8 +48,11 @@ import time
 import numpy as np
 import pytest
 
+# Check if muGrid was built with NetCDF support
+HAS_MUGRID_NETCDF = hasattr(muGrid, 'OpenMode')
+
 pytestmark = pytest.mark.skipif(
-    not muGrid.has_mpi, reason="muGrid has no OpenMode in serial build"
+    not HAS_MUGRID_NETCDF, reason="muGrid built without NetCDF support"
 )
 
 
@@ -69,9 +72,9 @@ class FileIOTest(unittest.TestCase):
 
         # global field collection
         self.fc_glob = muGrid.GlobalFieldCollection(
-            len(self.nb_domain_grid_pts),
+            self.nb_domain_grid_pts,
+            nb_subdomain_grid_pts=self.nb_subdomain_grid_pts
         )
-        self.fc_glob.initialise(self.nb_domain_grid_pts, self.nb_subdomain_grid_pts)
 
         # local field collection
         self.local_pixels = [2, 15, 9, 7, 3]
@@ -96,7 +99,7 @@ class FileIOTest(unittest.TestCase):
         glob_field_name = "global-test-field"
         loc_field_name = "local-test-field"
         f_glob = self.fc_glob.register_real_field(glob_field_name, 1, "pixel")
-        a_glob = np.array(f_glob, copy=False)
+        a_glob = np.from_dlpack(f_glob)
         # set seed to reproduce random numbers for read test
         np.random.seed(12345)
         a_glob[:] = np.random.random(self.nb_domain_grid_pts)
@@ -104,7 +107,7 @@ class FileIOTest(unittest.TestCase):
         file_io_object.register_field_collection(self.fc_glob)
 
         f_loc = self.fc_loc.register_real_field(loc_field_name, 1, "pixel")
-        a_loc = np.array(f_loc, copy=False)
+        a_loc = np.from_dlpack(f_loc)
         # set seed to reproduce random numbers for read test
         np.random.seed(98765)
         a_loc[:] = np.random.random(len(self.local_pixels))
@@ -185,7 +188,7 @@ class FileIOTest(unittest.TestCase):
         # iterate over state field where only the current field has write access
         for i in range(sf_glob.get_nb_memory() + 1):
             f_glob = sf_glob.current()
-            a_glob = np.array(f_glob, copy=False)
+            a_glob = np.from_dlpack(f_glob)
             a_glob[:] = i + 1
             sf_glob.cycle()
         # bring field in the correct order
@@ -197,7 +200,7 @@ class FileIOTest(unittest.TestCase):
         # iterate over state field where only the current field has write access
         for i in range(sf_loc.get_nb_memory() + 1):
             f_loc = sf_loc.current()
-            a_loc = np.array(f_loc, copy=False)
+            a_loc = np.from_dlpack(f_loc)
             a_loc[:] = 2 * i + 1
             sf_loc.cycle()
         # bring field in the correct order
@@ -216,12 +219,12 @@ class FileIOTest(unittest.TestCase):
         file_io_object.read(0, [glob_prefix, loc_prefix])
         for i in range(sf_glob.get_nb_memory() + 1):
             f_glob = sf_glob.old(i)
-            a_glob = np.array(f_glob, copy=False)
+            a_glob = np.from_dlpack(f_glob)
             ref = sf_glob.get_nb_memory() + 1 - i
             self.assertTrue((a_glob == ref).all(), str(a_glob) + " != " + str(ref))
         for i in range(sf_loc.get_nb_memory() + 1):
             f_loc = sf_loc.old(i)
-            a_loc = np.array(f_loc, copy=False)
+            a_loc = np.from_dlpack(f_loc)
             ref = 0
             self.assertTrue((a_loc == ref).all(), str(a_loc) + " != " + str(ref))
 
@@ -229,12 +232,12 @@ class FileIOTest(unittest.TestCase):
         file_io_object.read(1)
         for i in range(sf_glob.get_nb_memory() + 1):
             f_glob = sf_glob.old(i)
-            a_glob = np.array(f_glob, copy=False)
+            a_glob = np.from_dlpack(f_glob)
             ref = 0
             self.assertTrue((a_glob == ref).all(), str(a_glob) + " != " + str(ref))
         for i in range(sf_loc.get_nb_memory() + 1):
             f_loc = sf_loc.old(i)
-            a_loc = np.array(f_loc, copy=False)
+            a_loc = np.from_dlpack(f_loc)
             ref = 2 * (sf_loc.get_nb_memory() - i) + 1
             self.assertTrue((a_loc == ref).all(), str(a_loc) + " != " + str(ref))
 

@@ -34,9 +34,9 @@
  */
 
 #include "tests.hh"
-#include "libmugrid/state_field.hh"
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_collection_local.hh"
+#include "field/state_field.hh"
+#include "field/field_typed.hh"
+#include "collection/field_collection_local.hh"
 
 namespace muGrid {
 

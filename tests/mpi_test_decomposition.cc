@@ -1,11 +1,11 @@
 #include "mpi_context.hh"
 #include "tests.hh"
 
-#include "libmugrid/field_typed.hh"
-#include "libmugrid/field_map.hh"
-#include "libmugrid/ccoord_operations.hh"
-#include "libmugrid/communicator.hh"
-#include "libmugrid/cartesian_decomposition.hh"
+#include "field/field_typed.hh"
+#include "field/field_map.hh"
+#include "grid/index_ops.hh"
+#include "mpi/communicator.hh"
+#include "mpi/cartesian_decomposition.hh"
 
 namespace muGrid {
   BOOST_AUTO_TEST_SUITE(mpi_decomposition_test);
@@ -81,7 +81,8 @@ namespace muGrid {
     auto & collection{cart_decomp.get_collection()};
     const Index_t nb_components{1};
     const std::string field_name{"test_field"};
-    auto & field{collection.real_field(field_name, nb_components)};
+    auto & field{dynamic_cast<TypedFieldBase<Real, HostSpace> &>(
+        collection.real_field(field_name, nb_components))};
 
     // Fill the field with some values
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
@@ -190,7 +191,8 @@ namespace muGrid {
     auto & collection{cart_decomp.get_collection()};
     const Index_t nb_components{1};
     const std::string field_name{"multi_step_test_field"};
-    auto & field{collection.real_field(field_name, nb_components)};
+    auto & field{dynamic_cast<TypedFieldBase<Real, HostSpace> &>(
+        collection.real_field(field_name, nb_components))};
 
     // Fill the field with reference values
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};
@@ -296,7 +298,8 @@ namespace muGrid {
     auto & collection{cart_decomp.get_collection()};
     const Index_t nb_components{1};
     const std::string field_name{"zero_grid_points_field"};
-    auto & field{collection.real_field(field_name, nb_components)};
+    auto & field{dynamic_cast<TypedFieldBase<Real, HostSpace> &>(
+        collection.real_field(field_name, nb_components))};
 
     // Fill the field
     auto subdomain_locations{cart_decomp.get_subdomain_locations_with_ghosts()};

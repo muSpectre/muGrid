@@ -33,11 +33,11 @@
  *
  */
 
-#include "libmugrid/file_io_base.hh"
+#include "io/file_io_base.hh"
 #ifdef WITH_NETCDF_IO
-#include "libmugrid/file_io_netcdf.hh"
+#include "io/file_io_netcdf.hh"
 #endif
-#include "libmugrid/communicator.hh"
+#include "mpi/communicator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -230,27 +230,22 @@ void add_file_io_netcdf(py::module & mod) {
                   file_io_object.read_global_attribute(g_att_name)
                       .get_typed_value_c()};
               return py::cast(std::string(char_vec.begin(), char_vec.end()));
-              break;
             }
             case muGrid::MU_NC_INT: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_i());
-              break;
             }
             case muGrid::MU_NC_UINT: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_ui());
-              break;
             }
             case muGrid::MU_NC_INDEX_T: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_l());
-              break;
             }
             case muGrid::MU_NC_REAL: {
               return py::cast(file_io_object.read_global_attribute(g_att_name)
                                   .get_typed_value_d());
-              break;
             }
             default:
               throw muGrid::FileIOError(

@@ -38,7 +38,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "libmugrid/communicator.hh"
+#include "mpi/communicator.hh"
 
 namespace muGrid {
 #ifdef WITH_MPI
@@ -54,9 +54,11 @@ namespace muGrid {
     }
 
    private:
-    MPIContext() : comm(Communicator(MPI_COMM_WORLD)) {
+    MPIContext() : comm() {
+      // MPI_Init must be called before creating a Communicator with MPI_COMM_WORLD
       MPI_Init(&boost::unit_test::framework::master_test_suite().argc,
                &boost::unit_test::framework::master_test_suite().argv);
+      comm = Communicator(MPI_COMM_WORLD);
     }
     ~MPIContext() {
       // Wait for all processes to finish before calling finalize.

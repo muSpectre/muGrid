@@ -1,12 +1,14 @@
 #include "bind_py_declarations.hh"
 
-#include "libmugrid/decomposition.hh"
-#include "libmugrid/cartesian_decomposition.hh"
-#include "libmugrid/field.hh"
-#include "libmugrid/python_helpers.hh"
+#include "mpi/decomposition.hh"
+#include "mpi/cartesian_decomposition.hh"
+#include "field/field.hh"
+#include "collection/field_collection.hh"
+#include "util/python_helpers.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
+#include <pybind11/stl.h>
 
 using muGrid::Decomposition;
 using muGrid::CartesianDecomposition;
@@ -60,13 +62,18 @@ void add_decomposition(py::module & mod) {
 
 // Bind class Cartesian Decomposition
 void add_cartesian_decomposition(py::module & mod) {
+    using MemoryLocation = muGrid::FieldCollection::MemoryLocation;
     py::class_<CartesianDecomposition, Decomposition>(mod,
                                                       "CartesianDecomposition")
         .def(py::init<const Communicator &, const IntCoord_t &,
                       const IntCoord_t &, const IntCoord_t &,
-                      const IntCoord_t &>(),
+                      const IntCoord_t &,
+                      const muGrid::FieldCollection::SubPtMap_t &,
+                      MemoryLocation>(),
              "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
-             "nb_ghosts_left"_a, "nb_ghosts_right"_a)
+             "nb_ghosts_left"_a, "nb_ghosts_right"_a,
+             "sub_pts"_a = muGrid::FieldCollection::SubPtMap_t{},
+             "memory_location"_a = MemoryLocation::Host)
         .def_property_readonly(
             "collection",
             py::overload_cast<>(&CartesianDecomposition::get_collection,
@@ -102,7 +109,11 @@ void add_cartesian_decomposition(py::module & mod) {
         .def_property_readonly("icoordsg",
                                [](const CartesianDecomposition & self) {
                                    return py_coords<Int, true>(self);
-                               });
+                               })
+        .def_property_readonly("is_on_device",
+                               &CartesianDecomposition::is_on_device)
+        .def_property_readonly("memory_location",
+                               &CartesianDecomposition::get_memory_location);
 }
 
 // Combined binding function

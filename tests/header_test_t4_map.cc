@@ -37,7 +37,7 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <boost/mpl/list.hpp>
-#include "libmugrid/T4_map_proxy.hh"
+#include "util/T4_map_proxy.hh"
 #include "tests.hh"
 #include "test_goodies.hh"
 

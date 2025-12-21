@@ -38,11 +38,11 @@
 
 #include "mpi_context.hh"
 
-#include "libmugrid/field_collection_local.hh"
-#include "libmugrid/field_collection_global.hh"
-#include "libmugrid/field_map_static.hh"
+#include "collection/field_collection_local.hh"
+#include "collection/field_collection_global.hh"
+#include "field/field_map_static.hh"
 
-#include "libmugrid/communicator.hh"
+#include "mpi/communicator.hh"
 
 namespace muGrid {
   struct FileIOFixture {
@@ -52,14 +52,19 @@ namespace muGrid {
           nb_sub_pts_local{{this->quad, 3}},
           local_fc{this->spatial_dimension, "local_FC", this->nb_sub_pts_local},
           names{"T4_test_field", "T2_test_field", "T1_int_field"},
-          t4_field{this->global_fc.register_real_field(
-              names[0], muGrid::ipow(this->spatial_dimension, 4), this->quad)},
+          t4_field{dynamic_cast<muGrid::TypedField<Real> &>(
+              this->global_fc.register_real_field(
+                  names[0], muGrid::ipow(this->spatial_dimension, 4),
+                  this->quad))},
           t4_field_map{this->t4_field},
-          t2_field{this->global_fc.register_real_field(
-              names[1], muGrid::ipow(this->spatial_dimension, 2))},
+          t2_field{dynamic_cast<muGrid::TypedField<Real> &>(
+              this->global_fc.register_real_field(
+                  names[1], muGrid::ipow(this->spatial_dimension, 2)))},
           t2_field_map{this->t2_field},
-          t1_field{this->local_fc.register_field<int>(
-              names[2], muGrid::ipow(this->spatial_dimension, 1), this->quad)},
+          t1_field{dynamic_cast<muGrid::TypedField<int> &>(
+              this->local_fc.register_field<int>(
+                  names[2], muGrid::ipow(this->spatial_dimension, 1),
+                  this->quad))},
           t1_field_map{this->t1_field} {
       // add some pixels to the local field collection
       for (size_t index = 2; index < 7; index++) {
@@ -119,11 +124,14 @@ namespace muGrid {
           global_fc{this->nb_domain_grid_pts, this->nb_subdomain_grid_pts,
                     this->subdomain_locations, this->nb_sub_pts},
           names{"T1", "T2"},
-          t1_f{this->global_fc.register_real_field(
-              names[0], muGrid::ipow(this->spatial_dimension, 1), this->pixel)},
+          t1_f{dynamic_cast<muGrid::TypedField<Real> &>(
+              this->global_fc.register_real_field(
+                  names[0], muGrid::ipow(this->spatial_dimension, 1),
+                  this->pixel))},
           t1_f_map{this->t1_f},
-          t2_f{this->global_fc.register_real_field(
-              names[1], muGrid::ipow(this->spatial_dimension, 2))},
+          t2_f{dynamic_cast<muGrid::TypedField<Real> &>(
+              this->global_fc.register_real_field(
+                  names[1], muGrid::ipow(this->spatial_dimension, 2)))},
           t2_f_map{this->t2_f} {}
 
     Communicator comm{MPIContext::get_context().comm};

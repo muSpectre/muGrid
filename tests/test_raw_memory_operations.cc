@@ -36,7 +36,7 @@
 #include "tests.hh"
 #include "test_goodies.hh"
 
-#include "libmugrid/raw_memory_operations.hh"
+#include "util/raw_memory_operations.hh"
 
 #include <vector>
 

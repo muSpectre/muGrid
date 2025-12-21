@@ -11,6 +11,8 @@
    Summary
    GettingStarted
    Python
+   FFT
+   GPU
    Cplusplus
    CodingConvention
    CplusplusAPI
