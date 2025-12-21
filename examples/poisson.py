@@ -53,6 +53,12 @@ parser.add_argument(
     help="Maximum number of CG iterations (default: 1000)"
 )
 
+parser.add_argument(
+    "-p", "--plot",
+    action="store_true",
+    help="Show plot of RHS and solution (default: off)"
+)
+
 args = parser.parse_args()
 
 if args.memory == "host":
@@ -116,8 +122,14 @@ conjugate_gradients(
 elapsed_time = time.perf_counter() - start_time
 print(f"CG solver completed in {elapsed_time:.4f} seconds")
 
-if plt is not None:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-    ax1.imshow(rhs.p)
-    ax2.imshow(solution.p)
-    plt.show()
+if args.plot:
+    if plt is None:
+        print("Warning: matplotlib not available, cannot show plot")
+    else:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        ax1.imshow(rhs.p)
+        ax1.set_title("RHS")
+        ax2.imshow(solution.p)
+        ax2.set_title("Solution")
+        plt.tight_layout()
+        plt.show()
