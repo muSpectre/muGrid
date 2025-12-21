@@ -36,7 +36,8 @@
 #ifndef SRC_LIBMUGRID_FFT_FFT_UTILS_HH_
 #define SRC_LIBMUGRID_FFT_FFT_UTILS_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "core/coordinates.hh"
 
 #include <vector>
 

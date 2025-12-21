@@ -34,7 +34,8 @@
  *
  */
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "core/coordinates.hh"
 #include "core/exception.hh"
 
 #include <cstring>

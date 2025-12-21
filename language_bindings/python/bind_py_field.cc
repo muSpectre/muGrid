@@ -33,7 +33,7 @@
  *
  */
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "core/exception.hh"
 #include "field/field.hh"
 #include "field/field_map.hh"

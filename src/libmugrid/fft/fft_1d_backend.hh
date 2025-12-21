@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_FFT_FFT_1D_BACKEND_HH_
 #define SRC_LIBMUGRID_FFT_FFT_1D_BACKEND_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 
 #include <memory>
 

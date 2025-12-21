@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CPU_HH_
 #define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CPU_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "memory/array.hh"
 
 namespace muGrid {

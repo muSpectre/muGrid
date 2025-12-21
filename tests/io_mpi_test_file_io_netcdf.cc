@@ -45,7 +45,7 @@
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "field/field_map_static.hh"
-#include "core/grid_common.hh"
+#include "core/coordinates.hh"
 
 using muGrid::operator<<;
 

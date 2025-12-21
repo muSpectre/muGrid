@@ -36,11 +36,10 @@
 #ifndef SRC_LIBMUGRID_PYTHON_HELPERS_HH_
 #define SRC_LIBMUGRID_PYTHON_HELPERS_HH_
 
-#include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 
-#include "grid/ccoord_operations.hh"
-#include "core/grid_common.hh"
+#include "grid/index_ops.hh"
+#include "core/coordinates.hh"
 
 namespace py = pybind11;
 

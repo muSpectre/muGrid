@@ -39,7 +39,7 @@
 #ifdef MUGRID_ENABLE_HIP
 
 #include <hip/hip_runtime.h>
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "convolution_kernels_cpu.hh"  // For GridTraversalParams
 
 namespace muGrid {

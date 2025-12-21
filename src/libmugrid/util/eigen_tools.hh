@@ -36,30 +36,14 @@
 #ifndef SRC_LIBMUGRID_EIGEN_TOOLS_HH_
 #define SRC_LIBMUGRID_EIGEN_TOOLS_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "util/math.hh"
 
 #include "Eigen/Dense"
 
 #include <type_traits>
 
 namespace muGrid {
-
-  // compile-time square root
-  static constexpr Dim_t ct_sqrt(Dim_t res, Dim_t l, Dim_t r) {
-    if (l == r) {
-      return r;
-    } else {
-      const auto mid = (r + l) / 2;
-
-      if (mid * mid >= res) {
-        return ct_sqrt(res, l, mid);
-      } else {
-        return ct_sqrt(res, mid + 1, r);
-      }
-    }
-  }
-
-  static constexpr Dim_t ct_sqrt(Dim_t res) { return ct_sqrt(res, 1, res); }
 
   namespace EigenCheck {
     /**

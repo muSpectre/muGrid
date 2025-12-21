@@ -45,7 +45,9 @@
 #ifndef SRC_LIBMUGRID_FFT_DATATYPE_TRANSPOSE_HH_
 #define SRC_LIBMUGRID_FFT_DATATYPE_TRANSPOSE_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "core/enums.hh"
+#include "core/coordinates.hh"
 #include "mpi/communicator.hh"
 
 #include <vector>
@@ -55,14 +57,6 @@
 #endif
 
 namespace muGrid {
-
-/**
- * Memory layout for multi-component fields.
- */
-enum class MemoryLayout {
-  ArrayOfStructures,   //!< Components contiguous per point: [x0,y0,z0, x1,y1,z1, ...]
-  StructureOfArrays    //!< All values of one component contiguous: [x0,x1,..., y0,y1,...]
-};
 
 /**
  * Handles MPI transpose operations using derived datatypes.
@@ -100,7 +94,7 @@ class Transpose {
                     const IntCoord_t & local_out, Index_t global_in,
                     Index_t global_out, Index_t axis_in, Index_t axis_out,
                     Index_t nb_components = 1,
-                    MemoryLayout layout = MemoryLayout::ArrayOfStructures);
+                    StorageOrder layout = StorageOrder::ArrayOfStructures);
 
   Transpose() = delete;
   Transpose(const Transpose & other) = delete;
@@ -222,7 +216,7 @@ class Transpose {
   Index_t nb_components;
 
   //! Memory layout for multi-component fields
-  MemoryLayout layout;
+  StorageOrder layout;
 
   //! Distribution of global_in across ranks
   std::vector<Index_t> in_counts;

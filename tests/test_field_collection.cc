@@ -40,7 +40,7 @@
 #include "field/field_map_static.hh"
 #include "field/field_typed.hh"
 #include "grid/iterators.hh"
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
 
 #include "test_goodies.hh"
 

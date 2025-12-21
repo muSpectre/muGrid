@@ -37,7 +37,7 @@
 #ifndef SRC_LIBMUGRID_TENSOR_ALGEBRA_HH_
 #define SRC_LIBMUGRID_TENSOR_ALGEBRA_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "util/T4_map_proxy.hh"
 #include "util/eigen_tools.hh"
 

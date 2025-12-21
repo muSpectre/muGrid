@@ -36,9 +36,9 @@
 #ifndef SRC_LIBMUGRID_GRID_STRIDES_HH_
 #define SRC_LIBMUGRID_GRID_STRIDES_HH_
 
-#include "../core/types.hh"
-#include "../core/coordinates.hh"
-#include "../exception.hh"
+#include "core/types.hh"
+#include "core/coordinates.hh"
+#include "core/exception.hh"
 
 #include <utility>
 #include <numeric>
@@ -252,7 +252,7 @@ namespace muGrid {
             }
             // Forward declare - will be in index_ops.hh
             auto compute_volume = [](const T & lengths) {
-                typename std::remove_reference<decltype(lengths[0])>::type vol{};
+                typename std::remove_cv<typename std::remove_reference<decltype(lengths[0])>::type>::type vol{};
                 vol++;
                 for (auto && length : lengths) {
                     vol *= length;

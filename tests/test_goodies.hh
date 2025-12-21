@@ -36,7 +36,7 @@
 #ifndef TESTS_LIBMUGRID_TEST_GOODIES_HH_
 #define TESTS_LIBMUGRID_TEST_GOODIES_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "util/tensor_algebra.hh"
 #include <boost/mpl/list.hpp>
 

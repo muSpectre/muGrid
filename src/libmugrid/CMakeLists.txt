@@ -21,10 +21,11 @@ configure_file(
 set(MUGRID_SOURCES
     # core/
     core/exception.cc
-    core/grid_common.cc
+    core/enums.cc
     core/units.cc
     # grid/
-    grid/ccoord_operations.cc
+    grid/index_ops.cc
+    grid/pixels.cc
     # field/
     field/field.cc
     field/field_typed.cc

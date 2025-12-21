@@ -36,9 +36,12 @@
 #ifndef SRC_LIBMUGRID_FIELD_MAP_HH_
 #define SRC_LIBMUGRID_FIELD_MAP_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "core/enums.hh"
 #include "grid/iterators.hh"
 #include "collection/field_collection.hh"
+
+#include "Eigen/Dense"
 
 #include <cassert>
 #include <type_traits>

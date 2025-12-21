@@ -34,6 +34,7 @@
  */
 
 #include "collection/field_collection_global.hh"
+#include "util/math.hh"
 
 namespace muGrid {
     /* ---------------------------------------------------------------------- */

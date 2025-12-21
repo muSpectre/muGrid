@@ -1,11 +1,11 @@
 /**
- * @file   grid_common.cc
+ * @file   core/enums.cc
  *
  * @author Indre Joedicke <indre.joedicke@imtek.uni-freiburg.de>
  *
  * @date   17 Feb 2020
  *
- * @brief  Implementation of grid utilities
+ * @brief  Implementation of enum operators
  *
  * @section LICENSE
  *
@@ -35,7 +35,9 @@
  *
  */
 
-#include "core/grid_common.hh"
+#include "core/enums.hh"
+#include "exception.hh"
+
 namespace muGrid {
   /* ---------------------------------------------------------------------- */
   bool operator<(Verbosity v1, Verbosity v2) {

@@ -1,5 +1,5 @@
 /**
- * @file   ccoord_operations.cc
+ * @file   pixels.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
@@ -35,54 +35,11 @@
 #include <iostream>
 
 #include "core/exception.hh"
-#include "grid/ccoord_operations.hh"
+#include "grid/pixels.hh"
 
 namespace muGrid {
 
     namespace CcoordOps {
-
-        //------------------------------------------------------------------------//
-        Dim_t get_index(const IntCoord_t & nb_grid_pts,
-                        const IntCoord_t & locations,
-                        const IntCoord_t & ccoord) {
-            const Dim_t dim{nb_grid_pts.get_dim()};
-            if (locations.get_dim() != dim) {
-                std::stringstream error{};
-                error << "Dimension mismatch between nb_grid_pts (= "
-                      << nb_grid_pts << ") and locations (= " << locations
-                      << ")";
-                throw RuntimeError(error.str());
-            }
-            if (ccoord.get_dim() != dim) {
-                std::stringstream error{};
-                error << "Dimension mismatch between nb_grid_pts (= "
-                      << nb_grid_pts << ") and locations (= " << locations
-                      << ")";
-                throw RuntimeError(error.str());
-            }
-            Dim_t retval{0};
-            Dim_t factor{1};
-            for (Dim_t i = 0; i < dim; ++i) {
-                retval += (ccoord[i] - locations[i]) * factor;
-                if (i != dim - 1) {
-                    factor *= nb_grid_pts[i];
-                }
-            }
-            return retval;
-        }
-
-        //-----------------------------------------------------------------------//
-        Real compute_pixel_volume(const IntCoord_t & nb_grid_pts,
-                                  const RealCoord_t & lengths) {
-            Real vol{1.0};
-            for (auto && tup : akantu::zip(nb_grid_pts, lengths)) {
-                auto && nb_grid_pt{std::get<0>(tup)};
-                auto && length{std::get<1>(tup)};
-                vol *= (length / nb_grid_pt);
-            }
-            return vol;
-        }
-
         size_t get_buffer_size(const IntCoord_t & nb_grid_pts,
                                const IntCoord_t & strides) {
             const Dim_t & dim{nb_grid_pts.get_dim()};

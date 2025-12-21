@@ -44,7 +44,6 @@
 
 #include <vector>
 #include <string>
-#include <iostream>
 
 #ifdef WITH_MPI
 using Size_t = MPI_Offset;

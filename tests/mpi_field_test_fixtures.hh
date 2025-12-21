@@ -45,7 +45,7 @@
 #include "field/field_map.hh"
 #include "field/field_map_static.hh"
 
-#include "core/grid_common.hh"
+#include "core/coordinates.hh"
 #include "mpi/communicator.hh"
 
 namespace muGrid {

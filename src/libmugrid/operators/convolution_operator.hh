@@ -38,6 +38,7 @@
 #ifndef SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
 #define SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
 
+#include "core/coordinates.hh"
 #include "operators/convolution_operator_base.hh"
 #include "operators/convolution_kernels.hh"
 

@@ -38,7 +38,7 @@
 
 #include "field/field_typed.hh"
 #include "field/field_map.hh"
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
 #include "mpi/communicator.hh"
 #include "mpi/cartesian_decomposition.hh"
 

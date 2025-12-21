@@ -38,7 +38,7 @@
 #include <mpi.h>
 #endif
 
-#include "core/grid_common.hh"
+#include "core/coordinates.hh"
 #include "mpi/communicator.hh"
 
 namespace muGrid {

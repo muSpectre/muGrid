@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_STATE_FIELD_MAP_HH_
 #define SRC_LIBMUGRID_STATE_FIELD_MAP_HH_
 
-#include "core/grid_common.hh"
+#include "core/enums.hh"
 #include "field/field_map.hh"
 #include "util/ref_vector.hh"
 

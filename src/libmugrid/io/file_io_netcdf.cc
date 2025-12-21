@@ -35,8 +35,11 @@
  */
 
 #include "core/exception.hh"
+#include "core/version.hh"
 #include "grid/iterators.hh"
 #include "core/units.hh"
+#include "util/math.hh"
+#include "field/state_field.hh"
 
 #include "io/file_io_netcdf.hh"
 

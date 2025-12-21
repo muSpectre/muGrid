@@ -38,7 +38,7 @@
 #ifndef SRC_LIBMUGRID_UNITS_HH_
 #define SRC_LIBMUGRID_UNITS_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "core/exception.hh"
 
 #include <array>

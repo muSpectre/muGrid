@@ -39,8 +39,11 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
+#include "grid/pixels.hh"
 #include "core/units.hh"
+#include "core/enums.hh"
+#include "core/version.hh"
 
 using muGrid::DynCcoord;
 using muGrid::fourD;

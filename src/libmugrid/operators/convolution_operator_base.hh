@@ -34,7 +34,7 @@
  *
  */
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "field/field_typed.hh"
 
 #ifndef SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_

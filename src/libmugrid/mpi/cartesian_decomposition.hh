@@ -1,7 +1,7 @@
 #ifndef SRC_LIBMUGRID_CARTESIAN_DECOMPOSITION_HH_
 #define SRC_LIBMUGRID_CARTESIAN_DECOMPOSITION_HH_
 
-#include "core/grid_common.hh"
+#include "core/coordinates.hh"
 #include "collection/field_collection_global.hh"
 #include "mpi/communicator.hh"
 #include "mpi/cartesian_communicator.hh"

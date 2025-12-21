@@ -35,9 +35,10 @@
  */
 
 #include "operators/convolution_operator.hh"
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "collection/field_collection_global.hh"
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
+#include "util/math.hh"
 #include "grid/iterators.hh"
 #include "core/exception.hh"
 

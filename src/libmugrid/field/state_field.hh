@@ -47,7 +47,7 @@
 #ifndef SRC_LIBMUGRID_STATE_FIELD_HH_
 #define SRC_LIBMUGRID_STATE_FIELD_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "util/ref_vector.hh"
 #include "field/state_field_map.hh"
 

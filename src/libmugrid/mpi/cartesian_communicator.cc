@@ -2,8 +2,11 @@
 #include <mpi.h>
 #endif
 
-#include "core/grid_common.hh"
+#include "core/coordinates.hh"
+#include "core/exception.hh"
 #include "mpi/communicator.hh"
+
+#include <numeric>
 #include "mpi/cartesian_communicator.hh"
 
 #if defined(MUGRID_ENABLE_CUDA)

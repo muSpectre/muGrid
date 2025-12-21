@@ -32,7 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  *
  */
-#include "core/grid_common.hh"
+#include "core/types.hh"
 
 #include <boost/test/unit_test.hpp>
 #include <boost/mpl/list.hpp>

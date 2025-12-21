@@ -38,7 +38,7 @@
 
 #include "field/field.hh"
 #include "collection/field_collection.hh"
-#include "core/grid_common.hh"
+#include "core/enums.hh"
 #include "memory/array.hh"
 
 #include "Eigen/Dense"

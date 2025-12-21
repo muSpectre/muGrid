@@ -37,7 +37,7 @@
 #define SRC_LIBMUGRID_FIELD_COLLECTION_GLOBAL_HH_
 
 #include "collection/field_collection.hh"
-#include "grid/ccoord_operations.hh"
+#include "grid/pixels.hh"
 
 namespace muGrid {
     /** `muGrid::GlobalFieldCollection` derives from `muGrid::FieldCollection`

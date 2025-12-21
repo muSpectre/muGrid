@@ -5,7 +5,8 @@
 #include <mpi.h>
 #endif
 
-#include "core/grid_common.hh"
+#include "core/coordinates.hh"
+#include "core/enums.hh"
 #include "field/field.hh"
 #include "collection/field_collection_global.hh"
 #include "mpi/cartesian_communicator.hh"

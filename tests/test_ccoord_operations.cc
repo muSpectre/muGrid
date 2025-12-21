@@ -33,7 +33,8 @@
  *
  */
 
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
+#include "grid/pixels.hh"
 #include "grid/iterators.hh"
 
 #include "test_goodies.hh"

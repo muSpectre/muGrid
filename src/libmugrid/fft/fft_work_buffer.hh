@@ -41,7 +41,7 @@
 #ifndef SRC_LIBMUGRID_FFT_FFT_WORK_BUFFER_HH_
 #define SRC_LIBMUGRID_FFT_FFT_WORK_BUFFER_HH_
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 
 #include <cstddef>
 #include <cstring>

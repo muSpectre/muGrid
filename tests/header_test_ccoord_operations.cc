@@ -35,7 +35,7 @@
 
 #include <iostream>
 
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
 #include "test_goodies.hh"
 #include "tests.hh"
 

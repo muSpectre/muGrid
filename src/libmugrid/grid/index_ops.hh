@@ -36,14 +36,15 @@
 #ifndef SRC_LIBMUGRID_GRID_INDEX_OPS_HH_
 #define SRC_LIBMUGRID_GRID_INDEX_OPS_HH_
 
-#include "../core/types.hh"
-#include "../core/coordinates.hh"
-#include "../exception.hh"
-#include "../iterators.hh"
+#include "core/types.hh"
+#include "core/coordinates.hh"
+#include "core/exception.hh"
+#include "grid/iterators.hh"
 #include "strides.hh"
 
 #include "Eigen/Dense"
 
+#include <cassert>
 #include <sstream>
 #include <vector>
 

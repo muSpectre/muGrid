@@ -33,7 +33,7 @@
 *
 */
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
 #include "field/field_typed.hh"
 #include "operators/convolution_operator_base.hh"
 #include "operators/convolution_operator.hh"

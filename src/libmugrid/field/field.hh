@@ -37,7 +37,8 @@
 #define SRC_LIBMUGRID_FIELD_HH_
 
 #include "core/exception.hh"
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "core/enums.hh"
 #include "core/units.hh"
 
 #ifdef WITH_MPI

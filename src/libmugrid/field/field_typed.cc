@@ -35,7 +35,7 @@
 
 #include <sstream>
 
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
 #include "field/field_typed.hh"
 #include "collection/field_collection.hh"
 #include "field/field_map.hh"

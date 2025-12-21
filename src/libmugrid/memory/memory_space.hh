@@ -36,10 +36,9 @@
 #ifndef SRC_LIBMUGRID_MEMORY_SPACE_HH_
 #define SRC_LIBMUGRID_MEMORY_SPACE_HH_
 
-#include <cstddef>
 #include <type_traits>
 
-#include "core/grid_common.hh"
+#include "core/enums.hh"
 
 namespace muGrid {
 

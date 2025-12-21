@@ -37,8 +37,8 @@
 #define SRC_LIBMUGRID_CORE_COORDINATES_HH_
 
 #include "types.hh"
-#include "../exception.hh"
-#include "../iterators.hh"
+#include "exception.hh"
+#include "grid/iterators.hh"
 
 #include "Eigen/Dense"
 

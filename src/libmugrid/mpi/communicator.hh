@@ -45,7 +45,8 @@
 
 #include "Eigen/Dense"
 
-#include "core/grid_common.hh"
+#include "core/types.hh"
+#include "core/exception.hh"
 
 namespace muGrid {
 

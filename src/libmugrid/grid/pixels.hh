@@ -36,9 +36,9 @@
 #ifndef SRC_LIBMUGRID_GRID_PIXELS_HH_
 #define SRC_LIBMUGRID_GRID_PIXELS_HH_
 
-#include "../core/types.hh"
-#include "../core/coordinates.hh"
-#include "../exception.hh"
+#include "core/types.hh"
+#include "core/coordinates.hh"
+#include "core/exception.hh"
 #include "strides.hh"
 #include "index_ops.hh"
 

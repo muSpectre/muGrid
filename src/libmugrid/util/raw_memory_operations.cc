@@ -36,7 +36,7 @@
 
 #include <algorithm>
 
-#include "grid/ccoord_operations.hh"
+#include "grid/index_ops.hh"
 
 #include "util/raw_memory_operations.hh"
 

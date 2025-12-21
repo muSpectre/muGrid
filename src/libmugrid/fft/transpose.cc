@@ -65,7 +65,7 @@ Transpose::Transpose(const Communicator & comm,
                                      const IntCoord_t & local_out,
                                      Index_t global_in, Index_t global_out,
                                      Index_t axis_in, Index_t axis_out,
-                                     Index_t nb_components, MemoryLayout layout)
+                                     Index_t nb_components, StorageOrder layout)
     : comm{comm}, local_in{local_in}, local_out{local_out},
       global_in{global_in}, global_out{global_out}, axis_in{axis_in},
       axis_out{axis_out}, nb_components{nb_components}, layout{layout} {
@@ -226,7 +226,7 @@ Transpose::build_block_type(const IntCoord_t & local_shape,
 
   // For AoS layout, we first create an element type for n_comp complex values
   // For SoA layout, we create a spatial type and replicate across components
-  if (this->layout == MemoryLayout::ArrayOfStructures) {
+  if (this->layout == StorageOrder::ArrayOfStructures) {
     // AoS: [c0, c1, c2, c0, c1, c2, ...] - components interleaved
     // Create element type: nb_components complex values
     MPI_Datatype element_type;
