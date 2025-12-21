@@ -232,27 +232,32 @@ void FFTEngine::initialise_fft() {
         StorageOrder::ArrayOfStructures, no_ghosts,
         no_ghosts, memory_location);
 
-    // Set up Y↔Z transpose operations (within row communicator)
+    // Set up Y↔Z transpose configuration (within row communicator)
 #ifdef WITH_MPI
     // Only create transpose if we have multiple ranks that need data exchange
     if (this->row_comm.size() > 1) {
-      this->transpose_yz_forward = std::make_unique<DatatypeTranspose>(
-          this->row_comm, zpencil_shape, ypencil_shape,
-          nb_grid_pts[1], nb_grid_pts[2], 1, 2);
-
-      this->transpose_yz_backward = std::make_unique<DatatypeTranspose>(
-          this->row_comm, ypencil_shape, zpencil_shape,
-          nb_grid_pts[2], nb_grid_pts[1], 2, 1);
+      this->need_transpose_yz = true;
+      this->transpose_yz_fwd_config = {
+          zpencil_shape, ypencil_shape, nb_grid_pts[1], nb_grid_pts[2], 1, 2,
+          true  // use row_comm
+      };
+      this->transpose_yz_bwd_config = {
+          ypencil_shape, zpencil_shape, nb_grid_pts[2], nb_grid_pts[1], 2, 1,
+          true  // use row_comm
+      };
     }
 #endif
 
-    // Set up X↔Z transpose (within column communicator)
+    // Set up X↔Z transpose configuration (within column communicator)
 #ifdef WITH_MPI
     // Only create transpose if we have multiple ranks that need data exchange
     if (this->col_comm.size() > 1) {
-      this->transpose_xz = std::make_unique<DatatypeTranspose>(
-          this->col_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
-          this->nb_fourier_grid_pts[0], nb_grid_pts[2], 2, 0);
+      this->need_transpose_xz = true;
+      this->transpose_xz_config = {
+          zpencil_shape, this->nb_fourier_subdomain_grid_pts,
+          this->nb_fourier_grid_pts[0], nb_grid_pts[2], 2, 0,
+          false  // use col_comm
+      };
     }
 #endif
   } else {
@@ -261,11 +266,14 @@ void FFTEngine::initialise_fft() {
     // For 2D, use row_comm (ranks with same P1 coordinate) to transpose Y↔X
     // With process grid (1, P2), all ranks have P1=0, so row_comm contains all ranks
     if (this->row_comm.size() > 1) {
+      this->need_transpose_xz = true;
       // global_in = Ny (distributed in input, becomes local in output)
       // global_out = Fx (local in input, becomes distributed in output)
-      this->transpose_xz = std::make_unique<DatatypeTranspose>(
-          this->row_comm, zpencil_shape, this->nb_fourier_subdomain_grid_pts,
-          nb_grid_pts[1], this->nb_fourier_grid_pts[0], 1, 0);
+      this->transpose_xz_config = {
+          zpencil_shape, this->nb_fourier_subdomain_grid_pts,
+          nb_grid_pts[1], this->nb_fourier_grid_pts[0], 1, 0,
+          true  // use row_comm
+      };
     }
 #endif
   }
@@ -291,6 +299,85 @@ FFT1DBackend * FFTEngine::select_backend(bool is_device_memory) const {
     return this->host_backend.get();
   }
 }
+
+#ifdef WITH_MPI
+DatatypeTranspose * FFTEngine::get_transpose_xz(Index_t nb_components) {
+  if (!this->need_transpose_xz) {
+    return nullptr;
+  }
+
+  auto it = this->transpose_xz_cache.find(nb_components);
+  if (it != this->transpose_xz_cache.end()) {
+    return it->second.get();
+  }
+
+  // Create new transpose for this nb_components
+  const auto & cfg = this->transpose_xz_config;
+  const Communicator & comm =
+      cfg.use_row_comm ? this->row_comm : this->col_comm;
+
+  auto transpose = std::make_unique<DatatypeTranspose>(
+      comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
+      cfg.axis_in, cfg.axis_out, nb_components);
+
+  auto * ptr = transpose.get();
+  this->transpose_xz_cache[nb_components] = std::move(transpose);
+  return ptr;
+}
+
+DatatypeTranspose * FFTEngine::get_transpose_yz_forward(Index_t nb_components) {
+  if (!this->need_transpose_yz) {
+    return nullptr;
+  }
+
+  auto it = this->transpose_yz_fwd_cache.find(nb_components);
+  if (it != this->transpose_yz_fwd_cache.end()) {
+    return it->second.get();
+  }
+
+  // Create new transpose for this nb_components
+  const auto & cfg = this->transpose_yz_fwd_config;
+
+  auto transpose = std::make_unique<DatatypeTranspose>(
+      this->row_comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
+      cfg.axis_in, cfg.axis_out, nb_components);
+
+  auto * ptr = transpose.get();
+  this->transpose_yz_fwd_cache[nb_components] = std::move(transpose);
+  return ptr;
+}
+
+DatatypeTranspose * FFTEngine::get_transpose_yz_backward(Index_t nb_components) {
+  if (!this->need_transpose_yz) {
+    return nullptr;
+  }
+
+  auto it = this->transpose_yz_bwd_cache.find(nb_components);
+  if (it != this->transpose_yz_bwd_cache.end()) {
+    return it->second.get();
+  }
+
+  // Create new transpose for this nb_components
+  const auto & cfg = this->transpose_yz_bwd_config;
+
+  auto transpose = std::make_unique<DatatypeTranspose>(
+      this->row_comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
+      cfg.axis_in, cfg.axis_out, nb_components);
+
+  auto * ptr = transpose.get();
+  this->transpose_yz_bwd_cache[nb_components] = std::move(transpose);
+  return ptr;
+}
+#else
+// Non-MPI stubs
+DatatypeTranspose * FFTEngine::get_transpose_xz(Index_t) { return nullptr; }
+DatatypeTranspose * FFTEngine::get_transpose_yz_forward(Index_t) {
+  return nullptr;
+}
+DatatypeTranspose * FFTEngine::get_transpose_yz_backward(Index_t) {
+  return nullptr;
+}
+#endif
 
 void FFTEngine::fft(const Field & input, Field & output) {
   // Verify fields belong to correct collections
@@ -362,14 +449,9 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
                        "components");
   }
 
-  // Get work buffer field - ensure it has enough components
-  Field & work = this->work_zpencil->get_field("work");
-
   // Get pointers
   const Real * input_ptr =
       static_cast<const Real *>(input.get_void_data_ptr(!is_device));
-  Complex * work_ptr =
-      static_cast<Complex *>(work.get_void_data_ptr(!is_device));
   Complex * output_ptr =
       static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
@@ -387,43 +469,38 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
   Index_t in_base_offset =
       (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) * nb_components;
 
-  // Output: zpencil layout [Fx, Ny_local] per component
-  // For single-component work buffer, we process one component at a time
-  Index_t out_stride = 1;
-  Index_t out_dist = Fx;
-  Index_t work_size = Fx * local_real[1];
+  // Work buffer size: [Fx, Ny_local] with AoS layout for multi-component
+  Index_t work_size = Fx * local_real[1] * nb_components;
 
-  // Process each component separately
+  // Allocate work buffer for all components (AoS layout)
+  std::vector<Complex> work_buffer(work_size);
+  Complex * work_ptr = work_buffer.data();
+
+  // Step 1: r2c FFT along X for each component
+  // Output to work buffer in AoS layout: [comp0, comp1, ...] for each (x, y)
   for (Index_t comp = 0; comp < nb_components; ++comp) {
-    // Step 1: r2c FFT along X for this component
+    // Work buffer AoS: stride between X values is nb_components
+    // Distance between Y rows is Fx * nb_components
     backend->r2c(Nx, local_real[1], input_ptr + in_base_offset + comp,
-                 in_comp_stride, in_dist, work_ptr, out_stride, out_dist);
+                 in_comp_stride, in_dist, work_ptr + comp, nb_components,
+                 Fx * nb_components);
+  }
 
-    // Step 2: Transpose (or copy for serial)
-#ifdef WITH_MPI
-    if (this->transpose_xz) {
-      // For multi-component output, we need to place data at component offset
-      this->transpose_xz->forward(work_ptr, output_ptr + comp);
-    } else {
-      // Serial case: copy to output with component stride
-      for (Index_t i = 0; i < work_size; ++i) {
-        output_ptr[i * nb_components + comp] = work_ptr[i];
-      }
-    }
-#else
-    // Serial case: copy to output with component stride
-    for (Index_t i = 0; i < work_size; ++i) {
-      output_ptr[i * nb_components + comp] = work_ptr[i];
-    }
-#endif
+  // Step 2: Transpose (or copy for serial)
+  DatatypeTranspose * transpose = this->get_transpose_xz(nb_components);
+  if (transpose != nullptr) {
+    // MPI case: transpose all components at once
+    transpose->forward(work_ptr, output_ptr);
+  } else {
+    // Serial case: copy to output (same layout, just copy)
+    std::copy(work_ptr, work_ptr + work_size, output_ptr);
   }
 
   // Step 3: c2c FFT along Y for all components
   // Data layout depends on whether we did a transpose:
   // - MPI with transpose: X-pencil layout [Fx_local, Ny_full] with Y fully local
   // - Serial: zpencil layout [Fx_full, Ny_local] with X fully local
-#ifdef WITH_MPI
-  if (this->transpose_xz) {
+  if (transpose != nullptr) {
     // MPI case: after transpose, X is distributed, Y is full
     Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
     Index_t y_stride = local_fx * nb_components;
@@ -433,9 +510,7 @@ void FFTEngine::fft_2d(const Field & input, Field & output) {
       backend->c2c_forward(Ny, local_fx, output_ptr + comp, y_stride, y_dist,
                            output_ptr + comp, y_stride, y_dist);
     }
-  } else
-#endif
-  {
+  } else {
     // Serial case: X is full, Y is local (same as real space distribution)
     Index_t local_fy = local_real[1];
     Index_t y_stride = Fx * nb_components;
@@ -475,23 +550,21 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
   Index_t Nz = nb_grid_pts[2];
   Index_t Fx = Nx / 2 + 1;
 
-#ifdef WITH_MPI
-  if (this->transpose_xz) {
+  DatatypeTranspose * transpose_xz = this->get_transpose_xz(nb_components);
+  DatatypeTranspose * transpose_yz_fwd =
+      this->get_transpose_yz_forward(nb_components);
+  DatatypeTranspose * transpose_yz_bwd =
+      this->get_transpose_yz_backward(nb_components);
+
+  if (transpose_xz != nullptr) {
     // MPI path with transposes - TODO: implement multi-component support
     if (nb_components > 1) {
       throw RuntimeError(
           "Multi-component 3D FFT not yet supported in MPI mode");
     }
 
-    Field & work_z = this->work_zpencil->get_field("work");
-    Field & work_y = this->work_ypencil->get_field("work");
-
     const Real * input_ptr =
         static_cast<const Real *>(input.get_void_data_ptr(!is_device));
-    Complex * work_z_ptr =
-        static_cast<Complex *>(work_z.get_void_data_ptr(!is_device));
-    Complex * work_y_ptr =
-        static_cast<Complex *>(work_y.get_void_data_ptr(!is_device));
     Complex * output_ptr =
         static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
@@ -499,6 +572,11 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
     Index_t stride_z = stride_y * local_with_ghosts[1];
     Index_t in_offset =
         ghosts_left[0] + ghosts_left[1] * stride_y + ghosts_left[2] * stride_z;
+
+    // Z-pencil work buffer
+    Index_t zpencil_size = Fx * local_real[1] * local_real[2];
+    std::vector<Complex> work_z(zpencil_size);
+    Complex * work_z_ptr = work_z.data();
 
     // Step 1: r2c FFT along X
     for (Index_t iz = 0; iz < local_real[2]; ++iz) {
@@ -511,13 +589,17 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
     }
 
     // Step 2a: Transpose Y↔Z
-    if (this->transpose_yz_forward) {
-      this->transpose_yz_forward->forward(work_z_ptr, work_y_ptr);
+    const IntCoord_t & ypencil_shape =
+        this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t ypencil_size = Fx * Ny * ypencil_shape[2];
+    std::vector<Complex> work_y(ypencil_size);
+    Complex * work_y_ptr = work_y.data();
+
+    if (transpose_yz_fwd != nullptr) {
+      transpose_yz_fwd->forward(work_z_ptr, work_y_ptr);
     }
 
     // Step 2b: c2c FFT along Y
-    const IntCoord_t & ypencil_shape =
-        this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
     for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
       for (Index_t ix = 0; ix < Fx; ++ix) {
         Index_t idx = ix + iz * Fx * Ny;
@@ -527,12 +609,12 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
     }
 
     // Step 2c: Transpose Z↔Y
-    if (this->transpose_yz_backward) {
-      this->transpose_yz_backward->forward(work_y_ptr, work_z_ptr);
+    if (transpose_yz_bwd != nullptr) {
+      transpose_yz_bwd->forward(work_y_ptr, work_z_ptr);
     }
 
     // Step 3: Transpose X↔Z
-    this->transpose_xz->forward(work_z_ptr, output_ptr);
+    transpose_xz->forward(work_z_ptr, output_ptr);
 
     // Step 4: c2c FFT along Z
     const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
@@ -545,7 +627,6 @@ void FFTEngine::fft_3d(const Field & input, Field & output) {
       }
     }
   } else
-#endif
   {
     // Serial path: all dimensions are local, no transposes needed
     const Real * input_ptr =
@@ -628,14 +709,9 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
                        "components");
   }
 
-  // Get work buffer field
-  Field & work = this->work_zpencil->get_field("work");
-
   // Get pointers
   const Complex * input_ptr =
       static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
-  Complex * work_ptr =
-      static_cast<Complex *>(work.get_void_data_ptr(!is_device));
   Real * output_ptr =
       static_cast<Real *>(output.get_void_data_ptr(!is_device));
 
@@ -649,74 +725,62 @@ void FFTEngine::ifft_2d(const Field & input, Field & output) {
   Index_t out_base_offset =
       (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) * nb_components;
 
-#ifdef WITH_MPI
-  if (this->transpose_xz) {
-    // MPI case: input is in X-pencil layout [Fx_local, Ny]
+  DatatypeTranspose * transpose = this->get_transpose_xz(nb_components);
+  if (transpose != nullptr) {
+    // MPI case: input is in X-pencil layout [Fx_local, Ny] with AoS components
     Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
-    Index_t local_fourier_size = local_fx * Ny;
+    Index_t local_fourier_size = local_fx * Ny * nb_components;
 
-    // Process each component separately
+    // Allocate temp buffer for IFFT (we need to preserve input)
+    std::vector<Complex> temp(local_fourier_size);
+    std::copy(input_ptr, input_ptr + local_fourier_size, temp.data());
+
+    // Step 1: c2c IFFT along Y for each component
+    // Input layout: [Fx_local, Ny] × nb_components in AoS
+    Index_t y_stride = local_fx * nb_components;
+    Index_t y_dist = nb_components;
+
     for (Index_t comp = 0; comp < nb_components; ++comp) {
-      // Copy this component's data to temp buffer
-      std::vector<Complex> temp(local_fourier_size);
-      for (Index_t i = 0; i < local_fourier_size; ++i) {
-        temp[i] = input_ptr[i * nb_components + comp];
-      }
-
-      // Step 1: c2c IFFT along Y (Y is full in X-pencil layout)
-      Index_t y_stride = local_fx;  // Stride between consecutive Y values
-      Index_t y_dist = 1;           // Distance between different X transforms
-
-      backend->c2c_backward(Ny, local_fx, temp.data(), y_stride, y_dist,
-                            temp.data(), y_stride, y_dist);
-
-      // Step 2: Transpose X↔Y (backward) to get zpencil layout [Fx, Ny_local]
-      this->transpose_xz->backward(temp.data(), work_ptr);
-
-      // Step 3: c2r IFFT along X
-      // work_ptr layout: [Fx, Ny_local] row-major
-      Index_t in_stride = 1;
-      Index_t in_dist = Fx;
-
-      backend->c2r(Nx, local_real[1], work_ptr, in_stride, in_dist,
-                   output_ptr + out_base_offset + comp, out_comp_stride,
-                   out_dist);
+      backend->c2c_backward(Ny, local_fx, temp.data() + comp, y_stride, y_dist,
+                            temp.data() + comp, y_stride, y_dist);
     }
-  } else
-#endif
-  {
-    // Serial case: input is in zpencil layout [Fx, Ny_local]
-    Index_t local_fy = local_real[1];
-    Index_t fourier_size = Fx * local_fy;
 
-    // Process each component separately
+    // Step 2: Transpose X↔Y (backward) to get zpencil layout [Fx, Ny_local]
+    // Work buffer for transposed data
+    Index_t work_size = Fx * local_real[1] * nb_components;
+    std::vector<Complex> work_buffer(work_size);
+    transpose->backward(temp.data(), work_buffer.data());
+
+    // Step 3: c2r IFFT along X for each component
+    // work_buffer layout: [Fx, Ny_local] × nb_components in AoS
     for (Index_t comp = 0; comp < nb_components; ++comp) {
-      // Copy this component's data to temp buffer
-      std::vector<Complex> temp(fourier_size);
-      for (Index_t i = 0; i < fourier_size; ++i) {
-        temp[i] = input_ptr[i * nb_components + comp];
-      }
+      backend->c2r(Nx, local_real[1], work_buffer.data() + comp, nb_components,
+                   Fx * nb_components, output_ptr + out_base_offset + comp,
+                   out_comp_stride, out_dist);
+    }
+  } else {
+    // Serial case: input is in zpencil layout [Fx, Ny_local] with AoS components
+    Index_t local_fy = local_real[1];
+    Index_t fourier_size = Fx * local_fy * nb_components;
 
-      // Step 1: c2c IFFT along Y (Y is local in serial case)
-      Index_t y_stride = Fx;  // Stride between consecutive Y values
-      Index_t y_dist = 1;     // Distance between different X transforms
+    // Allocate temp buffer for IFFT (we need to preserve input)
+    std::vector<Complex> temp(fourier_size);
+    std::copy(input_ptr, input_ptr + fourier_size, temp.data());
 
-      backend->c2c_backward(local_fy, Fx, temp.data(), y_stride, y_dist,
-                            temp.data(), y_stride, y_dist);
+    // Step 1: c2c IFFT along Y for each component
+    Index_t y_stride = Fx * nb_components;
+    Index_t y_dist = nb_components;
 
-      // Copy to work buffer
-      for (Index_t i = 0; i < fourier_size; ++i) {
-        work_ptr[i] = temp[i];
-      }
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      backend->c2c_backward(local_fy, Fx, temp.data() + comp, y_stride, y_dist,
+                            temp.data() + comp, y_stride, y_dist);
+    }
 
-      // Step 2: c2r IFFT along X
-      // work_ptr layout: [Fx, Ny_local] row-major
-      Index_t in_stride = 1;
-      Index_t in_dist = Fx;
-
-      backend->c2r(Nx, local_fy, work_ptr, in_stride, in_dist,
-                   output_ptr + out_base_offset + comp, out_comp_stride,
-                   out_dist);
+    // Step 2: c2r IFFT along X for each component
+    for (Index_t comp = 0; comp < nb_components; ++comp) {
+      backend->c2r(Nx, local_fy, temp.data() + comp, nb_components,
+                   Fx * nb_components, output_ptr + out_base_offset + comp,
+                   out_comp_stride, out_dist);
     }
   }
 }
@@ -748,23 +812,21 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
   Index_t Nz = nb_grid_pts[2];
   Index_t Fx = Nx / 2 + 1;
 
-#ifdef WITH_MPI
-  if (this->transpose_xz) {
+  DatatypeTranspose * transpose_xz = this->get_transpose_xz(nb_components);
+  DatatypeTranspose * transpose_yz_fwd =
+      this->get_transpose_yz_forward(nb_components);
+  DatatypeTranspose * transpose_yz_bwd =
+      this->get_transpose_yz_backward(nb_components);
+
+  if (transpose_xz != nullptr) {
     // MPI path with transposes - TODO: implement multi-component support
     if (nb_components > 1) {
       throw RuntimeError(
           "Multi-component 3D FFT not yet supported in MPI mode");
     }
 
-    Field & work_z = this->work_zpencil->get_field("work");
-    Field & work_y = this->work_ypencil->get_field("work");
-
     const Complex * input_ptr =
         static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
-    Complex * work_z_ptr =
-        static_cast<Complex *>(work_z.get_void_data_ptr(!is_device));
-    Complex * work_y_ptr =
-        static_cast<Complex *>(work_y.get_void_data_ptr(!is_device));
     Real * output_ptr =
         static_cast<Real *>(output.get_void_data_ptr(!is_device));
 
@@ -773,9 +835,7 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
     Index_t fourier_size =
         fourier_local[0] * fourier_local[1] * fourier_local[2];
     std::vector<Complex> temp(fourier_size);
-    for (Index_t i = 0; i < fourier_size; ++i) {
-      temp[i] = input_ptr[i];
-    }
+    std::copy(input_ptr, input_ptr + fourier_size, temp.data());
 
     // Step 1: c2c IFFT along Z
     for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
@@ -787,17 +847,27 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
       }
     }
 
+    // Z-pencil work buffer
+    Index_t zpencil_size = Fx * local_real[1] * local_real[2];
+    std::vector<Complex> work_z(zpencil_size);
+    Complex * work_z_ptr = work_z.data();
+
     // Step 2: Transpose Z↔X (backward)
-    this->transpose_xz->backward(temp.data(), work_z_ptr);
+    transpose_xz->backward(temp.data(), work_z_ptr);
+
+    // Y-pencil work buffer
+    const IntCoord_t & ypencil_shape =
+        this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t ypencil_size = Fx * Ny * ypencil_shape[2];
+    std::vector<Complex> work_y(ypencil_size);
+    Complex * work_y_ptr = work_y.data();
 
     // Step 3a: Transpose Y↔Z (backward)
-    if (this->transpose_yz_backward) {
-      this->transpose_yz_backward->backward(work_z_ptr, work_y_ptr);
+    if (transpose_yz_bwd != nullptr) {
+      transpose_yz_bwd->backward(work_z_ptr, work_y_ptr);
     }
 
     // Step 3b: c2c IFFT along Y
-    const IntCoord_t & ypencil_shape =
-        this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
     for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
       for (Index_t ix = 0; ix < Fx; ++ix) {
         Index_t idx = ix + iz * Fx * Ny;
@@ -807,8 +877,8 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
     }
 
     // Step 3c: Transpose Z↔Y (backward)
-    if (this->transpose_yz_forward) {
-      this->transpose_yz_forward->backward(work_y_ptr, work_z_ptr);
+    if (transpose_yz_fwd != nullptr) {
+      transpose_yz_fwd->backward(work_y_ptr, work_z_ptr);
     }
 
     // Step 4: c2r IFFT along X
@@ -826,7 +896,6 @@ void FFTEngine::ifft_3d(const Field & input, Field & output) {
       }
     }
   } else
-#endif
   {
     // Serial path: all dimensions are local
     const Complex * input_ptr =

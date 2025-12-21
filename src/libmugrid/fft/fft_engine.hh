@@ -47,6 +47,7 @@
 #include <memory>
 #include <array>
 #include <string>
+#include <map>
 
 namespace muGrid {
 
@@ -290,9 +291,43 @@ class FFTEngine : public CartesianDecomposition {
   std::unique_ptr<FFT1DBackend> device_backend;  //!< Device (GPU) FFT backend
 
   // === Transpose operations ===
-  std::unique_ptr<DatatypeTranspose> transpose_yz_forward;   //!< Y↔Z (3D only)
-  std::unique_ptr<DatatypeTranspose> transpose_yz_backward;  //!< Z↔Y (3D only)
-  std::unique_ptr<DatatypeTranspose> transpose_xz;           //!< X↔Z
+  /**
+   * Configuration for creating transposes with different nb_components.
+   */
+  struct TransposeConfig {
+    IntCoord_t local_in;
+    IntCoord_t local_out;
+    Index_t global_in;
+    Index_t global_out;
+    Index_t axis_in;
+    Index_t axis_out;
+    bool use_row_comm;  //!< true = row_comm, false = col_comm
+  };
+
+  /**
+   * Get or create a transpose for the given nb_components.
+   */
+  DatatypeTranspose * get_transpose_xz(Index_t nb_components);
+  DatatypeTranspose * get_transpose_yz_forward(Index_t nb_components);
+  DatatypeTranspose * get_transpose_yz_backward(Index_t nb_components);
+
+  //! Configuration for X↔Z transpose (2D: Y↔X)
+  TransposeConfig transpose_xz_config;
+
+  //! Configuration for Y↔Z forward transpose (3D only)
+  TransposeConfig transpose_yz_fwd_config;
+
+  //! Configuration for Y↔Z backward transpose (3D only)
+  TransposeConfig transpose_yz_bwd_config;
+
+  //! Cached transposes by nb_components
+  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_xz_cache;
+  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_yz_fwd_cache;
+  std::map<Index_t, std::unique_ptr<DatatypeTranspose>> transpose_yz_bwd_cache;
+
+  //! Flag indicating if transpose is needed (comm.size() > 1)
+  bool need_transpose_xz{false};
+  bool need_transpose_yz{false};
 
   // === Work buffers ===
   //! Fourier-space field collection (final X-pencil layout)
