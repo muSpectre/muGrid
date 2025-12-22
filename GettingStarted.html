@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Python Bindings" href="Python.html"><link rel="prev" title="Summary" href="Summary.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Getting Started - µGrid 0.95.0-313-g6d5975b7 documentation</title>
+        <title>Getting Started - µGrid 0.95.0-322-gef13d375 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-313-g6d5975b7
+      <a href="index.html"><div class="brand">µGrid 0.95.0-322-gef13d375
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-313-g6d5975b7
+  <span class="sidebar-brand-text">µGrid 0.95.0-322-gef13d375
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -262,11 +262,13 @@ for serial builds and
 <a class="reference external" href="https://parallel-netcdf.github.io/">PnetCDF</a> for MPI-parallel builds.
 Monitor output to see which of these options were automatically detected.
 You should see something like:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="nl">Message</span><span class="p">:</span><span class="w">   </span><span class="o">--------------------</span>
-<span class="nl">Message</span><span class="p">:</span><span class="w">   </span><span class="n">muGrid</span><span class="w"> </span><span class="n">configuration</span>
-<span class="nl">Message</span><span class="p">:</span><span class="w">     </span><span class="n">MPI</span><span class="w">            </span><span class="o">:</span><span class="w"> </span><span class="o">***</span><span class="w"> </span><span class="n">YES</span><span class="w"> </span><span class="o">***</span>
-<span class="nl">Message</span><span class="p">:</span><span class="w">     </span><span class="n">Parallel</span><span class="w"> </span><span class="n">NetCDF</span><span class="o">:</span><span class="w"> </span><span class="o">***</span><span class="w"> </span><span class="n">YES</span><span class="w"> </span><span class="o">***</span>
-<span class="nl">Message</span><span class="p">:</span><span class="w">   </span><span class="o">--------------------</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="o">--------------------</span>
+<span class="n">muGrid</span><span class="w"> </span><span class="n">configuration</span>
+<span class="w">  </span><span class="nl">Version</span><span class="w">        </span><span class="p">:</span><span class="w"> </span><span class="n">v0</span><span class="mf">.96.0</span>
+<span class="w">  </span><span class="nl">MPI</span><span class="w">            </span><span class="p">:</span><span class="w"> </span><span class="n">ON</span>
+<span class="w">  </span><span class="n">Parallel</span><span class="w"> </span><span class="n">NetCDF</span><span class="o">:</span><span class="w"> </span><span class="n">ON</span>
+<span class="w">  </span><span class="n">Python</span><span class="w"> </span><span class="n">bindings</span><span class="o">:</span><span class="w"> </span><span class="n">ON</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Python</span><span class="w"> </span><span class="mf">3.11</span>
+<span class="o">--------------------</span>
 </pre></div>
 </div>
 </section>
@@ -284,54 +286,114 @@ You should see something like:</p>
 </section>
 <section id="building-grid">
 <h2>Building <em>µ</em>Grid<a class="headerlink" href="#building-grid" title="Link to this heading">¶</a></h2>
-<p><em>µ</em>Grid uses <a class="reference external" href="https://mesonbuild.com/">Meson</a> (0.42.0 or higher) as its build system.</p>
+<p><em>µ</em>Grid uses <a class="reference external" href="https://cmake.org/">CMake</a> (3.18 or higher) as its build system.</p>
 <p>The current (and possibly incomplete list of) dependencies are:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://mesonbuild.com/">Meson</a></p></li>
+<li><p><a class="reference external" href="https://cmake.org/">CMake</a> (3.18 or higher)</p></li>
 <li><p><a class="reference external" href="https://git-scm.com/">git</a></p></li>
-<li><p><a class="reference external" href="https://www.python.org/">Python3</a> including the header files</p></li>
+<li><p><a class="reference external" href="https://www.python.org/">Python3</a> (3.10 or higher) including the header files</p></li>
 <li><p><a class="reference external" href="http://www.numpy.org/">numpy</a></p></li>
 </ul>
-<p>The following dependencies are included as Meson subprojects:</p>
+<p>The following dependencies are fetched automatically if not found:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://pybind11.readthedocs.io/en/stable/">pybind11</a> (2.2.4 or higher)</p></li>
-<li><p><a class="reference external" href="http://eigen.tuxfamily.org/">Eigen</a> (3.4.0 or higher)</p></li>
+<li><p><a class="reference external" href="https://pybind11.readthedocs.io/en/stable/">pybind11</a> (2.11 or higher)</p></li>
+<li><p><a class="reference external" href="http://eigen.tuxfamily.org/">Eigen</a> (5.0.1 or higher)</p></li>
+<li><p><a class="reference external" href="https://github.com/dmlc/dlpack">DLPack</a> (for GPU array exchange)</p></li>
 </ul>
 <p>The following dependencies are optional:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="http://www.boost.org/doc/libs/1_66_0/libs/test/doc/html/index.html">Boost unit test framework</a></p></li>
-<li><p><a class="reference external" href="https://unidata.github.io/netcdf4-python/netCDF4/index.html">Unidata NetCDF</a></p></li>
-<li><p><a class="reference external" href="https://parallel-netcdf.github.io/">PnetCDF</a></p></li>
+<li><p><a class="reference external" href="https://unidata.github.io/netcdf4-python/netCDF4/index.html">Unidata NetCDF</a> (for serial I/O)</p></li>
+<li><p><a class="reference external" href="https://parallel-netcdf.github.io/">PnetCDF</a> (for parallel I/O with MPI)</p></li>
+<li><p><a class="reference external" href="https://developer.nvidia.com/cuda-toolkit">CUDA Toolkit</a> (for NVIDIA GPU support)</p></li>
+<li><p><a class="reference external" href="https://rocm.docs.amd.com/">ROCm/HIP</a> (for AMD GPU support)</p></li>
 </ul>
 <p>Recommended:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="http://www.sphinx-doc.org">Sphinx</a> and <a class="reference external" href="https://breathe.readthedocs.io">Breathe</a> (necessary if you want to build the
 documentation (turned off by default)</p></li>
 </ul>
-<p><em>µ</em>Grid requires a relatively modern compiler as it makes heavy use of C++17 features.</p>
+<p><em>µ</em>Grid requires a relatively modern compiler as it makes heavy use of C++20 features.</p>
 <p>To compile for <em>development</em>, i.e. with debug options turned on, first setup
 the build folder:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>meson<span class="w"> </span>setup<span class="w"> </span>meson-build-debug
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Debug<span class="w"> </span>-B<span class="w"> </span>build-debug
+$<span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build-debug
 </pre></div>
 </div>
 <p>To compile for <em>production</em>, i.e. with code optimizations turned on, setup the
-build folder while specifying the <cite>release</cite> build type.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>meson<span class="w"> </span>setup<span class="w"> </span>--buildtype<span class="w"> </span>release<span class="w"> </span>meson-build-release
+build folder while specifying the <cite>Release</cite> build type:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span>-B<span class="w"> </span>build-release
+$<span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build-release
 </pre></div>
 </div>
-<p>The compilation is typically handled with <a class="reference external" href="https://ninja-build.org/">ninja</a>.
-Navigate to the build folder and run:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>meson<span class="w"> </span>compile
+<p>You can also use <a class="reference external" href="https://ninja-build.org/">ninja</a> as the build backend for
+faster compilation:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>build-release
+$<span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build-release
 </pre></div>
 </div>
 </section>
-<section id="manually-enabling-and-disabling-features">
-<h2>Manually enabling and disabling features<a class="headerlink" href="#manually-enabling-and-disabling-features" title="Link to this heading">¶</a></h2>
-<p>By default, Meson autodetects features for you. However, sometimes you may want
-to manually enable or disable a specific feature, for example when compiling the
-serial version of <em>µ</em>Grid on a system that has MPI installed. To disable MPI,
-setup with</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>meson<span class="w"> </span>setup<span class="w"> </span>-Dmpi<span class="o">=</span>disabled<span class="w"> </span>buildDir
+<section id="enabling-and-disabling-features">
+<h2>Enabling and disabling features<a class="headerlink" href="#enabling-and-disabling-features" title="Link to this heading">¶</a></h2>
+<p>By default, CMake autodetects features for you. The build system will print a
+configuration summary showing what features are enabled:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>--------------------
+muGrid configuration
+  Version        : v0.96.0
+  Eigen          : 5.0.1
+  CUDA           : OFF
+  HIP            : OFF
+  MPI            : ON - MPI 3.1
+  Parallel NetCDF: ON - PnetCDF 1.12.3
+  Python bindings: ON - Python 3.11
+  pybind11       : 2.13.6
+  Tests          : ON
+  Examples       : ON
+--------------------
+</pre></div>
+</div>
+<p>You can manually enable or disable specific features using CMake options. Here
+are the available options:</p>
+<p><strong>Core features:</strong></p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Disable MPI (build serial version)</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_MPI<span class="o">=</span>OFF<span class="w"> </span>..
+
+<span class="c1"># Disable NetCDF I/O</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_NETCDF<span class="o">=</span>OFF<span class="w"> </span>..
+
+<span class="c1"># Disable Python bindings</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_PYTHON<span class="o">=</span>OFF<span class="w"> </span>..
+
+<span class="c1"># Disable tests</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_TESTS<span class="o">=</span>OFF<span class="w"> </span>..
+
+<span class="c1"># Disable examples</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_EXAMPLES<span class="o">=</span>OFF<span class="w"> </span>..
+</pre></div>
+</div>
+<p><strong>GPU support:</strong></p>
+<p>GPU support is disabled by default and must be explicitly enabled. See the
+<a class="reference internal" href="GPU.html"><span class="doc">GPU Computing</span></a> documentation for detailed usage information.</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enable NVIDIA CUDA support</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_CUDA<span class="o">=</span>ON<span class="w"> </span>..
+
+<span class="c1"># Enable AMD ROCm/HIP support</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_HIP<span class="o">=</span>ON<span class="w"> </span>..
+
+<span class="c1"># Specify CUDA target architectures (70=V100, 80=A100, 90=H100)</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_CUDA<span class="o">=</span>ON<span class="w"> </span>-DCMAKE_CUDA_ARCHITECTURES<span class="o">=</span><span class="s2">&quot;70;80;90&quot;</span><span class="w"> </span>..
+
+<span class="c1"># Specify HIP target architectures (gfx906=MI50, gfx90a=MI200, gfx942=MI300)</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_HIP<span class="o">=</span>ON<span class="w"> </span>-DCMAKE_HIP_ARCHITECTURES<span class="o">=</span><span class="s2">&quot;gfx906;gfx90a&quot;</span><span class="w"> </span>..
+</pre></div>
+</div>
+<p><strong>Combining options:</strong></p>
+<p>You can combine multiple options in a single command:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Build with CUDA but without MPI</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_CUDA<span class="o">=</span>ON<span class="w"> </span>-DMUGRID_ENABLE_MPI<span class="o">=</span>OFF<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span>..
+
+<span class="c1"># Build minimal version (no MPI, no NetCDF, no tests)</span>
+$<span class="w"> </span>cmake<span class="w"> </span>-DMUGRID_ENABLE_MPI<span class="o">=</span>OFF<span class="w"> </span>-DMUGRID_ENABLE_NETCDF<span class="o">=</span>OFF<span class="w"> </span>-DMUGRID_ENABLE_TESTS<span class="o">=</span>OFF<span class="w"> </span>..
 </pre></div>
 </div>
 </section>
@@ -408,7 +470,7 @@ be documented and have unit tests. Please submit merge requests for review.</p>
 <li><a class="reference internal" href="#python-quick-start">Python quick start</a></li>
 <li><a class="reference internal" href="#obtaining-grid-s-source-code">Obtaining <em>µ</em>Grid’s source code</a></li>
 <li><a class="reference internal" href="#building-grid">Building <em>µ</em>Grid</a></li>
-<li><a class="reference internal" href="#manually-enabling-and-disabling-features">Manually enabling and disabling features</a></li>
+<li><a class="reference internal" href="#enabling-and-disabling-features">Enabling and disabling features</a></li>
 <li><a class="reference internal" href="#getting-help-and-reporting-bugs">Getting help and reporting bugs</a></li>
 <li><a class="reference internal" href="#contribute">Contribute</a></li>
 </ul>
@@ -422,7 +484,7 @@ be documented and have unit tests. Please submit merge requests for review.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=7cc908e0"></script>
+</div><script src="_static/documentation_options.js?v=a4211a58"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
