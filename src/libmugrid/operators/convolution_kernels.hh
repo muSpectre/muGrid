@@ -172,9 +172,9 @@ namespace muGrid {
      */
     inline void device_synchronize() {
 #if defined(MUGRID_ENABLE_CUDA) && defined(__CUDACC__)
-        cudaDeviceSynchronize();
+        (void)cudaDeviceSynchronize();
 #elif defined(MUGRID_ENABLE_HIP) && defined(__HIPCC__)
-        hipDeviceSynchronize();
+        (void)hipDeviceSynchronize();
 #endif
         // No-op for CPU
     }
