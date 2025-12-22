@@ -58,7 +58,12 @@ namespace muGrid {
                                    StorageOrder storage_order,
                                    MemoryLocation memory_location)
       : domain{domain}, spatial_dim{spatial_dimension}, nb_sub_pts{nb_sub_pts},
-        storage_order{storage_order}, memory_location{memory_location} {
+        // Use StructureOfArrays (RowMajor) storage order for device memory
+        // to ensure optimal memory coalescing on GPU
+        storage_order{memory_location == MemoryLocation::Device
+                      ? StorageOrder::StructureOfArrays
+                      : storage_order},
+        memory_location{memory_location} {
     this->set_nb_sub_pts(PixelTag, 1);
   }
 
