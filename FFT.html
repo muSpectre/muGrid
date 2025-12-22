@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="GPU Computing" href="GPU.html"><link rel="prev" title="Python Bindings" href="Python.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Fast Fourier Transform - µGrid 0.95.0-322-gef13d375 documentation</title>
+        <title>Fast Fourier Transform - µGrid 0.95.0-329-g8102d742 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-322-gef13d375
+      <a href="index.html"><div class="brand">µGrid 0.95.0-329-g8102d742
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-322-gef13d375
+  <span class="sidebar-brand-text">µGrid 0.95.0-329-g8102d742
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -453,6 +453,212 @@ computing the gradient of a 2D field:</p>
 </pre></div>
 </div>
 </section>
+<section id="derivative-operators-fft">
+<h2>Derivative operators (µFFT)<a class="headerlink" href="#derivative-operators-fft" title="Link to this heading">¶</a></h2>
+<p>The separate <a class="reference external" href="https://github.com/muSpectre/muFFT">µFFT</a> library provides two types
+of derivative operators for computing derivatives in Fourier space: spectral
+derivatives (<code class="docutils literal notranslate"><span class="pre">FourierDerivative</span></code>) and finite-difference stencil derivatives
+(<code class="docutils literal notranslate"><span class="pre">DiscreteDerivative</span></code>). These can be used together with <em>µ</em>Grid’s FFT engine.</p>
+<section id="fourierderivative">
+<h3>FourierDerivative<a class="headerlink" href="#fourierderivative" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">FourierDerivative</span></code> class computes spectral derivatives by multiplying with
+the wavevector in Fourier space. This gives the highest accuracy possible on a
+discrete grid:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT</span><span class="w"> </span><span class="kn">import</span> <span class="n">FFT</span><span class="p">,</span> <span class="n">FourierDerivative</span>
+
+<span class="c1"># Create FFT engine</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span>
+<span class="n">physical_sizes</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+<span class="n">fft</span> <span class="o">=</span> <span class="n">FFT</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Create derivative operators</span>
+<span class="c1"># FourierDerivative(nb_dims, direction)</span>
+<span class="n">fourier_x</span> <span class="o">=</span> <span class="n">FourierDerivative</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># Derivative in x direction</span>
+<span class="n">fourier_y</span> <span class="o">=</span> <span class="n">FourierDerivative</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Derivative in y direction</span>
+
+<span class="c1"># Create fields</span>
+<span class="n">rfield</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s1">&#39;scalar&#39;</span><span class="p">)</span>
+<span class="n">ffield</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s1">&#39;scalar&#39;</span><span class="p">)</span>
+
+<span class="c1"># Initialize with sin(x)</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">coords</span>
+<span class="n">rfield</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># Forward FFT</span>
+<span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">rfield</span><span class="p">,</span> <span class="n">ffield</span><span class="p">)</span>
+
+<span class="c1"># Compute derivative in Fourier space</span>
+<span class="n">dx</span> <span class="o">=</span> <span class="n">physical_sizes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">nb_grid_pts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">fgrad</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s1">&#39;gradient&#39;</span><span class="p">)</span>
+<span class="n">fgrad</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">fourier_x</span><span class="o">.</span><span class="n">fourier</span><span class="p">(</span><span class="n">fft</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">)</span> <span class="o">*</span> <span class="n">ffield</span><span class="o">.</span><span class="n">p</span> <span class="o">/</span> <span class="n">dx</span>
+
+<span class="c1"># Inverse FFT</span>
+<span class="n">rgrad</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s1">&#39;gradient&#39;</span><span class="p">)</span>
+<span class="n">fft</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">fgrad</span><span class="p">,</span> <span class="n">rgrad</span><span class="p">)</span>
+<span class="n">rgrad</span><span class="o">.</span><span class="n">p</span> <span class="o">*=</span> <span class="n">fft</span><span class="o">.</span><span class="n">normalisation</span>
+
+<span class="c1"># Result is cos(x)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">rgrad</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span><span class="p">),</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">fourier</span></code> method returns the Fourier-space multiplier for the derivative,
+which is <code class="docutils literal notranslate"><span class="pre">2πi</span> <span class="pre">*</span> <span class="pre">k</span></code> where <code class="docutils literal notranslate"><span class="pre">k</span></code> is the wavevector.</p>
+</section>
+<section id="discretederivative">
+<h3>DiscreteDerivative<a class="headerlink" href="#discretederivative" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">DiscreteDerivative</span></code> class computes derivatives using finite-difference stencils.
+While less accurate than spectral derivatives, they correspond exactly to discrete
+finite-difference operations in real space:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT</span><span class="w"> </span><span class="kn">import</span> <span class="n">FFT</span><span class="p">,</span> <span class="n">DiscreteDerivative</span>
+
+<span class="c1"># Create FFT engine</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span>
+<span class="n">fft</span> <span class="o">=</span> <span class="n">FFT</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Create first-order upwind stencil: f&#39;(x) ≈ [f(x+h) - f(x)] / h</span>
+<span class="c1"># DiscreteDerivative(offsets, coefficients)</span>
+<span class="n">upwind_x</span> <span class="o">=</span> <span class="n">DiscreteDerivative</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
+<span class="n">upwind_y</span> <span class="o">=</span> <span class="n">DiscreteDerivative</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>
+
+<span class="c1"># Create second-order central stencil: f&#39;(x) ≈ [f(x+h) - f(x-h)] / (2h)</span>
+<span class="n">central_x</span> <span class="o">=</span> <span class="n">DiscreteDerivative</span><span class="p">([</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[[</span><span class="o">-</span><span class="mf">0.5</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">]])</span>
+<span class="n">central_y</span> <span class="o">=</span> <span class="n">DiscreteDerivative</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[[</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]])</span>
+</pre></div>
+</div>
+<p>The first argument is the offset (where the stencil starts relative to the current
+point), and the second argument is a 2D array of coefficients.</p>
+</section>
+<section id="stencil-libraries-fft">
+<h3>Stencil libraries (µFFT)<a class="headerlink" href="#stencil-libraries-fft" title="Link to this heading">¶</a></h3>
+<p><em>µ</em>FFT provides pre-built stencil libraries for common derivative operators:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">muFFT.Stencils1D</span><span class="w"> </span><span class="kn">import</span> <span class="n">upwind</span><span class="p">,</span> <span class="n">central</span><span class="p">,</span> <span class="n">central6</span><span class="p">,</span> <span class="n">central_2nd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT.Stencils2D</span><span class="w"> </span><span class="kn">import</span> <span class="n">upwind_x</span><span class="p">,</span> <span class="n">upwind_y</span><span class="p">,</span> <span class="n">central_x</span><span class="p">,</span> <span class="n">central_y</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT.Stencils2D</span><span class="w"> </span><span class="kn">import</span> <span class="n">linear_finite_elements</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT.Stencils3D</span><span class="w"> </span><span class="kn">import</span> <span class="n">upwind_x</span><span class="p">,</span> <span class="n">upwind_y</span><span class="p">,</span> <span class="n">upwind_z</span>
+</pre></div>
+</div>
+<p><strong>1D Stencils</strong> (<code class="docutils literal notranslate"><span class="pre">muFFT.Stencils1D</span></code>):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">upwind</span></code>: First-order upwind difference</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">central</span></code>: Second-order central difference</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">central6</span></code>: Sixth-order central difference</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">central_2nd</span></code>: Fourth-order second derivative</p></li>
+</ul>
+<p><strong>2D Stencils</strong> (<code class="docutils literal notranslate"><span class="pre">muFFT.Stencils2D</span></code>):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">upwind_x</span></code>, <code class="docutils literal notranslate"><span class="pre">upwind_y</span></code>: First-order upwind differences</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">central_x</span></code>, <code class="docutils literal notranslate"><span class="pre">central_y</span></code>: Second-order central differences</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">central_2nd_x</span></code>, <code class="docutils literal notranslate"><span class="pre">central_2nd_y</span></code>: Fourth-order second derivatives</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">averaged_upwind_x</span></code>, <code class="docutils literal notranslate"><span class="pre">averaged_upwind_y</span></code>: Averaged upwind differences</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">linear_finite_elements</span></code>: Tuple of 4 stencils for FEM on triangular mesh</p></li>
+</ul>
+<p><strong>3D Stencils</strong> (<code class="docutils literal notranslate"><span class="pre">muFFT.Stencils3D</span></code>):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">upwind_x</span></code>, <code class="docutils literal notranslate"><span class="pre">upwind_y</span></code>, <code class="docutils literal notranslate"><span class="pre">upwind_z</span></code>: First-order upwind differences</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">central_x</span></code>, <code class="docutils literal notranslate"><span class="pre">central_y</span></code>, <code class="docutils literal notranslate"><span class="pre">central_z</span></code>: Second-order central differences</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">linear_finite_elements</span></code>: Tuple of 18 stencils for FEM on tetrahedral mesh</p></li>
+</ul>
+<p>Example using stencils:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT</span><span class="w"> </span><span class="kn">import</span> <span class="n">FFT</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muFFT.Stencils2D</span><span class="w"> </span><span class="kn">import</span> <span class="n">upwind_x</span><span class="p">,</span> <span class="n">upwind_y</span>
+
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">54</span><span class="p">,</span> <span class="mi">17</span><span class="p">)</span>
+<span class="n">physical_sizes</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.4</span><span class="p">,</span> <span class="mf">2.3</span><span class="p">)</span>
+<span class="n">dx</span><span class="p">,</span> <span class="n">dy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">physical_sizes</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="n">fft</span> <span class="o">=</span> <span class="n">FFT</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Create and initialize field</span>
+<span class="n">rfield</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s1">&#39;scalar&#39;</span><span class="p">)</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">coords</span>
+<span class="n">rfield</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># Forward FFT</span>
+<span class="n">ffield</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s1">&#39;scalar&#39;</span><span class="p">)</span>
+<span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">rfield</span><span class="p">,</span> <span class="n">ffield</span><span class="p">)</span>
+
+<span class="c1"># Compute gradient using stencils</span>
+<span class="n">fgrad</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s1">&#39;gradient&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,))</span>
+<span class="n">fgrad</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">upwind_x</span><span class="o">.</span><span class="n">fourier</span><span class="p">(</span><span class="n">fft</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">)</span> <span class="o">*</span> <span class="n">ffield</span><span class="o">.</span><span class="n">p</span> <span class="o">/</span> <span class="n">dx</span>
+<span class="n">fgrad</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">upwind_y</span><span class="o">.</span><span class="n">fourier</span><span class="p">(</span><span class="n">fft</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">)</span> <span class="o">*</span> <span class="n">ffield</span><span class="o">.</span><span class="n">p</span> <span class="o">/</span> <span class="n">dy</span>
+
+<span class="c1"># Inverse FFT</span>
+<span class="n">rgrad</span> <span class="o">=</span> <span class="n">fft</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s1">&#39;gradient&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,))</span>
+<span class="n">fft</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">fgrad</span><span class="p">,</span> <span class="n">rgrad</span><span class="p">)</span>
+<span class="n">rgrad</span><span class="o">.</span><span class="n">p</span> <span class="o">*=</span> <span class="n">fft</span><span class="o">.</span><span class="n">normalisation</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="mpi-parallel-fft">
+<h2>MPI-parallel FFT<a class="headerlink" href="#mpi-parallel-fft" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">FFTEngine</span></code> class supports MPI parallelization using pencil (2D) decomposition,
+which allows efficient scaling to large numbers of ranks.</p>
+<section id="basic-parallel-usage">
+<h3>Basic parallel usage<a class="headerlink" href="#basic-parallel-usage" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">Communicator</span>
+
+<span class="c1"># Create parallel FFT engine</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">[</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">]</span>
+<span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">comm</span><span class="p">)</span>
+
+<span class="c1"># Each rank has a subdomain</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Global grid: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">nb_domain_grid_pts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Local subdomain: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">nb_subdomain_grid_pts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Process grid: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">process_grid</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Process coords: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">process_coords</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The FFT engine uses pencil decomposition, distributing the grid across a 2D process
+grid for efficient scaling.</p>
+</section>
+<section id="fft-with-ghost-regions">
+<h3>FFT with ghost regions<a class="headerlink" href="#fft-with-ghost-regions" title="Link to this heading">¶</a></h3>
+<p>For computations requiring ghost cells (e.g., stencil operations), specify the
+ghost buffer sizes:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">Communicator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
+
+<span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
+
+<span class="c1"># Create FFT engine with ghost regions</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">(</span>
+    <span class="n">nb_domain_grid_pts</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">comm</span><span class="o">=</span><span class="n">comm</span><span class="p">,</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="c1"># Real-space fields include ghost regions</span>
+<span class="n">real_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;displacement&quot;</span><span class="p">,</span> <span class="n">nb_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Fourier-space fields have no ghosts (hard assumption)</span>
+<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;displacement_k&quot;</span><span class="p">,</span> <span class="n">nb_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Run with MPI:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>mpirun<span class="w"> </span>-np<span class="w"> </span><span class="m">4</span><span class="w"> </span>python<span class="w"> </span>parallel_fft.py
+</pre></div>
+</div>
+</section>
+</section>
+<section id="gpu-support">
+<h2>GPU support<a class="headerlink" href="#gpu-support" title="Link to this heading">¶</a></h2>
+<p>When <em>µ</em>Grid is compiled with CUDA or HIP support, FFT operations can run on GPU.
+See the <a class="reference internal" href="GPU.html"><span class="doc">GPU Computing</span></a> documentation for details on building with GPU support and
+working with GPU fields.</p>
+<p>Currently, the FFT engine operates on host (CPU) memory. For GPU-accelerated FFT,
+you can transfer data between host and device fields as needed.</p>
+</section>
 </section>
 
         </article>
@@ -520,6 +726,18 @@ computing the gradient of a 2D field:</p>
 <li><a class="reference internal" href="#fft-normalization-factor">FFT normalization factor</a></li>
 <li><a class="reference internal" href="#example-fourier-derivative">Example: Fourier derivative</a></li>
 <li><a class="reference internal" href="#multi-component-fields">Multi-component fields</a></li>
+<li><a class="reference internal" href="#derivative-operators-fft">Derivative operators (µFFT)</a><ul>
+<li><a class="reference internal" href="#fourierderivative">FourierDerivative</a></li>
+<li><a class="reference internal" href="#discretederivative">DiscreteDerivative</a></li>
+<li><a class="reference internal" href="#stencil-libraries-fft">Stencil libraries (µFFT)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mpi-parallel-fft">MPI-parallel FFT</a><ul>
+<li><a class="reference internal" href="#basic-parallel-usage">Basic parallel usage</a></li>
+<li><a class="reference internal" href="#fft-with-ghost-regions">FFT with ghost regions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#gpu-support">GPU support</a></li>
 </ul>
 </li>
 </ul>
@@ -531,7 +749,7 @@ computing the gradient of a 2D field:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=a4211a58"></script>
+</div><script src="_static/documentation_options.js?v=59c9e740"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

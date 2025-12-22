@@ -236,3 +236,229 @@ FFT fields can have multiple components:
     # FFT transforms all components
     engine.fft(velocity._cpp, velocity_hat._cpp)
     engine.ifft(velocity_hat._cpp, velocity._cpp)
+
+Derivative operators (µFFT)
+***************************
+
+The separate `µFFT <https://github.com/muSpectre/muFFT>`_ library provides two types
+of derivative operators for computing derivatives in Fourier space: spectral
+derivatives (``FourierDerivative``) and finite-difference stencil derivatives
+(``DiscreteDerivative``). These can be used together with *µ*\Grid's FFT engine.
+
+FourierDerivative
+=================
+
+The ``FourierDerivative`` class computes spectral derivatives by multiplying with
+the wavevector in Fourier space. This gives the highest accuracy possible on a
+discrete grid:
+
+.. code-block:: python
+
+    import numpy as np
+    from muFFT import FFT, FourierDerivative
+
+    # Create FFT engine
+    nb_grid_pts = (64, 64)
+    physical_sizes = (2 * np.pi, 2 * np.pi)
+    fft = FFT(nb_grid_pts)
+
+    # Create derivative operators
+    # FourierDerivative(nb_dims, direction)
+    fourier_x = FourierDerivative(2, 0)  # Derivative in x direction
+    fourier_y = FourierDerivative(2, 1)  # Derivative in y direction
+
+    # Create fields
+    rfield = fft.real_space_field('scalar')
+    ffield = fft.fourier_space_field('scalar')
+
+    # Initialize with sin(x)
+    x, y = fft.coords
+    rfield.p = np.sin(2 * np.pi * x)
+
+    # Forward FFT
+    fft.fft(rfield, ffield)
+
+    # Compute derivative in Fourier space
+    dx = physical_sizes[0] / nb_grid_pts[0]
+    fgrad = fft.fourier_space_field('gradient')
+    fgrad.p = fourier_x.fourier(fft.fftfreq) * ffield.p / dx
+
+    # Inverse FFT
+    rgrad = fft.real_space_field('gradient')
+    fft.ifft(fgrad, rgrad)
+    rgrad.p *= fft.normalisation
+
+    # Result is cos(x)
+    np.testing.assert_allclose(rgrad.p, 2 * np.pi * np.cos(2 * np.pi * x), atol=1e-12)
+
+The ``fourier`` method returns the Fourier-space multiplier for the derivative,
+which is ``2πi * k`` where ``k`` is the wavevector.
+
+DiscreteDerivative
+==================
+
+The ``DiscreteDerivative`` class computes derivatives using finite-difference stencils.
+While less accurate than spectral derivatives, they correspond exactly to discrete
+finite-difference operations in real space:
+
+.. code-block:: python
+
+    import numpy as np
+    from muFFT import FFT, DiscreteDerivative
+
+    # Create FFT engine
+    nb_grid_pts = (64, 64)
+    fft = FFT(nb_grid_pts)
+
+    # Create first-order upwind stencil: f'(x) ≈ [f(x+h) - f(x)] / h
+    # DiscreteDerivative(offsets, coefficients)
+    upwind_x = DiscreteDerivative([0, 0], [[-1], [1]])
+    upwind_y = DiscreteDerivative([0, 0], [[-1, 1]])
+
+    # Create second-order central stencil: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)
+    central_x = DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
+    central_y = DiscreteDerivative([0, -1], [[-0.5, 0, 0.5]])
+
+The first argument is the offset (where the stencil starts relative to the current
+point), and the second argument is a 2D array of coefficients.
+
+Stencil libraries (µFFT)
+========================
+
+*µ*\FFT provides pre-built stencil libraries for common derivative operators:
+
+.. code-block:: python
+
+    from muFFT.Stencils1D import upwind, central, central6, central_2nd
+    from muFFT.Stencils2D import upwind_x, upwind_y, central_x, central_y
+    from muFFT.Stencils2D import linear_finite_elements
+    from muFFT.Stencils3D import upwind_x, upwind_y, upwind_z
+
+**1D Stencils** (``muFFT.Stencils1D``):
+
+- ``upwind``: First-order upwind difference
+- ``central``: Second-order central difference
+- ``central6``: Sixth-order central difference
+- ``central_2nd``: Fourth-order second derivative
+
+**2D Stencils** (``muFFT.Stencils2D``):
+
+- ``upwind_x``, ``upwind_y``: First-order upwind differences
+- ``central_x``, ``central_y``: Second-order central differences
+- ``central_2nd_x``, ``central_2nd_y``: Fourth-order second derivatives
+- ``averaged_upwind_x``, ``averaged_upwind_y``: Averaged upwind differences
+- ``linear_finite_elements``: Tuple of 4 stencils for FEM on triangular mesh
+
+**3D Stencils** (``muFFT.Stencils3D``):
+
+- ``upwind_x``, ``upwind_y``, ``upwind_z``: First-order upwind differences
+- ``central_x``, ``central_y``, ``central_z``: Second-order central differences
+- ``linear_finite_elements``: Tuple of 18 stencils for FEM on tetrahedral mesh
+
+Example using stencils:
+
+.. code-block:: python
+
+    import numpy as np
+    from muFFT import FFT
+    from muFFT.Stencils2D import upwind_x, upwind_y
+
+    nb_grid_pts = (54, 17)
+    physical_sizes = (1.4, 2.3)
+    dx, dy = np.array(physical_sizes) / np.array(nb_grid_pts)
+
+    fft = FFT(nb_grid_pts)
+
+    # Create and initialize field
+    rfield = fft.real_space_field('scalar')
+    x, y = fft.coords
+    rfield.p = np.sin(2 * np.pi * x)
+
+    # Forward FFT
+    ffield = fft.fourier_space_field('scalar')
+    fft.fft(rfield, ffield)
+
+    # Compute gradient using stencils
+    fgrad = fft.fourier_space_field('gradient', (2,))
+    fgrad.p[0] = upwind_x.fourier(fft.fftfreq) * ffield.p / dx
+    fgrad.p[1] = upwind_y.fourier(fft.fftfreq) * ffield.p / dy
+
+    # Inverse FFT
+    rgrad = fft.real_space_field('gradient', (2,))
+    fft.ifft(fgrad, rgrad)
+    rgrad.p *= fft.normalisation
+
+MPI-parallel FFT
+****************
+
+The ``FFTEngine`` class supports MPI parallelization using pencil (2D) decomposition,
+which allows efficient scaling to large numbers of ranks.
+
+Basic parallel usage
+====================
+
+.. code-block:: python
+
+    import numpy as np
+    from mpi4py import MPI
+    import muGrid
+    from muGrid import Communicator
+
+    # Create parallel FFT engine
+    nb_grid_pts = [128, 128, 128]
+    comm = Communicator(MPI.COMM_WORLD)
+    engine = muGrid.FFTEngine(nb_grid_pts, comm)
+
+    # Each rank has a subdomain
+    print(f"Rank {MPI.COMM_WORLD.rank}:")
+    print(f"  Global grid: {engine.nb_domain_grid_pts}")
+    print(f"  Local subdomain: {engine.nb_subdomain_grid_pts}")
+    print(f"  Process grid: {engine.process_grid}")
+    print(f"  Process coords: {engine.process_coords}")
+
+The FFT engine uses pencil decomposition, distributing the grid across a 2D process
+grid for efficient scaling.
+
+FFT with ghost regions
+======================
+
+For computations requiring ghost cells (e.g., stencil operations), specify the
+ghost buffer sizes:
+
+.. code-block:: python
+
+    import muGrid
+    from muGrid import Communicator
+    from mpi4py import MPI
+
+    comm = Communicator(MPI.COMM_WORLD)
+
+    # Create FFT engine with ghost regions
+    engine = muGrid.FFTEngine(
+        nb_domain_grid_pts=[64, 64, 64],
+        comm=comm,
+        nb_ghosts_left=[1, 1, 1],
+        nb_ghosts_right=[1, 1, 1]
+    )
+
+    # Real-space fields include ghost regions
+    real_field = engine.real_space_field("displacement", nb_components=3)
+
+    # Fourier-space fields have no ghosts (hard assumption)
+    fourier_field = engine.fourier_space_field("displacement_k", nb_components=3)
+
+Run with MPI:
+
+.. code-block:: sh
+
+    $ mpirun -np 4 python parallel_fft.py
+
+GPU support
+***********
+
+When *µ*\Grid is compiled with CUDA or HIP support, FFT operations can run on GPU.
+See the :doc:`GPU` documentation for details on building with GPU support and
+working with GPU fields.
+
+Currently, the FFT engine operates on host (CPU) memory. For GPU-accelerated FFT,
+you can transfer data between host and device fields as needed.
