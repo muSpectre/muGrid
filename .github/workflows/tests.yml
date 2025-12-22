@@ -160,11 +160,14 @@ jobs:
           echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
           sudo apt-get update -qy
           # Install HIP development packages (no runtime/driver needed for compile-only)
-          # hipcc: HIP compiler, hip-dev: headers, hipfft: FFT library, rocm-cmake: CMake support
+          # hipcc: HIP compiler, hip-dev: headers, hipfft: FFT library
+          # rocm-device-libs: device libraries needed by clang for GPU code generation
+          # rocm-cmake: CMake support
           sudo apt-get install -y \
             hipcc \
             hip-dev \
             hipfft \
+            rocm-device-libs \
             rocm-cmake
 
       - name: Install dependencies
