@@ -9,7 +9,7 @@ Change log for µGrid
 - ENH: Sparse stencils
 - BUG: NetCDF output of fields with ghost buffers
 - MAINT: Larger code reorganization
-- **muFFT** is not deprecated 
+- **muFFT** is now deprecated 
 
 0.96.0 (15Dec25)
 ----------------
