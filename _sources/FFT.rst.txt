@@ -28,7 +28,7 @@ The FFT engine provides properties for querying the grid dimensions:
 
     print(f"Real-space grid: {engine.nb_domain_grid_pts}")      # (16, 20)
     print(f"Fourier-space grid: {engine.nb_fourier_grid_pts}")  # (9, 20)
-    print(f"Backend: {engine.backend_name}")                     # "pocketfft"
+    print(f"Backend: {engine.backend_name}")                    # "pocketfft"
 
 The Fourier-space grid has reduced dimensions due to the real-to-complex (r2c) transform
 exploiting Hermitian symmetry.
@@ -60,32 +60,8 @@ Forward and inverse transforms
 The ``fft`` method performs the forward transform (real to Fourier space) and
 ``ifft`` performs the inverse transform (Fourier to real space):
 
-.. code-block:: python
-
-    import numpy as np
-    import muGrid
-    from muGrid import fft_real_space_field, fft_fourier_space_field
-
-    engine = muGrid.FFTEngine([16, 20])
-
-    real_field = fft_real_space_field(engine, "real")
-    fourier_field = fft_fourier_space_field(engine, "fourier")
-
-    # Initialize real-space field
-    real_field.s[:] = np.random.randn(1, 1, 16, 20)
-    original = real_field.s.copy()
-
-    # Forward FFT: real -> Fourier
-    engine.fft(real_field._cpp, fourier_field._cpp)
-
-    # Inverse FFT: Fourier -> real
-    engine.ifft(fourier_field._cpp, real_field._cpp)
-
-    # Apply normalization for roundtrip
-    real_field.s[:] *= engine.normalisation
-
-    # Verify roundtrip
-    np.testing.assert_allclose(real_field.s, original, atol=1e-14)
+.. literalinclude:: ../../examples/fft_roundtrip.py
+    :language: python
 
 Normalization
 *************
@@ -166,53 +142,8 @@ Example: Fourier derivative
 A common use of FFTs is computing derivatives in Fourier space. Here's an example
 computing the gradient of a 2D field:
 
-.. code-block:: python
-
-    import numpy as np
-    import muGrid
-    from muGrid import fft_real_space_field, fft_fourier_space_field
-
-    # Grid parameters
-    nx, ny = 64, 64
-    Lx, Ly = 2 * np.pi, 2 * np.pi
-    dx, dy = Lx / nx, Ly / ny
-
-    engine = muGrid.FFTEngine([nx, ny])
-
-    # Create fields
-    f = fft_real_space_field(engine, "f")
-    f_hat = fft_fourier_space_field(engine, "f_hat")
-    grad_x = fft_real_space_field(engine, "grad_x")
-    grad_y = fft_real_space_field(engine, "grad_y")
-    grad_hat = fft_fourier_space_field(engine, "grad_hat")
-
-    # Initialize with a smooth function
-    x = np.linspace(0, Lx, nx, endpoint=False)
-    y = np.linspace(0, Ly, ny, endpoint=False)
-    X, Y = np.meshgrid(x, y, indexing='ij')
-    f.s[0, 0, :, :] = np.sin(X) * np.cos(Y)
-
-    # Forward FFT
-    engine.fft(f._cpp, f_hat._cpp)
-
-    # Compute wavevectors
-    kx = 2 * np.pi * np.array(muGrid.rfft_freqind(nx)) / Lx
-    ky = 2 * np.pi * np.array(muGrid.fft_freqind(ny)) / Ly
-    KX, KY = np.meshgrid(kx, ky, indexing='ij')
-
-    # Derivative in x: multiply by i*kx
-    grad_hat.s[0, 0, :, :] = 1j * KX * f_hat.s[0, 0, :, :]
-    engine.ifft(grad_hat._cpp, grad_x._cpp)
-    grad_x.s[:] *= engine.normalisation
-
-    # Derivative in y: multiply by i*ky
-    grad_hat.s[0, 0, :, :] = 1j * KY * f_hat.s[0, 0, :, :]
-    engine.ifft(grad_hat._cpp, grad_y._cpp)
-    grad_y.s[:] *= engine.normalisation
-
-    # Verify: d/dx[sin(x)cos(y)] = cos(x)cos(y)
-    expected_grad_x = np.cos(X) * np.cos(Y)
-    np.testing.assert_allclose(grad_x.s[0, 0], expected_grad_x, atol=1e-10)
+.. literalinclude:: ../../examples/fourier_derivative.py
+    :language: python
 
 Multi-component fields
 **********************
@@ -236,157 +167,6 @@ FFT fields can have multiple components:
     # FFT transforms all components
     engine.fft(velocity._cpp, velocity_hat._cpp)
     engine.ifft(velocity_hat._cpp, velocity._cpp)
-
-Derivative operators (µFFT)
-***************************
-
-The separate `µFFT <https://github.com/muSpectre/muFFT>`_ library provides two types
-of derivative operators for computing derivatives in Fourier space: spectral
-derivatives (``FourierDerivative``) and finite-difference stencil derivatives
-(``DiscreteDerivative``). These can be used together with *µ*\Grid's FFT engine.
-
-FourierDerivative
-=================
-
-The ``FourierDerivative`` class computes spectral derivatives by multiplying with
-the wavevector in Fourier space. This gives the highest accuracy possible on a
-discrete grid:
-
-.. code-block:: python
-
-    import numpy as np
-    from muFFT import FFT, FourierDerivative
-
-    # Create FFT engine
-    nb_grid_pts = (64, 64)
-    physical_sizes = (2 * np.pi, 2 * np.pi)
-    fft = FFT(nb_grid_pts)
-
-    # Create derivative operators
-    # FourierDerivative(nb_dims, direction)
-    fourier_x = FourierDerivative(2, 0)  # Derivative in x direction
-    fourier_y = FourierDerivative(2, 1)  # Derivative in y direction
-
-    # Create fields
-    rfield = fft.real_space_field('scalar')
-    ffield = fft.fourier_space_field('scalar')
-
-    # Initialize with sin(x)
-    x, y = fft.coords
-    rfield.p = np.sin(2 * np.pi * x)
-
-    # Forward FFT
-    fft.fft(rfield, ffield)
-
-    # Compute derivative in Fourier space
-    dx = physical_sizes[0] / nb_grid_pts[0]
-    fgrad = fft.fourier_space_field('gradient')
-    fgrad.p = fourier_x.fourier(fft.fftfreq) * ffield.p / dx
-
-    # Inverse FFT
-    rgrad = fft.real_space_field('gradient')
-    fft.ifft(fgrad, rgrad)
-    rgrad.p *= fft.normalisation
-
-    # Result is cos(x)
-    np.testing.assert_allclose(rgrad.p, 2 * np.pi * np.cos(2 * np.pi * x), atol=1e-12)
-
-The ``fourier`` method returns the Fourier-space multiplier for the derivative,
-which is ``2πi * k`` where ``k`` is the wavevector.
-
-DiscreteDerivative
-==================
-
-The ``DiscreteDerivative`` class computes derivatives using finite-difference stencils.
-While less accurate than spectral derivatives, they correspond exactly to discrete
-finite-difference operations in real space:
-
-.. code-block:: python
-
-    import numpy as np
-    from muFFT import FFT, DiscreteDerivative
-
-    # Create FFT engine
-    nb_grid_pts = (64, 64)
-    fft = FFT(nb_grid_pts)
-
-    # Create first-order upwind stencil: f'(x) ≈ [f(x+h) - f(x)] / h
-    # DiscreteDerivative(offsets, coefficients)
-    upwind_x = DiscreteDerivative([0, 0], [[-1], [1]])
-    upwind_y = DiscreteDerivative([0, 0], [[-1, 1]])
-
-    # Create second-order central stencil: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)
-    central_x = DiscreteDerivative([-1, 0], [[-0.5], [0], [0.5]])
-    central_y = DiscreteDerivative([0, -1], [[-0.5, 0, 0.5]])
-
-The first argument is the offset (where the stencil starts relative to the current
-point), and the second argument is a 2D array of coefficients.
-
-Stencil libraries (µFFT)
-========================
-
-*µ*\FFT provides pre-built stencil libraries for common derivative operators:
-
-.. code-block:: python
-
-    from muFFT.Stencils1D import upwind, central, central6, central_2nd
-    from muFFT.Stencils2D import upwind_x, upwind_y, central_x, central_y
-    from muFFT.Stencils2D import linear_finite_elements
-    from muFFT.Stencils3D import upwind_x, upwind_y, upwind_z
-
-**1D Stencils** (``muFFT.Stencils1D``):
-
-- ``upwind``: First-order upwind difference
-- ``central``: Second-order central difference
-- ``central6``: Sixth-order central difference
-- ``central_2nd``: Fourth-order second derivative
-
-**2D Stencils** (``muFFT.Stencils2D``):
-
-- ``upwind_x``, ``upwind_y``: First-order upwind differences
-- ``central_x``, ``central_y``: Second-order central differences
-- ``central_2nd_x``, ``central_2nd_y``: Fourth-order second derivatives
-- ``averaged_upwind_x``, ``averaged_upwind_y``: Averaged upwind differences
-- ``linear_finite_elements``: Tuple of 4 stencils for FEM on triangular mesh
-
-**3D Stencils** (``muFFT.Stencils3D``):
-
-- ``upwind_x``, ``upwind_y``, ``upwind_z``: First-order upwind differences
-- ``central_x``, ``central_y``, ``central_z``: Second-order central differences
-- ``linear_finite_elements``: Tuple of 18 stencils for FEM on tetrahedral mesh
-
-Example using stencils:
-
-.. code-block:: python
-
-    import numpy as np
-    from muFFT import FFT
-    from muFFT.Stencils2D import upwind_x, upwind_y
-
-    nb_grid_pts = (54, 17)
-    physical_sizes = (1.4, 2.3)
-    dx, dy = np.array(physical_sizes) / np.array(nb_grid_pts)
-
-    fft = FFT(nb_grid_pts)
-
-    # Create and initialize field
-    rfield = fft.real_space_field('scalar')
-    x, y = fft.coords
-    rfield.p = np.sin(2 * np.pi * x)
-
-    # Forward FFT
-    ffield = fft.fourier_space_field('scalar')
-    fft.fft(rfield, ffield)
-
-    # Compute gradient using stencils
-    fgrad = fft.fourier_space_field('gradient', (2,))
-    fgrad.p[0] = upwind_x.fourier(fft.fftfreq) * ffield.p / dx
-    fgrad.p[1] = upwind_y.fourier(fft.fftfreq) * ffield.p / dy
-
-    # Inverse FFT
-    rgrad = fft.real_space_field('gradient', (2,))
-    fft.ifft(fgrad, rgrad)
-    rgrad.p *= fft.normalisation
 
 MPI-parallel FFT
 ****************
