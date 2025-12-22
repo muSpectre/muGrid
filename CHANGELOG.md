@@ -1,14 +1,25 @@
 Change log for µGrid
 ====================
 
-0.96.0 (not yet released)
--------------------------
+0.97.0 (22Dec25)
+----------------
+
+- ENH: GPU support
+- ENH: New parallel FFT with arbitrary ghost buffers
+- ENH: Sparse stencils
+- BUG: NetCDF output of fields with ghost buffers
+- MAINT: Larger code reorganization
+- **muFFT** is not deprecated 
+
+0.96.0 (15Dec25)
+----------------
 
 - ENH: Looping over strides fields
 - ENH: Ghost buffers larger than subdomains
+- BUG: Memory leak in `communicate_ghosts`
 
-0.95.0 (15Juli25)
------------------
+0.95.0 (15Jul25)
+----------------
 
 - ENH: Accessor properties for field access without (`s`, `p`) and with ghosts (`sg`, `pg`)
 - ENH: Parallel conjugate gradient solver
