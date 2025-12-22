@@ -287,10 +287,18 @@ namespace muGrid {
         params.nz = nb_pixels_without_ghosts[2];
         params.total_pixels = params.nx * params.ny * params.nz;
 
-        // Elements per pixel
-        params.nodal_elems_per_pixel = nb_nodal_components *
-                                       this->nb_pixelnodal_pts;
-        params.quad_elems_per_pixel = nb_quad_components * this->nb_quad_pts;
+        // Elements per pixel - used for base offset calculation in kernel
+        // For AoS: all components/subpts are interleaved per pixel
+        // For SoA: each plane has separate pixels, so elems_per_pixel = 1
+        if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
+            params.nodal_elems_per_pixel = nb_nodal_components *
+                                           this->nb_pixelnodal_pts;
+            params.quad_elems_per_pixel = nb_quad_components * this->nb_quad_pts;
+        } else {
+            // SoA: base offset is just the pixel index
+            params.nodal_elems_per_pixel = 1;
+            params.quad_elems_per_pixel = 1;
+        }
 
         // Starting pixel index (skip ghosts)
         params.start_pixel_index = collection.get_pixels_index_diff();
@@ -327,16 +335,17 @@ namespace muGrid {
             params.quad_stride_y = buffer_nx * params.quad_elems_per_pixel;
             params.quad_stride_z = params.quad_stride_y * buffer_ny;
         } else {
-            // SoA: pixels are consecutive for each component
-            // offset = component * total_pixels * pts_per_pixel + pixel_index * pts_per_pixel + pt
-            // For the base offset (component 0), stride is just 1 pixel
-            params.nodal_stride_x = this->nb_pixelnodal_pts;
-            params.nodal_stride_y = buffer_nx * this->nb_pixelnodal_pts;
-            params.nodal_stride_z = params.nodal_stride_y * buffer_ny;
+            // SoA: pixels are consecutive within each component/subpoint plane
+            // offset = comp * (total_pixels * subpts) + subpt * total_pixels + pixel_index
+            // The strides are just pixel strides (1, buffer_nx, buffer_nx*buffer_ny)
+            // because component/subpoint offsets are encoded in the sparse operator indices
+            params.nodal_stride_x = 1;
+            params.nodal_stride_y = buffer_nx;
+            params.nodal_stride_z = buffer_nx * buffer_ny;
 
-            params.quad_stride_x = this->nb_quad_pts * this->nb_operators;
-            params.quad_stride_y = buffer_nx * this->nb_quad_pts * this->nb_operators;
-            params.quad_stride_z = params.quad_stride_y * buffer_ny;
+            params.quad_stride_x = 1;
+            params.quad_stride_y = buffer_nx;
+            params.quad_stride_z = buffer_nx * buffer_ny;
         }
 
         return params;
@@ -461,11 +470,17 @@ namespace muGrid {
                                     index_diff_quad = (i_quad * this->nb_operators + i_operator)
                                                       * nb_nodal_components + i_component;
                                 } else {
-                                    // SoA: comp * total_elements + pixel_offset * pts + pt
+                                    // SoA: pixels are consecutive within each component/subpoint plane
+                                    // Layout: [comp0_op0_quad0_pixels..., comp0_op0_quad1_pixels..., ...]
+                                    // index = comp * total_quad_elements
+                                    //       + op * (total_pixels * nb_quad_pts)
+                                    //       + quad * total_pixels
+                                    //       + pixel_offset (added by kernel)
                                     index_diff_nodal = i_component * total_nodal_elements
                                                        + pixel_count * this->nb_pixelnodal_pts + i_node;
                                     index_diff_quad = i_component * total_quad_elements
-                                                      + i_quad * this->nb_operators + i_operator;
+                                                      + i_operator * (total_pixels * this->nb_quad_pts)
+                                                      + i_quad * total_pixels;
                                 }
 
                                 // Add the entry (use [] for Array access)
@@ -558,11 +573,13 @@ namespace muGrid {
                                                       nb_nodal_components + i_component;
                                     index_diff_nodal = i_node * nb_nodal_components + i_component;
                                 } else {
-                                    // SoA: comp * total_elements + pixel_offset * pts + pt
+                                    // SoA: pixels are consecutive within each component/subpoint plane
                                     // NOTE: pixel_count is negated for transpose (inverse mapping)
+                                    // We read from quad at the stencil offset position
                                     index_diff_quad = i_component * total_quad_elements
-                                                      - pixel_count * this->nb_quad_pts * this->nb_operators
-                                                      + i_quad * this->nb_operators + i_operator;
+                                                      + i_operator * (total_pixels * this->nb_quad_pts)
+                                                      + i_quad * total_pixels
+                                                      - pixel_count;
                                     index_diff_nodal = i_component * total_nodal_elements + i_node;
                                 }
 

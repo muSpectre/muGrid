@@ -109,18 +109,22 @@ def hessp(x, Ax):
 
 
 start_time = time.perf_counter()
-conjugate_gradients(
-    comm,
-    decomposition.collection,
-    hessp,  # linear operator
-    rhs._cpp,  # Pass the underlying C++ field
-    solution._cpp,
-    tol=1e-6,
-    callback=callback,
-    maxiter=args.maxiter,
-)
+try:
+    conjugate_gradients(
+        comm,
+        decomposition.collection,
+        hessp,  # linear operator
+        rhs._cpp,  # Pass the underlying C++ field
+        solution._cpp,
+        tol=1e-6,
+        callback=callback,
+        maxiter=args.maxiter,
+    )
+    print("CG converged.")
+except RuntimeError:
+    print("CG did not converge.")
 elapsed_time = time.perf_counter() - start_time
-print(f"CG solver completed in {elapsed_time:.4f} seconds")
+print(f"CG solver ran for {elapsed_time:.4f} seconds")
 
 if args.plot:
     if plt is None:
