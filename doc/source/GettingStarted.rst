@@ -29,10 +29,16 @@ You should see something like::
 
     --------------------
     muGrid configuration
-      Version        : v0.96.0
-      MPI            : ON
-      Parallel NetCDF: ON
-      Python bindings: ON - Python 3.11
+      Version        : 0.95.0-328-gc99adf21
+      Eigen          : 5.0.1 (fetched)
+      CUDA           : OFF
+      HIP            : OFF
+      MPI            : ON - MPI 3.1
+      Parallel NetCDF: ON - PnetCDF 1.13.0
+      Python bindings: ON - Python 3.14.2
+      pybind11       : 2.13.6 (fetched)
+      Tests          : ON
+      Examples       : ON
     --------------------
 
 Obtaining *µ*\Grid's source code
