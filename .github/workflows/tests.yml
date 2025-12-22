@@ -95,3 +95,98 @@ jobs:
         run: |
           source venv/bin/activate
           python3 -m pip install .
+
+  # CUDA compile-only test (no GPU required)
+  cuda-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.29
+        id: cuda-toolkit
+        with:
+          cuda: '12.6.3'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart-dev", "cufft-dev"]'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qy
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            libboost-test-dev
+
+      - name: Compile with CUDA enabled
+        run: |
+          echo "CUDA Toolkit installed at: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+          nvcc --version
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMUGRID_ENABLE_CUDA=ON \
+            -DMUGRID_ENABLE_PYTHON=OFF \
+            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_NETCDF=OFF \
+            -DMUGRID_ENABLE_TESTS=ON \
+            -DMUGRID_ENABLE_EXAMPLES=OFF \
+            -DCMAKE_CUDA_ARCHITECTURES="70;80;90"
+          cmake --build build
+
+  # HIP/ROCm compile-only test (no GPU required)
+  hip-compile:
+    runs-on: ubuntu-22.04  # ROCm has better support on 22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install ROCm/HIP
+        run: |
+          # Add ROCm repository
+          sudo mkdir -p --mode=0755 /etc/apt/keyrings
+          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/rocm.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.2.4 jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list > /dev/null
+          # Set package priority
+          echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
+          sudo apt-get update -qy
+          # Install HIP development packages (no runtime/driver needed for compile-only)
+          sudo apt-get install -y \
+            hip-dev \
+            hipfft-dev \
+            rocm-cmake
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            libboost-test-dev
+
+      - name: Compile with HIP enabled
+        run: |
+          # Set up HIP environment
+          export HIP_PATH=/opt/rocm
+          export PATH=$HIP_PATH/bin:$PATH
+          export CMAKE_PREFIX_PATH=$HIP_PATH:$CMAKE_PREFIX_PATH
+          hipcc --version || echo "hipcc not in PATH, checking /opt/rocm/bin"
+          /opt/rocm/bin/hipcc --version
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMUGRID_ENABLE_HIP=ON \
+            -DMUGRID_ENABLE_PYTHON=OFF \
+            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_NETCDF=OFF \
+            -DMUGRID_ENABLE_TESTS=ON \
+            -DMUGRID_ENABLE_EXAMPLES=OFF \
+            -DCMAKE_HIP_ARCHITECTURES="gfx906;gfx908;gfx90a" \
+            -DCMAKE_PREFIX_PATH=/opt/rocm
+          cmake --build build
