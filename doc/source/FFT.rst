@@ -237,12 +237,13 @@ FFT fields can have multiple components:
     engine.fft(velocity._cpp, velocity_hat._cpp)
     engine.ifft(velocity_hat._cpp, velocity._cpp)
 
-Derivative operators
-********************
+Derivative operators (µFFT)
+***************************
 
-*µ*\FFT provides two types of derivative operators for computing derivatives in
-Fourier space: spectral derivatives (``FourierDerivative``) and finite-difference
-stencil derivatives (``DiscreteDerivative``).
+The separate `µFFT <https://github.com/muSpectre/muFFT>`_ library provides two types
+of derivative operators for computing derivatives in Fourier space: spectral
+derivatives (``FourierDerivative``) and finite-difference stencil derivatives
+(``DiscreteDerivative``). These can be used together with *µ*\Grid's FFT engine.
 
 FourierDerivative
 =================
@@ -321,8 +322,8 @@ finite-difference operations in real space:
 The first argument is the offset (where the stencil starts relative to the current
 point), and the second argument is a 2D array of coefficients.
 
-Stencil libraries
-=================
+Stencil libraries (µFFT)
+========================
 
 *µ*\FFT provides pre-built stencil libraries for common derivative operators:
 
@@ -387,38 +388,11 @@ Example using stencils:
     fft.ifft(fgrad, rgrad)
     rgrad.p *= fft.normalisation
 
-FFT engine selection
-********************
-
-*µ*\FFT supports multiple FFT backends. The available engines depend on what
-libraries were compiled into the code:
-
-- ``pocketfft``: Pure C implementation, always available (default fallback)
-- ``fftw``: FFTW library, highly optimized for serial execution
-- ``fftwmpi``: FFTW with MPI, parallel execution with slab decomposition
-- ``pfft``: PFFT library, parallel execution with pencil decomposition
-
-Use the ``engine`` parameter to select a specific backend:
-
-.. code-block:: python
-
-    from muFFT import FFT
-
-    # Automatic selection (best available serial engine)
-    fft = FFT([64, 64], engine='serial')
-
-    # Explicit engine selection
-    fft = FFT([64, 64], engine='pocketfft')
-    fft = FFT([64, 64], engine='fftw')  # Requires FFTW
-
-The ``serial`` engine identifier automatically selects the best available serial
-engine (FFTW if available, otherwise PocketFFT).
-
 MPI-parallel FFT
 ****************
 
-For large-scale parallel computations, *µ*\FFT supports MPI-parallel FFT transforms
-using either FFTW-MPI or PFFT backends.
+The ``FFTEngine`` class supports MPI parallelization using pencil (2D) decomposition,
+which allows efficient scaling to large numbers of ranks.
 
 Basic parallel usage
 ====================
@@ -427,113 +401,64 @@ Basic parallel usage
 
     import numpy as np
     from mpi4py import MPI
-    from muFFT import FFT
+    import muGrid
+    from muGrid import Communicator
 
     # Create parallel FFT engine
-    nb_grid_pts = (128, 128, 128)
-    fft = FFT(nb_grid_pts, engine='mpi', communicator=MPI.COMM_WORLD)
+    nb_grid_pts = [128, 128, 128]
+    comm = Communicator(MPI.COMM_WORLD)
+    engine = muGrid.FFTEngine(nb_grid_pts, comm)
 
     # Each rank has a subdomain
     print(f"Rank {MPI.COMM_WORLD.rank}:")
-    print(f"  Global grid: {fft.nb_domain_grid_pts}")
-    print(f"  Local subdomain: {fft.nb_subdomain_grid_pts}")
-    print(f"  Subdomain location: {fft.subdomain_locations}")
+    print(f"  Global grid: {engine.nb_domain_grid_pts}")
+    print(f"  Local subdomain: {engine.nb_subdomain_grid_pts}")
+    print(f"  Process grid: {engine.process_grid}")
+    print(f"  Process coords: {engine.process_coords}")
 
-The ``mpi`` engine identifier automatically selects the best available parallel
-engine (FFTW-MPI if available, otherwise PFFT).
+The FFT engine uses pencil decomposition, distributing the grid across a 2D process
+grid for efficient scaling.
 
-Parallel gradient computation
-=============================
+FFT with ghost regions
+======================
 
-Here is a complete example computing a 3D gradient in parallel:
+For computations requiring ghost cells (e.g., stencil operations), specify the
+ghost buffer sizes:
 
 .. code-block:: python
 
-    import numpy as np
+    import muGrid
+    from muGrid import Communicator
     from mpi4py import MPI
-    from muFFT import FFT
 
-    # Create parallel FFT engine
-    nb_grid_pts = (32, 32, 32)
-    physical_sizes = (2.0, 2.0, 2.0)
-    fft = FFT(nb_grid_pts, engine='mpi', communicator=MPI.COMM_WORLD)
+    comm = Communicator(MPI.COMM_WORLD)
 
-    # Compute wavevectors (2π * k / L)
-    wavevectors = (2 * np.pi * fft.ifftfreq.T / np.array(physical_sizes)).T
+    # Create FFT engine with ghost regions
+    engine = muGrid.FFTEngine(
+        nb_domain_grid_pts=[64, 64, 64],
+        comm=comm,
+        nb_ghosts_left=[1, 1, 1],
+        nb_ghosts_right=[1, 1, 1]
+    )
 
-    # Create fields
-    rfield = fft.real_space_field('scalar')
-    ffield = fft.fourier_space_field('scalar')
+    # Real-space fields include ghost regions
+    real_field = engine.real_space_field("displacement", nb_components=3)
 
-    # Initialize with a function
-    x, y, z = fft.coords
-    rfield.p = np.sin(2 * np.pi * x + 4 * np.pi * y)
-
-    # Forward FFT
-    fft.fft(rfield, ffield)
-
-    # Compute gradient in Fourier space
-    fgrad = fft.fourier_space_field('gradient', (3,))
-    fgrad.p = 1j * wavevectors * ffield.p
-
-    # Inverse FFT
-    rgrad = fft.real_space_field('gradient', (3,))
-    fft.ifft(fgrad, rgrad)
-    rgrad.p *= fft.normalisation
-
-    # Each component is the derivative in that direction
-    gradx, grady, gradz = rgrad.p
+    # Fourier-space fields have no ghosts (hard assumption)
+    fourier_field = engine.fourier_space_field("displacement_k", nb_components=3)
 
 Run with MPI:
 
 .. code-block:: sh
 
-    $ mpirun -np 4 python parallel_gradient.py
+    $ mpirun -np 4 python parallel_fft.py
 
-Parallel I/O integration
-========================
+GPU support
+***********
 
-Parallel FFT fields can be saved to NetCDF files using *µ*\Grid's I/O facilities:
+When *µ*\Grid is compiled with CUDA or HIP support, FFT operations can run on GPU.
+See the :doc:`GPU` documentation for details on building with GPU support and
+working with GPU fields.
 
-.. code-block:: python
-
-    from mpi4py import MPI
-    from muGrid import FileIONetCDF, OpenMode, Communicator
-    from muFFT import FFT
-
-    fft = FFT([64, 64, 64], engine='mpi', communicator=MPI.COMM_WORLD)
-    field = fft.real_space_field('data')
-
-    # ... compute something ...
-
-    # Save to NetCDF (parallel write)
-    file = FileIONetCDF('output.nc', open_mode=OpenMode.Overwrite,
-                        communicator=Communicator(MPI.COMM_WORLD))
-    file.register_field_collection(fft.real_field_collection)
-    file.append_frame().write()
-
-Coordinate systems
-******************
-
-*µ*\FFT provides multiple ways to access coordinates:
-
-.. code-block:: python
-
-    from muFFT import FFT
-
-    fft = FFT([16, 20])
-
-    # Real-space fractional coordinates [0, 1)
-    x, y = fft.coords
-
-    # Real-space integer coordinates [0, N)
-    ix, iy = fft.icoords
-
-    # Fourier-space fractional frequencies (like numpy.fft.fftfreq)
-    kx, ky = fft.fftfreq
-
-    # Fourier-space integer frequencies
-    ikx, iky = fft.ifftfreq
-
-These coordinates respect the domain decomposition in parallel calculations,
-returning only the local subdomain's coordinates.
+Currently, the FFT engine operates on host (CPU) memory. For GPU-accelerated FFT,
+you can transfer data between host and device fields as needed.
