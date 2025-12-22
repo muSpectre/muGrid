@@ -141,7 +141,7 @@ jobs:
 
   # HIP/ROCm compile-only test (no GPU required)
   hip-compile:
-    runs-on: ubuntu-22.04  # ROCm has better support on 22.04
+    runs-on: ubuntu-24.04  # ROCm has better support on 22.04
     timeout-minutes: 30
 
     steps:
