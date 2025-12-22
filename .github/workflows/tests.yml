@@ -113,7 +113,8 @@ jobs:
         with:
           cuda: '12.6.3'
           method: 'network'
-          sub-packages: '["nvcc", "cudart-dev", "cufft-dev"]'
+          sub-packages: '["nvcc", "cudart-dev"]'
+          non-cuda-sub-packages: '["libcufft-dev"]'
 
       - name: Install dependencies
         run: |
@@ -155,13 +156,15 @@ jobs:
           sudo mkdir -p --mode=0755 /etc/apt/keyrings
           curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/rocm.gpg > /dev/null
           echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.2.4 jammy main" | sudo tee /etc/apt/sources.list.d/rocm.list > /dev/null
-          # Set package priority
+          # Set package priority to prefer ROCm repo over Ubuntu's packages
           echo -e 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' | sudo tee /etc/apt/preferences.d/rocm-pin-600
           sudo apt-get update -qy
           # Install HIP development packages (no runtime/driver needed for compile-only)
+          # hipcc: HIP compiler, hip-dev: headers, hipfft: FFT library, rocm-cmake: CMake support
           sudo apt-get install -y \
+            hipcc \
             hip-dev \
-            hipfft-dev \
+            hipfft \
             rocm-cmake
 
       - name: Install dependencies
