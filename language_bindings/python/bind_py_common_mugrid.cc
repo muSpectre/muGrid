@@ -191,9 +191,9 @@ void add_unit(py::module & mod) {
         .def("amount", &muGrid::Unit::amount);
 }
 
-// Helper to stringify macro values
-#define MUGRID_STRINGIFY_HELPER(x) #x
-#define MUGRID_STRINGIFY(x) MUGRID_STRINGIFY_HELPER(x)
+// Helper to stringify macro values (variadic to handle comma-separated values)
+#define MUGRID_STRINGIFY_HELPER(...) #__VA_ARGS__
+#define MUGRID_STRINGIFY(...) MUGRID_STRINGIFY_HELPER(__VA_ARGS__)
 
 void add_feature_flags(py::module & mod) {
     // CUDA support

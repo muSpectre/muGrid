@@ -127,7 +127,11 @@ endif()
 if(MUGRID_ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
     target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_CUDA)
+    # Link CUDA libraries privately (only needed at link time)
     target_link_libraries(muGrid PRIVATE CUDA::cudart CUDA::cufft)
+    # But expose CUDA include directories publicly since headers like array.hh
+    # include cuda_runtime.h when MUGRID_ENABLE_CUDA is defined
+    target_include_directories(muGrid PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
     target_compile_options(muGrid PRIVATE
         $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
