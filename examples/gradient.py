@@ -1,25 +1,30 @@
 import numpy as np
 
-from muGrid import ConvolutionOperator, GlobalFieldCollection, CartesianDecomposition, Communicator, real_field
+import muGrid
+
 try:
     from mpi4py import MPI
-    comm = Communicator(MPI.COMM_WORLD)
+    comm = muGrid.Communicator(MPI.COMM_WORLD)
 except ImportError:
-    comm = Communicator()
+    comm = muGrid.Communicator()
 
 # Two dimensional grid
 nx, ny = nb_grid_pts = (1024, 2)
 # Add some ghosts for computing
 nb_ghosts_left = (0, 0)
 nb_ghosts_right = (1, 1)
-fc = GlobalFieldCollection(nb_grid_pts, sub_pts={"quad": 2}, nb_ghosts_left=nb_ghosts_left,
-                           nb_ghosts_right=nb_ghosts_right)
+fc = muGrid.GlobalFieldCollection(
+    nb_grid_pts,
+    nb_sub_pts={"quad": 2},
+    nb_ghosts_left=nb_ghosts_left,
+    nb_ghosts_right=nb_ghosts_right,
+)
 
 # Get nodal field
-nodal_field = real_field(fc, "nodal-field")
+nodal_field = fc.real_field("nodal-field")
 
 # Get quadrature field of shape (2, quad, nx, ny)
-quad_field = real_field(fc, "quad-field", (2,), "quad")
+quad_field = fc.real_field("quad-field", (2,), "quad")
 
 # Fill nodal field with a sine-wave
 # Generate grid coordinates
@@ -41,10 +46,10 @@ gradient = np.array(
         ],
     ],
 )
-op = ConvolutionOperator([0, 0], gradient)
+op = muGrid.ConvolutionOperator([0, 0], gradient)
 
 # Apply the gradient operator to the nodal field and write result to the quad field
-op.apply(nodal_field._cpp, quad_field._cpp)
+op.apply(nodal_field, quad_field)
 
 # Check that the quadrature field has the correct derivative
 np.testing.assert_allclose(

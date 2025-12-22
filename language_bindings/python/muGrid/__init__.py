@@ -52,86 +52,124 @@ if has_mpi and MPI is None:
     raise RuntimeError("MPI support is enabled for muGrid but mpi4py is not available.")
 
 # Feature flags for compile-time configuration
-# FFT utility functions
-CartesianDecomposition = _muGrid.CartesianDecomposition
-ConvolutionOperator = _muGrid.ConvolutionOperator
+has_cuda = _muGrid.has_cuda
+has_rocm = _muGrid.has_rocm
+has_gpu = _muGrid.has_gpu
+has_netcdf = _muGrid.has_netcdf
+host_arch = _muGrid.host_arch
+device_arch = _muGrid.device_arch
+
+# Import Python wrappers for main classes (these accept wrapped Field objects)
+from .Wrappers import (  # noqa: E402
+    CartesianDecomposition,
+    ConvolutionOperator,
+    FFTEngine,
+    FileIONetCDF,
+    GlobalFieldCollection,
+    LocalFieldCollection,
+)
+
+# Expose OpenMode for FileIONetCDF if available
+if hasattr(_muGrid, "FileIONetCDF"):
+    OpenMode = _muGrid.FileIONetCDF.OpenMode
+
+# Low-level C++ classes (for advanced use cases)
+# These are prefixed with underscore to indicate they're internal
+_CartesianDecomposition = _muGrid.CartesianDecomposition
+_ConvolutionOperator = _muGrid.ConvolutionOperator
+_FFTEngine = _muGrid.FFTEngine
+_GlobalFieldCollection = _muGrid.GlobalFieldCollection
+_LocalFieldCollection = _muGrid.LocalFieldCollection
+if hasattr(_muGrid, "FileIONetCDF"):
+    _FileIONetCDF = _muGrid.FileIONetCDF
+
+# Base classes and utilities (always C++ objects)
 ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
 Decomposition = _muGrid.Decomposition
 DynCcoord = _muGrid.DynCcoord
 DynRcoord = _muGrid.DynRcoord
-FFTEngine = _muGrid.FFTEngine
-GlobalFieldCollection = _muGrid.GlobalFieldCollection
 IterUnit = _muGrid.IterUnit
-LocalFieldCollection = _muGrid.LocalFieldCollection
 Pixel = _muGrid.Pixel
 StorageOrder = _muGrid.StorageOrder
 SubPt = _muGrid.SubPt
 Unit = _muGrid.Unit
 Verbosity = _muGrid.Verbosity
+
+# FFT utility functions
 fft_freq = _muGrid.fft_freq
 fft_freqind = _muGrid.fft_freqind
 fft_normalization = _muGrid.fft_normalization
-get_domain_ccoord = _muGrid.get_domain_ccoord
-get_domain_index = _muGrid.get_domain_index
 get_hermitian_grid_pts = _muGrid.get_hermitian_grid_pts
-has_cuda = _muGrid.has_cuda
-has_gpu = _muGrid.has_gpu
-has_netcdf = _muGrid.has_netcdf
-has_rocm = _muGrid.has_rocm
-host_arch = _muGrid.host_arch
-device_arch = _muGrid.device_arch
 rfft_freq = _muGrid.rfft_freq
 rfft_freqind = _muGrid.rfft_freqind
 
-# FileIONetCDF is only compiled into the library if NetCDF libraries exist
-if hasattr(_muGrid, "FileIONetCDF"):
-    OpenMode = _muGrid.FileIONetCDF.OpenMode
+# Domain indexing utilities
+get_domain_ccoord = _muGrid.get_domain_ccoord
+get_domain_index = _muGrid.get_domain_index
 
-    def FileIONetCDF(file_name, open_mode=OpenMode.Read, communicator=None):
-        """
-        This function is used to open a NetCDF file with a specified mode and
-        communicator.
+# Field classes and utilities
+from .Field import Field  # noqa: E402
+from .Field import complex_field  # noqa: E402
+from .Field import fft_fourier_space_field  # noqa: E402
+from .Field import fft_real_space_field  # noqa: E402
+from .Field import int_field  # noqa: E402
+from .Field import real_field  # noqa: E402
+from .Field import uint_field  # noqa: E402
+from .Field import wrap_field  # noqa: E402
 
-        NetCDF (Network Common Data Form) is a set of software libraries
-        and machine-independent data formats that support the creation, access,
-        and sharing of array-oriented scientific data.
+# MPI communicator
+from .Parallel import Communicator  # noqa: E402
 
-        Parameters
-        ----------
-        file_name : str
-            The name of the NetCDF file to be opened. This should include the full
-            path if the file is not in the current working directory.
-        open_mode : OpenMode, optional
-            The mode in which the file is to be opened. This should be a value from
-            the OpenMode enumeration (Read, Write, Overwrite or Append).
-            (Default: OpenMode.Read)
-        communicator : Communicator, optional
-            The MPI communicator to be used for parallel I/O. If this is not
-            provided, the file I/O operations will be serial. (Default: None)
-
-        Returns
-        -------
-        file : FileIONetCDF
-            Returns a FileIONetCDF object which represents the opened file. This object
-            can be used to read data from or write data to the file, depending on the
-            open mode.
-        """
-        return _muGrid.FileIONetCDF(file_name, open_mode, Communicator(communicator))
-
-else:
-
-    def FileIONetCDF(*args, **kwargs):
-        raise ModuleNotFoundError("muGrid was installed without netCDF support")
-
-
-from .Field import Field  # noqa: F401, E402
-from .Field import complex_field  # noqa: F401, E402
-from .Field import fft_fourier_space_field  # noqa: F401, E402
-from .Field import fft_real_space_field  # noqa: F401, E402
-from .Field import int_field  # noqa: F401, E402
-from .Field import real_field  # noqa: F401, E402
-from .Field import uint_field  # noqa: F401, E402
-from .Field import wrap_field  # noqa: F401, E402
-from .Parallel import Communicator  # noqa: F401, E402
-
+# Version information
 __version__ = _muGrid.version.description()
+
+# Define public API
+__all__ = [
+    # Feature flags
+    "has_mpi",
+    "has_cuda",
+    "has_rocm",
+    "has_gpu",
+    "has_netcdf",
+    "host_arch",
+    "device_arch",
+    # Main classes (Python wrappers)
+    "CartesianDecomposition",
+    "Communicator",
+    "ConvolutionOperator",
+    "FFTEngine",
+    "Field",
+    "FileIONetCDF",
+    "GlobalFieldCollection",
+    "LocalFieldCollection",
+    # Field creation functions
+    "complex_field",
+    "fft_fourier_space_field",
+    "fft_real_space_field",
+    "int_field",
+    "real_field",
+    "uint_field",
+    "wrap_field",
+    # FFT utilities
+    "fft_freq",
+    "fft_freqind",
+    "fft_normalization",
+    "get_hermitian_grid_pts",
+    "rfft_freq",
+    "rfft_freqind",
+    # Domain utilities
+    "get_domain_ccoord",
+    "get_domain_index",
+    # Enums and types
+    "ConvolutionOperatorBase",
+    "Decomposition",
+    "DynCcoord",
+    "DynRcoord",
+    "IterUnit",
+    "OpenMode",
+    "Pixel",
+    "StorageOrder",
+    "SubPt",
+    "Unit",
+    "Verbosity",
+]

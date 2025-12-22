@@ -1,6 +1,5 @@
 import numpy as np
 import muGrid
-from muGrid import fft_real_space_field, fft_fourier_space_field
 
 # Grid parameters
 nx, ny = 64, 64
@@ -10,11 +9,11 @@ dx, dy = Lx / nx, Ly / ny
 engine = muGrid.FFTEngine([nx, ny])
 
 # Create fields
-f = fft_real_space_field(engine, "f")
-f_hat = fft_fourier_space_field(engine, "f_hat")
-grad_x = fft_real_space_field(engine, "grad_x")
-grad_y = fft_real_space_field(engine, "grad_y")
-grad_hat = fft_fourier_space_field(engine, "grad_hat")
+f = engine.real_space_field("f")
+f_hat = engine.fourier_space_field("f_hat")
+grad_x = engine.real_space_field("grad_x")
+grad_y = engine.real_space_field("grad_y")
+grad_hat = engine.fourier_space_field("grad_hat")
 
 # Initialize with a smooth function
 x = np.linspace(0, Lx, nx, endpoint=False)
@@ -23,7 +22,7 @@ X, Y = np.meshgrid(x, y, indexing='ij')
 f.s[0, 0, :, :] = np.sin(X) * np.cos(Y)
 
 # Forward FFT
-engine.fft(f._cpp, f_hat._cpp)
+engine.fft(f, f_hat)
 
 # Compute wavevectors
 kx = 2 * np.pi * np.array(muGrid.rfft_freqind(nx)) / Lx
@@ -32,12 +31,12 @@ KX, KY = np.meshgrid(kx, ky, indexing='ij')
 
 # Derivative in x: multiply by i*kx
 grad_hat.s[0, 0, :, :] = 1j * KX * f_hat.s[0, 0, :, :]
-engine.ifft(grad_hat._cpp, grad_x._cpp)
+engine.ifft(grad_hat, grad_x)
 grad_x.s[:] *= engine.normalisation
 
 # Derivative in y: multiply by i*ky
 grad_hat.s[0, 0, :, :] = 1j * KY * f_hat.s[0, 0, :, :]
-engine.ifft(grad_hat._cpp, grad_y._cpp)
+engine.ifft(grad_hat, grad_y)
 grad_y.s[:] *= engine.normalisation
 
 # Verify: d/dx[sin(x)cos(y)] = cos(x)cos(y)
