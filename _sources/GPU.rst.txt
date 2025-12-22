@@ -23,26 +23,22 @@ The ``has_gpu`` flag is ``True`` if either CUDA or ROCm support is available.
 Memory locations
 ****************
 
-Field collections can be created with a specific memory location. The two options are:
+Field collections can be created with a specific memory location using a string:
 
-* ``MemoryLocation.Host``: Allocate fields in CPU memory (default)
-* ``MemoryLocation.Device``: Allocate fields in GPU memory
+* ``"host"``: Allocate fields in CPU memory (default)
+* ``"device"``: Allocate fields in GPU memory
 
 Here is an example of creating a field collection on the GPU:
 
 .. code-block:: python
 
     import muGrid
-    from muGrid import real_field
 
     # Create a GPU field collection
-    fc = muGrid.GlobalFieldCollection(
-        (64, 64),
-        memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
-    )
+    fc = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
 
     # Create a field on the GPU
-    field = real_field(fc, "my_field")
+    field = fc.real_field("my_field")
     print(f"Field is on GPU: {field.is_on_gpu}")
     print(f"Device: {field.device}")
 
@@ -56,7 +52,6 @@ API for GPU arrays:
 .. code-block:: python
 
     import muGrid
-    from muGrid import real_field
 
     # Check GPU is available
     if not muGrid.has_gpu:
@@ -65,14 +60,11 @@ API for GPU arrays:
     import cupy as cp
 
     # Create GPU field collection
-    fc = muGrid.GlobalFieldCollection(
-        (64, 64),
-        memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
-    )
+    fc = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
 
     # Create fields
-    field_a = real_field(fc, "a")
-    field_b = real_field(fc, "b")
+    field_a = fc.real_field("a")
+    field_b = fc.real_field("b")
 
     # Initialize with CuPy (GPU) operations
     field_a.p[...] = cp.random.randn(*field_a.p.shape)
@@ -120,7 +112,6 @@ specify the memory location:
 .. code-block:: python
 
     import muGrid
-    from muGrid import real_field
 
     # Create communicator (serial or MPI)
     comm = muGrid.Communicator()
@@ -128,15 +119,14 @@ specify the memory location:
     # Create decomposition on GPU
     decomp = muGrid.CartesianDecomposition(
         comm,
-        nb_domain_grid_pts=(128, 128),
-        nb_subdivisions=(1, 1),
-        nb_ghosts_left=(1, 1),
-        nb_ghosts_right=(1, 1),
-        memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+        nb_domain_grid_pts=[128, 128],
+        nb_ghosts_left=[1, 1],
+        nb_ghosts_right=[1, 1],
+        memory_location="device"
     )
 
-    # Create GPU field
-    field = real_field(decomp, "gpu_field")
+    # Create GPU field using real_field helper
+    field = muGrid.real_field(decomp, "gpu_field")
 
     # Access coordinates (returned as CuPy arrays on GPU)
     x, y = decomp.coords
@@ -168,32 +158,28 @@ on the GPU when both input and output fields are on the GPU:
 
     import numpy as np
     import muGrid
-    from muGrid import real_field
 
     if not muGrid.has_gpu:
         raise RuntimeError("GPU support not available")
 
     import cupy as cp
 
-    # Create GPU field collection with ghost regions for convolution
-    fc = muGrid.GlobalFieldCollection(
-        (64, 64),
-        memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
-    )
+    # Create GPU field collection
+    fc = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
 
     # Create Laplacian stencil (defined on CPU as numpy array)
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
     laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
 
     # Create fields
-    input_field = real_field(fc, "input")
-    output_field = real_field(fc, "output")
+    input_field = fc.real_field("input")
+    output_field = fc.real_field("output")
 
     # Initialize input (using CuPy)
     input_field.p[...] = cp.random.randn(*input_field.p.shape)
 
-    # Apply convolution (executed on GPU)
-    laplace.apply(input_field._cpp, output_field._cpp)
+    # Apply convolution (executed on GPU) - fields are passed directly
+    laplace.apply(input_field, output_field)
 
 Performance considerations
 **************************

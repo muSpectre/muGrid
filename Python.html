@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Fast Fourier Transform" href="FFT.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Python Bindings - µGrid 0.95.0-332-g15c3266c documentation</title>
+        <title>Python Bindings - µGrid 0.95.0-333-gd647e6ff documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-332-g15c3266c
+      <a href="index.html"><div class="brand">µGrid 0.95.0-333-gd647e6ff
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-332-g15c3266c
+  <span class="sidebar-brand-text">µGrid 0.95.0-333-gd647e6ff
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -303,15 +303,15 @@ certain locations in the domain.</p></li>
 </ul>
 <p>The following example shows how to initialize a field collection and create scalar fields:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">real_field</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
 
 <span class="c1"># Get a scalar (real-valued) field</span>
 <span class="c1"># This call creates a new field if it does not exist.</span>
-<span class="n">field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check the registered fields</span>
 <span class="k">assert</span> <span class="n">fc</span><span class="o">.</span><span class="n">field_names</span> <span class="o">==</span> <span class="p">[</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">]</span>
@@ -323,7 +323,7 @@ certain locations in the domain.</p></li>
 <span class="n">field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mi">42</span>
 
 <span class="c1"># Get the field, but now into a different variable</span>
-<span class="n">field2</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
+<span class="n">field2</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my-real-valued-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check that the value is the same</span>
 <span class="k">assert</span> <span class="n">field2</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
@@ -346,14 +346,14 @@ tensor-valued field can be defined by specifying either simply a number of compo
 the shape of the components explicitly. The following example shows how to create a
 tensor-valued field that contains 2 x 2 matrices:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">real_field</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
 
 <span class="c1"># Fill the field with random numbers</span>
 <span class="n">strain</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
@@ -362,11 +362,11 @@ tensor-valued field that contains 2 x 2 matrices:</p>
 <p>Note that there is a difference between a scalar field and a field with a single component.
 When a single component is specified, this is reflected in the shape of the field:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
 
 <span class="c1"># Get a scalar field</span>
 <span class="n">phase</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;phase&quot;</span><span class="p">)</span>
@@ -374,7 +374,7 @@ When a single component is specified, this is reflected in the shape of the fiel
 <span class="k">assert</span> <span class="n">phase</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">]</span>
 
 <span class="c1"># Get a single component field</span>
-<span class="n">single</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;single&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">single</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;single&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))</span>
 <span class="c1"># Now there is an explicit component dimension of 1</span>
 <span class="k">assert</span> <span class="n">single</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">nb_grid_pts</span><span class="p">]</span>
 </pre></div>
@@ -391,14 +391,14 @@ is created.</p>
 <p>The following example initializes a three-dimension grid with
 a sub-division of each pixel into five elements:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">real_field</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">nb_sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;element&quot;</span><span class="p">)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;element&quot;</span><span class="p">)</span>
 
 <span class="c1"># Fill the field with random numbers</span>
 <span class="n">strain</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
@@ -462,26 +462,31 @@ be unity. It is assumed that first <cite>nodel-points</cite>, then <cite>quadrat
 missing. This means we can represent a simple forward-differences gradient operator in two dimensions as</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConvolutionOperator</span><span class="p">,</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">CartesianDecomposition</span><span class="p">,</span> <span class="n">Communicator</span><span class="p">,</span> <span class="n">real_field</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
-    <span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
+    <span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-    <span class="n">comm</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">()</span>
+    <span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">()</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span> <span class="o">=</span> <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 <span class="c1"># Add some ghosts for computing</span>
 <span class="n">nb_ghosts_left</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 <span class="n">nb_ghosts_right</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quad&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="n">nb_ghosts_left</span><span class="p">,</span>
-                           <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="n">nb_ghosts_right</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span>
+    <span class="n">nb_grid_pts</span><span class="p">,</span>
+    <span class="n">nb_sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quad&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="n">nb_ghosts_left</span><span class="p">,</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="n">nb_ghosts_right</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="c1"># Get nodal field</span>
-<span class="n">nodal_field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;nodal-field&quot;</span><span class="p">)</span>
+<span class="n">nodal_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;nodal-field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Get quadrature field of shape (2, quad, nx, ny)</span>
-<span class="n">quad_field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;quad-field&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span> <span class="s2">&quot;quad&quot;</span><span class="p">)</span>
+<span class="n">quad_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;quad-field&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span> <span class="s2">&quot;quad&quot;</span><span class="p">)</span>
 
 <span class="c1"># Fill nodal field with a sine-wave</span>
 <span class="c1"># Generate grid coordinates</span>
@@ -503,10 +508,10 @@ missing. This means we can represent a simple forward-differences gradient opera
         <span class="p">],</span>
     <span class="p">],</span>
 <span class="p">)</span>
-<span class="n">op</span> <span class="o">=</span> <span class="n">ConvolutionOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">ConvolutionOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
 
 <span class="c1"># Apply the gradient operator to the nodal field and write result to the quad field</span>
-<span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">quad_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="p">,</span> <span class="n">quad_field</span><span class="p">)</span>
 
 <span class="c1"># Check that the quadrature field has the correct derivative</span>
 <span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
@@ -567,27 +572,24 @@ with MPI enabled.</p>
 <p>I/O is handled by the <cite>FileIONetCDF</cite> class. The following example shows how to write all fields
 from a field collection to disk:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
-<span class="k">if</span> <span class="ow">not</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_mpi</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;IO example is skipped: muGrid has no OpenMode in serial build&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_netcdf</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;IO example is skipped: muGrid was built without NetCDF support&quot;</span><span class="p">)</span>
     <span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">GlobalFieldCollection</span><span class="p">,</span> <span class="n">FileIONetCDF</span><span class="p">,</span> <span class="n">OpenMode</span><span class="p">,</span> <span class="n">real_field</span>
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">nb_sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
 
 <span class="c1"># Get a tensor-field (for example to represent the strain)</span>
-<span class="n">strain</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;element&quot;</span><span class="p">)</span>
+<span class="n">strain</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;strain&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;element&quot;</span><span class="p">)</span>
 
 <span class="c1"># Fill the field with random numbers</span>
 <span class="n">strain</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="n">nb_grid_pts</span><span class="p">))</span>
 
-<span class="c1"># Initialize a file I/O object</span>
-<span class="n">file</span> <span class="o">=</span> <span class="n">FileIONetCDF</span><span class="p">(</span><span class="s2">&quot;example.nc&quot;</span><span class="p">,</span> <span class="n">OpenMode</span><span class="o">.</span><span class="n">Overwrite</span><span class="p">)</span>
+<span class="c1"># Initialize a file I/O object (using string for open mode)</span>
+<span class="n">file</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FileIONetCDF</span><span class="p">(</span><span class="s2">&quot;example.nc&quot;</span><span class="p">,</span> <span class="n">open_mode</span><span class="o">=</span><span class="s2">&quot;overwrite&quot;</span><span class="p">)</span>
 <span class="n">file</span><span class="o">.</span><span class="n">register_field_collection</span><span class="p">(</span><span class="n">fc</span><span class="p">)</span>  <span class="c1"># Register the field collection with the file</span>
 <span class="n">file</span><span class="o">.</span><span class="n">append_frame</span><span class="p">()</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>  <span class="c1"># Write all fields of the field collection to the file</span>
 </pre></div>
@@ -697,7 +699,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=de3230e1"></script>
+</div><script src="_static/documentation_options.js?v=7b60fc90"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

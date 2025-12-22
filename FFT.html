@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="GPU Computing" href="GPU.html"><link rel="prev" title="Python Bindings" href="Python.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Fast Fourier Transform - µGrid 0.95.0-332-g15c3266c documentation</title>
+        <title>Fast Fourier Transform - µGrid 0.95.0-333-gd647e6ff documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-332-g15c3266c
+      <a href="index.html"><div class="brand">µGrid 0.95.0-333-gd647e6ff
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-332-g15c3266c
+  <span class="sidebar-brand-text">µGrid 0.95.0-333-gd647e6ff
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -293,22 +293,21 @@ Fourier-space fields. Use the convenience functions to create fields:</p>
 <code class="docutils literal notranslate"><span class="pre">ifft</span></code> performs the inverse transform (Fourier to real space):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_real_space_field</span><span class="p">,</span> <span class="n">fft_fourier_space_field</span>
 
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">16</span><span class="p">,</span> <span class="mi">20</span><span class="p">])</span>
 
-<span class="n">real_field</span> <span class="o">=</span> <span class="n">fft_real_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;real&quot;</span><span class="p">)</span>
-<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">fft_fourier_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;fourier&quot;</span><span class="p">)</span>
+<span class="n">real_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;real&quot;</span><span class="p">)</span>
+<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;fourier&quot;</span><span class="p">)</span>
 
 <span class="c1"># Initialize real-space field</span>
 <span class="n">real_field</span><span class="o">.</span><span class="n">s</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
 <span class="n">original</span> <span class="o">=</span> <span class="n">real_field</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
 <span class="c1"># Forward FFT: real -&gt; Fourier</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">real_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">fourier_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">real_field</span><span class="p">,</span> <span class="n">fourier_field</span><span class="p">)</span>
 
 <span class="c1"># Inverse FFT: Fourier -&gt; real</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">fourier_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">real_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">fourier_field</span><span class="p">,</span> <span class="n">real_field</span><span class="p">)</span>
 
 <span class="c1"># Apply normalization for roundtrip</span>
 <span class="n">real_field</span><span class="o">.</span><span class="n">s</span><span class="p">[:]</span> <span class="o">*=</span> <span class="n">engine</span><span class="o">.</span><span class="n">normalisation</span>
@@ -386,7 +385,6 @@ grid size:</p>
 computing the gradient of a 2D field:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_real_space_field</span><span class="p">,</span> <span class="n">fft_fourier_space_field</span>
 
 <span class="c1"># Grid parameters</span>
 <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span> <span class="o">=</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span>
@@ -396,11 +394,11 @@ computing the gradient of a 2D field:</p>
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">])</span>
 
 <span class="c1"># Create fields</span>
-<span class="n">f</span> <span class="o">=</span> <span class="n">fft_real_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;f&quot;</span><span class="p">)</span>
-<span class="n">f_hat</span> <span class="o">=</span> <span class="n">fft_fourier_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;f_hat&quot;</span><span class="p">)</span>
-<span class="n">grad_x</span> <span class="o">=</span> <span class="n">fft_real_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;grad_x&quot;</span><span class="p">)</span>
-<span class="n">grad_y</span> <span class="o">=</span> <span class="n">fft_real_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;grad_y&quot;</span><span class="p">)</span>
-<span class="n">grad_hat</span> <span class="o">=</span> <span class="n">fft_fourier_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;grad_hat&quot;</span><span class="p">)</span>
+<span class="n">f</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;f&quot;</span><span class="p">)</span>
+<span class="n">f_hat</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;f_hat&quot;</span><span class="p">)</span>
+<span class="n">grad_x</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;grad_x&quot;</span><span class="p">)</span>
+<span class="n">grad_y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;grad_y&quot;</span><span class="p">)</span>
+<span class="n">grad_hat</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;grad_hat&quot;</span><span class="p">)</span>
 
 <span class="c1"># Initialize with a smooth function</span>
 <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Lx</span><span class="p">,</span> <span class="n">nx</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -409,7 +407,7 @@ computing the gradient of a 2D field:</p>
 <span class="n">f</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span>
 
 <span class="c1"># Forward FFT</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">f_hat</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">f_hat</span><span class="p">)</span>
 
 <span class="c1"># Compute wavevectors</span>
 <span class="n">kx</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">rfft_freqind</span><span class="p">(</span><span class="n">nx</span><span class="p">))</span> <span class="o">/</span> <span class="n">Lx</span>
@@ -418,12 +416,12 @@ computing the gradient of a 2D field:</p>
 
 <span class="c1"># Derivative in x: multiply by i*kx</span>
 <span class="n">grad_hat</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">KX</span> <span class="o">*</span> <span class="n">f_hat</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">grad_hat</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">grad_x</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">grad_hat</span><span class="p">,</span> <span class="n">grad_x</span><span class="p">)</span>
 <span class="n">grad_x</span><span class="o">.</span><span class="n">s</span><span class="p">[:]</span> <span class="o">*=</span> <span class="n">engine</span><span class="o">.</span><span class="n">normalisation</span>
 
 <span class="c1"># Derivative in y: multiply by i*ky</span>
 <span class="n">grad_hat</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">KY</span> <span class="o">*</span> <span class="n">f_hat</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">grad_hat</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">grad_y</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">grad_hat</span><span class="p">,</span> <span class="n">grad_y</span><span class="p">)</span>
 <span class="n">grad_y</span><span class="o">.</span><span class="n">s</span><span class="p">[:]</span> <span class="o">*=</span> <span class="n">engine</span><span class="o">.</span><span class="n">normalisation</span>
 
 <span class="c1"># Verify: d/dx[sin(x)cos(y)] = cos(x)cos(y)</span>
@@ -436,20 +434,19 @@ computing the gradient of a 2D field:</p>
 <h2>Multi-component fields<a class="headerlink" href="#multi-component-fields" title="Link to this heading">¶</a></h2>
 <p>FFT fields can have multiple components:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_real_space_field</span><span class="p">,</span> <span class="n">fft_fourier_space_field</span>
 
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">16</span><span class="p">,</span> <span class="mi">20</span><span class="p">])</span>
 
 <span class="c1"># Create field with 3 components (e.g., velocity vector)</span>
-<span class="n">velocity</span> <span class="o">=</span> <span class="n">fft_real_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;velocity&quot;</span><span class="p">,</span> <span class="n">nb_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-<span class="n">velocity_hat</span> <span class="o">=</span> <span class="n">fft_fourier_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;velocity_hat&quot;</span><span class="p">,</span> <span class="n">nb_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">velocity</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;velocity&quot;</span><span class="p">,</span> <span class="n">nb_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">velocity_hat</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;velocity_hat&quot;</span><span class="p">,</span> <span class="n">nb_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Velocity shape: </span><span class="si">{</span><span class="n">velocity</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>      <span class="c1"># (3, 1, 16, 20)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Velocity_hat shape: </span><span class="si">{</span><span class="n">velocity_hat</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># (3, 1, 9, 20)</span>
 
-<span class="c1"># FFT transforms all components</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">velocity</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">velocity_hat</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
-<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">velocity_hat</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">velocity</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="c1"># FFT transforms all components - fields are passed directly</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">velocity</span><span class="p">,</span> <span class="n">velocity_hat</span><span class="p">)</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">velocity_hat</span><span class="p">,</span> <span class="n">velocity</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -603,7 +600,7 @@ you can transfer data between host and device fields as needed.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=de3230e1"></script>
+</div><script src="_static/documentation_options.js?v=7b60fc90"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

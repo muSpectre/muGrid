@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ Bindings" href="Cplusplus.html"><link rel="prev" title="Fast Fourier Transform" href="FFT.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>GPU Computing - µGrid 0.95.0-332-g15c3266c documentation</title>
+        <title>GPU Computing - µGrid 0.95.0-333-gd647e6ff documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.95.0-332-g15c3266c
+      <a href="index.html"><div class="brand">µGrid 0.95.0-333-gd647e6ff
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.95.0-332-g15c3266c
+  <span class="sidebar-brand-text">µGrid 0.95.0-333-gd647e6ff
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -259,23 +259,19 @@ on GPU fields are executed on the GPU.</p>
 </section>
 <section id="memory-locations">
 <h2>Memory locations<a class="headerlink" href="#memory-locations" title="Link to this heading">¶</a></h2>
-<p>Field collections can be created with a specific memory location. The two options are:</p>
+<p>Field collections can be created with a specific memory location using a string:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">MemoryLocation.Host</span></code>: Allocate fields in CPU memory (default)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MemoryLocation.Device</span></code>: Allocate fields in GPU memory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code>: Allocate fields in CPU memory (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;device&quot;</span></code>: Allocate fields in GPU memory</p></li>
 </ul>
 <p>Here is an example of creating a field collection on the GPU:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">real_field</span>
 
 <span class="c1"># Create a GPU field collection</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span>
-    <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
-    <span class="n">memory_location</span><span class="o">=</span><span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="o">.</span><span class="n">MemoryLocation</span><span class="o">.</span><span class="n">Device</span>
-<span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create a field on the GPU</span>
-<span class="n">field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;my_field&quot;</span><span class="p">)</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my_field&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Field is on GPU: </span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">is_on_gpu</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Device: </span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
@@ -287,7 +283,6 @@ on GPU fields are executed on the GPU.</p>
 <a class="reference external" href="https://cupy.dev/">CuPy</a> arrays instead of numpy arrays. CuPy provides a numpy-compatible
 API for GPU arrays:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">real_field</span>
 
 <span class="c1"># Check GPU is available</span>
 <span class="k">if</span> <span class="ow">not</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_gpu</span><span class="p">:</span>
@@ -296,14 +291,11 @@ API for GPU arrays:</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
 
 <span class="c1"># Create GPU field collection</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span>
-    <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
-    <span class="n">memory_location</span><span class="o">=</span><span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="o">.</span><span class="n">MemoryLocation</span><span class="o">.</span><span class="n">Device</span>
-<span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create fields</span>
-<span class="n">field_a</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span>
-<span class="n">field_b</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">)</span>
+<span class="n">field_a</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">)</span>
+<span class="n">field_b</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)</span>
 
 <span class="c1"># Initialize with CuPy (GPU) operations</span>
 <span class="n">field_a</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="o">*</span><span class="n">field_a</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
@@ -344,7 +336,6 @@ data exchange between the C++ library and Python. This means:</p>
 <p>When using domain decomposition with <code class="docutils literal notranslate"><span class="pre">CartesianDecomposition</span></code>, you can also
 specify the memory location:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">real_field</span>
 
 <span class="c1"># Create communicator (serial or MPI)</span>
 <span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">()</span>
@@ -352,15 +343,14 @@ specify the memory location:</p>
 <span class="c1"># Create decomposition on GPU</span>
 <span class="n">decomp</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
     <span class="n">comm</span><span class="p">,</span>
-    <span class="n">nb_domain_grid_pts</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span>
-    <span class="n">nb_subdivisions</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-    <span class="n">memory_location</span><span class="o">=</span><span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="o">.</span><span class="n">MemoryLocation</span><span class="o">.</span><span class="n">Device</span>
+    <span class="n">nb_domain_grid_pts</span><span class="o">=</span><span class="p">[</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">],</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span>
 <span class="p">)</span>
 
-<span class="c1"># Create GPU field</span>
-<span class="n">field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">decomp</span><span class="p">,</span> <span class="s2">&quot;gpu_field&quot;</span><span class="p">)</span>
+<span class="c1"># Create GPU field using real_field helper</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="n">decomp</span><span class="p">,</span> <span class="s2">&quot;gpu_field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Access coordinates (returned as CuPy arrays on GPU)</span>
 <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">decomp</span><span class="o">.</span><span class="n">coords</span>
@@ -388,32 +378,28 @@ pip<span class="w"> </span>install<span class="w"> </span>cupy-rocm-5-0<span cla
 on the GPU when both input and output fields are on the GPU:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">real_field</span>
 
 <span class="k">if</span> <span class="ow">not</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_gpu</span><span class="p">:</span>
     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;GPU support not available&quot;</span><span class="p">)</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
 
-<span class="c1"># Create GPU field collection with ghost regions for convolution</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span>
-    <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
-    <span class="n">memory_location</span><span class="o">=</span><span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="o">.</span><span class="n">MemoryLocation</span><span class="o">.</span><span class="n">Device</span>
-<span class="p">)</span>
+<span class="c1"># Create GPU field collection</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create Laplacian stencil (defined on CPU as numpy array)</span>
 <span class="n">stencil</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
 <span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">ConvolutionOperator</span><span class="p">([</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">stencil</span><span class="p">)</span>
 
 <span class="c1"># Create fields</span>
-<span class="n">input_field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;input&quot;</span><span class="p">)</span>
-<span class="n">output_field</span> <span class="o">=</span> <span class="n">real_field</span><span class="p">(</span><span class="n">fc</span><span class="p">,</span> <span class="s2">&quot;output&quot;</span><span class="p">)</span>
+<span class="n">input_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+<span class="n">output_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;output&quot;</span><span class="p">)</span>
 
 <span class="c1"># Initialize input (using CuPy)</span>
 <span class="n">input_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="o">*</span><span class="n">input_field</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 
-<span class="c1"># Apply convolution (executed on GPU)</span>
-<span class="n">laplace</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">input_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">,</span> <span class="n">output_field</span><span class="o">.</span><span class="n">_cpp</span><span class="p">)</span>
+<span class="c1"># Apply convolution (executed on GPU) - fields are passed directly</span>
+<span class="n">laplace</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">input_field</span><span class="p">,</span> <span class="n">output_field</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -525,7 +511,7 @@ cmake<span class="w"> </span>-DMUGRID_ENABLE_HIP<span class="o">=</span>ON<span 
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=de3230e1"></script>
+</div><script src="_static/documentation_options.js?v=7b60fc90"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

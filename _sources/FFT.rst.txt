@@ -153,20 +153,19 @@ FFT fields can have multiple components:
 .. code-block:: python
 
     import muGrid
-    from muGrid import fft_real_space_field, fft_fourier_space_field
 
     engine = muGrid.FFTEngine([16, 20])
 
     # Create field with 3 components (e.g., velocity vector)
-    velocity = fft_real_space_field(engine, "velocity", nb_components=3)
-    velocity_hat = fft_fourier_space_field(engine, "velocity_hat", nb_components=3)
+    velocity = engine.real_space_field("velocity", nb_components=3)
+    velocity_hat = engine.fourier_space_field("velocity_hat", nb_components=3)
 
     print(f"Velocity shape: {velocity.s.shape}")      # (3, 1, 16, 20)
     print(f"Velocity_hat shape: {velocity_hat.s.shape}")  # (3, 1, 9, 20)
 
-    # FFT transforms all components
-    engine.fft(velocity._cpp, velocity_hat._cpp)
-    engine.ifft(velocity_hat._cpp, velocity._cpp)
+    # FFT transforms all components - fields are passed directly
+    engine.fft(velocity, velocity_hat)
+    engine.ifft(velocity_hat, velocity)
 
 MPI-parallel FFT
 ****************
