@@ -1,7 +1,9 @@
 # Example Python scripts
 set(MUGRID_EXAMPLES
     components.py
+    fft_roundtrip.py
     field_collection.py
+    fourier_derivative.py
     gradient.py
     io.py
     poisson.py

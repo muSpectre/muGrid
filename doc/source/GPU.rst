@@ -82,6 +82,23 @@ API for GPU arrays:
     result = cp.sum(field_b.p ** 2)
     print(f"Sum of squares: {result}")
 
+For writing device-agnostic code, avoid importing `numpy` or `cupy` directly.
+In the above example, execute the sum with:
+
+.. code-block:: python
+
+    result = (field_b.p ** 2).sum()
+
+This may not always be possible. In this case, it may be useful to either import
+`numpy` or `scipy` under the same module alias:
+
+.. code-block:: python
+
+    if memory == "host":
+        import numpy as xp
+    else:
+        import cupy as xp
+
 Zero-copy data exchange
 ***********************
 
