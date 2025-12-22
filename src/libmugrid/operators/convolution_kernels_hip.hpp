@@ -43,162 +43,141 @@
 #include "convolution_kernels_cpu.hh"  // For GridTraversalParams
 
 namespace muGrid {
-namespace hip {
+    namespace hip {
 
 // HIP kernel implementations - only compiled when using hipcc (__HIPCC__)
 #ifdef __HIPCC__
 
-    /**
-     * @brief HIP kernel for forward convolution
-     */
-    __global__ void apply_convolution_kernel_impl(
-        const Real* __restrict__ nodal_data,
-        Real* __restrict__ quad_data,
-        const Real alpha,
-        const Index_t nx, const Index_t ny, const Index_t nz,
-        const Index_t nodal_base, const Index_t quad_base,
-        const Index_t nodal_stride_x, const Index_t nodal_stride_y,
-        const Index_t nodal_stride_z,
-        const Index_t quad_stride_x, const Index_t quad_stride_y,
-        const Index_t quad_stride_z,
-        const Index_t* __restrict__ quad_indices,
-        const Index_t* __restrict__ nodal_indices,
-        const Real* __restrict__ op_values,
-        const Index_t nnz) {
+        /**
+         * @brief HIP kernel for forward convolution
+         */
+        __global__ void apply_convolution_kernel_impl(
+            const Real * __restrict__ nodal_data, Real * __restrict__ quad_data,
+            const Real alpha, const Index_t nx, const Index_t ny,
+            const Index_t nz, const Index_t nodal_base, const Index_t quad_base,
+            const Index_t nodal_stride_x, const Index_t nodal_stride_y,
+            const Index_t nodal_stride_z, const Index_t quad_stride_x,
+            const Index_t quad_stride_y, const Index_t quad_stride_z,
+            const Index_t * __restrict__ quad_indices,
+            const Index_t * __restrict__ nodal_indices,
+            const Real * __restrict__ op_values, const Index_t nnz) {
 
-        const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
-        const Index_t y = blockIdx.y * blockDim.y + threadIdx.y;
-        const Index_t z = blockIdx.z * blockDim.z + threadIdx.z;
+            const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
+            const Index_t y = blockIdx.y * blockDim.y + threadIdx.y;
+            const Index_t z = blockIdx.z * blockDim.z + threadIdx.z;
 
-        if (x < nx && y < ny && z < nz) {
-            const Index_t nodal_offset = nodal_base +
-                z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
-            const Index_t quad_offset = quad_base +
-                z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
+            if (x < nx && y < ny && z < nz) {
+                const Index_t nodal_offset = nodal_base + z * nodal_stride_z +
+                                             y * nodal_stride_y +
+                                             x * nodal_stride_x;
+                const Index_t quad_offset = quad_base + z * quad_stride_z +
+                                            y * quad_stride_y +
+                                            x * quad_stride_x;
 
-            for (Index_t i = 0; i < nnz; ++i) {
-                quad_data[quad_offset + quad_indices[i]] +=
-                    alpha * nodal_data[nodal_offset + nodal_indices[i]] *
-                    op_values[i];
+                for (Index_t i = 0; i < nnz; ++i) {
+                    quad_data[quad_offset + quad_indices[i]] +=
+                        alpha * nodal_data[nodal_offset + nodal_indices[i]] *
+                        op_values[i];
+                }
             }
         }
-    }
 
-    /**
-     * @brief HIP kernel for transpose convolution (with atomics)
-     */
-    __global__ void transpose_convolution_kernel_impl(
-        const Real* __restrict__ quad_data,
-        Real* __restrict__ nodal_data,
-        const Real alpha,
-        const Index_t nx, const Index_t ny, const Index_t nz,
-        const Index_t nodal_base, const Index_t quad_base,
-        const Index_t nodal_stride_x, const Index_t nodal_stride_y,
-        const Index_t nodal_stride_z,
-        const Index_t quad_stride_x, const Index_t quad_stride_y,
-        const Index_t quad_stride_z,
-        const Index_t* __restrict__ quad_indices,
-        const Index_t* __restrict__ nodal_indices,
-        const Real* __restrict__ op_values,
-        const Index_t nnz) {
+        /**
+         * @brief HIP kernel for transpose convolution (with atomics)
+         */
+        __global__ void transpose_convolution_kernel_impl(
+            const Real * __restrict__ quad_data, Real * __restrict__ nodal_data,
+            const Real alpha, const Index_t nx, const Index_t ny,
+            const Index_t nz, const Index_t nodal_base, const Index_t quad_base,
+            const Index_t nodal_stride_x, const Index_t nodal_stride_y,
+            const Index_t nodal_stride_z, const Index_t quad_stride_x,
+            const Index_t quad_stride_y, const Index_t quad_stride_z,
+            const Index_t * __restrict__ quad_indices,
+            const Index_t * __restrict__ nodal_indices,
+            const Real * __restrict__ op_values, const Index_t nnz) {
 
-        const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
-        const Index_t y = blockIdx.y * blockDim.y + threadIdx.y;
-        const Index_t z = blockIdx.z * blockDim.z + threadIdx.z;
+            const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
+            const Index_t y = blockIdx.y * blockDim.y + threadIdx.y;
+            const Index_t z = blockIdx.z * blockDim.z + threadIdx.z;
 
-        if (x < nx && y < ny && z < nz) {
-            const Index_t nodal_offset = nodal_base +
-                z * nodal_stride_z + y * nodal_stride_y + x * nodal_stride_x;
-            const Index_t quad_offset = quad_base +
-                z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
+            if (x < nx && y < ny && z < nz) {
+                const Index_t nodal_offset = nodal_base + z * nodal_stride_z +
+                                             y * nodal_stride_y +
+                                             x * nodal_stride_x;
+                const Index_t quad_offset = quad_base + z * quad_stride_z +
+                                            y * quad_stride_y +
+                                            x * quad_stride_x;
 
-            for (Index_t i = 0; i < nnz; ++i) {
-                atomicAdd(&nodal_data[nodal_offset + nodal_indices[i]],
-                         alpha * quad_data[quad_offset + quad_indices[i]] *
-                         op_values[i]);
+                for (Index_t i = 0; i < nnz; ++i) {
+                    nodal_data[nodal_offset + nodal_indices[i]] +=
+                        alpha * quad_data[quad_offset + quad_indices[i]] *
+                        op_values[i];
+                }
             }
         }
-    }
 
-    /**
-     * @brief Launch forward convolution kernel
-     */
-    inline void apply_convolution_kernel(
-        const Real* nodal_data,
-        Real* quad_data,
-        const Real alpha,
-        const GridTraversalParams& params,
-        const Index_t* quad_indices,
-        const Index_t* nodal_indices,
-        const Real* op_values,
-        const Index_t nnz,
-        hipStream_t stream = 0) {
+        /**
+         * @brief Launch forward convolution kernel
+         */
+        inline void apply_convolution_kernel(
+            const Real * nodal_data, Real * quad_data, const Real alpha,
+            const GridTraversalParams & params, const Index_t * quad_indices,
+            const Index_t * nodal_indices, const Real * op_values,
+            const Index_t nnz, hipStream_t stream = 0) {
 
-        const Index_t nodal_base = params.start_pixel_index *
-                                   params.nodal_elems_per_pixel;
-        const Index_t quad_base = params.start_pixel_index *
-                                  params.quad_elems_per_pixel;
+            const Index_t nodal_base =
+                params.start_pixel_index * params.nodal_elems_per_pixel;
+            const Index_t quad_base =
+                params.start_pixel_index * params.quad_elems_per_pixel;
 
-        // Thread block size (8x8x8 = 512 threads)
-        dim3 block(8, 8, 8);
-        dim3 grid(
-            (params.nx + block.x - 1) / block.x,
-            (params.ny + block.y - 1) / block.y,
-            (params.nz + block.z - 1) / block.z
-        );
+            // Thread block size (8x8x8 = 512 threads)
+            dim3 block(8, 8, 8);
+            dim3 grid((params.nx + block.x - 1) / block.x,
+                      (params.ny + block.y - 1) / block.y,
+                      (params.nz + block.z - 1) / block.z);
 
-        hipLaunchKernelGGL(apply_convolution_kernel_impl,
-            grid, block, 0, stream,
-            nodal_data, quad_data, alpha,
-            params.nx, params.ny, params.nz,
-            nodal_base, quad_base,
-            params.nodal_stride_x, params.nodal_stride_y, params.nodal_stride_z,
-            params.quad_stride_x, params.quad_stride_y, params.quad_stride_z,
-            quad_indices, nodal_indices, op_values, nnz
-        );
-    }
+            hipLaunchKernelGGL(apply_convolution_kernel_impl, grid, block, 0,
+                               stream, nodal_data, quad_data, alpha, params.nx,
+                               params.ny, params.nz, nodal_base, quad_base,
+                               params.nodal_stride_x, params.nodal_stride_y,
+                               params.nodal_stride_z, params.quad_stride_x,
+                               params.quad_stride_y, params.quad_stride_z,
+                               quad_indices, nodal_indices, op_values, nnz);
+        }
 
-    /**
-     * @brief Launch transpose convolution kernel
-     */
-    inline void transpose_convolution_kernel(
-        const Real* quad_data,
-        Real* nodal_data,
-        const Real alpha,
-        const GridTraversalParams& params,
-        const Index_t* quad_indices,
-        const Index_t* nodal_indices,
-        const Real* op_values,
-        const Index_t nnz,
-        hipStream_t stream = 0) {
+        /**
+         * @brief Launch transpose convolution kernel
+         */
+        inline void transpose_convolution_kernel(
+            const Real * quad_data, Real * nodal_data, const Real alpha,
+            const GridTraversalParams & params, const Index_t * quad_indices,
+            const Index_t * nodal_indices, const Real * op_values,
+            const Index_t nnz, hipStream_t stream = 0) {
 
-        const Index_t nodal_base = params.start_pixel_index *
-                                   params.nodal_elems_per_pixel;
-        const Index_t quad_base = params.start_pixel_index *
-                                  params.quad_elems_per_pixel;
+            const Index_t nodal_base =
+                params.start_pixel_index * params.nodal_elems_per_pixel;
+            const Index_t quad_base =
+                params.start_pixel_index * params.quad_elems_per_pixel;
 
-        // Thread block size (8x8x8 = 512 threads)
-        dim3 block(8, 8, 8);
-        dim3 grid(
-            (params.nx + block.x - 1) / block.x,
-            (params.ny + block.y - 1) / block.y,
-            (params.nz + block.z - 1) / block.z
-        );
+            // Thread block size (8x8x8 = 512 threads)
+            dim3 block(8, 8, 8);
+            dim3 grid((params.nx + block.x - 1) / block.x,
+                      (params.ny + block.y - 1) / block.y,
+                      (params.nz + block.z - 1) / block.z);
 
-        hipLaunchKernelGGL(transpose_convolution_kernel_impl,
-            grid, block, 0, stream,
-            quad_data, nodal_data, alpha,
-            params.nx, params.ny, params.nz,
-            nodal_base, quad_base,
-            params.nodal_stride_x, params.nodal_stride_y, params.nodal_stride_z,
-            params.quad_stride_x, params.quad_stride_y, params.quad_stride_z,
-            quad_indices, nodal_indices, op_values, nnz
-        );
-    }
+            hipLaunchKernelGGL(transpose_convolution_kernel_impl, grid, block,
+                               0, stream, quad_data, nodal_data, alpha,
+                               params.nx, params.ny, params.nz, nodal_base,
+                               quad_base, params.nodal_stride_x,
+                               params.nodal_stride_y, params.nodal_stride_z,
+                               params.quad_stride_x, params.quad_stride_y,
+                               params.quad_stride_z, quad_indices,
+                               nodal_indices, op_values, nnz);
+        }
 
 #endif  // __HIPCC__
 
-}  // namespace hip
+    }  // namespace hip
 }  // namespace muGrid
 
 #endif  // MUGRID_ENABLE_HIP
