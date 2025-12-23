@@ -163,6 +163,11 @@ if(EXECINFO_LIBRARY)
     target_link_libraries(muGrid PRIVATE ${EXECINFO_LIBRARY})
 endif()
 
+# Windows-specific libraries for stack trace support
+if(WIN32)
+    target_link_libraries(muGrid PRIVATE dbghelp)
+endif()
+
 # Installation
 # Build list of targets to export (muGrid + any FetchContent dependencies)
 set(_MUGRID_INSTALL_TARGETS muGrid)

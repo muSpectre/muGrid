@@ -33,9 +33,15 @@
  *
  */
 
+#ifdef _WIN32
+#include <windows.h>
+#include <dbghelp.h>
+#include <mutex>
+#else
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
+#endif
 
 #include "core/exception.hh"
 
@@ -43,6 +49,36 @@ using muGrid::Traceback;
 using muGrid::TracebackEntry;
 
 const int MAX_DEPTH = 256;
+
+#ifdef _WIN32
+// Windows-specific: Initialize symbol handler
+namespace {
+class SymbolHandler {
+ public:
+  SymbolHandler() : initialized(false) {
+    HANDLE process = GetCurrentProcess();
+    if (SymInitialize(process, NULL, TRUE)) {
+      initialized = true;
+      SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
+    }
+  }
+
+  ~SymbolHandler() {
+    if (initialized) {
+      SymCleanup(GetCurrentProcess());
+    }
+  }
+
+  bool is_initialized() const { return initialized; }
+
+ private:
+  bool initialized;
+};
+
+// Static instance ensures initialization/cleanup
+static SymbolHandler symbol_handler;
+}  // namespace
+#endif
 
 TracebackEntry::TracebackEntry(void * address, const std::string & symbol)
     : address(address), symbol(symbol), name{}, file{}, resolved{false} {
@@ -70,6 +106,42 @@ TracebackEntry & TracebackEntry::operator=(const TracebackEntry & other) {
 }
 
 void TracebackEntry::discover_name_and_file() {
+#ifdef _WIN32
+  // Windows implementation using DbgHelp
+  if (!symbol_handler.is_initialized())
+    return;
+
+  HANDLE process = GetCurrentProcess();
+  DWORD64 address64 = reinterpret_cast<DWORD64>(this->address);
+
+  // Get symbol information
+  char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+  SYMBOL_INFO * symbol_info = reinterpret_cast<SYMBOL_INFO *>(buffer);
+  symbol_info->SizeOfStruct = sizeof(SYMBOL_INFO);
+  symbol_info->MaxNameLen = MAX_SYM_NAME;
+
+  DWORD64 displacement = 0;
+  if (SymFromAddr(process, address64, &displacement, symbol_info)) {
+    this->name = symbol_info->Name;
+    this->resolved = true;
+
+    // Try to get file and line information
+    IMAGEHLP_LINE64 line;
+    line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+    DWORD line_displacement = 0;
+    if (SymGetLineFromAddr64(process, address64, &line_displacement, &line)) {
+      this->file = line.FileName;
+    } else {
+      // If we can't get the source file, use the module name
+      IMAGEHLP_MODULE64 module;
+      module.SizeOfStruct = sizeof(IMAGEHLP_MODULE64);
+      if (SymGetModuleInfo64(process, address64, &module)) {
+        this->file = module.ImageName;
+      }
+    }
+  }
+#else
+  // Unix/Linux/macOS implementation using dladdr
   Dl_info info;
   if (!dladdr(this->address, &info))
     return;
@@ -90,9 +162,22 @@ void TracebackEntry::discover_name_and_file() {
 
   if (info.dli_fname)
     this->file = info.dli_fname;
+#endif
 }
 
 Traceback::Traceback(int discard_entries) : stack{} {
+#ifdef _WIN32
+  // Windows implementation using CaptureStackBackTrace
+  void * buffer[MAX_DEPTH];
+  USHORT frames = CaptureStackBackTrace(discard_entries, MAX_DEPTH, buffer, NULL);
+
+  for (USHORT i = 0; i < frames; ++i) {
+    // On Windows, we don't have symbol strings at capture time
+    // Symbol resolution happens in discover_name_and_file()
+    this->stack.push_back(TracebackEntry{buffer[i], ""});
+  }
+#else
+  // Unix/Linux/macOS implementation using backtrace
   void * buffer[MAX_DEPTH];
   int size = backtrace(buffer, MAX_DEPTH);
   char ** symbols = backtrace_symbols(buffer, size);
@@ -102,6 +187,7 @@ Traceback::Traceback(int discard_entries) : stack{} {
   }
 
   free(symbols);
+#endif
 }
 
 Traceback::~Traceback() {}
