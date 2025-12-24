@@ -42,6 +42,8 @@ set(MUGRID_SOURCES
     mpi/cartesian_decomposition.cc
     # operators/
     operators/convolution_operator.cc
+    # benchmark/
+    benchmark/laplace_operator.cc
     # io/
     io/file_io_base.cc
     # util/
@@ -49,7 +51,7 @@ set(MUGRID_SOURCES
     # fft/
     fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
-        fft/transpose.cc
+    fft/transpose.cc
     fft/fft_utils.cc
     fft/fft_engine_base.cc
     fft/fft_engine.cc
@@ -65,6 +67,7 @@ endif()
 if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
+    list(APPEND MUGRID_SOURCES benchmark/laplace_operator_cuda.cu)
     # Mark the .cc file to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
@@ -73,9 +76,15 @@ if(MUGRID_ENABLE_CUDA)
 elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
+    list(APPEND MUGRID_SOURCES benchmark/laplace_operator_hip.cpp)
     # Mark the .cc file to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
+        PROPERTIES LANGUAGE HIP
+    )
+    # Mark the benchmark HIP file to be compiled as HIP
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/laplace_operator_hip.cpp
         PROPERTIES LANGUAGE HIP
     )
 endif()
@@ -105,6 +114,7 @@ target_include_directories(muGrid
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/memory>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/benchmark>
         $<INSTALL_INTERFACE:include>
 )
 
@@ -184,7 +194,7 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
 )
 
 # Install header files for each subdirectory
-foreach(subdir core grid field collection mpi operators io util memory fft)
+foreach(subdir core grid field collection mpi operators io util memory fft benchmark)
     file(GLOB MUGRID_${subdir}_HEADERS "${subdir}/*.hh")
     install(FILES ${MUGRID_${subdir}_HEADERS}
         DESTINATION include/libmugrid/${subdir}

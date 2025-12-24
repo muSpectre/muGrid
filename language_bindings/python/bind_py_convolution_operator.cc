@@ -37,6 +37,7 @@
 #include "field/field_typed.hh"
 #include "operators/convolution_operator_base.hh"
 #include "operators/convolution_operator.hh"
+#include "benchmark/laplace_operator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -46,6 +47,7 @@
 
 using muGrid::ConvolutionOperatorBase;
 using muGrid::ConvolutionOperator;
+using muGrid::LaplaceOperator;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Index_t;
@@ -244,7 +246,52 @@ void add_convolution_operator_default(py::module &mod) {
 }
 
 
+// Bind class LaplaceOperator (hard-coded stencil for benchmarking)
+void add_laplace_operator(py::module &mod) {
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (LaplaceOperator::*)(
+        const RealFieldHost&, RealFieldHost&) const;
+
+    auto laplace_op = py::class_<LaplaceOperator>(mod, "LaplaceOperator",
+        R"pbdoc(
+        Hard-coded Laplace operator for benchmarking purposes.
+
+        This operator provides optimized implementations of the discrete Laplace
+        operator using:
+        - 5-point stencil for 2D grids: [0,1,0; 1,-4,1; 0,1,0]
+        - 7-point stencil for 3D grids: center=-6, neighbors=+1
+
+        The implementation is designed for benchmarking and performance
+        comparison with the generic sparse convolution operator.
+        )pbdoc")
+        .def(py::init<Index_t>(),
+             "spatial_dim"_a,
+             "Construct a Laplace operator for the given dimension (2 or 3)")
+        .def("apply",
+             static_cast<ApplyHostFn>(&LaplaceOperator::apply),
+             "input_field"_a, "output_field"_a,
+             "Apply the Laplace operator to host (CPU) fields")
+        .def_property_readonly("spatial_dim", &LaplaceOperator::get_spatial_dim,
+             "Spatial dimension (2 or 3)")
+        .def_property_readonly("nb_stencil_pts", &LaplaceOperator::get_nb_stencil_pts,
+             "Number of stencil points (5 for 2D, 7 for 3D)");
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    // Device field overloads (only when GPU backend is enabled)
+    using ApplyDeviceFn = void (LaplaceOperator::*)(
+        const RealFieldDevice&, RealFieldDevice&) const;
+
+    laplace_op
+        .def("apply",
+             static_cast<ApplyDeviceFn>(&LaplaceOperator::apply),
+             "input_field"_a, "output_field"_a,
+             "Apply the Laplace operator to device (GPU) fields");
+#endif
+}
+
+
 void add_convolution_operator_classes(py::module &mod) {
     add_convolution_operator_base(mod);
     add_convolution_operator_default(mod);
+    add_laplace_operator(mod);
 }

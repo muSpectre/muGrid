@@ -59,6 +59,14 @@ parser.add_argument(
     help="Show plot of RHS and solution (default: off)"
 )
 
+parser.add_argument(
+    "-s", "--stencil",
+    choices=["generic", "hardcoded"],
+    default="generic",
+    help="Stencil implementation: 'generic' (sparse convolution) or "
+         "'hardcoded' (optimized Laplace operator) (default: generic)"
+)
+
 args = parser.parse_args()
 
 if args.memory == "host":
@@ -85,24 +93,39 @@ grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 # FD-stencil for the Laplacian
 if dim == 2:
-    # 5-point stencil for 2D
-    stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    stencil_offset = [-1, -1]
     nb_stencil_pts = 5
 else:
-    # 7-point stencil for 3D
-    stencil = np.zeros((3, 3, 3))
-    stencil[1, 1, 0] = 1  # z-1
-    stencil[1, 0, 1] = 1  # y-1
-    stencil[0, 1, 1] = 1  # x-1
-    stencil[1, 1, 1] = -6  # center
-    stencil[2, 1, 1] = 1  # x+1
-    stencil[1, 2, 1] = 1  # y+1
-    stencil[1, 1, 2] = 1  # z+1
-    stencil_offset = [-1, -1, -1]
     nb_stencil_pts = 7
 
-laplace = muGrid.ConvolutionOperator(stencil_offset, stencil)
+# Create the Laplace operator based on the selected implementation
+if args.stencil == "generic":
+    # Generic sparse convolution operator
+    if dim == 2:
+        # 5-point stencil for 2D
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        stencil_offset = [-1, -1]
+    else:
+        # 7-point stencil for 3D
+        stencil = np.zeros((3, 3, 3))
+        stencil[1, 1, 0] = 1  # z-1
+        stencil[1, 0, 1] = 1  # y-1
+        stencil[0, 1, 1] = 1  # x-1
+        stencil[1, 1, 1] = -6  # center
+        stencil[2, 1, 1] = 1  # x+1
+        stencil[1, 2, 1] = 1  # y+1
+        stencil[1, 1, 2] = 1  # z+1
+        stencil_offset = [-1, -1, -1]
+    laplace = muGrid.ConvolutionOperator(stencil_offset, stencil)
+    stencil_name = "Generic sparse convolution"
+else:
+    # Hard-coded optimized Laplace operator (for benchmarking)
+    laplace = muGrid.LaplaceOperator(dim)
+    stencil_name = "Hard-coded Laplace operator"
+
+# Scaling factor for the Laplacian (we need the minus sign because
+# the Laplace operator is negative definite, but the CG solver
+# assumes a positive-definite operator)
+laplace_scale = -1.0 / np.mean(grid_spacing) ** 2
 
 coords = decomposition.coords  # Domain-local coords for each pixel
 
@@ -141,10 +164,8 @@ def hessp(x, Ax):
     nb_hessp_calls += 1
     decomposition.communicate_ghosts(x._cpp)
     laplace.apply(x._cpp, Ax._cpp)
-    # We need the minus sign because the Laplace operator is negative
-    # definite, but the conjugate-gradients solver assumes a
-    # positive-definite operator.
-    Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+    # Scale by grid spacing (and flip sign for positive-definiteness)
+    Ax.s[...] *= laplace_scale
     return Ax
 
 
@@ -172,6 +193,7 @@ print(f"{'='*60}")
 print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
       f"{nb_grid_pts_total:,} points")
 print(f"Dimensions: {dim}D")
+print(f"Stencil implementation: {stencil_name}")
 print(f"Stencil points: {nb_stencil_pts}")
 print(f"CG iterations (hessp calls): {nb_hessp_calls}")
 print(f"Total time: {elapsed_time:.4f} seconds")
