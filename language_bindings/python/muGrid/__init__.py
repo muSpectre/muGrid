@@ -121,6 +121,9 @@ from .Field import wrap_field  # noqa: E402
 # MPI communicator
 from .Parallel import Communicator  # noqa: E402
 
+# Timing utility
+from .Timer import Timer  # noqa: E402
+
 # Version information
 __version__ = _muGrid.version.description()
 
@@ -174,4 +177,6 @@ __all__ = [
     "SubPt",
     "Unit",
     "Verbosity",
+    # Utilities
+    "Timer",
 ]

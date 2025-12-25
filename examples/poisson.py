@@ -1,7 +1,6 @@
 # Solver for the Poisson equation
 
 import argparse
-import time
 
 try:
     import matplotlib.pyplot as plt
@@ -97,12 +96,17 @@ if dim == 2:
 else:
     nb_stencil_pts = 7
 
+# Scaling factor for the Laplacian (we need the minus sign because
+# the Laplace operator is negative definite, but the CG solver
+# assumes a positive-definite operator)
+laplace_scale = -1.0 / np.mean(grid_spacing) ** 2
+
 # Create the Laplace operator based on the selected implementation
 if args.stencil == "generic":
     # Generic sparse convolution operator
     if dim == 2:
         # 5-point stencil for 2D
-        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        stencil = laplace_scale * np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
         stencil_offset = [-1, -1]
     else:
         # 7-point stencil for 3D
@@ -114,18 +118,15 @@ if args.stencil == "generic":
         stencil[2, 1, 1] = 1  # x+1
         stencil[1, 2, 1] = 1  # y+1
         stencil[1, 1, 2] = 1  # z+1
+        stencil *= laplace_scale
         stencil_offset = [-1, -1, -1]
     laplace = muGrid.ConvolutionOperator(stencil_offset, stencil)
     stencil_name = "Generic sparse convolution"
 else:
     # Hard-coded optimized Laplace operator (for benchmarking)
-    laplace = muGrid.LaplaceOperator(dim)
+    # Pass scale factor to fold in grid spacing and positive-definiteness
+    laplace = muGrid.LaplaceOperator(dim, laplace_scale)
     stencil_name = "Hard-coded Laplace operator"
-
-# Scaling factor for the Laplacian (we need the minus sign because
-# the Laplace operator is negative definite, but the CG solver
-# assumes a positive-definite operator)
-laplace_scale = -1.0 / np.mean(grid_spacing) ** 2
 
 coords = decomposition.coords  # Domain-local coords for each pixel
 
@@ -147,6 +148,9 @@ rhs.p[...] -= arr.mean(rhs.p)
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
 nb_hessp_calls = 0
 
+# Create global timer for hierarchical timing
+timer = muGrid.Timer()
+
 
 def callback(it, x, r, p):
     """
@@ -159,32 +163,35 @@ def hessp(x, Ax):
     """
     Function to compute the product of the Hessian matrix with a vector.
     The Hessian is represented by the convolution operator.
+    The scale factor (grid spacing and sign) is already folded into the operator.
     """
     global nb_hessp_calls
-    nb_hessp_calls += 1
-    decomposition.communicate_ghosts(x._cpp)
-    laplace.apply(x._cpp, Ax._cpp)
-    # Scale by grid spacing (and flip sign for positive-definiteness)
-    Ax.s[...] *= laplace_scale
+    with timer("hessp"):
+        nb_hessp_calls += 1
+        with timer("communicate_ghosts"):
+            decomposition.communicate_ghosts(x._cpp)
+        with timer("apply"):
+            laplace.apply(x._cpp, Ax._cpp)
     return Ax
 
 
-start_time = time.perf_counter()
-try:
-    conjugate_gradients(
-        comm,
-        decomposition.collection,
-        hessp,  # linear operator
-        rhs._cpp,  # Pass the underlying C++ field
-        solution._cpp,
-        tol=1e-6,
-        callback=callback,
-        maxiter=args.maxiter,
-    )
-    print("CG converged.")
-except RuntimeError:
-    print("CG did not converge.")
-elapsed_time = time.perf_counter() - start_time
+with timer("conjugate_gradients"):
+    try:
+        conjugate_gradients(
+            comm,
+            decomposition.collection,
+            hessp,  # linear operator
+            rhs._cpp,  # Pass the underlying C++ field
+            solution._cpp,
+            tol=1e-6,
+            callback=callback,
+            maxiter=args.maxiter,
+        )
+        print("CG converged.")
+    except RuntimeError:
+        print("CG did not converge.")
+
+elapsed_time = timer.get_time("conjugate_gradients")
 
 # Performance metrics
 print(f"\n{'='*60}")
@@ -228,6 +235,9 @@ print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
 arithmetic_intensity = total_flops / total_bytes
 print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")
 print(f"{'='*60}")
+
+# Print hierarchical timing breakdown
+timer.print_summary()
 
 if args.plot:
     if dim == 3:

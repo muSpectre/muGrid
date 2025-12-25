@@ -125,8 +125,15 @@ namespace muGrid {
             return spatial_dim == 2 ? 5 : 7;
         }
 
+        /**
+         * @brief Get the scale factor.
+         * @return Scale factor applied to output
+         */
+        Real get_scale() const { return scale; }
+
     private:
         Index_t spatial_dim;
+        Real scale;
 
         /**
          * @brief Validate that fields are compatible with this operator.
@@ -146,26 +153,28 @@ namespace muGrid {
         /**
          * @brief Apply 5-point 2D Laplace stencil on host.
          *
-         * Stencil: [0, 1, 0]
-         *          [1,-4, 1]
-         *          [0, 1, 0]
+         * Stencil: scale * [0, 1, 0]
+         *                  [1,-4, 1]
+         *                  [0, 1, 0]
          */
         void laplace_2d_host(
             const Real* __restrict__ input,
             Real* __restrict__ output,
             Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y);
+            Index_t stride_x, Index_t stride_y,
+            Real scale);
 
         /**
          * @brief Apply 7-point 3D Laplace stencil on host.
          *
-         * Stencil: center = -6, each of 6 neighbors = +1
+         * Stencil: scale * (center = -6, each of 6 neighbors = +1)
          */
         void laplace_3d_host(
             const Real* __restrict__ input,
             Real* __restrict__ output,
             Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z);
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            Real scale);
 
 #if defined(MUGRID_ENABLE_CUDA)
         /**
@@ -175,7 +184,8 @@ namespace muGrid {
             const Real* input,
             Real* output,
             Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y);
+            Index_t stride_x, Index_t stride_y,
+            Real scale);
 
         /**
          * @brief Apply 3D Laplace stencil on CUDA device.
@@ -184,7 +194,8 @@ namespace muGrid {
             const Real* input,
             Real* output,
             Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z);
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            Real scale);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
@@ -195,7 +206,8 @@ namespace muGrid {
             const Real* input,
             Real* output,
             Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y);
+            Index_t stride_x, Index_t stride_y,
+            Real scale);
 
         /**
          * @brief Apply 3D Laplace stencil on HIP device.
@@ -204,7 +216,8 @@ namespace muGrid {
             const Real* input,
             Real* output,
             Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z);
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            Real scale);
 #endif
 
     }  // namespace benchmark_kernels

@@ -39,8 +39,8 @@
 
 namespace muGrid {
 
-    LaplaceOperator::LaplaceOperator(Index_t spatial_dim)
-        : spatial_dim{spatial_dim} {
+    LaplaceOperator::LaplaceOperator(Index_t spatial_dim, Real scale)
+        : spatial_dim{spatial_dim}, scale{scale} {
         if (spatial_dim != 2 && spatial_dim != 3) {
             throw RuntimeError("LaplaceOperator only supports 2D and 3D grids");
         }
@@ -105,14 +105,14 @@ namespace muGrid {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             benchmark_kernels::laplace_2d_host(
-                input, output, nx, ny, 1, nx);
+                input, output, nx, ny, 1, nx, this->scale);
         } else {
             // For 3D with ArrayOfStructures layout
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
             benchmark_kernels::laplace_3d_host(
-                input, output, nx, ny, nz, 1, nx, nx * ny);
+                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
         }
     }
 
@@ -136,10 +136,10 @@ namespace muGrid {
             // Device uses StructureOfArrays, but for scalar fields it's the same
 #if defined(MUGRID_ENABLE_CUDA)
             benchmark_kernels::laplace_2d_cuda(
-                input, output, nx, ny, 1, nx);
+                input, output, nx, ny, 1, nx, this->scale);
 #elif defined(MUGRID_ENABLE_HIP)
             benchmark_kernels::laplace_2d_hip(
-                input, output, nx, ny, 1, nx);
+                input, output, nx, ny, 1, nx, this->scale);
 #endif
         } else {
             Index_t nx = nb_grid_pts[0];
@@ -147,10 +147,10 @@ namespace muGrid {
             Index_t nz = nb_grid_pts[2];
 #if defined(MUGRID_ENABLE_CUDA)
             benchmark_kernels::laplace_3d_cuda(
-                input, output, nx, ny, nz, 1, nx, nx * ny);
+                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
 #elif defined(MUGRID_ENABLE_HIP)
             benchmark_kernels::laplace_3d_hip(
-                input, output, nx, ny, nz, 1, nx, nx * ny);
+                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
 #endif
         }
     }
@@ -162,7 +162,8 @@ namespace muGrid {
             const Real* __restrict__ input,
             Real* __restrict__ output,
             Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y) {
+            Index_t stride_x, Index_t stride_y,
+            Real scale) {
 
             // Process interior points (excluding ghost layers)
             // Ghost layer is 1 pixel on each side
@@ -177,7 +178,7 @@ namespace muGrid {
                     Real down   = input[idx - stride_y];
                     Real up     = input[idx + stride_y];
 
-                    output[idx] = left + right + down + up - 4.0 * center;
+                    output[idx] = scale * (left + right + down + up - 4.0 * center);
                 }
             }
         }
@@ -186,7 +187,8 @@ namespace muGrid {
             const Real* __restrict__ input,
             Real* __restrict__ output,
             Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z) {
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            Real scale) {
 
             // Process interior points (excluding ghost layers)
             for (Index_t iz = 1; iz < nz - 1; ++iz) {
@@ -203,7 +205,7 @@ namespace muGrid {
                         Real zm = input[idx - stride_z];
                         Real zp = input[idx + stride_z];
 
-                        output[idx] = xm + xp + ym + yp + zm + zp - 6.0 * center;
+                        output[idx] = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
                     }
                 }
             }

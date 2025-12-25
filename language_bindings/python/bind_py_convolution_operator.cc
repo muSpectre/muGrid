@@ -261,12 +261,17 @@ void add_laplace_operator(py::module &mod) {
         - 5-point stencil for 2D grids: [0,1,0; 1,-4,1; 0,1,0]
         - 7-point stencil for 3D grids: center=-6, neighbors=+1
 
+        The output is multiplied by a scale factor, which can be used to
+        incorporate grid spacing and sign conventions (e.g., for making
+        the operator positive-definite).
+
         The implementation is designed for benchmarking and performance
         comparison with the generic sparse convolution operator.
         )pbdoc")
-        .def(py::init<Index_t>(),
-             "spatial_dim"_a,
-             "Construct a Laplace operator for the given dimension (2 or 3)")
+        .def(py::init<Index_t, Real>(),
+             "spatial_dim"_a, "scale"_a = 1.0,
+             "Construct a Laplace operator for the given dimension (2 or 3) "
+             "and optional scale factor (default: 1.0)")
         .def("apply",
              static_cast<ApplyHostFn>(&LaplaceOperator::apply),
              "input_field"_a, "output_field"_a,
@@ -274,7 +279,9 @@ void add_laplace_operator(py::module &mod) {
         .def_property_readonly("spatial_dim", &LaplaceOperator::get_spatial_dim,
              "Spatial dimension (2 or 3)")
         .def_property_readonly("nb_stencil_pts", &LaplaceOperator::get_nb_stencil_pts,
-             "Number of stencil points (5 for 2D, 7 for 3D)");
+             "Number of stencil points (5 for 2D, 7 for 3D)")
+        .def_property_readonly("scale", &LaplaceOperator::get_scale,
+             "Scale factor applied to output");
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device field overloads (only when GPU backend is enabled)

@@ -50,7 +50,8 @@ __global__ void laplace_2d_kernel(
     const Real* __restrict__ input,
     Real* __restrict__ output,
     Index_t nx, Index_t ny,
-    Index_t stride_x, Index_t stride_y) {
+    Index_t stride_x, Index_t stride_y,
+    Real scale) {
 
     // Thread indices (offset by 1 for ghost layer)
     Index_t ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -67,7 +68,7 @@ __global__ void laplace_2d_kernel(
         Real down   = input[idx - stride_y];
         Real up     = input[idx + stride_y];
 
-        output[idx] = left + right + down + up - 4.0 * center;
+        output[idx] = scale * (left + right + down + up - 4.0 * center);
     }
 }
 
@@ -78,7 +79,8 @@ __global__ void laplace_3d_kernel(
     const Real* __restrict__ input,
     Real* __restrict__ output,
     Index_t nx, Index_t ny, Index_t nz,
-    Index_t stride_x, Index_t stride_y, Index_t stride_z) {
+    Index_t stride_x, Index_t stride_y, Index_t stride_z,
+    Real scale) {
 
     // Thread indices (offset by 1 for ghost layer)
     Index_t ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -98,7 +100,7 @@ __global__ void laplace_3d_kernel(
         Real zm = input[idx - stride_z];
         Real zp = input[idx + stride_z];
 
-        output[idx] = xm + xp + ym + yp + zm + zp - 6.0 * center;
+        output[idx] = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
     }
 }
 
@@ -106,7 +108,8 @@ void laplace_2d_hip(
     const Real* input,
     Real* output,
     Index_t nx, Index_t ny,
-    Index_t stride_x, Index_t stride_y) {
+    Index_t stride_x, Index_t stride_y,
+    Real scale) {
 
     // Compute grid dimensions (for interior points only)
     Index_t interior_nx = nx - 2;  // Exclude ghost layers
@@ -119,7 +122,7 @@ void laplace_2d_hip(
     );
 
     hipLaunchKernelGGL(laplace_2d_kernel, grid, block, 0, 0,
-        input, output, nx, ny, stride_x, stride_y);
+        input, output, nx, ny, stride_x, stride_y, scale);
 
     // Synchronize to ensure kernel completion
     hipDeviceSynchronize();
@@ -129,7 +132,8 @@ void laplace_3d_hip(
     const Real* input,
     Real* output,
     Index_t nx, Index_t ny, Index_t nz,
-    Index_t stride_x, Index_t stride_y, Index_t stride_z) {
+    Index_t stride_x, Index_t stride_y, Index_t stride_z,
+    Real scale) {
 
     // Compute grid dimensions (for interior points only)
     Index_t interior_nx = nx - 2;
@@ -144,7 +148,7 @@ void laplace_3d_hip(
     );
 
     hipLaunchKernelGGL(laplace_3d_kernel, grid, block, 0, 0,
-        input, output, nx, ny, nz, stride_x, stride_y, stride_z);
+        input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale);
 
     // Synchronize to ensure kernel completion
     hipDeviceSynchronize();
