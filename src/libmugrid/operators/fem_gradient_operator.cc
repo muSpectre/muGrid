@@ -37,6 +37,12 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
+#if defined(MUGRID_ENABLE_CUDA)
+    #include <cuda_runtime.h>
+#elif defined(MUGRID_ENABLE_HIP)
+    #include <hip/hip_runtime.h>
+#endif
+
 namespace muGrid {
 
     // =========================================================================
@@ -353,8 +359,82 @@ namespace muGrid {
         TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field,
         Real alpha,
         bool increment) const {
-        // TODO: Implement GPU version
-        throw RuntimeError("GPU FEMGradientOperator not yet implemented");
+        const auto& collection = this->validate_fields(nodal_field, gradient_field);
+
+        // Get grid dimensions (with ghosts)
+        auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
+
+        // Get raw device data pointers via view()
+        const Real* nodal = nodal_field.view().data();
+        Real* gradient = gradient_field.view().data();
+
+        // Grid spacing
+        Real hx = this->grid_spacing[0];
+        Real hy = this->grid_spacing[1];
+
+        // Device uses StructureOfArrays (SoA) layout:
+        // - spatial indices are fastest varying
+        // - component/quadrature indices are slowest varying
+        if (this->spatial_dim == 2) {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+
+            // For SoA: nodal field [1, x, y] -> spatial first
+            Index_t nodal_stride_x = 1;
+            Index_t nodal_stride_y = nx;
+            Index_t nodal_stride_n = nx * ny;
+
+            // For SoA: gradient field [dim, nb_quad, x, y]
+            // Memory layout: x varies fastest, then y, then q, then d
+            Index_t dim = this->spatial_dim;
+            Index_t nb_quad = this->get_nb_quad_pts();
+            Index_t grad_stride_x = 1;
+            Index_t grad_stride_y = nx;
+            Index_t grad_stride_q = nx * ny;
+            Index_t grad_stride_d = nx * ny * nb_quad;
+
+#if defined(MUGRID_ENABLE_CUDA)
+            fem_gradient_kernels::fem_gradient_2d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+            fem_gradient_kernels::fem_gradient_2d_hip(
+#endif
+                nodal, gradient, nx, ny,
+                nodal_stride_x, nodal_stride_y, nodal_stride_n,
+                grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
+                hx, hy, alpha, increment);
+        } else {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+            Index_t nz = nb_grid_pts[2];
+            Real hz = this->grid_spacing[2];
+
+            // For SoA: nodal field [1, x, y, z] -> spatial first
+            Index_t nodal_stride_x = 1;
+            Index_t nodal_stride_y = nx;
+            Index_t nodal_stride_z = nx * ny;
+            Index_t nodal_stride_n = nx * ny * nz;
+
+            // For SoA: gradient field [dim, nb_quad, x, y, z]
+            // Memory layout: x varies fastest, then y, then z, then q, then d
+            Index_t dim = this->spatial_dim;
+            Index_t nb_quad = this->get_nb_quad_pts();
+            Index_t grad_stride_x = 1;
+            Index_t grad_stride_y = nx;
+            Index_t grad_stride_z = nx * ny;
+            Index_t grad_stride_q = nx * ny * nz;
+            Index_t grad_stride_d = nx * ny * nz * nb_quad;
+
+#if defined(MUGRID_ENABLE_CUDA)
+            fem_gradient_kernels::fem_gradient_3d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+            fem_gradient_kernels::fem_gradient_3d_hip(
+#endif
+                nodal, gradient, nx, ny, nz,
+                nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
+                grad_stride_x, grad_stride_y, grad_stride_z,
+                grad_stride_q, grad_stride_d,
+                hx, hy, hz, alpha, increment);
+        }
     }
 
     void FEMGradientOperator::transpose_impl(
@@ -363,8 +443,102 @@ namespace muGrid {
         Real alpha,
         bool increment,
         const std::vector<Real> &weights) const {
-        // TODO: Implement GPU version
-        throw RuntimeError("GPU FEMGradientOperator not yet implemented");
+        const auto& collection = this->validate_fields(nodal_field, gradient_field);
+
+        // Get grid dimensions
+        auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
+
+        // Get raw device data pointers via view()
+        const Real* gradient = gradient_field.view().data();
+        Real* nodal = nodal_field.view().data();
+
+        // Grid spacing
+        Real hx = this->grid_spacing[0];
+        Real hy = this->grid_spacing[1];
+
+        // Get quadrature weights (host memory)
+        std::vector<Real> quad_weights = weights.empty() ?
+            this->get_quadrature_weights() : weights;
+
+        // Device uses StructureOfArrays (SoA) layout:
+        // - spatial indices are fastest varying
+        // - component/quadrature indices are slowest varying
+        if (this->spatial_dim == 2) {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+
+            // For SoA: nodal field [1, x, y] -> spatial first
+            Index_t nodal_stride_x = 1;
+            Index_t nodal_stride_y = nx;
+            Index_t nodal_stride_n = nx * ny;
+
+            // For SoA: gradient field [dim, nb_quad, x, y]
+            // Memory layout: x varies fastest, then y, then q, then d
+            Index_t dim = this->spatial_dim;
+            Index_t nb_quad = this->get_nb_quad_pts();
+            Index_t grad_stride_x = 1;
+            Index_t grad_stride_y = nx;
+            Index_t grad_stride_q = nx * ny;
+            Index_t grad_stride_d = nx * ny * nb_quad;
+
+#if defined(MUGRID_ENABLE_CUDA)
+            fem_gradient_kernels::fem_divergence_2d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+            fem_gradient_kernels::fem_divergence_2d_hip(
+#endif
+                gradient, nodal, nx, ny,
+                grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
+                nodal_stride_x, nodal_stride_y, nodal_stride_n,
+                hx, hy, quad_weights.data(), alpha, increment);
+        } else {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+            Index_t nz = nb_grid_pts[2];
+            Real hz = this->grid_spacing[2];
+
+            // For SoA: nodal field [1, x, y, z] -> spatial first
+            Index_t nodal_stride_x = 1;
+            Index_t nodal_stride_y = nx;
+            Index_t nodal_stride_z = nx * ny;
+            Index_t nodal_stride_n = nx * ny * nz;
+
+            // For SoA: gradient field [dim, nb_quad, x, y, z]
+            // Memory layout: x varies fastest, then y, then z, then q, then d
+            Index_t dim = this->spatial_dim;
+            Index_t nb_quad = this->get_nb_quad_pts();
+            Index_t grad_stride_x = 1;
+            Index_t grad_stride_y = nx;
+            Index_t grad_stride_z = nx * ny;
+            Index_t grad_stride_q = nx * ny * nz;
+            Index_t grad_stride_d = nx * ny * nz * nb_quad;
+
+            // For 3D, we need to pass quad_weights to the kernel
+            // Allocate device memory for weights
+            Real* d_quad_weights = nullptr;
+#if defined(MUGRID_ENABLE_CUDA)
+            cudaMalloc(&d_quad_weights, quad_weights.size() * sizeof(Real));
+            cudaMemcpy(d_quad_weights, quad_weights.data(),
+                       quad_weights.size() * sizeof(Real), cudaMemcpyHostToDevice);
+            fem_gradient_kernels::fem_divergence_3d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+            hipMalloc(&d_quad_weights, quad_weights.size() * sizeof(Real));
+            hipMemcpy(d_quad_weights, quad_weights.data(),
+                      quad_weights.size() * sizeof(Real), hipMemcpyHostToDevice);
+            fem_gradient_kernels::fem_divergence_3d_hip(
+#endif
+                gradient, nodal, nx, ny, nz,
+                grad_stride_x, grad_stride_y, grad_stride_z,
+                grad_stride_q, grad_stride_d,
+                nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
+                hx, hy, hz, d_quad_weights, alpha, increment);
+
+            // Free device weights
+#if defined(MUGRID_ENABLE_CUDA)
+            cudaFree(d_quad_weights);
+#elif defined(MUGRID_ENABLE_HIP)
+            hipFree(d_quad_weights);
+#endif
+        }
     }
 
     void FEMGradientOperator::apply(

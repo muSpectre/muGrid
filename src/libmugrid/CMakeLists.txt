@@ -68,20 +68,24 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cpp)
+    list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cpp)
     # Mark .cc/.cpp files to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cpp
         PROPERTIES LANGUAGE CUDA
     )
 elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cpp)
+    list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cpp)
     # Mark .cc/.cpp files to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cpp
         PROPERTIES LANGUAGE HIP
     )
 endif()
