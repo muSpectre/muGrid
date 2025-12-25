@@ -43,6 +43,7 @@ set(MUGRID_SOURCES
     # operators/
     operators/convolution_operator.cc
     operators/laplace_operator.cc
+    operators/fem_gradient_operator.cc
     # io/
     io/file_io_base.cc
     # util/

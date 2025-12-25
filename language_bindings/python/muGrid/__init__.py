@@ -86,6 +86,7 @@ if hasattr(_muGrid, "FileIONetCDF"):
 # Base classes and utilities (always C++ objects)
 ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
 LaplaceOperator = _muGrid.LaplaceOperator
+FEMGradientOperator = _muGrid.FEMGradientOperator
 Decomposition = _muGrid.Decomposition
 DynCcoord = _muGrid.DynCcoord
 DynRcoord = _muGrid.DynRcoord
@@ -167,6 +168,7 @@ __all__ = [
     # Enums and types
     "ConvolutionOperatorBase",
     "LaplaceOperator",
+    "FEMGradientOperator",
     "Decomposition",
     "DynCcoord",
     "DynRcoord",
