@@ -125,10 +125,10 @@ echo "============================================================"
 echo ""
 
 # Print header
-printf "%-15s %12s %12s %12s %12s\n" \
-    "Grid Size" "Generic" "Hardcoded" "Speedup" "GB/s (HC)"
-printf "%-15s %12s %12s %12s %12s\n" \
-    "---------------" "------------" "------------" "------------" "------------"
+printf "%-15s %12s %12s %10s %10s %10s\n" \
+    "Grid Size" "Generic" "Hardcoded" "Speedup" "GB/s" "GFLOP/s"
+printf "%-15s %12s %12s %10s %10s %10s\n" \
+    "---------------" "------------" "------------" "----------" "----------" "----------"
 
 # Process results and compute speedup
 for grid in "${GRID_SIZES[@]}"; do
@@ -146,6 +146,11 @@ for grid in "${GRID_SIZES[@]}"; do
     hardcoded_throughput=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
               | select(.config.stencil == "hardcoded")] | .[0].results.apply_throughput_GBps // "N/A"' \
+        "$RESULTS_FILE")
+
+    hardcoded_flops=$(jq -r --arg g "$grid" \
+        '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
+              | select(.config.stencil == "hardcoded")] | .[0].results.apply_flops_rate_GFLOPs // "N/A"' \
         "$RESULTS_FILE")
 
     # Compute speedup
@@ -174,8 +179,14 @@ for grid in "${GRID_SIZES[@]}"; do
         throughput_str="N/A"
     fi
 
-    printf "%-15s %12s %12s %11sx %12s\n" \
-        "$grid" "$generic_ms" "$hardcoded_ms" "$speedup" "$throughput_str"
+    if [[ "$hardcoded_flops" != "N/A" ]]; then
+        flops_str=$(printf "%.2f" "$hardcoded_flops")
+    else
+        flops_str="N/A"
+    fi
+
+    printf "%-15s %12s %12s %9sx %10s %10s\n" \
+        "$grid" "$generic_ms" "$hardcoded_ms" "$speedup" "$throughput_str" "$flops_str"
 done
 
 echo ""
@@ -184,10 +195,10 @@ echo "Scaling Analysis (Hardcoded Stencil)"
 echo "============================================================"
 echo ""
 
-printf "%-15s %15s %12s %12s\n" \
-    "Grid Size" "Grid Points" "Time (ms)" "us/point"
-printf "%-15s %15s %12s %12s\n" \
-    "---------------" "---------------" "------------" "------------"
+printf "%-15s %12s %12s %10s %10s\n" \
+    "Grid Size" "Grid Points" "Time/iter" "GB/s" "GFLOP/s"
+printf "%-15s %12s %12s %10s %10s\n" \
+    "---------------" "------------" "------------" "----------" "----------"
 
 for grid in "${GRID_SIZES[@]}"; do
     # Get metrics for hardcoded stencil
@@ -198,20 +209,30 @@ for grid in "${GRID_SIZES[@]}"; do
 
     if [[ -n "$result" ]]; then
         nb_pts=$(echo "$result" | jq -r '.config.nb_grid_pts_total')
+        apply_throughput=$(echo "$result" | jq -r '.results.apply_throughput_GBps')
+        apply_flops=$(echo "$result" | jq -r '.results.apply_flops_rate_GFLOPs')
         apply_time=$(echo "$result" | jq -r '.results.apply_time_seconds')
         iterations=$(echo "$result" | jq -r '.results.iterations')
 
-        # Time per iteration in ms
+        # Time per iteration
         time_per_iter_ms=$(echo "scale=3; $apply_time * 1000 / $iterations" | bc)
 
-        # Microseconds per grid point (per iteration)
-        us_per_point=$(echo "scale=4; $apply_time * 1000000 / $iterations / $nb_pts" | bc)
-
-        printf "%-15s %15s %12s %12s\n" \
-            "$grid" "$nb_pts" "$time_per_iter_ms" "$us_per_point"
+        printf "%-15s %12s %11s ms %10.2f %10.2f\n" \
+            "$grid" "$nb_pts" "$time_per_iter_ms" "$apply_throughput" "$apply_flops"
     fi
 done
 
+echo ""
+echo "============================================================"
+echo "Notes"
+echo "============================================================"
+echo ""
+echo "Bandwidth (GB/s): Estimated assuming 8 memory accesses per point"
+echo "                  (7 stencil reads + 1 write). With cache reuse,"
+echo "                  actual DRAM bandwidth is ~4x lower."
+echo ""
+echo "GFLOP/s:          Floating-point operations (14 FLOPs per point"
+echo "                  for 7-point stencil with scaling)."
 echo ""
 echo "Results saved to: $RESULTS_FILE"
 echo ""
