@@ -49,7 +49,7 @@ from typing import (
 )
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 
 # Import C++ module
 try:
@@ -57,7 +57,7 @@ try:
 except ImportError:
     import _muGrid
 
-from .Field import Field, wrap_field
+from .Field import Field
 
 if TYPE_CHECKING:
     from .Parallel import Communicator
@@ -66,6 +66,130 @@ if TYPE_CHECKING:
 MemoryLocationStr = Literal["host", "device"]
 SubPtMap = Dict[str, int]
 Shape = Union[Tuple[int, ...], List[int], Sequence[int]]
+
+
+class FieldCollectionMixin:
+    """
+    Mixin providing field creation methods for classes that have an underlying
+    C++ field collection.
+
+    Classes using this mixin must implement `_get_field_collection()` which
+    returns the C++ field collection object to use for field creation.
+    """
+
+    def _get_field_collection(self) -> Any:
+        """
+        Get the C++ field collection for field creation.
+
+        Subclasses must override this method. The default implementation
+        returns self._cpp, which works for GlobalFieldCollection and
+        LocalFieldCollection.
+        """
+        return self._cpp
+
+    def real_field(
+        self,
+        name: str,
+        components: Shape = (),
+        sub_pt: str = "pixel",
+    ) -> Field:
+        """
+        Create a real-valued field.
+
+        Parameters
+        ----------
+        name : str
+            Unique name for the field.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
+        sub_pt : str, optional
+            Sub-point type. Default is "pixel".
+
+        Returns
+        -------
+        Field
+            Wrapped field with .s, .p, .sg, .pg accessors.
+        """
+        cpp_field = self._get_field_collection().real_field(name, components, sub_pt)
+        return Field(cpp_field)
+
+    def complex_field(
+        self,
+        name: str,
+        components: Shape = (),
+        sub_pt: str = "pixel",
+    ) -> Field:
+        """
+        Create a complex-valued field.
+
+        Parameters
+        ----------
+        name : str
+            Unique name for the field.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
+        sub_pt : str, optional
+            Sub-point type. Default is "pixel".
+
+        Returns
+        -------
+        Field
+            Wrapped field with .s, .p, .sg, .pg accessors.
+        """
+        cpp_field = self._get_field_collection().complex_field(name, components, sub_pt)
+        return Field(cpp_field)
+
+    def int_field(
+        self,
+        name: str,
+        components: Shape = (),
+        sub_pt: str = "pixel",
+    ) -> Field:
+        """
+        Create an integer field.
+
+        Parameters
+        ----------
+        name : str
+            Unique name for the field.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
+        sub_pt : str, optional
+            Sub-point type. Default is "pixel".
+
+        Returns
+        -------
+        Field
+            Wrapped field with .s, .p, .sg, .pg accessors.
+        """
+        cpp_field = self._get_field_collection().int_field(name, components, sub_pt)
+        return Field(cpp_field)
+
+    def uint_field(
+        self,
+        name: str,
+        components: Shape = (),
+        sub_pt: str = "pixel",
+    ) -> Field:
+        """
+        Create an unsigned integer field.
+
+        Parameters
+        ----------
+        name : str
+            Unique name for the field.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
+        sub_pt : str, optional
+            Sub-point type. Default is "pixel".
+
+        Returns
+        -------
+        Field
+            Wrapped field with .s, .p, .sg, .pg accessors.
+        """
+        cpp_field = self._get_field_collection().uint_field(name, components, sub_pt)
+        return Field(cpp_field)
 
 
 def _unwrap(obj: Any) -> Any:
@@ -86,7 +210,9 @@ def _unwrap(obj: Any) -> Any:
 
 
 def _parse_memory_location(
-    location: Optional[Union[MemoryLocationStr, "_muGrid.GlobalFieldCollection.MemoryLocation"]],
+    location: Optional[
+        Union[MemoryLocationStr, "_muGrid.GlobalFieldCollection.MemoryLocation"]
+    ],
 ) -> "_muGrid.GlobalFieldCollection.MemoryLocation":
     """
     Parse a memory location string to the C++ enum.
@@ -122,12 +248,11 @@ def _parse_memory_location(
         return MemoryLocation.Device
     else:
         raise ValueError(
-            f"Invalid memory_location: {location!r}. "
-            f"Must be 'host' or 'device'."
+            f"Invalid memory_location: {location!r}. " f"Must be 'host' or 'device'."
         )
 
 
-class GlobalFieldCollection:
+class GlobalFieldCollection(FieldCollectionMixin):
     """
     Python wrapper for muGrid GlobalFieldCollection.
 
@@ -186,7 +311,10 @@ class GlobalFieldCollection:
         # Handle sub_pts alias
         if sub_pts is not None:
             if nb_sub_pts is not None and nb_sub_pts != sub_pts:
-                raise ValueError("Cannot specify both 'nb_sub_pts' and 'sub_pts' with different values")
+                raise ValueError(
+                    "Cannot specify both 'nb_sub_pts' and 'sub_pts' with "
+                    "different values"
+                )
             nb_sub_pts = sub_pts
         if nb_sub_pts is None:
             nb_sub_pts = {}
@@ -224,110 +352,6 @@ class GlobalFieldCollection:
         """Grid dimensions."""
         return self._nb_grid_pts
 
-    def real_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """
-        Create a real-valued field.
-
-        Parameters
-        ----------
-        name : str
-            Unique name for the field.
-        components : tuple of int, optional
-            Shape of field components. Default is () for scalar.
-        sub_pt : str, optional
-            Sub-point type. Default is "pixel".
-
-        Returns
-        -------
-        Field
-            Wrapped field with .s, .p, .sg, .pg accessors.
-        """
-        cpp_field = self._cpp.real_field(name, components, sub_pt)
-        return Field(cpp_field)
-
-    def complex_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """
-        Create a complex-valued field.
-
-        Parameters
-        ----------
-        name : str
-            Unique name for the field.
-        components : tuple of int, optional
-            Shape of field components. Default is () for scalar.
-        sub_pt : str, optional
-            Sub-point type. Default is "pixel".
-
-        Returns
-        -------
-        Field
-            Wrapped field with .s, .p, .sg, .pg accessors.
-        """
-        cpp_field = self._cpp.complex_field(name, components, sub_pt)
-        return Field(cpp_field)
-
-    def int_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """
-        Create an integer field.
-
-        Parameters
-        ----------
-        name : str
-            Unique name for the field.
-        components : tuple of int, optional
-            Shape of field components. Default is () for scalar.
-        sub_pt : str, optional
-            Sub-point type. Default is "pixel".
-
-        Returns
-        -------
-        Field
-            Wrapped field with .s, .p, .sg, .pg accessors.
-        """
-        cpp_field = self._cpp.int_field(name, components, sub_pt)
-        return Field(cpp_field)
-
-    def uint_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """
-        Create an unsigned integer field.
-
-        Parameters
-        ----------
-        name : str
-            Unique name for the field.
-        components : tuple of int, optional
-            Shape of field components. Default is () for scalar.
-        sub_pt : str, optional
-            Sub-point type. Default is "pixel".
-
-        Returns
-        -------
-        Field
-            Wrapped field with .s, .p, .sg, .pg accessors.
-        """
-        cpp_field = self._cpp.uint_field(name, components, sub_pt)
-        return Field(cpp_field)
-
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the underlying C++ object."""
         return getattr(self._cpp, name)
@@ -336,7 +360,7 @@ class GlobalFieldCollection:
         return f"GlobalFieldCollection({self._nb_grid_pts})"
 
 
-class LocalFieldCollection:
+class LocalFieldCollection(FieldCollectionMixin):
     """
     Python wrapper for muGrid LocalFieldCollection.
 
@@ -361,7 +385,8 @@ class LocalFieldCollection:
     def __init__(self, *args, **kwargs) -> None:
         # If called with positional args matching C++ signature, pass through directly
         if len(args) >= 2:
-            # User is using C++ constructor directly: LocalFieldCollection(dim, name, ...)
+            # User is using C++ constructor directly:
+            # LocalFieldCollection(dim, name, ...)
             self._cpp = _muGrid.LocalFieldCollection(*args, **kwargs)
             self._spatial_dim = args[0]
             return
@@ -390,46 +415,6 @@ class LocalFieldCollection:
         self._cpp = _muGrid.LocalFieldCollection(**cpp_kwargs)
         self._spatial_dim = spatial_dim
 
-    def real_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """Create a real-valued field."""
-        cpp_field = self._cpp.real_field(name, components, sub_pt)
-        return Field(cpp_field)
-
-    def complex_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """Create a complex-valued field."""
-        cpp_field = self._cpp.complex_field(name, components, sub_pt)
-        return Field(cpp_field)
-
-    def int_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """Create an integer field."""
-        cpp_field = self._cpp.int_field(name, components, sub_pt)
-        return Field(cpp_field)
-
-    def uint_field(
-        self,
-        name: str,
-        components: Shape = (),
-        sub_pt: str = "pixel",
-    ) -> Field:
-        """Create an unsigned integer field."""
-        cpp_field = self._cpp.uint_field(name, components, sub_pt)
-        return Field(cpp_field)
-
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the underlying C++ object."""
         return getattr(self._cpp, name)
@@ -438,7 +423,7 @@ class LocalFieldCollection:
         return f"LocalFieldCollection(spatial_dim={self._spatial_dim})"
 
 
-class CartesianDecomposition:
+class CartesianDecomposition(FieldCollectionMixin):
     """
     Python wrapper for muGrid CartesianDecomposition.
 
@@ -465,7 +450,7 @@ class CartesianDecomposition:
 
     Examples
     --------
-    >>> from muGrid import Communicator, CartesianDecomposition, real_field
+    >>> from muGrid import Communicator, CartesianDecomposition
     >>> comm = Communicator()
     >>> decomp = CartesianDecomposition(
     ...     comm,
@@ -473,7 +458,7 @@ class CartesianDecomposition:
     ...     nb_ghosts_left=[1, 1],
     ...     nb_ghosts_right=[1, 1]
     ... )
-    >>> field = real_field(decomp, "displacement", components=(3,))
+    >>> field = decomp.real_field("displacement", components=(3,))
     """
 
     def __init__(
@@ -518,10 +503,38 @@ class CartesianDecomposition:
             mem_loc,
         )
 
-    @property
-    def collection(self) -> Any:
-        """Get the underlying field collection."""
+    def _get_field_collection(self) -> Any:
+        """Get the C++ field collection for field creation."""
         return self._cpp.collection
+
+    @property
+    def nb_grid_pts(self) -> List[int]:
+        """Local subdomain grid dimensions (alias for nb_subdomain_grid_pts)."""
+        return list(self._cpp.nb_subdomain_grid_pts)
+
+    def set_nb_sub_pts(self, sub_pt_type: str, nb_sub_pts: int) -> None:
+        """
+        Set the number of sub-points for a given sub-point type.
+
+        Parameters
+        ----------
+        sub_pt_type : str
+            Name of the sub-point type (e.g., "quad").
+        nb_sub_pts : int
+            Number of sub-points per pixel for this type.
+        """
+        self._cpp.collection.set_nb_sub_pts(sub_pt_type, nb_sub_pts)
+
+    def communicate_ghosts(self, field: Field) -> None:
+        """
+        Exchange ghost buffer data for a field.
+
+        Parameters
+        ----------
+        field : Field
+            The field whose ghost buffers should be filled from neighbors.
+        """
+        self._cpp.communicate_ghosts(_unwrap(field))
 
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the underlying C++ object."""
@@ -584,7 +597,6 @@ class FFTEngine:
             comm = communicator
 
         # Handle defaults
-        nb_dims = len(nb_domain_grid_pts)
         if nb_ghosts_left is None:
             nb_ghosts_left = []
         if nb_ghosts_right is None:
@@ -762,6 +774,205 @@ class ConvolutionOperator:
         )
 
 
+class LaplaceOperator:
+    """
+    Python wrapper for muGrid LaplaceOperator.
+
+    A hard-coded, optimized Laplacian stencil operator using the standard
+    5-point (2D) or 7-point (3D) finite difference stencil.
+
+    Parameters
+    ----------
+    spatial_dim : int
+        Spatial dimension (2 or 3).
+    scale : float, optional
+        Scaling factor for the Laplacian. Default is 1.0.
+
+    Examples
+    --------
+    >>> # Create a 2D Laplacian
+    >>> laplace = LaplaceOperator(2, scale=-1.0)
+    >>> laplace.apply(input_field, output_field)
+    """
+
+    def __init__(self, spatial_dim: int, scale: float = 1.0) -> None:
+        self._cpp = _muGrid.LaplaceOperator(spatial_dim, scale)
+
+    def apply(self, input_field: Field, output_field: Field) -> None:
+        """
+        Apply the Laplacian operator.
+
+        Parameters
+        ----------
+        input_field : Field
+            Input field.
+        output_field : Field
+            Output field.
+        """
+        self._cpp.apply(_unwrap(input_field), _unwrap(output_field))
+
+    def apply_increment(
+        self, input_field: Field, alpha: float, output_field: Field
+    ) -> None:
+        """
+        Apply Laplacian and add scaled result to output: output += alpha * L(input).
+
+        Parameters
+        ----------
+        input_field : Field
+            Input field.
+        alpha : float
+            Scaling factor.
+        output_field : Field
+            Output field (updated in-place).
+        """
+        self._cpp.apply_increment(_unwrap(input_field), alpha, _unwrap(output_field))
+
+    def transpose(
+        self,
+        input_field: Field,
+        output_field: Field,
+        weights: Optional[Sequence[float]] = None,
+    ) -> None:
+        """
+        Apply transpose operator. For Laplacian, this is the same as apply.
+
+        Parameters
+        ----------
+        input_field : Field
+            Input field.
+        output_field : Field
+            Output field.
+        weights : sequence of float, optional
+            Weights (unused for Laplacian, included for API compatibility).
+        """
+        if weights is None:
+            weights = []
+        self._cpp.transpose(_unwrap(input_field), _unwrap(output_field), list(weights))
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying C++ object."""
+        return getattr(self._cpp, name)
+
+    def __repr__(self) -> str:
+        return f"LaplaceOperator(spatial_dim={self._cpp.spatial_dim})"
+
+
+class FEMGradientOperator:
+    """
+    Python wrapper for muGrid FEMGradientOperator.
+
+    A hard-coded, optimized gradient operator using linear finite element
+    shape functions on triangles (2D) or tetrahedra (3D).
+
+    Parameters
+    ----------
+    spatial_dim : int
+        Spatial dimension (2 or 3).
+    scale : float, optional
+        Scaling factor. Default is 1.0.
+
+    Examples
+    --------
+    >>> # Create a 2D gradient operator
+    >>> grad = FEMGradientOperator(2, scale=1.0)
+    >>> grad.apply(nodal_field, quadrature_point_gradient_field)
+    """
+
+    def __init__(self, spatial_dim: int, scale: float = 1.0) -> None:
+        self._cpp = _muGrid.FEMGradientOperator(spatial_dim, scale)
+
+    def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
+        """
+        Apply the gradient operator (nodal values → quadrature point gradients).
+
+        Parameters
+        ----------
+        nodal_field : Field
+            Input field at nodal points.
+        quadrature_point_field : Field
+            Output field at quadrature points.
+        """
+        self._cpp.apply(_unwrap(nodal_field), _unwrap(quadrature_point_field))
+
+    def apply_increment(
+        self, nodal_field: Field, alpha: float, quadrature_point_field: Field
+    ) -> None:
+        """
+        Apply gradient and add scaled result to output: output += alpha * grad(input).
+
+        Parameters
+        ----------
+        nodal_field : Field
+            Input field at nodal points.
+        alpha : float
+            Scaling factor.
+        quadrature_point_field : Field
+            Output field at quadrature points (updated in-place).
+        """
+        self._cpp.apply_increment(
+            _unwrap(nodal_field), alpha, _unwrap(quadrature_point_field)
+        )
+
+    def transpose(
+        self,
+        quadrature_point_field: Field,
+        nodal_field: Field,
+        weights: Optional[Sequence[float]] = None,
+    ) -> None:
+        """
+        Apply transpose (divergence) operator (quadrature points → nodal values).
+
+        Parameters
+        ----------
+        quadrature_point_field : Field
+            Input field at quadrature points.
+        nodal_field : Field
+            Output field at nodal points.
+        weights : sequence of float, optional
+            Weights for the transpose operation.
+        """
+        if weights is None:
+            weights = []
+        self._cpp.transpose(
+            _unwrap(quadrature_point_field), _unwrap(nodal_field), list(weights)
+        )
+
+    def transpose_increment(
+        self,
+        quadrature_point_field: Field,
+        alpha: float,
+        nodal_field: Field,
+        weights: Optional[Sequence[float]] = None,
+    ) -> None:
+        """
+        Apply transpose and add scaled result: output += alpha * div(input).
+
+        Parameters
+        ----------
+        quadrature_point_field : Field
+            Input field at quadrature points.
+        alpha : float
+            Scaling factor.
+        nodal_field : Field
+            Output field at nodal points (updated in-place).
+        weights : sequence of float, optional
+            Weights for the transpose operation.
+        """
+        if weights is None:
+            weights = []
+        self._cpp.transpose_increment(
+            _unwrap(quadrature_point_field), alpha, _unwrap(nodal_field), list(weights)
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying C++ object."""
+        return getattr(self._cpp, name)
+
+    def __repr__(self) -> str:
+        return f"FEMGradientOperator(spatial_dim={self._cpp.spatial_dim})"
+
+
 # FileIONetCDF wrapper (only if NetCDF is available)
 if hasattr(_muGrid, "FileIONetCDF"):
     _OpenMode = _muGrid.FileIONetCDF.OpenMode
@@ -824,22 +1035,32 @@ if hasattr(_muGrid, "FileIONetCDF"):
                     )
                 open_mode = mode_map[open_mode_lower]
 
-            self._cpp = _muGrid.FileIONetCDF(
-                file_name, open_mode, _unwrap(comm)
-            )
+            self._cpp = _muGrid.FileIONetCDF(file_name, open_mode, _unwrap(comm))
 
         def register_field_collection(
-            self, collection: Union[GlobalFieldCollection, LocalFieldCollection, Any]
+            self,
+            collection: Union[
+                GlobalFieldCollection, LocalFieldCollection, CartesianDecomposition, Any
+            ],
+            **kwargs,
         ) -> None:
             """
             Register a field collection for I/O.
 
             Parameters
             ----------
-            collection : FieldCollection
-                The field collection to register.
+            collection : FieldCollection or CartesianDecomposition
+                The field collection to register. If a CartesianDecomposition is
+                passed, its underlying field collection is used.
+            **kwargs
+                Additional arguments passed to C++ register_field_collection.
             """
-            self._cpp.register_field_collection(_unwrap(collection))
+            # Handle CartesianDecomposition specially - extract its collection
+            if isinstance(collection, CartesianDecomposition):
+                cpp_collection = collection._cpp.collection
+            else:
+                cpp_collection = _unwrap(collection)
+            self._cpp.register_field_collection(cpp_collection, **kwargs)
 
         def __getitem__(self, index: int) -> Any:
             """Access a frame by index."""

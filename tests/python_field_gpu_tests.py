@@ -39,7 +39,6 @@ import unittest
 import numpy as np
 
 import muGrid
-from muGrid import complex_field, int_field, real_field, uint_field
 
 # Try to import CuPy for GPU tests
 try:
@@ -80,7 +79,7 @@ class HostFieldDeviceInfoTests(unittest.TestCase):
 
     def test_wrapped_field_device_properties(self):
         """Test device properties through Python Field wrapper."""
-        field = real_field(self.fc, "wrapped_test", (3,))
+        field = self.fc.real_field("wrapped_test", (3,))
         self.assertEqual(field.device, "cpu")
         self.assertFalse(field.is_on_gpu)
 
@@ -103,16 +102,16 @@ class HostFieldAccessTests(unittest.TestCase):
 
     def test_host_field_returns_numpy(self):
         """Test that host field accessors return numpy arrays."""
-        field = real_field(self.fc, "numpy_test", (3,))
+        field = self.fc.real_field("numpy_test", (3,))
         arr = field.s
         self.assertIsInstance(arr, np.ndarray)
 
     def test_all_field_types_host(self):
         """Test all field types with host memory space."""
-        real_f = real_field(self.fc, "real_host")
-        int_f = int_field(self.fc, "int_host")
-        uint_f = uint_field(self.fc, "uint_host")
-        complex_f = complex_field(self.fc, "complex_host")
+        real_f = self.fc.real_field("real_host")
+        int_f = self.fc.int_field("int_host")
+        uint_f = self.fc.uint_field("uint_host")
+        complex_f = self.fc.complex_field("complex_host")
 
         for f in [real_f, int_f, uint_f, complex_f]:
             self.assertFalse(f.is_on_gpu)
@@ -191,15 +190,15 @@ class DeviceFieldFactoryTests(unittest.TestCase):
 
     def test_real_field_on_device_collection(self):
         """Test creating real field on device collection."""
-        field = real_field(self.fc, "device_real", (3,))
+        field = self.fc.real_field("device_real", (3,))
         self.assertTrue(field.is_on_gpu)
 
     def test_all_field_types_device(self):
         """Test all field factory functions on device collection."""
-        real_f = real_field(self.fc, "real_dev")
-        int_f = int_field(self.fc, "int_dev")
-        uint_f = uint_field(self.fc, "uint_dev")
-        complex_f = complex_field(self.fc, "complex_dev")
+        real_f = self.fc.real_field("real_dev")
+        int_f = self.fc.int_field("int_dev")
+        uint_f = self.fc.uint_field("uint_dev")
+        complex_f = self.fc.complex_field("complex_dev")
 
         for f in [real_f, int_f, uint_f, complex_f]:
             self.assertTrue(f.is_on_gpu)
@@ -219,7 +218,7 @@ class CuPyIntegrationTests(unittest.TestCase):
 
     def test_device_field_returns_cupy_array(self):
         """Test that device field accessors return CuPy arrays."""
-        field = real_field(self.fc, "cupy_test", (3,))
+        field = self.fc.real_field("cupy_test", (3,))
 
         # Access should return CuPy array
         arr = field.s
@@ -227,7 +226,7 @@ class CuPyIntegrationTests(unittest.TestCase):
 
     def test_cupy_array_shape(self):
         """Test that CuPy array has correct shape."""
-        field = real_field(self.fc, "shape_test", (2, 3))
+        field = self.fc.real_field("shape_test", (2, 3))
 
         arr = field.s
         # Shape should be (2, 3, 1) + nb_grid_pts for SubPt layout
@@ -236,7 +235,7 @@ class CuPyIntegrationTests(unittest.TestCase):
 
     def test_cupy_array_writability(self):
         """Test that CuPy arrays from device fields are writable."""
-        field = real_field(self.fc, "write_test", (2,))
+        field = self.fc.real_field("write_test", (2,))
 
         arr = field.s
         # Fill with values
@@ -251,8 +250,8 @@ class CuPyIntegrationTests(unittest.TestCase):
         fc_host = muGrid.GlobalFieldCollection(self.nb_grid_pts)
 
         # Create both host and device fields
-        host_field = real_field(fc_host, "host", (2,))
-        device_field = real_field(self.fc, "device", (2,))
+        host_field = fc_host.real_field("host", (2,))
+        device_field = self.fc.real_field("device", (2,))
 
         # Initialize host field with test data
         test_data = np.random.rand(*host_field.s.shape).astype(np.float64)
@@ -270,7 +269,7 @@ class CuPyIntegrationTests(unittest.TestCase):
 
     def test_all_accessors_return_cupy(self):
         """Test that all field accessors (s, sg, p, pg) return CuPy arrays."""
-        field = real_field(self.fc, "accessor_test", (2,))
+        field = self.fc.real_field("accessor_test", (2,))
 
         # All accessors should return CuPy arrays
         self.assertIsInstance(field.s, cp.ndarray)
@@ -307,8 +306,8 @@ class MixedHostDeviceTests(unittest.TestCase):
 
     def test_different_array_types(self):
         """Test that host returns numpy, device returns cupy."""
-        host_field = real_field(self.fc_host, "host")
-        device_field = real_field(self.fc_device, "device")
+        host_field = self.fc_host.real_field("host")
+        device_field = self.fc_device.real_field("device")
 
         host_arr = host_field.s
         device_arr = device_field.s

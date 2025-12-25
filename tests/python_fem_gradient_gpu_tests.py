@@ -39,11 +39,11 @@ import unittest
 import numpy as np
 
 import muGrid
-from muGrid import real_field
 
 # Try to import CuPy for GPU tests
 try:
     import cupy as cp
+
     HAS_CUPY = True
 except ImportError:
     HAS_CUPY = False
@@ -74,13 +74,13 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
         )
 
         # Create nodal and gradient fields
-        nodal = real_field(fc, "nodal", (1,))
-        gradient = real_field(fc, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
         # Initialize and apply (should not raise)
-        nodal._cpp.set_zero()
-        gradient._cpp.set_zero()
-        fem_grad.apply(nodal._cpp, gradient._cpp)
+        nodal.set_zero()
+        gradient.set_zero()
+        fem_grad.apply(nodal, gradient)
 
     def test_device_fem_gradient_2d_transpose(self):
         """Test that FEM gradient 2D transpose can be applied on device fields."""
@@ -93,12 +93,12 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
-        nodal = real_field(fc, "nodal", (1,))
-        gradient = real_field(fc, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
-        gradient._cpp.set_zero()
-        nodal._cpp.set_zero()
-        fem_grad.transpose(gradient._cpp, nodal._cpp)
+        gradient.set_zero()
+        nodal.set_zero()
+        fem_grad.transpose(gradient, nodal)
 
 
 @unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
@@ -121,12 +121,12 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
-        nodal = real_field(fc, "nodal", (1,))
-        gradient = real_field(fc, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
-        nodal._cpp.set_zero()
-        gradient._cpp.set_zero()
-        fem_grad.apply(nodal._cpp, gradient._cpp)
+        nodal.set_zero()
+        gradient.set_zero()
+        fem_grad.apply(nodal, gradient)
 
     def test_device_fem_gradient_3d_transpose(self):
         """Test that FEM gradient 3D transpose can be applied on device fields."""
@@ -139,12 +139,12 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
-        nodal = real_field(fc, "nodal", (1,))
-        gradient = real_field(fc, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
-        gradient._cpp.set_zero()
-        nodal._cpp.set_zero()
-        fem_grad.transpose(gradient._cpp, nodal._cpp)
+        gradient.set_zero()
+        nodal.set_zero()
+        fem_grad.transpose(gradient, nodal)
 
 
 @unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU backend or CuPy not available")
@@ -170,14 +170,14 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
-        nodal = real_field(fc, "nodal", (1,))
-        gradient = real_field(fc, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
         # Arrays should be CuPy
         self.assertIsInstance(nodal.s, cp.ndarray)
         self.assertIsInstance(gradient.s, cp.ndarray)
 
-        fem_grad.apply(nodal._cpp, gradient._cpp)
+        fem_grad.apply(nodal, gradient)
 
         # Result should still be CuPy
         self.assertIsInstance(gradient.s, cp.ndarray)
@@ -195,8 +195,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
         )
-        nodal_host = real_field(fc_host, "nodal", (1,))
-        gradient_host = real_field(fc_host, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_host = fc_host.real_field("nodal", (1,))
+        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -205,8 +205,10 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1),
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
-        nodal_device = real_field(fc_device, "nodal", (1,))
-        gradient_device = real_field(fc_device, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_device = fc_device.real_field("nodal", (1,))
+        gradient_device = fc_device.real_field(
+            "gradient", (fem_grad.nb_operators,), "quad"
+        )
 
         # Initialize with same random data
         test_data = np.random.rand(*nodal_host.pg.shape)
@@ -214,8 +216,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         nodal_device.pg[...] = cp.asarray(test_data)
 
         # Apply on both
-        fem_grad.apply(nodal_host._cpp, gradient_host._cpp)
-        fem_grad.apply(nodal_device._cpp, gradient_device._cpp)
+        fem_grad.apply(nodal_host, gradient_host)
+        fem_grad.apply(nodal_device, gradient_device)
 
         # Compare results
         host_result = gradient_host.s
@@ -233,8 +235,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
         )
-        nodal_host = real_field(fc_host, "nodal", (1,))
-        gradient_host = real_field(fc_host, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_host = fc_host.real_field("nodal", (1,))
+        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -243,8 +245,10 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1),
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
-        nodal_device = real_field(fc_device, "nodal", (1,))
-        gradient_device = real_field(fc_device, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_device = fc_device.real_field("nodal", (1,))
+        gradient_device = fc_device.real_field(
+            "gradient", (fem_grad.nb_operators,), "quad"
+        )
 
         # Initialize gradient with random data
         test_data = np.random.rand(*gradient_host.s.shape)
@@ -252,8 +256,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         gradient_device.s[...] = cp.asarray(test_data)
 
         # Apply transpose on both
-        fem_grad.transpose(gradient_host._cpp, nodal_host._cpp)
-        fem_grad.transpose(gradient_device._cpp, nodal_device._cpp)
+        fem_grad.transpose(gradient_host, nodal_host)
+        fem_grad.transpose(gradient_device, nodal_device)
 
         # Compare results
         host_result = nodal_host.s
@@ -272,8 +276,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
         )
-        nodal_host = real_field(fc_host, "nodal", (1,))
-        gradient_host = real_field(fc_host, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_host = fc_host.real_field("nodal", (1,))
+        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -282,8 +286,10 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1, 1),
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
-        nodal_device = real_field(fc_device, "nodal", (1,))
-        gradient_device = real_field(fc_device, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_device = fc_device.real_field("nodal", (1,))
+        gradient_device = fc_device.real_field(
+            "gradient", (fem_grad.nb_operators,), "quad"
+        )
 
         # Initialize with same random data
         test_data = np.random.rand(*nodal_host.pg.shape)
@@ -291,8 +297,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         nodal_device.pg[...] = cp.asarray(test_data)
 
         # Apply on both
-        fem_grad.apply(nodal_host._cpp, gradient_host._cpp)
-        fem_grad.apply(nodal_device._cpp, gradient_device._cpp)
+        fem_grad.apply(nodal_host, gradient_host)
+        fem_grad.apply(nodal_device, gradient_device)
 
         # Compare results
         host_result = gradient_host.s
@@ -311,8 +317,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
         )
-        nodal_host = real_field(fc_host, "nodal", (1,))
-        gradient_host = real_field(fc_host, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_host = fc_host.real_field("nodal", (1,))
+        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -321,8 +327,10 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1, 1),
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
-        nodal_device = real_field(fc_device, "nodal", (1,))
-        gradient_device = real_field(fc_device, "gradient", (fem_grad.nb_operators,), "quad")
+        nodal_device = fc_device.real_field("nodal", (1,))
+        gradient_device = fc_device.real_field(
+            "gradient", (fem_grad.nb_operators,), "quad"
+        )
 
         # Initialize gradient with random data
         test_data = np.random.rand(*gradient_host.s.shape)
@@ -330,8 +338,8 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         gradient_device.s[...] = cp.asarray(test_data)
 
         # Apply transpose on both
-        fem_grad.transpose(gradient_host._cpp, nodal_host._cpp)
-        fem_grad.transpose(gradient_device._cpp, nodal_device._cpp)
+        fem_grad.transpose(gradient_host, nodal_host)
+        fem_grad.transpose(gradient_device, nodal_device)
 
         # Compare results
         host_result = nodal_host.s
@@ -351,17 +359,17 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
         )
 
-        nodal_in = real_field(fc, "nodal_in", (1,))
-        gradient = real_field(fc, "gradient", (fem_grad.nb_operators,), "quad")
-        nodal_out = real_field(fc, "nodal_out", (1,))
+        nodal_in = fc.real_field("nodal_in", (1,))
+        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        nodal_out = fc.real_field("nodal_out", (1,))
 
         # Initialize with random data
         test_data = cp.random.rand(*nodal_in.pg.shape)
         nodal_in.pg[...] = test_data
 
         # Apply B then B^T
-        fem_grad.apply(nodal_in._cpp, gradient._cpp)
-        fem_grad.transpose(gradient._cpp, nodal_out._cpp)
+        fem_grad.apply(nodal_in, gradient)
+        fem_grad.transpose(gradient, nodal_out)
 
         # Result should be a valid array (no NaN or Inf)
         result = cp.asnumpy(nodal_out.s)

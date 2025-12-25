@@ -30,7 +30,6 @@ except ModuleNotFoundError:
     plt = None
 
 import muGrid
-from muGrid import real_field
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -240,16 +239,16 @@ if comm.rank == 0 and not args.quiet:
 
 # Create muGrid fields for gradient operations
 # These are scalar fields (one component at a time)
-u_nodal = real_field(fc, "u_nodal", nb_nodes)
-grad_u = real_field(fc, "grad_u", dim, "quad")
-f_nodal = real_field(fc, "f_nodal", nb_nodes)
-stress_field = real_field(fc, "stress_field", dim, "quad")
+u_nodal = fc.real_field("u_nodal", nb_nodes)
+grad_u = fc.real_field("grad_u", dim, "quad")
+f_nodal = fc.real_field("f_nodal", nb_nodes)
+stress_field = fc.real_field("stress_field", dim, "quad")
 
 # Create fields for CG solver (displacement and force vectors)
 # Shape: [dim, nb_nodes, nx, ny] flattened to single field with dim*nb_nodes components
-u_field = real_field(fc, "u_field", dim * nb_nodes)
-f_field = real_field(fc, "f_field", dim * nb_nodes)
-rhs_field = real_field(fc, "rhs_field", dim * nb_nodes)
+u_field = fc.real_field("u_field", dim * nb_nodes)
+f_field = fc.real_field("f_field", dim * nb_nodes)
+rhs_field = fc.real_field("rhs_field", dim * nb_nodes)
 
 # Material stiffness at each quadrature point [voigt, voigt, quad, nx, ny]
 C_field = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
@@ -279,7 +278,7 @@ def compute_strain(u_arr, strain):
         u_nodal.pg[...] = np.pad(u_nodal.p, ((0, 0), (0, 1), (0, 1)), mode="wrap")
 
         # Compute gradient of u_i
-        gradient_op.apply(u_nodal._cpp, grad_u._cpp)
+        gradient_op.apply(u_nodal, grad_u)
 
         # Add to strain (symmetric part)
         for j in range(dim):
@@ -346,7 +345,7 @@ def compute_divergence(stress, f_arr):
 
         # Apply transpose (divergence) with quadrature weights
         f_nodal.pg[...] = 0.0  # Clear including ghosts
-        gradient_op.transpose(stress_field._cpp, f_nodal._cpp, list(quad_weights))
+        gradient_op.transpose(stress_field, f_nodal, list(quad_weights))
 
         # Reduce ghost contributions for periodic BC
         reduce_ghosts(f_nodal)

@@ -32,12 +32,12 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import pytest
 import numpy as np
+import pytest
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
-from muGrid import real_field, wrap_field
+from muGrid import wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 
@@ -50,14 +50,16 @@ def test_fd_stencil():
     assert laplace.nb_quad_pts == 1
 
     nb_ghosts = (1, 1)
-    fc = muGrid.GlobalFieldCollection([3, 3], nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts)
-    ifield = real_field(fc, "input-field")
-    ofield = real_field(fc, "output-field")
+    fc = muGrid.GlobalFieldCollection(
+        [3, 3], nb_ghosts_left=nb_ghosts, nb_ghosts_right=nb_ghosts
+    )
+    ifield = fc.real_field("input-field")
+    ofield = fc.real_field("output-field")
     ifield.p[...] = 1
     ifield.p[1, 1] = 2
     # Manually correct a periodic boundary
     ifield.pg[...] = np.pad(ifield.p, tuple(zip(nb_ghosts, nb_ghosts)), mode="wrap")
-    laplace.apply(ifield._cpp, ofield._cpp)
+    laplace.apply(ifield, ofield)
     np.testing.assert_allclose(ofield.p, stencil)
     np.testing.assert_allclose(np.sum(ifield.p * ofield.p), -4)
 
@@ -67,8 +69,6 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
     decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
-    fc = decomposition.collection
-    # fc = muGrid.GlobalFieldCollection(nb_grid_pts)
     grid_spacing = 1 / np.array(nb_grid_pts)  # Grid spacing
 
     stencil = np.array(
@@ -82,8 +82,8 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
 
     x, y = decomposition.coords  # Domain-local coords for each pixel
 
-    rhs = real_field(decomposition, "rhs")
-    solution = real_field(decomposition, "solution")
+    rhs = decomposition.real_field("rhs")
+    solution = decomposition.real_field("solution")
 
     rhs.p[...] = np.sin(2 * np.pi * x)
 
@@ -103,16 +103,15 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         # We need the minus sign because the Laplace operator is negative
         # definite, but the conjugate-gradients solver assumes a
         # positive-definite operator.
-        Ax = wrap_field(Ax_field)
-        Ax.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
+        Ax_field.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
         return Ax_field
 
     conjugate_gradients(
         comm,
-        fc,
+        decomposition,
         hessp,  # linear operator
-        rhs._cpp,
-        solution._cpp,
+        rhs,
+        solution,
         tol=1e-6,
         callback=callback,
         maxiter=10,
@@ -124,11 +123,13 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
 
 
 @pytest.mark.skip("Currently fails; reenable after migration")
-def test_unit_impulse(comm, ):
+def test_unit_impulse(
+    comm,
+):
     nx, ny = nb_grid_pts = (4, 6)  # grid size should be arbitrary
     s = suggest_subdivisions(len(nb_grid_pts), comm.size)
     decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
-    fc = decomposition.collection
+    fc = decomposition._cpp.collection
     fc.set_nb_sub_pts("quad_points", 2)
     fc.set_nb_sub_pts("nodal_points", 1)
 
@@ -149,7 +150,9 @@ def test_unit_impulse(comm, ):
 
     # Get nodal field
     nodal_field_cpp = fc.real_field("nodal-field", (1,), "nodal_points")
-    impuls_response_field_cpp = fc.real_field("impuls_response_field", (1,), "nodal_points")
+    impuls_response_field_cpp = fc.real_field(
+        "impuls_response_field", (1,), "nodal_points"
+    )
     nodal_field = wrap_field(nodal_field_cpp)
     impuls_response_field = wrap_field(impuls_response_field_cpp)
 
@@ -157,12 +160,22 @@ def test_unit_impulse(comm, ):
     quad_field_cpp = fc.real_field("quad-field", (2,), "quad_points")
 
     # set up impulse
-    impuls_locations = (impuls_response_field.icoordsg[0] == 0) & (impuls_response_field.icoordsg[1] == 0)
+    impuls_locations = (impuls_response_field.icoordsg[0] == 0) & (
+        impuls_response_field.icoordsg[1] == 0
+    )
 
-    left_location = (impuls_response_field.icoordsg[0] == nx - 1) & (impuls_response_field.icoordsg[1] == 0)
-    right_location = (impuls_response_field.icoordsg[0] == 1) & (impuls_response_field.icoordsg[1] == 0)
-    top_location = (impuls_response_field.icoordsg[0] == 0) & (impuls_response_field.icoordsg[1] == 1)
-    bottom_location = (impuls_response_field.icoordsg[0] == 0) & (impuls_response_field.icoordsg[1] == ny - 1)
+    left_location = (impuls_response_field.icoordsg[0] == nx - 1) & (
+        impuls_response_field.icoordsg[1] == 0
+    )
+    right_location = (impuls_response_field.icoordsg[0] == 1) & (
+        impuls_response_field.icoordsg[1] == 0
+    )
+    top_location = (impuls_response_field.icoordsg[0] == 0) & (
+        impuls_response_field.icoordsg[1] == 1
+    )
+    bottom_location = (impuls_response_field.icoordsg[0] == 0) & (
+        impuls_response_field.icoordsg[1] == ny - 1
+    )
 
     nodal_field.sg[0, 0, impuls_locations] = 1
     impuls_response_field.sg[0, 0, impuls_locations] = 4
@@ -171,34 +184,54 @@ def test_unit_impulse(comm, ):
     impuls_response_field.sg[0, 0, top_location] = -1
     impuls_response_field.sg[0, 0, bottom_location] = -1
 
-    decomposition.communicate_ghosts(nodal_field_cpp)
-    print(f'unit impuls: nodal field with buffers in rank {comm.rank} \n ' + f'{nodal_field.sg}')
-    print(f'impuls_response_field: nodal field with buffers in rank {comm.rank} \n ' + f'{impuls_response_field.sg}')
+    decomposition.communicate_ghosts(nodal_field)
+    print(
+        f"unit impuls: nodal field with buffers in rank {comm.rank} \n "
+        + f"{nodal_field.sg}"
+    )
+    print(
+        f"impuls_response_field: nodal field with buffers in rank {comm.rank} \n "
+        + f"{impuls_response_field.sg}"
+    )
 
     # Apply the gradient operator to the nodal field and write result to the quad field
-    gradient_op.apply(nodal_field_cpp, quad_field_cpp)
+    gradient_op.apply(nodal_field, wrap_field(quad_field_cpp))
 
-    decomposition.communicate_ghosts(quad_field_cpp)
+    decomposition.communicate_ghosts(wrap_field(quad_field_cpp))
 
-    # Apply the gradient transposed operator to the quad field and write result to the nodal field
-    gradient_op.transpose(quadrature_point_field=quad_field_cpp,
-                          nodal_field=nodal_field_cpp,
-                          weights=[1 / 2, 1 / 2]  # size of the element is half of the pixel. Pixel size is 1
-                          )
+    # Apply the gradient transposed operator to the quad field and write result to
+    # the nodal field
+    gradient_op.transpose(
+        quadrature_point_field=wrap_field(quad_field_cpp),
+        nodal_field=nodal_field,
+        weights=[
+            1 / 2,
+            1 / 2,
+        ],  # size of the element is half of the pixel. Pixel size is 1
+    )
 
-    decomposition.communicate_ghosts(nodal_field_cpp)
-    print(f'computed unit impuls response: nodal field with buffers in rank {comm.rank} \n ' + f'{nodal_field.sg}')
+    decomposition.communicate_ghosts(nodal_field)
+    print(
+        "computed unit impuls response: nodal field with buffers in rank "
+        f"{comm.rank} \n {nodal_field.sg}"
+    )
 
-    print(f'local sum on core (nodal_field.s) = {np.sum(nodal_field.s)}')  # does not have to be zero
+    print(
+        f"local sum on core (nodal_field.s) = {np.sum(nodal_field.s)}"
+    )  # does not have to be zero
     local_sum = np.sum(nodal_field.s)
     total_sum = comm.sum(local_sum)
-    print(f'total_sum= {total_sum}')  # have to be zero
+    print(f"total_sum= {total_sum}")  # have to be zero
 
     # Check that the nodal_field has zero mean
     np.testing.assert_allclose(
-        total_sum, 0,
-        atol=1e-10, )
+        total_sum,
+        0,
+        atol=1e-10,
+    )
     # Check that the impulse response is correct
     np.testing.assert_allclose(
-        nodal_field.s, impuls_response_field.s,
-        atol=1e-5, )
+        nodal_field.s,
+        impuls_response_field.s,
+        atol=1e-5,
+    )

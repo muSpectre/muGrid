@@ -7,7 +7,6 @@ from NuMPI.Testing.Assertions import assert_all_allclose
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
-from muGrid import real_field, wrap_field
 
 try:
     import netCDF4
@@ -85,7 +84,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
 
     # Create a field for testing
     field_name = "test_field"
-    field = real_field(cart_decomp, field_name)
+    field = cart_decomp.real_field(field_name)
 
     # Create reference values
     global_coords = cart_decomp.icoordsg
@@ -116,7 +115,7 @@ def test_communicate_ghosts(comm, nb_subdivisions):
     )
 
     # Communicate ghost cells
-    cart_decomp.communicate_ghosts(field._cpp)
+    cart_decomp.communicate_ghosts(field)
 
     # Check values at all grid points
     for index in np.ndindex(*nb_subdomain_grid_pts):
@@ -132,7 +131,7 @@ def test_field_accessors(comm, nb_grid_pts=(128, 128)):
 
     decomposition = muGrid.CartesianDecomposition(comm, nb_grid_pts, s, (1, 1), (1, 1))
 
-    field = real_field(decomposition, "test-field")
+    field = decomposition.real_field("test-field")
 
     xg, yg = decomposition.coordsg
     field.pg[...] = xg + 100 * yg
@@ -168,7 +167,7 @@ def test_io(comm, nb_subdivisions):
 
     # Create a field for testing
     field_name = "test_field"
-    field = real_field(cart_decomp, field_name)
+    field = cart_decomp.real_field(field_name)
 
     field.pg[...] = (cart_decomp.icoordsg**2).sum(axis=0)
 
@@ -178,7 +177,7 @@ def test_io(comm, nb_subdivisions):
     except RuntimeError as e:
         print(f"Opening file for write failed on rank {comm.rank}/{comm.size}")
         raise e
-    f.register_field_collection(cart_decomp.collection)
+    f.register_field_collection(cart_decomp)
     f.append_frame().write()
     f.close()
 
@@ -218,7 +217,7 @@ def test_fileio_netcdf_ghost_offset(comm, nb_subdivisions):
         nb_ghost_right.tolist(),
     )
 
-    field = real_field(cart_decomp, "test_field")
+    field = cart_decomp.real_field("test_field")
 
     # Fill pg with weighted coordinate sums to make shifts detectable
     global_coords = cart_decomp.icoordsg
@@ -234,7 +233,7 @@ def test_fileio_netcdf_ghost_offset(comm, nb_subdivisions):
             filename, muGrid.OpenMode.Overwrite, communicator=comm
         )
         file_io.register_field_collection(
-            cart_decomp.collection, field_names=["test_field"]
+            cart_decomp, field_names=["test_field"]
         )
         file_io.append_frame().write()
         file_io.close()

@@ -43,7 +43,7 @@ import numpy as np
 from scipy.sparse import coo_array
 
 import muGrid
-from muGrid import real_field, wrap_field
+from muGrid import wrap_field
 from muGrid.Solvers import conjugate_gradients
 
 # Try to import pypapi for hardware counter access
@@ -452,7 +452,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         decomposition = muGrid.CartesianDecomposition(
             comm, (nb_x_pts, nb_y_pts), subdivisions, (1, 1), (1, 1)
         )
-        fc = decomposition.collection
+        fc = decomposition
         fc.set_nb_sub_pts("quad", nb_quad_pts)
 
         # Create fields
@@ -583,14 +583,14 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
     decomposition = muGrid.CartesianDecomposition(
         comm, nb_grid_pts, subdivisions, (1, 1), (1, 1), memory_location=memory_location
     )
-    fc = decomposition.collection
+    fc = decomposition
     grid_spacing = 1 / np.array(nb_grid_pts)
 
     x, y = decomposition.coords
     i, j = decomposition.icoords
 
-    rhs = real_field(decomposition, "rhs")
-    solution = real_field(decomposition, "solution")
+    rhs = decomposition.real_field("rhs")
+    solution = decomposition.real_field("solution")
 
     # Initialize RHS - need to handle device arrays differently
     if use_device and HAS_CUPY:
@@ -610,7 +610,7 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
     laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
 
     # Get device string for reporting
-    device_str = rhs._cpp.device
+    device_str = rhs.device
 
     # Define Hessian-vector product
     scale_factor = -np.mean(grid_spacing) ** 2
@@ -634,8 +634,8 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
         comm,
         fc,
         hessp_mugrid,
-        rhs._cpp,
-        solution._cpp,
+        rhs,
+        solution,
         tol=1e-6,
         maxiter=1000,
     )
@@ -669,13 +669,13 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
     decomposition = muGrid.CartesianDecomposition(
         comm, nb_grid_pts, subdivisions, (1, 1), (1, 1)
     )
-    fc = decomposition.collection
+    fc = decomposition
     grid_spacing = 1 / np.array(nb_grid_pts)
     x, y = decomposition.coords
     i, j = decomposition.icoords
 
-    solution = real_field(decomposition, "solution")
-    rhs = real_field(decomposition, "rhs")
+    solution = decomposition.real_field("solution")
+    rhs = decomposition.real_field("rhs")
     rhs.p[...] = (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10
     rhs.p[...] -= np.mean(rhs.p)
     solution.s[...] = 0
@@ -718,8 +718,8 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
         comm,
         fc,
         hessp_scipy,
-        rhs._cpp,
-        solution._cpp,
+        rhs,
+        solution,
         tol=1e-6,
         maxiter=1000,
     )

@@ -10,7 +10,6 @@ except ModuleNotFoundError:
 import numpy as np
 
 import muGrid
-from muGrid import real_field
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -147,9 +146,9 @@ else:
 
 coords = decomposition.coords  # Domain-local coords for each pixel
 
-# Create fields using the helper function - works directly with CartesianDecomposition
-rhs = real_field(decomposition, "rhs")
-solution = real_field(decomposition, "solution")
+# Create fields using the decomposition's method API
+rhs = decomposition.real_field("rhs")
+solution = decomposition.real_field("solution")
 
 # Set up RHS with a smooth function
 if dim == 2:
@@ -187,9 +186,9 @@ def hessp(x, Ax):
     with timer("hessp"):
         nb_hessp_calls += 1
         with timer("communicate_ghosts"):
-            decomposition.communicate_ghosts(x._cpp)
+            decomposition.communicate_ghosts(x)
         with timer("apply"):
-            laplace.apply(x._cpp, Ax._cpp)
+            laplace.apply(x, Ax)
     return Ax
 
 
@@ -198,10 +197,10 @@ with timer("conjugate_gradients"):
     try:
         conjugate_gradients(
             comm,
-            decomposition.collection,
+            decomposition,
             hessp,  # linear operator
-            rhs._cpp,  # Pass the underlying C++ field
-            solution._cpp,
+            rhs,
+            solution,
             tol=1e-6,
             callback=callback,
             maxiter=args.maxiter,

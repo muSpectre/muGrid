@@ -2,22 +2,10 @@
 Collection of simple parallel solvers
 """
 
-from muGrid import real_field
-
-# Import the C++ extension module
-# Try relative import first (for installed wheels),
-# fall back to absolute (for development)
-try:
-    from ._muGrid import Communicator, FieldCollection
-except ImportError:
-    from _muGrid import Communicator, FieldCollection
-
-from .Field import wrap_field
-
 
 def conjugate_gradients(
-    comm: Communicator,
-    fc: FieldCollection,
+    comm,
+    fc,
     hessp: callable,
     b,
     x,
@@ -36,83 +24,72 @@ def conjugate_gradients(
     ----------
     comm : muGrid.Communicator
         Communicator for parallel processing.
-    fc : muGrid.FieldCollection
-        Collection holding temporary fields of the CG algorithm.
+    fc : muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or
+         muGrid.CartesianDecomposition
+        Collection for creating temporary fields used by the CG algorithm.
     hessp : callable
         Function that computes the product of the Hessian matrix A with a vector.
+        Signature: hessp(input_field, output_field) where both are muGrid.Field.
     b : muGrid.Field
-        Right-hand side vector (C++ field or wrapped Field).
+        Right-hand side vector.
     x : muGrid.Field
-        Initial guess for the solution (C++ field or wrapped Field).
+        Initial guess for the solution (modified in place).
     tol : float, optional
         Tolerance for convergence. The default is 1e-6.
     maxiter : int, optional
         Maximum number of iterations. The default is 1000.
     callback : callable, optional
-        Function to call after each iteration with the current solution, residual,
-        and search direction.
+        Function to call after each iteration with signature:
+        callback(iteration, x_array, residual_array, search_direction_array)
 
     Returns
     -------
-    x : array_like
-        Approximate solution to the system Ax = b. (Same as input field x.)
+    x : muGrid.Field
+        Solution to the system Ax = b (same as input field x).
+
+    Raises
+    ------
+    RuntimeError
+        If the algorithm does not converge within maxiter iterations,
+        or if the Hessian is not positive definite.
     """
     tol_sq = tol * tol
 
-    # Wrap fields for array access if they are not already wrapped
-    b = wrap_field(b)
-    x = wrap_field(x)
+    # Get spatial dimension from the field collection
+    spatial_dim = len(fc.nb_grid_pts)
 
-    # Get the component shape from b to create matching temporary fields
-    # b.s.shape = (*components_shape, nb_sub_pts, *spatial_dims)
-    # Handle both wrapped and unwrapped field collections
-    try:
-        # Try wrapped version first (Python wrapper exposes nb_grid_pts)
-        spatial_dim = len(fc.nb_grid_pts)
-    except AttributeError:
-        # For raw C++ object, infer spatial_dim from field shape
-        # Assume scalar fields have shape (nb_sub_pts, *spatial_dims)
-        # where nb_sub_pts is typically 1 or small
-        # Use heuristic: spatial_dim is len(shape) - 1 for shapes like (1, nx, ny)
-        # This works for scalar fields which is the typical case for raw C++ objects
-        shape = b.s.shape
-        if len(shape) >= 3 and shape[0] <= 10:
-            # Likely scalar field: (nb_sub_pts, nx, ny) or (nb_sub_pts, nx, ny, nz)
-            spatial_dim = len(shape) - 1
-        else:
-            # Fallback: assume 2D or 3D based on total shape length
-            spatial_dim = min(len(shape) - 1, 3)
-
-    # Extract component shape: everything before the last (spatial_dim + 1) elements
+    # Extract component shape from b: b.s.shape = (*components, nb_sub_pts, *spatial)
     # The +1 accounts for the nb_sub_pts dimension
     components_shape = b.s.shape[: -(spatial_dim + 1)]
 
     # Create temporary fields with matching component shape
-    # Pass as tuple to preserve exact shape (empty tuple for scalar fields)
-    p = real_field(fc, "cg-search-direction", components_shape)
-    Ap = real_field(fc, "cg-hessian-product", components_shape)
+    p = fc.real_field("cg-search-direction", components_shape)
+    Ap = fc.real_field("cg-hessian-product", components_shape)
 
+    # Initial residual: r = b - A*x
     hessp(x, Ap)
     p.s[...] = b.s - Ap.s
-    r = p.s.copy()  # residual
+    r = p.s.copy()
 
     if callback:
         callback(0, x.s, r, p.s)
 
-    rr = comm.sum(r.ravel().dot(r.ravel()))  # initial residual dot product
+    rr = comm.sum(r.ravel().dot(r.ravel()))
     if rr < tol_sq:
         return x
 
     for iteration in range(maxiter):
-        # Compute Hessian product
+        # Compute Hessian product: Ap = A * p
         hessp(p, Ap)
 
-        # Update x (and residual)
+        # Compute step size
         pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
         if pAp <= 0:
             raise RuntimeError("Hessian is not positive definite")
 
         alpha = rr / pAp
+
+        # Update solution and residual
         x.s[...] += alpha * p.s
         r -= alpha * Ap.s
 
