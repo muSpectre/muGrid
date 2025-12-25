@@ -40,12 +40,8 @@
 #include "memory/array.hh"
 #include "convolution_kernels_cpu.hh"
 
-#if defined(MUGRID_ENABLE_CUDA)
-#include "convolution_kernels_cuda.cuh"
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-#include "convolution_kernels_hip.hpp"
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "convolution_kernels_gpu.hpp"
 #endif
 
 namespace muGrid {
@@ -75,19 +71,10 @@ namespace muGrid {
                     sparse_op.values.data(),
                     sparse_op.size);
             }
-#if defined(MUGRID_ENABLE_CUDA) && defined(__CUDACC__)
-            else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
-                cuda::apply_convolution_kernel(
-                    nodal_data, quad_data, alpha, params,
-                    sparse_op.quad_indices.data(),
-                    sparse_op.nodal_indices.data(),
-                    sparse_op.values.data(),
-                    sparse_op.size);
-            }
-#endif
-#if defined(MUGRID_ENABLE_HIP) && defined(__HIPCC__)
-            else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
-                hip::apply_convolution_kernel(
+#if (defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)) && \
+    (defined(__CUDACC__) || defined(__HIPCC__))
+            else if constexpr (is_device_space_v<MemorySpace>) {
+                gpu::apply_convolution_kernel(
                     nodal_data, quad_data, alpha, params,
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
@@ -119,19 +106,10 @@ namespace muGrid {
                     sparse_op.values.data(),
                     sparse_op.size);
             }
-#if defined(MUGRID_ENABLE_CUDA) && defined(__CUDACC__)
-            else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
-                cuda::transpose_convolution_kernel(
-                    quad_data, nodal_data, alpha, params,
-                    sparse_op.quad_indices.data(),
-                    sparse_op.nodal_indices.data(),
-                    sparse_op.values.data(),
-                    sparse_op.size);
-            }
-#endif
-#if defined(MUGRID_ENABLE_HIP) && defined(__HIPCC__)
-            else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
-                hip::transpose_convolution_kernel(
+#if (defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)) && \
+    (defined(__CUDACC__) || defined(__HIPCC__))
+            else if constexpr (is_device_space_v<MemorySpace>) {
+                gpu::transpose_convolution_kernel(
                     quad_data, nodal_data, alpha, params,
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
