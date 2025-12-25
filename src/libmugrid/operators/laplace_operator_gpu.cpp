@@ -1,11 +1,15 @@
 /**
- * @file   laplace_operator_hip.cpp
+ * @file   laplace_operator_gpu.cpp
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   24 Dec 2024
+ * @date   25 Dec 2024
  *
- * @brief  HIP implementation of hard-coded Laplace operator
+ * @brief  Unified CUDA/HIP implementation of hard-coded Laplace operator
+ *
+ * This file provides GPU implementations that work with both CUDA and HIP
+ * backends. The kernel code is identical; only the launch mechanism and
+ * runtime API differ, which are abstracted via macros.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -34,17 +38,30 @@
  */
 
 #include "laplace_operator.hh"
-#include <hip/hip_runtime.h>
+
+// Unified GPU abstraction macros
+#if defined(MUGRID_ENABLE_CUDA)
+    #include <cuda_runtime.h>
+    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
+        kernel<<<grid, block>>>(__VA_ARGS__)
+    #define GPU_DEVICE_SYNCHRONIZE() cudaDeviceSynchronize()
+#elif defined(MUGRID_ENABLE_HIP)
+    #include <hip/hip_runtime.h>
+    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
+        hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
+    #define GPU_DEVICE_SYNCHRONIZE() hipDeviceSynchronize()
+#endif
 
 namespace muGrid {
 namespace laplace_kernels {
 
-// Block size for HIP kernels
+// Block sizes for GPU kernels
 constexpr int BLOCK_SIZE_2D = 16;
 constexpr int BLOCK_SIZE_3D = 8;
 
 /**
- * HIP kernel for 2D Laplace operator with 5-point stencil.
+ * GPU kernel for 2D Laplace operator with 5-point stencil.
+ * Works with both CUDA and HIP - the __global__ keyword is the same.
  */
 __global__ void laplace_2d_kernel(
     const Real* __restrict__ input,
@@ -79,7 +96,8 @@ __global__ void laplace_2d_kernel(
 }
 
 /**
- * HIP kernel for 3D Laplace operator with 7-point stencil.
+ * GPU kernel for 3D Laplace operator with 7-point stencil.
+ * Works with both CUDA and HIP.
  */
 __global__ void laplace_3d_kernel(
     const Real* __restrict__ input,
@@ -116,7 +134,12 @@ __global__ void laplace_3d_kernel(
     }
 }
 
+// Launch wrapper for 2D - uses unified macro
+#if defined(MUGRID_ENABLE_CUDA)
+void laplace_2d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
 void laplace_2d_hip(
+#endif
     const Real* input,
     Real* output,
     Index_t nx, Index_t ny,
@@ -134,14 +157,18 @@ void laplace_2d_hip(
         (interior_ny + block.y - 1) / block.y
     );
 
-    hipLaunchKernelGGL(laplace_2d_kernel, grid, block, 0, 0,
+    GPU_LAUNCH_KERNEL(laplace_2d_kernel, grid, block,
         input, output, nx, ny, stride_x, stride_y, scale, increment);
 
-    // Synchronize to ensure kernel completion
-    hipDeviceSynchronize();
+    GPU_DEVICE_SYNCHRONIZE();
 }
 
+// Launch wrapper for 3D - uses unified macro
+#if defined(MUGRID_ENABLE_CUDA)
+void laplace_3d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
 void laplace_3d_hip(
+#endif
     const Real* input,
     Real* output,
     Index_t nx, Index_t ny, Index_t nz,
@@ -161,11 +188,10 @@ void laplace_3d_hip(
         (interior_nz + block.z - 1) / block.z
     );
 
-    hipLaunchKernelGGL(laplace_3d_kernel, grid, block, 0, 0,
+    GPU_LAUNCH_KERNEL(laplace_3d_kernel, grid, block,
         input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale, increment);
 
-    // Synchronize to ensure kernel completion
-    hipDeviceSynchronize();
+    GPU_DEVICE_SYNCHRONIZE();
 }
 
 }  // namespace laplace_kernels
