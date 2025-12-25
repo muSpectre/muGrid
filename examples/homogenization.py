@@ -31,6 +31,7 @@ except ModuleNotFoundError:
 
 import muGrid
 from muGrid import real_field
+from muGrid.Solvers import conjugate_gradients
 
 try:
     from mpi4py import MPI
@@ -92,77 +93,6 @@ def create_microstructure(coords, inclusion_type="single", inclusion_radius=0.25
         raise ValueError(f"Unknown inclusion type: {inclusion_type}")
 
     return phase
-
-
-def simple_cg(hessp, b, x0, tol=1e-6, maxiter=1000, callback=None):
-    """
-    Simple conjugate gradient solver for Ax = b.
-
-    Parameters
-    ----------
-    hessp : callable
-        Function computing A @ x, takes (x, Ax) and fills Ax in place
-    b : ndarray
-        Right-hand side
-    x0 : ndarray
-        Initial guess (modified in place)
-    tol : float
-        Convergence tolerance (on residual norm squared)
-    maxiter : int
-        Maximum iterations
-    callback : callable
-        Called as callback(iteration, x, r) after each iteration
-
-    Returns
-    -------
-    x : ndarray
-        Solution (same as x0)
-    converged : bool
-        Whether the solver converged
-    iterations : int
-        Number of iterations performed
-    """
-    tol_sq = tol * tol
-    x = x0
-    Ax = np.zeros_like(x)
-
-    # Initial residual: r = b - A @ x
-    hessp(x, Ax)
-    r = b - Ax
-    p = r.copy()
-
-    rr = comm.sum(np.dot(r.ravel(), r.ravel()))
-
-    if callback:
-        callback(0, x, r)
-
-    if rr < tol_sq:
-        return x, True, 0
-
-    for iteration in range(maxiter):
-        # Compute A @ p
-        hessp(p, Ax)
-
-        pAp = comm.sum(np.dot(p.ravel(), Ax.ravel()))
-        if pAp <= 0:
-            raise RuntimeError("Matrix is not positive definite")
-
-        alpha = rr / pAp
-        x += alpha * p
-        r -= alpha * Ax
-
-        if callback:
-            callback(iteration + 1, x, r)
-
-        next_rr = comm.sum(np.dot(r.ravel(), r.ravel()))
-        if next_rr < tol_sq:
-            return x, True, iteration + 1
-
-        beta = next_rr / rr
-        rr = next_rr
-        p = r + beta * p
-
-    return x, False, maxiter
 
 
 parser = argparse.ArgumentParser(
@@ -315,6 +245,12 @@ grad_u = real_field(fc, "grad_u", dim, "quad")
 f_nodal = real_field(fc, "f_nodal", nb_nodes)
 stress_field = real_field(fc, "stress_field", dim, "quad")
 
+# Create fields for CG solver (displacement and force vectors)
+# Shape: [dim, nb_nodes, nx, ny] flattened to single field with dim*nb_nodes components
+u_field = real_field(fc, "u_field", dim * nb_nodes)
+f_field = real_field(fc, "f_field", dim * nb_nodes)
+rhs_field = real_field(fc, "rhs_field", dim * nb_nodes)
+
 # Material stiffness at each quadrature point [voigt, voigt, quad, nx, ny]
 C_field = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
 for q in range(nb_quad):
@@ -419,13 +355,20 @@ def compute_divergence(stress, f_arr):
         f_arr[i, ...] = f_nodal.p[...]
 
 
-def apply_stiffness(u_flat, f_flat):
+def apply_stiffness(u_in, f_out):
     """
     Apply K = B^T C B to displacement vector.
+
+    Parameters
+    ----------
+    u_in : Field
+        Input displacement field with dim*nb_nodes components
+    f_out : Field
+        Output force field with dim*nb_nodes components (modified in place)
     """
-    # Reshape flat arrays to structured form
-    u_arr = u_flat.reshape(dim, nb_nodes, nx, ny)
-    f_arr = f_flat.reshape(dim, nb_nodes, nx, ny)
+    # Get array views with shape [dim*nb_nodes, nx, ny]
+    u_arr = u_in.s.reshape(dim, nb_nodes, nx, ny)
+    f_arr = f_out.s.reshape(dim, nb_nodes, nx, ny)
 
     # Compute strain eps = B * u
     compute_strain(u_arr, strain_arr)
@@ -437,10 +380,16 @@ def apply_stiffness(u_flat, f_flat):
     compute_divergence(stress_arr, f_arr)
 
 
-def compute_rhs(E_macro):
+def compute_rhs(E_macro, rhs_out):
     """
     Compute RHS: f = -B^T C E_macro
-    Returns flat array [dim * nb_nodes * nx * ny]
+
+    Parameters
+    ----------
+    E_macro : ndarray
+        Macroscopic strain tensor [dim, dim]
+    rhs_out : Field
+        Output field for RHS (modified in place)
     """
     # Create uniform strain field from macroscopic strain
     eps_macro = np.zeros((dim, dim, nb_quad, nx, ny))
@@ -453,11 +402,9 @@ def compute_rhs(E_macro):
     compute_stress(eps_macro, sig_macro, C_field)
 
     # Compute divergence (with negative sign for RHS)
-    f_arr = np.zeros((dim, nb_nodes, nx, ny))
+    f_arr = rhs_out.s.reshape(dim, nb_nodes, nx, ny)
     compute_divergence(sig_macro, f_arr)
     f_arr *= -1.0
-
-    return f_arr.ravel()
 
 
 # Storage for homogenized stiffness
@@ -487,37 +434,49 @@ for case_idx, (i, j) in enumerate(strain_cases):
     if comm.rank == 0 and not args.quiet:
         print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
 
-    # Compute RHS
-    rhs = compute_rhs(E_macro)
+    # Compute RHS into rhs_field
+    compute_rhs(E_macro, rhs_field)
 
     # Initialize displacement to zero
-    u_flat = np.zeros(dim * nb_nodes * nx * ny)
+    u_field.s[...] = 0.0
 
     # CG callback
-    def callback(it, x, r):
+    iteration_count = [0]  # Use list to allow modification in nested function
+
+    def callback(it, x, r, p):
+        iteration_count[0] = it
         if not args.quiet:
             res_norm = np.sqrt(comm.sum(np.dot(r.ravel(), r.ravel())))
             if comm.rank == 0 and it % 10 == 0:
                 print(f"  CG iteration {it}: |r| = {res_norm:.6e}")
 
-    # Solve K u = f using simple CG
-    u_flat, converged, iterations = simple_cg(
-        apply_stiffness,
-        rhs,
-        u_flat,
-        tol=args.tol,
-        callback=callback,
-        maxiter=args.maxiter,
-    )
+    # Solve K u = f using conjugate_gradients from Solvers.py
+    try:
+        conjugate_gradients(
+            comm,
+            fc,
+            apply_stiffness,
+            rhs_field,
+            u_field,
+            tol=args.tol,
+            callback=callback,
+            maxiter=args.maxiter,
+        )
+        converged = True
+    except RuntimeError as e:
+        if "did not converge" in str(e):
+            converged = False
+        else:
+            raise
 
     if comm.rank == 0 and not args.quiet:
         if converged:
-            print(f"  CG converged in {iterations} iterations")
+            print(f"  CG converged in {iteration_count[0]} iterations")
         else:
             print(f"  CG did not converge after {args.maxiter} iterations")
 
-    # Reshape displacement
-    u_arr = u_flat.reshape(dim, nb_nodes, nx, ny)
+    # Get displacement array from field
+    u_arr = u_field.s.reshape(dim, nb_nodes, nx, ny)
 
     # Compute total strain = E_macro + eps(u)
     compute_strain(u_arr, strain_arr)
@@ -607,8 +566,8 @@ if args.plot and comm.rank == 0:
 
         # Displacement magnitude from last load case
         ax = axes[2]
-        u_arr = u_flat.reshape(dim, nb_nodes, nx, ny)
-        u_mag = np.sqrt(u_arr[0, 0, ...] ** 2 + u_arr[1, 0, ...] ** 2)
+        u_arr_plot = u_field.s.reshape(dim, nb_nodes, nx, ny)
+        u_mag = np.sqrt(u_arr_plot[0, 0, ...] ** 2 + u_arr_plot[1, 0, ...] ** 2)
         im = ax.imshow(u_mag.T, origin="lower", cmap="viridis")
         ax.set_title("|u| (last load case)")
         plt.colorbar(im, ax=ax)

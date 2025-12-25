@@ -63,8 +63,34 @@ def conjugate_gradients(
     b = wrap_field(b)
     x = wrap_field(x)
 
-    p = real_field(fc, "cg-search-direction")
-    Ap = real_field(fc, "cg-hessian-product")
+    # Get the component shape from b to create matching temporary fields
+    # b.s.shape = (*components_shape, nb_sub_pts, *spatial_dims)
+    # Handle both wrapped and unwrapped field collections
+    try:
+        # Try wrapped version first (Python wrapper exposes nb_grid_pts)
+        spatial_dim = len(fc.nb_grid_pts)
+    except AttributeError:
+        # For raw C++ object, infer spatial_dim from field shape
+        # Assume scalar fields have shape (nb_sub_pts, *spatial_dims)
+        # where nb_sub_pts is typically 1 or small
+        # Use heuristic: spatial_dim is len(shape) - 1 for shapes like (1, nx, ny)
+        # This works for scalar fields which is the typical case for raw C++ objects
+        shape = b.s.shape
+        if len(shape) >= 3 and shape[0] <= 10:
+            # Likely scalar field: (nb_sub_pts, nx, ny) or (nb_sub_pts, nx, ny, nz)
+            spatial_dim = len(shape) - 1
+        else:
+            # Fallback: assume 2D or 3D based on total shape length
+            spatial_dim = min(len(shape) - 1, 3)
+
+    # Extract component shape: everything before the last (spatial_dim + 1) elements
+    # The +1 accounts for the nb_sub_pts dimension
+    components_shape = b.s.shape[: -(spatial_dim + 1)]
+
+    # Create temporary fields with matching component shape
+    # Pass as tuple to preserve exact shape (empty tuple for scalar fields)
+    p = real_field(fc, "cg-search-direction", components_shape)
+    Ap = real_field(fc, "cg-hessian-product", components_shape)
 
     hessp(x, Ap)
     p.s[...] = b.s - Ap.s
