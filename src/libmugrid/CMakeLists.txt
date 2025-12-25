@@ -42,8 +42,7 @@ set(MUGRID_SOURCES
     mpi/cartesian_decomposition.cc
     # operators/
     operators/convolution_operator.cc
-    # benchmark/
-    benchmark/laplace_operator.cc
+    operators/laplace_operator.cc
     # io/
     io/file_io_base.cc
     # util/
@@ -67,7 +66,7 @@ endif()
 if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
-    list(APPEND MUGRID_SOURCES benchmark/laplace_operator_cuda.cu)
+    list(APPEND MUGRID_SOURCES operators/laplace_operator_cuda.cu)
     # Mark the .cc file to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
@@ -76,15 +75,15 @@ if(MUGRID_ENABLE_CUDA)
 elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
-    list(APPEND MUGRID_SOURCES benchmark/laplace_operator_hip.cpp)
+    list(APPEND MUGRID_SOURCES operators/laplace_operator_hip.cpp)
     # Mark the .cc file to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         PROPERTIES LANGUAGE HIP
     )
-    # Mark the benchmark HIP file to be compiled as HIP
+    # Mark the Laplace HIP file to be compiled as HIP
     set_source_files_properties(
-        ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/laplace_operator_hip.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_hip.cpp
         PROPERTIES LANGUAGE HIP
     )
 endif()

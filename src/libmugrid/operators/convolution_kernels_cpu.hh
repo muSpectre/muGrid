@@ -86,15 +86,20 @@ namespace muGrid {
          * @brief Forward convolution kernel for CPU
          *
          * Applies: quad_data += alpha * Op * nodal_data
+         *
+         * Loop structure is optimized for SIMD vectorization:
+         * - Stencil entries are in the outermost loop (constant per x-sweep)
+         * - X-dimension is innermost for contiguous memory access
+         * - Compiler can vectorize the x-loop when strides are 1
          */
         inline void apply_convolution_kernel(
-            const Real* nodal_data,
-            Real* quad_data,
+            const Real* __restrict__ nodal_data,
+            Real* __restrict__ quad_data,
             const Real alpha,
             const GridTraversalParams& params,
-            const Index_t* quad_indices,
-            const Index_t* nodal_indices,
-            const Real* op_values,
+            const Index_t* __restrict__ quad_indices,
+            const Index_t* __restrict__ nodal_indices,
+            const Real* __restrict__ op_values,
             const Index_t nnz) {
 
             const Index_t nx = params.nx;
@@ -111,21 +116,33 @@ namespace muGrid {
             const Index_t quad_stride_y = params.quad_stride_y;
             const Index_t quad_stride_z = params.quad_stride_z;
 
-            // Simple triple nested loop for CPU
-            for (Index_t z = 0; z < nz; ++z) {
-                for (Index_t y = 0; y < ny; ++y) {
-                    for (Index_t x = 0; x < nx; ++x) {
-                        const Index_t nodal_offset = nodal_base +
-                            z * nodal_stride_z + y * nodal_stride_y +
-                            x * nodal_stride_x;
-                        const Index_t quad_offset = quad_base +
-                            z * quad_stride_z + y * quad_stride_y +
-                            x * quad_stride_x;
+            // Restructured loop: stencil entries outside, x inside for SIMD
+            // This allows the compiler to:
+            // 1. Hoist op_values[i] and index offsets out of the x-loop
+            // 2. Vectorize the x-loop with predictable stride access
+            for (Index_t i = 0; i < nnz; ++i) {
+                const Index_t nodal_idx = nodal_indices[i];
+                const Index_t quad_idx = quad_indices[i];
+                const Real scaled_op_val = alpha * op_values[i];
 
-                        for (Index_t i = 0; i < nnz; ++i) {
-                            quad_data[quad_offset + quad_indices[i]] +=
-                                alpha * nodal_data[nodal_offset + nodal_indices[i]] *
-                                op_values[i];
+                for (Index_t z = 0; z < nz; ++z) {
+                    const Index_t nodal_z = nodal_base + z * nodal_stride_z + nodal_idx;
+                    const Index_t quad_z = quad_base + z * quad_stride_z + quad_idx;
+
+                    for (Index_t y = 0; y < ny; ++y) {
+                        const Index_t nodal_yz = nodal_z + y * nodal_stride_y;
+                        const Index_t quad_yz = quad_z + y * quad_stride_y;
+
+                        // Innermost loop over x - vectorizable with stride access
+                        #if defined(__clang__)
+                        #pragma clang loop vectorize(enable) interleave(enable)
+                        #elif defined(__GNUC__)
+                        #pragma GCC ivdep
+                        #endif
+                        for (Index_t x = 0; x < nx; ++x) {
+                            quad_data[quad_yz + x * quad_stride_x] +=
+                                scaled_op_val *
+                                nodal_data[nodal_yz + x * nodal_stride_x];
                         }
                     }
                 }
@@ -140,15 +157,17 @@ namespace muGrid {
          * Note: This kernel accumulates to nodal_data, which may have
          * overlapping writes if stencils overlap. For CPU, no atomics
          * are needed since we process sequentially.
+         *
+         * Loop structure is optimized for SIMD vectorization (same as apply).
          */
         inline void transpose_convolution_kernel(
-            const Real* quad_data,
-            Real* nodal_data,
+            const Real* __restrict__ quad_data,
+            Real* __restrict__ nodal_data,
             const Real alpha,
             const GridTraversalParams& params,
-            const Index_t* quad_indices,
-            const Index_t* nodal_indices,
-            const Real* op_values,
+            const Index_t* __restrict__ quad_indices,
+            const Index_t* __restrict__ nodal_indices,
+            const Real* __restrict__ op_values,
             const Index_t nnz) {
 
             const Index_t nx = params.nx;
@@ -165,21 +184,30 @@ namespace muGrid {
             const Index_t quad_stride_y = params.quad_stride_y;
             const Index_t quad_stride_z = params.quad_stride_z;
 
-            // Simple triple nested loop for CPU
-            for (Index_t z = 0; z < nz; ++z) {
-                for (Index_t y = 0; y < ny; ++y) {
-                    for (Index_t x = 0; x < nx; ++x) {
-                        const Index_t nodal_offset = nodal_base +
-                            z * nodal_stride_z + y * nodal_stride_y +
-                            x * nodal_stride_x;
-                        const Index_t quad_offset = quad_base +
-                            z * quad_stride_z + y * quad_stride_y +
-                            x * quad_stride_x;
+            // Restructured loop: stencil entries outside, x inside for SIMD
+            for (Index_t i = 0; i < nnz; ++i) {
+                const Index_t nodal_idx = nodal_indices[i];
+                const Index_t quad_idx = quad_indices[i];
+                const Real scaled_op_val = alpha * op_values[i];
 
-                        for (Index_t i = 0; i < nnz; ++i) {
-                            nodal_data[nodal_offset + nodal_indices[i]] +=
-                                alpha * quad_data[quad_offset + quad_indices[i]] *
-                                op_values[i];
+                for (Index_t z = 0; z < nz; ++z) {
+                    const Index_t nodal_z = nodal_base + z * nodal_stride_z + nodal_idx;
+                    const Index_t quad_z = quad_base + z * quad_stride_z + quad_idx;
+
+                    for (Index_t y = 0; y < ny; ++y) {
+                        const Index_t nodal_yz = nodal_z + y * nodal_stride_y;
+                        const Index_t quad_yz = quad_z + y * quad_stride_y;
+
+                        // Innermost loop over x - vectorizable with stride access
+                        #if defined(__clang__)
+                        #pragma clang loop vectorize(enable) interleave(enable)
+                        #elif defined(__GNUC__)
+                        #pragma GCC ivdep
+                        #endif
+                        for (Index_t x = 0; x < nx; ++x) {
+                            nodal_data[nodal_yz + x * nodal_stride_x] +=
+                                scaled_op_val *
+                                quad_data[quad_yz + x * quad_stride_x];
                         }
                     }
                 }

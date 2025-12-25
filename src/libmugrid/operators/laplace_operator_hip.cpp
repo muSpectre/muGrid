@@ -5,7 +5,7 @@
  *
  * @date   24 Dec 2024
  *
- * @brief  HIP implementation of hard-coded Laplace operators
+ * @brief  HIP implementation of hard-coded Laplace operator
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -37,7 +37,7 @@
 #include <hip/hip_runtime.h>
 
 namespace muGrid {
-namespace benchmark_kernels {
+namespace laplace_kernels {
 
 // Block size for HIP kernels
 constexpr int BLOCK_SIZE_2D = 16;
@@ -51,7 +51,8 @@ __global__ void laplace_2d_kernel(
     Real* __restrict__ output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
-    Real scale) {
+    Real scale,
+    bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
     Index_t ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -68,7 +69,12 @@ __global__ void laplace_2d_kernel(
         Real down   = input[idx - stride_y];
         Real up     = input[idx + stride_y];
 
-        output[idx] = scale * (left + right + down + up - 4.0 * center);
+        Real result = scale * (left + right + down + up - 4.0 * center);
+        if (increment) {
+            output[idx] += result;
+        } else {
+            output[idx] = result;
+        }
     }
 }
 
@@ -80,7 +86,8 @@ __global__ void laplace_3d_kernel(
     Real* __restrict__ output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    Real scale) {
+    Real scale,
+    bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
     Index_t ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -100,7 +107,12 @@ __global__ void laplace_3d_kernel(
         Real zm = input[idx - stride_z];
         Real zp = input[idx + stride_z];
 
-        output[idx] = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
+        Real result = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
+        if (increment) {
+            output[idx] += result;
+        } else {
+            output[idx] = result;
+        }
     }
 }
 
@@ -109,7 +121,8 @@ void laplace_2d_hip(
     Real* output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
-    Real scale) {
+    Real scale,
+    bool increment) {
 
     // Compute grid dimensions (for interior points only)
     Index_t interior_nx = nx - 2;  // Exclude ghost layers
@@ -122,7 +135,7 @@ void laplace_2d_hip(
     );
 
     hipLaunchKernelGGL(laplace_2d_kernel, grid, block, 0, 0,
-        input, output, nx, ny, stride_x, stride_y, scale);
+        input, output, nx, ny, stride_x, stride_y, scale, increment);
 
     // Synchronize to ensure kernel completion
     hipDeviceSynchronize();
@@ -133,7 +146,8 @@ void laplace_3d_hip(
     Real* output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    Real scale) {
+    Real scale,
+    bool increment) {
 
     // Compute grid dimensions (for interior points only)
     Index_t interior_nx = nx - 2;
@@ -148,11 +162,11 @@ void laplace_3d_hip(
     );
 
     hipLaunchKernelGGL(laplace_3d_kernel, grid, block, 0, 0,
-        input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale);
+        input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale, increment);
 
     // Synchronize to ensure kernel completion
     hipDeviceSynchronize();
 }
 
-}  // namespace benchmark_kernels
+}  // namespace laplace_kernels
 }  // namespace muGrid

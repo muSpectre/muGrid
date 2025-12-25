@@ -5,7 +5,7 @@
  *
  * @date   24 Dec 2024
  *
- * @brief  Host implementation of hard-coded Laplace operators
+ * @brief  Host implementation of hard-coded Laplace operator
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -40,7 +40,7 @@
 namespace muGrid {
 
     LaplaceOperator::LaplaceOperator(Index_t spatial_dim, Real scale)
-        : spatial_dim{spatial_dim}, scale{scale} {
+        : Parent{}, spatial_dim{spatial_dim}, scale{scale} {
         if (spatial_dim != 2 && spatial_dim != 3) {
             throw RuntimeError("LaplaceOperator only supports 2D and 3D grids");
         }
@@ -89,8 +89,10 @@ namespace muGrid {
         return *global_fc;
     }
 
-    void LaplaceOperator::apply(const TypedFieldBase<Real> &input_field,
-                                 TypedFieldBase<Real> &output_field) const {
+    void LaplaceOperator::apply_impl(const TypedFieldBase<Real> &input_field,
+                                      TypedFieldBase<Real> &output_field,
+                                      Real alpha,
+                                      bool increment) const {
         const auto& collection = this->validate_fields(input_field, output_field);
 
         // Get grid dimensions (with ghosts for input, without for output range)
@@ -100,26 +102,60 @@ namespace muGrid {
         const Real* input = input_field.data();
         Real* output = output_field.data();
 
+        // Combine alpha with scale
+        Real effective_scale = alpha * this->scale;
+
         if (this->spatial_dim == 2) {
             // For 2D with ArrayOfStructures layout, stride_x = 1, stride_y = nx
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
-            benchmark_kernels::laplace_2d_host(
-                input, output, nx, ny, 1, nx, this->scale);
+            laplace_kernels::laplace_2d_host(
+                input, output, nx, ny, 1, nx, effective_scale, increment);
         } else {
             // For 3D with ArrayOfStructures layout
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
-            benchmark_kernels::laplace_3d_host(
-                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
+            laplace_kernels::laplace_3d_host(
+                input, output, nx, ny, nz, 1, nx, nx * ny, effective_scale, increment);
         }
     }
 
+    void LaplaceOperator::apply(const TypedFieldBase<Real> &input_field,
+                                 TypedFieldBase<Real> &output_field) const {
+        this->apply_impl(input_field, output_field, 1.0, false);
+    }
+
+    void LaplaceOperator::apply_increment(const TypedFieldBase<Real> &input_field,
+                                           const Real &alpha,
+                                           TypedFieldBase<Real> &output_field) const {
+        this->apply_impl(input_field, output_field, alpha, true);
+    }
+
+    void LaplaceOperator::transpose(const TypedFieldBase<Real> &input_field,
+                                     TypedFieldBase<Real> &output_field,
+                                     const std::vector<Real> &weights) const {
+        // Laplacian is self-adjoint, so transpose = apply
+        // weights are ignored (no quadrature weighting for Laplacian)
+        (void)weights;
+        this->apply(input_field, output_field);
+    }
+
+    void LaplaceOperator::transpose_increment(const TypedFieldBase<Real> &input_field,
+                                               const Real &alpha,
+                                               TypedFieldBase<Real> &output_field,
+                                               const std::vector<Real> &weights) const {
+        // Laplacian is self-adjoint, so transpose = apply
+        (void)weights;
+        this->apply_increment(input_field, alpha, output_field);
+    }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-    void LaplaceOperator::apply(
+    void LaplaceOperator::apply_impl(
         const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
-        TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
+        TypedFieldBase<Real, DefaultDeviceSpace> &output_field,
+        Real alpha,
+        bool increment) const {
 
         const auto& collection = this->validate_fields(input_field, output_field);
 
@@ -130,44 +166,66 @@ namespace muGrid {
         const Real* input = input_field.data();
         Real* output = output_field.data();
 
+        // Combine alpha with scale
+        Real effective_scale = alpha * this->scale;
+
         if (this->spatial_dim == 2) {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             // Device uses StructureOfArrays, but for scalar fields it's the same
 #if defined(MUGRID_ENABLE_CUDA)
-            benchmark_kernels::laplace_2d_cuda(
-                input, output, nx, ny, 1, nx, this->scale);
+            laplace_kernels::laplace_2d_cuda(
+                input, output, nx, ny, 1, nx, effective_scale, increment);
 #elif defined(MUGRID_ENABLE_HIP)
-            benchmark_kernels::laplace_2d_hip(
-                input, output, nx, ny, 1, nx, this->scale);
+            laplace_kernels::laplace_2d_hip(
+                input, output, nx, ny, 1, nx, effective_scale, increment);
 #endif
         } else {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
 #if defined(MUGRID_ENABLE_CUDA)
-            benchmark_kernels::laplace_3d_cuda(
-                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
+            laplace_kernels::laplace_3d_cuda(
+                input, output, nx, ny, nz, 1, nx, nx * ny, effective_scale, increment);
 #elif defined(MUGRID_ENABLE_HIP)
-            benchmark_kernels::laplace_3d_hip(
-                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
+            laplace_kernels::laplace_3d_hip(
+                input, output, nx, ny, nz, 1, nx, nx * ny, effective_scale, increment);
 #endif
         }
     }
+
+    void LaplaceOperator::apply(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
+        TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
+        this->apply_impl(input_field, output_field, 1.0, false);
+    }
+
+    void LaplaceOperator::apply_increment(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
+        const Real &alpha,
+        TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
+        this->apply_impl(input_field, output_field, alpha, true);
+    }
 #endif
 
-    namespace benchmark_kernels {
+    namespace laplace_kernels {
 
         void laplace_2d_host(
             const Real* __restrict__ input,
             Real* __restrict__ output,
             Index_t nx, Index_t ny,
             Index_t stride_x, Index_t stride_y,
-            Real scale) {
+            Real scale,
+            bool increment) {
 
             // Process interior points (excluding ghost layers)
             // Ghost layer is 1 pixel on each side
             for (Index_t iy = 1; iy < ny - 1; ++iy) {
+                #if defined(__clang__)
+                #pragma clang loop vectorize(enable) interleave(enable)
+                #elif defined(__GNUC__)
+                #pragma GCC ivdep
+                #endif
                 for (Index_t ix = 1; ix < nx - 1; ++ix) {
                     Index_t idx = ix * stride_x + iy * stride_y;
 
@@ -178,7 +236,12 @@ namespace muGrid {
                     Real down   = input[idx - stride_y];
                     Real up     = input[idx + stride_y];
 
-                    output[idx] = scale * (left + right + down + up - 4.0 * center);
+                    Real result = scale * (left + right + down + up - 4.0 * center);
+                    if (increment) {
+                        output[idx] += result;
+                    } else {
+                        output[idx] = result;
+                    }
                 }
             }
         }
@@ -188,11 +251,17 @@ namespace muGrid {
             Real* __restrict__ output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale) {
+            Real scale,
+            bool increment) {
 
             // Process interior points (excluding ghost layers)
             for (Index_t iz = 1; iz < nz - 1; ++iz) {
                 for (Index_t iy = 1; iy < ny - 1; ++iy) {
+                    #if defined(__clang__)
+                    #pragma clang loop vectorize(enable) interleave(enable)
+                    #elif defined(__GNUC__)
+                    #pragma GCC ivdep
+                    #endif
                     for (Index_t ix = 1; ix < nx - 1; ++ix) {
                         Index_t idx = ix * stride_x + iy * stride_y + iz * stride_z;
 
@@ -205,12 +274,17 @@ namespace muGrid {
                         Real zm = input[idx - stride_z];
                         Real zp = input[idx + stride_z];
 
-                        output[idx] = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
+                        Real result = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
+                        if (increment) {
+                            output[idx] += result;
+                        } else {
+                            output[idx] = result;
+                        }
                     }
                 }
             }
         }
 
-    }  // namespace benchmark_kernels
+    }  // namespace laplace_kernels
 
 }  // namespace muGrid

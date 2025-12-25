@@ -37,7 +37,7 @@
 #include "field/field_typed.hh"
 #include "operators/convolution_operator_base.hh"
 #include "operators/convolution_operator.hh"
-#include "benchmark/laplace_operator.hh"
+#include "operators/laplace_operator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -246,15 +246,16 @@ void add_convolution_operator_default(py::module &mod) {
 }
 
 
-// Bind class LaplaceOperator (hard-coded stencil for benchmarking)
+// Bind class LaplaceOperator (optimized stencil implementation)
 void add_laplace_operator(py::module &mod) {
     // Function pointer types for explicit overload selection
     using ApplyHostFn = void (LaplaceOperator::*)(
         const RealFieldHost&, RealFieldHost&) const;
 
-    auto laplace_op = py::class_<LaplaceOperator>(mod, "LaplaceOperator",
+    // LaplaceOperator inherits from ConvolutionOperatorBase
+    auto laplace_op = py::class_<LaplaceOperator, ConvolutionOperatorBase>(mod, "LaplaceOperator",
         R"pbdoc(
-        Hard-coded Laplace operator for benchmarking purposes.
+        Optimized Laplace operator with hard-coded stencil implementation.
 
         This operator provides optimized implementations of the discrete Laplace
         operator using:
@@ -263,10 +264,16 @@ void add_laplace_operator(py::module &mod) {
 
         The output is multiplied by a scale factor, which can be used to
         incorporate grid spacing and sign conventions (e.g., for making
-        the operator positive-definite).
+        the operator positive-definite for use with CG solvers).
 
-        The implementation is designed for benchmarking and performance
-        comparison with the generic sparse convolution operator.
+        This operator inherits from ConvolutionOperatorBase and can be used
+        interchangeably with the generic ConvolutionOperator. The hard-coded
+        implementation provides significantly better performance (~3-10x) due
+        to compile-time known memory access patterns that enable SIMD
+        vectorization.
+
+        Since the Laplacian is self-adjoint (symmetric), the transpose operation
+        is identical to the forward apply operation.
         )pbdoc")
         .def(py::init<Index_t, Real>(),
              "spatial_dim"_a, "scale"_a = 1.0,
@@ -276,12 +283,12 @@ void add_laplace_operator(py::module &mod) {
              static_cast<ApplyHostFn>(&LaplaceOperator::apply),
              "input_field"_a, "output_field"_a,
              "Apply the Laplace operator to host (CPU) fields")
-        .def_property_readonly("spatial_dim", &LaplaceOperator::get_spatial_dim,
-             "Spatial dimension (2 or 3)")
         .def_property_readonly("nb_stencil_pts", &LaplaceOperator::get_nb_stencil_pts,
              "Number of stencil points (5 for 2D, 7 for 3D)")
         .def_property_readonly("scale", &LaplaceOperator::get_scale,
              "Scale factor applied to output");
+    // Note: spatial_dim, nb_operators, nb_quad_pts, nb_nodal_pts are inherited
+    // from ConvolutionOperatorBase
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device field overloads (only when GPU backend is enabled)
