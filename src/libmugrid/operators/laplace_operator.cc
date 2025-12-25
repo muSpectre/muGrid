@@ -162,9 +162,9 @@ namespace muGrid {
         // Get grid dimensions
         auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
 
-        // Get raw device data pointers
-        const Real* input = input_field.data();
-        Real* output = output_field.data();
+        // Get raw device data pointers via view()
+        const Real* input = input_field.view().data();
+        Real* output = output_field.view().data();
 
         // Combine alpha with scale
         Real effective_scale = alpha * this->scale;
