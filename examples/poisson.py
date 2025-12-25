@@ -1,6 +1,7 @@
 # Solver for the Poisson equation
 
 import argparse
+import json
 
 try:
     import matplotlib.pyplot as plt
@@ -66,7 +67,23 @@ parser.add_argument(
          "'hardcoded' (optimized Laplace operator) (default: generic)"
 )
 
+parser.add_argument(
+    "-q", "--quiet",
+    action="store_true",
+    help="Suppress per-iteration output (default: off)"
+)
+
+parser.add_argument(
+    "--json",
+    action="store_true",
+    help="Output results in JSON format (implies --quiet)"
+)
+
 args = parser.parse_args()
+
+# JSON implies quiet mode
+if args.json:
+    args.quiet = True
 
 if args.memory == "host":
     import numpy as arr
@@ -156,7 +173,8 @@ def callback(it, x, r, p):
     """
     Callback function to print the current solution, residual, and search direction.
     """
-    print(f"{it:5} {arr.dot(r.ravel(), r.ravel()):.5}")
+    if not args.quiet:
+        print(f"{it:5} {arr.dot(r.ravel(), r.ravel()):.5}")
 
 
 def hessp(x, Ax):
@@ -175,6 +193,7 @@ def hessp(x, Ax):
     return Ax
 
 
+converged = False
 with timer("conjugate_gradients"):
     try:
         conjugate_gradients(
@@ -187,36 +206,23 @@ with timer("conjugate_gradients"):
             callback=callback,
             maxiter=args.maxiter,
         )
-        print("CG converged.")
+        converged = True
+        if not args.quiet:
+            print("CG converged.")
     except RuntimeError:
-        print("CG did not converge.")
+        if not args.quiet:
+            print("CG did not converge.")
 
 elapsed_time = timer.get_time("conjugate_gradients")
 
-# Performance metrics
-print(f"\n{'='*60}")
-print("Performance Summary")
-print(f"{'='*60}")
-print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
-      f"{nb_grid_pts_total:,} points")
-print(f"Dimensions: {dim}D")
-print(f"Stencil implementation: {stencil_name}")
-print(f"Stencil points: {nb_stencil_pts}")
-print(f"CG iterations (hessp calls): {nb_hessp_calls}")
-print(f"Total time: {elapsed_time:.4f} seconds")
-
-# Memory throughput estimate for the convolution operation:l
+# Performance metrics calculations
+# Memory throughput estimate for the convolution operation:
 # - Read: nb_stencil_pts values per grid point (stencil neighborhood)
 # - Write: 1 value per grid point
 # Each value is 8 bytes (double precision)
 bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8  # bytes
 total_bytes = nb_hessp_calls * bytes_per_hessp
-memory_throughput = total_bytes / elapsed_time
-
-print("\nMemory throughput (estimated):")
-print(f"  Bytes per hessp call: {bytes_per_hessp / 1e6:.2f} MB")
-print(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB")
-print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
+memory_throughput = total_bytes / elapsed_time if elapsed_time > 0 else 0
 
 # FLOPS estimate for the convolution operation:
 # - nb_stencil_pts multiplications and nb_stencil_pts-1 additions per grid point
@@ -224,20 +230,75 @@ print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
 # Total: 2 * nb_stencil_pts FLOPs per grid point (approx)
 flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
 total_flops = nb_hessp_calls * flops_per_hessp
-flops_rate = total_flops / elapsed_time
-
-print("\nFLOPS (estimated for convolution only):")
-print(f"  FLOPs per hessp call: {flops_per_hessp / 1e6:.2f} MFLOP")
-print(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP")
-print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
+flops_rate = total_flops / elapsed_time if elapsed_time > 0 else 0
 
 # Arithmetic intensity (FLOPs per byte)
-arithmetic_intensity = total_flops / total_bytes
-print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")
-print(f"{'='*60}")
+arithmetic_intensity = total_flops / total_bytes if total_bytes > 0 else 0
 
-# Print hierarchical timing breakdown
-timer.print_summary()
+# Get apply time from timer
+apply_time = timer.get_time("conjugate_gradients/hessp/apply")
+apply_throughput = total_bytes / apply_time if apply_time > 0 else 0
+apply_flops_rate = total_flops / apply_time if apply_time > 0 else 0
+
+if args.json:
+    # JSON output (convert numpy types to Python types for JSON serialization)
+    results = {
+        "config": {
+            "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
+            "nb_grid_pts_total": int(nb_grid_pts_total),
+            "dimensions": int(dim),
+            "stencil": args.stencil,
+            "stencil_name": stencil_name,
+            "nb_stencil_pts": int(nb_stencil_pts),
+            "memory": "host" if args.memory == _memory_locations["host"] else "device",
+            "maxiter": int(args.maxiter),
+        },
+        "results": {
+            "converged": converged,
+            "iterations": int(nb_hessp_calls),
+            "total_time_seconds": float(elapsed_time),
+            "bytes_per_iteration": int(bytes_per_hessp),
+            "total_bytes": int(total_bytes),
+            "memory_throughput_GBps": float(memory_throughput / 1e9),
+            "flops_per_iteration": int(flops_per_hessp),
+            "total_flops": int(total_flops),
+            "flops_rate_GFLOPs": float(flops_rate / 1e9),
+            "arithmetic_intensity": float(arithmetic_intensity),
+            "apply_time_seconds": float(apply_time),
+            "apply_throughput_GBps": float(apply_throughput / 1e9),
+            "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
+        },
+        "timing": timer.to_dict(),
+    }
+    print(json.dumps(results, indent=2))
+else:
+    # Text output
+    print(f"\n{'='*60}")
+    print("Performance Summary")
+    print(f"{'='*60}")
+    print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
+          f"{nb_grid_pts_total:,} points")
+    print(f"Dimensions: {dim}D")
+    print(f"Stencil implementation: {stencil_name}")
+    print(f"Stencil points: {nb_stencil_pts}")
+    print(f"CG iterations (hessp calls): {nb_hessp_calls}")
+    print(f"Total time: {elapsed_time:.4f} seconds")
+
+    print("\nMemory throughput (estimated):")
+    print(f"  Bytes per hessp call: {bytes_per_hessp / 1e6:.2f} MB")
+    print(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB")
+    print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
+
+    print("\nFLOPS (estimated for convolution only):")
+    print(f"  FLOPs per hessp call: {flops_per_hessp / 1e6:.2f} MFLOP")
+    print(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP")
+    print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
+
+    print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")
+    print(f"{'='*60}")
+
+    # Print hierarchical timing breakdown
+    timer.print_summary()
 
 if args.plot:
     if dim == 3:

@@ -34,6 +34,7 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import json
 import time
 from contextlib import contextmanager
 
@@ -286,9 +287,56 @@ class Timer:
 
         print(f"{'=' * 78}")
 
+    def _build_tree(self, name):
+        """Recursively build a tree structure for a timer and its children."""
+        info = self._timers[name]
+        total = info["total"]
+        calls = info["calls"]
+
+        result = {
+            "name": name.split("/")[-1],
+            "total_seconds": total,
+            "calls": calls,
+            "avg_seconds": total / calls if calls > 0 else 0,
+        }
+
+        if info["children"]:
+            result["children"] = [
+                self._build_tree(child) for child in info["children"]
+            ]
+            children_time = sum(self._timers[c]["total"] for c in info["children"])
+            other_time = total - children_time
+            if other_time > 1e-9:
+                result["other_seconds"] = other_time
+
+        return result
+
+    def to_dict(self):
+        """
+        Return timing data as a hierarchical dictionary.
+
+        Returns:
+            Dictionary with hierarchical timer structure suitable for JSON export.
+        """
+        return {
+            "timers": [self._build_tree(root) for root in self._roots]
+        }
+
+    def to_json(self, indent=2):
+        """
+        Return timing data as a JSON string.
+
+        Args:
+            indent: Indentation level for pretty printing (default: 2)
+
+        Returns:
+            JSON string representation of timing data.
+        """
+        return json.dumps(self.to_dict(), indent=indent)
+
     def summary_dict(self):
         """
-        Return timing data as a dictionary for programmatic access.
+        Return timing data as a flat dictionary for programmatic access.
 
         Returns:
             Dictionary with timer names as keys and dicts containing
