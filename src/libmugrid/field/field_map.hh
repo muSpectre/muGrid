@@ -415,8 +415,10 @@ namespace muGrid {
         }
         //! dereference
         inline value_type operator*() { return this->map[this->index]; }
-        //! dereference
-        inline cvalue_type operator*() const { return this->map[this->index]; }
+        //! dereference (force const operator[] to get const Eigen::Map)
+        inline cvalue_type operator*() const {
+            return static_cast<const FieldMap<T, Mutability> &>(this->map)[this->index];
+        }
         //! equality
         inline bool operator==(const Iterator & other) const {
             return this->index == other.index;
