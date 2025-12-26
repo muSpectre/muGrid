@@ -209,6 +209,8 @@ if(MUGRID_ENABLE_PYTHON)
     # Fetch DLPack header for zero-copy array exchange
     message(STATUS "Fetching DLPack header...")
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE INTERNAL "Set minimum policy version for DLPack header")
+    # Disable DLPack's mock target (uses posix_memalign which doesn't exist on Windows)
+    set(BUILD_MOCK OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
         dlpack
         GIT_REPOSITORY https://github.com/dmlc/dlpack.git
