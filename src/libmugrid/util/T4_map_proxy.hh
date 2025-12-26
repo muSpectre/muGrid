@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_T4_MAP_PROXY_HH_
 #define SRC_LIBMUGRID_T4_MAP_PROXY_HH_
 
-#include "util/eigen_tools.hh"
+#include "util/math.hh"
 
 #include "Eigen/Dense"
 #include "Eigen/src/Core/util/Constants.h"

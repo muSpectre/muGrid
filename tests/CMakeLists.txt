@@ -17,7 +17,6 @@ if(Boost_FOUND)
     set(MUGRID_TEST_SOURCES
         main_test_suite.cc
         header_test_ccoord_operations.cc
-        header_test_eigen_tools.cc
         header_test_ref_array.cc
         header_test_t4_map.cc
         header_test_tensor_algebra.cc
