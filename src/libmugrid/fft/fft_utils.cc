@@ -93,14 +93,14 @@ std::vector<Real> rfft_freq(Index_t n, Real d) {
   return freq;
 }
 
-IntCoord_t get_hermitian_grid_pts(const IntCoord_t & nb_grid_pts,
+DynGridIndex get_hermitian_grid_pts(const DynGridIndex & nb_grid_pts,
                                   Index_t r2c_axis) {
-  IntCoord_t result = nb_grid_pts;
+  DynGridIndex result = nb_grid_pts;
   result[r2c_axis] = nb_grid_pts[r2c_axis] / 2 + 1;
   return result;
 }
 
-Real fft_normalization(const IntCoord_t & nb_grid_pts) {
+Real fft_normalization(const DynGridIndex & nb_grid_pts) {
   Index_t total = 1;
   for (Dim_t d = 0; d < nb_grid_pts.get_dim(); ++d) {
     total *= nb_grid_pts[d];
@@ -123,7 +123,7 @@ void distribute_dimension(Index_t global_size, int comm_size, int rank,
   }
 }
 
-void select_process_grid(int num_ranks, const IntCoord_t & nb_grid_pts, int & p1,
+void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & p1,
                          int & p2) {
   // For 2D grids, we just have one distribution dimension
   if (nb_grid_pts.get_dim() == 2) {

@@ -45,7 +45,7 @@
 #include "core/enums.hh"
 #include "core/version.hh"
 
-using muGrid::DynCcoord;
+using muGrid::DynCoord;
 using muGrid::fourD;
 using muGrid::Index_t;
 using muGrid::Real;
@@ -85,16 +85,16 @@ void add_enums(py::module & mod) {
 
 template <size_t MaxDim, typename T = Index_t>
 void add_dyn_ccoord_helper(py::module & mod, std::string name) {
-    py::class_<DynCcoord<MaxDim, T>>(mod, name.c_str())
+    py::class_<DynCoord<MaxDim, T>>(mod, name.c_str())
         .def(py::init<const std::vector<T>>())
         .def(py::init<Index_t>())
-        .def("__len__", &DynCcoord<MaxDim, T>::get_dim)
+        .def("__len__", &DynCoord<MaxDim, T>::get_dim)
         .def("__str__",
-             [](const DynCcoord<MaxDim, T> & self) {
+             [](const DynCoord<MaxDim, T> & self) {
                  return (std::stringstream() << self).str();
              })
         .def("__getitem__",
-             [](const DynCcoord<MaxDim, T> & self, const Index_t & index) {
+             [](const DynCoord<MaxDim, T> & self, const Index_t & index) {
                  if (index < 0 or index >= self.get_dim()) {
                      std::stringstream err{};
                      err << "index " << index << " out of range 0.."
@@ -103,9 +103,9 @@ void add_dyn_ccoord_helper(py::module & mod, std::string name) {
                  }
                  return self[index];
              })
-        .def_property_readonly("dim", &DynCcoord<MaxDim, T>::get_dim);
-    py::implicitly_convertible<py::list, DynCcoord<MaxDim, T>>();
-    py::implicitly_convertible<py::tuple, DynCcoord<MaxDim, T>>();
+        .def_property_readonly("dim", &DynCoord<MaxDim, T>::get_dim);
+    py::implicitly_convertible<py::list, DynCoord<MaxDim, T>>();
+    py::implicitly_convertible<py::tuple, DynCoord<MaxDim, T>>();
 }
 
 template <Index_t dim, typename T>
@@ -118,7 +118,7 @@ void add_get_cube_helper(py::module & mod) {
 
 template <Index_t dim>
 void add_get_coord_helper(py::module & mod) {
-    using Ccoord = muGrid::Ccoord_t<dim>;
+    using Ccoord = muGrid::GridIndex<dim>;
     mod.def(
         "get_domain_ccoord",
         [](Ccoord nb_grid_pts, Index_t index) {
@@ -146,7 +146,7 @@ void add_get_cube(py::module & mod) {
 
 template <Index_t dim>
 void add_get_index_helper(py::module & mod) {
-    using Ccoord = muGrid::Ccoord_t<dim>;
+    using Ccoord = muGrid::GridIndex<dim>;
     mod.def(
         "get_domain_index",
         [](Ccoord sizes, Ccoord ccoord) {
@@ -256,7 +256,7 @@ void add_common_mugrid(py::module & mod) {
 
     add_feature_flags(mod);
 
-    add_dyn_ccoord_helper<fourD, Index_t>(mod, "DynCcoord");
+    add_dyn_ccoord_helper<fourD, Index_t>(mod, "DynCoord");
     add_dyn_ccoord_helper<fourD, Real>(mod, "DynRcoord");
 
     add_get_cube(mod);

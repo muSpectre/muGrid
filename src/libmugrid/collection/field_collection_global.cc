@@ -45,17 +45,17 @@ namespace muGrid {
               ValidityDomain::Global, spatial_dimension, nb_sub_pts,
               storage_order, memory_location
           },
-          nb_ghosts_left{IntCoord_t(spatial_dimension)},
-          nb_ghosts_right{IntCoord_t(spatial_dimension)} {
+          nb_ghosts_left{DynGridIndex(spatial_dimension)},
+          nb_ghosts_right{DynGridIndex(spatial_dimension)} {
     }
 
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
-        const IntCoord_t &nb_domain_grid_pts,
-        const IntCoord_t &nb_subdomain_grid_pts_with_ghosts,
-        const IntCoord_t &subdomain_locations_with_ghosts,
+        const DynGridIndex &nb_domain_grid_pts,
+        const DynGridIndex &nb_subdomain_grid_pts_with_ghosts,
+        const DynGridIndex &subdomain_locations_with_ghosts,
         const SubPtMap_t &nb_sub_pts, StorageOrder storage_order,
-        const IntCoord_t &nb_ghosts_left, const IntCoord_t &nb_ghosts_right,
+        const DynGridIndex &nb_ghosts_left, const DynGridIndex &nb_ghosts_right,
         MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
@@ -68,12 +68,12 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
-        const IntCoord_t &nb_domain_grid_pts,
-        const IntCoord_t &nb_subdomain_grid_pts_with_ghosts,
-        const IntCoord_t &subdomain_locations_with_ghosts,
-        const IntCoord_t &pixels_strides, const SubPtMap_t &nb_sub_pts,
-        StorageOrder storage_order, const IntCoord_t &nb_ghosts_left,
-        const IntCoord_t &nb_ghosts_right, MemoryLocation memory_location)
+        const DynGridIndex &nb_domain_grid_pts,
+        const DynGridIndex &nb_subdomain_grid_pts_with_ghosts,
+        const DynGridIndex &subdomain_locations_with_ghosts,
+        const DynGridIndex &pixels_strides, const SubPtMap_t &nb_sub_pts,
+        StorageOrder storage_order, const DynGridIndex &nb_ghosts_left,
+        const DynGridIndex &nb_ghosts_right, MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
               nb_sub_pts, storage_order, memory_location
@@ -85,12 +85,12 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
-        const IntCoord_t &nb_domain_grid_pts,
-        const IntCoord_t &nb_subdomain_grid_pts_with_ghosts,
-        const IntCoord_t &subdomain_locations_with_ghosts,
+        const DynGridIndex &nb_domain_grid_pts,
+        const DynGridIndex &nb_subdomain_grid_pts_with_ghosts,
+        const DynGridIndex &subdomain_locations_with_ghosts,
         StorageOrder pixels_storage_order, const SubPtMap_t &nb_sub_pts,
-        StorageOrder storage_order, const IntCoord_t &nb_ghosts_left,
-        const IntCoord_t &nb_ghosts_right, MemoryLocation memory_location)
+        StorageOrder storage_order, const DynGridIndex &nb_ghosts_left,
+        const DynGridIndex &nb_ghosts_right, MemoryLocation memory_location)
         : Parent{
             ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
             nb_sub_pts, storage_order, memory_location
@@ -102,12 +102,12 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     void GlobalFieldCollection::initialise(
-        const IntCoord_t &nb_domain_grid_pts,
-        const IntCoord_t &nb_subdomain_grid_pts_with_ghosts,
-        const IntCoord_t &subdomain_locations_with_ghosts,
-        const IntCoord_t &pixels_strides,
-        const IntCoord_t &nb_ghosts_left,
-        const IntCoord_t &nb_ghosts_right) {
+        const DynGridIndex &nb_domain_grid_pts,
+        const DynGridIndex &nb_subdomain_grid_pts_with_ghosts,
+        const DynGridIndex &subdomain_locations_with_ghosts,
+        const DynGridIndex &pixels_strides,
+        const DynGridIndex &nb_ghosts_left,
+        const DynGridIndex &nb_ghosts_right) {
         if (this->initialised) {
             throw FieldCollectionError("double initialisation");
         }
@@ -124,7 +124,7 @@ namespace muGrid {
         }
         // sanity check 2 - the subdomain and / or ghosts
         auto _nb_ghosts_left{nb_ghosts_left.get_dim() == 0
-                                   ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                   ? DynGridIndex(nb_domain_grid_pts.get_dim())
                                    : nb_ghosts_left};
         auto total_nb_ghosts_left{
             get_nb_from_shape(_nb_ghosts_left)
@@ -139,7 +139,7 @@ namespace muGrid {
         }
 
         auto _nb_ghosts_right{nb_ghosts_right.get_dim() == 0
-                                    ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                    ? DynGridIndex(nb_domain_grid_pts.get_dim())
                                     : nb_ghosts_right};
         auto total_nb_ghosts_right{
             get_nb_from_shape(_nb_ghosts_right)
@@ -179,7 +179,7 @@ namespace muGrid {
         // Set subdomain pixel iterators
         auto _subdomain_locations_with_ghosts{
             subdomain_locations_with_ghosts.get_dim() == 0
-                ? IntCoord_t(nb_domain_grid_pts.get_dim()) - _nb_ghosts_left
+                ? DynGridIndex(nb_domain_grid_pts.get_dim()) - _nb_ghosts_left
                 : subdomain_locations_with_ghosts};
         this->pixels_with_ghosts =
             CcoordOps::Pixels(_nb_subdomain_grid_pts,
@@ -204,21 +204,21 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     void
-    GlobalFieldCollection::initialise(const IntCoord_t &nb_domain_grid_pts,
-                                      const IntCoord_t &nb_subdomain_grid_pts_with_ghosts,
-                                      const IntCoord_t &subdomain_locations_with_ghosts,
+    GlobalFieldCollection::initialise(const DynGridIndex &nb_domain_grid_pts,
+                                      const DynGridIndex &nb_subdomain_grid_pts_with_ghosts,
+                                      const DynGridIndex &subdomain_locations_with_ghosts,
                                       StorageOrder pixels_storage_order,
-                                      const IntCoord_t &nb_ghosts_left,
-                                      const IntCoord_t &nb_ghosts_right) {
+                                      const DynGridIndex &nb_ghosts_left,
+                                      const DynGridIndex &nb_ghosts_right) {
         if (pixels_storage_order == StorageOrder::Automatic) {
             pixels_storage_order = this->get_storage_order();
         }
         // The domain and / or ghosts may be empty
         auto _nb_ghosts_left{nb_ghosts_left.get_dim() == 0
-                                   ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                   ? DynGridIndex(nb_domain_grid_pts.get_dim())
                                    : nb_ghosts_left};
         auto _nb_ghosts_right{nb_ghosts_right.get_dim() == 0
-                                    ? IntCoord_t(nb_domain_grid_pts.get_dim())
+                                    ? DynGridIndex(nb_domain_grid_pts.get_dim())
                                     : nb_ghosts_right};
         auto _nb_subdomain_grid_pts{
             nb_subdomain_grid_pts_with_ghosts.get_dim() == 0

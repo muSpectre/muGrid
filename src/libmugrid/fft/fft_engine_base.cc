@@ -42,10 +42,10 @@
 
 namespace muGrid {
 
-FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
+FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                              const Communicator & comm,
-                             const IntCoord_t & nb_ghosts_left,
-                             const IntCoord_t & nb_ghosts_right,
+                             const DynGridIndex & nb_ghosts_left,
+                             const DynGridIndex & nb_ghosts_right,
                              const SubPtMap_t & nb_sub_pts,
                              MemoryLocation memory_location)
     : Parent_t{comm, nb_domain_grid_pts.get_dim(), nb_sub_pts, memory_location},
@@ -88,7 +88,7 @@ FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
   // Compute the real-space subdomain distribution
   // For 2D: Y is distributed across P2 ranks
   // For 3D: Y is distributed across P2, Z across P1
-  IntCoord_t nb_subdivisions(spatial_dim);
+  DynGridIndex nb_subdivisions(spatial_dim);
   nb_subdivisions[0] = 1;  // X is not distributed in real space
   nb_subdivisions[1] = this->proc_grid_p2;
   if (spatial_dim == 3) {
@@ -97,13 +97,13 @@ FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
 
   // Initialize the parent CartesianDecomposition
   // This sets up the real-space field collection with ghosts
-  IntCoord_t effective_ghosts_left = nb_ghosts_left;
-  IntCoord_t effective_ghosts_right = nb_ghosts_right;
+  DynGridIndex effective_ghosts_left = nb_ghosts_left;
+  DynGridIndex effective_ghosts_right = nb_ghosts_right;
   if (effective_ghosts_left.get_dim() == 0) {
-    effective_ghosts_left = IntCoord_t(spatial_dim, 0);
+    effective_ghosts_left = DynGridIndex(spatial_dim, 0);
   }
   if (effective_ghosts_right.get_dim() == 0) {
-    effective_ghosts_right = IntCoord_t(spatial_dim, 0);
+    effective_ghosts_right = DynGridIndex(spatial_dim, 0);
   }
 
   Parent_t::initialise(nb_domain_grid_pts, nb_subdivisions,
@@ -136,14 +136,14 @@ FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
     offset_fz = 0;
   }
 
-  this->nb_fourier_subdomain_grid_pts = IntCoord_t(spatial_dim);
+  this->nb_fourier_subdomain_grid_pts = DynGridIndex(spatial_dim);
   this->nb_fourier_subdomain_grid_pts[0] = local_fx;
   this->nb_fourier_subdomain_grid_pts[1] = local_fy;
   if (spatial_dim == 3) {
     this->nb_fourier_subdomain_grid_pts[2] = local_fz;
   }
 
-  this->fourier_subdomain_locations = IntCoord_t(spatial_dim);
+  this->fourier_subdomain_locations = DynGridIndex(spatial_dim);
   this->fourier_subdomain_locations[0] = offset_fx;
   this->fourier_subdomain_locations[1] = offset_fy;
   if (spatial_dim == 3) {
@@ -151,7 +151,7 @@ FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
   }
 
   // Initialize the Fourier collection (no ghosts in Fourier space)
-  IntCoord_t fourier_no_ghosts(spatial_dim, 0);
+  DynGridIndex fourier_no_ghosts(spatial_dim, 0);
   this->fourier_collection = std::make_unique<GlobalFieldCollection>(
       this->nb_fourier_grid_pts, this->nb_fourier_subdomain_grid_pts,
       this->fourier_subdomain_locations, nb_sub_pts,
@@ -166,29 +166,29 @@ FFTEngineBase::FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
 }
 
 void FFTEngineBase::initialise_fft_base() {
-  const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
+  const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
   auto memory_location = this->get_memory_location();
 
   // Get local real-space dimensions (without ghosts)
-  IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+  DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
 
   // Work buffer 1: After first FFT (r2c along X), Z-pencil layout
   // Shape: [Nx/2+1, Ny/P2, Nz/P1] - same Y,Z distribution as real space
-  IntCoord_t zpencil_shape(this->spatial_dim);
+  DynGridIndex zpencil_shape(this->spatial_dim);
   zpencil_shape[0] = nb_grid_pts[0] / 2 + 1;
   zpencil_shape[1] = local_real[1];
   if (this->spatial_dim == 3) {
     zpencil_shape[2] = local_real[2];
   }
 
-  IntCoord_t zpencil_loc(this->spatial_dim);
+  DynGridIndex zpencil_loc(this->spatial_dim);
   zpencil_loc[0] = 0;
   zpencil_loc[1] = this->get_subdomain_locations_without_ghosts()[1];
   if (this->spatial_dim == 3) {
     zpencil_loc[2] = this->get_subdomain_locations_without_ghosts()[2];
   }
 
-  IntCoord_t no_ghosts(this->spatial_dim, 0);
+  DynGridIndex no_ghosts(this->spatial_dim, 0);
   this->work_zpencil = std::make_unique<GlobalFieldCollection>(
       get_hermitian_grid_pts(nb_grid_pts, 0), zpencil_shape, zpencil_loc,
       SubPtMap_t{}, StorageOrder::ArrayOfStructures,
@@ -201,7 +201,7 @@ void FFTEngineBase::initialise_fft_base() {
     // This gives us full Y for the Y-FFT, Z remains distributed across P1
     // Note: The YZ transpose within row_comm only gathers Y; Z stays the same
     // because all ranks in a row have the same Z portion.
-    IntCoord_t ypencil_global(3);
+    DynGridIndex ypencil_global(3);
     ypencil_global[0] = nb_grid_pts[0] / 2 + 1;
     ypencil_global[1] = nb_grid_pts[1];
     ypencil_global[2] = nb_grid_pts[2];
@@ -210,12 +210,12 @@ void FFTEngineBase::initialise_fft_base() {
     Index_t local_z_ypencil = local_real[2];  // Nz/P1
     Index_t offset_z_ypencil = zpencil_loc[2];  // Same offset as Z-pencil
 
-    IntCoord_t ypencil_shape(3);
+    DynGridIndex ypencil_shape(3);
     ypencil_shape[0] = nb_grid_pts[0] / 2 + 1;
     ypencil_shape[1] = nb_grid_pts[1];  // Full Y
     ypencil_shape[2] = local_z_ypencil;
 
-    IntCoord_t ypencil_loc(3);
+    DynGridIndex ypencil_loc(3);
     ypencil_loc[0] = 0;
     ypencil_loc[1] = 0;  // Full Y starts at 0
     ypencil_loc[2] = offset_z_ypencil;

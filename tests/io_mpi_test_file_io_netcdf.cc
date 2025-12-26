@@ -309,12 +309,12 @@ namespace muGrid {
       const Dim_t Dim{twoD};
       const std::string quad{"quad"};
       const muGrid::FieldCollection::SubPtMap_t & nb_sub_pts{{quad, 2}};
-      const IntCoord_t & nb_subdomain_grid_pts_2{2, 3};
-      const IntCoord_t & nb_subdomain_grid_pts_1{2, 6};
-      const IntCoord_t & nb_domain_grid_pts{2, 6};
-      const IntCoord_t & subdomain_locations_2{
+      const DynGridIndex & nb_subdomain_grid_pts_2{2, 3};
+      const DynGridIndex & nb_subdomain_grid_pts_1{2, 6};
+      const DynGridIndex & nb_domain_grid_pts{2, 6};
+      const DynGridIndex & subdomain_locations_2{
           0, comm_2.rank() * nb_subdomain_grid_pts_2[1]};
-      const IntCoord_t & subdomain_locations_1{0, 0};
+      const DynGridIndex & subdomain_locations_1{0, 0};
       muGrid::GlobalFieldCollection global_fc_2(
           nb_domain_grid_pts, nb_subdomain_grid_pts_2, subdomain_locations_2,
           nb_sub_pts);

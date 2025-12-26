@@ -90,8 +90,8 @@ class Transpose {
    * @param nb_components  Number of field components (default: 1)
    * @param layout         Memory layout for multi-component fields
    */
-  Transpose(const Communicator & comm, const IntCoord_t & local_in,
-                    const IntCoord_t & local_out, Index_t global_in,
+  Transpose(const Communicator & comm, const DynGridIndex & local_in,
+                    const DynGridIndex & local_out, Index_t global_in,
                     Index_t global_out, Index_t axis_in, Index_t axis_out,
                     Index_t nb_components = 1,
                     StorageOrder layout = StorageOrder::ArrayOfStructures);
@@ -123,12 +123,12 @@ class Transpose {
   /**
    * Get the local input shape.
    */
-  const IntCoord_t & get_local_in() const { return this->local_in; }
+  const DynGridIndex & get_local_in() const { return this->local_in; }
 
   /**
    * Get the local output shape.
    */
-  const IntCoord_t & get_local_out() const { return this->local_out; }
+  const DynGridIndex & get_local_out() const { return this->local_out; }
 
   /**
    * Get the input axis that is distributed (will become local after forward).
@@ -159,9 +159,9 @@ class Transpose {
    * @param block_start   Starting position of block
    * @return Committed MPI datatype (caller must free)
    */
-  MPI_Datatype build_block_type(const IntCoord_t & local_shape,
-                                const IntCoord_t & block_shape,
-                                const IntCoord_t & block_start) const;
+  MPI_Datatype build_block_type(const DynGridIndex & local_shape,
+                                const DynGridIndex & block_shape,
+                                const DynGridIndex & block_start) const;
 
   /**
    * Free all MPI datatypes.
@@ -195,10 +195,10 @@ class Transpose {
   Communicator comm;
 
   //! Local shape before transpose
-  IntCoord_t local_in;
+  DynGridIndex local_in;
 
   //! Local shape after transpose
-  IntCoord_t local_out;
+  DynGridIndex local_out;
 
   //! Global size of dimension distributed in input
   Index_t global_in;

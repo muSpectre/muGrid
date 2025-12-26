@@ -95,20 +95,20 @@ BOOST_AUTO_TEST_CASE(test_fft_freq) {
 }
 
 BOOST_AUTO_TEST_CASE(test_hermitian_grid_pts) {
-  IntCoord_t grid_2d{8, 10};
-  IntCoord_t fourier_2d = get_hermitian_grid_pts(grid_2d);
+  DynGridIndex grid_2d{8, 10};
+  DynGridIndex fourier_2d = get_hermitian_grid_pts(grid_2d);
   BOOST_CHECK_EQUAL(fourier_2d[0], 5);  // 8/2 + 1
   BOOST_CHECK_EQUAL(fourier_2d[1], 10);
 
-  IntCoord_t grid_3d{8, 10, 12};
-  IntCoord_t fourier_3d = get_hermitian_grid_pts(grid_3d);
+  DynGridIndex grid_3d{8, 10, 12};
+  DynGridIndex fourier_3d = get_hermitian_grid_pts(grid_3d);
   BOOST_CHECK_EQUAL(fourier_3d[0], 5);  // 8/2 + 1
   BOOST_CHECK_EQUAL(fourier_3d[1], 10);
   BOOST_CHECK_EQUAL(fourier_3d[2], 12);
 }
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_creation) {
-  IntCoord_t nb_grid_pts{8, 10};
+  DynGridIndex nb_grid_pts{8, 10};
 
   FFTEngineHost engine(nb_grid_pts);
 
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_creation) {
 }
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_3d_creation) {
-  IntCoord_t nb_grid_pts{8, 10, 12};
+  DynGridIndex nb_grid_pts{8, 10, 12};
 
   FFTEngineHost engine(nb_grid_pts);
 
@@ -139,7 +139,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_3d_creation) {
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_small_roundtrip) {
   // Small grid test to catch edge cases
-  IntCoord_t nb_grid_pts{4, 5};
+  DynGridIndex nb_grid_pts{4, 5};
   FFTEngineHost engine(nb_grid_pts);
 
   Field & real_field = engine.register_real_space_field("test_real");
@@ -177,7 +177,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_small_roundtrip) {
 }
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_roundtrip) {
-  IntCoord_t nb_grid_pts{16, 20};
+  DynGridIndex nb_grid_pts{16, 20};
 
   FFTEngineHost engine(nb_grid_pts);
 
@@ -225,7 +225,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_roundtrip) {
 }
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_3d_roundtrip) {
-  IntCoord_t nb_grid_pts{8, 10, 12};
+  DynGridIndex nb_grid_pts{8, 10, 12};
 
   FFTEngineHost engine(nb_grid_pts);
 
@@ -278,9 +278,9 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_3d_roundtrip) {
 // TODO: Fix ghost buffer handling in FFT and re-enable this test.
 /*
 BOOST_AUTO_TEST_CASE(test_fft_engine_2d_with_ghosts) {
-  IntCoord_t nb_grid_pts{16, 20};
-  IntCoord_t nb_ghosts_left{1, 2};
-  IntCoord_t nb_ghosts_right{1, 2};
+  DynGridIndex nb_grid_pts{16, 20};
+  DynGridIndex nb_ghosts_left{1, 2};
+  DynGridIndex nb_ghosts_right{1, 2};
 
   FFTEngine engine(nb_grid_pts, Communicator(), nb_ghosts_left, nb_ghosts_right);
 
@@ -332,7 +332,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_2d_with_ghosts) {
 // This test is commented out pending multi-component support.
 /*
 BOOST_AUTO_TEST_CASE(test_fft_engine_vector_field) {
-  IntCoord_t nb_grid_pts{8, 10};
+  DynGridIndex nb_grid_pts{8, 10};
 
   FFTEngineHost engine(nb_grid_pts);
 
@@ -379,7 +379,7 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_vector_field) {
 */
 
 BOOST_AUTO_TEST_CASE(test_fft_engine_backend_name) {
-  IntCoord_t nb_grid_pts{8, 10};
+  DynGridIndex nb_grid_pts{8, 10};
   FFTEngineHost engine(nb_grid_pts);
 
   const char * name = engine.get_backend_name();

@@ -59,7 +59,7 @@ namespace muGrid {
      * @brief Cache key for sparse operator memoization
      */
     struct SparseOperatorCacheKey {
-        IntCoord_t nb_grid_pts;
+        DynGridIndex nb_grid_pts;
         Index_t nb_nodal_components;
 
         bool operator==(const SparseOperatorCacheKey& other) const {
@@ -367,7 +367,7 @@ namespace muGrid {
          * @return Reference to the sparse operator (cached, row-major order)
          */
         const SparseOperatorSoA<HostSpace>&
-        get_apply_operator(const IntCoord_t & nb_grid_pts,
+        get_apply_operator(const DynGridIndex & nb_grid_pts,
                            const Index_t nb_nodal_components) const;
 
         /**
@@ -378,7 +378,7 @@ namespace muGrid {
          * @return Reference to the sparse operator (cached, column-major order)
          */
         const SparseOperatorSoA<HostSpace>&
-        get_transpose_operator(const IntCoord_t & nb_grid_pts,
+        get_transpose_operator(const DynGridIndex & nb_grid_pts,
                                const Index_t nb_nodal_components) const;
 
         /**
@@ -399,7 +399,7 @@ namespace muGrid {
          */
         template<StorageOrder storage_order>
         SparseOperatorSoA<HostSpace>
-        create_apply_operator(const IntCoord_t & nb_grid_pts,
+        create_apply_operator(const DynGridIndex & nb_grid_pts,
                               const Index_t nb_nodal_components) const;
 
         /**
@@ -420,7 +420,7 @@ namespace muGrid {
          */
         template<StorageOrder storage_order>
         SparseOperatorSoA<HostSpace>
-        create_transpose_operator(const IntCoord_t & nb_grid_pts,
+        create_transpose_operator(const DynGridIndex & nb_grid_pts,
                                   const Index_t nb_nodal_components) const;
 
         /**
@@ -485,7 +485,7 @@ namespace muGrid {
          */
         template<typename DeviceSpace>
         const SparseOperatorSoA<DeviceSpace>&
-        get_device_apply_operator(const IntCoord_t& nb_grid_pts,
+        get_device_apply_operator(const DynGridIndex& nb_grid_pts,
                                   Index_t nb_nodal_components) const;
 
         /**
@@ -499,7 +499,7 @@ namespace muGrid {
          */
         template<typename DeviceSpace>
         const SparseOperatorSoA<DeviceSpace>&
-        get_device_transpose_operator(const IntCoord_t& nb_grid_pts,
+        get_device_transpose_operator(const DynGridIndex& nb_grid_pts,
                                       Index_t nb_nodal_components) const;
     };
 
@@ -520,13 +520,13 @@ namespace muGrid {
     }
 
     /**
-     * @brief Pad a DynCcoord to 3D Shape_t by appending fill_value
+     * @brief Pad a DynCoord to 3D Shape_t by appending fill_value
      * @param coord Input coordinate (can be 1D, 2D, or 3D)
      * @param fill_value Value to use for padding (default: 1)
      * @return 3D shape vector
      */
     template<size_t MaxDim, typename T>
-    inline Shape_t pad_shape_to_3d(const DynCcoord<MaxDim, T>& coord,
+    inline Shape_t pad_shape_to_3d(const DynCoord<MaxDim, T>& coord,
                                    Index_t fill_value = 1) {
         Shape_t result(coord.begin(), coord.end());
         while (result.size() < 3) {
@@ -570,7 +570,7 @@ namespace muGrid {
     template<typename DeviceSpace>
     const SparseOperatorSoA<DeviceSpace>&
     ConvolutionOperator::get_device_apply_operator(
-        const IntCoord_t& nb_grid_pts,
+        const DynGridIndex& nb_grid_pts,
         Index_t nb_nodal_components) const {
         // Check if device cache needs update
         if (!this->cached_device_apply_op.has_value()) {
@@ -588,7 +588,7 @@ namespace muGrid {
     template<typename DeviceSpace>
     const SparseOperatorSoA<DeviceSpace>&
     ConvolutionOperator::get_device_transpose_operator(
-        const IntCoord_t& nb_grid_pts,
+        const DynGridIndex& nb_grid_pts,
         Index_t nb_nodal_components) const {
         // Check if device cache needs update
         if (!this->cached_device_transpose_op.has_value()) {

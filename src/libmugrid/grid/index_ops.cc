@@ -42,9 +42,9 @@ namespace muGrid {
     namespace CcoordOps {
 
         //------------------------------------------------------------------------//
-        Dim_t get_index(const IntCoord_t & nb_grid_pts,
-                        const IntCoord_t & locations,
-                        const IntCoord_t & ccoord) {
+        Dim_t get_index(const DynGridIndex & nb_grid_pts,
+                        const DynGridIndex & locations,
+                        const DynGridIndex & ccoord) {
             const Dim_t dim{nb_grid_pts.get_dim()};
             if (locations.get_dim() != dim) {
                 std::stringstream error{};
@@ -72,8 +72,8 @@ namespace muGrid {
         }
 
         //-----------------------------------------------------------------------//
-        Real compute_pixel_volume(const IntCoord_t & nb_grid_pts,
-                                  const RealCoord_t & lengths) {
+        Real compute_pixel_volume(const DynGridIndex & nb_grid_pts,
+                                  const DynCoord<fourD, Real> & lengths) {
             Real vol{1.0};
             for (auto && tup : akantu::zip(nb_grid_pts, lengths)) {
                 auto && nb_grid_pt{std::get<0>(tup)};

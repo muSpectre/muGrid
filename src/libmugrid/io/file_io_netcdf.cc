@@ -674,10 +674,10 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void FileIONetCDF::initialise_gfc_local_pixels(
       const muGrid::GlobalFieldCollection & fc_global) {
-    const IntCoord_t & nb_domain_grid_pts{fc_global.get_nb_domain_grid_pts()};
-    const IntCoord_t & nb_subdomain_grid_pts{
+    const DynGridIndex & nb_domain_grid_pts{fc_global.get_nb_domain_grid_pts()};
+    const DynGridIndex & nb_subdomain_grid_pts{
         fc_global.get_nb_subdomain_grid_pts_without_ghosts()};
-    const IntCoord_t & subdomain_locations{
+    const DynGridIndex & subdomain_locations{
         fc_global.get_subdomain_locations_without_ghosts()};
 
     // init global field collection "local_pixels"

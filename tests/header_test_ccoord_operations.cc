@@ -44,7 +44,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_cube, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
     constexpr Index_t size{5};
 
     constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
@@ -59,7 +59,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_size, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
     constexpr Index_t size{5};
 
     constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
@@ -70,7 +70,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_stride_size, Fix, testGoodies::dimlist,
                                    Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
     constexpr Index_t size{5};
 
     constexpr Ccoord cube{CcoordOps::get_cube<dim>(size)};
@@ -82,7 +82,7 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index, Fix, testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
 
     testGoodies::RandRange<Dim_t> rng;
 
@@ -104,7 +104,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_col_major, Fix,
                                    testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
 
     testGoodies::RandRange<Dim_t> rng;
 
@@ -135,7 +135,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_row_major, Fix,
                                    testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
 
     testGoodies::RandRange<Dim_t> rng;
 
@@ -159,7 +159,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_non_contiguous_strides, Fix,
                                  testGoodies::dimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
 
     testGoodies::RandRange<Dim_t> rng;
 
@@ -190,7 +190,7 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_index_transposed_strides, Fix,
                                    testGoodies::multidimlist, Fix) {
     constexpr auto dim{Fix::dim};
-    using Ccoord = Ccoord_t<dim>;
+    using Ccoord = GridIndex<dim>;
 
     testGoodies::RandRange<Dim_t> rng;
 
@@ -221,30 +221,30 @@ namespace muGrid {
   }
 
   BOOST_AUTO_TEST_CASE(test_ccoord_unit_grid_pts) {
-    IntCoord_t nb_grid_pts1{1, 2};
-    IntCoord_t strides1{1, 1};
-    IntCoord_t ccoord1{0, 1};
+    DynGridIndex nb_grid_pts1{1, 2};
+    DynGridIndex strides1{1, 1};
+    DynGridIndex ccoord1{0, 1};
     BOOST_CHECK_EQUAL(CcoordOps::get_coord_from_strides(
-                          nb_grid_pts1, IntCoord_t{}, strides1, 1), ccoord1);
+                          nb_grid_pts1, DynGridIndex{}, strides1, 1), ccoord1);
 
-    IntCoord_t nb_grid_pts2{1, 1, 2};
-    IntCoord_t strides2{1, 1, 1};
-    IntCoord_t ccoord2{0, 0, 1};
+    DynGridIndex nb_grid_pts2{1, 1, 2};
+    DynGridIndex strides2{1, 1, 1};
+    DynGridIndex ccoord2{0, 0, 1};
     BOOST_CHECK_EQUAL(CcoordOps::get_coord_from_strides(
-                          nb_grid_pts2, IntCoord_t{}, strides2, 1), ccoord2);
+                          nb_grid_pts2, DynGridIndex{}, strides2, 1), ccoord2);
 
-    IntCoord_t nb_grid_pts3{1, 2, 1};
-    IntCoord_t strides3{1, 1, 1};
-    IntCoord_t ccoord3{0, 1, 0};
+    DynGridIndex nb_grid_pts3{1, 2, 1};
+    DynGridIndex strides3{1, 1, 1};
+    DynGridIndex ccoord3{0, 1, 0};
     BOOST_CHECK_EQUAL(CcoordOps::get_coord_from_strides(
-                          nb_grid_pts3, IntCoord_t{}, strides3, 1), ccoord3);
+                          nb_grid_pts3, DynGridIndex{}, strides3, 1), ccoord3);
   }
 
   BOOST_AUTO_TEST_CASE(vector_test) {
-    constexpr Ccoord_t<threeD> c3{1, 2, 3};
-    constexpr Ccoord_t<twoD> c2{c3[0], c3[1]};
-    constexpr Rcoord_t<threeD> s3{1.3, 2.8, 5.7};
-    constexpr Rcoord_t<twoD> s2{s3[0], s3[1]};
+    constexpr GridIndex<threeD> c3{1, 2, 3};
+    constexpr GridIndex<twoD> c2{c3[0], c3[1]};
+    constexpr GridPoint<threeD> s3{1.3, 2.8, 5.7};
+    constexpr GridPoint<twoD> s2{s3[0], s3[1]};
 
     Eigen::Matrix<Real, twoD, 1> v2;
     v2 << s3[0], s3[1];

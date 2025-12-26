@@ -37,10 +37,10 @@ namespace muGrid {
          * @param memory_location where to allocate field memory (Host or Device)
          */
         CartesianDecomposition(const Communicator & comm,
-                               const IntCoord_t & nb_domain_grid_pts,
-                               const IntCoord_t & nb_subdivisions,
-                               const IntCoord_t & nb_ghosts_left,
-                               const IntCoord_t & nb_ghosts_right,
+                               const DynGridIndex & nb_domain_grid_pts,
+                               const DynGridIndex & nb_subdivisions,
+                               const DynGridIndex & nb_ghosts_left,
+                               const DynGridIndex & nb_ghosts_right,
                                const SubPtMap_t & nb_sub_pts = {},
                                MemoryLocation memory_location = MemoryLocation::Host);
 
@@ -49,19 +49,19 @@ namespace muGrid {
         ~CartesianDecomposition() override = default;
 
         //! initialise with known subdomains
-        void initialise(const IntCoord_t & nb_domain_grid_pts,
-                        const IntCoord_t & nb_subdivisions,
-                        const IntCoord_t & nb_subdomain_grid_pts_without_ghosts,
-                        const IntCoord_t & subdomain_locations_without_ghosts,
-                        const IntCoord_t & nb_ghosts_left,
-                        const IntCoord_t & nb_ghosts_right,
-                        const IntCoord_t & subdomain_strides = IntCoord_t{});
+        void initialise(const DynGridIndex & nb_domain_grid_pts,
+                        const DynGridIndex & nb_subdivisions,
+                        const DynGridIndex & nb_subdomain_grid_pts_without_ghosts,
+                        const DynGridIndex & subdomain_locations_without_ghosts,
+                        const DynGridIndex & nb_ghosts_left,
+                        const DynGridIndex & nb_ghosts_right,
+                        const DynGridIndex & subdomain_strides = DynGridIndex{});
 
         //! initialise and determine subdomains from subdivisions
-        void initialise(const IntCoord_t & nb_domain_grid_pts,
-                        const IntCoord_t & nb_subdivisions,
-                        const IntCoord_t & nb_ghosts_left,
-                        const IntCoord_t & nb_ghosts_right);
+        void initialise(const DynGridIndex & nb_domain_grid_pts,
+                        const DynGridIndex & nb_subdivisions,
+                        const DynGridIndex & nb_ghosts_left,
+                        const DynGridIndex & nb_ghosts_right);
 
         //! fill the ghost buffers with the values from the neighboring
         //! processes.
@@ -81,30 +81,30 @@ namespace muGrid {
         virtual Index_t get_spatial_dim() const;
 
         //! get the number of subdivisions
-        const IntCoord_t & get_nb_subdivisions() const;
+        const DynGridIndex & get_nb_subdivisions() const;
 
         //! get the number of grid points of the whole domain
-        virtual const IntCoord_t & get_nb_domain_grid_pts() const;
+        virtual const DynGridIndex & get_nb_domain_grid_pts() const;
 
         //! get the number of grid points per subdomain
-        const IntCoord_t & get_nb_subdomain_grid_pts_with_ghosts() const;
+        const DynGridIndex & get_nb_subdomain_grid_pts_with_ghosts() const;
 
         //! get the number of grid points per subdomain
-        IntCoord_t get_nb_subdomain_grid_pts_without_ghosts() const;
+        DynGridIndex get_nb_subdomain_grid_pts_without_ghosts() const;
 
         //! get the subdomain locations
-        const IntCoord_t & get_subdomain_locations_with_ghosts() const;
+        const DynGridIndex & get_subdomain_locations_with_ghosts() const;
 
         //! get the subdomain locations
-        IntCoord_t get_subdomain_locations_without_ghosts() const;
+        DynGridIndex get_subdomain_locations_without_ghosts() const;
 
         //! get the number of ghost cells on the left side
-        const IntCoord_t & get_nb_ghosts_left() const {
+        const DynGridIndex & get_nb_ghosts_left() const {
             return this->collection.get_nb_ghosts_left();
         }
 
         //! get the number of ghost cells on the right side
-        const IntCoord_t & get_nb_ghosts_right() const {
+        const DynGridIndex & get_nb_ghosts_right() const {
             return this->collection.get_nb_ghosts_right();
         }
 
@@ -126,7 +126,7 @@ namespace muGrid {
         std::vector<std::vector<Index_t>> recv_left_sequence;
         std::vector<Index_t> nb_sendrecv_steps;
 
-        void check_dimension(const IntCoord_t & n,
+        void check_dimension(const DynGridIndex & n,
                              const std::string & name) const;
     };
 }  // namespace muGrid

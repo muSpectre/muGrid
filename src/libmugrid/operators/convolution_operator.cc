@@ -112,11 +112,11 @@ namespace muGrid {
         const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
 
         // Base requirements for apply operation
-        const auto apply_min_left{IntCoord_t(this->spatial_dim, 0) -
-                                  IntCoord_t(this->pixel_offset)};
-        const auto apply_min_right{IntCoord_t(this->conv_pts_shape) -
-                                   IntCoord_t(this->spatial_dim, 1) +
-                                   IntCoord_t(this->pixel_offset)};
+        const auto apply_min_left{DynGridIndex(this->spatial_dim, 0) -
+                                  DynGridIndex(this->pixel_offset)};
+        const auto apply_min_right{DynGridIndex(this->conv_pts_shape) -
+                                   DynGridIndex(this->spatial_dim, 1) +
+                                   DynGridIndex(this->pixel_offset)};
 
         // For transpose, swap left/right requirements
         const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
@@ -212,11 +212,11 @@ namespace muGrid {
         const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
 
         // Base requirements for apply operation
-        const auto apply_min_left{IntCoord_t(this->spatial_dim, 0) -
-                                  IntCoord_t(this->pixel_offset)};
-        const auto apply_min_right{IntCoord_t(this->conv_pts_shape) -
-                                   IntCoord_t(this->spatial_dim, 1) +
-                                   IntCoord_t(this->pixel_offset)};
+        const auto apply_min_left{DynGridIndex(this->spatial_dim, 0) -
+                                  DynGridIndex(this->pixel_offset)};
+        const auto apply_min_right{DynGridIndex(this->conv_pts_shape) -
+                                   DynGridIndex(this->spatial_dim, 1) +
+                                   DynGridIndex(this->pixel_offset)};
 
         // For transpose, swap left/right requirements
         const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
@@ -362,7 +362,7 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
     ConvolutionOperator::get_apply_operator(
-        const IntCoord_t & nb_grid_pts,
+        const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
         SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
@@ -384,7 +384,7 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
     ConvolutionOperator::get_transpose_operator(
-        const IntCoord_t & nb_grid_pts,
+        const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
         SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
@@ -407,11 +407,11 @@ namespace muGrid {
     template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_apply_operator(
-        const IntCoord_t & nb_grid_pts,
+        const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between col-major index and coordinate
-        const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
-                                              IntCoord_t(this->pixel_offset)};
+        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->conv_pts_shape),
+                                              DynGridIndex(this->pixel_offset)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
 
         // For SoA storage order, we need total element counts
@@ -500,20 +500,20 @@ namespace muGrid {
     // Explicit template instantiations for create_apply_operator
     template SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_apply_operator<StorageOrder::ArrayOfStructures>(
-        const IntCoord_t&, Index_t) const;
+        const DynGridIndex&, Index_t) const;
     template SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_apply_operator<StorageOrder::StructureOfArrays>(
-        const IntCoord_t&, Index_t) const;
+        const DynGridIndex&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_transpose_operator(
-        const IntCoord_t & nb_grid_pts,
+        const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between index and coordinates
-        const CcoordOps::Pixels kernel_pixels{IntCoord_t(this->conv_pts_shape),
-                                              IntCoord_t(this->pixel_offset)};
+        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->conv_pts_shape),
+                                              DynGridIndex(this->pixel_offset)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
 
         // For SoA storage order, we need total element counts
@@ -600,10 +600,10 @@ namespace muGrid {
     // Explicit template instantiations for create_transpose_operator
     template SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_transpose_operator<StorageOrder::ArrayOfStructures>(
-        const IntCoord_t&, Index_t) const;
+        const DynGridIndex&, Index_t) const;
     template SparseOperatorSoA<HostSpace>
     ConvolutionOperator::create_transpose_operator<StorageOrder::StructureOfArrays>(
-        const IntCoord_t&, Index_t) const;
+        const DynGridIndex&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     void ConvolutionOperator::clear_cache() const {

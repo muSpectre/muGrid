@@ -50,14 +50,14 @@ namespace muGrid {
   struct FileIOFixture {
   private:
     // Helper functions for NVCC compatibility in initializer lists
-    static IntCoord_t make_nb_domain_grid_pts(Index_t spatial_dim,
+    static DynGridIndex make_nb_domain_grid_pts(Index_t spatial_dim,
                                                Index_t comm_size,
-                                               const IntCoord_t & subdomain_pts) {
-      return IntCoord_t{spatial_dim, comm_size * subdomain_pts[1]};
+                                               const DynGridIndex & subdomain_pts) {
+      return DynGridIndex{spatial_dim, comm_size * subdomain_pts[1]};
     }
-    static IntCoord_t make_subdomain_locations(Index_t comm_rank,
-                                                const IntCoord_t & subdomain_pts) {
-      return IntCoord_t{0, comm_rank * subdomain_pts[1]};
+    static DynGridIndex make_subdomain_locations(Index_t comm_rank,
+                                                const DynGridIndex & subdomain_pts) {
+      return DynGridIndex{0, comm_rank * subdomain_pts[1]};
     }
 
   public:
@@ -107,9 +107,9 @@ namespace muGrid {
     Communicator comm{MPIContext::get_context().comm};
     static constexpr Index_t spatial_dimension{twoD};
     const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
-    const IntCoord_t nb_subdomain_grid_pts{2, 3};
-    const IntCoord_t nb_domain_grid_pts;
-    const IntCoord_t subdomain_locations;
+    const DynGridIndex nb_subdomain_grid_pts{2, 3};
+    const DynGridIndex nb_domain_grid_pts;
+    const DynGridIndex subdomain_locations;
     const std::string quad{"quad"};
     muGrid::GlobalFieldCollection global_fc;
 

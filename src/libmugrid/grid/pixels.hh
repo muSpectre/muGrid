@@ -58,28 +58,28 @@ namespace muGrid {
             //! Constructor with default strides (column-major pixel storage
             //! order)
             explicit Pixels(
-                const IntCoord_t & nb_subdomain_grid_pts,
-                const IntCoord_t & subdomain_locations = IntCoord_t{});
+                const DynGridIndex & nb_subdomain_grid_pts,
+                const DynGridIndex & subdomain_locations = DynGridIndex{});
 
             /**
              * Constructor with custom strides (any, including partially
              * transposed pixel storage order)
              */
-            Pixels(const IntCoord_t & nb_subdomain_grid_pts,
-                   const IntCoord_t & subdomain_locations,
-                   const IntCoord_t & strides);
+            Pixels(const DynGridIndex & nb_subdomain_grid_pts,
+                   const DynGridIndex & subdomain_locations,
+                   const DynGridIndex & strides);
 
             //! Constructor with default strides from statically sized coords
             template <size_t Dim>
             explicit Pixels(
-                const Ccoord_t<Dim> & nb_subdomain_grid_pts,
-                const Ccoord_t<Dim> & subdomain_locations = Ccoord_t<Dim>{});
+                const GridIndex<Dim> & nb_subdomain_grid_pts,
+                const GridIndex<Dim> & subdomain_locations = GridIndex<Dim>{});
 
             //! Constructor with custom strides from statically sized coords
             template <size_t Dim>
-            Pixels(const Ccoord_t<Dim> & nb_subdomain_grid_pts,
-                   const Ccoord_t<Dim> & subdomain_locations,
-                   const Ccoord_t<Dim> & strides);
+            Pixels(const GridIndex<Dim> & nb_subdomain_grid_pts,
+                   const GridIndex<Dim> & subdomain_locations,
+                   const GridIndex<Dim> & strides);
 
             //! Copy constructor
             Pixels(const Pixels & other) = default;
@@ -98,14 +98,14 @@ namespace muGrid {
 
             //! evaluate and return the linear index corresponding to dynamic
             //! `ccoord`
-            Index_t get_index(const IntCoord_t & ccoord) const {
+            Index_t get_index(const DynGridIndex & ccoord) const {
                 return get_index_from_strides(
                     this->strides, this->subdomain_locations, ccoord);
             }
 
             //! evaluate and return the linear index corresponding to `ccoord`
             template <size_t Dim>
-            Index_t get_index(const Ccoord_t<Dim> & ccoord) const {
+            Index_t get_index(const GridIndex<Dim> & ccoord) const {
                 if (this->dim != Dim) {
                     throw RuntimeError("dimension mismatch");
                 }
@@ -115,21 +115,21 @@ namespace muGrid {
             }
 
             //! return coordinates of the i-th pixel
-            IntCoord_t get_coord(const Index_t & index) const {
+            DynGridIndex get_coord(const Index_t & index) const {
                 return get_coord_from_axes_order(
                     this->nb_subdomain_grid_pts, this->subdomain_locations,
                     this->strides, this->axes_order, index);
             }
 
             //! return coordinates of the i-th pixel, with zero as location
-            IntCoord_t get_coord0(const Index_t & index) const {
+            DynGridIndex get_coord0(const Index_t & index) const {
                 return get_coord0_from_axes_order(this->nb_subdomain_grid_pts,
                                                   this->strides,
                                                   this->axes_order, index);
             }
 
-            IntCoord_t get_neighbour(const IntCoord_t & ccoord,
-                                     const IntCoord_t & offset) const {
+            DynGridIndex get_neighbour(const DynGridIndex & ccoord,
+                                     const DynGridIndex & offset) const {
                 return modulo(ccoord + offset - this->subdomain_locations,
                               this->nb_subdomain_grid_pts) +
                        this->subdomain_locations;
@@ -141,7 +141,7 @@ namespace muGrid {
             class iterator {
                public:
                 //! stl
-                using value_type = IntCoord_t;
+                using value_type = DynGridIndex;
                 using const_value_type = const value_type;  //!< stl conformance
                 using pointer = value_type *;               //!< stl conformance
                 using difference_type = std::ptrdiff_t;     //!< stl conformance
@@ -154,7 +154,7 @@ namespace muGrid {
                     : pixels{pixels}, coord0{pixels.get_coord0(index)} {}
 
                 //! constructor
-                iterator(const Pixels & pixels, IntCoord_t coord0)
+                iterator(const Pixels & pixels, DynGridIndex coord0)
                     : pixels{pixels}, coord0{coord0} {}
 
                 //! Default constructor
@@ -210,7 +210,7 @@ namespace muGrid {
 
                protected:
                 const Pixels & pixels;  //!< ref to pixels in cell
-                IntCoord_t coord0;      //!< coordinate of current pixel
+                DynGridIndex coord0;      //!< coordinate of current pixel
             };
 
             //! stl conformance
@@ -237,7 +237,7 @@ namespace muGrid {
 
             //! return the resolution of the discretisation grid in each spatial
             //! dim
-            const IntCoord_t & get_nb_subdomain_grid_pts() const {
+            const DynGridIndex & get_nb_subdomain_grid_pts() const {
                 return this->nb_subdomain_grid_pts;
             }
 
@@ -246,12 +246,12 @@ namespace muGrid {
              * of this processors partition of the discretisation grid. For
              * sequential calculations, this is alvays the origin
              */
-            const IntCoord_t & get_subdomain_locations() const {
+            const DynGridIndex & get_subdomain_locations() const {
                 return this->subdomain_locations;
             }
 
             //! return the strides used for iterating over the pixels
-            const IntCoord_t & get_strides() const { return this->strides; }
+            const DynGridIndex & get_strides() const { return this->strides; }
 
             /**
              * enumerator class for `muSpectre::Pixels`
@@ -348,10 +348,10 @@ namespace muGrid {
 
            protected:
             Dim_t dim;                         //!< spatial dimension
-            IntCoord_t nb_subdomain_grid_pts;  //!< nb_grid_pts of this domain
-            IntCoord_t subdomain_locations;    //!< locations of this domain
-            IntCoord_t strides;                //!< strides of memory layout
-            IntCoord_t axes_order;             //!< order of axes
+            DynGridIndex nb_subdomain_grid_pts;  //!< nb_grid_pts of this domain
+            DynGridIndex subdomain_locations;    //!< locations of this domain
+            DynGridIndex strides;                //!< strides of memory layout
+            DynGridIndex axes_order;             //!< order of axes
             bool contiguous;                   //!< is this a contiguous buffer?
         };
     }  // namespace CcoordOps
