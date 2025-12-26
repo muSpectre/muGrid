@@ -64,10 +64,11 @@ jobs:
           CIBW_ENVIRONMENT_MACOS: >-
             PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:/usr/local/lib/pkgconfig
             PATH=/opt/homebrew/bin:/usr/local/bin:$PATH
-          # Windows: Set CMAKE_PREFIX_PATH to find NetCDF (installed by PowerShell script)
+          # Windows: Set CMAKE_PREFIX_PATH to find NetCDF
+          # Uses fixed path matching install_netcdf4_windows.ps1
           CIBW_ENVIRONMENT_WINDOWS: >-
-            CMAKE_PREFIX_PATH="$TEMP/netcdf-install;$CMAKE_PREFIX_PATH"
-            netCDF_DIR="$TEMP/netcdf-install/lib/cmake/netCDF"
+            CMAKE_PREFIX_PATH="C:/netcdf-install"
+            netCDF_DIR="C:/netcdf-install/lib/cmake/netCDF"
           # Test with NetCDF on all platforms
           CIBW_TEST_COMMAND: python -c "import muGrid; print(muGrid.__version__); from muGrid._muGrid import FileIONetCDF"
 
