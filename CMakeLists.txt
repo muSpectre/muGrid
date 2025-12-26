@@ -47,6 +47,14 @@ project(muGrid
     DESCRIPTION "MPI-parallel regular grids"
 )
 
+# Windows-specific settings
+if(WIN32)
+    # Prevent windows.h from defining min/max macros that conflict with std::min/max
+    add_compile_definitions(NOMINMAX)
+    # Reduce windows.h include size
+    add_compile_definitions(WIN32_LEAN_AND_MEAN)
+endif()
+
 # GPU backend options
 option(MUGRID_ENABLE_CUDA "Enable CUDA GPU support" OFF)
 option(MUGRID_ENABLE_HIP "Enable HIP GPU support (AMD ROCm)" OFF)
