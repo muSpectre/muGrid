@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from muGrid import Communicator, GlobalFieldCollection, real_field, wrap_field
+from muGrid import Communicator, GlobalFieldCollection
 from muGrid.Solvers import conjugate_gradients
 
 
@@ -22,18 +22,16 @@ def test_conjugate_gradients(A, b, x0):
     A = np.array(A)
 
     def hessp(x, Ax):
-        x_wrap = wrap_field(x)
-        Ax_wrap = wrap_field(Ax)
-        Ax_wrap.p[...] = A @ x_wrap.p
+        Ax.p[...] = A @ x.p
         return Ax
 
-    solution = real_field(fc, "solution")
+    solution = fc.real_field("solution")
     solution.p[...] = np.array(x0)
-    rhs = real_field(fc, "rhs")
+    rhs = fc.real_field("rhs")
     rhs.p[...] = np.array(b)
 
     conjugate_gradients(
-        comm, fc, hessp, rhs._cpp, solution._cpp, tol=1e-6, maxiter=10  # linear operator
+        comm, fc, hessp, rhs, solution, tol=1e-6, maxiter=10
     )
 
     np.testing.assert_allclose(solution.p, np.linalg.solve(A, b), atol=1e-6)

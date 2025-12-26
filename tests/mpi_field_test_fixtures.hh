@@ -56,8 +56,8 @@ namespace muGrid {
     static constexpr Dim_t NbComponent{2};
     static constexpr Index_t spatial_dimension{threeD};
     const FieldCollection::SubPtMap_t nb_sub_pts{{"quad", NbQuadPts}};
-    const IntCoord_t nb_subdomain_grid_pts{3, 3, 1};
-    const IntCoord_t nb_subdomain_grid_pts_empty{0, 0, 0};
+    const DynGridIndex nb_subdomain_grid_pts{3, 3, 1};
+    const DynGridIndex nb_subdomain_grid_pts_empty{0, 0, 0};
     const std::string quad{"quad"};
   };
   constexpr Dim_t MpiFieldMapFixture::NbQuadPts;
@@ -90,8 +90,8 @@ namespace muGrid {
           pixel_map{pixel_field}, quad_pt_map{quad_pt_field},
           pixel_quad_pt_map{quad_pt_field, IterUnit::Pixel} {};
 
-    const IntCoord_t nb_domain_grid_pts;
-    const IntCoord_t subdomain_locations;
+    const DynGridIndex nb_domain_grid_pts;
+    const DynGridIndex subdomain_locations;
 
     GlobalFieldCollection fc;
 
@@ -126,8 +126,8 @@ namespace muGrid {
           pixel_map{pixel_field}, quad_pt_map{quad_pt_field},
           pixel_quad_pt_map{quad_pt_field, IterUnit::Pixel} {};
 
-    const IntCoord_t nb_domain_grid_pts;
-    const IntCoord_t subdomain_locations;
+    const DynGridIndex nb_domain_grid_pts;
+    const DynGridIndex subdomain_locations;
 
     GlobalFieldCollection fc;
 

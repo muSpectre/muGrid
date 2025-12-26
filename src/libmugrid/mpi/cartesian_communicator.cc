@@ -20,7 +20,7 @@
 namespace muGrid {
 #ifdef WITH_MPI
     CartesianCommunicator::CartesianCommunicator(
-        const Parent_t & parent, const IntCoord_t & nb_subdivisions)
+        const Parent_t & parent, const DynGridIndex & nb_subdivisions)
         : Parent_t{parent.get_mpi_comm()}, parent{parent},
           nb_subdivisions{nb_subdivisions},
           coordinates(nb_subdivisions.size(), 0),
@@ -73,8 +73,8 @@ namespace muGrid {
     }
 
     CartesianCommunicator::CartesianCommunicator(
-        const Parent_t & parent, const IntCoord_t & nb_subdivisions,
-        const IntCoord_t & coordinates, const std::vector<int> & left_ranks,
+        const Parent_t & parent, const DynGridIndex & nb_subdivisions,
+        const DynGridIndex & coordinates, const std::vector<int> & left_ranks,
         const std::vector<int> & right_ranks)
         : Parent_t{parent.get_mpi_comm()}, parent{parent},
           nb_subdivisions{nb_subdivisions}, coordinates{coordinates},
@@ -149,7 +149,7 @@ namespace muGrid {
     }
 #else   // not WITH_MPI
     CartesianCommunicator::CartesianCommunicator(
-        const Parent_t & parent, const IntCoord_t & nb_subdivisions)
+        const Parent_t & parent, const DynGridIndex & nb_subdivisions)
         : Parent_t{}, parent{parent}, nb_subdivisions{nb_subdivisions},
           coordinates(nb_subdivisions.size(), 0) {}
 
@@ -236,11 +236,11 @@ namespace muGrid {
     }
 #endif  // WITH_MPI
 
-    const IntCoord_t & CartesianCommunicator::get_nb_subdivisions() const {
+    const DynGridIndex & CartesianCommunicator::get_nb_subdivisions() const {
         return this->nb_subdivisions;
     }
 
-    const IntCoord_t & CartesianCommunicator::get_coordinates() const {
+    const DynGridIndex & CartesianCommunicator::get_coordinates() const {
         return this->coordinates;
     }
 }  // namespace muGrid

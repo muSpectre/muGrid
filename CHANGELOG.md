@@ -1,6 +1,18 @@
 Change log for µGrid
 ====================
 
+0.98.0 (26Dec25)
+----------------
+
+- ENH: **Simplified API**: Streamlined user-facing API for improved usability
+- ENH: **Windows support**: Full Windows platform compatibility with exception traceback support (closes #48)
+- ENH: **3D Poisson solver example**: New example demonstrating 3D Poisson solver usage
+- ENH: **Benchmark suite**: Automatic Poisson benchmark suite with fine-grained timing and GFLOP/s metrics
+- ENH: **FEM gradient operator**: New FEM gradient operator with homogenization example
+- MAINT: **Unified GPU code**: Consolidated GPU backend code for CUDA and HIP
+- MAINT: **Laplace kernels**: Hard-coded Laplace kernels are now part of the main library
+- BUG: Fixed obtaining raw data pointer in Laplace operator implementation
+
 0.97.0 (22Dec25)
 ----------------
 

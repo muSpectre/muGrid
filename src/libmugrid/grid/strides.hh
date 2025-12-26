@@ -64,7 +64,7 @@ namespace muGrid {
             //! compute the stride in a direction of a column-major grid
             template <Dim_t Dim>
             constexpr Index_t
-            col_major_stride(const Ccoord_t<Dim> & nb_grid_pts,
+            col_major_stride(const GridIndex<Dim> & nb_grid_pts,
                              const size_t index) {
                 static_assert(Dim > 0,
                               "only for positive numbers of dimensions");
@@ -79,7 +79,7 @@ namespace muGrid {
             //! compute the stride in a direction of a row-major grid
             template <Dim_t Dim>
             constexpr Index_t
-            row_major_stride(const Ccoord_t<Dim> & nb_grid_pts,
+            row_major_stride(const GridIndex<Dim> & nb_grid_pts,
                              const size_t index) {
                 static_assert(Dim > 0,
                               "only for positive numbers of dimensions");
@@ -93,18 +93,18 @@ namespace muGrid {
 
             //! get all strides from a column-major grid (helper function)
             template <Dim_t Dim, size_t... I>
-            constexpr Ccoord_t<Dim>
-            compute_col_major_strides(const Ccoord_t<Dim> & nb_grid_pts,
+            constexpr GridIndex<Dim>
+            compute_col_major_strides(const GridIndex<Dim> & nb_grid_pts,
                                       std::index_sequence<I...>) {
-                return Ccoord_t<Dim>{col_major_stride<Dim>(nb_grid_pts, I)...};
+                return GridIndex<Dim>{col_major_stride<Dim>(nb_grid_pts, I)...};
             }
 
             //! get all strides from a row-major grid (helper function)
             template <Dim_t Dim, size_t... I>
-            constexpr Ccoord_t<Dim>
-            compute_row_major_strides(const Ccoord_t<Dim> & nb_grid_pts,
+            constexpr GridIndex<Dim>
+            compute_row_major_strides(const GridIndex<Dim> & nb_grid_pts,
                                       std::index_sequence<I...>) {
-                return Ccoord_t<Dim>{row_major_stride<Dim>(nb_grid_pts, I)...};
+                return GridIndex<Dim>{row_major_stride<Dim>(nb_grid_pts, I)...};
             }
         }  // namespace internal
 
@@ -117,17 +117,17 @@ namespace muGrid {
 
         //! returns a grid of equal number of grid points in each direction
         template <size_t MaxDim = fourD>  // 4 to ease alignment
-        DynCcoord<MaxDim> get_cube(const Dim_t & dim,
+        DynCoord<MaxDim> get_cube(const Dim_t & dim,
                                    const Index_t & nb_grid_pts) {
             switch (dim) {
             case oneD: {
-                return DynCcoord<MaxDim>{get_cube<oneD>(nb_grid_pts)};
+                return DynCoord<MaxDim>{get_cube<oneD>(nb_grid_pts)};
             }
             case twoD: {
-                return DynCcoord<MaxDim>{get_cube<twoD>(nb_grid_pts)};
+                return DynCoord<MaxDim>{get_cube<twoD>(nb_grid_pts)};
             }
             case threeD: {
-                return DynCcoord<MaxDim>{get_cube<threeD>(nb_grid_pts)};
+                return DynCoord<MaxDim>{get_cube<threeD>(nb_grid_pts)};
             }
             default:
                 throw RuntimeError("Unknown dimension");
@@ -137,8 +137,8 @@ namespace muGrid {
         /* ---------------------------------------------------------------------- */
         //! get all strides from a column-major grid
         template <size_t Dim>
-        constexpr Ccoord_t<Dim>
-        get_col_major_strides(const Ccoord_t<Dim> & nb_grid_pts) {
+        constexpr GridIndex<Dim>
+        get_col_major_strides(const GridIndex<Dim> & nb_grid_pts) {
             return internal::compute_col_major_strides<Dim>(
                 nb_grid_pts, std::make_index_sequence<Dim>{});
         }
@@ -146,23 +146,23 @@ namespace muGrid {
         /* ---------------------------------------------------------------------- */
         //! get all strides from a column-major grid
         template <size_t MaxDim>
-        constexpr DynCcoord<MaxDim>
-        get_col_major_strides(const DynCcoord<MaxDim> & nb_grid_pts) {
+        constexpr DynCoord<MaxDim>
+        get_col_major_strides(const DynCoord<MaxDim> & nb_grid_pts) {
             switch (nb_grid_pts.get_dim()) {
             case oneD: {
-                return DynCcoord<MaxDim>{
+                return DynCoord<MaxDim>{
                     internal::compute_col_major_strides<oneD>(
                         nb_grid_pts.template get<oneD>(),
                         std::make_index_sequence<oneD>{})};
             }
             case twoD: {
-                return DynCcoord<MaxDim>{
+                return DynCoord<MaxDim>{
                     internal::compute_col_major_strides<twoD>(
                         nb_grid_pts.template get<twoD>(),
                         std::make_index_sequence<twoD>{})};
             }
             case threeD: {
-                return DynCcoord<MaxDim>{
+                return DynCoord<MaxDim>{
                     internal::compute_col_major_strides<threeD>(
                         nb_grid_pts.template get<threeD>(),
                         std::make_index_sequence<threeD>{})};
@@ -177,8 +177,8 @@ namespace muGrid {
         /* ---------------------------------------------------------------------- */
         //! get all strides from a row-major grid
         template <size_t Dim>
-        constexpr Ccoord_t<Dim>
-        get_row_major_strides(const Ccoord_t<Dim> & nb_grid_pts) {
+        constexpr GridIndex<Dim>
+        get_row_major_strides(const GridIndex<Dim> & nb_grid_pts) {
             return internal::compute_row_major_strides<Dim>(
                 nb_grid_pts, std::make_index_sequence<Dim>{});
         }
@@ -186,23 +186,23 @@ namespace muGrid {
         /* ---------------------------------------------------------------------- */
         //! get all strides from a row-major grid
         template <size_t MaxDim>
-        constexpr DynCcoord<MaxDim>
-        get_row_major_strides(const DynCcoord<MaxDim> & nb_grid_pts) {
+        constexpr DynCoord<MaxDim>
+        get_row_major_strides(const DynCoord<MaxDim> & nb_grid_pts) {
             switch (nb_grid_pts.get_dim()) {
             case oneD: {
-                return DynCcoord<MaxDim>{
+                return DynCoord<MaxDim>{
                     internal::compute_row_major_strides<oneD>(
                         nb_grid_pts.template get<oneD>(),
                         std::make_index_sequence<oneD>{})};
             }
             case twoD: {
-                return DynCcoord<MaxDim>{
+                return DynCoord<MaxDim>{
                     internal::compute_row_major_strides<twoD>(
                         nb_grid_pts.template get<twoD>(),
                         std::make_index_sequence<twoD>{})};
             }
             case threeD: {
-                return DynCcoord<MaxDim>{
+                return DynCoord<MaxDim>{
                     internal::compute_row_major_strides<threeD>(
                         nb_grid_pts.template get<threeD>(),
                         std::make_index_sequence<threeD>{})};
@@ -230,9 +230,9 @@ namespace muGrid {
 
         //! compute the order of the axes given strides, fastest first
         template <size_t dim>
-        Ccoord_t<dim> compute_axes_order(const Ccoord_t<dim> & shape,
-                                         const Ccoord_t<dim> & strides) {
-            Ccoord_t<dim> axes_order;
+        GridIndex<dim> compute_axes_order(const GridIndex<dim> & shape,
+                                         const GridIndex<dim> & strides) {
+            GridIndex<dim> axes_order;
             std::iota(axes_order.begin(), axes_order.end(), 0);
             std::sort(axes_order.begin(), axes_order.end(),
                       [&shape, &strides](const Dim_t & a, const Dim_t & b) {
@@ -280,7 +280,7 @@ namespace muGrid {
         //-----------------------------------------------------------------------//
         //! get the number of pixels in a grid
         template <size_t Dim>
-        constexpr size_t get_size(const Ccoord_t<Dim> & nb_grid_pts) {
+        constexpr size_t get_size(const GridIndex<Dim> & nb_grid_pts) {
             size_t retval{1};
             for (size_t i{0}; i < Dim; ++i) {
                 retval *= nb_grid_pts[i];
@@ -291,7 +291,7 @@ namespace muGrid {
         //-----------------------------------------------------------------------//
         //! get the number of pixels in a grid
         template <size_t MaxDim>
-        size_t get_size(const DynCcoord<MaxDim> & nb_grid_pts) {
+        size_t get_size(const DynCoord<MaxDim> & nb_grid_pts) {
             size_t retval{1};
             Dim_t dim{nb_grid_pts.get_dim()};
             for (Dim_t i{0}; i < dim; ++i) {
@@ -303,8 +303,8 @@ namespace muGrid {
         //-----------------------------------------------------------------------//
         //! get the buffer size required to store a grid given its strides
         template <size_t dim>
-        constexpr size_t get_buffer_size(const Ccoord_t<dim> & nb_grid_pts,
-                                         const Ccoord_t<dim> & strides) {
+        constexpr size_t get_buffer_size(const GridIndex<dim> & nb_grid_pts,
+                                         const GridIndex<dim> & strides) {
             size_t buffer_size{0};
             // We need to loop over the dimensions because the largest stride
             // can occur anywhere. (It depends on the storage order.)
@@ -318,8 +318,8 @@ namespace muGrid {
 
         //-----------------------------------------------------------------------//
         //! get the buffer size required to store a grid given its strides
-        size_t get_buffer_size(const IntCoord_t & nb_grid_pts,
-                               const IntCoord_t & strides);
+        size_t get_buffer_size(const DynGridIndex & nb_grid_pts,
+                               const DynGridIndex & strides);
 
         //-----------------------------------------------------------------------//
         //! get the buffer size required to store a grid given its strides

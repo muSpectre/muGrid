@@ -107,7 +107,7 @@ std::vector<Real> rfft_freq(Index_t n, Real d = 1.0);
  * @param r2c_axis     Axis along which r2c transform is performed (default 0)
  * @return             Fourier-space grid dimensions
  */
-IntCoord_t get_hermitian_grid_pts(const IntCoord_t & nb_grid_pts,
+DynGridIndex get_hermitian_grid_pts(const DynGridIndex & nb_grid_pts,
                                   Index_t r2c_axis = 0);
 
 /**
@@ -119,7 +119,7 @@ IntCoord_t get_hermitian_grid_pts(const IntCoord_t & nb_grid_pts,
  * @param nb_grid_pts  Grid dimensions
  * @return             Normalization factor (1.0 / total_grid_points)
  */
-Real fft_normalization(const IntCoord_t & nb_grid_pts);
+Real fft_normalization(const DynGridIndex & nb_grid_pts);
 
 /**
  * Evenly distribute a global dimension across ranks.
@@ -147,7 +147,7 @@ void distribute_dimension(Index_t global_size, int comm_size, int rank,
  * @param p1           Output: first dimension of process grid
  * @param p2           Output: second dimension of process grid
  */
-void select_process_grid(int num_ranks, const IntCoord_t & nb_grid_pts, int & p1,
+void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & p1,
                          int & p2);
 
 }  // namespace muGrid

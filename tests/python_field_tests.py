@@ -39,7 +39,7 @@ import unittest
 import numpy as np
 
 import muGrid
-from muGrid import real_field, wrap_field
+from muGrid import wrap_field
 
 
 class FieldCheck(unittest.TestCase):
@@ -73,9 +73,9 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(f2.s.shape, (4, 1) + self.nb_grid_pts)
 
         # Check that we get those fields back
-        self.assertEqual(fc.get_field('test-field-scalar'), fs_cpp)
-        self.assertEqual(fc.get_field('test-field'), f_cpp)
-        self.assertEqual(fc.get_field('test-field2'), f2_cpp)
+        self.assertEqual(fc.get_field("test-field-scalar"), fs_cpp)
+        self.assertEqual(fc.get_field("test-field"), f_cpp)
+        self.assertEqual(fc.get_field("test-field2"), f2_cpp)
 
         # Check strides
         self.assertEqual(fs.stride(muGrid.Pixel), 1)
@@ -110,20 +110,20 @@ class FieldCheck(unittest.TestCase):
         np.testing.assert_allclose(f2.p, values2)
 
     def test_buffer_size_four_quad_pt(self):
-        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, sub_pts={'quad': 4})
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, sub_pts={"quad": 4})
         # Single component
-        f_cpp = fc.register_real_field("test-field", 1, 'quad')
+        f_cpp = fc.register_real_field("test-field", 1, "quad")
         f = wrap_field(f_cpp)
         self.assertEqual(f.p.shape, (4,) + self.nb_grid_pts)
         self.assertEqual(f.s.shape, (1, 4) + self.nb_grid_pts)
         # Four components
-        f2_cpp = fc.register_real_field("test-field2", 3, 'quad')
+        f2_cpp = fc.register_real_field("test-field2", 3, "quad")
         f2 = wrap_field(f2_cpp)
         self.assertEqual(f2.p.shape, (4 * 3,) + self.nb_grid_pts)
         self.assertEqual(f2.s.shape, (3, 4) + self.nb_grid_pts)
         # Check that we get those fields back
-        self.assertEqual(fc.get_field('test-field'), f_cpp)
-        self.assertEqual(fc.get_field('test-field2'), f2_cpp)
+        self.assertEqual(fc.get_field("test-field"), f_cpp)
+        self.assertEqual(fc.get_field("test-field2"), f2_cpp)
         # Check strides
         self.assertEqual(f.stride(muGrid.Pixel), 4)
         self.assertEqual(f2.stride(muGrid.Pixel), 3 * 4)
@@ -131,9 +131,9 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(f2.stride(muGrid.SubPt), 3)
 
     def test_buffer_access(self):
-        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, sub_pts={'quad': 4})
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, sub_pts={"quad": 4})
         # Single component
-        f_cpp = fc.register_real_field("test-field", 1, 'quad')
+        f_cpp = fc.register_real_field("test-field", 1, "quad")
         f = wrap_field(f_cpp)
 
         # Access via DLPack - arrays from sg (full buffer)
@@ -148,25 +148,33 @@ class FieldCheck(unittest.TestCase):
         arr1[0, 0, 2, 1, 0] = 10  # f-contiguous
         self.assertEqual(arr2[0, 2, 1, 0], 10)  # f-contiguous
 
-        f2_cpp = fc.register_real_field("test-field-2", 3, 'quad')
-        f2 = wrap_field(f2_cpp)
+        f2_cpp = fc.register_real_field("test-field-2", 3, "quad")
         # Different fields should have different data buffers
-        self.assertTrue(np.from_dlpack(f_cpp).ctypes.data !=
-                        np.from_dlpack(f2_cpp).ctypes.data)
+        self.assertTrue(
+            np.from_dlpack(f_cpp).ctypes.data != np.from_dlpack(f2_cpp).ctypes.data
+        )
 
     def test_col_major(self):
         dims = (3, 4)
-        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts, self.nb_grid_pts,
-                                          (0,) * len(self.nb_grid_pts),
-                                          {})
+        fc = muGrid.GlobalFieldCollection(
+            self.nb_grid_pts, self.nb_grid_pts, (0,) * len(self.nb_grid_pts), {}
+        )
         f_cpp = fc.register_real_field("test-field", dims)
         a = np.from_dlpack(f_cpp)
         self.assertTrue(a.flags.f_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + [1, ] + list(self.nb_grid_pts)))
+        self.assertEqual(
+            a.shape,
+            tuple(
+                list(dims)
+                + [
+                    1,
+                ]
+                + list(self.nb_grid_pts)
+            ),
+        )
         strides = np.append([1], np.cumprod(dims))
         strides = np.append(strides, strides[-1])
-        strides = np.append(strides,
-                            strides[-1] * np.cumprod(self.nb_grid_pts))
+        strides = np.append(strides, strides[-1] * np.cumprod(self.nb_grid_pts))
         strides = 8 * strides[:-1]
         self.assertEqual(a.strides, tuple(strides))
 
@@ -175,12 +183,26 @@ class FieldCheck(unittest.TestCase):
         # things.
         dims = (3, 4)
         fc = muGrid.GlobalFieldCollection(
-            self.nb_grid_pts, self.nb_grid_pts, [0] * len(self.nb_grid_pts),
-            muGrid.StorageOrder.RowMajor, {}, muGrid.StorageOrder.RowMajor)
+            self.nb_grid_pts,
+            self.nb_grid_pts,
+            [0] * len(self.nb_grid_pts),
+            muGrid.StorageOrder.RowMajor,
+            {},
+            muGrid.StorageOrder.RowMajor,
+        )
         f_cpp = fc.register_real_field("test-field", dims)
         a = np.from_dlpack(f_cpp)
         self.assertTrue(a.flags.c_contiguous)
-        self.assertEqual(a.shape, tuple(list(dims) + [1, ] + list(self.nb_grid_pts)))
+        self.assertEqual(
+            a.shape,
+            tuple(
+                list(dims)
+                + [
+                    1,
+                ]
+                + list(self.nb_grid_pts)
+            ),
+        )
         strides = np.append([1], np.cumprod(self.nb_grid_pts[::-1]))
         strides = np.append(strides, strides[-1])
         strides = np.append(strides, strides[-1] * np.cumprod(dims[::-1]))
@@ -193,7 +215,7 @@ class FieldCheck(unittest.TestCase):
         fc = muGrid.LocalFieldCollection(3, lfc_name)
         fc.add_pixel(1)  # add pixel with global_index = 1
         fc.initialise()
-        field_cpp = fc.register_real_field(lfc_field_name, 1, 'pixel')
+        field_cpp = fc.register_real_field(lfc_field_name, 1, "pixel")
         field_array = np.from_dlpack(field_cpp)
         field_array[:] = 5  # assigne value 5 to pixel 1
 
@@ -201,7 +223,7 @@ class FieldCheck(unittest.TestCase):
 
     def test_accessors(self):
         fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
-        field_cpp = fc.register_real_field("test-field", 1, 'pixel')
+        field_cpp = fc.register_real_field("test-field", 1, "pixel")
         field = wrap_field(field_cpp)
         # Without ghosts, p and pg should have the same shape
         # Similarly for s and sg
@@ -211,7 +233,7 @@ class FieldCheck(unittest.TestCase):
     def test_dlpack_writability(self):
         """Test that arrays obtained via DLPack are writable."""
         fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
-        field_cpp = fc.register_real_field("test-field", 1, 'pixel')
+        field_cpp = fc.register_real_field("test-field", 1, "pixel")
         arr = np.from_dlpack(field_cpp)
 
         # Should be writable
@@ -224,7 +246,7 @@ class FieldCheck(unittest.TestCase):
     def test_field_wrapper_properties(self):
         """Test the Python Field wrapper properties."""
         fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
-        field_cpp = fc.register_real_field("test-field", 3, 'pixel')
+        field_cpp = fc.register_real_field("test-field", 3, "pixel")
         field = wrap_field(field_cpp)
 
         # Check that wrapper provides all expected properties

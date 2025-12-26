@@ -1,11 +1,15 @@
 /**
- * @file   convolution_kernels_cuda.cuh
+ * @file   convolution_kernels_gpu.hpp
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   19 Dec 2024
+ * @date   25 Dec 2024
  *
- * @brief  CUDA implementations of convolution kernels
+ * @brief  Unified CUDA/HIP implementations of convolution kernels
+ *
+ * This file provides GPU implementations that work with both CUDA and HIP
+ * backends. The kernel code is identical; only the launch mechanism and
+ * runtime API differ, which are abstracted via macros.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -33,27 +37,47 @@
  *
  */
 
-#ifndef SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CUDA_CUH_
-#define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CUDA_CUH_
+#ifndef SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_GPU_HPP_
+#define SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_GPU_HPP_
 
-#ifdef MUGRID_ENABLE_CUDA
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 
-#include <cuda_runtime.h>
 #include "core/types.hh"
 #include "convolution_kernels_cpu.hh"  // For GridTraversalParams
 
-namespace muGrid {
-namespace cuda {
+// Unified GPU abstraction
+#if defined(MUGRID_ENABLE_CUDA)
+    #include <cuda_runtime.h>
+    #define GPU_LAUNCH_KERNEL(kernel, grid, block, stream, ...) \
+        kernel<<<grid, block, 0, stream>>>(__VA_ARGS__)
+    using gpuStream_t = cudaStream_t;
+#elif defined(MUGRID_ENABLE_HIP)
+    #include <hip/hip_runtime.h>
+    #define GPU_LAUNCH_KERNEL(kernel, grid, block, stream, ...) \
+        hipLaunchKernelGGL(kernel, grid, block, 0, stream, __VA_ARGS__)
+    using gpuStream_t = hipStream_t;
+#endif
 
-// CUDA kernel implementations - only compiled when using nvcc (__CUDACC__)
-#ifdef __CUDACC__
+namespace muGrid {
+
+// Use a single namespace for GPU kernels - the dispatcher will select
+// based on memory space, not on CUDA vs HIP
+namespace gpu {
+
+// GPU kernel implementations - only compiled when using nvcc or hipcc
+#if defined(__CUDACC__) || defined(__HIPCC__)
 
     /**
-     * @brief CUDA kernel for forward convolution
+     * @brief GPU kernel for forward convolution
+     *
+     * Computes: quad_data[quad_offset + quad_indices[i]] +=
+     *           alpha * nodal_data[nodal_offset + nodal_indices[i]] * op_values[i]
+     *
+     * Works with both CUDA and HIP backends.
      */
     __global__ void apply_convolution_kernel_impl(
-        const Real* __restrict__ nodal_data,
-        Real* __restrict__ quad_data,
+        const Real* MUGRID_RESTRICT nodal_data,
+        Real* MUGRID_RESTRICT quad_data,
         const Real alpha,
         const Index_t nx, const Index_t ny, const Index_t nz,
         const Index_t nodal_base, const Index_t quad_base,
@@ -61,9 +85,9 @@ namespace cuda {
         const Index_t nodal_stride_z,
         const Index_t quad_stride_x, const Index_t quad_stride_y,
         const Index_t quad_stride_z,
-        const Index_t* __restrict__ quad_indices,
-        const Index_t* __restrict__ nodal_indices,
-        const Real* __restrict__ op_values,
+        const Index_t* MUGRID_RESTRICT quad_indices,
+        const Index_t* MUGRID_RESTRICT nodal_indices,
+        const Real* MUGRID_RESTRICT op_values,
         const Index_t nnz) {
 
         const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -85,11 +109,16 @@ namespace cuda {
     }
 
     /**
-     * @brief CUDA kernel for transpose convolution
+     * @brief GPU kernel for transpose convolution
+     *
+     * Computes: nodal_data[nodal_offset + nodal_indices[i]] +=
+     *           alpha * quad_data[quad_offset + quad_indices[i]] * op_values[i]
+     *
+     * Works with both CUDA and HIP backends.
      */
     __global__ void transpose_convolution_kernel_impl(
-        const Real* __restrict__ quad_data,
-        Real* __restrict__ nodal_data,
+        const Real* MUGRID_RESTRICT quad_data,
+        Real* MUGRID_RESTRICT nodal_data,
         const Real alpha,
         const Index_t nx, const Index_t ny, const Index_t nz,
         const Index_t nodal_base, const Index_t quad_base,
@@ -97,9 +126,9 @@ namespace cuda {
         const Index_t nodal_stride_z,
         const Index_t quad_stride_x, const Index_t quad_stride_y,
         const Index_t quad_stride_z,
-        const Index_t* __restrict__ quad_indices,
-        const Index_t* __restrict__ nodal_indices,
-        const Real* __restrict__ op_values,
+        const Index_t* MUGRID_RESTRICT quad_indices,
+        const Index_t* MUGRID_RESTRICT nodal_indices,
+        const Real* MUGRID_RESTRICT op_values,
         const Index_t nnz) {
 
         const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -122,6 +151,8 @@ namespace cuda {
 
     /**
      * @brief Launch forward convolution kernel
+     *
+     * Uses unified GPU_LAUNCH_KERNEL macro that works for both CUDA and HIP.
      */
     inline void apply_convolution_kernel(
         const Real* nodal_data,
@@ -132,7 +163,7 @@ namespace cuda {
         const Index_t* nodal_indices,
         const Real* op_values,
         const Index_t nnz,
-        cudaStream_t stream = 0) {
+        gpuStream_t stream = 0) {
 
         const Index_t nodal_base = params.start_pixel_index *
                                    params.nodal_elems_per_pixel;
@@ -147,7 +178,7 @@ namespace cuda {
             (params.nz + block.z - 1) / block.z
         );
 
-        apply_convolution_kernel_impl<<<grid, block, 0, stream>>>(
+        GPU_LAUNCH_KERNEL(apply_convolution_kernel_impl, grid, block, stream,
             nodal_data, quad_data, alpha,
             params.nx, params.ny, params.nz,
             nodal_base, quad_base,
@@ -159,6 +190,8 @@ namespace cuda {
 
     /**
      * @brief Launch transpose convolution kernel
+     *
+     * Uses unified GPU_LAUNCH_KERNEL macro that works for both CUDA and HIP.
      */
     inline void transpose_convolution_kernel(
         const Real* quad_data,
@@ -169,7 +202,7 @@ namespace cuda {
         const Index_t* nodal_indices,
         const Real* op_values,
         const Index_t nnz,
-        cudaStream_t stream = 0) {
+        gpuStream_t stream = 0) {
 
         const Index_t nodal_base = params.start_pixel_index *
                                    params.nodal_elems_per_pixel;
@@ -184,7 +217,7 @@ namespace cuda {
             (params.nz + block.z - 1) / block.z
         );
 
-        transpose_convolution_kernel_impl<<<grid, block, 0, stream>>>(
+        GPU_LAUNCH_KERNEL(transpose_convolution_kernel_impl, grid, block, stream,
             quad_data, nodal_data, alpha,
             params.nx, params.ny, params.nz,
             nodal_base, quad_base,
@@ -194,11 +227,11 @@ namespace cuda {
         );
     }
 
-#endif  // __CUDACC__
+#endif  // __CUDACC__ || __HIPCC__
 
-}  // namespace cuda
+}  // namespace gpu
 }  // namespace muGrid
 
-#endif  // MUGRID_ENABLE_CUDA
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 
-#endif  // SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_CUDA_CUH_
+#endif  // SRC_LIBMUGRID_OPERATORS_CONVOLUTION_KERNELS_GPU_HPP_

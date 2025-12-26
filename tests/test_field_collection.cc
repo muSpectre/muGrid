@@ -166,8 +166,8 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(initialisation_test_global, Fix,
                                    GlobalFCFixtures, Fix) {
-    Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
-    Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
+    GridIndex<Fix::spatial_dimension()> nb_domain_grid_pts{};
+    GridIndex<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
       nb_domain_grid_pts[i] = nb_grid;
@@ -216,8 +216,8 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(iteration_test_global, Fix, GlobalFCFixtures,
                                    Fix) {
-    Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
-    Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
+    GridIndex<Fix::spatial_dimension()> nb_domain_grid_pts{};
+    GridIndex<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
     constexpr Dim_t NbQuad{3};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};
@@ -271,8 +271,8 @@ namespace muGrid {
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(global_clone, Fix, GlobalFCFixtures, Fix) {
-    Ccoord_t<Fix::spatial_dimension()> nb_domain_grid_pts{};
-    Ccoord_t<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
+    GridIndex<Fix::spatial_dimension()> nb_domain_grid_pts{};
+    GridIndex<Fix::spatial_dimension()> nb_subdomain_grid_pts{};
     constexpr Dim_t NbQuad{3};
     for (int i{0}; i < Fix::spatial_dimension(); ++i) {
       const auto nb_grid{2 * i + 1};

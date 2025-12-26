@@ -79,10 +79,10 @@ class FFTEngine : public FFTEngineBase {
    * @param nb_ghosts_right     Ghost cells on high-index side of each dimension
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
    */
-  FFTEngine(const IntCoord_t & nb_domain_grid_pts,
+  FFTEngine(const DynGridIndex & nb_domain_grid_pts,
             const Communicator & comm = Communicator(),
-            const IntCoord_t & nb_ghosts_left = IntCoord_t{},
-            const IntCoord_t & nb_ghosts_right = IntCoord_t{},
+            const DynGridIndex & nb_ghosts_left = DynGridIndex{},
+            const DynGridIndex & nb_ghosts_right = DynGridIndex{},
             const SubPtMap_t & nb_sub_pts = {})
       : Parent_t{nb_domain_grid_pts, comm, nb_ghosts_left, nb_ghosts_right,
                  nb_sub_pts, memory_location<MemorySpace>()},
@@ -176,10 +176,10 @@ class FFTEngine : public FFTEngineBase {
 
  protected:
   void fft_2d(const Field & input, Field & output) {
-    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
-    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
-    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
-    const IntCoord_t & local_with_ghosts =
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
     Index_t nb_components = input.get_nb_components();
@@ -246,10 +246,10 @@ class FFTEngine : public FFTEngineBase {
   }
 
   void fft_3d(const Field & input, Field & output) {
-    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
-    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
-    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
-    const IntCoord_t & local_with_ghosts =
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
     Index_t nb_components = input.get_nb_components();
@@ -307,7 +307,7 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 2a: Transpose Y<->Z
-      const IntCoord_t & ypencil_shape =
+      const DynGridIndex & ypencil_shape =
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
       Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
       WorkBuffer work_y(ypencil_size);
@@ -336,7 +336,7 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 3: Transpose X<->Z (or copy if no transpose needed)
-      const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
+      const DynGridIndex & fourier_local = this->nb_fourier_subdomain_grid_pts;
       if (transpose_xz != nullptr) {
         transpose_xz->forward(work_z_ptr, output_ptr);
       } else {
@@ -399,10 +399,10 @@ class FFTEngine : public FFTEngineBase {
   }
 
   void ifft_2d(const Field & input, Field & output) {
-    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
-    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
-    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
-    const IntCoord_t & local_with_ghosts =
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
     Index_t nb_components = input.get_nb_components();
@@ -483,10 +483,10 @@ class FFTEngine : public FFTEngineBase {
   }
 
   void ifft_3d(const Field & input, Field & output) {
-    const IntCoord_t & nb_grid_pts = this->get_nb_domain_grid_pts();
-    IntCoord_t local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
-    const IntCoord_t & ghosts_left = this->get_nb_ghosts_left();
-    const IntCoord_t & local_with_ghosts =
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
     Index_t nb_components = input.get_nb_components();
@@ -525,7 +525,7 @@ class FFTEngine : public FFTEngineBase {
 
     if (need_mpi_path) {
       // MPI path with transposes
-      const IntCoord_t & fourier_local = this->nb_fourier_subdomain_grid_pts;
+      const DynGridIndex & fourier_local = this->nb_fourier_subdomain_grid_pts;
       Index_t fourier_size =
           fourier_local[0] * fourier_local[1] * fourier_local[2] *
           nb_components;
@@ -559,7 +559,7 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Y-pencil work buffer
-      const IntCoord_t & ypencil_shape =
+      const DynGridIndex & ypencil_shape =
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
       Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
       WorkBuffer work_y(ypencil_size);

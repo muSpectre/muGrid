@@ -42,14 +42,15 @@ set(MUGRID_SOURCES
     mpi/cartesian_decomposition.cc
     # operators/
     operators/convolution_operator.cc
+    operators/laplace_operator.cc
+    operators/fem_gradient_operator.cc
     # io/
     io/file_io_base.cc
     # util/
-    util/raw_memory_operations.cc
     # fft/
     fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
-        fft/transpose.cc
+    fft/transpose.cc
     fft/fft_utils.cc
     fft/fft_engine_base.cc
     fft/fft_engine.cc
@@ -65,17 +66,25 @@ endif()
 if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cu)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
-    # Mark the .cc file to be compiled as CUDA
+    list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cpp)
+    list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cpp)
+    # Mark .cc/.cpp files to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cpp
         PROPERTIES LANGUAGE CUDA
     )
 elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cpp)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
-    # Mark the .cc file to be compiled as HIP
+    list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cpp)
+    list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cpp)
+    # Mark .cc/.cpp files to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cpp
         PROPERTIES LANGUAGE HIP
     )
 endif()
@@ -105,6 +114,7 @@ target_include_directories(muGrid
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/memory>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/benchmark>
         $<INSTALL_INTERFACE:include>
 )
 
@@ -163,6 +173,11 @@ if(EXECINFO_LIBRARY)
     target_link_libraries(muGrid PRIVATE ${EXECINFO_LIBRARY})
 endif()
 
+# Windows-specific libraries for stack trace support
+if(WIN32)
+    target_link_libraries(muGrid PRIVATE dbghelp)
+endif()
+
 # Installation
 # Build list of targets to export (muGrid + any FetchContent dependencies)
 set(_MUGRID_INSTALL_TARGETS muGrid)
@@ -179,7 +194,7 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
 )
 
 # Install header files for each subdirectory
-foreach(subdir core grid field collection mpi operators io util memory fft)
+foreach(subdir core grid field collection mpi operators io util memory fft benchmark)
     file(GLOB MUGRID_${subdir}_HEADERS "${subdir}/*.hh")
     install(FILES ${MUGRID_${subdir}_HEADERS}
         DESTINATION include/libmugrid/${subdir}

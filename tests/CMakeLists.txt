@@ -17,12 +17,12 @@ if(Boost_FOUND)
     set(MUGRID_TEST_SOURCES
         main_test_suite.cc
         header_test_ccoord_operations.cc
-        header_test_eigen_tools.cc
         header_test_ref_array.cc
         header_test_t4_map.cc
         header_test_tensor_algebra.cc
         test_ccoord_operations.cc
         test_convolution_operator.cc
+        test_exception.cc
         test_field.cc
         test_field_gpu.cc
         test_field_collection.cc
@@ -30,7 +30,6 @@ if(Boost_FOUND)
         test_goodies.cc
         test_mapped_fields.cc
         test_mapped_state_fields.cc
-        test_raw_memory_operations.cc
         test_state_field_maps.cc
         test_state_fields.cc
         test_units.cc

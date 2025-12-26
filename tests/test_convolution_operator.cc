@@ -114,11 +114,11 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   struct Fixture2D : public ConvolutionFixtureBase<twoD> {
     static constexpr Index_t grid_size = 8;
-    IntCoord_t nb_grid_pts{grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
-    IntCoord_t subdomain_locations{0, 0};
-    IntCoord_t nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
-    IntCoord_t nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
+    DynGridIndex nb_grid_pts{grid_size, grid_size};
+    DynGridIndex nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
+    DynGridIndex subdomain_locations{0, 0};
+    DynGridIndex nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
+    DynGridIndex nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -141,11 +141,11 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   struct Fixture3D : public ConvolutionFixtureBase<threeD> {
     static constexpr Index_t grid_size = 8;
-    IntCoord_t nb_grid_pts{grid_size, grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
-    IntCoord_t subdomain_locations{0, 0, 0};
-    IntCoord_t nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
-    IntCoord_t nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
+    DynGridIndex nb_grid_pts{grid_size, grid_size, grid_size};
+    DynGridIndex nb_subdomain_grid_pts{grid_size + 2, grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
+    DynGridIndex subdomain_locations{0, 0, 0};
+    DynGridIndex nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
+    DynGridIndex nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -170,11 +170,11 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   struct FixtureLarge2D : public ConvolutionFixtureBase<twoD> {
     static constexpr Index_t grid_size = 128;
-    IntCoord_t nb_grid_pts{grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
-    IntCoord_t subdomain_locations{0, 0};
-    IntCoord_t nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
-    IntCoord_t nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
+    DynGridIndex nb_grid_pts{grid_size, grid_size};
+    DynGridIndex nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
+    DynGridIndex subdomain_locations{0, 0};
+    DynGridIndex nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
+    DynGridIndex nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),
@@ -196,11 +196,11 @@ namespace muGrid {
 
   struct FixtureLarge3D : public ConvolutionFixtureBase<threeD> {
     static constexpr Index_t grid_size = 32;
-    IntCoord_t nb_grid_pts{grid_size, grid_size, grid_size};
-    IntCoord_t nb_subdomain_grid_pts{grid_size + 2, grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
-    IntCoord_t subdomain_locations{0, 0, 0};
-    IntCoord_t nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
-    IntCoord_t nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
+    DynGridIndex nb_grid_pts{grid_size, grid_size, grid_size};
+    DynGridIndex nb_subdomain_grid_pts{grid_size + 2, grid_size + 2, grid_size + 2};  // +2 for symmetric ghosts
+    DynGridIndex subdomain_locations{0, 0, 0};
+    DynGridIndex nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
+    DynGridIndex nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
     ConvolutionOperator op{
         get_pixel_offset(),

@@ -232,7 +232,7 @@ namespace muGrid {
           break;
       }
       // Print stack trace in reverse or (most recent entry last)
-      for (ssize_t j = i - 1; j >= 0; --j) {
+      for (int j = static_cast<int>(i) - 1; j >= 0; --j) {
         os << self.stack[j];
         if (j != 0)
           os << std::endl;

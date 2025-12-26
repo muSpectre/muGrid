@@ -91,7 +91,7 @@ namespace muGrid {
          *                     the communicator size.
          */
         explicit CartesianCommunicator(const Parent_t & parent,
-                                       const IntCoord_t & nb_subdivisions);
+                                       const DynGridIndex & nb_subdivisions);
         /**
          * @brief Construct a Cartesian communicator with explicit topology.
          *
@@ -117,8 +117,8 @@ namespace muGrid {
          *                    wraps to the opposite side).
          */
         explicit CartesianCommunicator(const Parent_t & parent,
-                                       const IntCoord_t & nb_subdivisions,
-                                       const IntCoord_t & coordinates,
+                                       const DynGridIndex & nb_subdivisions,
+                                       const DynGridIndex & coordinates,
                                        const std::vector<int> & left_ranks,
                                        const std::vector<int> & right_ranks);
 
@@ -143,7 +143,7 @@ namespace muGrid {
          *
          * @return Const reference to the vector of subdivision counts.
          */
-        const IntCoord_t & get_nb_subdivisions() const;
+        const DynGridIndex & get_nb_subdivisions() const;
 
         /**
          * @brief Get the Cartesian coordinates of this rank.
@@ -153,7 +153,7 @@ namespace muGrid {
          *
          * @return Const reference to the vector of coordinates.
          */
-        const IntCoord_t & get_coordinates() const;
+        const DynGridIndex & get_coordinates() const;
 
         /**
          * @brief Send data to the right neighbor; receive from the left.
@@ -305,11 +305,11 @@ namespace muGrid {
         Parent_t parent;
 
         //! The number of subdivisions (ranks) in each spatial dimension.
-        IntCoord_t nb_subdivisions;
+        DynGridIndex nb_subdivisions;
 
         //! The Cartesian coordinates of this rank (0-indexed in each
         //! dimension).
-        IntCoord_t coordinates;
+        DynGridIndex coordinates;
 
 #if WITH_MPI
         //! Ranks of the left neighbors (lower coordinate) in each dimension.

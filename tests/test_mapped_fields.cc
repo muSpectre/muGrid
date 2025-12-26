@@ -52,7 +52,7 @@ namespace muGrid {
     GlobalFieldCollection fc{DimS};
     static std::string division_tag() { return "tag"; }
     InitialiserBase() {
-      this->fc.initialise(Ccoord_t<twoD>{2, 3}, Ccoord_t<twoD>{2, 3});
+      this->fc.initialise(GridIndex<twoD>{2, 3}, GridIndex<twoD>{2, 3});
       this->fc.set_nb_sub_pts(division_tag(), NbQuad);
     }
   };

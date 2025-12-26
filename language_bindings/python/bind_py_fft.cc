@@ -54,7 +54,7 @@ using muGrid::Communicator;
 using PyFFTEngine = FFTEngine<HostSpace>;
 using muGrid::Int;
 using muGrid::Index_t;
-using muGrid::IntCoord_t;
+using muGrid::DynGridIndex;
 using muGrid::Real;
 using muGrid::Complex;
 using muGrid::Field;
@@ -164,7 +164,7 @@ void add_fft_utils(py::module & mod) {
 
   mod.def(
       "get_hermitian_grid_pts",
-      [](const IntCoord_t & nb_grid_pts, Index_t r2c_axis) {
+      [](const DynGridIndex & nb_grid_pts, Index_t r2c_axis) {
         return muGrid::get_hermitian_grid_pts(nb_grid_pts, r2c_axis);
       },
       "nb_grid_pts"_a, "r2c_axis"_a = 0,
@@ -189,7 +189,7 @@ void add_fft_utils(py::module & mod) {
 
   mod.def(
       "fft_normalization",
-      [](const IntCoord_t & nb_grid_pts) {
+      [](const DynGridIndex & nb_grid_pts) {
         return muGrid::fft_normalization(nb_grid_pts);
       },
       "nb_grid_pts"_a,
@@ -242,12 +242,12 @@ void add_fft_engine(py::module & mod) {
       >>> engine.ifft(fourier_field, real_field)
       >>> real_field.s[:] *= engine.normalisation
       )")
-      .def(py::init<const IntCoord_t &, const Communicator &, const IntCoord_t &,
-                    const IntCoord_t &, const SubPtMap_t &>(),
+      .def(py::init<const DynGridIndex &, const Communicator &, const DynGridIndex &,
+                    const DynGridIndex &, const SubPtMap_t &>(),
            "nb_domain_grid_pts"_a,
            "comm"_a = Communicator(),
-           "nb_ghosts_left"_a = IntCoord_t{},
-           "nb_ghosts_right"_a = IntCoord_t{},
+           "nb_ghosts_left"_a = DynGridIndex{},
+           "nb_ghosts_right"_a = DynGridIndex{},
            "nb_sub_pts"_a = SubPtMap_t{},
            R"(
            Construct an FFT engine with pencil decomposition.

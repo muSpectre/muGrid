@@ -61,8 +61,8 @@ void Transpose::compute_distribution(Index_t global_size, int comm_size,
 }
 
 Transpose::Transpose(const Communicator & comm,
-                                     const IntCoord_t & local_in,
-                                     const IntCoord_t & local_out,
+                                     const DynGridIndex & local_in,
+                                     const DynGridIndex & local_out,
                                      Index_t global_in, Index_t global_out,
                                      Index_t axis_in, Index_t axis_out,
                                      Index_t nb_components, StorageOrder layout)
@@ -218,9 +218,9 @@ void Transpose::free_datatypes() {
 }
 
 MPI_Datatype
-Transpose::build_block_type(const IntCoord_t & local_shape,
-                                    const IntCoord_t & block_shape,
-                                    const IntCoord_t & block_start) const {
+Transpose::build_block_type(const DynGridIndex & local_shape,
+                                    const DynGridIndex & block_shape,
+                                    const DynGridIndex & block_start) const {
   Dim_t dim = local_shape.get_dim();
   MPI_Datatype result;
 
@@ -332,8 +332,8 @@ void Transpose::init_forward_types() {
   if (this->is_allgather) {
     // Allgather mode: send same data to all peers, receive at different offsets
     // Build one send type (full local input) used for all peers
-    IntCoord_t send_block_shape = this->local_in;
-    IntCoord_t send_block_start(dim, 0);
+    DynGridIndex send_block_shape = this->local_in;
+    DynGridIndex send_block_start(dim, 0);
 
     MPI_Datatype send_type =
         build_block_type(this->local_in, send_block_shape, send_block_start);
@@ -347,8 +347,8 @@ void Transpose::init_forward_types() {
       }
 
       // Build recv type: place incoming data at the correct position
-      IntCoord_t recv_block_shape(dim);
-      IntCoord_t recv_block_start(dim);
+      DynGridIndex recv_block_shape(dim);
+      DynGridIndex recv_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_in) {
@@ -370,16 +370,16 @@ void Transpose::init_forward_types() {
     // receive our own portion from all peers (they all send the same)
 
     // Build one recv type (full local output) used for all peers
-    IntCoord_t recv_block_shape = this->local_out;
-    IntCoord_t recv_block_start(dim, 0);
+    DynGridIndex recv_block_shape = this->local_out;
+    DynGridIndex recv_block_start(dim, 0);
 
     MPI_Datatype recv_type =
         build_block_type(this->local_out, recv_block_shape, recv_block_start);
 
     for (int r = 0; r < comm_size; ++r) {
       // Build send type: extract rank r's portion along axis_out
-      IntCoord_t send_block_shape(dim);
-      IntCoord_t send_block_start(dim);
+      DynGridIndex send_block_shape(dim);
+      DynGridIndex send_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_out) {
@@ -414,8 +414,8 @@ void Transpose::init_forward_types() {
       //   (the dimension that is distributed in input)
 
       // Build send type: extract block from input
-      IntCoord_t send_block_shape(dim);
-      IntCoord_t send_block_start(dim);
+      DynGridIndex send_block_shape(dim);
+      DynGridIndex send_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_out) {
@@ -434,8 +434,8 @@ void Transpose::init_forward_types() {
           build_block_type(this->local_in, send_block_shape, send_block_start);
 
       // Build recv type: place block into output
-      IntCoord_t recv_block_shape(dim);
-      IntCoord_t recv_block_start(dim);
+      DynGridIndex recv_block_shape(dim);
+      DynGridIndex recv_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_in) {
@@ -466,16 +466,16 @@ void Transpose::init_backward_types() {
     // receives the same data from all peers (but from different positions)
 
     // Build one recv type (full local output) used for all peers
-    IntCoord_t recv_block_shape = this->local_in;
-    IntCoord_t recv_block_start(dim, 0);
+    DynGridIndex recv_block_shape = this->local_in;
+    DynGridIndex recv_block_start(dim, 0);
 
     MPI_Datatype recv_type =
         build_block_type(this->local_in, recv_block_shape, recv_block_start);
 
     for (int r = 0; r < comm_size; ++r) {
       // Build send type: extract rank r's portion from our gathered data
-      IntCoord_t send_block_shape(dim);
-      IntCoord_t send_block_start(dim);
+      DynGridIndex send_block_shape(dim);
+      DynGridIndex send_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_in) {
@@ -505,8 +505,8 @@ void Transpose::init_backward_types() {
     // receives different portions at different positions
 
     // Build one send type (full local output) used for all peers
-    IntCoord_t send_block_shape = this->local_out;
-    IntCoord_t send_block_start(dim, 0);
+    DynGridIndex send_block_shape = this->local_out;
+    DynGridIndex send_block_start(dim, 0);
 
     MPI_Datatype send_type =
         build_block_type(this->local_out, send_block_shape, send_block_start);
@@ -520,8 +520,8 @@ void Transpose::init_backward_types() {
       }
 
       // Build recv type: place rank r's data at the correct position
-      IntCoord_t recv_block_shape(dim);
-      IntCoord_t recv_block_start(dim);
+      DynGridIndex recv_block_shape(dim);
+      DynGridIndex recv_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_out) {
@@ -545,8 +545,8 @@ void Transpose::init_backward_types() {
 
     for (int r = 0; r < comm_size; ++r) {
       // Build send type: extract block from output (backward input)
-      IntCoord_t send_block_shape(dim);
-      IntCoord_t send_block_start(dim);
+      DynGridIndex send_block_shape(dim);
+      DynGridIndex send_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_in) {
@@ -564,8 +564,8 @@ void Transpose::init_backward_types() {
           build_block_type(this->local_out, send_block_shape, send_block_start);
 
       // Build recv type: place block into input (backward output)
-      IntCoord_t recv_block_shape(dim);
-      IntCoord_t recv_block_start(dim);
+      DynGridIndex recv_block_shape(dim);
+      DynGridIndex recv_block_start(dim);
 
       for (Dim_t d = 0; d < dim; ++d) {
         if (d == this->axis_out) {

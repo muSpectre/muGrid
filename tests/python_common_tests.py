@@ -41,9 +41,9 @@ import muGrid
 import _muGrid
 
 
-class DynCcoordCheck(unittest.TestCase):
+class DynCoordCheck(unittest.TestCase):
     def test_dyn_ccoord_3d(self):
-        c = muGrid.DynCcoord([1, 20, 3])
+        c = muGrid.DynCoord([1, 20, 3])
         self.assertEqual(c[0], 1)
         self.assertEqual(c[1], 20)
         self.assertEqual(c[2], 3)

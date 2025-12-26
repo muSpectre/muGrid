@@ -63,9 +63,11 @@ device_arch = _muGrid.device_arch
 from .Wrappers import (  # noqa: E402
     CartesianDecomposition,
     ConvolutionOperator,
+    FEMGradientOperator,
     FFTEngine,
     FileIONetCDF,
     GlobalFieldCollection,
+    LaplaceOperator,
     LocalFieldCollection,
 )
 
@@ -86,7 +88,7 @@ if hasattr(_muGrid, "FileIONetCDF"):
 # Base classes and utilities (always C++ objects)
 ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
 Decomposition = _muGrid.Decomposition
-DynCcoord = _muGrid.DynCcoord
+DynCoord = _muGrid.DynCoord
 DynRcoord = _muGrid.DynRcoord
 IterUnit = _muGrid.IterUnit
 Pixel = _muGrid.Pixel
@@ -109,16 +111,15 @@ get_domain_index = _muGrid.get_domain_index
 
 # Field classes and utilities
 from .Field import Field  # noqa: E402
-from .Field import complex_field  # noqa: E402
 from .Field import fft_fourier_space_field  # noqa: E402
 from .Field import fft_real_space_field  # noqa: E402
-from .Field import int_field  # noqa: E402
-from .Field import real_field  # noqa: E402
-from .Field import uint_field  # noqa: E402
 from .Field import wrap_field  # noqa: E402
 
 # MPI communicator
 from .Parallel import Communicator  # noqa: E402
+
+# Timing utility
+from .Timer import Timer  # noqa: E402
 
 # Version information
 __version__ = _muGrid.version.description()
@@ -142,13 +143,9 @@ __all__ = [
     "FileIONetCDF",
     "GlobalFieldCollection",
     "LocalFieldCollection",
-    # Field creation functions
-    "complex_field",
+    # Field utilities
     "fft_fourier_space_field",
     "fft_real_space_field",
-    "int_field",
-    "real_field",
-    "uint_field",
     "wrap_field",
     # FFT utilities
     "fft_freq",
@@ -162,8 +159,10 @@ __all__ = [
     "get_domain_index",
     # Enums and types
     "ConvolutionOperatorBase",
+    "LaplaceOperator",
+    "FEMGradientOperator",
     "Decomposition",
-    "DynCcoord",
+    "DynCoord",
     "DynRcoord",
     "IterUnit",
     "OpenMode",
@@ -172,4 +171,6 @@ __all__ = [
     "SubPt",
     "Unit",
     "Verbosity",
+    # Utilities
+    "Timer",
 ]

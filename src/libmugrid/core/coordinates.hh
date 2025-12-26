@@ -51,64 +51,67 @@ namespace muGrid {
 
     /**
      * \defgroup Coordinates Coordinate types
+     *
+     * Type Selection Guide:
+     * - GridIndex<Dim>: Compile-time dimension grid indices (for templates)
+     * - GridPoint<Dim>: Compile-time dimension physical coordinates
+     * - DynGridIndex: Runtime dimension grid indices (Python API, config)
+     * - GridShape: Alias for DynGridIndex, semantic clarity for shapes
+     *
      * @{
      */
 
     /**
-     * @typedef Ccoord_t
-     * @brief A type alias for cell coordinates.
+     * @brief Integer grid indices with compile-time known dimension.
      *
-     * This type alias represents cell coordinates, which are up to three
-     * integer numbers with a fixed dimension. The dimension is determined by
-     * the template parameter Dim. The coordinates are stored in a std::array of
-     * type Index_t.
+     * Used for pixel/voxel coordinates, grid sizes, and strides in
+     * performance-critical templated code where the spatial dimension
+     * is known at compile time.
      *
-     * @tparam Dim The dimension of the cell coordinates. It should be between 1
-     * and 3.
+     * @tparam Dim The spatial dimension (1, 2, or 3)
      */
     template <size_t Dim>
-    using Ccoord_t = std::array<Index_t, Dim>;
+    using GridIndex = std::array<Index_t, Dim>;
 
     /**
-     * @typedef Rcoord_t
-     * @brief A type alias for real space coordinates.
+     * @brief Real-valued spatial coordinates with compile-time known dimension.
      *
-     * This type alias represents real space coordinates, which are up to three
-     * floating point numbers with a fixed dimension. The dimension is
-     * determined by the template parameter Dim. The coordinates are stored in a
-     * std::array of type Real.
+     * Used for physical space coordinates and domain lengths in
+     * performance-critical templated code.
      *
-     * @tparam Dim The dimension of the real space coordinates. It should be
-     * between 1 and 3.
+     * @tparam Dim The spatial dimension (1, 2, or 3)
      */
     template <size_t Dim>
-    using Rcoord_t = std::array<Real, Dim>;
+    using GridPoint = std::array<Real, Dim>;
 
     /**@}*/
 
     /**
-     * Class to represent integer (cell-) coordinates or real-valued
-     * coordinates. This class can dynamically accept any spatial-dimension
-     * between 1 and MaxDim, and DynCcoord references can be cast to
-     * `muGrid::Ccoord_t &` or `muGrid::Rcoord_t &` references. These are used
-     * when templating with the spatial dimension of the problem is
-     * undesireable/impossible.
+     * @brief Dynamic coordinate container with runtime-determined dimension.
+     *
+     * This class can accept any spatial dimension between 1 and MaxDim at
+     * runtime. DynCoord references can be cast to GridIndex or GridPoint
+     * references. Used when templating with the spatial dimension is
+     * undesirable or impossible (e.g., Python bindings).
+     *
+     * @tparam MaxDim Maximum supported dimension (for stack allocation)
+     * @tparam T Element type (Index_t for integers, Real for floating point)
      */
     template <size_t MaxDim, typename T = Index_t>
-    class DynCcoord {
+    class DynCoord {
         template <size_t Dim, size_t... Indices>
         constexpr static std::array<T, MaxDim>
-        fill_front_helper(const std::array<T, Dim> & ccoord,
+        fill_front_helper(const std::array<T, Dim> & coord,
                           std::index_sequence<Indices...>) {
-            return std::array<T, MaxDim>{ccoord[Indices]...};
+            return std::array<T, MaxDim>{coord[Indices]...};
         }
 
         template <size_t Dim>
         constexpr std::array<T, MaxDim>
-        fill_front(const std::array<T, Dim> & ccoord) {
+        fill_front(const std::array<T, Dim> & coord) {
             static_assert(Dim <= MaxDim,
                           "Coord has more than MaxDim dimensions.");
-            return fill_front_helper(ccoord, std::make_index_sequence<Dim>{});
+            return fill_front_helper(coord, std::make_index_sequence<Dim>{});
         }
 
        public:
@@ -116,11 +119,6 @@ namespace muGrid {
          * @typedef iterator
          * @brief A type alias for an iterator over the elements of a
          * std::array.
-         *
-         * This type alias is used to create an iterator that can traverse the
-         * elements of a std::array. The std::array is templated on type T and
-         * has a maximum size of MaxDim. The iterator can be used to access and
-         * modify the elements of the std::array.
          */
         using iterator = typename std::array<T, MaxDim>::iterator;
 
@@ -128,34 +126,19 @@ namespace muGrid {
          * @typedef const_iterator
          * @brief A type alias for a constant iterator over the elements of a
          * std::array.
-         *
-         * This type alias is used to create a constant iterator that can
-         * traverse the elements of a std::array. The std::array is templated on
-         * type T and has a maximum size of MaxDim. The constant iterator can be
-         * used to access the elements of the std::array, but cannot modify
-         * them.
          */
         using const_iterator = typename std::array<T, MaxDim>::const_iterator;
 
         //! default constructor
-        DynCcoord() : dim{}, long_array{} {};
+        DynCoord() : dim{}, long_array{} {};
 
         /**
-         * @brief Constructs a DynCcoord object from an initializer list.
+         * @brief Constructs a DynCoord object from an initializer list.
          *
-         * This constructor creates a DynCcoord object using an initializer
-         * list. The length of the initializer list determines the spatial
-         * dimension of the coordinate. The initializer list must have a length
-         * between 1 and MaxDim.
-         *
-         * @param init_list Initializer list used to set the values of the
-         * DynCcoord object. The length of the list becomes the spatial
-         * dimension of the coordinate.
-         * @throws RuntimeError If the length of the initializer list is greater
-         * than MaxDim, a RuntimeError is thrown with a message indicating the
-         * maximum dimension and the provided dimension.
+         * @param init_list Initializer list used to set the values.
+         * @throws RuntimeError If the length exceeds MaxDim.
          */
-        DynCcoord(std::initializer_list<T> init_list)
+        DynCoord(std::initializer_list<T> init_list)
             : dim(init_list.size()), long_array{} {
             if (this->dim > Dim_t(MaxDim)) {
                 std::stringstream error{};
@@ -170,82 +153,70 @@ namespace muGrid {
         }
 
         /**
-         * @brief Constructs a DynCcoord object with a specified dimension.
+         * @brief Constructs a DynCoord object with a specified dimension.
          *
-         * This constructor creates a DynCcoord object with a specified
-         * dimension. The dimension must be between 1 and MaxDim. Note: This
-         * constructor requires regular (round) braces '()'. Using curly braces
-         * '{}' will result in the initializer list constructor being called and
-         * creating a DynCcoord with spatial dimension 1.
+         * Note: Use round braces '()'. Curly braces '{}' invoke the
+         * initializer list constructor.
          *
-         * @param dim The spatial dimension of the DynCcoord object. It needs to
-         * be between 1 and MaxDim.
-         * @param value The value to fill the DynCcoord object with. (optional)
+         * @param dim The spatial dimension (1 to MaxDim).
+         * @param value The value to fill with (optional, default 0).
          */
-        explicit DynCcoord(Dim_t dim, const T value = T{})
+        explicit DynCoord(Dim_t dim, const T value = T{})
             : dim{dim}, long_array{} {
             std::fill(this->long_array.begin(), this->long_array.end(), value);
         }
 
         //! Constructor from a statically sized coord
         template <size_t Dim>
-        explicit DynCcoord(const std::array<T, Dim> & ccoord)
-            : dim{Dim}, long_array{fill_front(ccoord)} {
+        explicit DynCoord(const std::array<T, Dim> & coord)
+            : dim{Dim}, long_array{fill_front(coord)} {
             static_assert(Dim <= MaxDim,
-                          "Assigned Ccoord has more than MaxDim dimensions.");
+                          "Assigned coord has more than MaxDim dimensions.");
         }
 
         /**
-         * @brief Constructs a DynCcoord object from a std::vector.
+         * @brief Constructs a DynCoord object from a std::vector.
          *
-         * This constructor creates a DynCcoord object using a std::vector. The
-         * size of the std::vector determines the spatial dimension of the
-         * coordinate. The std::vector must have a size between 1 and MaxDim.
-         *
-         * @param ccoord std::vector used to set the values of the DynCcoord
-         * object. The size of the vector becomes the spatial dimension of the
-         * coordinate.
-         * @throws RuntimeError If the size of the std::vector is greater than
-         * MaxDim, a RuntimeError is thrown with a message indicating the
-         * maximum dimension and the provided dimension.
+         * @param coord Vector used to set the values.
+         * @throws RuntimeError If the size exceeds MaxDim.
          */
-        explicit DynCcoord(const std::vector<T> & ccoord)
-            : dim{Dim_t(ccoord.size())}, long_array{} {
+        explicit DynCoord(const std::vector<T> & coord)
+            : dim{Dim_t(coord.size())}, long_array{} {
             if (this->dim > Dim_t(MaxDim)) {
                 std::stringstream error{};
                 error << "The maximum dimension representable by this dynamic "
                          "array is "
                       << MaxDim << ". You supplied a vector with "
-                      << ccoord.size() << " entries.";
+                      << coord.size() << " entries.";
                 throw RuntimeError(error.str());
             }
-            std::copy(ccoord.begin(), ccoord.end(), this->long_array.begin());
+            std::copy(coord.begin(), coord.end(), this->long_array.begin());
         }
 
         //! Copy constructor
-        DynCcoord(const DynCcoord & other) = default;
+        DynCoord(const DynCoord & other) = default;
 
         //! Move constructor
-        DynCcoord(DynCcoord && other) = default;
+        DynCoord(DynCoord && other) = default;
 
         //! nonvirtual Destructor
-        ~DynCcoord() = default;
+        ~DynCoord() = default;
 
         //! Assign arrays
         template <size_t Dim>
-        DynCcoord & operator=(const std::array<T, Dim> & ccoord) {
+        DynCoord & operator=(const std::array<T, Dim> & coord) {
             static_assert(Dim <= MaxDim,
-                          "Assigned Ccoord has more than MaxDim dimensions.");
+                          "Assigned coord has more than MaxDim dimensions.");
             this->dim = Dim;
-            std::copy(ccoord.begin(), ccoord.end(), this->long_array.begin());
+            std::copy(coord.begin(), coord.end(), this->long_array.begin());
             return *this;
         }
 
         //! Copy assignment operator
-        DynCcoord & operator=(const DynCcoord & other) = default;
+        DynCoord & operator=(const DynCoord & other) = default;
 
         //! Move assignment operator
-        DynCcoord & operator=(DynCcoord && other) = default;
+        DynCoord & operator=(DynCoord && other) = default;
 
         //! comparison operator
         template <size_t Dim2>
@@ -255,7 +226,7 @@ namespace muGrid {
         }
 
         //! comparison operator
-        bool operator==(const DynCcoord & other) const {
+        bool operator==(const DynCoord & other) const {
             bool retval{this->get_dim() == other.get_dim()};
             for (int i{0}; i < this->get_dim(); ++i) {
                 retval &= this->long_array[i] == other[i];
@@ -264,12 +235,12 @@ namespace muGrid {
         }
 
         //! comparison operator
-        bool operator!=(const DynCcoord & other) const {
+        bool operator!=(const DynCoord & other) const {
             return !(*this == other);
         }
 
         //! element-wise addition
-        DynCcoord & operator+=(const DynCcoord & other) {
+        DynCoord & operator+=(const DynCoord & other) {
             if (this->get_dim() != other.get_dim()) {
                 std::stringstream error{};
                 error << "you are trying to add a " << this->get_dim()
@@ -285,8 +256,8 @@ namespace muGrid {
 
         //! element-wise addition
         template <typename T2>
-        DynCcoord<MaxDim, decltype(T{} + T2{})>
-        operator+(const DynCcoord<MaxDim, T2> & other) const {
+        DynCoord<MaxDim, decltype(T{} + T2{})>
+        operator+(const DynCoord<MaxDim, T2> & other) const {
             if (this->get_dim() != other.get_dim()) {
                 std::stringstream error{};
                 error << "you are trying to add a " << this->get_dim()
@@ -294,7 +265,7 @@ namespace muGrid {
                       << "-dimensional coord element-wise.";
                 throw RuntimeError(error.str());
             }
-            DynCcoord<MaxDim, decltype(T{} + T2{})> retval(this->get_dim());
+            DynCoord<MaxDim, decltype(T{} + T2{})> retval(this->get_dim());
             for (Dim_t i{0}; i < this->get_dim(); ++i) {
                 retval[i] = this->operator[](i) + other[i];
             }
@@ -302,7 +273,7 @@ namespace muGrid {
         }
 
         //! element-wise subtraction
-        DynCcoord & operator-=(const DynCcoord & other) {
+        DynCoord & operator-=(const DynCoord & other) {
             if (this->get_dim() != other.get_dim()) {
                 std::stringstream error{};
                 error << "you are trying to subtract a " << this->get_dim()
@@ -318,8 +289,8 @@ namespace muGrid {
 
         //! element-wise subtraction
         template <typename T2>
-        DynCcoord<MaxDim, decltype(T{} - T2{})>
-        operator-(const DynCcoord<MaxDim, T2> & other) const {
+        DynCoord<MaxDim, decltype(T{} - T2{})>
+        operator-(const DynCoord<MaxDim, T2> & other) const {
             if (this->get_dim() != other.get_dim()) {
                 std::stringstream error{};
                 error << "you are trying to subtract a " << this->get_dim()
@@ -327,7 +298,7 @@ namespace muGrid {
                       << "-dimensional coord element-wise.";
                 throw RuntimeError(error.str());
             }
-            DynCcoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
+            DynCoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
             for (Dim_t i{0}; i < this->get_dim(); ++i) {
                 retval[i] = this->operator[](i) - other[i];
             }
@@ -336,8 +307,8 @@ namespace muGrid {
 
         //! element-wise subtraction
         template <typename T2>
-        DynCcoord<MaxDim, decltype(T{} - T2{})> operator-(T2 other) const {
-            DynCcoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
+        DynCoord<MaxDim, decltype(T{} - T2{})> operator-(T2 other) const {
+            DynCoord<MaxDim, decltype(T{} - T2{})> retval(this->get_dim());
             for (Dim_t i{0}; i < this->get_dim(); ++i) {
                 retval[i] = this->operator[](i) - other;
             }
@@ -346,8 +317,8 @@ namespace muGrid {
 
         //! element-wise multiplication
         template <typename T2>
-        DynCcoord<MaxDim, decltype(T{} * T2{})>
-        operator*(const DynCcoord<MaxDim, T2> & other) const {
+        DynCoord<MaxDim, decltype(T{} * T2{})>
+        operator*(const DynCoord<MaxDim, T2> & other) const {
             if (this->get_dim() != other.get_dim()) {
                 std::stringstream error{};
                 error << "you are trying to multiply a " << this->get_dim()
@@ -355,7 +326,7 @@ namespace muGrid {
                       << "-dimensional coord element-wise.";
                 throw RuntimeError(error.str());
             }
-            DynCcoord<MaxDim, decltype(T{} * T2{})> retval(this->get_dim());
+            DynCoord<MaxDim, decltype(T{} * T2{})> retval(this->get_dim());
             for (Dim_t i{0}; i < this->get_dim(); ++i) {
                 retval[i] = this->operator[](i) * other[i];
             }
@@ -364,8 +335,8 @@ namespace muGrid {
 
         //! element-wise division
         template <typename T2>
-        DynCcoord<MaxDim, decltype(T{} / T2{})>
-        operator/(const DynCcoord<MaxDim, T2> & other) const {
+        DynCoord<MaxDim, decltype(T{} / T2{})>
+        operator/(const DynCoord<MaxDim, T2> & other) const {
             if (this->get_dim() != other.get_dim()) {
                 std::stringstream error{};
                 error << "you are trying to divide a " << this->get_dim()
@@ -373,7 +344,7 @@ namespace muGrid {
                       << "-dimensional coord element-wise.";
                 throw RuntimeError(error.str());
             }
-            DynCcoord<MaxDim, decltype(T{} / T2{})> retval(this->get_dim());
+            DynCoord<MaxDim, decltype(T{} / T2{})> retval(this->get_dim());
             for (Dim_t i{0}; i < this->get_dim(); ++i) {
                 retval[i] = this->operator[](i) / other[i];
             }
@@ -381,7 +352,7 @@ namespace muGrid {
         }
 
         //! modulo assignment operator (mostly for periodic boundaries stuff)
-        DynCcoord & operator%=(const DynCcoord & other) {
+        DynCoord & operator%=(const DynCoord & other) {
             for (auto && tup : akantu::zip(*this, other)) {
                 std::get<0>(tup) %= std::get<1>(tup);
                 if (std::get<0>(tup) < 0) {
@@ -392,8 +363,8 @@ namespace muGrid {
         }
 
         //! modulo operator (mostly for periodic boundaries stuff)
-        DynCcoord operator%(const DynCcoord & other) const {
-            DynCcoord ret_val{*this};
+        DynCoord operator%(const DynCoord & other) const {
+            DynCoord ret_val{*this};
             ret_val %= other;
             return ret_val;
         }
@@ -425,7 +396,7 @@ namespace muGrid {
         template <Dim_t Dim>
         std::array<T, Dim> & get() {
             static_assert(Dim <= MaxDim,
-                          "Requested Ccoord has more than MaxDim dimensions.");
+                          "Requested coord has more than MaxDim dimensions.");
             char * intermediate{reinterpret_cast<char *>(&this->long_array)};
             return reinterpret_cast<std::array<T, Dim> &>(*intermediate);
         }
@@ -434,7 +405,7 @@ namespace muGrid {
         template <Dim_t Dim>
         const std::array<T, Dim> & get() const {
             static_assert(Dim <= MaxDim,
-                          "Requested Ccoord has more than MaxDim dimensions.");
+                          "Requested coord has more than MaxDim dimensions.");
             const char * intermediate{
                 reinterpret_cast<const char *>(&this->long_array)};
             return reinterpret_cast<const std::array<T, Dim> &>(*intermediate);
@@ -488,16 +459,21 @@ namespace muGrid {
     };
 
     /**
-     * Cell coordinates, i.e. up to three integer numbers with dynamic
-     * (determined during runtime) dimension
+     * @brief Dynamic integer grid indices with runtime dimension.
+     *
+     * Used for grid dimensions, pixel coordinates, strides, and ghost counts
+     * when the spatial dimension is determined at runtime (e.g., Python API).
+     * Maximum dimension is 4 for SIMD alignment.
      */
-    using IntCoord_t = DynCcoord<fourD>;  // 4D for alignment
+    using DynGridIndex = DynCoord<fourD>;
 
     /**
-     * Real space coordinates, i.e. up to three floating point numbers with
-     * dynamic (determined during runtime) dimension
+     * @brief Alias for DynGridIndex used for grid/pixel shapes.
+     *
+     * Provides semantic clarity when the coordinate represents a shape
+     * (e.g., nb_grid_pts) rather than a position.
      */
-    using RealCoord_t = DynCcoord<fourD, Real>;  // 4D for alignment
+    using GridShape = DynGridIndex;
 
     /**
      * return a Eigen representation of the data stored in a std::array (e.g.,
@@ -519,23 +495,23 @@ namespace muGrid {
     }
 
     /**
-     * return a Eigen representation of the data stored in a std::array (e.g.,
+     * return a Eigen representation of the data stored in a DynCoord (e.g.,
      * for doing vector operations on a coordinate)
      */
     template <typename T, size_t MaxDim>
     Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 1>>
-    eigen(DynCcoord<MaxDim, T> & coord) {
+    eigen(DynCoord<MaxDim, T> & coord) {
         return Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 1>>{coord.data(),
                                                                coord.get_dim()};
     }
 
     /**
-     * return a const Eigen representation of the data stored in a std::array
+     * return a const Eigen representation of the data stored in a DynCoord
      * (e.g., for doing vector operations on a coordinate)
      */
     template <typename T, size_t MaxDim>
     Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, 1>>
-    eigen(const DynCcoord<MaxDim, T> & coord) {
+    eigen(const DynCoord<MaxDim, T> & coord) {
         return Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, 1>>{
             coord.data(), coord.get_dim()};
     }
@@ -558,7 +534,7 @@ namespace muGrid {
     }
 
     /**
-     * Allows inserting `muGrid::Ccoord_t` and `muGrid::Rcoord_t`
+     * Allows inserting `muGrid::GridIndex` and `muGrid::GridPoint`
      * into `std::ostream`s
      */
     template <typename T, size_t dim>
@@ -573,11 +549,11 @@ namespace muGrid {
     }
 
     /**
-     * Allows inserting `muGrid::DynCcoord` into `std::ostream`s
+     * Allows inserting `muGrid::DynCoord` into `std::ostream`s
      */
     template <size_t MaxDim, typename T>
     std::ostream & operator<<(std::ostream & os,
-                              const DynCcoord<MaxDim, T> & values) {
+                              const DynCoord<MaxDim, T> & values) {
         os << "(";
         if (values.get_dim() > 0) {
             for (Dim_t i = 0; i < values.get_dim() - 1; ++i) {
@@ -591,8 +567,8 @@ namespace muGrid {
 
     //! element-wise division
     template <size_t dim>
-    Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Rcoord_t<dim> & b) {
-        Rcoord_t<dim> retval{a};
+    GridPoint<dim> operator/(const GridPoint<dim> & a, const GridPoint<dim> & b) {
+        GridPoint<dim> retval{a};
         for (size_t i = 0; i < dim; ++i) {
             retval[i] /= b[i];
         }
@@ -601,8 +577,8 @@ namespace muGrid {
 
     //! element-wise division
     template <size_t dim>
-    Rcoord_t<dim> operator/(const Rcoord_t<dim> & a, const Ccoord_t<dim> & b) {
-        Rcoord_t<dim> retval{a};
+    GridPoint<dim> operator/(const GridPoint<dim> & a, const GridIndex<dim> & b) {
+        GridPoint<dim> retval{a};
         for (size_t i = 0; i < dim; ++i) {
             retval[i] /= b[i];
         }

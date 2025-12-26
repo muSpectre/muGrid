@@ -39,7 +39,7 @@
 
 #include "core/types.hh"
 #include "util/T4_map_proxy.hh"
-#include "util/eigen_tools.hh"
+#include "util/eigen_checks.hh"
 
 #include "Eigen/Dense"
 #include "unsupported/Eigen/CXX11/Tensor"

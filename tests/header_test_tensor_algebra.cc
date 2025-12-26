@@ -39,7 +39,7 @@
 
 #include "tests.hh"
 #include "test_goodies.hh"
-#include "util/eigen_tools.hh"
+#include "util/eigen_checks.hh"
 #include "util/tensor_algebra.hh"
 #include <iostream>
 

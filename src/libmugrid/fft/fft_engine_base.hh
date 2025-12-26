@@ -74,10 +74,10 @@ class FFTEngineBase : public CartesianDecomposition {
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
    * @param memory_location     Where to allocate field memory (Host or Device)
    */
-  FFTEngineBase(const IntCoord_t & nb_domain_grid_pts,
+  FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                 const Communicator & comm = Communicator(),
-                const IntCoord_t & nb_ghosts_left = IntCoord_t{},
-                const IntCoord_t & nb_ghosts_right = IntCoord_t{},
+                const DynGridIndex & nb_ghosts_left = DynGridIndex{},
+                const DynGridIndex & nb_ghosts_right = DynGridIndex{},
                 const SubPtMap_t & nb_sub_pts = {},
                 MemoryLocation memory_location = MemoryLocation::Host);
 
@@ -127,15 +127,15 @@ class FFTEngineBase : public CartesianDecomposition {
 
   Real normalisation() const { return this->norm_factor; }
 
-  const IntCoord_t & get_nb_fourier_grid_pts() const {
+  const DynGridIndex & get_nb_fourier_grid_pts() const {
     return this->nb_fourier_grid_pts;
   }
 
-  const IntCoord_t & get_nb_fourier_subdomain_grid_pts() const {
+  const DynGridIndex & get_nb_fourier_subdomain_grid_pts() const {
     return this->nb_fourier_subdomain_grid_pts;
   }
 
-  const IntCoord_t & get_fourier_subdomain_locations() const {
+  const DynGridIndex & get_fourier_subdomain_locations() const {
     return this->fourier_subdomain_locations;
   }
 
@@ -163,8 +163,8 @@ class FFTEngineBase : public CartesianDecomposition {
    * Configuration for creating transposes with different nb_components.
    */
   struct TransposeConfig {
-    IntCoord_t local_in;
-    IntCoord_t local_out;
+    DynGridIndex local_in;
+    DynGridIndex local_out;
     Index_t global_in;
     Index_t global_out;
     Index_t axis_in;
@@ -214,9 +214,9 @@ class FFTEngineBase : public CartesianDecomposition {
   std::unique_ptr<GlobalFieldCollection> work_ypencil;
 
   // === Geometry ===
-  IntCoord_t nb_fourier_grid_pts;
-  IntCoord_t nb_fourier_subdomain_grid_pts;
-  IntCoord_t fourier_subdomain_locations;
+  DynGridIndex nb_fourier_grid_pts;
+  DynGridIndex nb_fourier_subdomain_grid_pts;
+  DynGridIndex fourier_subdomain_locations;
   Real norm_factor;
   Dim_t spatial_dim;
 };

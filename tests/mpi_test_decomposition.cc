@@ -15,12 +15,12 @@ namespace muGrid {
     auto & comm{MPIContext::get_context().comm};
 
     // A large enough domain
-    IntCoord_t nb_domain_grid_pts{1, 10};
+    DynGridIndex nb_domain_grid_pts{1, 10};
 
     // Decomposition only along one dimension
-    IntCoord_t nb_subdivisions{1, comm.size()};
-    IntCoord_t nb_ghosts_left{1, 0};
-    IntCoord_t nb_ghosts_right{1, 0};
+    DynGridIndex nb_subdivisions{1, comm.size()};
+    DynGridIndex nb_ghosts_left{1, 0};
+    DynGridIndex nb_ghosts_right{1, 0};
     CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                        nb_subdivisions, nb_ghosts_left,
                                        nb_ghosts_right};
@@ -40,27 +40,27 @@ namespace muGrid {
 
     // Decide the number of subdivisions according to number of processes.
     int nb_process{comm.size()};
-    IntCoord_t nb_subdivisions{};
+    DynGridIndex nb_subdivisions{};
     if (nb_process == 1)
-      nb_subdivisions = IntCoord_t{1};
+      nb_subdivisions = DynGridIndex{1};
     else if (nb_process == 2)
-      nb_subdivisions = IntCoord_t{2};
+      nb_subdivisions = DynGridIndex{2};
     else if (nb_process == 4)
-      nb_subdivisions = IntCoord_t{2, 2};
+      nb_subdivisions = DynGridIndex{2, 2};
     else if (nb_process == 8)
-      nb_subdivisions = IntCoord_t{2, 2, 2};
+      nb_subdivisions = DynGridIndex{2, 2, 2};
     else
       throw RuntimeError("Not planned for this number of processes.");
 
     // Decide the size of the whole domain
     int spatial_dims{nb_subdivisions.size()};
     int nb_grid_pts_per_dim{5};
-    const IntCoord_t & nb_domain_grid_pts{
-        IntCoord_t(spatial_dims, nb_grid_pts_per_dim)};
+    const DynGridIndex & nb_domain_grid_pts{
+        DynGridIndex(spatial_dims, nb_grid_pts_per_dim)};
 
     // A function to get referrence values
     auto && get_ref_value{
-        [nb_grid_pts_per_dim](const IntCoord_t & global_coords) {
+        [nb_grid_pts_per_dim](const DynGridIndex & global_coords) {
           Index_t val{0};
           Index_t coeff{1};
           for (int dim{0}; dim < global_coords.size(); ++dim) {
@@ -71,8 +71,8 @@ namespace muGrid {
         }};
 
     // Create a Cartesian decomposition with ghost buffers
-    const IntCoord_t & nb_ghosts_left{IntCoord_t(spatial_dims, 1)};
-    const IntCoord_t & nb_ghosts_right{IntCoord_t(spatial_dims, 2)};
+    const DynGridIndex & nb_ghosts_left{DynGridIndex(spatial_dims, 1)};
+    const DynGridIndex & nb_ghosts_right{DynGridIndex(spatial_dims, 2)};
     CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                        nb_subdivisions, nb_ghosts_left,
                                        nb_ghosts_right};
@@ -137,26 +137,26 @@ namespace muGrid {
     // least one direction.
 
     int nb_process{comm.size()};
-    IntCoord_t nb_subdivisions{};
+    DynGridIndex nb_subdivisions{};
     int nb_grid_pts_per_dim{10};  // Larger domain to allow realistic halo sizes
     int halo_size{6};             // Large halo that exceeds subdomain size
 
     if (nb_process == 1) {
       // Serial case: 1D decomposition
-      nb_subdivisions = IntCoord_t{1};
+      nb_subdivisions = DynGridIndex{1};
     } else if (nb_process == 2) {
       // 1D decomposition with 2 processes
-      nb_subdivisions = IntCoord_t{2};
+      nb_subdivisions = DynGridIndex{2};
       // Each process gets ~5 grid points, but halo is 6
       // => requires 2 communication steps
     } else if (nb_process == 4) {
       // 2D decomposition (2x2)
-      nb_subdivisions = IntCoord_t{2, 2};
+      nb_subdivisions = DynGridIndex{2, 2};
       // Each dimension: ~5 grid points per subdomain, halo is 6
       // => requires 2 communication steps per dimension
     } else if (nb_process == 8) {
       // 3D decomposition (2x2x2)
-      nb_subdivisions = IntCoord_t{2, 2, 2};
+      nb_subdivisions = DynGridIndex{2, 2, 2};
       // Each dimension: ~5 grid points per subdomain, halo is 6
       // => requires 2 communication steps per dimension
     } else {
@@ -164,12 +164,12 @@ namespace muGrid {
     }
 
     int spatial_dims{nb_subdivisions.size()};
-    const IntCoord_t & nb_domain_grid_pts{
-        IntCoord_t(spatial_dims, nb_grid_pts_per_dim)};
+    const DynGridIndex & nb_domain_grid_pts{
+        DynGridIndex(spatial_dims, nb_grid_pts_per_dim)};
 
     // A function to get reference values based on global coordinates
     auto && get_ref_value{
-        [nb_grid_pts_per_dim](const IntCoord_t & global_coords) {
+        [nb_grid_pts_per_dim](const DynGridIndex & global_coords) {
           Index_t val{0};
           Index_t coeff{1};
           for (int dim{0}; dim < global_coords.size(); ++dim) {
@@ -181,8 +181,8 @@ namespace muGrid {
         }};
 
     // Create decomposition with large halo buffer
-    const IntCoord_t & nb_ghosts_left{IntCoord_t(spatial_dims, halo_size)};
-    const IntCoord_t & nb_ghosts_right{IntCoord_t(spatial_dims, halo_size)};
+    const DynGridIndex & nb_ghosts_left{DynGridIndex(spatial_dims, halo_size)};
+    const DynGridIndex & nb_ghosts_right{DynGridIndex(spatial_dims, halo_size)};
     CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                        nb_subdivisions, nb_ghosts_left,
                                        nb_ghosts_right};
@@ -258,26 +258,26 @@ namespace muGrid {
     // Create a very small domain that will result in zero grid points on some
     // processes when decomposed
     int nb_process{comm.size()};
-    IntCoord_t nb_subdivisions{};
+    DynGridIndex nb_subdivisions{};
     int nb_grid_pts_per_dim{2};  // Very small domain
     int halo_size{1};
 
     if (nb_process == 2) {
-      nb_subdivisions = IntCoord_t{2};
+      nb_subdivisions = DynGridIndex{2};
     } else if (nb_process == 4) {
-      nb_subdivisions = IntCoord_t{2, 2};
+      nb_subdivisions = DynGridIndex{2, 2};
     } else if (nb_process == 8) {
-      nb_subdivisions = IntCoord_t{2, 2, 2};
+      nb_subdivisions = DynGridIndex{2, 2, 2};
     } else {
       return;  // Skip for other process counts
     }
 
     int spatial_dims{nb_subdivisions.size()};
-    const IntCoord_t & nb_domain_grid_pts{
-        IntCoord_t(spatial_dims, nb_grid_pts_per_dim)};
+    const DynGridIndex & nb_domain_grid_pts{
+        DynGridIndex(spatial_dims, nb_grid_pts_per_dim)};
 
     auto && get_ref_value{
-        [nb_grid_pts_per_dim](const IntCoord_t & global_coords) {
+        [nb_grid_pts_per_dim](const DynGridIndex & global_coords) {
           Index_t val{0};
           Index_t coeff{1};
           for (int dim{0}; dim < global_coords.size(); ++dim) {
@@ -288,8 +288,8 @@ namespace muGrid {
         }};
 
     // Create decomposition with ghost buffers
-    const IntCoord_t & nb_ghosts_left{IntCoord_t(spatial_dims, halo_size)};
-    const IntCoord_t & nb_ghosts_right{IntCoord_t(spatial_dims, halo_size)};
+    const DynGridIndex & nb_ghosts_left{DynGridIndex(spatial_dims, halo_size)};
+    const DynGridIndex & nb_ghosts_right{DynGridIndex(spatial_dims, halo_size)};
     CartesianDecomposition cart_decomp{comm, nb_domain_grid_pts,
                                        nb_subdivisions, nb_ghosts_left,
                                        nb_ghosts_right};

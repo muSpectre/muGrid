@@ -47,6 +47,14 @@ project(muGrid
     DESCRIPTION "MPI-parallel regular grids"
 )
 
+# Windows-specific settings
+if(WIN32)
+    # Prevent windows.h from defining min/max macros that conflict with std::min/max
+    add_compile_definitions(NOMINMAX)
+    # Reduce windows.h include size
+    add_compile_definitions(WIN32_LEAN_AND_MEAN)
+endif()
+
 # GPU backend options
 option(MUGRID_ENABLE_CUDA "Enable CUDA GPU support" OFF)
 option(MUGRID_ENABLE_HIP "Enable HIP GPU support (AMD ROCm)" OFF)
@@ -146,7 +154,8 @@ if(MUGRID_ENABLE_NETCDF)
             message(STATUS "PnetCDF not found, building without NetCDF support")
         endif()
     else()
-        # Look for serial NetCDF
+        # Look for serial NetCDF - try pkg-config first, then CMake find_package
+        set(NETCDF_FOUND FALSE)
         find_package(PkgConfig QUIET)
         if(PkgConfig_FOUND)
             pkg_check_modules(NETCDF netcdf QUIET)
@@ -154,10 +163,25 @@ if(MUGRID_ENABLE_NETCDF)
         if(NETCDF_FOUND)
             set(MUGRID_NETCDF_LIBRARIES ${NETCDF_LINK_LIBRARIES})
             set(MUGRID_NETCDF_INCLUDE_DIRS ${NETCDF_INCLUDE_DIRS})
-            message(STATUS "NetCDF found")
+            message(STATUS "NetCDF found via pkg-config")
         else()
-            set(MUGRID_ENABLE_NETCDF OFF)
-            message(STATUS "NetCDF not found, building without NetCDF support")
+            # Fallback to CMake find_package (works on Windows with CMake config files)
+            find_package(netCDF QUIET CONFIG)
+            if(netCDF_FOUND)
+                set(MUGRID_NETCDF_LIBRARIES netCDF::netcdf)
+                # Extract include directories from the imported target for use by other targets
+                get_target_property(_netcdf_include_dirs netCDF::netcdf INTERFACE_INCLUDE_DIRECTORIES)
+                if(_netcdf_include_dirs)
+                    set(MUGRID_NETCDF_INCLUDE_DIRS "${_netcdf_include_dirs}")
+                else()
+                    set(MUGRID_NETCDF_INCLUDE_DIRS "")
+                endif()
+                set(NETCDF_FOUND TRUE)
+                message(STATUS "NetCDF found via CMake config")
+            else()
+                set(MUGRID_ENABLE_NETCDF OFF)
+                message(STATUS "NetCDF not found, building without NetCDF support")
+            endif()
         endif()
     endif()
 endif()
@@ -185,6 +209,8 @@ if(MUGRID_ENABLE_PYTHON)
     # Fetch DLPack header for zero-copy array exchange
     message(STATUS "Fetching DLPack header...")
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE INTERNAL "Set minimum policy version for DLPack header")
+    # Disable DLPack's mock target (uses posix_memalign which doesn't exist on Windows)
+    set(BUILD_MOCK OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
         dlpack
         GIT_REPOSITORY https://github.com/dmlc/dlpack.git
