@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Coding Convention" href="CodingConvention.html"><link rel="prev" title="GPU Computing" href="GPU.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>C++ Bindings - µGrid 0.97.0-1-g19c112b3 documentation</title>
+        <title>C++ Bindings - µGrid 0.97.0-33-g03890e9a documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.97.0-1-g19c112b3
+      <a href="index.html"><div class="brand">µGrid 0.97.0-33-g03890e9a
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.97.0-1-g19c112b3
+  <span class="sidebar-brand-text">µGrid 0.97.0-33-g03890e9a
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -309,28 +309,35 @@ for details.</p>
 <dl>
 <dt class="sig sig-object cpp">
 <span class="target" id="group__Coordinates"></span><em><span class="pre">group</span></em> <span class="sig-name descname"><span class="pre">Coordinate</span> <span class="pre">types</span></span></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><p>Type Selection Guide:<ul class="simple">
+<li><p>GridIndex&lt;Dim&gt;: Compile-time dimension grid indices (for templates)</p></li>
+<li><p>GridPoint&lt;Dim&gt;: Compile-time dimension physical coordinates</p></li>
+<li><p>DynGridIndex: Runtime dimension grid indices (Python API, config)</p></li>
+<li><p>GridShape: Alias for DynGridIndex, semantic clarity for shapes </p></li>
+</ul>
+</p>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-typedefs">Typedefs</p>
 <dl class="cpp type">
-<dt class="sig sig-object cpp" id="_CPPv48Ccoord_t">
-<span id="_CPPv38Ccoord_t"></span><span id="_CPPv28Ccoord_t"></span><span id="Ccoord_t"></span><span class="target" id="group__Coordinates_1ga85d0d87dc88ebcd583e0fc6cbde8571c"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><a class="reference internal" href="CplusplusAPI.html#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv47Index_t" title="Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Dim</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Ccoord_t</span></span></span><a class="headerlink" href="#_CPPv48Ccoord_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>A type alias for cell coordinates. </p>
-<p>This type alias represents cell coordinates, which are up to three integer numbers with a fixed dimension. The dimension is determined by the template parameter Dim. The coordinates are stored in a std::array of type Index_t.</p>
+<dt class="sig sig-object cpp" id="_CPPv4I_6size_tE9GridIndex">
+<span id="_CPPv3I_6size_tE9GridIndex"></span><span id="_CPPv2I_6size_tE9GridIndex"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Dim</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="group__Coordinates_1ga6d5280613d97edd2960522558c05090d"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GridIndex</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="CplusplusAPI.html#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv47Index_t" title="Index_t"><span class="n"><span class="pre">Index_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_tE9GridIndex" title="GridIndex::Dim"><span class="n"><span class="pre">Dim</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I_6size_tE9GridIndex" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Integer grid indices with compile-time known dimension. </p>
+<p>Used for pixel/voxel coordinates, grid sizes, and strides in performance-critical templated code where the spatial dimension is known at compile time.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>Dim</strong> – The dimension of the cell coordinates. It should be between 1 and 3. </p>
+<dd class="field-odd"><p><strong>Dim</strong> – The spatial dimension (1, 2, or 3) </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp type">
-<dt class="sig sig-object cpp" id="_CPPv48Rcoord_t">
-<span id="_CPPv38Rcoord_t"></span><span id="_CPPv28Rcoord_t"></span><span id="Rcoord_t"></span><span class="target" id="group__Coordinates_1ga4d11f393f70f5526a9887b74118bd1fb"></span><span class="k"><span class="pre">typedef</span></span><span class="w"> </span><a class="reference internal" href="CplusplusAPI.html#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv44Real" title="Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Dim</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Rcoord_t</span></span></span><a class="headerlink" href="#_CPPv48Rcoord_t" title="Link to this definition">¶</a><br /></dt>
-<dd><p>A type alias for real space coordinates. </p>
-<p>This type alias represents real space coordinates, which are up to three floating point numbers with a fixed dimension. The dimension is determined by the template parameter Dim. The coordinates are stored in a std::array of type Real.</p>
+<dt class="sig sig-object cpp" id="_CPPv4I_6size_tE9GridPoint">
+<span id="_CPPv3I_6size_tE9GridPoint"></span><span id="_CPPv2I_6size_tE9GridPoint"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Dim</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="group__Coordinates_1gab9a803037fc2f47df7f0d79ef2b46204"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GridPoint</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="CplusplusAPI.html#_CPPv4St" title="std"><span class="n"><span class="pre">std</span></span></a><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv44Real" title="Real"><span class="n"><span class="pre">Real</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I_6size_tE9GridPoint" title="GridPoint::Dim"><span class="n"><span class="pre">Dim</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I_6size_tE9GridPoint" title="Link to this definition">¶</a><br /></dt>
+<dd><p>Real-valued spatial coordinates with compile-time known dimension. </p>
+<p>Used for physical space coordinates and domain lengths in performance-critical templated code.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>Dim</strong> – The dimension of the real space coordinates. It should be between 1 and 3. </p>
+<dd class="field-odd"><p><strong>Dim</strong> – The spatial dimension (1, 2, or 3) </p>
 </dd>
 </dl>
 </dd></dl>
@@ -583,8 +590,8 @@ drastically reducing boilerplate code.</p>
 <li><a class="reference internal" href="#_CPPv43Int"><code class="docutils literal notranslate"><span class="pre">Int</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv44Real"><code class="docutils literal notranslate"><span class="pre">Real</span></code></a></li>
 <li><a class="reference internal" href="#_CPPv47Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv48Ccoord_t"><code class="docutils literal notranslate"><span class="pre">Ccoord_t</span></code></a></li>
-<li><a class="reference internal" href="#_CPPv48Rcoord_t"><code class="docutils literal notranslate"><span class="pre">Rcoord_t</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4I_6size_tE9GridIndex"><code class="docutils literal notranslate"><span class="pre">GridIndex</span></code></a></li>
+<li><a class="reference internal" href="#_CPPv4I_6size_tE9GridPoint"><code class="docutils literal notranslate"><span class="pre">GridPoint</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#field-types">Field Types</a></li>
@@ -608,7 +615,7 @@ drastically reducing boilerplate code.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=bcf563b3"></script>
+</div><script src="_static/documentation_options.js?v=92952e5d"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
