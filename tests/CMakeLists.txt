@@ -31,7 +31,6 @@ if(Boost_FOUND)
         test_goodies.cc
         test_mapped_fields.cc
         test_mapped_state_fields.cc
-        test_raw_memory_operations.cc
         test_state_field_maps.cc
         test_state_fields.cc
         test_units.cc

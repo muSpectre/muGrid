@@ -39,7 +39,6 @@
 #include "field/field_typed.hh"
 #include "collection/field_collection.hh"
 #include "field/field_map.hh"
-#include "util/raw_memory_operations.hh"
 #include "util/tensor_algebra.hh"
 
 namespace muGrid {

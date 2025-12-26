@@ -47,7 +47,6 @@ set(MUGRID_SOURCES
     # io/
     io/file_io_base.cc
     # util/
-    util/raw_memory_operations.cc
     # fft/
     fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
