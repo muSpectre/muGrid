@@ -56,6 +56,7 @@ install(FILES
     muGrid/Field.py
     muGrid/Parallel.py
     muGrid/Solvers.py
+    muGrid/Timer.py
     muGrid/Wrappers.py
     DESTINATION muGrid
     COMPONENT python
