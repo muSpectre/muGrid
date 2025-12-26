@@ -41,6 +41,13 @@
 #include <cstdint>
 #include <vector>
 
+// Compiler compatibility macros
+#if defined(_MSC_VER)
+    #define MUGRID_RESTRICT __restrict
+#else
+    #define MUGRID_RESTRICT __restrict__
+#endif
+
 namespace muGrid {
 
     /**

@@ -432,8 +432,8 @@ namespace muGrid {
          * @param increment If true, add to output; if false, overwrite
          */
         void fem_gradient_2d_host(
-            const Real* __restrict__ nodal_input,
-            Real* __restrict__ gradient_output,
+            const Real* MUGRID_RESTRICT nodal_input,
+            Real* MUGRID_RESTRICT gradient_output,
             Index_t nx, Index_t ny,
             Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
             Index_t grad_stride_x, Index_t grad_stride_y,
@@ -446,8 +446,8 @@ namespace muGrid {
          * @brief Apply 2D FEM transpose (divergence) operator on host.
          */
         void fem_divergence_2d_host(
-            const Real* __restrict__ gradient_input,
-            Real* __restrict__ nodal_output,
+            const Real* MUGRID_RESTRICT gradient_input,
+            Real* MUGRID_RESTRICT nodal_output,
             Index_t nx, Index_t ny,
             Index_t grad_stride_x, Index_t grad_stride_y,
             Index_t grad_stride_q, Index_t grad_stride_d,
@@ -461,8 +461,8 @@ namespace muGrid {
          * @brief Apply 3D FEM gradient operator on host.
          */
         void fem_gradient_3d_host(
-            const Real* __restrict__ nodal_input,
-            Real* __restrict__ gradient_output,
+            const Real* MUGRID_RESTRICT nodal_input,
+            Real* MUGRID_RESTRICT gradient_output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
             Index_t nodal_stride_n,
@@ -476,8 +476,8 @@ namespace muGrid {
          * @brief Apply 3D FEM transpose (divergence) operator on host.
          */
         void fem_divergence_3d_host(
-            const Real* __restrict__ gradient_input,
-            Real* __restrict__ nodal_output,
+            const Real* MUGRID_RESTRICT gradient_input,
+            Real* MUGRID_RESTRICT nodal_output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
             Index_t grad_stride_q, Index_t grad_stride_d,

@@ -98,8 +98,8 @@ __device__ inline double atomicAddDouble(double* address, double val) {
  * Each thread processes one pixel.
  */
 __global__ void fem_gradient_2d_kernel(
-    const Real* __restrict__ nodal_input,
-    Real* __restrict__ gradient_output,
+    const Real* MUGRID_RESTRICT nodal_input,
+    Real* MUGRID_RESTRICT gradient_output,
     Index_t nx, Index_t ny,
     Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
     Index_t grad_stride_x, Index_t grad_stride_y,
@@ -162,8 +162,8 @@ __global__ void fem_gradient_2d_kernel(
  * to shared nodal points.
  */
 __global__ void fem_divergence_2d_kernel(
-    const Real* __restrict__ gradient_input,
-    Real* __restrict__ nodal_output,
+    const Real* MUGRID_RESTRICT gradient_input,
+    Real* MUGRID_RESTRICT nodal_output,
     Index_t nx, Index_t ny,
     Index_t grad_stride_x, Index_t grad_stride_y,
     Index_t grad_stride_q, Index_t grad_stride_d,
@@ -250,8 +250,8 @@ __constant__ Index_t d_NODE_OFFSET_3D[NB_NODES_3D][DIM_3D] = {
  * Each thread processes one voxel.
  */
 __global__ void fem_gradient_3d_kernel(
-    const Real* __restrict__ nodal_input,
-    Real* __restrict__ gradient_output,
+    const Real* MUGRID_RESTRICT nodal_input,
+    Real* MUGRID_RESTRICT gradient_output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
     Index_t nodal_stride_n,
@@ -318,15 +318,15 @@ __global__ void fem_gradient_3d_kernel(
  * Uses atomic operations to accumulate contributions.
  */
 __global__ void fem_divergence_3d_kernel(
-    const Real* __restrict__ gradient_input,
-    Real* __restrict__ nodal_output,
+    const Real* MUGRID_RESTRICT gradient_input,
+    Real* MUGRID_RESTRICT nodal_output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
     Index_t grad_stride_q, Index_t grad_stride_d,
     Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
     Index_t nodal_stride_n,
     Real inv_hx, Real inv_hy, Real inv_hz,
-    const Real* __restrict__ quad_weights) {
+    const Real* MUGRID_RESTRICT quad_weights) {
 
     // Thread indices
     Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;

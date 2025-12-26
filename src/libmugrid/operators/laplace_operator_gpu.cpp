@@ -64,8 +64,8 @@ constexpr int BLOCK_SIZE_3D = 8;
  * Works with both CUDA and HIP - the __global__ keyword is the same.
  */
 __global__ void laplace_2d_kernel(
-    const Real* __restrict__ input,
-    Real* __restrict__ output,
+    const Real* MUGRID_RESTRICT input,
+    Real* MUGRID_RESTRICT output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
     Real scale,
@@ -100,8 +100,8 @@ __global__ void laplace_2d_kernel(
  * Works with both CUDA and HIP.
  */
 __global__ void laplace_3d_kernel(
-    const Real* __restrict__ input,
-    Real* __restrict__ output,
+    const Real* MUGRID_RESTRICT input,
+    Real* MUGRID_RESTRICT output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
     Real scale,

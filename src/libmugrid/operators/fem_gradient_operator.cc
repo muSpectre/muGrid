@@ -577,8 +577,8 @@ namespace muGrid {
     namespace fem_gradient_kernels {
 
         void fem_gradient_2d_host(
-            const Real* __restrict__ nodal_input,
-            Real* __restrict__ gradient_output,
+            const Real* MUGRID_RESTRICT nodal_input,
+            Real* MUGRID_RESTRICT gradient_output,
             Index_t nx, Index_t ny,
             Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
             Index_t grad_stride_x, Index_t grad_stride_y,
@@ -594,7 +594,9 @@ namespace muGrid {
             // Process interior points (excluding last row/column which need
             // nodes from the next pixel)
             for (Index_t iy = 0; iy < ny - 1; ++iy) {
-                #if defined(__clang__)
+                #if defined(_MSC_VER)
+                #pragma loop(ivdep)
+                #elif defined(__clang__)
                 #pragma clang loop vectorize(enable) interleave(enable)
                 #elif defined(__GNUC__)
                 #pragma GCC ivdep
@@ -644,8 +646,8 @@ namespace muGrid {
         }
 
         void fem_divergence_2d_host(
-            const Real* __restrict__ gradient_input,
-            Real* __restrict__ nodal_output,
+            const Real* MUGRID_RESTRICT gradient_input,
+            Real* MUGRID_RESTRICT nodal_output,
             Index_t nx, Index_t ny,
             Index_t grad_stride_x, Index_t grad_stride_y,
             Index_t grad_stride_q, Index_t grad_stride_d,
@@ -716,8 +718,8 @@ namespace muGrid {
         }
 
         void fem_gradient_3d_host(
-            const Real* __restrict__ nodal_input,
-            Real* __restrict__ gradient_output,
+            const Real* MUGRID_RESTRICT nodal_input,
+            Real* MUGRID_RESTRICT gradient_output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
             Index_t nodal_stride_n,
@@ -733,7 +735,9 @@ namespace muGrid {
 
             for (Index_t iz = 0; iz < nz - 1; ++iz) {
                 for (Index_t iy = 0; iy < ny - 1; ++iy) {
-                    #if defined(__clang__)
+                    #if defined(_MSC_VER)
+                    #pragma loop(ivdep)
+                    #elif defined(__clang__)
                     #pragma clang loop vectorize(enable) interleave(enable)
                     #elif defined(__GNUC__)
                     #pragma GCC ivdep
@@ -787,8 +791,8 @@ namespace muGrid {
         }
 
         void fem_divergence_3d_host(
-            const Real* __restrict__ gradient_input,
-            Real* __restrict__ nodal_output,
+            const Real* MUGRID_RESTRICT gradient_input,
+            Real* MUGRID_RESTRICT nodal_output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
             Index_t grad_stride_q, Index_t grad_stride_d,

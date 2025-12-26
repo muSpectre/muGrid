@@ -93,13 +93,13 @@ namespace muGrid {
          * - Compiler can vectorize the x-loop when strides are 1
          */
         inline void apply_convolution_kernel(
-            const Real* __restrict__ nodal_data,
-            Real* __restrict__ quad_data,
+            const Real* MUGRID_RESTRICT nodal_data,
+            Real* MUGRID_RESTRICT quad_data,
             const Real alpha,
             const GridTraversalParams& params,
-            const Index_t* __restrict__ quad_indices,
-            const Index_t* __restrict__ nodal_indices,
-            const Real* __restrict__ op_values,
+            const Index_t* MUGRID_RESTRICT quad_indices,
+            const Index_t* MUGRID_RESTRICT nodal_indices,
+            const Real* MUGRID_RESTRICT op_values,
             const Index_t nnz) {
 
             const Index_t nx = params.nx;
@@ -134,7 +134,9 @@ namespace muGrid {
                         const Index_t quad_yz = quad_z + y * quad_stride_y;
 
                         // Innermost loop over x - vectorizable with stride access
-                        #if defined(__clang__)
+                        #if defined(_MSC_VER)
+                        #pragma loop(ivdep)
+                        #elif defined(__clang__)
                         #pragma clang loop vectorize(enable) interleave(enable)
                         #elif defined(__GNUC__)
                         #pragma GCC ivdep
@@ -161,13 +163,13 @@ namespace muGrid {
          * Loop structure is optimized for SIMD vectorization (same as apply).
          */
         inline void transpose_convolution_kernel(
-            const Real* __restrict__ quad_data,
-            Real* __restrict__ nodal_data,
+            const Real* MUGRID_RESTRICT quad_data,
+            Real* MUGRID_RESTRICT nodal_data,
             const Real alpha,
             const GridTraversalParams& params,
-            const Index_t* __restrict__ quad_indices,
-            const Index_t* __restrict__ nodal_indices,
-            const Real* __restrict__ op_values,
+            const Index_t* MUGRID_RESTRICT quad_indices,
+            const Index_t* MUGRID_RESTRICT nodal_indices,
+            const Real* MUGRID_RESTRICT op_values,
             const Index_t nnz) {
 
             const Index_t nx = params.nx;
@@ -199,7 +201,9 @@ namespace muGrid {
                         const Index_t quad_yz = quad_z + y * quad_stride_y;
 
                         // Innermost loop over x - vectorizable with stride access
-                        #if defined(__clang__)
+                        #if defined(_MSC_VER)
+                        #pragma loop(ivdep)
+                        #elif defined(__clang__)
                         #pragma clang loop vectorize(enable) interleave(enable)
                         #elif defined(__GNUC__)
                         #pragma GCC ivdep

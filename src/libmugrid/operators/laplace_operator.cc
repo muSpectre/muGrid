@@ -211,8 +211,8 @@ namespace muGrid {
     namespace laplace_kernels {
 
         void laplace_2d_host(
-            const Real* __restrict__ input,
-            Real* __restrict__ output,
+            const Real* MUGRID_RESTRICT input,
+            Real* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny,
             Index_t stride_x, Index_t stride_y,
             Real scale,
@@ -221,7 +221,9 @@ namespace muGrid {
             // Process interior points (excluding ghost layers)
             // Ghost layer is 1 pixel on each side
             for (Index_t iy = 1; iy < ny - 1; ++iy) {
-                #if defined(__clang__)
+                #if defined(_MSC_VER)
+                #pragma loop(ivdep)
+                #elif defined(__clang__)
                 #pragma clang loop vectorize(enable) interleave(enable)
                 #elif defined(__GNUC__)
                 #pragma GCC ivdep
@@ -247,8 +249,8 @@ namespace muGrid {
         }
 
         void laplace_3d_host(
-            const Real* __restrict__ input,
-            Real* __restrict__ output,
+            const Real* MUGRID_RESTRICT input,
+            Real* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
             Real scale,
@@ -257,7 +259,9 @@ namespace muGrid {
             // Process interior points (excluding ghost layers)
             for (Index_t iz = 1; iz < nz - 1; ++iz) {
                 for (Index_t iy = 1; iy < ny - 1; ++iy) {
-                    #if defined(__clang__)
+                    #if defined(_MSC_VER)
+                    #pragma loop(ivdep)
+                    #elif defined(__clang__)
                     #pragma clang loop vectorize(enable) interleave(enable)
                     #elif defined(__GNUC__)
                     #pragma GCC ivdep

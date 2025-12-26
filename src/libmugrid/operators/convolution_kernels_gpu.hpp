@@ -76,8 +76,8 @@ namespace gpu {
      * Works with both CUDA and HIP backends.
      */
     __global__ void apply_convolution_kernel_impl(
-        const Real* __restrict__ nodal_data,
-        Real* __restrict__ quad_data,
+        const Real* MUGRID_RESTRICT nodal_data,
+        Real* MUGRID_RESTRICT quad_data,
         const Real alpha,
         const Index_t nx, const Index_t ny, const Index_t nz,
         const Index_t nodal_base, const Index_t quad_base,
@@ -85,9 +85,9 @@ namespace gpu {
         const Index_t nodal_stride_z,
         const Index_t quad_stride_x, const Index_t quad_stride_y,
         const Index_t quad_stride_z,
-        const Index_t* __restrict__ quad_indices,
-        const Index_t* __restrict__ nodal_indices,
-        const Real* __restrict__ op_values,
+        const Index_t* MUGRID_RESTRICT quad_indices,
+        const Index_t* MUGRID_RESTRICT nodal_indices,
+        const Real* MUGRID_RESTRICT op_values,
         const Index_t nnz) {
 
         const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -117,8 +117,8 @@ namespace gpu {
      * Works with both CUDA and HIP backends.
      */
     __global__ void transpose_convolution_kernel_impl(
-        const Real* __restrict__ quad_data,
-        Real* __restrict__ nodal_data,
+        const Real* MUGRID_RESTRICT quad_data,
+        Real* MUGRID_RESTRICT nodal_data,
         const Real alpha,
         const Index_t nx, const Index_t ny, const Index_t nz,
         const Index_t nodal_base, const Index_t quad_base,
@@ -126,9 +126,9 @@ namespace gpu {
         const Index_t nodal_stride_z,
         const Index_t quad_stride_x, const Index_t quad_stride_y,
         const Index_t quad_stride_z,
-        const Index_t* __restrict__ quad_indices,
-        const Index_t* __restrict__ nodal_indices,
-        const Real* __restrict__ op_values,
+        const Index_t* MUGRID_RESTRICT quad_indices,
+        const Index_t* MUGRID_RESTRICT nodal_indices,
+        const Real* MUGRID_RESTRICT op_values,
         const Index_t nnz) {
 
         const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
