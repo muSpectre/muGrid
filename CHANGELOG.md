@@ -1,7 +1,7 @@
 Change log for µGrid
 ====================
 
-0.98.0 (26Dec25)
+0.98.0 (27Dec25)
 ----------------
 
 - ENH: **Simplified API**: Streamlined user-facing API for improved usability
@@ -9,9 +9,17 @@ Change log for µGrid
 - ENH: **3D Poisson solver example**: New example demonstrating 3D Poisson solver usage
 - ENH: **Benchmark suite**: Automatic Poisson benchmark suite with fine-grained timing and GFLOP/s metrics
 - ENH: **FEM gradient operator**: New FEM gradient operator with homogenization example
+- ENH: **PAPI hardware counters**: Optional PAPI hardware counter support in Timer class for performance analysis
+- ENH: **Multi-component fields**: Added multi-component field support in FEMGradientOperator
+- ENH: **reduce_ghosts**: Added reduce_ghosts operation to CartesianDecomposition
+- API: Removed standalone FFT field creation functions
 - MAINT: **Unified GPU code**: Consolidated GPU backend code for CUDA and HIP
 - MAINT: **Laplace kernels**: Hard-coded Laplace kernels are now part of the main library
+- MAINT: Removed unused pad_size field functionality
+- CI: Added GPU testing workflow with Tesla T4 runner
+- DOC: Improved API documentation with docstrings and structured references
 - BUG: Fixed obtaining raw data pointer in Laplace operator implementation
+- BUG: Fixed FEMGradientOperator Python wrapper API mismatch
 
 0.97.0 (22Dec25)
 ----------------
