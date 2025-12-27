@@ -1,8 +1,17 @@
 #include <cassert>
+#include <cstring>
 #include <iterator>
 
 #ifdef WITH_MPI
 #include <mpi.h>
+#endif
+
+#if defined(MUGRID_ENABLE_CUDA)
+#include <cuda_runtime.h>
+#endif
+
+#if defined(MUGRID_ENABLE_HIP)
+#include <hip/hip_runtime.h>
 #endif
 
 #include "core/coordinates.hh"
@@ -364,6 +373,158 @@ namespace muGrid {
     void CartesianDecomposition::communicate_ghosts(
         const std::string & field_name) const {
         this->communicate_ghosts(this->collection.get_field(field_name));
+    }
+
+    void CartesianDecomposition::reduce_ghosts(const Field & field) const {
+        // Get spatial dimensions
+        auto spatial_dims{this->get_spatial_dim()};
+
+        // Get strides (in unit: elements)
+        auto strides{field.get_strides(IterUnit::SubPt)};
+
+        // Total number of elements in the field
+        auto nb_total_elements{
+            strides[strides.size() - 1] *
+            this->get_nb_subdomain_grid_pts_with_ghosts()[spatial_dims - 1]};
+
+        // Get the begin address of the field data
+        auto * data{static_cast<char *>(field.get_void_data_ptr(false))};
+
+        // Check if field is on device memory
+        bool is_device_memory{field.is_on_device()};
+
+        // Get element size
+        auto element_size{
+            static_cast<Index_t>(field.get_element_size_in_bytes())};
+
+#ifdef WITH_MPI
+        MPI_Datatype mpi_type{field.get_mpi_type()};
+        void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
+#else
+        void * mpi_type_ptr{nullptr};
+#endif
+
+        // For each direction (in reverse order to handle corners correctly)
+        for (int direction{static_cast<int>(spatial_dims) - 1}; direction >= 0;
+             --direction) {
+            // Grid size
+            auto nb_subdomain_grid_pts_without_ghosts{
+                this->get_nb_subdomain_grid_pts_without_ghosts()[direction]};
+
+            // Calculate memory layout
+            auto block_len{strides[strides.size() - spatial_dims + direction]};
+            auto block_stride{
+                direction < spatial_dims - 1
+                    ? strides[strides.size() - spatial_dims + direction + 1]
+                    : nb_total_elements};
+
+            // Number of blocks for single slice
+            auto nb_blocks{nb_total_elements / block_stride};
+
+            // Ghost counts
+            auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
+            auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
+
+            // For reduce_ghosts, we reverse the communication direction:
+            // - Send our LEFT ghost to LEFT neighbor → they add to their RIGHT interior
+            // - Send our RIGHT ghost to RIGHT neighbor → they add to their LEFT interior
+            // - Receive from neighbors and add to our interior
+
+            // For reduce_ghosts, we send ghost values to neighbors who add them
+            // to their interior. In single process mode, this is a local
+            // accumulation from ghost to interior.
+            //
+            // Unlike communicate_ghosts which uses multi-step communication for
+            // large ghost regions, reduce_ghosts can be done in a single step
+            // since we're always reducing the full ghost region.
+
+            // Send LEFT ghost to LEFT neighbor, receive from RIGHT neighbor
+            // (who is sending their LEFT ghost, same size as ours)
+            if (nb_ghosts_left > 0) {
+                this->cart_comm->sendrecv_left_accumulate(
+                    direction,
+                    block_stride,
+                    nb_blocks,
+                    // Send from LEFT ghost region
+                    nb_ghosts_left * block_len,
+                    0,  // Start of left ghost (always at 0)
+                    // Receive into RIGHT interior edge
+                    nb_blocks,
+                    nb_ghosts_left * block_len,
+                    nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts -
+                        nb_ghosts_left,
+                    data,
+                    block_len,
+                    element_size, mpi_type_ptr,
+                    is_device_memory);
+            }
+
+            // Send RIGHT ghost to RIGHT neighbor, receive from LEFT neighbor
+            // (who is sending their RIGHT ghost, same size as ours)
+            if (nb_ghosts_right > 0) {
+                this->cart_comm->sendrecv_right_accumulate(
+                    direction,
+                    block_stride,
+                    nb_blocks,
+                    // Send from RIGHT ghost region
+                    nb_ghosts_right * block_len,
+                    nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts,
+                    // Receive into LEFT interior edge
+                    nb_blocks,
+                    nb_ghosts_right * block_len,
+                    nb_ghosts_left,
+                    data,
+                    block_len,
+                    element_size, mpi_type_ptr,
+                    is_device_memory);
+            }
+
+            // Zero out the ghost buffers after reduction
+            // Left ghost region
+            for (Index_t block{0}; block < nb_blocks; ++block) {
+                for (Index_t slice{0}; slice < nb_ghosts_left; ++slice) {
+                    auto offset{block * block_stride + slice * block_len};
+                    if (is_device_memory) {
+#if defined(MUGRID_ENABLE_CUDA)
+                        cudaMemset(data + offset * element_size, 0,
+                                   block_len * element_size);
+#elif defined(MUGRID_ENABLE_HIP)
+                        hipMemset(data + offset * element_size, 0,
+                                  block_len * element_size);
+#endif
+                    } else {
+                        std::memset(data + offset * element_size, 0,
+                                    block_len * element_size);
+                    }
+                }
+            }
+
+            // Right ghost region
+            auto right_ghost_start{nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts};
+            for (Index_t block{0}; block < nb_blocks; ++block) {
+                for (Index_t slice{0}; slice < nb_ghosts_right; ++slice) {
+                    auto offset{block * block_stride +
+                                (right_ghost_start + slice) * block_len};
+                    if (is_device_memory) {
+#if defined(MUGRID_ENABLE_CUDA)
+                        cudaMemset(data + offset * element_size, 0,
+                                   block_len * element_size);
+#elif defined(MUGRID_ENABLE_HIP)
+                        hipMemset(data + offset * element_size, 0,
+                                  block_len * element_size);
+#endif
+                    } else {
+                        std::memset(data + offset * element_size, 0,
+                                    block_len * element_size);
+                    }
+                }
+            }
+        }
+    }
+
+    void CartesianDecomposition::reduce_ghosts(
+        const std::string & field_name) const {
+        this->reduce_ghosts(this->collection.get_field(field_name));
     }
 
     GlobalFieldCollection & CartesianDecomposition::get_collection() {

@@ -252,11 +252,15 @@ namespace muGrid {
 
         /**
          * @brief Validate that fields are compatible with this operator.
+         * @param nodal_field Input field at nodal points
+         * @param gradient_field Output field at gradient/quadrature points
+         * @param nb_components Output: number of components in nodal field
          * @throws RuntimeError if validation fails
          */
         const GlobalFieldCollection& validate_fields(
             const Field &nodal_field,
-            const Field &gradient_field) const;
+            const Field &gradient_field,
+            Index_t &nb_components) const;
 
         /**
          * @brief Internal implementation of apply with optional increment.

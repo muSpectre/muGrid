@@ -186,25 +186,26 @@ grid_spacing = domain_size / np.array(args.nb_grid_pts)
 # Number of Voigt components
 nb_voigt = 3  # 2D: xx, yy, xy
 
-# Note: For serial execution, we use GlobalFieldCollection with right-only ghosts.
+# Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
-# For MPI parallel execution, additional ghost communication would be needed.
-if comm.size > 1:
-    raise NotImplementedError(
-        "MPI parallel homogenization not yet supported. "
-        "Please run with a single process."
-    )
-
-# Create field collection with right ghosts only (for FEM stencil)
-fc = muGrid.GlobalFieldCollection(
+# CartesianDecomposition handles ghost communication for both serial and MPI parallel execution.
+#
+# We use ghosts on BOTH sides (left and right). This approach means:
+# - Ghost elements on the left boundary provide contributions to interior nodes directly
+# - Ghost elements on the right boundary provide contributions to interior nodes directly
+# - No ghost reduction is needed since interior nodes receive all contributions directly
+# - The trade-off is slightly more memory and computation in ghost regions
+decomposition = muGrid.CartesianDecomposition(
+    comm,
     args.nb_grid_pts,
-    sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
+    nb_subdivisions=(1,) * dim,  # Serial execution: single subdivision
+    nb_ghosts_left=(1,) * dim,
     nb_ghosts_right=(1,) * dim,
+    nb_sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
 )
 
 # Get local grid dimensions
-local_shape = args.nb_grid_pts
-nx, ny = local_shape
+nx, ny = args.nb_grid_pts
 
 # Get coordinates for microstructure generation
 x = np.linspace(0, 1, args.nb_grid_pts[0], endpoint=False) + 0.5 / args.nb_grid_pts[0]
@@ -237,18 +238,20 @@ if comm.rank == 0 and not args.quiet:
     print(f"Inclusion volume fraction: {np.mean(phase):.4f}")
     print()
 
-# Create muGrid fields for gradient operations
-# These are scalar fields (one component at a time)
-u_nodal = fc.real_field("u_nodal", nb_nodes)
-grad_u = fc.real_field("grad_u", dim, "quad")
-f_nodal = fc.real_field("f_nodal", nb_nodes)
-stress_field = fc.real_field("stress_field", dim, "quad")
+# Create muGrid fields for gradient operations.
+# The FEM gradient operator now supports multi-component fields:
+# - Input: vector field with (dim,) components -> shape (dim, sub_pts, pixels)
+# - Output: tensor field with (dim, dim) components at quad pts
+#   (dim input components × dim operators)
+#
+# Tensor fields for gradient/stress at quadrature points:
+grad_u = decomposition.real_field("grad_u", (dim, dim), "quad")  # displacement gradient tensor
+stress_field = decomposition.real_field("stress_field", (dim, dim), "quad")  # stress tensor
 
-# Create fields for CG solver (displacement and force vectors)
-# Shape: [dim, nb_nodes, nx, ny] flattened to single field with dim*nb_nodes components
-u_field = fc.real_field("u_field", dim * nb_nodes)
-f_field = fc.real_field("f_field", dim * nb_nodes)
-rhs_field = fc.real_field("rhs_field", dim * nb_nodes)
+# Vector fields for CG solver (displacement and force vectors)
+u_field = decomposition.real_field("u_field", (dim,))
+f_field = decomposition.real_field("f_field", (dim,))
+rhs_field = decomposition.real_field("rhs_field", (dim,))
 
 # Material stiffness at each quadrature point [voigt, voigt, quad, nx, ny]
 C_field = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
@@ -257,39 +260,46 @@ for q in range(nb_quad):
         for j in range(nb_voigt):
             C_field[i, j, q] = C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
 
-# Temporary arrays for strain and stress [dim, dim, quad, nx, ny]
-strain_arr = np.zeros((dim, dim, nb_quad, nx, ny))
-stress_arr = np.zeros((dim, dim, nb_quad, nx, ny))
 
-
-def compute_strain(u_arr, strain):
+def compute_strain(u_vec, strain_out):
     """
-    Compute strain from displacement array.
-    u_arr has shape [dim, nb_nodes, nx, ny]
-    strain has shape [dim, dim, nb_quad, nx, ny]
+    Compute strain from displacement field.
+
+    The gradient operator directly handles vector input:
+    - Input: vector field u with (dim,) components
+    - Output: tensor field ∂u_i/∂x_j with (dim, dim) components
+    - Strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
+
+    Parameters
+    ----------
+    u_vec : Field
+        Vector displacement field with shape (dim, nb_nodes, pixels)
+    strain_out : ndarray
+        Output strain array with shape (dim, dim, quad, pixels)
     """
-    strain[...] = 0.0
+    # Fill ghost values for periodic BC
+    decomposition.communicate_ghosts(u_vec)
 
-    for i in range(dim):
-        # Copy displacement component to muGrid field
-        u_nodal.p[...] = u_arr[i, ...]
+    # Compute gradient tensor: grad_u.s[i, j, ...] = ∂u_i/∂x_j
+    gradient_op.apply(u_vec, grad_u)
 
-        # Set up ghost values (periodic BC via wrap)
-        u_nodal.pg[...] = np.pad(u_nodal.p, ((0, 0), (0, 1), (0, 1)), mode="wrap")
-
-        # Compute gradient of u_i
-        gradient_op.apply(u_nodal, grad_u)
-
-        # Add to strain (symmetric part)
-        for j in range(dim):
-            strain[i, j, ...] += 0.5 * grad_u.s[j, ...]
-            if i != j:
-                strain[j, i, ...] += 0.5 * grad_u.s[j, ...]
+    # Compute symmetric strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
+    grad = grad_u.s
+    strain_out[...] = 0.5 * (grad + grad.swapaxes(0, 1))
 
 
 def compute_stress(strain, stress, C):
     """
     Compute stress from strain using Voigt notation.
+
+    Parameters
+    ----------
+    strain : ndarray
+        Strain tensor with shape (dim, dim, quad, pixels)
+    stress : ndarray
+        Output stress tensor with shape (dim, dim, quad, pixels)
+    C : ndarray
+        Material stiffness in Voigt notation (nb_voigt, nb_voigt, quad, pixels)
     """
     # Convert strain to Voigt: [voigt, quad, nx, ny]
     eps_voigt = np.zeros((nb_voigt, nb_quad, nx, ny))
@@ -307,51 +317,41 @@ def compute_stress(strain, stress, C):
     stress[1, 0, ...] = sig_voigt[2, ...]  # syx
 
 
-def reduce_ghosts(field):
+def compute_divergence(stress, f_vec):
     """
-    Add ghost contributions back to the main domain for periodic BC.
+    Compute divergence of stress tensor.
 
-    For periodic boundary conditions, the transpose operation writes
-    contributions to the ghost region that need to be accumulated back
-    to the corresponding nodes in the main domain.
+    The transpose of the gradient operator directly handles tensor input:
+    - Input: stress tensor with (dim, dim) components
+    - Output: force vector with (dim,) components
+    - f_i = Σ_j ∂σ_ij/∂x_j (divergence of stress)
+
+    With two-sided ghosts:
+    1. We fill ghost pixel stresses via communicate_ghosts (periodic copies)
+    2. The transpose reads stress from ALL pixels (interior + ghost)
+    3. Ghost elements contribute directly to interior nodes
+    4. No ghost reduction needed
+
+    Parameters
+    ----------
+    stress : ndarray
+        Stress tensor with shape (dim, dim, quad, pixels)
+    f_vec : Field
+        Output vector force field with shape (dim, nb_nodes, pixels)
     """
-    # field.pg has shape [nb_sub, nx+nb_ghosts, ny+nb_ghosts]
-    # Ghost at [:, nx:, :ny] should add to [:, 0:nb_ghosts, :]
-    # Ghost at [:, :nx, ny:] should add to [:, :, 0:nb_ghosts]
-    nb_ghosts_x = field.pg.shape[-2] - field.p.shape[-2]
-    nb_ghosts_y = field.pg.shape[-1] - field.p.shape[-1]
-    local_nx = field.p.shape[-2]
-    local_ny = field.p.shape[-1]
+    # Copy stress to field and fill ghost values
+    stress_field.s[...] = stress
+    decomposition.communicate_ghosts(stress_field)
 
-    # Add right ghost to left
-    field.p[..., :nb_ghosts_x, :] += field.pg[..., local_nx:, :local_ny]
-    # Add top ghost to bottom
-    field.p[..., :, :nb_ghosts_y] += field.pg[..., :local_nx, local_ny:]
-    # Add corner ghost
-    field.p[..., :nb_ghosts_x, :nb_ghosts_y] += field.pg[..., local_nx:, local_ny:]
+    # Apply transpose (divergence) with quadrature weights
+    # The transpose sums over operators (j direction) for each input component (i)
+    f_vec.pg[...] = 0.0
+    gradient_op.transpose(stress_field, f_vec, list(quad_weights))
 
 
-def compute_divergence(stress, f_arr):
-    """
-    Compute divergence of stress.
-    f_arr has shape [dim, nb_nodes, nx, ny]
-    """
-    f_arr[...] = 0.0
-
-    for i in range(dim):
-        # Prepare stress row for divergence: sigma_i: = [sigma_ix, sigma_iy]
-        for j in range(dim):
-            stress_field.s[j, ...] = stress[i, j, ...]
-
-        # Apply transpose (divergence) with quadrature weights
-        f_nodal.pg[...] = 0.0  # Clear including ghosts
-        gradient_op.transpose(stress_field, f_nodal, list(quad_weights))
-
-        # Reduce ghost contributions for periodic BC
-        reduce_ghosts(f_nodal)
-
-        # Copy result
-        f_arr[i, ...] = f_nodal.p[...]
+# Temporary arrays for strain and stress [dim, dim, quad, nx, ny]
+strain_arr = np.zeros((dim, dim, nb_quad, nx, ny))
+stress_arr = np.zeros((dim, dim, nb_quad, nx, ny))
 
 
 def apply_stiffness(u_in, f_out):
@@ -361,22 +361,18 @@ def apply_stiffness(u_in, f_out):
     Parameters
     ----------
     u_in : Field
-        Input displacement field with dim*nb_nodes components
+        Input displacement field with (dim, nb_nodes) components
     f_out : Field
-        Output force field with dim*nb_nodes components (modified in place)
+        Output force field with (dim, nb_nodes) components (modified in place)
     """
-    # Get array views with shape [dim*nb_nodes, nx, ny]
-    u_arr = u_in.s.reshape(dim, nb_nodes, nx, ny)
-    f_arr = f_out.s.reshape(dim, nb_nodes, nx, ny)
-
     # Compute strain eps = B * u
-    compute_strain(u_arr, strain_arr)
+    compute_strain(u_in, strain_arr)
 
     # Compute stress sig = C : eps
     compute_stress(strain_arr, stress_arr, C_field)
 
     # Compute force f = B^T * sig
-    compute_divergence(stress_arr, f_arr)
+    compute_divergence(stress_arr, f_out)
 
 
 def compute_rhs(E_macro, rhs_out):
@@ -401,9 +397,8 @@ def compute_rhs(E_macro, rhs_out):
     compute_stress(eps_macro, sig_macro, C_field)
 
     # Compute divergence (with negative sign for RHS)
-    f_arr = rhs_out.s.reshape(dim, nb_nodes, nx, ny)
-    compute_divergence(sig_macro, f_arr)
-    f_arr *= -1.0
+    compute_divergence(sig_macro, rhs_out)
+    rhs_out.s[...] *= -1.0
 
 
 # Storage for homogenized stiffness
@@ -453,7 +448,7 @@ for case_idx, (i, j) in enumerate(strain_cases):
     try:
         conjugate_gradients(
             comm,
-            fc,
+            decomposition,
             apply_stiffness,
             rhs_field,
             u_field,
@@ -474,11 +469,10 @@ for case_idx, (i, j) in enumerate(strain_cases):
         else:
             print(f"  CG did not converge after {args.maxiter} iterations")
 
-    # Get displacement array from field
-    u_arr = u_field.s.reshape(dim, nb_nodes, nx, ny)
+    # Compute strain from solution
+    compute_strain(u_field, strain_arr)
 
-    # Compute total strain = E_macro + eps(u)
-    compute_strain(u_arr, strain_arr)
+    # Add macroscopic strain to get total strain
     for ii in range(dim):
         for jj in range(dim):
             strain_arr[ii, jj, ...] += E_macro[ii, jj]
@@ -565,8 +559,7 @@ if args.plot and comm.rank == 0:
 
         # Displacement magnitude from last load case
         ax = axes[2]
-        u_arr_plot = u_field.s.reshape(dim, nb_nodes, nx, ny)
-        u_mag = np.sqrt(u_arr_plot[0, 0, ...] ** 2 + u_arr_plot[1, 0, ...] ** 2)
+        u_mag = np.sqrt(u_field.s[0, 0, ...] ** 2 + u_field.s[1, 0, ...] ** 2)
         im = ax.imshow(u_mag.T, origin="lower", cmap="viridis")
         ax.set_title("|u| (last load case)")
         plt.colorbar(im, ax=ax)

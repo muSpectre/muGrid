@@ -131,7 +131,8 @@ namespace muGrid {
 
     const GlobalFieldCollection& FEMGradientOperator::validate_fields(
         const Field &nodal_field,
-        const Field &gradient_field) const {
+        const Field &gradient_field,
+        Index_t &nb_components) const {
 
         // Get field collections
         auto& nodal_collection = nodal_field.get_collection();
@@ -158,6 +159,23 @@ namespace muGrid {
                 std::to_string(this->spatial_dim) + ")");
         }
 
+        // Get and validate component counts
+        // Output should have nb_operators * nb_nodal_components components
+        Index_t nb_nodal_components = nodal_field.get_nb_components();
+        Index_t nb_grad_components = gradient_field.get_nb_components();
+        Index_t expected_grad_components = this->get_nb_operators() * nb_nodal_components;
+
+        if (nb_grad_components != expected_grad_components) {
+            std::stringstream err_msg;
+            err_msg << "Component mismatch: Expected gradient field with "
+                    << expected_grad_components << " components ("
+                    << this->get_nb_operators() << " operators × "
+                    << nb_nodal_components << " nodal components) but got "
+                    << nb_grad_components << " components.";
+            throw RuntimeError(err_msg.str());
+        }
+
+        nb_components = nb_nodal_components;
         return *global_fc;
     }
 
@@ -181,7 +199,9 @@ namespace muGrid {
                                           TypedFieldBase<Real> &gradient_field,
                                           Real alpha,
                                           bool increment) const {
-        const auto& collection = this->validate_fields(nodal_field, gradient_field);
+        Index_t nb_components;
+        const auto& collection = this->validate_fields(nodal_field, gradient_field,
+                                                        nb_components);
 
         // Get grid dimensions (with ghosts)
         auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
@@ -198,58 +218,76 @@ namespace muGrid {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
 
-            // For continuous FEM, the nodal field has one scalar per grid point:
-            // shape [1, nx, ny] where the first axis has size 1 (or just [nx, ny])
-            // Neighbor values are accessed via ghost communication.
-            // nodal_stride_n: stride between sub-points (1 since we have 1 value)
-            // nodal_stride_x: stride to move one grid point in x direction
-            // nodal_stride_y: stride to move one grid point in y direction
+            // For continuous FEM, the nodal field has shape [components, sub_pts, nx, ny]
+            // Field layout (column-major/AoS): components vary FASTEST, then sub_pts,
+            // then spatial dimensions.
             Index_t nb_sub = this->get_nb_nodal_pts();  // 1 (one scalar per grid point)
-            Index_t nodal_stride_n = 1;
-            Index_t nodal_stride_x = nb_sub;  // Move to next grid point in x
-            Index_t nodal_stride_y = nb_sub * nx;  // Move to next grid point in y
+            Index_t nodal_stride_c = 1;  // components are innermost
+            Index_t nodal_stride_n = nb_components;
+            Index_t nodal_stride_x = nb_components * nb_sub;
+            Index_t nodal_stride_y = nb_components * nb_sub * nx;
 
-            // For gradient field [dim, nb_quad, x, y]:
-            Index_t dim = this->spatial_dim;  // 2
+            // For gradient field [components, operators, nb_quad, x, y]:
+            // Column-major (AoS): components vary fastest, then operators, then quad,
+            // then spatial dimensions.
+            Index_t dim = this->spatial_dim;  // 2 (operators = derivative directions)
             Index_t nb_quad = this->get_nb_quad_pts();  // 2
-            Index_t grad_stride_d = 1;
-            Index_t grad_stride_q = dim;
-            Index_t grad_stride_x = dim * nb_quad;
-            Index_t grad_stride_y = dim * nb_quad * nx;
+            Index_t grad_stride_c = 1;  // components are innermost
+            Index_t grad_stride_d = nb_components;  // operators after components
+            Index_t grad_stride_q = nb_components * dim;  // quad after components*operators
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
 
-            fem_gradient_kernels::fem_gradient_2d_host(
-                nodal, gradient, nx, ny,
-                nodal_stride_x, nodal_stride_y, nodal_stride_n,
-                grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
-                hx, hy, alpha, increment);
+            // Process each component independently
+            // Each component's data is interleaved, offset by just comp (not comp * stride)
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* nodal_comp = nodal + comp * nodal_stride_c;
+                Real* gradient_comp = gradient + comp * grad_stride_c;
+
+                fem_gradient_kernels::fem_gradient_2d_host(
+                    nodal_comp, gradient_comp, nx, ny,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_n,
+                    grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
+                    hx, hy, alpha, increment);
+            }
         } else {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
             Real hz = this->grid_spacing[2];
 
-            // For continuous FEM, nodal field has one scalar per grid point [1, x, y, z]:
+            // Nodal field strides [components, sub_pts, x, y, z]
+            // Column-major (AoS): components vary fastest
             Index_t nb_sub = this->get_nb_nodal_pts();  // 1
-            Index_t nodal_stride_n = 1;
-            Index_t nodal_stride_x = nb_sub;
-            Index_t nodal_stride_y = nb_sub * nx;
-            Index_t nodal_stride_z = nb_sub * nx * ny;
+            Index_t nodal_stride_c = 1;
+            Index_t nodal_stride_n = nb_components;
+            Index_t nodal_stride_x = nb_components * nb_sub;
+            Index_t nodal_stride_y = nb_components * nb_sub * nx;
+            Index_t nodal_stride_z = nb_components * nb_sub * nx * ny;
 
-            // For gradient field [dim, nb_quad, x, y, z]:
+            // Gradient field strides [components, operators, nb_quad, x, y, z]
+            // Column-major (AoS): components vary fastest
             Index_t dim = this->spatial_dim;  // 3
             Index_t nb_quad = this->get_nb_quad_pts();  // 5
-            Index_t grad_stride_d = 1;
-            Index_t grad_stride_q = dim;
-            Index_t grad_stride_x = dim * nb_quad;
-            Index_t grad_stride_y = dim * nb_quad * nx;
-            Index_t grad_stride_z = dim * nb_quad * nx * ny;
+            Index_t grad_stride_c = 1;
+            Index_t grad_stride_d = nb_components;
+            Index_t grad_stride_q = nb_components * dim;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
+            Index_t grad_stride_z = nb_components * dim * nb_quad * nx * ny;
 
-            fem_gradient_kernels::fem_gradient_3d_host(
-                nodal, gradient, nx, ny, nz,
-                nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
-                grad_stride_x, grad_stride_y, grad_stride_z,
-                grad_stride_q, grad_stride_d,
-                hx, hy, hz, alpha, increment);
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* nodal_comp = nodal + comp * nodal_stride_c;
+                Real* gradient_comp = gradient + comp * grad_stride_c;
+
+                fem_gradient_kernels::fem_gradient_3d_host(
+                    nodal_comp, gradient_comp, nx, ny, nz,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
+                    grad_stride_x, grad_stride_y, grad_stride_z,
+                    grad_stride_q, grad_stride_d,
+                    hx, hy, hz, alpha, increment);
+            }
         }
     }
 
@@ -260,7 +298,9 @@ namespace muGrid {
         bool increment,
         const std::vector<Real> &weights) const {
 
-        const auto& collection = this->validate_fields(nodal_field, gradient_field);
+        Index_t nb_components;
+        const auto& collection = this->validate_fields(nodal_field, gradient_field,
+                                                        nb_components);
 
         // Get grid dimensions
         auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
@@ -281,49 +321,73 @@ namespace muGrid {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
 
+            // Nodal field strides [components, sub_pts, x, y]
+            // Column-major (AoS): components vary fastest
             Index_t nb_nodes = this->get_nb_nodal_pts();
-            Index_t nodal_stride_n = 1;
-            Index_t nodal_stride_x = nb_nodes;
-            Index_t nodal_stride_y = nb_nodes * nx;
+            Index_t nodal_stride_c = 1;
+            Index_t nodal_stride_n = nb_components;
+            Index_t nodal_stride_x = nb_components * nb_nodes;
+            Index_t nodal_stride_y = nb_components * nb_nodes * nx;
 
+            // Gradient field strides [components, operators, nb_quad, x, y]
+            // Column-major (AoS): components vary fastest
             Index_t dim = this->spatial_dim;
             Index_t nb_quad = this->get_nb_quad_pts();
-            Index_t grad_stride_d = 1;
-            Index_t grad_stride_q = dim;
-            Index_t grad_stride_x = dim * nb_quad;
-            Index_t grad_stride_y = dim * nb_quad * nx;
+            Index_t grad_stride_c = 1;
+            Index_t grad_stride_d = nb_components;
+            Index_t grad_stride_q = nb_components * dim;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
 
-            fem_gradient_kernels::fem_divergence_2d_host(
-                gradient, nodal, nx, ny,
-                grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
-                nodal_stride_x, nodal_stride_y, nodal_stride_n,
-                hx, hy, quad_weights.data(), alpha, increment);
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* gradient_comp = gradient + comp * grad_stride_c;
+                Real* nodal_comp = nodal + comp * nodal_stride_c;
+
+                fem_gradient_kernels::fem_divergence_2d_host(
+                    gradient_comp, nodal_comp, nx, ny,
+                    grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_n,
+                    hx, hy, quad_weights.data(), alpha, increment);
+            }
         } else {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
             Real hz = this->grid_spacing[2];
 
+            // Nodal field strides [components, sub_pts, x, y, z]
+            // Column-major (AoS): components vary fastest
             Index_t nb_nodes = this->get_nb_nodal_pts();
-            Index_t nodal_stride_n = 1;
-            Index_t nodal_stride_x = nb_nodes;
-            Index_t nodal_stride_y = nb_nodes * nx;
-            Index_t nodal_stride_z = nb_nodes * nx * ny;
+            Index_t nodal_stride_c = 1;
+            Index_t nodal_stride_n = nb_components;
+            Index_t nodal_stride_x = nb_components * nb_nodes;
+            Index_t nodal_stride_y = nb_components * nb_nodes * nx;
+            Index_t nodal_stride_z = nb_components * nb_nodes * nx * ny;
 
+            // Gradient field strides [components, operators, nb_quad, x, y, z]
+            // Column-major (AoS): components vary fastest
             Index_t dim = this->spatial_dim;
             Index_t nb_quad = this->get_nb_quad_pts();
-            Index_t grad_stride_d = 1;
-            Index_t grad_stride_q = dim;
-            Index_t grad_stride_x = dim * nb_quad;
-            Index_t grad_stride_y = dim * nb_quad * nx;
-            Index_t grad_stride_z = dim * nb_quad * nx * ny;
+            Index_t grad_stride_c = 1;
+            Index_t grad_stride_d = nb_components;
+            Index_t grad_stride_q = nb_components * dim;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
+            Index_t grad_stride_z = nb_components * dim * nb_quad * nx * ny;
 
-            fem_gradient_kernels::fem_divergence_3d_host(
-                gradient, nodal, nx, ny, nz,
-                grad_stride_x, grad_stride_y, grad_stride_z,
-                grad_stride_q, grad_stride_d,
-                nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
-                hx, hy, hz, quad_weights.data(), alpha, increment);
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* gradient_comp = gradient + comp * grad_stride_c;
+                Real* nodal_comp = nodal + comp * nodal_stride_c;
+
+                fem_gradient_kernels::fem_divergence_3d_host(
+                    gradient_comp, nodal_comp, nx, ny, nz,
+                    grad_stride_x, grad_stride_y, grad_stride_z,
+                    grad_stride_q, grad_stride_d,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
+                    hx, hy, hz, quad_weights.data(), alpha, increment);
+            }
         }
     }
 
@@ -359,7 +423,9 @@ namespace muGrid {
         TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field,
         Real alpha,
         bool increment) const {
-        const auto& collection = this->validate_fields(nodal_field, gradient_field);
+        Index_t nb_components;
+        const auto& collection = this->validate_fields(nodal_field, gradient_field,
+                                                        nb_components);
 
         // Get grid dimensions (with ghosts)
         auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
@@ -379,43 +445,52 @@ namespace muGrid {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
 
-            // For SoA: nodal field [1, x, y] -> spatial first
+            // For SoA: nodal field [components, sub_pts, x, y]
+            // Memory: x fastest, then y, then sub_pts, then components
             Index_t nodal_stride_x = 1;
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_n = nx * ny;
+            Index_t nodal_stride_c = nx * ny * this->get_nb_nodal_pts();
 
-            // For SoA: gradient field [dim, nb_quad, x, y]
-            // Memory layout: x varies fastest, then y, then q, then d
+            // For SoA: gradient field [components, operators, nb_quad, x, y]
+            // Memory: x fastest, then y, then q, then operators, then components
             Index_t dim = this->spatial_dim;
             Index_t nb_quad = this->get_nb_quad_pts();
             Index_t grad_stride_x = 1;
             Index_t grad_stride_y = nx;
             Index_t grad_stride_q = nx * ny;
             Index_t grad_stride_d = nx * ny * nb_quad;
+            Index_t grad_stride_c = nx * ny * nb_quad * dim;
+
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* nodal_comp = nodal + comp * nodal_stride_c;
+                Real* gradient_comp = gradient + comp * grad_stride_c;
 
 #if defined(MUGRID_ENABLE_CUDA)
-            fem_gradient_kernels::fem_gradient_2d_cuda(
+                fem_gradient_kernels::fem_gradient_2d_cuda(
 #elif defined(MUGRID_ENABLE_HIP)
-            fem_gradient_kernels::fem_gradient_2d_hip(
+                fem_gradient_kernels::fem_gradient_2d_hip(
 #endif
-                nodal, gradient, nx, ny,
-                nodal_stride_x, nodal_stride_y, nodal_stride_n,
-                grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
-                hx, hy, alpha, increment);
+                    nodal_comp, gradient_comp, nx, ny,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_n,
+                    grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
+                    hx, hy, alpha, increment);
+            }
         } else {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
             Real hz = this->grid_spacing[2];
 
-            // For SoA: nodal field [1, x, y, z] -> spatial first
+            // For SoA: nodal field [components, sub_pts, x, y, z]
             Index_t nodal_stride_x = 1;
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_z = nx * ny;
             Index_t nodal_stride_n = nx * ny * nz;
+            Index_t nodal_stride_c = nx * ny * nz * this->get_nb_nodal_pts();
 
-            // For SoA: gradient field [dim, nb_quad, x, y, z]
-            // Memory layout: x varies fastest, then y, then z, then q, then d
+            // For SoA: gradient field [components, operators, nb_quad, x, y, z]
             Index_t dim = this->spatial_dim;
             Index_t nb_quad = this->get_nb_quad_pts();
             Index_t grad_stride_x = 1;
@@ -423,17 +498,24 @@ namespace muGrid {
             Index_t grad_stride_z = nx * ny;
             Index_t grad_stride_q = nx * ny * nz;
             Index_t grad_stride_d = nx * ny * nz * nb_quad;
+            Index_t grad_stride_c = nx * ny * nz * nb_quad * dim;
+
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* nodal_comp = nodal + comp * nodal_stride_c;
+                Real* gradient_comp = gradient + comp * grad_stride_c;
 
 #if defined(MUGRID_ENABLE_CUDA)
-            fem_gradient_kernels::fem_gradient_3d_cuda(
+                fem_gradient_kernels::fem_gradient_3d_cuda(
 #elif defined(MUGRID_ENABLE_HIP)
-            fem_gradient_kernels::fem_gradient_3d_hip(
+                fem_gradient_kernels::fem_gradient_3d_hip(
 #endif
-                nodal, gradient, nx, ny, nz,
-                nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
-                grad_stride_x, grad_stride_y, grad_stride_z,
-                grad_stride_q, grad_stride_d,
-                hx, hy, hz, alpha, increment);
+                    nodal_comp, gradient_comp, nx, ny, nz,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
+                    grad_stride_x, grad_stride_y, grad_stride_z,
+                    grad_stride_q, grad_stride_d,
+                    hx, hy, hz, alpha, increment);
+            }
         }
     }
 
@@ -443,7 +525,9 @@ namespace muGrid {
         Real alpha,
         bool increment,
         const std::vector<Real> &weights) const {
-        const auto& collection = this->validate_fields(nodal_field, gradient_field);
+        Index_t nb_components;
+        const auto& collection = this->validate_fields(nodal_field, gradient_field,
+                                                        nb_components);
 
         // Get grid dimensions
         auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
@@ -467,43 +551,50 @@ namespace muGrid {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
 
-            // For SoA: nodal field [1, x, y] -> spatial first
+            // For SoA: nodal field [components, sub_pts, x, y]
             Index_t nodal_stride_x = 1;
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_n = nx * ny;
+            Index_t nodal_stride_c = nx * ny * this->get_nb_nodal_pts();
 
-            // For SoA: gradient field [dim, nb_quad, x, y]
-            // Memory layout: x varies fastest, then y, then q, then d
+            // For SoA: gradient field [components, operators, nb_quad, x, y]
             Index_t dim = this->spatial_dim;
             Index_t nb_quad = this->get_nb_quad_pts();
             Index_t grad_stride_x = 1;
             Index_t grad_stride_y = nx;
             Index_t grad_stride_q = nx * ny;
             Index_t grad_stride_d = nx * ny * nb_quad;
+            Index_t grad_stride_c = nx * ny * nb_quad * dim;
+
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* gradient_comp = gradient + comp * grad_stride_c;
+                Real* nodal_comp = nodal + comp * nodal_stride_c;
 
 #if defined(MUGRID_ENABLE_CUDA)
-            fem_gradient_kernels::fem_divergence_2d_cuda(
+                fem_gradient_kernels::fem_divergence_2d_cuda(
 #elif defined(MUGRID_ENABLE_HIP)
-            fem_gradient_kernels::fem_divergence_2d_hip(
+                fem_gradient_kernels::fem_divergence_2d_hip(
 #endif
-                gradient, nodal, nx, ny,
-                grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
-                nodal_stride_x, nodal_stride_y, nodal_stride_n,
-                hx, hy, quad_weights.data(), alpha, increment);
+                    gradient_comp, nodal_comp, nx, ny,
+                    grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_n,
+                    hx, hy, quad_weights.data(), alpha, increment);
+            }
         } else {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
             Real hz = this->grid_spacing[2];
 
-            // For SoA: nodal field [1, x, y, z] -> spatial first
+            // For SoA: nodal field [components, sub_pts, x, y, z]
             Index_t nodal_stride_x = 1;
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_z = nx * ny;
             Index_t nodal_stride_n = nx * ny * nz;
+            Index_t nodal_stride_c = nx * ny * nz * this->get_nb_nodal_pts();
 
-            // For SoA: gradient field [dim, nb_quad, x, y, z]
-            // Memory layout: x varies fastest, then y, then z, then q, then d
+            // For SoA: gradient field [components, operators, nb_quad, x, y, z]
             Index_t dim = this->spatial_dim;
             Index_t nb_quad = this->get_nb_quad_pts();
             Index_t grad_stride_x = 1;
@@ -511,26 +602,36 @@ namespace muGrid {
             Index_t grad_stride_z = nx * ny;
             Index_t grad_stride_q = nx * ny * nz;
             Index_t grad_stride_d = nx * ny * nz * nb_quad;
+            Index_t grad_stride_c = nx * ny * nz * nb_quad * dim;
 
-            // For 3D, we need to pass quad_weights to the kernel
-            // Allocate device memory for weights
+            // Allocate device memory for weights (once, shared by all components)
             Real* d_quad_weights = nullptr;
 #if defined(MUGRID_ENABLE_CUDA)
             cudaMalloc(&d_quad_weights, quad_weights.size() * sizeof(Real));
             cudaMemcpy(d_quad_weights, quad_weights.data(),
                        quad_weights.size() * sizeof(Real), cudaMemcpyHostToDevice);
-            fem_gradient_kernels::fem_divergence_3d_cuda(
 #elif defined(MUGRID_ENABLE_HIP)
             hipMalloc(&d_quad_weights, quad_weights.size() * sizeof(Real));
             hipMemcpy(d_quad_weights, quad_weights.data(),
                       quad_weights.size() * sizeof(Real), hipMemcpyHostToDevice);
-            fem_gradient_kernels::fem_divergence_3d_hip(
 #endif
-                gradient, nodal, nx, ny, nz,
-                grad_stride_x, grad_stride_y, grad_stride_z,
-                grad_stride_q, grad_stride_d,
-                nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
-                hx, hy, hz, d_quad_weights, alpha, increment);
+
+            // Process each component independently
+            for (Index_t comp = 0; comp < nb_components; ++comp) {
+                const Real* gradient_comp = gradient + comp * grad_stride_c;
+                Real* nodal_comp = nodal + comp * nodal_stride_c;
+
+#if defined(MUGRID_ENABLE_CUDA)
+                fem_gradient_kernels::fem_divergence_3d_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+                fem_gradient_kernels::fem_divergence_3d_hip(
+#endif
+                    gradient_comp, nodal_comp, nx, ny, nz,
+                    grad_stride_x, grad_stride_y, grad_stride_z,
+                    grad_stride_q, grad_stride_d,
+                    nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
+                    hx, hy, hz, d_quad_weights, alpha, increment);
+            }
 
             // Free device weights
 #if defined(MUGRID_ENABLE_CUDA)
