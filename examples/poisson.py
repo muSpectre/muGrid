@@ -168,7 +168,6 @@ rhs.p[...] -= arr.mean(rhs.p)
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
-nb_hessp_calls = 0
 
 # Create global timer for hierarchical timing
 # PAPI is only available on host (CPU), not on device (GPU)
@@ -193,9 +192,7 @@ def hessp(x, Ax):
     The Hessian is represented by the convolution operator.
     The scale factor (grid spacing and sign) is already folded into the operator.
     """
-    global nb_hessp_calls
     with timer("hessp"):
-        nb_hessp_calls += 1
         with timer("communicate_ghosts"):
             decomposition.communicate_ghosts(x)
         with timer("apply"):
@@ -226,6 +223,9 @@ with timer("conjugate_gradients"):
 elapsed_time = timer.get_time("conjugate_gradients")
 
 # Performance metrics calculations
+# Get number of hessp calls from timer
+nb_hessp_calls = timer.get_calls("hessp")
+
 # Memory throughput estimate for the convolution operation:
 # - Read: nb_stencil_pts values per grid point (stencil neighborhood)
 # - Write: 1 value per grid point

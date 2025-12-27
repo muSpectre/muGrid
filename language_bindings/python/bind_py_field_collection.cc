@@ -62,7 +62,29 @@ using pybind11::literals::operator""_a;
 namespace py = pybind11;
 
 void add_field_collection(py::module & mod) {
-    py::class_<FieldCollection> field_collection(mod, "FieldCollection");
+    py::class_<FieldCollection> field_collection(mod, "FieldCollection",
+        R"pbdoc(
+        Base class for managing collections of fields on structured grids.
+
+        A FieldCollection groups fields that share the same spatial discretization.
+        Each field can have different numbers of components and sub-points, but all
+        fields in a collection share the same pixel grid.
+
+        Fields are created using accessor methods like ``real_field()`` or
+        ``register_real_field()``. The difference is that accessor methods return
+        an existing field if one with the same name exists, while register methods
+        raise an exception if the field already exists.
+
+        There are two concrete implementations:
+
+        - ``GlobalFieldCollection``: Fields defined at all grid points
+        - ``LocalFieldCollection``: Fields defined at a subset of grid points
+
+        See Also
+        --------
+        GlobalFieldCollection : Collection for fields at all grid points
+        LocalFieldCollection : Collection for fields at selected grid points
+        )pbdoc");
     field_collection
         .def(
             "register_real_field",
@@ -470,7 +492,40 @@ void add_field_collection(py::module & mod) {
 void add_global_field_collection(py::module & mod) {
     using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<GlobalFieldCollection, FieldCollection>(mod,
-                                                       "GlobalFieldCollection")
+                                                       "GlobalFieldCollection",
+        R"pbdoc(
+        Field collection for fields defined at all grid points.
+
+        A GlobalFieldCollection manages fields on a structured Cartesian grid.
+        All fields in the collection share the same grid dimensions and can
+        optionally include ghost layers for domain decomposition in parallel
+        computations.
+
+        Parameters
+        ----------
+        nb_domain_grid_pts : list of int
+            Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
+        nb_subdomain_grid_pts : list of int, optional
+            Local subdomain dimensions (for MPI decomposition)
+        subdomain_locations : list of int, optional
+            Starting indices of the local subdomain in the global grid
+        sub_pts : dict, optional
+            Mapping of sub-point names to counts (e.g., {"quad": 4})
+        storage_order : StorageOrder, optional
+            Memory layout for field data (default: ColMajor)
+        nb_ghosts_left : list of int, optional
+            Ghost layers on low-index side of each dimension
+        nb_ghosts_right : list of int, optional
+            Ghost layers on high-index side of each dimension
+        memory_location : MemoryLocation, optional
+            Where to allocate field memory (Host or Device)
+
+        Examples
+        --------
+        >>> fc = GlobalFieldCollection([64, 64, 64])
+        >>> displacement = fc.real_field("displacement", (3,))
+        >>> stress = fc.real_field("stress", (3, 3), "quad")
+        )pbdoc")
         // Primary constructor: creates and initializes the collection
         // Following Python's "initialization is instantiation" idiom
         .def(py::init<const DynGridIndex &, const DynGridIndex &,
@@ -514,7 +569,36 @@ void add_global_field_collection(py::module & mod) {
 void add_local_field_collection(py::module & mod) {
     using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<LocalFieldCollection, FieldCollection> fc_local(
-        mod, "LocalFieldCollection");
+        mod, "LocalFieldCollection",
+        R"pbdoc(
+        Field collection for fields defined at a subset of grid points.
+
+        A LocalFieldCollection manages fields that only exist at selected pixels
+        rather than the entire grid. This is useful for material properties that
+        only apply to certain regions (e.g., inclusion properties in a composite).
+
+        Pixels must be added explicitly using ``add_pixel()`` before calling
+        ``initialise()``. After initialization, no new pixels can be added.
+
+        Parameters
+        ----------
+        spatial_dimension : int
+            Number of spatial dimensions (2 or 3)
+        name : str, optional
+            Name for this collection (for identification)
+        nb_sub_pts : dict, optional
+            Mapping of sub-point names to counts
+        memory_location : MemoryLocation, optional
+            Where to allocate field memory (Host or Device)
+
+        Examples
+        --------
+        >>> lfc = LocalFieldCollection(3, "inclusions")
+        >>> lfc.add_pixel(42)  # Add pixel at global index 42
+        >>> lfc.add_pixel(100)
+        >>> lfc.initialise()
+        >>> props = lfc.real_field("elastic_modulus", 1)
+        )pbdoc");
     fc_local
         .def(py::init<const Index_t &,
                       const muGrid::FieldCollection::SubPtMap_t &,

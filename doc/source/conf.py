@@ -35,12 +35,21 @@ import subprocess
 # ones.
 extensions = ['breathe',
               'sphinx.ext.autodoc',
+              'sphinx.ext.autosummary',
               'sphinx.ext.intersphinx',
               'sphinx.ext.todo',
               'sphinx.ext.coverage',
               'sphinx.ext.mathjax',
               'sphinx.ext.viewcode',
-              'sphinx.ext.ifconfig']
+              'sphinx.ext.ifconfig',
+              'sphinx.ext.napoleon']
+
+# Try to add sphinx-autodoc-typehints if available
+try:
+    import sphinx_autodoc_typehints
+    extensions.append('sphinx_autodoc_typehints')
+except ImportError:
+    pass
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 if os.environ.get('READTHEDOCS', None) is not None:
     print("${READTHEDOCS} = " + os.environ.get('READTHEDOCS', None))
@@ -204,6 +213,37 @@ epub_copyright = copyright
 epub_exclude_files = ['search.html']
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'python': ('https://docs.python.org/', None)}
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+}
 primary_domain = 'cpp'
 highlight_language = 'cpp'
+
+# -- Options for autodoc ---------------------------------------------------
+
+# Autodoc settings for Python API documentation
+autodoc_default_options = {
+    'members': True,
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True,
+    'show-inheritance': True,
+}
+
+# Don't sort members alphabetically
+autodoc_member_order = 'bysource'
+
+# Napoleon settings for Google/NumPy style docstrings
+napoleon_google_docstring = True
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = True
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = True
+napoleon_use_admonition_for_notes = True
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+napoleon_type_aliases = None
