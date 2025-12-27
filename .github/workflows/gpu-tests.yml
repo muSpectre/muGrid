@@ -3,23 +3,12 @@ name: GPU Tests
 on:
   push:
     branches:
-      - '**'
+      - main
     tags:
-      - '**'
+      - 'v*'
   pull_request:
     branches:
-      - '**'
-
-# TODO: When ready for production, replace the above with:
-# on:
-#   push:
-#     branches:
-#       - main
-#     tags:
-#       - 'v*'
-#   pull_request:
-#     branches:
-#       - main
+      - main
 
 jobs:
   gpu-tests:
