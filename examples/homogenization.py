@@ -186,20 +186,16 @@ grid_spacing = domain_size / np.array(args.nb_grid_pts)
 # Number of Voigt components
 nb_voigt = 3  # 2D: xx, yy, xy
 
-# Note: For serial execution, we use GlobalFieldCollection with right-only ghosts.
+# Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
-# For MPI parallel execution, additional ghost communication would be needed.
-if comm.size > 1:
-    raise NotImplementedError(
-        "MPI parallel homogenization not yet supported. "
-        "Please run with a single process."
-    )
-
-# Create field collection with right ghosts only (for FEM stencil)
-fc = muGrid.GlobalFieldCollection(
+# CartesianDecomposition handles ghost communication for both serial and MPI parallel execution.
+decomposition = muGrid.CartesianDecomposition(
+    comm,
     args.nb_grid_pts,
-    sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
+    nb_subdivisions=(1,) * dim,  # Serial execution: single subdivision
+    nb_ghosts_left=(0,) * dim,
     nb_ghosts_right=(1,) * dim,
+    nb_sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
 )
 
 # Get local grid dimensions
@@ -239,16 +235,16 @@ if comm.rank == 0 and not args.quiet:
 
 # Create muGrid fields for gradient operations
 # These are scalar fields (one component at a time)
-u_nodal = fc.real_field("u_nodal", nb_nodes)
-grad_u = fc.real_field("grad_u", dim, "quad")
-f_nodal = fc.real_field("f_nodal", nb_nodes)
-stress_field = fc.real_field("stress_field", dim, "quad")
+u_nodal = decomposition.real_field("u_nodal", nb_nodes)
+grad_u = decomposition.real_field("grad_u", dim, "quad")
+f_nodal = decomposition.real_field("f_nodal", nb_nodes)
+stress_field = decomposition.real_field("stress_field", dim, "quad")
 
 # Create fields for CG solver (displacement and force vectors)
 # Shape: [dim, nb_nodes, nx, ny] flattened to single field with dim*nb_nodes components
-u_field = fc.real_field("u_field", dim * nb_nodes)
-f_field = fc.real_field("f_field", dim * nb_nodes)
-rhs_field = fc.real_field("rhs_field", dim * nb_nodes)
+u_field = decomposition.real_field("u_field", dim * nb_nodes)
+f_field = decomposition.real_field("f_field", dim * nb_nodes)
+rhs_field = decomposition.real_field("rhs_field", dim * nb_nodes)
 
 # Material stiffness at each quadrature point [voigt, voigt, quad, nx, ny]
 C_field = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
@@ -274,8 +270,8 @@ def compute_strain(u_arr, strain):
         # Copy displacement component to muGrid field
         u_nodal.p[...] = u_arr[i, ...]
 
-        # Set up ghost values (periodic BC via wrap)
-        u_nodal.pg[...] = np.pad(u_nodal.p, ((0, 0), (0, 1), (0, 1)), mode="wrap")
+        # Fill ghost values (periodic BC handled by CartesianDecomposition)
+        decomposition.communicate_ghosts(u_nodal)
 
         # Compute gradient of u_i
         gradient_op.apply(u_nodal, grad_u)
@@ -307,30 +303,6 @@ def compute_stress(strain, stress, C):
     stress[1, 0, ...] = sig_voigt[2, ...]  # syx
 
 
-def reduce_ghosts(field):
-    """
-    Add ghost contributions back to the main domain for periodic BC.
-
-    For periodic boundary conditions, the transpose operation writes
-    contributions to the ghost region that need to be accumulated back
-    to the corresponding nodes in the main domain.
-    """
-    # field.pg has shape [nb_sub, nx+nb_ghosts, ny+nb_ghosts]
-    # Ghost at [:, nx:, :ny] should add to [:, 0:nb_ghosts, :]
-    # Ghost at [:, :nx, ny:] should add to [:, :, 0:nb_ghosts]
-    nb_ghosts_x = field.pg.shape[-2] - field.p.shape[-2]
-    nb_ghosts_y = field.pg.shape[-1] - field.p.shape[-1]
-    local_nx = field.p.shape[-2]
-    local_ny = field.p.shape[-1]
-
-    # Add right ghost to left
-    field.p[..., :nb_ghosts_x, :] += field.pg[..., local_nx:, :local_ny]
-    # Add top ghost to bottom
-    field.p[..., :, :nb_ghosts_y] += field.pg[..., :local_nx, local_ny:]
-    # Add corner ghost
-    field.p[..., :nb_ghosts_x, :nb_ghosts_y] += field.pg[..., local_nx:, local_ny:]
-
-
 def compute_divergence(stress, f_arr):
     """
     Compute divergence of stress.
@@ -348,7 +320,7 @@ def compute_divergence(stress, f_arr):
         gradient_op.transpose(stress_field, f_nodal, list(quad_weights))
 
         # Reduce ghost contributions for periodic BC
-        reduce_ghosts(f_nodal)
+        decomposition.reduce_ghosts(f_nodal)
 
         # Copy result
         f_arr[i, ...] = f_nodal.p[...]
@@ -453,7 +425,7 @@ for case_idx, (i, j) in enumerate(strain_cases):
     try:
         conjugate_gradients(
             comm,
-            fc,
+            decomposition,
             apply_stiffness,
             rhs_field,
             u_field,

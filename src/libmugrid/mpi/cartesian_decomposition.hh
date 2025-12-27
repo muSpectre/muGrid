@@ -71,6 +71,15 @@ namespace muGrid {
         //! processes.
         void communicate_ghosts(const std::string & field_name) const override;
 
+        //! accumulate ghost buffer contributions back to the interior domain.
+        //! This is the adjoint operation of communicate_ghosts and is needed
+        //! for transpose operations (e.g., divergence) with periodic BCs.
+        //! After the operation, ghost buffers are zeroed.
+        void reduce_ghosts(const Field & field) const override;
+
+        //! accumulate ghost buffer contributions back to the interior domain.
+        void reduce_ghosts(const std::string & field_name) const override;
+
         //! get the field collection
         GlobalFieldCollection & get_collection();
 

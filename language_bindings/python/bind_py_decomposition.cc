@@ -40,6 +40,14 @@ class PyDecomposition : public Decomposition {
         PYBIND11_OVERRIDE_PURE(void, Decomposition, communicate_ghosts,
                                field_name);
     }
+
+    void reduce_ghosts(const Field & field) const override {
+        PYBIND11_OVERRIDE_PURE(void, Decomposition, reduce_ghosts, field);
+    }
+
+    void reduce_ghosts(const std::string & field_name) const override {
+        PYBIND11_OVERRIDE_PURE(void, Decomposition, reduce_ghosts, field_name);
+    }
 };
 
 // Bind abstract class Decomposition
@@ -57,7 +65,22 @@ void add_decomposition(py::module & mod) {
             [](const Decomposition & self, std::string field_name) {
                 self.communicate_ghosts(field_name);
             },
-            "field_name"_a);
+            "field_name"_a)
+        .def(
+            "reduce_ghosts",
+            [](const Decomposition & self, const Field & field) {
+                self.reduce_ghosts(field);
+            },
+            "field"_a,
+            "Accumulate ghost buffer contributions back to interior domain. "
+            "This is the adjoint of communicate_ghosts for transpose operations.")
+        .def(
+            "reduce_ghosts",
+            [](const Decomposition & self, std::string field_name) {
+                self.reduce_ghosts(field_name);
+            },
+            "field_name"_a,
+            "Accumulate ghost buffer contributions back to interior domain.");
 }
 
 // Bind class Cartesian Decomposition

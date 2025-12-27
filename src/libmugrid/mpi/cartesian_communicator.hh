@@ -299,6 +299,64 @@ namespace muGrid {
 #endif
         }
 
+        /**
+         * @brief Send to right neighbor, receive from left and accumulate (add).
+         *
+         * @details Like sendrecv_right, but received values are added to the
+         * destination rather than overwriting it. This is the adjoint operation
+         * for ghost reduction in transpose operations with periodic BCs.
+         *
+         * @param direction The spatial dimension in which to communicate.
+         * @param block_stride Stride to the next block.
+         * @param nb_send_blocks Number of blocks to send.
+         * @param send_block_len Length of each block to send.
+         * @param send_offset Offset of send buffer in blocks.
+         * @param nb_recv_blocks Number of blocks to receive.
+         * @param recv_block_len Length of each block to receive.
+         * @param recv_offset Offset of receive buffer in blocks.
+         * @param data Base address of the data buffer.
+         * @param stride_in_direction Stride in communication direction.
+         * @param elem_size_in_bytes Size of each element in bytes.
+         * @param elem_mpi_t Pointer to MPI_Datatype for elements.
+         * @param is_device_memory If true, data is on GPU device memory.
+         */
+        void sendrecv_right_accumulate(int direction, int block_stride,
+                                       int nb_send_blocks, int send_block_len,
+                                       Index_t send_offset, int nb_recv_blocks,
+                                       int recv_block_len, Index_t recv_offset,
+                                       char * data, int stride_in_direction,
+                                       int elem_size_in_bytes, void * elem_mpi_t,
+                                       bool is_device_memory = false) const;
+
+        /**
+         * @brief Send to left neighbor, receive from right and accumulate (add).
+         *
+         * @details Like sendrecv_left, but received values are added to the
+         * destination rather than overwriting it. This is the adjoint operation
+         * for ghost reduction in transpose operations with periodic BCs.
+         *
+         * @param direction The spatial dimension in which to communicate.
+         * @param block_stride Stride to the next block.
+         * @param nb_send_blocks Number of blocks to send.
+         * @param send_block_len Length of each block to send.
+         * @param send_offset Offset of send buffer in blocks.
+         * @param nb_recv_blocks Number of blocks to receive.
+         * @param recv_block_len Length of each block to receive.
+         * @param recv_offset Offset of receive buffer in blocks.
+         * @param data Base address of the data buffer.
+         * @param stride_in_direction Stride in communication direction.
+         * @param elem_size_in_bytes Size of each element in bytes.
+         * @param elem_mpi_t Pointer to MPI_Datatype for elements.
+         * @param is_device_memory If true, data is on GPU device memory.
+         */
+        void sendrecv_left_accumulate(int direction, int block_stride,
+                                      int nb_send_blocks, int send_block_len,
+                                      Index_t send_offset, int nb_recv_blocks,
+                                      int recv_block_len, Index_t recv_offset,
+                                      char * data, int stride_in_direction,
+                                      int elem_size_in_bytes, void * elem_mpi_t,
+                                      bool is_device_memory = false) const;
+
        protected:
         //! The parent communicator from which this Cartesian communicator
         //! was derived.

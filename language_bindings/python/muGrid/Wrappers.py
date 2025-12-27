@@ -536,6 +536,21 @@ class CartesianDecomposition(FieldCollectionMixin):
         """
         self._cpp.communicate_ghosts(_unwrap(field))
 
+    def reduce_ghosts(self, field: Field) -> None:
+        """
+        Accumulate ghost buffer contributions back to the interior domain.
+
+        This is the adjoint operation of communicate_ghosts and is needed
+        for transpose operations (e.g., divergence) with periodic BCs.
+        After the operation, ghost buffers are zeroed.
+
+        Parameters
+        ----------
+        field : Field
+            The field whose ghost buffers should be reduced to interior.
+        """
+        self._cpp.reduce_ghosts(_unwrap(field))
+
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the underlying C++ object."""
         return getattr(self._cpp, name)
