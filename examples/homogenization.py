@@ -244,13 +244,11 @@ if comm.rank == 0 and not args.quiet:
 # - Output: tensor field with (dim, dim) components at quad pts
 #   (dim input components × dim operators)
 #
-# Vector/tensor fields for direct gradient operations:
-u_nodal = decomposition.real_field("u_nodal", (dim,))  # vector displacement at pixels
+# Tensor fields for gradient/stress at quadrature points:
 grad_u = decomposition.real_field("grad_u", (dim, dim), "quad")  # displacement gradient tensor
-f_nodal = decomposition.real_field("f_nodal", (dim,))  # vector force at pixels
 stress_field = decomposition.real_field("stress_field", (dim, dim), "quad")  # stress tensor
 
-# Create vector fields for CG solver (displacement and force vectors)
+# Vector fields for CG solver (displacement and force vectors)
 u_field = decomposition.real_field("u_field", (dim,))
 f_field = decomposition.real_field("f_field", (dim,))
 rhs_field = decomposition.real_field("rhs_field", (dim,))
@@ -279,14 +277,11 @@ def compute_strain(u_vec, strain_out):
     strain_out : ndarray
         Output strain array with shape (dim, dim, quad, pixels)
     """
-    # Copy displacement to working field
-    u_nodal.s[...] = u_vec.s
-
     # Fill ghost values for periodic BC
-    decomposition.communicate_ghosts(u_nodal)
+    decomposition.communicate_ghosts(u_vec)
 
     # Compute gradient tensor: grad_u.s[i, j, ...] = ∂u_i/∂x_j
-    gradient_op.apply(u_nodal, grad_u)
+    gradient_op.apply(u_vec, grad_u)
 
     # Compute symmetric strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
     grad = grad_u.s
@@ -344,19 +339,14 @@ def compute_divergence(stress, f_vec):
     f_vec : Field
         Output vector force field with shape (dim, nb_nodes, pixels)
     """
-    # Copy stress to working field
+    # Copy stress to field and fill ghost values
     stress_field.s[...] = stress
-
-    # Fill ghost pixel stresses (periodic boundary condition)
     decomposition.communicate_ghosts(stress_field)
 
     # Apply transpose (divergence) with quadrature weights
     # The transpose sums over operators (j direction) for each input component (i)
-    f_nodal.pg[...] = 0.0
-    gradient_op.transpose(stress_field, f_nodal, list(quad_weights))
-
-    # Copy result to output
-    f_vec.s[...] = f_nodal.s
+    f_vec.pg[...] = 0.0
+    gradient_op.transpose(stress_field, f_vec, list(quad_weights))
 
 
 # Temporary arrays for strain and stress [dim, dim, quad, nx, ny]
