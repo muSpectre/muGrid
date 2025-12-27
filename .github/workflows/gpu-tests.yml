@@ -135,4 +135,11 @@ jobs:
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Homogenization 2D on HOST ==="
-          python3 examples/homogenization.py -n 16,16 -q
+          python3 examples/homogenization.py -n 16,16 -m host -q
+
+      - name: Run Homogenization example (device)
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          echo "=== Homogenization 2D on DEVICE (GPU) ==="
+          python3 examples/homogenization.py -n 16,16 -m device -q

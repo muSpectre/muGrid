@@ -21,13 +21,14 @@ by applying unit strains in each direction.
 """
 
 import argparse
-
-import numpy as np
+import json
 
 try:
     import matplotlib.pyplot as plt
 except ModuleNotFoundError:
     plt = None
+
+import numpy as np
 
 import muGrid
 from muGrid.Solvers import conjugate_gradients
@@ -107,6 +108,19 @@ parser.add_argument(
     help="Grid points as nx,ny (default: 16,16)",
 )
 
+_memory_locations = {
+    "host": muGrid.GlobalFieldCollection.MemoryLocation.Host,
+    "device": muGrid.GlobalFieldCollection.MemoryLocation.Device,
+}
+
+parser.add_argument(
+    "-m",
+    "--memory",
+    choices=_memory_locations,
+    default="host",
+    help="Memory space for allocation (default: host)",
+)
+
 parser.add_argument(
     "-i",
     "--maxiter",
@@ -172,7 +186,25 @@ parser.add_argument(
     help="Suppress per-iteration output (default: off)",
 )
 
+parser.add_argument(
+    "--json",
+    action="store_true",
+    help="Output results in JSON format (implies --quiet)",
+)
+
 args = parser.parse_args()
+
+# JSON implies quiet mode
+if args.json:
+    args.quiet = True
+
+# Select array library based on memory location
+if args.memory == "host":
+    import numpy as arr
+else:
+    import cupy as arr
+
+memory_location = _memory_locations[args.memory]
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
@@ -202,6 +234,7 @@ decomposition = muGrid.CartesianDecomposition(
     nb_ghosts_left=(1,) * dim,
     nb_ghosts_right=(1,) * dim,
     nb_sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
+    memory_location=memory_location,
 )
 
 # Get local grid dimensions
@@ -232,6 +265,7 @@ quad_weights = np.array(gradient_op.get_quadrature_weights())
 if comm.rank == 0 and not args.quiet:
     print(f"Grid size: {args.nb_grid_pts}")
     print(f"Grid spacing: {grid_spacing}")
+    print(f"Memory location: {args.memory}")
     print(f"Number of quadrature points per pixel: {nb_quad}")
     print(f"Number of nodal points per pixel: {nb_nodes}")
     print(f"Quadrature weights: {quad_weights}")
@@ -254,11 +288,22 @@ f_field = decomposition.real_field("f_field", (dim,))
 rhs_field = decomposition.real_field("rhs_field", (dim,))
 
 # Material stiffness at each quadrature point [voigt, voigt, quad, nx, ny]
-C_field = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
+# Create on host first, then convert to device array if needed
+C_field_np = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
 for q in range(nb_quad):
     for i in range(nb_voigt):
         for j in range(nb_voigt):
-            C_field[i, j, q] = C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
+            C_field_np[i, j, q] = C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
+
+# Convert to device array if using GPU
+C_field = arr.asarray(C_field_np)
+
+# Create global timer for hierarchical timing
+timer = muGrid.Timer()
+
+# Performance counters
+nb_grid_pts_total = np.prod(args.nb_grid_pts)
+nb_stiffness_calls = 0
 
 
 def compute_strain(u_vec, strain_out):
@@ -277,11 +322,13 @@ def compute_strain(u_vec, strain_out):
     strain_out : ndarray
         Output strain array with shape (dim, dim, quad, pixels)
     """
-    # Fill ghost values for periodic BC
-    decomposition.communicate_ghosts(u_vec)
+    with timer("communicate_ghosts"):
+        # Fill ghost values for periodic BC
+        decomposition.communicate_ghosts(u_vec)
 
-    # Compute gradient tensor: grad_u.s[i, j, ...] = ∂u_i/∂x_j
-    gradient_op.apply(u_vec, grad_u)
+    with timer("gradient_apply"):
+        # Compute gradient tensor: grad_u.s[i, j, ...] = ∂u_i/∂x_j
+        gradient_op.apply(u_vec, grad_u)
 
     # Compute symmetric strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
     grad = grad_u.s
@@ -301,20 +348,25 @@ def compute_stress(strain, stress, C):
     C : ndarray
         Material stiffness in Voigt notation (nb_voigt, nb_voigt, quad, pixels)
     """
-    # Convert strain to Voigt: [voigt, quad, nx, ny]
-    eps_voigt = np.zeros((nb_voigt, nb_quad, nx, ny))
-    eps_voigt[0, ...] = strain[0, 0, ...]  # exx
-    eps_voigt[1, ...] = strain[1, 1, ...]  # eyy
-    eps_voigt[2, ...] = 2 * strain[0, 1, ...]  # 2*exy (engineering shear)
+    with timer("compute_stress"):
+        # Convert strain to Voigt: [voigt, quad, nx, ny]
+        eps_voigt = arr.zeros((nb_voigt, nb_quad, nx, ny))
+        eps_voigt[0, ...] = strain[0, 0, ...]  # exx
+        eps_voigt[1, ...] = strain[1, 1, ...]  # eyy
+        eps_voigt[2, ...] = 2 * strain[0, 1, ...]  # 2*exy (engineering shear)
 
-    # Compute stress in Voigt: sig = C @ eps
-    sig_voigt = np.einsum("ijq...,jq...->iq...", C, eps_voigt)
+        # Compute stress in Voigt: sig = C @ eps
+        if args.memory == "host":
+            sig_voigt = np.einsum("ijq...,jq...->iq...", C, eps_voigt)
+        else:
+            # CuPy einsum
+            sig_voigt = arr.einsum("ijq...,jq...->iq...", C, eps_voigt)
 
-    # Convert back to tensor
-    stress[0, 0, ...] = sig_voigt[0, ...]  # sxx
-    stress[1, 1, ...] = sig_voigt[1, ...]  # syy
-    stress[0, 1, ...] = sig_voigt[2, ...]  # sxy
-    stress[1, 0, ...] = sig_voigt[2, ...]  # syx
+        # Convert back to tensor
+        stress[0, 0, ...] = sig_voigt[0, ...]  # sxx
+        stress[1, 1, ...] = sig_voigt[1, ...]  # syy
+        stress[0, 1, ...] = sig_voigt[2, ...]  # sxy
+        stress[1, 0, ...] = sig_voigt[2, ...]  # syx
 
 
 def compute_divergence(stress, f_vec):
@@ -341,17 +393,19 @@ def compute_divergence(stress, f_vec):
     """
     # Copy stress to field and fill ghost values
     stress_field.s[...] = stress
-    decomposition.communicate_ghosts(stress_field)
+    with timer("communicate_ghosts"):
+        decomposition.communicate_ghosts(stress_field)
 
-    # Apply transpose (divergence) with quadrature weights
-    # The transpose sums over operators (j direction) for each input component (i)
-    f_vec.pg[...] = 0.0
-    gradient_op.transpose(stress_field, f_vec, list(quad_weights))
+    with timer("gradient_transpose"):
+        # Apply transpose (divergence) with quadrature weights
+        # The transpose sums over operators (j direction) for each input component (i)
+        f_vec.pg[...] = 0.0
+        gradient_op.transpose(stress_field, f_vec, list(quad_weights))
 
 
 # Temporary arrays for strain and stress [dim, dim, quad, nx, ny]
-strain_arr = np.zeros((dim, dim, nb_quad, nx, ny))
-stress_arr = np.zeros((dim, dim, nb_quad, nx, ny))
+strain_arr = arr.zeros((dim, dim, nb_quad, nx, ny))
+stress_arr = arr.zeros((dim, dim, nb_quad, nx, ny))
 
 
 def apply_stiffness(u_in, f_out):
@@ -365,14 +419,17 @@ def apply_stiffness(u_in, f_out):
     f_out : Field
         Output force field with (dim, nb_nodes) components (modified in place)
     """
-    # Compute strain eps = B * u
-    compute_strain(u_in, strain_arr)
+    global nb_stiffness_calls
+    with timer("apply_stiffness"):
+        nb_stiffness_calls += 1
+        # Compute strain eps = B * u
+        compute_strain(u_in, strain_arr)
 
-    # Compute stress sig = C : eps
-    compute_stress(strain_arr, stress_arr, C_field)
+        # Compute stress sig = C : eps
+        compute_stress(strain_arr, stress_arr, C_field)
 
-    # Compute force f = B^T * sig
-    compute_divergence(stress_arr, f_out)
+        # Compute force f = B^T * sig
+        compute_divergence(stress_arr, f_out)
 
 
 def compute_rhs(E_macro, rhs_out):
@@ -387,13 +444,13 @@ def compute_rhs(E_macro, rhs_out):
         Output field for RHS (modified in place)
     """
     # Create uniform strain field from macroscopic strain
-    eps_macro = np.zeros((dim, dim, nb_quad, nx, ny))
+    eps_macro = arr.zeros((dim, dim, nb_quad, nx, ny))
     for i in range(dim):
         for j in range(dim):
             eps_macro[i, j, ...] = E_macro[i, j]
 
     # Compute stress from macroscopic strain
-    sig_macro = np.zeros_like(eps_macro)
+    sig_macro = arr.zeros_like(eps_macro)
     compute_stress(eps_macro, sig_macro, C_field)
 
     # Compute divergence (with negative sign for RHS)
@@ -416,97 +473,173 @@ if comm.rank == 0 and not args.quiet:
     print("Computing homogenized stiffness tensor")
     print("=" * 60)
 
-for case_idx, (i, j) in enumerate(strain_cases):
-    # Create unit macroscopic strain
-    E_macro = np.zeros((dim, dim))
-    E_macro[i, j] = 1.0
-    if i != j:
-        E_macro[j, i] = 1.0  # Symmetric
+total_iterations = 0
 
-    voigt_col = voigt_index_2d(i, j)
+with timer("total_solve"):
+    for case_idx, (i, j) in enumerate(strain_cases):
+        # Create unit macroscopic strain
+        E_macro = arr.zeros((dim, dim))
+        E_macro[i, j] = 1.0
+        if i != j:
+            E_macro[j, i] = 1.0  # Symmetric
 
-    if comm.rank == 0 and not args.quiet:
-        print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
+        voigt_col = voigt_index_2d(i, j)
 
-    # Compute RHS into rhs_field
-    compute_rhs(E_macro, rhs_field)
+        if comm.rank == 0 and not args.quiet:
+            print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
 
-    # Initialize displacement to zero
-    u_field.s[...] = 0.0
+        # Compute RHS into rhs_field
+        compute_rhs(E_macro, rhs_field)
 
-    # CG callback
-    iteration_count = [0]  # Use list to allow modification in nested function
+        # Initialize displacement to zero
+        u_field.s[...] = 0.0
 
-    def callback(it, x, r, p):
-        iteration_count[0] = it
-        if not args.quiet:
-            res_norm = np.sqrt(comm.sum(np.dot(r.ravel(), r.ravel())))
-            if comm.rank == 0 and it % 10 == 0:
-                print(f"  CG iteration {it}: |r| = {res_norm:.6e}")
+        # CG callback
+        iteration_count = [0]  # Use list to allow modification in nested function
 
-    # Solve K u = f using conjugate_gradients from Solvers.py
-    try:
-        conjugate_gradients(
-            comm,
-            decomposition,
-            apply_stiffness,
-            rhs_field,
-            u_field,
-            tol=args.tol,
-            callback=callback,
-            maxiter=args.maxiter,
-        )
-        converged = True
-    except RuntimeError as e:
-        if "did not converge" in str(e):
-            converged = False
-        else:
-            raise
+        def callback(it, x, r, p):
+            iteration_count[0] = it
+            if not args.quiet:
+                r_flat = r.ravel()
+                res_norm = float(arr.sqrt(comm.sum(arr.dot(r_flat, r_flat))))
+                if comm.rank == 0 and it % 10 == 0:
+                    print(f"  CG iteration {it}: |r| = {res_norm:.6e}")
 
-    if comm.rank == 0 and not args.quiet:
-        if converged:
-            print(f"  CG converged in {iteration_count[0]} iterations")
-        else:
-            print(f"  CG did not converge after {args.maxiter} iterations")
+        # Solve K u = f using conjugate_gradients from Solvers.py
+        with timer(f"cg_case_{case_idx}"):
+            try:
+                conjugate_gradients(
+                    comm,
+                    decomposition,
+                    apply_stiffness,
+                    rhs_field,
+                    u_field,
+                    tol=args.tol,
+                    callback=callback,
+                    maxiter=args.maxiter,
+                )
+                converged = True
+            except RuntimeError as e:
+                if "did not converge" in str(e):
+                    converged = False
+                else:
+                    raise
 
-    # Compute strain from solution
-    compute_strain(u_field, strain_arr)
+        total_iterations += iteration_count[0]
 
-    # Add macroscopic strain to get total strain
-    for ii in range(dim):
-        for jj in range(dim):
-            strain_arr[ii, jj, ...] += E_macro[ii, jj]
+        if comm.rank == 0 and not args.quiet:
+            if converged:
+                print(f"  CG converged in {iteration_count[0]} iterations")
+            else:
+                print(f"  CG did not converge after {args.maxiter} iterations")
 
-    # Compute stress from total strain
-    compute_stress(strain_arr, stress_arr, C_field)
+        # Compute strain from solution
+        compute_strain(u_field, strain_arr)
 
-    # Compute average stress (homogenized stress)
-    # Σ_kl = (1/V) ∫ σ_kl dV = (1/V) Σ_q w_q * σ_kl(q)
-    sig_avg = np.zeros((dim, dim))
-    for k in range(dim):
-        for L in range(dim):
-            local_sum = 0.0
-            for q in range(nb_quad):
-                local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
-            sig_avg[k, L] = comm.sum(local_sum)
+        # Add macroscopic strain to get total strain
+        for ii in range(dim):
+            for jj in range(dim):
+                strain_arr[ii, jj, ...] += E_macro[ii, jj]
 
-    # Normalize by total volume
-    total_volume = np.prod(domain_size)
-    sig_avg /= total_volume
+        # Compute stress from total strain
+        compute_stress(strain_arr, stress_arr, C_field)
 
-    # Store in homogenized stiffness (column voigt_col)
-    C_eff[0, voigt_col] = sig_avg[0, 0]  # Sigma_xx
-    C_eff[1, voigt_col] = sig_avg[1, 1]  # Sigma_yy
-    C_eff[2, voigt_col] = sig_avg[0, 1]  # Sigma_xy
+        # Compute average stress (homogenized stress)
+        # Σ_kl = (1/V) ∫ σ_kl dV = (1/V) Σ_q w_q * σ_kl(q)
+        sig_avg = np.zeros((dim, dim))
+        for k in range(dim):
+            for L in range(dim):
+                local_sum = 0.0
+                for q in range(nb_quad):
+                    if args.memory == "host":
+                        local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
+                    else:
+                        local_sum += quad_weights[q] * float(arr.sum(stress_arr[k, L, q, ...]))
+                sig_avg[k, L] = comm.sum(local_sum)
 
-    if comm.rank == 0 and not args.quiet:
-        print(
-            f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
-            f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
-        )
+        # Normalize by total volume
+        total_volume = np.prod(domain_size)
+        sig_avg /= total_volume
 
-# Print results
-if comm.rank == 0:
+        # Store in homogenized stiffness (column voigt_col)
+        C_eff[0, voigt_col] = sig_avg[0, 0]  # Sigma_xx
+        C_eff[1, voigt_col] = sig_avg[1, 1]  # Sigma_yy
+        C_eff[2, voigt_col] = sig_avg[0, 1]  # Sigma_xy
+
+        if comm.rank == 0 and not args.quiet:
+            print(
+                f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
+                f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
+            )
+
+# Get timing information
+elapsed_time = timer.get_time("total_solve")
+apply_stiffness_time = timer.get_time("total_solve/apply_stiffness") if nb_stiffness_calls > 0 else 0
+
+# Performance metrics
+# Memory throughput estimate:
+# - FEM gradient: reads neighbor values, writes gradient
+# - Stress computation: reads strain, writes stress
+# - Divergence: reads stress, writes force
+# Approximate: 2 * dim * dim * nb_quad + dim values per grid point, 8 bytes each
+bytes_per_call = nb_grid_pts_total * (2 * dim * dim * nb_quad + dim) * 8
+total_bytes = nb_stiffness_calls * bytes_per_call
+memory_throughput = total_bytes / elapsed_time if elapsed_time > 0 else 0
+
+# FLOPS estimate (rough)
+# - Gradient: ~dim * dim * nb_stencil_pts * 2 FLOPs per grid point
+# - Stress: ~nb_voigt * nb_voigt * nb_quad FLOPs per grid point
+# - Divergence: similar to gradient
+flops_per_call = nb_grid_pts_total * (dim * dim * 10 + nb_voigt * nb_voigt * nb_quad * 2)
+total_flops = nb_stiffness_calls * flops_per_call
+flops_rate = total_flops / elapsed_time if elapsed_time > 0 else 0
+
+# Analytical bounds
+v_f = float(np.mean(phase))  # Volume fraction of inclusion
+E_m, E_i = args.E_matrix, args.E_inclusion
+nu = args.nu
+E_voigt = v_f * E_i + (1 - v_f) * E_m
+E_reuss = 1.0 / (v_f / E_i + (1 - v_f) / E_m)
+E_eff_approx = C_eff[0, 0] * (1 - nu**2)
+
+if args.json and comm.rank == 0:
+    # JSON output
+    results = {
+        "config": {
+            "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
+            "nb_grid_pts_total": int(nb_grid_pts_total),
+            "dimensions": int(dim),
+            "memory": args.memory,
+            "maxiter": int(args.maxiter),
+            "tolerance": float(args.tol),
+            "E_matrix": float(args.E_matrix),
+            "E_inclusion": float(args.E_inclusion),
+            "nu": float(args.nu),
+            "inclusion_type": args.inclusion_type,
+            "inclusion_radius": float(args.inclusion_radius),
+            "volume_fraction": float(v_f),
+        },
+        "results": {
+            "total_cg_iterations": int(total_iterations),
+            "stiffness_calls": int(nb_stiffness_calls),
+            "total_time_seconds": float(elapsed_time),
+            "apply_stiffness_time_seconds": float(apply_stiffness_time),
+            "bytes_per_call": int(bytes_per_call),
+            "total_bytes": int(total_bytes),
+            "memory_throughput_GBps": float(memory_throughput / 1e9),
+            "flops_per_call": int(flops_per_call),
+            "total_flops": int(total_flops),
+            "flops_rate_GFLOPs": float(flops_rate / 1e9),
+            "C_eff": [[float(C_eff[i, j]) for j in range(nb_voigt)] for i in range(nb_voigt)],
+            "E_effective_approx": float(E_eff_approx),
+            "E_voigt_bound": float(E_voigt),
+            "E_reuss_bound": float(E_reuss),
+        },
+        "timing": timer.to_dict(),
+    }
+    print(json.dumps(results, indent=2))
+elif comm.rank == 0:
+    # Text output
     print("\n" + "=" * 60)
     print("Homogenized stiffness tensor (Voigt notation)")
     print("=" * 60)
@@ -515,19 +648,6 @@ if comm.rank == 0:
     print(f"yy  {C_eff[1, 0]:10.6f} {C_eff[1, 1]:10.6f} {C_eff[1, 2]:10.6f}")
     print(f"xy  {C_eff[2, 0]:10.6f} {C_eff[2, 1]:10.6f} {C_eff[2, 2]:10.6f}")
 
-    # Compare to analytical bounds
-    v_f = np.mean(phase)  # Volume fraction of inclusion
-    E_m, E_i = args.E_matrix, args.E_inclusion
-    nu = args.nu
-
-    # Voigt (upper) bound: parallel
-    E_voigt = v_f * E_i + (1 - v_f) * E_m
-    # Reuss (lower) bound: series
-    E_reuss = 1.0 / (v_f / E_i + (1 - v_f) / E_m)
-
-    # Effective modulus from C_eff (plane strain)
-    E_eff_approx = C_eff[0, 0] * (1 - nu**2)
-
     print("\n" + "=" * 60)
     print("Comparison with analytical bounds")
     print("=" * 60)
@@ -535,7 +655,29 @@ if comm.rank == 0:
     print(f"Voigt bound (upper): E = {E_voigt:.4f}")
     print(f"Reuss bound (lower): E = {E_reuss:.4f}")
     print(f"Effective E (approx from C_xxxx): E ≈ {E_eff_approx:.4f}")
+
+    print("\n" + "=" * 60)
+    print("Performance Summary")
     print("=" * 60)
+    print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = {nb_grid_pts_total:,} points")
+    print(f"Memory location: {args.memory}")
+    print(f"Total CG iterations: {total_iterations}")
+    print(f"Stiffness operator calls: {nb_stiffness_calls}")
+    print(f"Total time: {elapsed_time:.4f} seconds")
+
+    print("\nMemory throughput (estimated):")
+    print(f"  Bytes per stiffness call: {bytes_per_call / 1e6:.2f} MB")
+    print(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB")
+    print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
+
+    print("\nFLOPS (estimated):")
+    print(f"  FLOPs per stiffness call: {flops_per_call / 1e6:.2f} MFLOP")
+    print(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP")
+    print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
+    print("=" * 60)
+
+    # Print hierarchical timing breakdown
+    timer.print_summary()
 
 # Optional plotting
 if args.plot and comm.rank == 0:
@@ -550,16 +692,23 @@ if args.plot and comm.rank == 0:
         ax.set_title("Microstructure (0=matrix, 1=inclusion)")
         plt.colorbar(im, ax=ax)
 
-        # Stress xx from last load case
+        # Stress xx from last load case (convert to numpy if on device)
         ax = axes[1]
-        sig_xx_avg = np.mean(stress_arr[0, 0, ...], axis=0)
+        if args.memory == "host":
+            sig_xx_avg = np.mean(stress_arr[0, 0, ...], axis=0)
+        else:
+            sig_xx_avg = np.mean(arr.asnumpy(stress_arr[0, 0, ...]), axis=0)
         im = ax.imshow(sig_xx_avg.T, origin="lower", cmap="RdBu_r")
         ax.set_title(r"$\sigma_{xx}$ (last load case)")
         plt.colorbar(im, ax=ax)
 
         # Displacement magnitude from last load case
         ax = axes[2]
-        u_mag = np.sqrt(u_field.s[0, 0, ...] ** 2 + u_field.s[1, 0, ...] ** 2)
+        if args.memory == "host":
+            u_mag = np.sqrt(u_field.s[0, 0, ...] ** 2 + u_field.s[1, 0, ...] ** 2)
+        else:
+            u_s = arr.asnumpy(u_field.s)
+            u_mag = np.sqrt(u_s[0, 0, ...] ** 2 + u_s[1, 0, ...] ** 2)
         im = ax.imshow(u_mag.T, origin="lower", cmap="viridis")
         ax.set_title("|u| (last load case)")
         plt.colorbar(im, ax=ax)
