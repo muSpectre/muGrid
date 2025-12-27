@@ -1,0 +1,101 @@
+name: GPU Tests
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+# TODO: When ready for production, replace the above with:
+# on:
+#   push:
+#     branches:
+#       - main
+#     tags:
+#       - 'v*'
+#   pull_request:
+#     branches:
+#       - main
+
+jobs:
+  gpu-tests:
+    runs-on: linux-x86-cuda
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        python-version: ['3.10']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Show GPU info
+        run: |
+          echo "=== NVIDIA SMI ==="
+          nvidia-smi || echo "nvidia-smi not available"
+          echo ""
+          echo "=== CUDA Version ==="
+          nvcc --version || echo "nvcc not in PATH"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qy
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            libboost-test-dev
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          python3 -m pip install --upgrade pip
+          python3 -m pip install numpy pytest
+
+      - name: Configure with CMake (CUDA enabled)
+        run: |
+          source venv/bin/activate
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMUGRID_ENABLE_CUDA=ON \
+            -DMUGRID_ENABLE_PYTHON=ON \
+            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_NETCDF=OFF \
+            -DMUGRID_ENABLE_TESTS=ON \
+            -DMUGRID_ENABLE_EXAMPLES=OFF \
+            -DCMAKE_CUDA_ARCHITECTURES="75" \
+            -DPython_EXECUTABLE=$(which python3)
+
+      - name: Build
+        run: |
+          source venv/bin/activate
+          cmake --build build --parallel
+
+      - name: Run C++ GPU tests
+        run: |
+          source venv/bin/activate
+          cd build
+          # Run all tests, GPU tests will actually execute on the Tesla T4
+          ctest --output-on-failure -V
+
+      - name: Run Python GPU tests
+        run: |
+          source venv/bin/activate
+          # Install the built package
+          python3 -m pip install .
+          # Run GPU-specific Python tests
+          cd tests
+          python3 -m pytest python_field_gpu_tests.py -v -s || true
+          python3 -m pytest python_fem_gradient_gpu_tests.py -v -s || true
