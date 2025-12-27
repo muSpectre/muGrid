@@ -36,13 +36,43 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Set up CUDA environment
+        run: |
+          # Find CUDA installation
+          CUDA_PATH=""
+          for path in /usr/local/cuda /usr/local/cuda-* /opt/cuda; do
+            if [ -d "$path" ] && [ -f "$path/bin/nvcc" ]; then
+              CUDA_PATH="$path"
+              break
+            fi
+          done
+
+          if [ -z "$CUDA_PATH" ]; then
+            echo "ERROR: Could not find CUDA installation"
+            echo "Searching for nvcc..."
+            find /usr -name "nvcc" 2>/dev/null || true
+            find /opt -name "nvcc" 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Found CUDA at: $CUDA_PATH"
+          echo "CUDA_HOME=$CUDA_PATH" >> $GITHUB_ENV
+          echo "CUDA_PATH=$CUDA_PATH" >> $GITHUB_ENV
+          echo "CUDAToolkit_ROOT=$CUDA_PATH" >> $GITHUB_ENV
+          echo "$CUDA_PATH/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=$CUDA_PATH/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
       - name: Show GPU info
         run: |
           echo "=== NVIDIA SMI ==="
           nvidia-smi || echo "nvidia-smi not available"
           echo ""
           echo "=== CUDA Version ==="
-          nvcc --version || echo "nvcc not in PATH"
+          nvcc --version
+          echo ""
+          echo "=== CUDA Environment ==="
+          echo "CUDA_HOME: $CUDA_HOME"
+          echo "PATH includes: $(echo $PATH | tr ':' '\n' | grep cuda || true)"
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -76,6 +106,7 @@ jobs:
             -DMUGRID_ENABLE_TESTS=ON \
             -DMUGRID_ENABLE_EXAMPLES=OFF \
             -DCMAKE_CUDA_ARCHITECTURES="75" \
+            -DCUDAToolkit_ROOT="$CUDA_HOME" \
             -DPython_EXECUTABLE=$(which python3)
 
       - name: Build
