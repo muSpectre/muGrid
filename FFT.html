@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="GPU Computing" href="GPU.html"><link rel="prev" title="Python Bindings" href="Python.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Fast Fourier Transform - µGrid 0.97.0-63-gd39c6000 documentation</title>
+        <title>Fast Fourier Transform - µGrid 0.97.0-65-gaa8b999e documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.97.0-63-gd39c6000
+      <a href="index.html"><div class="brand">µGrid 0.97.0-65-gaa8b999e
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.97.0-63-gd39c6000
+  <span class="sidebar-brand-text">µGrid 0.97.0-65-gaa8b999e
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -271,18 +271,17 @@ exploiting Hermitian symmetry.</p>
 <section id="creating-fft-fields">
 <h2>Creating FFT fields<a class="headerlink" href="#creating-fft-fields" title="Link to this heading">¶</a></h2>
 <p>The FFT engine manages two field collections: one for real-space fields and one for
-Fourier-space fields. Use the convenience functions to create fields:</p>
+Fourier-space fields. Use the engine’s methods to create fields:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_real_space_field</span><span class="p">,</span> <span class="n">fft_fourier_space_field</span>
 
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">16</span><span class="p">,</span> <span class="mi">20</span><span class="p">])</span>
 
 <span class="c1"># Create real-space field (real-valued)</span>
-<span class="n">real_field</span> <span class="o">=</span> <span class="n">fft_real_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;real&quot;</span><span class="p">)</span>
+<span class="n">real_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;real&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Real field shape: </span><span class="si">{</span><span class="n">real_field</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># (1, 1, 16, 20)</span>
 
 <span class="c1"># Create Fourier-space field (complex-valued)</span>
-<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">fft_fourier_space_field</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;fourier&quot;</span><span class="p">)</span>
+<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;fourier&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fourier field shape: </span><span class="si">{</span><span class="n">fourier_field</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># (1, 1, 9, 20)</span>
 </pre></div>
 </div>
@@ -600,7 +599,7 @@ you can transfer data between host and device fields as needed.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=b6c80921"></script>
+</div><script src="_static/documentation_options.js?v=d3361558"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
