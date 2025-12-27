@@ -252,6 +252,12 @@ parser.add_argument(
     help="Output results in JSON format (implies --quiet)",
 )
 
+parser.add_argument(
+    "--papi",
+    action="store_true",
+    help="Use PAPI hardware counters for performance measurement (requires pypapi)",
+)
+
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -371,7 +377,12 @@ for q in range(nb_quad):
 C_field = arr.asarray(C_field_np)
 
 # Create global timer for hierarchical timing
-timer = muGrid.Timer()
+# PAPI is only available on host (CPU), not on device (GPU)
+use_papi = args.papi and args.memory == "host"
+if args.papi and args.memory != "host":
+    if comm.rank == 0 and not args.quiet:
+        print("Warning: PAPI not available for device memory (GPU). Using estimates only.")
+timer = muGrid.Timer(use_papi=use_papi)
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
@@ -754,6 +765,7 @@ E_eff_approx = C_eff[0, 0] * (1 - nu**2)
 
 if args.json and comm.rank == 0:
     # JSON output
+    # Timer's to_dict() includes PAPI data when available
     results = {
         "config": {
             "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
@@ -777,9 +789,9 @@ if args.json and comm.rank == 0:
             "bytes_per_call": int(bytes_per_call),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_call": int(flops_per_call),
-            "total_flops": int(total_flops),
-            "flops_rate_GFLOPs": float(flops_rate / 1e9),
+            "flops_per_call_estimated": int(flops_per_call),
+            "total_flops_estimated": int(total_flops),
+            "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
             "C_eff": [[float(C_eff[i, j]) for j in range(nb_voigt)] for i in range(nb_voigt)],
             "E_effective_approx": float(E_eff_approx),
             "E_voigt_bound": float(E_voigt),
@@ -832,7 +844,7 @@ elif comm.rank == 0:
     print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
     print("=" * 60)
 
-    # Print hierarchical timing breakdown
+    # Print hierarchical timing breakdown (includes PAPI data when enabled)
     timer.print_summary()
 
 # Optional plotting (2D only)

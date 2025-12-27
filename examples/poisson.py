@@ -78,6 +78,12 @@ parser.add_argument(
     help="Output results in JSON format (implies --quiet)"
 )
 
+parser.add_argument(
+    "--papi",
+    action="store_true",
+    help="Use PAPI hardware counters for performance measurement (requires pypapi)"
+)
+
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -165,7 +171,12 @@ nb_grid_pts_total = np.prod(args.nb_grid_pts)
 nb_hessp_calls = 0
 
 # Create global timer for hierarchical timing
-timer = muGrid.Timer()
+# PAPI is only available on host (CPU), not on device (GPU)
+use_papi = args.papi and args.memory == _memory_locations["host"]
+if args.papi and args.memory != _memory_locations["host"]:
+    if not args.quiet:
+        print("Warning: PAPI not available for device memory (GPU). Using estimates only.")
+timer = muGrid.Timer(use_papi=use_papi)
 
 
 def callback(it, x, r, p):
@@ -241,6 +252,7 @@ apply_flops_rate = total_flops / apply_time if apply_time > 0 else 0
 
 if args.json:
     # JSON output (convert numpy types to Python types for JSON serialization)
+    # Timer's to_dict() includes PAPI data when available
     results = {
         "config": {
             "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
@@ -259,13 +271,13 @@ if args.json:
             "bytes_per_iteration": int(bytes_per_hessp),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_iteration": int(flops_per_hessp),
-            "total_flops": int(total_flops),
-            "flops_rate_GFLOPs": float(flops_rate / 1e9),
+            "flops_per_iteration_estimated": int(flops_per_hessp),
+            "total_flops_estimated": int(total_flops),
+            "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
             "arithmetic_intensity": float(arithmetic_intensity),
             "apply_time_seconds": float(apply_time),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
-            "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
+            "apply_flops_rate_GFLOPs_estimated": float(apply_flops_rate / 1e9),
         },
         "timing": timer.to_dict(),
     }
@@ -296,7 +308,7 @@ else:
     print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")
     print(f"{'='*60}")
 
-    # Print hierarchical timing breakdown
+    # Print hierarchical timing breakdown (includes PAPI data when enabled)
     timer.print_summary()
 
 if args.plot:
