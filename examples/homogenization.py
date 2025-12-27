@@ -386,7 +386,6 @@ timer = muGrid.Timer(use_papi=use_papi)
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
-nb_stiffness_calls = 0
 
 
 def compute_strain(u_vec, strain_out):
@@ -557,9 +556,7 @@ def apply_stiffness(u_in, f_out):
     f_out : Field
         Output force field with (dim, nb_nodes) components (modified in place)
     """
-    global nb_stiffness_calls
     with timer("apply_stiffness"):
-        nb_stiffness_calls += 1
         # Compute strain eps = B * u
         compute_strain(u_in, strain_arr)
 
@@ -735,6 +732,7 @@ with timer("total_solve"):
 
 # Get timing information
 elapsed_time = timer.get_time("total_solve")
+nb_stiffness_calls = timer.get_calls("apply_stiffness")
 apply_stiffness_time = timer.get_time("total_solve/apply_stiffness") if nb_stiffness_calls > 0 else 0
 
 # Performance metrics
