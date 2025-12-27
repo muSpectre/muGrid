@@ -326,15 +326,6 @@ namespace muGrid {
         virtual size_t get_buffer_size() const = 0;
 
         /**
-         * add a pad region to the end of the field buffer; required for using
-         * this as e.g. an FFT workspace
-         */
-        virtual void set_pad_size(const size_t & pad_size_) = 0;
-
-        //! pad region size
-        size_t get_pad_size() const;
-
-        /**
          * initialise field to zero (do more complicated initialisations through
          * fully typed maps)
          */
@@ -438,9 +429,6 @@ namespace muGrid {
          * three-dimensional second-rank tensor)
          */
         Shape_t components_shape;
-
-        //! size of padding region at end of buffer
-        size_t pad_size{};
 
         /**
          * number of pixel subdivisions. Will depend on sub_division. This value

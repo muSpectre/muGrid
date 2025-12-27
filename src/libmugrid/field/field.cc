@@ -360,8 +360,6 @@ namespace muGrid {
   Index_t Field::get_default_nb_cols(const IterUnit & iter_type) const {
     return (iter_type == IterUnit::Pixel ? this->get_nb_sub_pts() : 1);
   }
-  /* ---------------------------------------------------------------------- */
-  size_t Field::get_pad_size() const { return this->pad_size; }
 
   /* ---------------------------------------------------------------------- */
   bool Field::is_global() const {

@@ -214,16 +214,6 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
-
-    constexpr Index_t pad_size{3};
-    tensor_field.get_field().set_pad_size(pad_size);
-    dynamic_field1.set_pad_size(pad_size);
-    dynamic_field2.set_pad_size(pad_size);
-
-    // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -263,35 +253,6 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
     BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
-
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_pad_size(), 0);
-    BOOST_CHECK_EQUAL(dynamic_field1.get_pad_size(), 0);
-    BOOST_CHECK_EQUAL(dynamic_field2.get_pad_size(), 0);
-
-    constexpr Index_t pad_size{3};
-    tensor_field.get_field().set_pad_size(pad_size);
-    dynamic_field1.set_pad_size(pad_size);
-    dynamic_field2.set_pad_size(pad_size);
-
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_pad_size(), pad_size);
-    BOOST_CHECK_EQUAL(dynamic_field1.get_pad_size(), pad_size);
-    BOOST_CHECK_EQUAL(dynamic_field2.get_pad_size(), pad_size);
-
-    // check that setting pad size won't change logical size
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_nb_entries(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field1.get_nb_entries(), nb_pixels);
-    BOOST_CHECK_EQUAL(dynamic_field2.get_nb_entries(), nb_pixels);
-
-    // check that the buffer size is correct
-    BOOST_CHECK_EQUAL(tensor_field.get_field().get_buffer_size(),
-                      nb_pixels * tensor_field.get_field().get_nb_components() +
-                          pad_size);
-    BOOST_CHECK_EQUAL(dynamic_field1.get_buffer_size(),
-                      nb_pixels * dynamic_field1.get_nb_components() +
-                          pad_size);
-    BOOST_CHECK_EQUAL(dynamic_field2.get_buffer_size(),
-                      nb_pixels * dynamic_field2.get_nb_components() +
-                          pad_size);
   }
 
   /* ---------------------------------------------------------------------- */
