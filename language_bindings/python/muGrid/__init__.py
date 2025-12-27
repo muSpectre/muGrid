@@ -111,8 +111,6 @@ get_domain_index = _muGrid.get_domain_index
 
 # Field classes and utilities
 from .Field import Field  # noqa: E402
-from .Field import fft_fourier_space_field  # noqa: E402
-from .Field import fft_real_space_field  # noqa: E402
 from .Field import wrap_field  # noqa: E402
 
 # MPI communicator
@@ -144,8 +142,6 @@ __all__ = [
     "GlobalFieldCollection",
     "LocalFieldCollection",
     # Field utilities
-    "fft_fourier_space_field",
-    "fft_real_space_field",
     "wrap_field",
     # FFT utilities
     "fft_freq",

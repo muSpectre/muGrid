@@ -38,7 +38,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from muGrid import FFTEngine, fft_fourier_space_field, fft_real_space_field
+from muGrid import FFTEngine
 
 
 def make_subdomain_slices(locations, nb_pts):
@@ -154,8 +154,8 @@ class TestMPIFFTForwardTransform:
         nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Create global input array
         np.random.seed(42)
@@ -175,7 +175,7 @@ class TestMPIFFTForwardTransform:
         real_field.p[0, ...] = local_input
 
         # Perform FFT
-        engine.fft(real_field._cpp, fourier_field._cpp)
+        engine.fft(real_field, fourier_field)
 
         # Extract expected local Fourier data
         fourier_slices = make_fourier_slices(
@@ -198,8 +198,8 @@ class TestMPIFFTForwardTransform:
         nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Create global input array
         np.random.seed(42)
@@ -216,7 +216,7 @@ class TestMPIFFTForwardTransform:
         real_field.p[0, ...] = local_input
 
         # Perform FFT
-        engine.fft(real_field._cpp, fourier_field._cpp)
+        engine.fft(real_field, fourier_field)
 
         # Extract expected local Fourier data
         fourier_slices = make_fourier_slices(
@@ -243,8 +243,8 @@ class TestMPIFFTInverseTransform:
         nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Create global Fourier input array
         fourier_shape = list(engine.nb_fourier_grid_pts)
@@ -264,7 +264,7 @@ class TestMPIFFTInverseTransform:
         fourier_field.p[0, ...] = local_fourier
 
         # Perform inverse FFT
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.ifft(fourier_field, real_field)
         real_field.p[0, ...] *= engine.normalisation
 
         # Extract expected local real data
@@ -292,8 +292,8 @@ class TestMPIFFTRoundtrip:
         nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Initialize with random data
         np.random.seed(42 + comm.rank)  # Different seed per rank
@@ -301,10 +301,10 @@ class TestMPIFFTRoundtrip:
         real_field.p[0, ...] = original
 
         # Forward FFT
-        engine.fft(real_field._cpp, fourier_field._cpp)
+        engine.fft(real_field, fourier_field)
 
         # Inverse FFT
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.ifft(fourier_field, real_field)
 
         # Normalize
         real_field.p[0, ...] *= engine.normalisation
@@ -317,8 +317,8 @@ class TestMPIFFTRoundtrip:
         nb_grid_pts = [32 * max(1, comm.size), 32]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Create sine wave
         x = np.arange(
@@ -337,8 +337,8 @@ class TestMPIFFTRoundtrip:
         real_field.p[0, ...] = original
 
         # Roundtrip
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
         real_field.p[0, ...] *= engine.normalisation
 
         assert_allclose(real_field.p.squeeze(), original, atol=1e-13)
@@ -353,8 +353,8 @@ class TestMPIFFTMultipleComponents:
         engine = FFTEngine(nb_grid_pts, comm)
 
         # Create 2-component fields
-        real_field = fft_real_space_field(engine, "real_vec", nb_components=2)
-        fourier_field = fft_fourier_space_field(engine, "fourier_vec", nb_components=2)
+        real_field = engine.real_space_field("real_vec", nb_components=2)
+        fourier_field = engine.fourier_space_field("fourier_vec", nb_components=2)
 
         # Initialize with random data
         np.random.seed(42 + comm.rank)
@@ -362,8 +362,8 @@ class TestMPIFFTMultipleComponents:
         real_field.p[:] = original
 
         # Roundtrip
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
         real_field.p[:] *= engine.normalisation
 
         assert_allclose(real_field.p, original, atol=1e-14)
@@ -374,10 +374,8 @@ class TestMPIFFTMultipleComponents:
         engine = FFTEngine(nb_grid_pts, comm)
 
         # Create 9-component field (3x3 tensor)
-        real_field = fft_real_space_field(engine, "real_tensor", nb_components=9)
-        fourier_field = fft_fourier_space_field(
-            engine, "fourier_tensor", nb_components=9
-        )
+        real_field = engine.real_space_field("real_tensor", nb_components=9)
+        fourier_field = engine.fourier_space_field("fourier_tensor", nb_components=9)
 
         # Initialize with random data
         np.random.seed(42)
@@ -385,8 +383,8 @@ class TestMPIFFTMultipleComponents:
         real_field.p[:] = original
 
         # Roundtrip
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
         real_field.p[:] *= engine.normalisation
 
         assert_allclose(real_field.p, original, atol=1e-14)
@@ -400,14 +398,14 @@ class TestMPIFFTDCComponent:
         nb_grid_pts = [16 * max(1, comm.size), 20]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Constant field
         constant_value = 5.0
         real_field.p[0, ...] = constant_value
 
-        engine.fft(real_field._cpp, fourier_field._cpp)
+        engine.fft(real_field, fourier_field)
 
         # DC component should be at (0,0) = constant_value * total_points
         expected_dc = constant_value * np.prod(nb_grid_pts)
@@ -479,8 +477,8 @@ class TestMPIFFTEdgeCases:
         engine = FFTEngine(nb_grid_pts, comm)
 
         # Should still work correctly
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         np.random.seed(42 + comm.rank)
         subdomain_shape = engine.nb_subdomain_grid_pts
@@ -488,8 +486,8 @@ class TestMPIFFTEdgeCases:
             original = np.random.randn(*subdomain_shape)
             real_field.p[0, ...] = original
 
-            engine.fft(real_field._cpp, fourier_field._cpp)
-            engine.ifft(fourier_field._cpp, real_field._cpp)
+            engine.fft(real_field, fourier_field)
+            engine.ifft(fourier_field, real_field)
             real_field.p[0, ...] *= engine.normalisation
 
             # Compare without squeeze to handle subdomains with size-1 dimensions
@@ -500,15 +498,15 @@ class TestMPIFFTEdgeCases:
         nb_grid_pts = [17 * max(1, comm.size), 23]
         engine = FFTEngine(nb_grid_pts, comm)
 
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         np.random.seed(42 + comm.rank)
         original = np.random.randn(*engine.nb_subdomain_grid_pts)
         real_field.p[0, ...] = original
 
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
         real_field.p[0, ...] *= engine.normalisation
 
         assert_allclose(real_field.p.squeeze(), original, atol=1e-14)
