@@ -97,13 +97,6 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T, typename MemorySpace>
-  void TypedField<T, MemorySpace>::set_pad_size(const size_t & pad_size) {
-    this->pad_size = pad_size;
-    this->resize();
-  }
-
-  /* ---------------------------------------------------------------------- */
-  template <typename T, typename MemorySpace>
   TypedField<T, MemorySpace> &
   TypedField<T, MemorySpace>::safe_cast(Field & other) {
     try {
@@ -197,7 +190,7 @@ namespace muGrid {
     }
 
     auto && size{this->nb_sub_pts * this->get_nb_buffer_pixels()};
-    const auto expected_size{size * this->get_nb_components() + this->pad_size};
+    const auto expected_size{size * this->get_nb_components()};
     if (this->values.size() != static_cast<size_t>(expected_size) or
         static_cast<Index_t>(this->current_nb_entries) != size) {
       this->current_nb_entries = size;

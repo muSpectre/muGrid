@@ -64,9 +64,6 @@ namespace muGrid {
                   CcoordOps::get_cube<SDim>(len), {});
     // check that returned size is correct
     BOOST_CHECK_EQUAL(field.get_nb_entries(), ipow(len, SDim));
-    // check that setting pad size won't change logical size
-    field.set_pad_size(24);
-    BOOST_CHECK_EQUAL(field.get_nb_entries(), ipow(len, SDim));
     // check the shape returned by the field
     auto shape{field.get_shape(IterUnit::Pixel)};
     BOOST_CHECK_EQUAL(shape.size(), 3);

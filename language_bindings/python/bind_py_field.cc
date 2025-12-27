@@ -265,7 +265,6 @@ void add_field(py::module &mod) {
                                    [](Field &field) {
                                        return field.get_strides(muGrid::IterUnit::Pixel, 1);
                                    })
-            .def_property_readonly("pad_size", &Field::get_pad_size)
             .def_property_readonly("name", &Field::get_name)
             .def_property_readonly("collection", &Field::get_collection)
             .def_property_readonly("nb_components", &Field::get_nb_components)

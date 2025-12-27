@@ -448,7 +448,6 @@ namespace muGrid {
     TypedField & operator=(const EigenRep_t & other);
 
     void set_zero() final;
-    void set_pad_size(const size_t & pad_size) final;
 
     //! cast a reference to a base type to this type, with full checks
     static TypedField & safe_cast(Field & other);
