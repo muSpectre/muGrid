@@ -189,11 +189,17 @@ nb_voigt = 3  # 2D: xx, yy, xy
 # Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
 # CartesianDecomposition handles ghost communication for both serial and MPI parallel execution.
+#
+# We use ghosts on BOTH sides (left and right). This approach means:
+# - Ghost elements on the left boundary provide contributions to interior nodes directly
+# - Ghost elements on the right boundary provide contributions to interior nodes directly
+# - No ghost reduction is needed since interior nodes receive all contributions directly
+# - The trade-off is slightly more memory and computation in ghost regions
 decomposition = muGrid.CartesianDecomposition(
     comm,
     args.nb_grid_pts,
     nb_subdivisions=(1,) * dim,  # Serial execution: single subdivision
-    nb_ghosts_left=(0,) * dim,
+    nb_ghosts_left=(1,) * dim,
     nb_ghosts_right=(1,) * dim,
     nb_sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
 )
@@ -307,6 +313,12 @@ def compute_divergence(stress, f_arr):
     """
     Compute divergence of stress.
     f_arr has shape [dim, nb_nodes, nx, ny]
+
+    With two-sided ghosts:
+    1. We fill ghost pixel stresses via communicate_ghosts (periodic copies)
+    2. The transpose reads stress from ALL pixels (interior + ghost)
+    3. Ghost elements (e.g., left_ghost-node_0) contribute directly to interior nodes
+    4. No ghost reduction needed - interior nodes receive all contributions directly
     """
     f_arr[...] = 0.0
 
@@ -315,14 +327,14 @@ def compute_divergence(stress, f_arr):
         for j in range(dim):
             stress_field.s[j, ...] = stress[i, j, ...]
 
+        # Fill ghost pixel stresses (periodic boundary condition)
+        decomposition.communicate_ghosts(stress_field)
+
         # Apply transpose (divergence) with quadrature weights
         f_nodal.pg[...] = 0.0  # Clear including ghosts
         gradient_op.transpose(stress_field, f_nodal, list(quad_weights))
 
-        # Reduce ghost contributions for periodic BC
-        decomposition.reduce_ghosts(f_nodal)
-
-        # Copy result
+        # Copy result from interior (ghost contributions already included)
         f_arr[i, ...] = f_nodal.p[...]
 
 
