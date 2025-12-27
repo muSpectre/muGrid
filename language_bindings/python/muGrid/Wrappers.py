@@ -884,18 +884,22 @@ class FEMGradientOperator:
     ----------
     spatial_dim : int
         Spatial dimension (2 or 3).
-    scale : float, optional
-        Scaling factor. Default is 1.0.
+    grid_spacing : sequence of float, optional
+        Grid spacing in each direction. Default is [1.0, ...] for each dimension.
 
     Examples
     --------
-    >>> # Create a 2D gradient operator
-    >>> grad = FEMGradientOperator(2, scale=1.0)
+    >>> # Create a 2D gradient operator with default grid spacing
+    >>> grad = FEMGradientOperator(2)
     >>> grad.apply(nodal_field, quadrature_point_gradient_field)
     """
 
-    def __init__(self, spatial_dim: int, scale: float = 1.0) -> None:
-        self._cpp = _muGrid.FEMGradientOperator(spatial_dim, scale)
+    def __init__(
+        self, spatial_dim: int, grid_spacing: Optional[Sequence[float]] = None
+    ) -> None:
+        if grid_spacing is None:
+            grid_spacing = []
+        self._cpp = _muGrid.FEMGradientOperator(spatial_dim, list(grid_spacing))
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """
