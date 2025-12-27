@@ -397,12 +397,13 @@ def test_reduce_ghosts_adjoint_property(comm, nb_subdivisions):
     field_x = cart_decomp.real_field("x")
     field_y = cart_decomp.real_field("y")
 
-    # Initialize with random interior values, zero ghosts
+    # Initialize x with random interior values and zero ghosts
+    # Initialize y with random values everywhere (interior + ghosts)
     np.random.seed(42 + comm.rank)
-    field_x.s[...] = np.random.rand(*field_x.s.shape)
-    field_y.s[...] = np.random.rand(*field_y.s.shape)
+    field_x.sg[...] = np.random.rand(*field_x.sg.shape)
+    field_y.sg[...] = np.random.rand(*field_y.sg.shape)
 
-    # Zero out ghosts initially
+    # Zero out x's ghosts (x represents interior-only data)
     nb_subdomain_grid_pts = cart_decomp.nb_subdomain_grid_pts_with_ghosts
     for index in np.ndindex(*nb_subdomain_grid_pts):
         is_ghost = any(
@@ -412,48 +413,24 @@ def test_reduce_ghosts_adjoint_property(comm, nb_subdivisions):
         )
         if is_ghost:
             field_x.sg[(..., *index)] = 0.0
-            field_y.sg[(..., *index)] = 0.0
 
-    # Store copies
-    x_interior = field_x.s.copy()
-    y_interior = field_y.s.copy()
+    # Store original values
+    x_original = field_x.sg.copy()  # x with interior values, zero ghosts
+    y_original = field_y.sg.copy()  # y with values everywhere
 
-    # Compute <C(x), y_full> where y_full has ghosts filled
-    field_x.s[...] = x_interior
-    for index in np.ndindex(*nb_subdomain_grid_pts):
-        is_ghost = any(
-            idx < nb_ghosts_left[dim]
-            or idx >= nb_subdomain_grid_pts[dim] - nb_ghosts_right[dim]
-            for dim, idx in enumerate(index)
-        )
-        if is_ghost:
-            field_x.sg[(..., *index)] = 0.0
-    cart_decomp.communicate_ghosts(field_x)  # C(x)
-
-    # Fill y with random values everywhere for the inner product
-    field_y.s[...] = y_interior
-    field_y.sg[...] = np.random.rand(*field_y.sg.shape)
+    # Compute C(x) = communicate_ghosts(x)
+    cart_decomp.communicate_ghosts(field_x)
 
     # <C(x), y> - inner product over full ghosted domain
-    inner_Cx_y = comm.sum(np.sum(field_x.sg * field_y.sg))
+    inner_Cx_y = comm.sum(np.sum(field_x.sg * y_original))
 
-    # Compute <x, R(y)>
-    # Reset x to interior only
-    field_x.s[...] = x_interior
-    for index in np.ndindex(*nb_subdomain_grid_pts):
-        is_ghost = any(
-            idx < nb_ghosts_left[dim]
-            or idx >= nb_subdomain_grid_pts[dim] - nb_ghosts_right[dim]
-            for dim, idx in enumerate(index)
-        )
-        if is_ghost:
-            field_x.sg[(..., *index)] = 0.0
-
-    # R(y)
+    # Compute R(y) = reduce_ghosts(y)
+    # Restore y to original values first
+    field_y.sg[...] = y_original
     cart_decomp.reduce_ghosts(field_y)
 
-    # <x, R(y)> - inner product over full domain (but ghosts of R(y) are zero)
-    inner_x_Ry = comm.sum(np.sum(field_x.sg * field_y.sg))
+    # <x, R(y)> - inner product with original x (zero ghosts)
+    inner_x_Ry = comm.sum(np.sum(x_original * field_y.sg))
 
     # The adjoint property: <C(x), y> = <x, R(y)>
     np.testing.assert_allclose(
