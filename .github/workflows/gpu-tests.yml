@@ -84,7 +84,7 @@ jobs:
             -DMUGRID_ENABLE_MPI=OFF \
             -DMUGRID_ENABLE_NETCDF=OFF \
             -DMUGRID_ENABLE_TESTS=ON \
-            -DMUGRID_ENABLE_EXAMPLES=OFF \
+            -DMUGRID_ENABLE_EXAMPLES=ON \
             -DCMAKE_CUDA_ARCHITECTURES="75" \
             -DPython_EXECUTABLE=$(which python3)
 
@@ -107,5 +107,32 @@ jobs:
           python3 -m pip install .
           # Run GPU-specific Python tests
           cd tests
-          python3 -m pytest python_field_gpu_tests.py -v -s || true
-          python3 -m pytest python_fem_gradient_gpu_tests.py -v -s || true
+          python3 -m pytest python_field_gpu_tests.py -v -s
+          python3 -m pytest python_fem_gradient_gpu_tests.py -v -s
+
+      - name: Run Poisson example (host)
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          echo "=== Poisson 2D on HOST ==="
+          python3 examples/poisson.py -n 32,32 -m host -s hardcoded -q
+          echo ""
+          echo "=== Poisson 3D on HOST ==="
+          python3 examples/poisson.py -n 16,16,16 -m host -s hardcoded -q
+
+      - name: Run Poisson example (device)
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          echo "=== Poisson 2D on DEVICE (GPU) ==="
+          python3 examples/poisson.py -n 32,32 -m device -s hardcoded -q
+          echo ""
+          echo "=== Poisson 3D on DEVICE (GPU) ==="
+          python3 examples/poisson.py -n 16,16,16 -m device -s hardcoded -q
+
+      - name: Run Homogenization example (host)
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          echo "=== Homogenization 2D on HOST ==="
+          python3 examples/homogenization.py -n 16,16 -q
