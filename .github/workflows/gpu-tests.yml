@@ -136,6 +136,9 @@ jobs:
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Homogenization 2D on HOST ==="
           python3 examples/homogenization.py -n 16,16 -m host -q
+          echo ""
+          echo "=== Homogenization 3D on HOST ==="
+          python3 examples/homogenization.py -n 8,8,8 -m host -q
 
       - name: Run Homogenization example (device)
         run: |
@@ -143,3 +146,6 @@ jobs:
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Homogenization 2D on DEVICE (GPU) ==="
           python3 examples/homogenization.py -n 16,16 -m device -q
+          echo ""
+          echo "=== Homogenization 3D on DEVICE (GPU) ==="
+          python3 examples/homogenization.py -n 8,8,8 -m device -q
