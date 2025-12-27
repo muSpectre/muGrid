@@ -6,6 +6,14 @@
 #include <mpi.h>
 #endif
 
+#if defined(MUGRID_ENABLE_CUDA)
+#include <cuda_runtime.h>
+#endif
+
+#if defined(MUGRID_ENABLE_HIP)
+#include <hip/hip_runtime.h>
+#endif
+
 #include "core/coordinates.hh"
 #include "core/enums.hh"
 #include "field/field.hh"
