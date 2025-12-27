@@ -16,8 +16,8 @@ where:
 After solving, the homogenized stress is computed as:
     Σ = (1/|Ω|) ∫ C : (E_macro + ε(u)) dΩ
 
-For a 2D problem, we compute all 3 independent stiffness components (xx, yy, xy)
-by applying unit strains in each direction.
+For a 2D problem, we compute all 3 independent stiffness components (xx, yy, xy).
+For a 3D problem, we compute all 6 independent stiffness components (xx, yy, zz, yz, xz, xy).
 """
 
 import argparse
@@ -41,11 +41,39 @@ except ImportError:
     comm = muGrid.Communicator()
 
 
+# Voigt notation mappings
+# 2D: [xx, yy, xy] -> indices 0, 1, 2
+# 3D: [xx, yy, zz, yz, xz, xy] -> indices 0, 1, 2, 3, 4, 5
+
 def voigt_index_2d(i, j):
     """Convert 2D tensor indices to Voigt notation index."""
     if i == j:
         return i
     return 2
+
+
+def voigt_index_3d(i, j):
+    """Convert 3D tensor indices to Voigt notation index.
+
+    Voigt ordering: xx=0, yy=1, zz=2, yz=3, xz=4, xy=5
+    """
+    if i == j:
+        return i
+    # Off-diagonal: map (i,j) to Voigt index
+    # (1,2) or (2,1) -> yz -> 3
+    # (0,2) or (2,0) -> xz -> 4
+    # (0,1) or (1,0) -> xy -> 5
+    pair = tuple(sorted([i, j]))
+    mapping = {(1, 2): 3, (0, 2): 4, (0, 1): 5}
+    return mapping[pair]
+
+
+def voigt_index(dim, i, j):
+    """Convert tensor indices to Voigt notation index for given dimension."""
+    if dim == 2:
+        return voigt_index_2d(i, j)
+    else:
+        return voigt_index_3d(i, j)
 
 
 def isotropic_stiffness_2d(E, nu):
@@ -62,6 +90,38 @@ def isotropic_stiffness_2d(E, nu):
     C[2, 2] = mu  # C_xyxy
     C[0, 1] = C[1, 0] = lam  # C_xxyy
     return C
+
+
+def isotropic_stiffness_3d(E, nu):
+    """
+    Create 3D isotropic stiffness tensor in Voigt notation.
+    Returns C[6, 6] where [xx, yy, zz, yz, xz, xy] ordering is used.
+    """
+    lam = E * nu / ((1 + nu) * (1 - 2 * nu))
+    mu = E / (2 * (1 + nu))
+
+    C = np.zeros((6, 6))
+    # Diagonal: normal components
+    C[0, 0] = lam + 2 * mu  # C_xxxx
+    C[1, 1] = lam + 2 * mu  # C_yyyy
+    C[2, 2] = lam + 2 * mu  # C_zzzz
+    # Diagonal: shear components
+    C[3, 3] = mu  # C_yzyz
+    C[4, 4] = mu  # C_xzxz
+    C[5, 5] = mu  # C_xyxy
+    # Off-diagonal: coupling between normal components
+    C[0, 1] = C[1, 0] = lam  # C_xxyy
+    C[0, 2] = C[2, 0] = lam  # C_xxzz
+    C[1, 2] = C[2, 1] = lam  # C_yyzz
+    return C
+
+
+def isotropic_stiffness(dim, E, nu):
+    """Create isotropic stiffness tensor for given dimension."""
+    if dim == 2:
+        return isotropic_stiffness_2d(E, nu)
+    else:
+        return isotropic_stiffness_3d(E, nu)
 
 
 def create_microstructure(coords, inclusion_type="single", inclusion_radius=0.25):
@@ -105,7 +165,7 @@ parser.add_argument(
     "--nb-grid-pts",
     default=[16, 16],
     type=lambda s: [int(x) for x in s.split(",")],
-    help="Grid points as nx,ny (default: 16,16)",
+    help="Grid points as nx,ny or nx,ny,nz (default: 16,16)",
 )
 
 _memory_locations = {
@@ -176,7 +236,7 @@ parser.add_argument(
     "-p",
     "--plot",
     action="store_true",
-    help="Show plot of microstructure and stress fields (default: off)",
+    help="Show plot of microstructure and stress fields (default: off, 2D only)",
 )
 
 parser.add_argument(
@@ -208,15 +268,31 @@ memory_location = _memory_locations[args.memory]
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
-if dim != 2:
-    raise ValueError("Only 2D grids are supported in this example")
+if dim not in (2, 3):
+    raise ValueError("Only 2D and 3D grids are supported")
 
 # Physical domain size (unit cell)
 domain_size = np.ones(dim)
 grid_spacing = domain_size / np.array(args.nb_grid_pts)
 
 # Number of Voigt components
-nb_voigt = 3  # 2D: xx, yy, xy
+nb_voigt = 3 if dim == 2 else 6  # 2D: xx, yy, xy; 3D: xx, yy, zz, yz, xz, xy
+
+# Voigt component labels for output
+if dim == 2:
+    voigt_labels = ["xx", "yy", "xy"]
+else:
+    voigt_labels = ["xx", "yy", "zz", "yz", "xz", "xy"]
+
+# Create the FEM gradient operator first to get accurate quadrature info
+gradient_op = muGrid.FEMGradientOperator(dim, list(grid_spacing))
+
+# Number of quadrature points and nodal points from the operator
+nb_quad = gradient_op.nb_quad_pts
+nb_nodes = gradient_op.nb_nodal_pts
+
+# Quadrature weights (area/volume of each element)
+quad_weights = np.array(gradient_op.get_quadrature_weights())
 
 # Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
@@ -233,37 +309,32 @@ decomposition = muGrid.CartesianDecomposition(
     nb_subdivisions=(1,) * dim,  # Serial execution: single subdivision
     nb_ghosts_left=(1,) * dim,
     nb_ghosts_right=(1,) * dim,
-    nb_sub_pts={"quad": 2},  # 2 quadrature points (triangles) per pixel
+    nb_sub_pts={"quad": nb_quad},  # Use actual quad count from operator
     memory_location=memory_location,
 )
 
 # Get local grid dimensions
-nx, ny = args.nb_grid_pts
+grid_shape = tuple(args.nb_grid_pts)
 
 # Get coordinates for microstructure generation
-x = np.linspace(0, 1, args.nb_grid_pts[0], endpoint=False) + 0.5 / args.nb_grid_pts[0]
-y = np.linspace(0, 1, args.nb_grid_pts[1], endpoint=False) + 0.5 / args.nb_grid_pts[1]
-coords = np.meshgrid(x, y, indexing="ij")
+coord_arrays = []
+for d in range(dim):
+    coord_arrays.append(
+        np.linspace(0, 1, args.nb_grid_pts[d], endpoint=False)
+        + 0.5 / args.nb_grid_pts[d]
+    )
+coords = np.meshgrid(*coord_arrays, indexing="ij")
 
 # Create the microstructure (phase field)
 phase = create_microstructure(coords, args.inclusion_type, args.inclusion_radius)
 
 # Create the material stiffness tensor at each pixel
-C_matrix = isotropic_stiffness_2d(args.E_matrix, args.nu)
-C_inclusion = isotropic_stiffness_2d(args.E_inclusion, args.nu)
-
-# Create the FEM gradient operator
-gradient_op = muGrid.FEMGradientOperator(dim, list(grid_spacing))
-
-# Number of quadrature points and nodal points
-nb_quad = gradient_op.nb_quad_pts  # 2 for 2D triangles
-nb_nodes = gradient_op.nb_nodal_pts  # 1 for continuous FEM
-
-# Quadrature weights (area of each triangle)
-quad_weights = np.array(gradient_op.get_quadrature_weights())
+C_matrix = isotropic_stiffness(dim, args.E_matrix, args.nu)
+C_inclusion = isotropic_stiffness(dim, args.E_inclusion, args.nu)
 
 if comm.rank == 0 and not args.quiet:
     print(f"Grid size: {args.nb_grid_pts}")
+    print(f"Dimensions: {dim}D")
     print(f"Grid spacing: {grid_spacing}")
     print(f"Memory location: {args.memory}")
     print(f"Number of quadrature points per pixel: {nb_quad}")
@@ -287,9 +358,10 @@ u_field = decomposition.real_field("u_field", (dim,))
 f_field = decomposition.real_field("f_field", (dim,))
 rhs_field = decomposition.real_field("rhs_field", (dim,))
 
-# Material stiffness at each quadrature point [voigt, voigt, quad, nx, ny]
+# Material stiffness at each quadrature point [voigt, voigt, quad, *grid_shape]
 # Create on host first, then convert to device array if needed
-C_field_np = np.zeros((nb_voigt, nb_voigt, nb_quad, nx, ny))
+C_field_shape = (nb_voigt, nb_voigt, nb_quad) + grid_shape
+C_field_np = np.zeros(C_field_shape)
 for q in range(nb_quad):
     for i in range(nb_voigt):
         for j in range(nb_voigt):
@@ -320,7 +392,7 @@ def compute_strain(u_vec, strain_out):
     u_vec : Field
         Vector displacement field with shape (dim, nb_nodes, pixels)
     strain_out : ndarray
-        Output strain array with shape (dim, dim, quad, pixels)
+        Output strain array with shape (dim, dim, quad, *grid_shape)
     """
     with timer("communicate_ghosts"):
         # Fill ghost values for periodic BC
@@ -335,6 +407,66 @@ def compute_strain(u_vec, strain_out):
     strain_out[...] = 0.5 * (grad + grad.swapaxes(0, 1))
 
 
+def strain_to_voigt(strain):
+    """
+    Convert strain tensor to Voigt notation.
+
+    Parameters
+    ----------
+    strain : ndarray
+        Strain tensor with shape (dim, dim, quad, *grid_shape)
+
+    Returns
+    -------
+    eps_voigt : ndarray
+        Strain in Voigt notation with shape (nb_voigt, quad, *grid_shape)
+    """
+    voigt_shape = (nb_voigt, nb_quad) + grid_shape
+    eps_voigt = arr.zeros(voigt_shape)
+
+    if dim == 2:
+        eps_voigt[0, ...] = strain[0, 0, ...]  # exx
+        eps_voigt[1, ...] = strain[1, 1, ...]  # eyy
+        eps_voigt[2, ...] = 2 * strain[0, 1, ...]  # 2*exy (engineering shear)
+    else:  # dim == 3
+        eps_voigt[0, ...] = strain[0, 0, ...]  # exx
+        eps_voigt[1, ...] = strain[1, 1, ...]  # eyy
+        eps_voigt[2, ...] = strain[2, 2, ...]  # ezz
+        eps_voigt[3, ...] = 2 * strain[1, 2, ...]  # 2*eyz (engineering shear)
+        eps_voigt[4, ...] = 2 * strain[0, 2, ...]  # 2*exz (engineering shear)
+        eps_voigt[5, ...] = 2 * strain[0, 1, ...]  # 2*exy (engineering shear)
+
+    return eps_voigt
+
+
+def voigt_to_stress(sig_voigt, stress):
+    """
+    Convert stress from Voigt notation to tensor.
+
+    Parameters
+    ----------
+    sig_voigt : ndarray
+        Stress in Voigt notation with shape (nb_voigt, quad, *grid_shape)
+    stress : ndarray
+        Output stress tensor with shape (dim, dim, quad, *grid_shape)
+    """
+    if dim == 2:
+        stress[0, 0, ...] = sig_voigt[0, ...]  # sxx
+        stress[1, 1, ...] = sig_voigt[1, ...]  # syy
+        stress[0, 1, ...] = sig_voigt[2, ...]  # sxy
+        stress[1, 0, ...] = sig_voigt[2, ...]  # syx
+    else:  # dim == 3
+        stress[0, 0, ...] = sig_voigt[0, ...]  # sxx
+        stress[1, 1, ...] = sig_voigt[1, ...]  # syy
+        stress[2, 2, ...] = sig_voigt[2, ...]  # szz
+        stress[1, 2, ...] = sig_voigt[3, ...]  # syz
+        stress[2, 1, ...] = sig_voigt[3, ...]  # szy
+        stress[0, 2, ...] = sig_voigt[4, ...]  # sxz
+        stress[2, 0, ...] = sig_voigt[4, ...]  # szx
+        stress[0, 1, ...] = sig_voigt[5, ...]  # sxy
+        stress[1, 0, ...] = sig_voigt[5, ...]  # syx
+
+
 def compute_stress(strain, stress, C):
     """
     Compute stress from strain using Voigt notation.
@@ -342,18 +474,15 @@ def compute_stress(strain, stress, C):
     Parameters
     ----------
     strain : ndarray
-        Strain tensor with shape (dim, dim, quad, pixels)
+        Strain tensor with shape (dim, dim, quad, *grid_shape)
     stress : ndarray
-        Output stress tensor with shape (dim, dim, quad, pixels)
+        Output stress tensor with shape (dim, dim, quad, *grid_shape)
     C : ndarray
-        Material stiffness in Voigt notation (nb_voigt, nb_voigt, quad, pixels)
+        Material stiffness in Voigt notation (nb_voigt, nb_voigt, quad, *grid_shape)
     """
     with timer("compute_stress"):
-        # Convert strain to Voigt: [voigt, quad, nx, ny]
-        eps_voigt = arr.zeros((nb_voigt, nb_quad, nx, ny))
-        eps_voigt[0, ...] = strain[0, 0, ...]  # exx
-        eps_voigt[1, ...] = strain[1, 1, ...]  # eyy
-        eps_voigt[2, ...] = 2 * strain[0, 1, ...]  # 2*exy (engineering shear)
+        # Convert strain to Voigt notation
+        eps_voigt = strain_to_voigt(strain)
 
         # Compute stress in Voigt: sig = C @ eps
         if args.memory == "host":
@@ -363,10 +492,7 @@ def compute_stress(strain, stress, C):
             sig_voigt = arr.einsum("ijq...,jq...->iq...", C, eps_voigt)
 
         # Convert back to tensor
-        stress[0, 0, ...] = sig_voigt[0, ...]  # sxx
-        stress[1, 1, ...] = sig_voigt[1, ...]  # syy
-        stress[0, 1, ...] = sig_voigt[2, ...]  # sxy
-        stress[1, 0, ...] = sig_voigt[2, ...]  # syx
+        voigt_to_stress(sig_voigt, stress)
 
 
 def compute_divergence(stress, f_vec):
@@ -387,9 +513,9 @@ def compute_divergence(stress, f_vec):
     Parameters
     ----------
     stress : ndarray
-        Stress tensor with shape (dim, dim, quad, pixels)
+        Stress tensor with shape (dim, dim, quad, *grid_shape)
     f_vec : Field
-        Output vector force field with shape (dim, nb_nodes, pixels)
+        Output vector force field with shape (dim, nb_nodes, *grid_shape)
     """
     # Copy stress to field and fill ghost values
     stress_field.s[...] = stress
@@ -403,9 +529,10 @@ def compute_divergence(stress, f_vec):
         gradient_op.transpose(stress_field, f_vec, list(quad_weights))
 
 
-# Temporary arrays for strain and stress [dim, dim, quad, nx, ny]
-strain_arr = arr.zeros((dim, dim, nb_quad, nx, ny))
-stress_arr = arr.zeros((dim, dim, nb_quad, nx, ny))
+# Temporary arrays for strain and stress [dim, dim, quad, *grid_shape]
+strain_shape = (dim, dim, nb_quad) + grid_shape
+strain_arr = arr.zeros(strain_shape)
+stress_arr = arr.zeros(strain_shape)
 
 
 def apply_stiffness(u_in, f_out):
@@ -444,7 +571,7 @@ def compute_rhs(E_macro, rhs_out):
         Output field for RHS (modified in place)
     """
     # Create uniform strain field from macroscopic strain
-    eps_macro = arr.zeros((dim, dim, nb_quad, nx, ny))
+    eps_macro = arr.zeros(strain_shape)
     for i in range(dim):
         for j in range(dim):
             eps_macro[i, j, ...] = E_macro[i, j]
@@ -461,12 +588,22 @@ def compute_rhs(E_macro, rhs_out):
 # Storage for homogenized stiffness
 C_eff = np.zeros((nb_voigt, nb_voigt))
 
-# Macroscopic strain cases for 2D
-strain_cases = [
-    (0, 0),  # xx
-    (1, 1),  # yy
-    (0, 1),  # xy
-]
+# Macroscopic strain cases
+if dim == 2:
+    strain_cases = [
+        (0, 0),  # xx
+        (1, 1),  # yy
+        (0, 1),  # xy
+    ]
+else:  # dim == 3
+    strain_cases = [
+        (0, 0),  # xx
+        (1, 1),  # yy
+        (2, 2),  # zz
+        (1, 2),  # yz
+        (0, 2),  # xz
+        (0, 1),  # xy
+    ]
 
 if comm.rank == 0 and not args.quiet:
     print("=" * 60)
@@ -483,7 +620,7 @@ with timer("total_solve"):
         if i != j:
             E_macro[j, i] = 1.0  # Symmetric
 
-        voigt_col = voigt_index_2d(i, j)
+        voigt_col = voigt_index(dim, i, j)
 
         if comm.rank == 0 and not args.quiet:
             print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
@@ -562,15 +699,28 @@ with timer("total_solve"):
         sig_avg /= total_volume
 
         # Store in homogenized stiffness (column voigt_col)
-        C_eff[0, voigt_col] = sig_avg[0, 0]  # Sigma_xx
-        C_eff[1, voigt_col] = sig_avg[1, 1]  # Sigma_yy
-        C_eff[2, voigt_col] = sig_avg[0, 1]  # Sigma_xy
+        for k in range(dim):
+            for L in range(dim):
+                voigt_row = voigt_index(dim, k, L)
+                # Only store unique components (upper triangle in tensor, all in Voigt)
+                if k <= L:
+                    C_eff[voigt_row, voigt_col] = sig_avg[k, L]
 
         if comm.rank == 0 and not args.quiet:
-            print(
-                f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
-                f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
-            )
+            if dim == 2:
+                print(
+                    f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
+                    f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
+                )
+            else:
+                print(
+                    f"  Average stress: xx={sig_avg[0, 0]:.6f}, yy={sig_avg[1, 1]:.6f}, "
+                    f"zz={sig_avg[2, 2]:.6f}"
+                )
+                print(
+                    f"                  yz={sig_avg[1, 2]:.6f}, xz={sig_avg[0, 2]:.6f}, "
+                    f"xy={sig_avg[0, 1]:.6f}"
+                )
 
 # Get timing information
 elapsed_time = timer.get_time("total_solve")
@@ -643,10 +793,15 @@ elif comm.rank == 0:
     print("\n" + "=" * 60)
     print("Homogenized stiffness tensor (Voigt notation)")
     print("=" * 60)
-    print("\n       xx         yy         xy")
-    print(f"xx  {C_eff[0, 0]:10.6f} {C_eff[0, 1]:10.6f} {C_eff[0, 2]:10.6f}")
-    print(f"yy  {C_eff[1, 0]:10.6f} {C_eff[1, 1]:10.6f} {C_eff[1, 2]:10.6f}")
-    print(f"xy  {C_eff[2, 0]:10.6f} {C_eff[2, 1]:10.6f} {C_eff[2, 2]:10.6f}")
+
+    # Print header
+    header = "      " + "".join(f"{lbl:>10}" for lbl in voigt_labels)
+    print(header)
+
+    # Print matrix
+    for i, row_label in enumerate(voigt_labels):
+        row = f"{row_label:>4}  " + "".join(f"{C_eff[i, j]:10.6f}" for j in range(nb_voigt))
+        print(row)
 
     print("\n" + "=" * 60)
     print("Comparison with analytical bounds")
@@ -660,6 +815,7 @@ elif comm.rank == 0:
     print("Performance Summary")
     print("=" * 60)
     print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = {nb_grid_pts_total:,} points")
+    print(f"Dimensions: {dim}D")
     print(f"Memory location: {args.memory}")
     print(f"Total CG iterations: {total_iterations}")
     print(f"Stiffness operator calls: {nb_stiffness_calls}")
@@ -679,9 +835,11 @@ elif comm.rank == 0:
     # Print hierarchical timing breakdown
     timer.print_summary()
 
-# Optional plotting
+# Optional plotting (2D only)
 if args.plot and comm.rank == 0:
-    if plt is None:
+    if dim == 3:
+        print("Warning: Plotting not supported for 3D grids")
+    elif plt is None:
         print("Warning: matplotlib not available, cannot show plot")
     else:
         fig, axes = plt.subplots(1, 3, figsize=(12, 4))
