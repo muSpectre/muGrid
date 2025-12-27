@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import time
 
 try:
     import matplotlib.pyplot as plt
@@ -11,6 +12,15 @@ import numpy as np
 
 import muGrid
 from muGrid.Solvers import conjugate_gradients
+
+# Try to import pypapi for hardware counter access (optional)
+try:
+    import pypapi
+    from pypapi import events as papi_events
+
+    PAPI_AVAILABLE = True
+except ImportError:
+    PAPI_AVAILABLE = False
 
 try:
     from mpi4py import MPI
@@ -76,6 +86,12 @@ parser.add_argument(
     "--json",
     action="store_true",
     help="Output results in JSON format (implies --quiet)"
+)
+
+parser.add_argument(
+    "--papi",
+    action="store_true",
+    help="Use PAPI hardware counters for performance measurement (requires pypapi)"
 )
 
 args = parser.parse_args()
@@ -192,6 +208,33 @@ def hessp(x, Ax):
     return Ax
 
 
+# Initialize PAPI if available, requested, and on host (PAPI doesn't work for GPU)
+papi_values = {}
+use_papi = args.papi and PAPI_AVAILABLE and args.memory == _memory_locations["host"]
+if args.papi and not PAPI_AVAILABLE:
+    if not args.quiet:
+        print("Warning: PAPI requested but pypapi not available. Install with: pip install pypapi")
+if args.papi and args.memory != _memory_locations["host"]:
+    if not args.quiet:
+        print("Warning: PAPI not available for device memory (GPU). Using estimates only.")
+
+papi_enabled = False
+if use_papi:
+    try:
+        papi_events_list = [
+            papi_events.PAPI_TOT_CYC,  # Total cycles
+            papi_events.PAPI_TOT_INS,  # Total instructions
+            papi_events.PAPI_FP_OPS,   # Floating point operations
+            papi_events.PAPI_L1_DCM,   # L1 data cache misses
+            papi_events.PAPI_L2_DCM,   # L2 data cache misses
+            papi_events.PAPI_L3_TCM,   # L3 total cache misses
+        ]
+        pypapi.papi_high.start_counters(papi_events_list)
+        papi_enabled = True
+    except Exception as e:
+        if not args.quiet:
+            print(f"Warning: Could not initialize PAPI: {e}")
+
 converged = False
 with timer("conjugate_gradients"):
     try:
@@ -211,6 +254,22 @@ with timer("conjugate_gradients"):
     except RuntimeError:
         if not args.quiet:
             print("CG did not converge.")
+
+# Read PAPI counters
+if papi_enabled:
+    try:
+        counters = pypapi.papi_high.stop_counters()
+        papi_values = {
+            "cycles": counters[0],
+            "instructions": counters[1],
+            "fp_ops": counters[2],
+            "l1_dcm": counters[3],
+            "l2_dcm": counters[4],
+            "l3_tcm": counters[5],
+        }
+    except Exception as e:
+        if not args.quiet:
+            print(f"Warning: Could not read PAPI counters: {e}")
 
 elapsed_time = timer.get_time("conjugate_gradients")
 
@@ -239,6 +298,15 @@ apply_time = timer.get_time("conjugate_gradients/hessp/apply")
 apply_throughput = total_bytes / apply_time if apply_time > 0 else 0
 apply_flops_rate = total_flops / apply_time if apply_time > 0 else 0
 
+# Calculate actual FLOP rate from PAPI if available
+papi_flops_rate = None
+papi_ipc = None
+if papi_values:
+    if papi_values.get("fp_ops") is not None and elapsed_time > 0:
+        papi_flops_rate = papi_values["fp_ops"] / elapsed_time
+    if papi_values.get("cycles") and papi_values.get("instructions"):
+        papi_ipc = papi_values["instructions"] / papi_values["cycles"]
+
 if args.json:
     # JSON output (convert numpy types to Python types for JSON serialization)
     results = {
@@ -259,14 +327,25 @@ if args.json:
             "bytes_per_iteration": int(bytes_per_hessp),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_iteration": int(flops_per_hessp),
-            "total_flops": int(total_flops),
-            "flops_rate_GFLOPs": float(flops_rate / 1e9),
+            "flops_per_iteration_estimated": int(flops_per_hessp),
+            "total_flops_estimated": int(total_flops),
+            "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
             "arithmetic_intensity": float(arithmetic_intensity),
             "apply_time_seconds": float(apply_time),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
-            "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
+            "apply_flops_rate_GFLOPs_estimated": float(apply_flops_rate / 1e9),
         },
+        "papi": {
+            "available": papi_enabled,
+            "cycles": papi_values.get("cycles"),
+            "instructions": papi_values.get("instructions"),
+            "fp_ops": papi_values.get("fp_ops"),
+            "flops_rate_GFLOPs_measured": float(papi_flops_rate / 1e9) if papi_flops_rate else None,
+            "ipc": float(papi_ipc) if papi_ipc else None,
+            "l1_dcm": papi_values.get("l1_dcm"),
+            "l2_dcm": papi_values.get("l2_dcm"),
+            "l3_tcm": papi_values.get("l3_tcm"),
+        } if papi_enabled else {"available": False},
         "timing": timer.to_dict(),
     }
     print(json.dumps(results, indent=2))
@@ -294,6 +373,31 @@ else:
     print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
 
     print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")
+
+    # PAPI hardware counters (if available)
+    if papi_values:
+        print(f"\n{'-'*60}")
+        print("PAPI Hardware Counters (measured):")
+        print(f"{'-'*60}")
+        if papi_values.get("fp_ops") is not None:
+            print(f"  Floating-point ops: {papi_values['fp_ops']:,}")
+            if papi_flops_rate:
+                print(f"  FLOP rate (measured): {papi_flops_rate / 1e9:.2f} GFLOP/s")
+                ratio = papi_values['fp_ops'] / total_flops if total_flops > 0 else 0
+                print(f"  Measured/Estimated ratio: {ratio:.2f}")
+        if papi_values.get("cycles") is not None:
+            print(f"  CPU cycles: {papi_values['cycles']:,}")
+        if papi_values.get("instructions") is not None:
+            print(f"  Instructions: {papi_values['instructions']:,}")
+        if papi_ipc is not None:
+            print(f"  Instructions per cycle (IPC): {papi_ipc:.2f}")
+        if papi_values.get("l1_dcm") is not None:
+            print(f"  L1 data cache misses: {papi_values['l1_dcm']:,}")
+        if papi_values.get("l2_dcm") is not None:
+            print(f"  L2 data cache misses: {papi_values['l2_dcm']:,}")
+        if papi_values.get("l3_tcm") is not None:
+            print(f"  L3 total cache misses: {papi_values['l3_tcm']:,}")
+
     print(f"{'='*60}")
 
     # Print hierarchical timing breakdown
