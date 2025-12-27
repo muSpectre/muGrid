@@ -37,21 +37,20 @@ Creating FFT fields
 *******************
 
 The FFT engine manages two field collections: one for real-space fields and one for
-Fourier-space fields. Use the convenience functions to create fields:
+Fourier-space fields. Use the engine's methods to create fields:
 
 .. code-block:: python
 
     import muGrid
-    from muGrid import fft_real_space_field, fft_fourier_space_field
 
     engine = muGrid.FFTEngine([16, 20])
 
     # Create real-space field (real-valued)
-    real_field = fft_real_space_field(engine, "real")
+    real_field = engine.real_space_field("real")
     print(f"Real field shape: {real_field.s.shape}")  # (1, 1, 16, 20)
 
     # Create Fourier-space field (complex-valued)
-    fourier_field = fft_fourier_space_field(engine, "fourier")
+    fourier_field = engine.fourier_space_field("fourier")
     print(f"Fourier field shape: {fourier_field.s.shape}")  # (1, 1, 9, 20)
 
 Forward and inverse transforms

@@ -40,7 +40,6 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal
 
 import muGrid
-from muGrid import fft_fourier_space_field, fft_real_space_field
 
 
 class FFTUtilsTest(unittest.TestCase):
@@ -167,27 +166,27 @@ class FFTFieldTest(unittest.TestCase):
 
     def test_create_real_field(self):
         """Test creating real-space field."""
-        field = fft_real_space_field(self.engine_2d, "test_real")
+        field = self.engine_2d.real_space_field("test_real")
         self.assertEqual(field.name, "test_real")
         self.assertEqual(field.s.shape, (1, 1, 16, 20))
 
     def test_create_fourier_field(self):
         """Test creating Fourier-space field."""
-        field = fft_fourier_space_field(self.engine_2d, "test_fourier")
+        field = self.engine_2d.fourier_space_field("test_fourier")
         self.assertEqual(field.name, "test_fourier")
         self.assertEqual(field.s.shape, (1, 1, 9, 20))  # Half-complex
 
     def test_field_data_types(self):
         """Test field data types."""
-        real_field = fft_real_space_field(self.engine_2d, "real")
-        fourier_field = fft_fourier_space_field(self.engine_2d, "fourier")
+        real_field = self.engine_2d.real_space_field("real")
+        fourier_field = self.engine_2d.fourier_space_field("fourier")
 
         self.assertEqual(real_field.s.dtype, np.float64)
         self.assertEqual(fourier_field.s.dtype, np.complex128)
 
     def test_field_pixel_layout(self):
         """Test pixel layout access."""
-        real_field = fft_real_space_field(self.engine_2d, "real_p")
+        real_field = self.engine_2d.real_space_field("real_p")
 
         # SubPt layout: (components, sub_pts, nx, ny)
         self.assertEqual(real_field.s.shape, (1, 1, 16, 20))
@@ -197,15 +196,15 @@ class FFTFieldTest(unittest.TestCase):
 
     def test_field_3d_shapes(self):
         """Test 3D field shapes."""
-        real_field = fft_real_space_field(self.engine_3d, "real_3d")
-        fourier_field = fft_fourier_space_field(self.engine_3d, "fourier_3d")
+        real_field = self.engine_3d.real_space_field("real_3d")
+        fourier_field = self.engine_3d.fourier_space_field("fourier_3d")
 
         self.assertEqual(real_field.s.shape, (1, 1, 8, 10, 12))
         self.assertEqual(fourier_field.s.shape, (1, 1, 5, 10, 12))
 
     def test_field_write_access(self):
         """Test that field data can be written."""
-        field = fft_real_space_field(self.engine_2d, "writable")
+        field = self.engine_2d.real_space_field("writable")
         field.s[:] = 1.0
         self.assertTrue(np.all(field.s == 1.0))
 
@@ -219,8 +218,8 @@ class FFTRoundtripTest(unittest.TestCase):
     def test_2d_roundtrip_sine(self):
         """Test 2D FFT roundtrip with sine wave."""
         engine = muGrid.FFTEngine([16, 20])
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Initialize with sine wave
         x = np.arange(16 * 20).reshape(1, 1, 16, 20)
@@ -228,8 +227,8 @@ class FFTRoundtripTest(unittest.TestCase):
         original = real_field.s.copy()
 
         # Forward and inverse FFT
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
 
         # Normalize
         real_field.s[:] *= engine.normalisation
@@ -240,8 +239,8 @@ class FFTRoundtripTest(unittest.TestCase):
     def test_2d_roundtrip_random(self):
         """Test 2D FFT roundtrip with random data."""
         engine = muGrid.FFTEngine([16, 20])
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Initialize with random data
         np.random.seed(42)
@@ -249,8 +248,8 @@ class FFTRoundtripTest(unittest.TestCase):
         original = real_field.s.copy()
 
         # Forward and inverse FFT
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
         real_field.s[:] *= engine.normalisation
 
         # Check roundtrip
@@ -259,8 +258,8 @@ class FFTRoundtripTest(unittest.TestCase):
     def test_3d_roundtrip(self):
         """Test 3D FFT roundtrip."""
         engine = muGrid.FFTEngine([8, 10, 12])
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Initialize
         np.random.seed(42)
@@ -268,8 +267,8 @@ class FFTRoundtripTest(unittest.TestCase):
         original = real_field.s.copy()
 
         # Forward and inverse FFT
-        engine.fft(real_field._cpp, fourier_field._cpp)
-        engine.ifft(fourier_field._cpp, real_field._cpp)
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
         real_field.s[:] *= engine.normalisation
 
         # Check roundtrip
@@ -278,13 +277,13 @@ class FFTRoundtripTest(unittest.TestCase):
     def test_fft_dc_component(self):
         """Test that constant field has only DC component."""
         engine = muGrid.FFTEngine([8, 10])
-        real_field = fft_real_space_field(engine, "real")
-        fourier_field = fft_fourier_space_field(engine, "fourier")
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
 
         # Constant field
         real_field.s[:] = 5.0
 
-        engine.fft(real_field._cpp, fourier_field._cpp)
+        engine.fft(real_field, fourier_field)
 
         # DC component should be sum = 5 * 80 = 400
         self.assertAlmostEqual(fourier_field.s[0, 0, 0, 0].real, 400.0, places=10)
