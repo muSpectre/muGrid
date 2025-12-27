@@ -239,14 +239,16 @@ if comm.rank == 0 and not args.quiet:
     print()
 
 # Create muGrid fields for gradient operations.
-# The FEM gradient operator maps scalar fields: (sub_pts, pixels) -> (operators, quad, pixels)
-# For vector displacement, we apply the gradient component by component.
+# The FEM gradient operator now supports multi-component fields:
+# - Input: vector field with (dim,) components -> shape (dim, sub_pts, pixels)
+# - Output: tensor field with (dim, dim) components at quad pts
+#   (dim input components × dim operators)
 #
-# Scalar working fields for gradient operator:
-u_nodal = decomposition.real_field("u_nodal")  # scalar field at pixels
-grad_u = decomposition.real_field("grad_u", (dim,), "quad")  # (dim,) operators at quad pts
-f_nodal = decomposition.real_field("f_nodal")  # scalar field at pixels
-stress_comp = decomposition.real_field("stress_comp", (dim,), "quad")  # stress row at quad
+# Vector/tensor fields for direct gradient operations:
+u_nodal = decomposition.real_field("u_nodal", (dim,))  # vector displacement at pixels
+grad_u = decomposition.real_field("grad_u", (dim, dim), "quad")  # displacement gradient tensor
+f_nodal = decomposition.real_field("f_nodal", (dim,))  # vector force at pixels
+stress_field = decomposition.real_field("stress_field", (dim, dim), "quad")  # stress tensor
 
 # Create vector fields for CG solver (displacement and force vectors)
 u_field = decomposition.real_field("u_field", (dim,))
@@ -265,9 +267,10 @@ def compute_strain(u_vec, strain_out):
     """
     Compute strain from displacement field.
 
-    The gradient operator is applied component by component:
-    - For each displacement component i, compute ∂u_i/∂x_j for all j
-    - Assemble into strain tensor: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
+    The gradient operator directly handles vector input:
+    - Input: vector field u with (dim,) components
+    - Output: tensor field ∂u_i/∂x_j with (dim, dim) components
+    - Strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
 
     Parameters
     ----------
@@ -276,25 +279,18 @@ def compute_strain(u_vec, strain_out):
     strain_out : ndarray
         Output strain array with shape (dim, dim, quad, pixels)
     """
-    # Temporary array for displacement gradient tensor
-    grad_arr = np.zeros((dim, dim, nb_quad, nx, ny))
+    # Copy displacement to working field
+    u_nodal.s[...] = u_vec.s
 
-    # Compute gradient component by component
-    for i in range(dim):
-        # Copy component i to scalar field
-        u_nodal.s[...] = u_vec.s[i, ...]
+    # Fill ghost values for periodic BC
+    decomposition.communicate_ghosts(u_nodal)
 
-        # Fill ghost values for periodic BC
-        decomposition.communicate_ghosts(u_nodal)
-
-        # Compute gradient: grad_u.s[j, ...] = ∂u_i/∂x_j
-        gradient_op.apply(u_nodal, grad_u)
-
-        # Store in gradient tensor
-        grad_arr[i, ...] = grad_u.s
+    # Compute gradient tensor: grad_u.s[i, j, ...] = ∂u_i/∂x_j
+    gradient_op.apply(u_nodal, grad_u)
 
     # Compute symmetric strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
-    strain_out[...] = 0.5 * (grad_arr + grad_arr.swapaxes(0, 1))
+    grad = grad_u.s
+    strain_out[...] = 0.5 * (grad + grad.swapaxes(0, 1))
 
 
 def compute_stress(strain, stress, C):
@@ -330,12 +326,10 @@ def compute_divergence(stress, f_vec):
     """
     Compute divergence of stress tensor.
 
-    The transpose of the gradient operator computes:
-    f_i = Σ_j ∂σ_ij/∂x_j (divergence of stress)
-
-    The divergence is computed component by component:
-    - For each force component i, apply transpose to stress row σ_{i,:}
-    - stress_comp.s[j, ...] = σ_{ij} -> f_nodal.s = Σ_j ∂σ_{ij}/∂x_j
+    The transpose of the gradient operator directly handles tensor input:
+    - Input: stress tensor with (dim, dim) components
+    - Output: force vector with (dim,) components
+    - f_i = Σ_j ∂σ_ij/∂x_j (divergence of stress)
 
     With two-sided ghosts:
     1. We fill ghost pixel stresses via communicate_ghosts (periodic copies)
@@ -350,23 +344,19 @@ def compute_divergence(stress, f_vec):
     f_vec : Field
         Output vector force field with shape (dim, nb_nodes, pixels)
     """
-    # Clear output force field
-    f_vec.pg[...] = 0.0
+    # Copy stress to working field
+    stress_field.s[...] = stress
 
-    # Compute divergence component by component
-    for i in range(dim):
-        # Copy stress row i to working field: stress_comp[j] = σ_{ij}
-        stress_comp.s[...] = stress[i, ...]
+    # Fill ghost pixel stresses (periodic boundary condition)
+    decomposition.communicate_ghosts(stress_field)
 
-        # Fill ghost pixel stresses (periodic boundary condition)
-        decomposition.communicate_ghosts(stress_comp)
+    # Apply transpose (divergence) with quadrature weights
+    # The transpose sums over operators (j direction) for each input component (i)
+    f_nodal.pg[...] = 0.0
+    gradient_op.transpose(stress_field, f_nodal, list(quad_weights))
 
-        # Apply transpose (divergence) with quadrature weights
-        f_nodal.pg[...] = 0.0
-        gradient_op.transpose(stress_comp, f_nodal, list(quad_weights))
-
-        # Copy result to output
-        f_vec.s[i, ...] = f_nodal.s
+    # Copy result to output
+    f_vec.s[...] = f_nodal.s
 
 
 # Temporary arrays for strain and stress [dim, dim, quad, nx, ny]
