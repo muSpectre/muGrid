@@ -42,7 +42,7 @@ jobs:
         with:
           cuda: '12.6.3'
           method: 'network'
-          sub-packages: '["nvcc", "cudart-dev"]'
+          sub-packages: '["nvcc", "cudart-dev", "nvrtc-dev"]'
           non-cuda-sub-packages: '["libcufft-dev"]'
 
       - name: Show GPU info
