@@ -380,7 +380,9 @@ def test_reduce_ghosts_adjoint_property(comm, nb_subdivisions):
     where <.,.> is the inner product over the full domain (including ghosts).
     """
     spatial_dim = len(nb_subdivisions)
-    nb_pts_per_dim = 4
+    # Use enough points to ensure every rank has at least 1 interior point
+    # even with maximum subdivision (8 in any dimension for 8 processes)
+    nb_pts_per_dim = max(8, max(nb_subdivisions))
     nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
     nb_ghosts_left = np.full(spatial_dim, 1)
     nb_ghosts_right = np.full(spatial_dim, 1)
