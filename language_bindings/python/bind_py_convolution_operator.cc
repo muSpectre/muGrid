@@ -309,19 +309,19 @@ void add_convolution_operator_default(py::module &mod) {
                  >>> coeffs = op.fourier(phases)  # Returns array of shape (10, 10)
                  )pbdoc")
             .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
-            .def_property_readonly("pixel_offset",
+            .def_property_readonly("offset",
                 [](const ConvolutionOperator & op) {
                     const auto& offset = op.get_pixel_offset();
                     return py::array_t<Index_t>(offset.size(), offset.data());
                 },
                 "Stencil offset in number of pixels")
-            .def_property_readonly("stencil_shape",
+            .def_property_readonly("shape",
                 [](const ConvolutionOperator & op) {
                     const auto& shape = op.get_conv_pts_shape();
                     return py::array_t<Index_t>(shape.size(), shape.data());
                 },
                 "Shape of the convolution stencil")
-            .def("get_stencil",
+            .def_property_readonly("coefficients",
                 [](const ConvolutionOperator & op) {
                     const auto& flat_op = op.get_pixel_operator();
                     const auto& stencil_shape = op.get_conv_pts_shape();
@@ -348,11 +348,11 @@ void add_convolution_operator_default(py::module &mod) {
                     return result;
                 },
                 R"pbdoc(
-                Get the stencil coefficients in reshaped form.
+                Stencil coefficients in reshaped form.
 
                 Returns the stencil coefficients with shape
-                (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape),
-                where stencil_shape contains the spatial dimensions of the stencil.
+                (nb_operators, nb_quad_pts, nb_nodal_pts, *shape),
+                where shape contains the spatial dimensions of the stencil.
 
                 Returns
                 -------
@@ -364,7 +364,7 @@ void add_convolution_operator_default(py::module &mod) {
                 >>> # 2D Laplacian stencil
                 >>> stencil_2d = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
                 >>> op = muGrid.ConvolutionOperator([-1, -1], stencil_2d)
-                >>> reshaped = op.get_stencil()
+                >>> reshaped = op.coefficients
                 >>> reshaped.shape  # (1, 1, 1, 3, 3) for 1 operator, 1 quad pt, 1 nodal pt
                 )pbdoc")
             .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
