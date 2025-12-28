@@ -221,6 +221,93 @@ void add_convolution_operator_default(py::module &mod) {
                  "quadrature_point_field"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
                  "Apply transpose convolution to host (CPU) fields")
+            .def("fourier",
+                 [](const ConvolutionOperator & op,
+                    py::array_t<Real, py::array::f_style> phases) {
+                     // Extract buffer info from input phases array
+                     py::buffer_info phases_info = phases.request();
+
+                     // Validate input shape
+                     if (phases_info.ndim < 1) {
+                         throw std::runtime_error("phases array must have at least 1 dimension");
+                     }
+
+                     // First dimension = spatial dimensions; remaining = entries
+                     py::ssize_t nb_components = phases_info.shape[0];
+                     if (nb_components != op.get_spatial_dim()) {
+                         std::ostringstream err_msg;
+                         err_msg << "Phase dimension mismatch: expected "
+                                 << op.get_spatial_dim() << " but got "
+                                 << nb_components;
+                         throw std::runtime_error(err_msg.str());
+                     }
+
+                     // Calculate number of phase vectors and output shape
+                     py::ssize_t nb_entries = 1;
+                     std::vector<py::ssize_t> output_shape;
+                     for (py::ssize_t i = 1; i < phases_info.ndim; ++i) {
+                         output_shape.push_back(phases_info.shape[i]);
+                         nb_entries *= phases_info.shape[i];
+                     }
+
+                     // Create output array for Complex coefficients
+                     py::array_t<muGrid::Complex, py::array::f_style> coeffs(output_shape);
+                     py::buffer_info coeffs_info = coeffs.request();
+
+                     // Loop over all entries, calling fourier() for each phase vector
+                     auto phase_ptr = static_cast<const Real *>(phases_info.ptr);
+                     auto coeffs_ptr = static_cast<muGrid::Complex *>(coeffs_info.ptr);
+
+                     for (py::ssize_t i = 0; i < nb_entries; ++i) {
+                         // Map phase data to Eigen vector
+                         Eigen::Map<const Eigen::VectorXd> phase_vec(phase_ptr, nb_components);
+                         coeffs_ptr[i] = op.fourier(phase_vec);
+                         phase_ptr += nb_components;
+                     }
+
+                     return coeffs;
+                 },
+                 "phases"_a,
+                 R"pbdoc(
+                 Compute the Fourier representation of this convolution operator.
+
+                 This method converts a translationally invariant linear combination of
+                 grid values into a multiplication with a complex number in Fourier space.
+
+                 Parameters
+                 ----------
+                 phases : numpy.ndarray
+                     Array of phase vectors. First dimension must match spatial_dim.
+                     Remaining dimensions represent the batch of phase vectors.
+                     Each phase is the wavevector times cell dimension (lacking factor of 2π).
+
+                     Examples:
+                     - 1D: shape (1,) for single phase, (1, N) for N phases
+                     - 2D: shape (2,) for single phase, (2, N) or (2, M, N) for batches
+                     - 3D: shape (3,) for single phase, (3, N, M, K) for batches
+
+                 Returns
+                 -------
+                 numpy.ndarray of complex128
+                     Complex Fourier coefficients with shape matching the batch dimensions
+                     (i.e., input shape with first dimension removed).
+
+                 Examples
+                 --------
+                 >>> # Single phase vector in 2D
+                 >>> phase = np.array([0.25, 0.5])
+                 >>> coeff = op.fourier(phase)  # Returns scalar complex number
+                 >>>
+                 >>> # Multiple phase vectors in 2D
+                 >>> phases = np.array([[0.1, 0.2, 0.3],
+                 ...                    [0.4, 0.5, 0.6]])  # shape (2, 3)
+                 >>> coeffs = op.fourier(phases)  # Returns array of shape (3,)
+                 >>>
+                 >>> # Grid of phase vectors in 2D
+                 >>> qx, qy = np.meshgrid(np.linspace(0, 1, 10), np.linspace(0, 1, 10))
+                 >>> phases = np.stack([qx, qy], axis=0)  # shape (2, 10, 10)
+                 >>> coeffs = op.fourier(phases)  # Returns array of shape (10, 10)
+                 )pbdoc")
             .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
             .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
             .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)

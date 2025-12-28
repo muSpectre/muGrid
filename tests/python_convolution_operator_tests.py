@@ -453,6 +453,191 @@ def test_convolution_wrong_output_subpt_type_global():
 
 
 # =============================================================================
+# Fourier representation tests
+# =============================================================================
+
+
+class FourierMethodCheck(unittest.TestCase):
+    """Test suite for ConvolutionOperator.fourier() method.
+
+    Tests verify the vectorized Fourier representation computation,
+    comparing against known analytical results for common stencils.
+    """
+
+    def test_fourier_single_phase_1d(self):
+        """Test fourier() with a single phase vector in 1D."""
+        # Create 1D central difference operator: [-1/2, 0, 1/2]
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([0], stencil)
+
+        # Single phase vector
+        phase = np.array([0.25])
+        result = op.fourier(phase)
+
+        # Expected: i*sin(2π*q)
+        expected = 1j * np.sin(2.0 * np.pi * 0.25)
+
+        np.testing.assert_allclose(result, expected, rtol=1e-10)
+
+    def test_fourier_vectorized_1d(self):
+        """Test fourier() with multiple phase vectors in 1D."""
+        # Create 1D central difference operator
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([0], stencil)
+
+        # Multiple phase vectors - shape (1, N)
+        phases = np.array([[0.0, 0.1, 0.25, 0.5]])
+        results = op.fourier(phases)
+
+        # Expected: i*sin(2π*q) for each q
+        expected = 1j * np.sin(2.0 * np.pi * phases[0, :])
+
+        self.assertEqual(results.shape, (4,))
+        np.testing.assert_allclose(results, expected, rtol=1e-10)
+
+    def test_fourier_single_phase_2d(self):
+        """Test fourier() with a single phase vector in 2D."""
+        # Create 2D x-derivative: central differences in x, no y variation
+        stencil = np.array([[-0.5, 0.0, 0.5]])
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Single phase vector
+        phase = np.array([0.25, 0.5])
+        result = op.fourier(phase)
+
+        # Expected: i*sin(2π*qx) (independent of qy)
+        expected = 1j * np.sin(2.0 * np.pi * 0.25)
+
+        np.testing.assert_allclose(result, expected, rtol=1e-10)
+
+    def test_fourier_vectorized_2d_1d_batch(self):
+        """Test fourier() with 1D batch of 2D phase vectors."""
+        # 2D y-derivative: no x variation, central differences in y
+        stencil = np.array([[-0.5], [0.0], [0.5]])
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # 1D batch: shape (2, N)
+        qx = np.array([0.0, 0.1, 0.2])
+        qy = np.array([0.1, 0.2, 0.3])
+        phases = np.stack([qx, qy], axis=0)
+        results = op.fourier(phases)
+
+        # Expected: i*sin(2π*qy) for each qy (independent of qx)
+        expected = 1j * np.sin(2.0 * np.pi * qy)
+
+        self.assertEqual(results.shape, (3,))
+        np.testing.assert_allclose(results, expected, rtol=1e-10)
+
+    def test_fourier_vectorized_2d_grid(self):
+        """Test fourier() with 2D grid of 2D phase vectors."""
+        # 2D Laplacian: 5-point stencil
+        # Pattern:     0  1  0
+        #              1 -4  1
+        #              0  1  0
+        stencil = np.array(
+            [
+                [0.0, 1.0, 0.0],  # x=-1
+                [1.0, -4.0, 1.0],  # x=0
+                [0.0, 1.0, 0.0],  # x=1
+            ]
+        )
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        # Create 2D grid of phases
+        qx = np.linspace(0, 0.5, 5)
+        qy = np.linspace(0, 0.5, 4)
+        qx_grid, qy_grid = np.meshgrid(qx, qy, indexing="ij")
+        phases = np.stack([qx_grid, qy_grid], axis=0)  # shape (2, 5, 4)
+
+        results = op.fourier(phases)
+
+        # Expected: -4*(sin²(π*qx) + sin²(π*qy))
+        sin_x = np.sin(np.pi * qx_grid)
+        sin_y = np.sin(np.pi * qy_grid)
+        expected = -4.0 * (sin_x * sin_x + sin_y * sin_y)
+
+        self.assertEqual(results.shape, (5, 4))
+        np.testing.assert_allclose(results, expected, rtol=1e-10)
+
+    def test_fourier_upwind_difference(self):
+        """Test fourier() for upwind (backward) difference."""
+        # 1D backward difference: [-1, 1, 0]
+        stencil = np.array([-1.0, 1.0, 0.0])
+        op = muGrid.ConvolutionOperator([0], stencil)
+
+        # Test at several phases
+        phases = np.array([[0.0, 0.1, 0.25, 0.5]])
+        results = op.fourier(phases)
+
+        # Expected: 1 - exp(-2πiq)
+        expected = 1.0 - np.exp(-2j * np.pi * phases[0, :])
+
+        np.testing.assert_allclose(results, expected, rtol=1e-10)
+
+    def test_fourier_second_derivative(self):
+        """Test fourier() for second derivative operator."""
+        # 1D second derivative: [1, -2, 1]
+        stencil = np.array([1.0, -2.0, 1.0])
+        op = muGrid.ConvolutionOperator([0], stencil)
+
+        # Test at several phases
+        phases = np.array([[0.0, 0.1, 0.25, 0.5]])
+        results = op.fourier(phases)
+
+        # Expected: -4*sin²(π*q)
+        sin_term = np.sin(np.pi * phases[0, :])
+        expected = -4.0 * sin_term * sin_term
+
+        np.testing.assert_allclose(results, expected, rtol=1e-10)
+
+    def test_fourier_dimension_validation(self):
+        """Test that fourier() validates phase dimension."""
+        # 2D operator
+        stencil = np.array([[-0.5, 0.0, 0.5]])
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Wrong dimension (3D phase for 2D operator)
+        phases_wrong = np.array([[0.1], [0.2], [0.3]])
+
+        with pytest.raises(RuntimeError, match="Phase dimension mismatch"):
+            op.fourier(phases_wrong)
+
+    def test_fourier_zero_phase(self):
+        """Test fourier() at zero phase returns sum of coefficients."""
+        # For gradient operators, sum should be zero (translational invariance)
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([0], stencil)
+
+        phase = np.array([0.0])
+        result = op.fourier(phase)
+
+        # Sum of coefficients is zero for centered differences
+        np.testing.assert_allclose(np.abs(result), 0.0, atol=1e-14)
+
+    def test_fourier_output_dtype(self):
+        """Test that fourier() returns complex128."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([0], stencil)
+
+        phases = np.array([[0.1, 0.2, 0.3]])
+        results = op.fourier(phases)
+
+        self.assertEqual(results.dtype, np.complex128)
+
+    def test_fourier_fortran_order(self):
+        """Test that fourier() preserves Fortran (column-major) order."""
+        stencil = np.array([[-0.5], [0.0], [0.5]])
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Create Fortran-ordered input
+        phases = np.asfortranarray(np.random.rand(2, 10, 10))
+        results = op.fourier(phases)
+
+        # Output should also be Fortran-ordered
+        self.assertTrue(results.flags["F_CONTIGUOUS"])
+
+
+# =============================================================================
 # GPU-specific convolution tests
 # =============================================================================
 
