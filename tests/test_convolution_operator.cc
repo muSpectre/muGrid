@@ -907,10 +907,10 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(fourier_1d_central_difference) {
     // Create a 1D central difference operator: [-1/2, 0, 1/2]
-    // Stencil: y-1, y, y+1
+    // Stencil at positions -1, 0, 1 (centered)
     // This should give Fourier representation: i*sin(2π*q)
 
-    Shape_t pixel_offset{0};  // offset [0]
+    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
     Shape_t conv_pts_shape{3};  // 3 points in stencil
     std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};  // central difference
 
@@ -935,10 +935,10 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(fourier_1d_upwind_difference) {
     // Create a 1D backward (upwind) difference operator: [-1, 1, 0]
-    // Stencil: y-1, y, y+1
+    // Stencil at positions -1, 0, 1
     // This should give Fourier representation: 1 - exp(-2πiq)
 
-    Shape_t pixel_offset{0};
+    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
     Shape_t conv_pts_shape{3};
     std::vector<Real> pixel_operator{-1.0, 1.0, 0.0};  // backward difference
 
@@ -963,10 +963,10 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(fourier_1d_second_derivative) {
     // Create a 1D second derivative operator: [1, -2, 1]
-    // Stencil: y-1, y, y+1
+    // Stencil at positions -1, 0, 1 (centered)
     // This should give Fourier representation: -4*sin²(π*q)
 
-    Shape_t pixel_offset{0};
+    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
     Shape_t conv_pts_shape{3};
     std::vector<Real> pixel_operator{1.0, -2.0, 1.0};  // second derivative
 
@@ -991,10 +991,10 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(fourier_2d_x_derivative) {
     // Create a 2D x-derivative operator using central differences
-    // Stencil in 2D: (x-1,y), (x,y), (x+1,y) with coefficients [-1/2, 0, 1/2]
+    // Stencil at x positions -1, 0, 1; y position 0
     // This should give Fourier representation: i*sin(2π*qx)
 
-    Shape_t pixel_offset{0, 0};  // offset [0, 0]
+    Shape_t pixel_offset{-1, 0};  // offset [-1, 0] for x-centered stencil
     Shape_t conv_pts_shape{3, 1};  // 3 points in x, 1 in y
     // Operator coefficients for x-derivative: [-1/2, 0, 1/2] at y=0
     std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};
@@ -1021,9 +1021,9 @@ namespace muGrid {
 
   BOOST_AUTO_TEST_CASE(fourier_2d_y_derivative) {
     // Create a 2D y-derivative operator using central differences
-    // Stencil in 2D: (x,y-1), (x,y), (x,y+1) with coefficients [-1/2, 0, 1/2]
+    // Stencil at x position 0; y positions -1, 0, 1
 
-    Shape_t pixel_offset{0, 0};
+    Shape_t pixel_offset{0, -1};  // offset [0, -1] for y-centered stencil
     Shape_t conv_pts_shape{1, 3};  // 1 point in x, 3 in y
     std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};
 

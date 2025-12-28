@@ -467,8 +467,9 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_single_phase_1d(self):
         """Test fourier() with a single phase vector in 1D."""
         # Create 1D central difference operator: [-1/2, 0, 1/2]
+        # Stencil at positions -1, 0, 1 (centered)
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([0], stencil)
+        op = muGrid.ConvolutionOperator([-1], stencil)
 
         # Single phase vector
         phase = np.array([0.25])
@@ -482,8 +483,9 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_vectorized_1d(self):
         """Test fourier() with multiple phase vectors in 1D."""
         # Create 1D central difference operator
+        # Stencil at positions -1, 0, 1 (centered)
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([0], stencil)
+        op = muGrid.ConvolutionOperator([-1], stencil)
 
         # Multiple phase vectors - shape (1, N)
         phases = np.array([[0.0, 0.1, 0.25, 0.5]])
@@ -498,8 +500,9 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_single_phase_2d(self):
         """Test fourier() with a single phase vector in 2D."""
         # Create 2D x-derivative: central differences in x, no y variation
+        # Stencil at x positions -1, 0, 1; y position 0
         stencil = np.array([[-0.5, 0.0, 0.5]])
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.ConvolutionOperator([-1, 0], stencil)
 
         # Single phase vector
         phase = np.array([0.25, 0.5])
@@ -513,8 +516,9 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_vectorized_2d_1d_batch(self):
         """Test fourier() with 1D batch of 2D phase vectors."""
         # 2D y-derivative: no x variation, central differences in y
+        # Stencil at x position 0; y positions -1, 0, 1
         stencil = np.array([[-0.5], [0.0], [0.5]])
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.ConvolutionOperator([0, -1], stencil)
 
         # 1D batch: shape (2, N)
         qx = np.array([0.0, 0.1, 0.2])
@@ -562,8 +566,9 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_upwind_difference(self):
         """Test fourier() for upwind (backward) difference."""
         # 1D backward difference: [-1, 1, 0]
+        # Stencil at positions -1, 0, 1
         stencil = np.array([-1.0, 1.0, 0.0])
-        op = muGrid.ConvolutionOperator([0], stencil)
+        op = muGrid.ConvolutionOperator([-1], stencil)
 
         # Test at several phases
         phases = np.array([[0.0, 0.1, 0.25, 0.5]])
@@ -577,8 +582,9 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_second_derivative(self):
         """Test fourier() for second derivative operator."""
         # 1D second derivative: [1, -2, 1]
+        # Stencil at positions -1, 0, 1 (centered)
         stencil = np.array([1.0, -2.0, 1.0])
-        op = muGrid.ConvolutionOperator([0], stencil)
+        op = muGrid.ConvolutionOperator([-1], stencil)
 
         # Test at several phases
         phases = np.array([[0.0, 0.1, 0.25, 0.5]])
@@ -594,7 +600,7 @@ class FourierMethodCheck(unittest.TestCase):
         """Test that fourier() validates phase dimension."""
         # 2D operator
         stencil = np.array([[-0.5, 0.0, 0.5]])
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.ConvolutionOperator([-1, 0], stencil)
 
         # Wrong dimension (3D phase for 2D operator)
         phases_wrong = np.array([[0.1], [0.2], [0.3]])
@@ -606,7 +612,7 @@ class FourierMethodCheck(unittest.TestCase):
         """Test fourier() at zero phase returns sum of coefficients."""
         # For gradient operators, sum should be zero (translational invariance)
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([0], stencil)
+        op = muGrid.ConvolutionOperator([-1], stencil)
 
         phase = np.array([0.0])
         result = op.fourier(phase)
@@ -617,7 +623,7 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_output_dtype(self):
         """Test that fourier() returns complex128."""
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([0], stencil)
+        op = muGrid.ConvolutionOperator([-1], stencil)
 
         phases = np.array([[0.1, 0.2, 0.3]])
         results = op.fourier(phases)
@@ -627,7 +633,7 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_fortran_order(self):
         """Test that fourier() preserves Fortran (column-major) order."""
         stencil = np.array([[-0.5], [0.0], [0.5]])
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.ConvolutionOperator([0, -1], stencil)
 
         # Create Fortran-ordered input
         phases = np.asfortranarray(np.random.rand(2, 10, 10))
