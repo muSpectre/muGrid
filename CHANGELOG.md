@@ -1,6 +1,13 @@
 Change log for µGrid
 ====================
 
+0.99.0 (28Dec25)
+----------------
+
+- ENH: Added `fourier()` method to `ConvolutionOperator` for computing Fourier space representations
+- ENH: Vectorized Python bindings for `ConvolutionOperator.fourier()` supporting batch computation
+- TEST: Comprehensive C++ and Python test suites for Fourier method validation
+
 0.98.1 (28Dec25)
 ----------------
 
