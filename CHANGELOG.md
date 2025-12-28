@@ -1,6 +1,15 @@
 Change log for µGrid
 ====================
 
+0.98.1 (28Dec25)
+----------------
+
+- BUG: Fixed dynamic version detection in publish workflow (was building as 0.0.0)
+- MAINT: Configured setuptools_scm for automatic version discovery from git tags
+- MAINT: Updated PyPI publish action from deprecated @master to @release/v1
+- MAINT: Consolidated setup.cfg and pytest.ini into pyproject.toml
+- MAINT: Removed legacy discover_version.py, .gitattributes, and unused requirements.txt
+
 0.98.0 (27Dec25)
 ----------------
 
