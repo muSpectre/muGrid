@@ -501,7 +501,8 @@ class FourierMethodCheck(unittest.TestCase):
         """Test fourier() with a single phase vector in 2D."""
         # Create 2D x-derivative: central differences in x, no y variation
         # Stencil at x positions -1, 0, 1; y position 0
-        stencil = np.array([[-0.5, 0.0, 0.5]])
+        # Shape (3, 1) means 3 points in x, 1 point in y
+        stencil = np.array([[-0.5], [0.0], [0.5]])
         op = muGrid.ConvolutionOperator([-1, 0], stencil)
 
         # Single phase vector
@@ -517,7 +518,8 @@ class FourierMethodCheck(unittest.TestCase):
         """Test fourier() with 1D batch of 2D phase vectors."""
         # 2D y-derivative: no x variation, central differences in y
         # Stencil at x position 0; y positions -1, 0, 1
-        stencil = np.array([[-0.5], [0.0], [0.5]])
+        # Shape (1, 3) means 1 point in x, 3 points in y
+        stencil = np.array([[-0.5, 0.0, 0.5]])
         op = muGrid.ConvolutionOperator([0, -1], stencil)
 
         # 1D batch: shape (2, N)
