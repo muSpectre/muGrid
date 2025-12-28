@@ -38,6 +38,7 @@
 #include "core/types.hh"
 #include "collection/field_collection_global.hh"
 #include "grid/index_ops.hh"
+#include "grid/pixels.hh"
 #include "util/math.hh"
 #include "grid/iterators.hh"
 #include "core/exception.hh"
@@ -612,6 +613,55 @@ namespace muGrid {
         this->cached_key.reset();
         this->cached_device_apply_op.reset();
         this->cached_device_transpose_op.reset();
+    }
+
+    /* ---------------------------------------------------------------------- */
+    Complex ConvolutionOperator::fourier(const Eigen::VectorXd & phase) const {
+        // Validate phase vector dimension
+        if (phase.size() != this->spatial_dim) {
+            std::stringstream err_msg{};
+            err_msg << "Phase dimension mismatch: expected phase vector of size "
+                    << this->spatial_dim << " but received size " << phase.size();
+            throw RuntimeError{err_msg.str()};
+        }
+
+        // Initialize accumulator
+        Complex s{0.0, 0.0};
+
+        // Helper for conversion between index and coordinates
+        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->conv_pts_shape),
+                                              DynGridIndex(this->pixel_offset)};
+
+        // Loop through all stencil points
+        for (Index_t i_stencil = 0; i_stencil < this->nb_conv_pts; ++i_stencil) {
+            // Get the coordinate of this stencil point
+            const auto stencil_coord{kernel_pixels.get_coord(i_stencil)};
+
+            // Compute the dot product: phase · coordinate
+            Real arg{0.0};
+            for (Index_t i = 0; i < this->spatial_dim; ++i) {
+                arg += phase(i) * static_cast<Real>(stencil_coord[i]);
+            }
+
+            // Sum all operator values for this stencil point
+            Real operator_sum{0.0};
+            for (Index_t i_node = 0; i_node < this->nb_pixelnodal_pts; ++i_node) {
+                for (Index_t i_quad = 0; i_quad < this->nb_quad_pts; ++i_quad) {
+                    for (Index_t i_operator = 0; i_operator < this->nb_operators; ++i_operator) {
+                        // Get the entry via col-major index
+                        const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) *
+                                             this->nb_quad_pts + i_quad) *
+                                             this->nb_operators + i_operator};
+                        operator_sum += this->pixel_operator[op_index];
+                    }
+                }
+            }
+
+            // Accumulate: operator_sum * exp(2πi * arg)
+            s += operator_sum * std::exp(Complex(0.0, 2.0 * pi * arg));
+        }
+
+        return s;
     }
 
     /* ---------------------------------------------------------------------- */
