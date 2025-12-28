@@ -1,6 +1,24 @@
 Change log for µGrid
 ====================
 
+0.101.0 (28Dec25)
+-----------------
+
+- API: Added `fftfreq`, `ifftfreq`, `coords`, `icoords` properties to `FFTEngine`
+  - `fftfreq`: Normalized FFT frequencies for local Fourier subdomain
+  - `ifftfreq`: Integer FFT frequency indices
+  - `coords`: Normalized real-space coordinates for local subdomain
+  - `icoords`: Integer real-space coordinate indices
+  - `coordsg`/`icoordsg`: Same as above but including ghost cells
+  - `spatial_dim`: Returns the spatial dimension (2 or 3)
+- API: Removed standalone FFT frequency functions from module level
+  - `fft_freq`, `fft_freqind`, `rfft_freq`, `rfft_freqind` are no longer available
+  - Use `engine.fftfreq` and `engine.ifftfreq` instead
+- API: Properties now return Python tuples instead of C++ objects
+  - `nb_fourier_grid_pts`, `nb_fourier_subdomain_grid_pts`, `fourier_subdomain_locations`
+  - `nb_subdomain_grid_pts`, `subdomain_locations`, `nb_subdivisions`, `nb_domain_grid_pts`
+- TEST: Comprehensive test suite for FFT frequency and coordinate properties
+
 0.100.0 (28Dec25)
 -----------------
 

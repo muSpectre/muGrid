@@ -64,103 +64,61 @@ using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
 
+/**
+ * Generate real-space coordinate array for a distributed FFT engine.
+ *
+ * Returns an array of shape [dim, local_nx, local_ny, ...] containing
+ * the fractional coordinates for each pixel in the local subdomain.
+ *
+ * For T=Real: coordinates are normalized (in range [0, 1))
+ * For T=Int: coordinates are integer indices
+ *
+ * @tparam T Output type (Real or Int)
+ * @tparam with_ghosts Include ghost cells if true
+ * @param eng The FFT engine
+ * @return numpy array of coordinates
+ */
+template<typename T, bool with_ghosts>
+auto py_fft_coords(const PyFFTEngine & eng) {
+    const auto & real_collection = eng.get_real_space_collection();
+    const auto & pixels = with_ghosts
+        ? real_collection.get_pixels_with_ghosts()
+        : real_collection.get_pixels_without_ghosts();
+    const auto & nb_domain_grid_pts = eng.get_nb_domain_grid_pts();
+    const Index_t dim = eng.get_spatial_dim();
+
+    // Shape: [dim, local_nx, local_ny, ...]
+    std::vector<Index_t> shape;
+    shape.push_back(dim);
+    for (auto && n : pixels.get_nb_subdomain_grid_pts()) {
+        shape.push_back(n);
+    }
+
+    // Strides: first index (dim) is contiguous
+    std::vector<Index_t> strides;
+    strides.push_back(sizeof(T));
+    for (auto && s : pixels.get_strides()) {
+        strides.push_back(s * dim * sizeof(T));
+    }
+
+    py::array_t<T> coords(shape, strides);
+    T * ptr = static_cast<T *>(coords.request().ptr);
+
+    // Iterate over local pixels and compute coordinates
+    for (auto && pix : pixels) {
+        for (Index_t i = 0; i < dim; ++i) {
+            // pix[i] is the global coordinate (may be negative for ghosts)
+            ptr[i] = muGrid::normalize_coord<T>(pix[i], nb_domain_grid_pts[i]);
+        }
+        ptr += dim;
+    }
+
+    return coords;
+}
+
 void add_fft_utils(py::module & mod) {
-  // FFT frequency index functions
-  mod.def(
-      "fft_freqind",
-      [](Index_t n) { return muGrid::fft_freqind(n); },
-      "n"_a,
-      R"(
-      Compute the frequency bin indices for a full c2c FFT.
-
-      For n samples, returns indices [0, 1, ..., n/2-1, -n/2, ..., -1] for even n,
-      or [0, 1, ..., (n-1)/2, -(n-1)/2, ..., -1] for odd n.
-
-      This is equivalent to numpy.fft.fftfreq(n) * n.
-
-      Parameters
-      ----------
-      n : int
-          Number of points in the transform
-
-      Returns
-      -------
-      list of int
-          Vector of integer frequency indices
-      )");
-
-  mod.def(
-      "fft_freq",
-      [](Index_t n, Real d) { return muGrid::fft_freq(n, d); },
-      "n"_a, "d"_a = 1.0,
-      R"(
-      Compute the frequency values for a full c2c FFT.
-
-      Returns frequencies in cycles per unit spacing: f = k / (n * d)
-      where k is the frequency index from fft_freqind.
-
-      This is equivalent to numpy.fft.fftfreq(n, d).
-
-      Parameters
-      ----------
-      n : int
-          Number of points in the transform
-      d : float, optional
-          Sample spacing (default 1.0)
-
-      Returns
-      -------
-      list of float
-          Vector of frequency values
-      )");
-
-  mod.def(
-      "rfft_freqind",
-      [](Index_t n) { return muGrid::rfft_freqind(n); },
-      "n"_a,
-      R"(
-      Compute the frequency bin indices for a r2c (half-complex) FFT.
-
-      For n real input samples, the r2c transform produces n/2+1 complex outputs.
-      Returns indices [0, 1, ..., n/2].
-
-      This is equivalent to numpy.fft.rfftfreq(n) * n.
-
-      Parameters
-      ----------
-      n : int
-          Number of real input points
-
-      Returns
-      -------
-      list of int
-          Vector of integer frequency indices (length n/2+1)
-      )");
-
-  mod.def(
-      "rfft_freq",
-      [](Index_t n, Real d) { return muGrid::rfft_freq(n, d); },
-      "n"_a, "d"_a = 1.0,
-      R"(
-      Compute the frequency values for a r2c (half-complex) FFT.
-
-      Returns frequencies in cycles per unit spacing: f = k / (n * d)
-      where k is the frequency index from rfft_freqind.
-
-      This is equivalent to numpy.fft.rfftfreq(n, d).
-
-      Parameters
-      ----------
-      n : int
-          Number of real input points
-      d : float, optional
-          Sample spacing (default 1.0)
-
-      Returns
-      -------
-      list of float
-          Vector of frequency values (length n/2+1)
-      )");
+  // Note: fft_freqind, fft_freq, rfft_freqind, rfft_freq are now properties
+  // on the FFTEngine class, not standalone functions.
 
   mod.def(
       "get_hermitian_grid_pts",
@@ -367,19 +325,39 @@ void add_fft_engine(py::module & mod) {
            )")
 
       .def_property_readonly("nb_fourier_grid_pts",
-           &PyFFTEngine::get_nb_fourier_grid_pts,
+           [](const PyFFTEngine & self) {
+             return muGrid::to_tuple(self.get_nb_fourier_grid_pts());
+           },
            R"(
            Get the global Fourier grid dimensions.
-           For r2c transform: [Nx/2+1, Ny, Nz]
+           For r2c transform: (Nx/2+1, Ny, Nz)
            )")
 
       .def_property_readonly("nb_fourier_subdomain_grid_pts",
-           &PyFFTEngine::get_nb_fourier_subdomain_grid_pts,
+           [](const PyFFTEngine & self) {
+             return muGrid::to_tuple(self.get_nb_fourier_subdomain_grid_pts());
+           },
            "Get the local Fourier grid dimensions on this rank.")
 
       .def_property_readonly("fourier_subdomain_locations",
-           &PyFFTEngine::get_fourier_subdomain_locations,
+           [](const PyFFTEngine & self) {
+             return muGrid::to_tuple(self.get_fourier_subdomain_locations());
+           },
            "Get the starting location of this rank's Fourier subdomain.")
+
+      .def_property_readonly("nb_subdomain_grid_pts",
+           [](const PyFFTEngine & self) {
+             return muGrid::to_tuple(
+                 self.get_nb_subdomain_grid_pts_without_ghosts());
+           },
+           "Get the local real-space grid dimensions on this rank (excluding ghosts).")
+
+      .def_property_readonly("subdomain_locations",
+           [](const PyFFTEngine & self) {
+             return muGrid::to_tuple(
+                 self.get_subdomain_locations_without_ghosts());
+           },
+           "Get the starting location of this rank's real-space subdomain.")
 
       .def_property_readonly("process_grid",
            [](const PyFFTEngine & self) {
@@ -397,7 +375,119 @@ void add_fft_engine(py::module & mod) {
 
       .def_property_readonly("backend_name",
            &PyFFTEngine::get_backend_name,
-           "Get the name of the FFT backend being used.");
+           "Get the name of the FFT backend being used.")
+
+      .def_property_readonly("spatial_dim",
+           &PyFFTEngine::get_spatial_dim,
+           "Get the spatial dimension (2 or 3).")
+
+      // FFT frequency arrays
+      .def_property_readonly("fftfreq",
+           [](const PyFFTEngine & self) {
+             return muGrid::py_fftfreq<Real, PyFFTEngine>(self);
+           },
+           R"(
+           Get array of normalized FFT frequencies for the local Fourier subdomain.
+
+           Returns an array of shape [dim, local_fx, local_fy, ...] where each
+           element is the normalized frequency in range [-0.5, 0.5).
+
+           For MPI parallel runs, this returns only the frequencies for the
+           local subdomain owned by this rank.
+
+           Returns
+           -------
+           ndarray
+               Array of fractional frequencies
+           )")
+
+      .def_property_readonly("ifftfreq",
+           [](const PyFFTEngine & self) {
+             return muGrid::py_fftfreq<Int, PyFFTEngine>(self);
+           },
+           R"(
+           Get array of integer FFT frequency indices for the local Fourier subdomain.
+
+           Returns an array of shape [dim, local_fx, local_fy, ...] where each
+           element is the integer frequency index.
+
+           For MPI parallel runs, this returns only the frequencies for the
+           local subdomain owned by this rank.
+
+           Returns
+           -------
+           ndarray
+               Array of integer frequency indices
+           )")
+
+      // Real-space coordinate arrays
+      .def_property_readonly("coords",
+           [](const PyFFTEngine & self) {
+             return py_fft_coords<Real, false>(self);
+           },
+           R"(
+           Get array of normalized coordinates for the local real-space subdomain.
+
+           Returns an array of shape [dim, local_nx, local_ny, ...] where each
+           element is the normalized coordinate in range [0, 1).
+
+           Ghost cells are excluded.
+
+           Returns
+           -------
+           ndarray
+               Array of fractional coordinates
+           )")
+
+      .def_property_readonly("icoords",
+           [](const PyFFTEngine & self) {
+             return py_fft_coords<Int, false>(self);
+           },
+           R"(
+           Get array of integer coordinate indices for the local real-space subdomain.
+
+           Returns an array of shape [dim, local_nx, local_ny, ...] where each
+           element is the integer coordinate index.
+
+           Ghost cells are excluded.
+
+           Returns
+           -------
+           ndarray
+               Array of integer coordinate indices
+           )")
+
+      .def_property_readonly("coordsg",
+           [](const PyFFTEngine & self) {
+             return py_fft_coords<Real, true>(self);
+           },
+           R"(
+           Get array of normalized coordinates including ghost cells.
+
+           Returns an array of shape [dim, local_nx+ghosts, local_ny+ghosts, ...]
+           where each element is the normalized coordinate in range [0, 1).
+
+           Returns
+           -------
+           ndarray
+               Array of fractional coordinates including ghosts
+           )")
+
+      .def_property_readonly("icoordsg",
+           [](const PyFFTEngine & self) {
+             return py_fft_coords<Int, true>(self);
+           },
+           R"(
+           Get array of integer coordinate indices including ghost cells.
+
+           Returns an array of shape [dim, local_nx+ghosts, local_ny+ghosts, ...]
+           where each element is the integer coordinate index.
+
+           Returns
+           -------
+           ndarray
+               Array of integer coordinate indices including ghosts
+           )");
 }
 
 void add_fft_classes(py::module & mod) {

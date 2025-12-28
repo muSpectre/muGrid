@@ -40,8 +40,9 @@ except ModuleNotFoundError:
     MPI = None
 
 # Import the C++ extension module
-# Try relative import first (for installed wheels where _muGrid.so is in the package)
-# Fall back to absolute import (for development where _muGrid.so is in build directory)
+# Try relative import first (for installed wheels where _muGrid.so is in the
+# package). Fall back to absolute import (for development where _muGrid.so is
+# in build directory)
 try:
     from . import _muGrid
 except ImportError:
@@ -98,12 +99,10 @@ Unit = _muGrid.Unit
 Verbosity = _muGrid.Verbosity
 
 # FFT utility functions
-fft_freq = _muGrid.fft_freq
-fft_freqind = _muGrid.fft_freqind
+# Note: fft_freq, fft_freqind, rfft_freq, rfft_freqind are now properties
+# on the FFTEngine class (fftfreq, ifftfreq). Use engine.fftfreq instead.
 fft_normalization = _muGrid.fft_normalization
 get_hermitian_grid_pts = _muGrid.get_hermitian_grid_pts
-rfft_freq = _muGrid.rfft_freq
-rfft_freqind = _muGrid.rfft_freqind
 
 # Domain indexing utilities
 get_domain_ccoord = _muGrid.get_domain_ccoord
@@ -144,12 +143,8 @@ __all__ = [
     # Field utilities
     "wrap_field",
     # FFT utilities
-    "fft_freq",
-    "fft_freqind",
     "fft_normalization",
     "get_hermitian_grid_pts",
-    "rfft_freq",
-    "rfft_freqind",
     # Domain utilities
     "get_domain_ccoord",
     "get_domain_index",

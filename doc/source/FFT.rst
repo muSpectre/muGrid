@@ -81,30 +81,138 @@ The reason for leaving normalization to the user is that there are multiple vali
 conventions (normalize forward, normalize inverse, or split between both), and
 different applications may prefer different choices.
 
-Wavevector utilities
-********************
+Frequency and coordinate arrays
+*******************************
 
-*µ*\Grid provides utility functions for working with FFT frequencies:
+The FFT engine provides properties for accessing frequency and coordinate arrays
+that are correctly shaped for the local subdomain. This is particularly useful
+for MPI-parallel computations where each rank only handles a portion of the grid.
+
+Frequency arrays
+================
+
+The ``fftfreq`` and ``ifftfreq`` properties provide FFT frequency arrays:
+
+.. code-block:: python
+
+    import muGrid
+    import numpy as np
+
+    engine = muGrid.FFTEngine([7, 4])
+
+    # Normalized frequencies (range [-0.5, 0.5))
+    qx, qy = engine.fftfreq
+    print(f"fftfreq shape: {engine.fftfreq.shape}")  # (2, 4, 4) for r2c transform
+
+    # Integer frequency indices
+    iqx, iqy = engine.ifftfreq
+    print(f"ifftfreq dtype: {iqx.dtype}")  # integer type
+
+    # These match numpy's frequency arrays (sliced for r2c transform)
+    freq_ref = np.array(np.meshgrid(
+        *(np.fft.fftfreq(n) for n in [7, 4]), indexing="ij"
+    ))
+    freq_ref = freq_ref[:, :4, :]  # Slice for half-complex
+    np.testing.assert_allclose(engine.fftfreq, freq_ref)
+
+The frequency arrays have shape ``[dim, local_fx, local_fy, ...]`` where the first
+axis indexes the spatial dimension and the remaining axes match the local Fourier
+subdomain dimensions.
+
+Coordinate arrays
+=================
+
+The ``coords`` and ``icoords`` properties provide real-space coordinate arrays:
 
 .. code-block:: python
 
     import muGrid
 
-    n = 8
+    engine = muGrid.FFTEngine([7, 4])
 
-    # Integer frequency indices (same as numpy.fft.fftfreq(n) * n)
-    freq_idx = muGrid.fft_freqind(n)
-    print(freq_idx)  # [0, 1, 2, 3, -4, -3, -2, -1]
+    # Normalized coordinates (range [0, 1))
+    x, y = engine.coords
+    print(f"coords shape: {engine.coords.shape}")  # (2, 7, 4)
 
-    # Frequency values with spacing dx
-    dx = 0.1
-    freqs = muGrid.fft_freq(n, dx)  # Same as numpy.fft.fftfreq(n, dx)
+    # Integer coordinate indices
+    ix, iy = engine.icoords
+    print(f"icoords dtype: {ix.dtype}")  # integer type
 
-    # For real FFT (half-complex output)
-    rfft_idx = muGrid.rfft_freqind(n)
-    print(rfft_idx)  # [0, 1, 2, 3, 4]
+    # Verify: integer coords = fractional * n
+    np.testing.assert_allclose(ix, x * 7)
+    np.testing.assert_allclose(iy, y * 4)
 
-    rfft_freqs = muGrid.rfft_freq(n, dx)  # Same as numpy.fft.rfftfreq(n, dx)
+For fields with ghost regions, use ``coordsg`` and ``icoordsg`` to get coordinates
+including the ghost cells:
+
+.. code-block:: python
+
+    engine = muGrid.FFTEngine(
+        [64, 64],
+        nb_ghosts_left=[1, 1],
+        nb_ghosts_right=[1, 1]
+    )
+
+    # Coordinates without ghosts
+    x, y = engine.coords
+
+    # Coordinates with ghosts (larger array)
+    xg, yg = engine.coordsg
+    print(f"Without ghosts: {engine.coords.shape}")   # (2, local_nx, local_ny)
+    print(f"With ghosts: {engine.coordsg.shape}")     # (2, local_nx+2, local_ny+2)
+
+MPI-parallel frequency arrays
+=============================
+
+In MPI-parallel runs, frequency and coordinate arrays return only the data for the
+local subdomain owned by each rank:
+
+.. code-block:: python
+
+    from mpi4py import MPI
+    import muGrid
+
+    comm = muGrid.Communicator(MPI.COMM_WORLD)
+    engine = muGrid.FFTEngine([128, 128], comm)
+
+    # Each rank gets frequencies for its local Fourier subdomain
+    qx, qy = engine.fftfreq
+    print(f"Rank {MPI.COMM_WORLD.rank}: fftfreq shape = {engine.fftfreq.shape}")
+
+    # Coordinates for local real-space subdomain
+    x, y = engine.coords
+    print(f"Rank {MPI.COMM_WORLD.rank}: coords shape = {engine.coords.shape}")
+
+Example: Fourier-space operations
+=================================
+
+A common pattern is using frequency arrays to construct Fourier-space operators:
+
+.. code-block:: python
+
+    import numpy as np
+    import muGrid
+
+    engine = muGrid.FFTEngine([64, 64])
+    qx, qy = engine.fftfreq
+
+    real_field = engine.real_space_field("u")
+    fourier_field = engine.fourier_space_field("u_hat")
+
+    # Initialize with a cosine wave
+    x, y = engine.coords
+    real_field.p[0] = np.cos(2 * np.pi * x)
+
+    # Forward FFT
+    engine.fft(real_field, fourier_field)
+
+    # Compute Laplacian in Fourier space: -4π²(qx² + qy²) * u_hat
+    laplacian_hat = -4 * np.pi**2 * (qx**2 + qy**2) * fourier_field.p[0]
+
+    # Or use integer frequencies for identifying specific modes
+    iqx, iqy = engine.ifftfreq
+    # Find the (1, 0) mode
+    mode_mask = (np.abs(iqx) == 1) & (iqy == 0)
 
 Hermitian grid dimensions
 *************************

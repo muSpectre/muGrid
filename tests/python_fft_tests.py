@@ -45,55 +45,6 @@ import muGrid
 class FFTUtilsTest(unittest.TestCase):
     """Test FFT utility functions."""
 
-    def test_fft_freqind_even(self):
-        """Test fft_freqind for even size (should match numpy)."""
-        freqs = muGrid.fft_freqind(8)
-        expected = [0, 1, 2, 3, -4, -3, -2, -1]
-        assert_array_equal(freqs, expected)
-
-    def test_fft_freqind_odd(self):
-        """Test fft_freqind for odd size (should match numpy)."""
-        freqs = muGrid.fft_freqind(7)
-        expected = [0, 1, 2, 3, -3, -2, -1]
-        assert_array_equal(freqs, expected)
-
-    def test_fft_freqind_matches_numpy(self):
-        """Test that fft_freqind matches numpy.fft.fftfreq * n."""
-        for n in [7, 8, 16, 17]:
-            freqs = muGrid.fft_freqind(n)
-            # numpy.fft.fftfreq returns floats, and astype(int) truncates.
-            # Use round() for proper comparison.
-            expected = np.round(np.fft.fftfreq(n) * n).astype(int)
-            assert_array_equal(freqs, expected, err_msg=f"Failed for n={n}")
-
-    def test_rfft_freqind(self):
-        """Test rfft_freqind (half-complex)."""
-        freqs = muGrid.rfft_freqind(8)
-        expected = [0, 1, 2, 3, 4]
-        assert_array_equal(freqs, expected)
-
-    def test_rfft_freqind_matches_numpy(self):
-        """Test that rfft_freqind matches numpy.fft.rfftfreq * n."""
-        for n in [7, 8, 16, 17]:
-            freqs = muGrid.rfft_freqind(n)
-            # numpy.fft.rfftfreq returns floats, and astype(int) truncates.
-            # Use round() for proper comparison.
-            expected = np.round(np.fft.rfftfreq(n) * n).astype(int)
-            assert_array_equal(freqs, expected, err_msg=f"Failed for n={n}")
-
-    def test_fft_freq(self):
-        """Test fft_freq values."""
-        freqs = muGrid.fft_freq(8, 2.0)
-        # freq = k / (N * dx) where k is frequency index
-        expected = np.fft.fftfreq(8, 2.0)
-        assert_allclose(freqs, expected, rtol=1e-10)
-
-    def test_rfft_freq(self):
-        """Test rfft_freq values."""
-        freqs = muGrid.rfft_freq(8, 2.0)
-        expected = np.fft.rfftfreq(8, 2.0)
-        assert_allclose(freqs, expected, rtol=1e-10)
-
     def test_get_hermitian_grid_pts_2d(self):
         """Test hermitian grid dimensions for 2D."""
         fourier = muGrid.get_hermitian_grid_pts([8, 10])
@@ -293,6 +244,172 @@ class FFTRoundtripTest(unittest.TestCase):
         fourier_copy = fourier_field.s.copy()
         fourier_copy[0, 0, 0, 0] = 0
         assert_allclose(fourier_copy, 0, atol=1e-12)
+
+
+class FFTFrequencyTest(unittest.TestCase):
+    """Test FFT frequency and coordinate properties."""
+
+    def test_fftfreq_2d(self):
+        """Test 2D fftfreq property matches numpy."""
+        nb_grid_pts = [7, 4]
+        nx, ny = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        # Build reference from numpy
+        freq_ref = np.array(
+            np.meshgrid(*(np.fft.fftfreq(n) for n in nb_grid_pts), indexing="ij")
+        )
+        # Slice for half-complex (r2c) transform
+        freq_ref = freq_ref[:, : nx // 2 + 1, :]
+
+        assert_allclose(engine.fftfreq, freq_ref)
+
+    def test_ifftfreq_2d(self):
+        """Test 2D ifftfreq property (integer indices)."""
+        nb_grid_pts = [7, 4]
+        nx, ny = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        # Build reference from numpy
+        freq_ref = np.array(
+            np.meshgrid(
+                *(np.fft.fftfreq(n, 1 / n) for n in nb_grid_pts),
+                indexing="ij",
+            )
+        )
+        freq_ref = freq_ref[:, : nx // 2 + 1, :]
+
+        assert_allclose(engine.ifftfreq, freq_ref)
+
+    def test_fftfreq_3d(self):
+        """Test 3D fftfreq property matches numpy."""
+        nb_grid_pts = [6, 4, 5]
+        nx, ny, nz = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        # Build reference from numpy
+        freq_ref = np.array(
+            np.meshgrid(*(np.fft.fftfreq(n) for n in nb_grid_pts), indexing="ij")
+        )
+        # Slice for half-complex (r2c) transform
+        freq_ref = freq_ref[:, : nx // 2 + 1, :, :]
+
+        assert_allclose(engine.fftfreq, freq_ref)
+
+    def test_coords_2d(self):
+        """Test 2D coords property."""
+        nb_grid_pts = [7, 4]
+        nx, ny = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        x, y = engine.coords
+        xref, yref = np.mgrid[0:nx, 0:ny]
+
+        assert_allclose(x, xref / nx)
+        assert_allclose(y, yref / ny)
+
+    def test_coords_3d(self):
+        """Test 3D coords property."""
+        nb_grid_pts = [7, 4, 5]
+        nx, ny, nz = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        assert_array_equal(engine.coords.shape, [3] + nb_grid_pts)
+
+        x, y, z = engine.coords
+        xref, yref, zref = np.mgrid[0:nx, 0:ny, 0:nz]
+
+        assert_allclose(x, xref / nx)
+        assert_allclose(y, yref / ny)
+        assert_allclose(z, zref / nz)
+
+    def test_icoords_2d(self):
+        """Test 2D icoords property (integer indices)."""
+        nb_grid_pts = [7, 4]
+        nx, ny = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        x, y = engine.coords
+        ix, iy = engine.icoords
+
+        # Integer coords should equal fractional * n
+        assert_allclose(ix, x * nx)
+        assert_allclose(iy, y * ny)
+
+    def test_icoords_dtype(self):
+        """Test that icoords returns integer type."""
+        engine = muGrid.FFTEngine([7, 4])
+        ix, iy = engine.icoords
+        self.assertTrue(np.issubdtype(ix.dtype, np.integer))
+        self.assertTrue(np.issubdtype(iy.dtype, np.integer))
+
+    def test_ifftfreq_dtype(self):
+        """Test that ifftfreq returns integer type."""
+        engine = muGrid.FFTEngine([7, 4])
+        iqx, iqy = engine.ifftfreq
+        self.assertTrue(np.issubdtype(iqx.dtype, np.integer))
+        self.assertTrue(np.issubdtype(iqy.dtype, np.integer))
+
+    def test_frequency_coordinate_consistency(self):
+        """Test that setting Fourier modes using fftfreq produces correct result."""
+        nb_grid_pts = [7, 4]
+        nx, ny = nb_grid_pts
+        engine = muGrid.FFTEngine(nb_grid_pts)
+
+        x, y = engine.coords
+        qx, qy = engine.fftfreq
+
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        # Set a single x-direction mode
+        fourier_field.s[:] = 0
+        fourier_field.s[
+            0,
+            0,
+            np.logical_and(
+                np.abs(np.abs(qx) * nx - 1) < 1e-6, np.abs(np.abs(qy) * ny - 0) < 1e-6
+            ),
+        ] = 0.5
+
+        engine.ifft(fourier_field, real_field)
+        # Should produce cos(2*pi*x)
+        assert_allclose(real_field.p[0], np.cos(2 * np.pi * x), atol=1e-12)
+
+        # Set a single y-direction mode
+        fourier_field.s[:] = 0
+        fourier_field.s[
+            0,
+            0,
+            np.logical_and(
+                np.abs(np.abs(qx) * nx - 0) < 1e-6, np.abs(np.abs(qy) * ny - 1) < 1e-6
+            ),
+        ] = 0.5
+
+        engine.ifft(fourier_field, real_field)
+        # Should produce cos(2*pi*y)
+        assert_allclose(real_field.p[0], np.cos(2 * np.pi * y), atol=1e-12)
+
+    def test_properties_return_tuples(self):
+        """Test that dimension properties return tuples."""
+        engine = muGrid.FFTEngine([8, 10])
+
+        # These should all be tuples, not DynGridIndex objects
+        self.assertIsInstance(engine.nb_fourier_grid_pts, tuple)
+        self.assertIsInstance(engine.nb_fourier_subdomain_grid_pts, tuple)
+        self.assertIsInstance(engine.fourier_subdomain_locations, tuple)
+        self.assertIsInstance(engine.nb_subdomain_grid_pts, tuple)
+        self.assertIsInstance(engine.subdomain_locations, tuple)
+        self.assertIsInstance(engine.process_grid, tuple)
+        self.assertIsInstance(engine.process_coords, tuple)
+
+    def test_spatial_dim_property(self):
+        """Test spatial_dim property."""
+        engine_2d = muGrid.FFTEngine([8, 10])
+        self.assertEqual(engine_2d.spatial_dim, 2)
+
+        engine_3d = muGrid.FFTEngine([8, 10, 12])
+        self.assertEqual(engine_3d.spatial_dim, 3)
 
 
 if __name__ == "__main__":
