@@ -4,6 +4,15 @@
 *µ*\Grid, MPI-parallel regular grids
 ====================================
 
+*µ*\Grid is a C++17 library for discrete representation of fields on structured
+grids, with Python bindings. It provides efficient data structures and algorithms
+for solving partial differential equations on regular grids, with support for
+MPI parallelization and GPU acceleration.
+
+Key features include field collections for managing grid data, a built-in FFT
+engine with MPI-parallel support, convolution operators for spectral methods,
+domain decomposition with ghost cell communication, and NetCDF I/O.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

@@ -1,18 +1,28 @@
 # µGrid
 
-µGrid is a library for discrete representation of fields on structured grids.
-A *field* is a physical quantity that varies in space. µGrid makes it easy to
-implement algorithms that operate on fields, such as solving partial
-differential equations. It supports parallelization using domain decomposition
-implemented using the Message Passing Interface (MPI).
+µGrid is a C++ library for discrete representation of fields on structured
+grids, with Python bindings. It provides efficient data structures and
+algorithms for solving partial differential equations on regular grids,
+with support for MPI parallelization and GPU acceleration.
 
-µGrid is written in C++ and currently has language bindings for
-[Python](https://www.python.org/).
+## Features
+
+- **Field collections**: Manage scalar, vector, and tensor fields on structured
+  grids with flexible memory layouts
+- **FFT engine**: Built-in Fast Fourier Transform with MPI-parallel support
+  using pencil decomposition
+- **Convolution operators**: Discrete differential operators including Laplacian
+  and FEM gradient operators for spectral methods
+- **Domain decomposition**: Cartesian decomposition with ghost cell communication
+  for stencil operations
+- **GPU support**: Optional CUDA and HIP backends for GPU-accelerated computation
+- **NetCDF I/O**: Serial and parallel file I/O for checkpointing and analysis
+
+µGrid is written in C++17 and has language bindings for
+[Python](https://www.python.org/) via pybind11.
 
 This README contains only a small quick start guide. Please refer to the
-[full documentation](https://muspectre.github.io/muGrid/) or the DeepWiki
-[LLM-generated documentation](https://deepwiki.com/muSpectre/muGrid)
-for more help.
+[full documentation](https://muspectre.github.io/muGrid/) for more help.
 
 ## Quick start
 
