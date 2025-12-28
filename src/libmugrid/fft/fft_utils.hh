@@ -44,6 +44,26 @@
 namespace muGrid {
 
 /**
+ * Compute the frequency bin index for a single position in a full c2c FFT.
+ *
+ * Maps position i (0 <= i < n) to frequency index:
+ * - For i < (n+1)/2: returns i
+ * - For i >= (n+1)/2: returns i - n
+ *
+ * @param i  Position in the FFT output (0 <= i < n)
+ * @param n  Number of points in the transform
+ * @return   Frequency index for position i
+ */
+inline Int fft_freqind(Index_t i, Index_t n) {
+    Index_t half = (n + 1) / 2;  // Ceiling division
+    if (i < half) {
+        return static_cast<Int>(i);
+    } else {
+        return static_cast<Int>(i - n);
+    }
+}
+
+/**
  * Compute the frequency bin indices for a full c2c FFT.
  *
  * For n samples, returns indices [0, 1, ..., n/2-1, -n/2, ..., -1] for even n,

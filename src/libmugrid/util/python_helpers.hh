@@ -37,9 +37,11 @@
 #define SRC_LIBMUGRID_PYTHON_HELPERS_HH_
 
 #include <pybind11/eigen.h>
+#include <pybind11/numpy.h>
 
 #include "grid/index_ops.hh"
 #include "core/coordinates.hh"
+#include "fft/fft_utils.hh"
 
 namespace py = pybind11;
 
@@ -99,6 +101,91 @@ namespace muGrid {
         }
         return coords;
     }
+
+    /**
+     * Convert any iterable container with get_dim() to a Python tuple.
+     *
+     * Used to convert DynGridIndex, DynCoord, etc. to Python tuples for
+     * a more natural Python API (allows unpacking, hashing, etc.).
+     */
+    template<typename T>
+    py::tuple to_tuple(const T & container) {
+        py::tuple t(container.get_dim());
+        Index_t i = 0;
+        for (auto && v : container) {
+            t[i] = v;
+            i++;
+        }
+        return t;
+    }
+
+    /**
+     * Helper to compute normalized FFT frequency from integer index.
+     * For Real: returns freq / nb_domain_grid_pts (fractional frequency)
+     * For Int: returns the raw frequency index
+     */
+    template<typename T>
+    T normalize_fftfreq(Int freq_index, Int nb_domain_grid_pts) {
+        return static_cast<T>(freq_index) / nb_domain_grid_pts;
+    }
+
+    template<>
+    inline Int normalize_fftfreq<Int>(Int freq_index, Int /* nb_domain_grid_pts */) {
+        return freq_index;
+    }
+
+    /**
+     * Generate FFT frequency array for a distributed FFT engine.
+     *
+     * Returns an array of shape [dim, local_fx, local_fy, ...] containing
+     * the FFT frequencies for each pixel in the local Fourier subdomain.
+     *
+     * For T=Real: frequencies are normalized (in range [-0.5, 0.5))
+     * For T=Int: frequencies are integer indices (in range [-N/2, N/2-1])
+     *
+     * @tparam T Output type (Real or Int)
+     * @tparam Engine FFT engine type
+     * @param eng The FFT engine
+     * @return numpy array of FFT frequencies
+     */
+    template<typename T, class Engine>
+    auto py_fftfreq(const Engine & eng) {
+        const auto & fourier_collection = eng.get_fourier_space_collection();
+        const auto & pixels = fourier_collection.get_pixels_without_ghosts();
+        const auto & nb_domain_grid_pts = eng.get_nb_domain_grid_pts();
+        const Index_t dim = eng.get_spatial_dim();
+
+        // Shape: [dim, local_fx, local_fy, ...]
+        std::vector<Index_t> shape;
+        shape.push_back(dim);
+        for (auto && n : eng.get_nb_fourier_subdomain_grid_pts()) {
+            shape.push_back(n);
+        }
+
+        // Strides: first index (dim) is contiguous
+        std::vector<Index_t> strides;
+        strides.push_back(sizeof(T));
+        for (auto && s : pixels.get_strides()) {
+            strides.push_back(s * dim * sizeof(T));
+        }
+
+        py::array_t<T> fftfreqs(shape, strides);
+        T * ptr = static_cast<T *>(fftfreqs.request().ptr);
+
+        // Iterate over local Fourier pixels and compute frequencies
+        for (auto && pix : pixels) {
+            for (Index_t i = 0; i < dim; ++i) {
+                // pix[i] is the global coordinate
+                // fft_freqind converts position to frequency index
+                Int freq_index = fft_freqind(pix[i], nb_domain_grid_pts[i]);
+                ptr[i] = normalize_fftfreq<T>(freq_index, nb_domain_grid_pts[i]);
+            }
+            ptr += dim;
+        }
+
+        return fftfreqs;
+    }
+
 } // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_PYTHON_HELPERS_HH_

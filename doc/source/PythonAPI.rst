@@ -524,48 +524,69 @@ FFTEngine
 
       :type: float
 
+   .. py:attribute:: spatial_dim
+
+      Spatial dimension of the grid (2 or 3).
+
+      :type: int
+
+   .. py:attribute:: fftfreq
+
+      Normalized FFT frequencies for the local Fourier subdomain.
+
+      Returns an array of shape ``[dim, local_fx, local_fy, ...]`` where each
+      element is the normalized frequency in range ``[-0.5, 0.5)``.
+
+      For MPI-parallel runs, this returns only the frequencies for the local
+      subdomain owned by this rank.
+
+      :type: numpy.ndarray
+
+   .. py:attribute:: ifftfreq
+
+      Integer FFT frequency indices for the local Fourier subdomain.
+
+      Returns an array of shape ``[dim, local_fx, local_fy, ...]`` where each
+      element is the integer frequency index.
+
+      :type: numpy.ndarray
+
+   .. py:attribute:: coords
+
+      Normalized real-space coordinates for the local subdomain (excluding ghost cells).
+
+      Returns an array of shape ``[dim, local_nx, local_ny, ...]`` where each
+      element is the normalized coordinate in range ``[0, 1)``.
+
+      :type: numpy.ndarray
+
+   .. py:attribute:: icoords
+
+      Integer real-space coordinate indices for the local subdomain (excluding ghost cells).
+
+      Returns an array of shape ``[dim, local_nx, local_ny, ...]`` where each
+      element is the integer coordinate index.
+
+      :type: numpy.ndarray
+
+   .. py:attribute:: coordsg
+
+      Normalized real-space coordinates including ghost cells.
+
+      Same as ``coords`` but includes ghost cells if configured.
+
+      :type: numpy.ndarray
+
+   .. py:attribute:: icoordsg
+
+      Integer real-space coordinate indices including ghost cells.
+
+      Same as ``icoords`` but includes ghost cells if configured.
+
+      :type: numpy.ndarray
+
 FFT Utilities
 -------------
-
-.. py:function:: muGrid.fft_freq(nb_grid_pts, lengths)
-
-   Return FFT sample frequencies for a given grid.
-
-   :param nb_grid_pts: Number of grid points in each dimension.
-   :type nb_grid_pts: sequence of int
-   :param lengths: Physical lengths in each dimension.
-   :type lengths: sequence of float
-   :returns: Array of frequency values.
-   :rtype: numpy.ndarray
-
-.. py:function:: muGrid.fft_freqind(nb_grid_pts)
-
-   Return FFT frequency indices for a given grid.
-
-   :param nb_grid_pts: Number of grid points in each dimension.
-   :type nb_grid_pts: sequence of int
-   :returns: Array of frequency indices.
-   :rtype: numpy.ndarray
-
-.. py:function:: muGrid.rfft_freq(nb_grid_pts, lengths)
-
-   Return real FFT sample frequencies (Hermitian-symmetric) for a given grid.
-
-   :param nb_grid_pts: Number of grid points in each dimension.
-   :type nb_grid_pts: sequence of int
-   :param lengths: Physical lengths in each dimension.
-   :type lengths: sequence of float
-   :returns: Array of frequency values.
-   :rtype: numpy.ndarray
-
-.. py:function:: muGrid.rfft_freqind(nb_grid_pts)
-
-   Return real FFT frequency indices for a given grid.
-
-   :param nb_grid_pts: Number of grid points in each dimension.
-   :type nb_grid_pts: sequence of int
-   :returns: Array of frequency indices.
-   :rtype: numpy.ndarray
 
 .. py:function:: muGrid.fft_normalization(nb_grid_pts)
 

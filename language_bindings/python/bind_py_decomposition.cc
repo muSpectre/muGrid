@@ -19,6 +19,7 @@ using muGrid::DynGridIndex;
 using muGrid::Real;
 using muGrid::Field;
 using muGrid::py_coords;
+using muGrid::to_tuple;
 using Pixels_t = muGrid::CcoordOps::Pixels;
 using pybind11::literals::operator""_a;
 
@@ -194,26 +195,42 @@ void add_cartesian_decomposition(py::module & mod) {
                                 py::const_),
             "Get the underlying GlobalFieldCollection.")
         .def_property_readonly("nb_subdivisions",
-                               &CartesianDecomposition::get_nb_subdivisions,
+                               [](const CartesianDecomposition & self) {
+                                   return muGrid::to_tuple(self.get_nb_subdivisions());
+                               },
                                "Number of subdivisions in each direction.")
         .def_property_readonly("nb_domain_grid_pts",
-                               &CartesianDecomposition::get_nb_domain_grid_pts,
+                               [](const CartesianDecomposition & self) {
+                                   return muGrid::to_tuple(self.get_nb_domain_grid_pts());
+                               },
                                "Global grid dimensions.")
         .def_property_readonly(
             "nb_subdomain_grid_pts",
-            &CartesianDecomposition::get_nb_subdomain_grid_pts_without_ghosts,
+            [](const CartesianDecomposition & self) {
+                return muGrid::to_tuple(
+                    self.get_nb_subdomain_grid_pts_without_ghosts());
+            },
             "Local subdomain dimensions (excluding ghosts).")
         .def_property_readonly(
             "subdomain_locations",
-            &CartesianDecomposition::get_subdomain_locations_without_ghosts,
+            [](const CartesianDecomposition & self) {
+                return muGrid::to_tuple(
+                    self.get_subdomain_locations_without_ghosts());
+            },
             "Starting indices of local subdomain in global grid.")
         .def_property_readonly(
             "nb_subdomain_grid_pts_with_ghosts",
-            &CartesianDecomposition::get_nb_subdomain_grid_pts_with_ghosts,
+            [](const CartesianDecomposition & self) {
+                return muGrid::to_tuple(
+                    self.get_nb_subdomain_grid_pts_with_ghosts());
+            },
             "Local subdomain dimensions (including ghosts).")
         .def_property_readonly(
             "subdomain_locations_with_ghosts",
-            &CartesianDecomposition::get_subdomain_locations_with_ghosts,
+            [](const CartesianDecomposition & self) {
+                return muGrid::to_tuple(
+                    self.get_subdomain_locations_with_ghosts());
+            },
             "Starting indices including ghost offset.")
         .def_property_readonly("coords",
                                [](const CartesianDecomposition & self) {

@@ -134,13 +134,25 @@ Utilities for working with grid coordinates and indices.
 
 .. doxygenfunction:: muGrid::get_domain_index
 
-.. doxygenfunction:: muGrid::fft_freq
+FFT Utilities
+*************
 
-.. doxygenfunction:: muGrid::fft_freqind
+Low-level utilities for computing FFT frequencies. In Python, use the
+``fftfreq`` and ``ifftfreq`` properties on ``FFTEngine`` instead.
 
-.. doxygenfunction:: muGrid::rfft_freq
+.. doxygenfunction:: muGrid::fft_freq(Index_t n, Real d)
+
+.. doxygenfunction:: muGrid::fft_freqind(Index_t i, Index_t n)
+
+.. doxygenfunction:: muGrid::fft_freqind(Index_t n)
+
+.. doxygenfunction:: muGrid::rfft_freq(Index_t n, Real d)
 
 .. doxygenfunction:: muGrid::rfft_freqind
+
+.. doxygenfunction:: muGrid::fft_normalization
+
+.. doxygenfunction:: muGrid::get_hermitian_grid_pts
 
 Full Index
 **********
