@@ -71,6 +71,13 @@ before-all = [
     "apk add libexecinfo libexecinfo-dev"
 ]
 
+[tool.pytest.ini_options]
+python_files = "python_*_tests.py"
+testpaths = ["tests"]
+
+[tool.flake8]
+max-line-length = 88
+
 [tool.black]
 line-length = 88
 target-version = ["py310", "py311", "py312", "py313", "py314"]
