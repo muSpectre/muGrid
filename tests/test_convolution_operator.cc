@@ -882,6 +882,210 @@ namespace muGrid {
     BOOST_CHECK(!is_device_space_v<HostSpace>);
   }
 
+  /* ---------------------------------------------------------------------- */
+  /* Test fourier method                                                     */
+  /* ---------------------------------------------------------------------- */
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(fourier_zero_phase, Fix, ConvolutionFixtures,
+                                   Fix) {
+    // At zero phase, fourier should return the sum of all operator coefficients
+    Eigen::VectorXd phase = Eigen::VectorXd::Zero(Fix::Dim);
+    Complex result = Fix::op.fourier(phase);
+
+    // For gradient operators, the sum of coefficients should be zero
+    // (finite differences sum to zero for translational invariance)
+    BOOST_CHECK_SMALL(std::abs(result), tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(fourier_dimension_validation, Fix,
+                                   ConvolutionFixtures, Fix) {
+    // Test that fourier() validates phase dimension
+    Eigen::VectorXd wrong_phase = Eigen::VectorXd::Zero(Fix::Dim + 1);
+
+    BOOST_CHECK_THROW(Fix::op.fourier(wrong_phase), RuntimeError);
+  }
+
+  BOOST_AUTO_TEST_CASE(fourier_1d_central_difference) {
+    // Create a 1D central difference operator: [-1/2, 0, 1/2]
+    // Stencil at positions -1, 0, 1 (centered)
+    // This should give Fourier representation: i*sin(2π*q)
+
+    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
+    Shape_t conv_pts_shape{3};  // 3 points in stencil
+    std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};  // central difference
+
+    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
+                          1, 1, 1};  // 1 nodal pt, 1 quad pt, 1 operator
+
+    // Test at several phase values
+    const Real pi_val = 3.1415926535897932384626433;
+    std::vector<Real> test_phases{0.0, 0.1, 0.25, 0.5};
+
+    for (Real q : test_phases) {
+      Eigen::VectorXd phase(1);
+      phase(0) = q;
+      Complex result = op.fourier(phase);
+
+      // Expected: i*sin(2π*q)
+      Complex expected(0.0, std::sin(2.0 * pi_val * q));
+
+      BOOST_CHECK_SMALL(std::abs(result - expected), tol);
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(fourier_1d_upwind_difference) {
+    // Create a 1D backward (upwind) difference operator: [-1, 1, 0]
+    // Stencil at positions -1, 0, 1
+    // This should give Fourier representation: 1 - exp(-2πiq)
+
+    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
+    Shape_t conv_pts_shape{3};
+    std::vector<Real> pixel_operator{-1.0, 1.0, 0.0};  // backward difference
+
+    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
+                          1, 1, 1};
+
+    const Real pi_val = 3.1415926535897932384626433;
+    std::vector<Real> test_phases{0.0, 0.1, 0.25, 0.5};
+
+    for (Real q : test_phases) {
+      Eigen::VectorXd phase(1);
+      phase(0) = q;
+      Complex result = op.fourier(phase);
+
+      // Expected: 1 - exp(-2πiq)
+      Complex expected = Complex(1.0, 0.0) -
+                        std::exp(Complex(0.0, -2.0 * pi_val * q));
+
+      BOOST_CHECK_SMALL(std::abs(result - expected), tol);
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(fourier_1d_second_derivative) {
+    // Create a 1D second derivative operator: [1, -2, 1]
+    // Stencil at positions -1, 0, 1 (centered)
+    // This should give Fourier representation: -4*sin²(π*q)
+
+    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
+    Shape_t conv_pts_shape{3};
+    std::vector<Real> pixel_operator{1.0, -2.0, 1.0};  // second derivative
+
+    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
+                          1, 1, 1};
+
+    const Real pi_val = 3.1415926535897932384626433;
+    std::vector<Real> test_phases{0.0, 0.1, 0.25, 0.5};
+
+    for (Real q : test_phases) {
+      Eigen::VectorXd phase(1);
+      phase(0) = q;
+      Complex result = op.fourier(phase);
+
+      // Expected: -4*sin²(π*q) = 2*(cos(2π*q) - 1)
+      Real sin_term = std::sin(pi_val * q);
+      Complex expected(-4.0 * sin_term * sin_term, 0.0);
+
+      BOOST_CHECK_SMALL(std::abs(result - expected), tol);
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(fourier_2d_x_derivative) {
+    // Create a 2D x-derivative operator using central differences
+    // Stencil at x positions -1, 0, 1; y position 0
+    // This should give Fourier representation: i*sin(2π*qx)
+
+    Shape_t pixel_offset{-1, 0};  // offset [-1, 0] for x-centered stencil
+    Shape_t conv_pts_shape{3, 1};  // 3 points in x, 1 in y
+    // Operator coefficients for x-derivative: [-1/2, 0, 1/2] at y=0
+    std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};
+
+    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
+                          1, 1, 1};
+
+    const Real pi_val = 3.1415926535897932384626433;
+    std::vector<std::pair<Real, Real>> test_phases{
+      {0.0, 0.0}, {0.1, 0.0}, {0.25, 0.15}, {0.5, 0.3}};
+
+    for (auto [qx, qy] : test_phases) {
+      Eigen::VectorXd phase(2);
+      phase(0) = qx;
+      phase(1) = qy;
+      Complex result = op.fourier(phase);
+
+      // Expected: i*sin(2π*qx) (independent of qy since no y variation)
+      Complex expected(0.0, std::sin(2.0 * pi_val * qx));
+
+      BOOST_CHECK_SMALL(std::abs(result - expected), tol);
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(fourier_2d_y_derivative) {
+    // Create a 2D y-derivative operator using central differences
+    // Stencil at x position 0; y positions -1, 0, 1
+
+    Shape_t pixel_offset{0, -1};  // offset [0, -1] for y-centered stencil
+    Shape_t conv_pts_shape{1, 3};  // 1 point in x, 3 in y
+    std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};
+
+    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
+                          1, 1, 1};
+
+    const Real pi_val = 3.1415926535897932384626433;
+    std::vector<std::pair<Real, Real>> test_phases{
+      {0.0, 0.0}, {0.0, 0.1}, {0.15, 0.25}, {0.3, 0.5}};
+
+    for (auto [qx, qy] : test_phases) {
+      Eigen::VectorXd phase(2);
+      phase(0) = qx;
+      phase(1) = qy;
+      Complex result = op.fourier(phase);
+
+      // Expected: i*sin(2π*qy) (independent of qx since no x variation)
+      Complex expected(0.0, std::sin(2.0 * pi_val * qy));
+
+      BOOST_CHECK_SMALL(std::abs(result - expected), tol);
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(fourier_2d_laplacian) {
+    // Create a 2D 5-point Laplacian stencil
+    // Pattern:     0  1  0
+    //              1 -4  1
+    //              0  1  0
+    // This should give Fourier representation:
+    // -4*(sin²(π*qx) + sin²(π*qy))
+
+    Shape_t pixel_offset{-1, -1};  // center at (0,0), so offset is (-1,-1)
+    Shape_t conv_pts_shape{3, 3};  // 3x3 stencil
+    // Layout is column-major through stencil points
+    std::vector<Real> pixel_operator{
+      0.0, 1.0, 0.0,    // x=-1: (y=-1,y=0,y=1)
+      1.0, -4.0, 1.0,   // x=0:  (y=-1,y=0,y=1)
+      0.0, 1.0, 0.0     // x=1:  (y=-1,y=0,y=1)
+    };
+
+    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
+                          1, 1, 1};
+
+    const Real pi_val = 3.1415926535897932384626433;
+    std::vector<std::pair<Real, Real>> test_phases{
+      {0.0, 0.0}, {0.1, 0.1}, {0.25, 0.15}, {0.5, 0.3}};
+
+    for (auto [qx, qy] : test_phases) {
+      Eigen::VectorXd phase(2);
+      phase(0) = qx;
+      phase(1) = qy;
+      Complex result = op.fourier(phase);
+
+      // Expected: -4*(sin²(π*qx) + sin²(π*qy))
+      Real sin_x = std::sin(pi_val * qx);
+      Real sin_y = std::sin(pi_val * qy);
+      Complex expected(-4.0 * (sin_x * sin_x + sin_y * sin_y), 0.0);
+
+      BOOST_CHECK_SMALL(std::abs(result - expected), 1e-10);
+    }
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

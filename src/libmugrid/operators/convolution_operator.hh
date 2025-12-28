@@ -276,6 +276,17 @@ namespace muGrid {
          */
         void clear_cache() const;
 
+        /**
+         * Compute the Fourier representation of this convolution operator
+         *
+         * Converts a translationally invariant linear combination of grid values
+         * into a multiplication with a complex number in Fourier space.
+         *
+         * @param phase The wavevector times cell dimension (lacking factor of 2π)
+         * @return Complex Fourier representation of the operator
+         */
+        Complex fourier(const Eigen::VectorXd & phase) const;
+
     private:
         /**
          * stencil offset in number of pixels
