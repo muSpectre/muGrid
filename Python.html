@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Fast Fourier Transform" href="FFT.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Python Bindings - µGrid 0.98.1-9-g00ebcb19 documentation</title>
+        <title>Python Bindings - µGrid 0.98.1-11-g052473b0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.98.1-9-g00ebcb19
+      <a href="index.html"><div class="brand">µGrid 0.98.1-11-g052473b0
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.98.1-9-g00ebcb19
+  <span class="sidebar-brand-text">µGrid 0.98.1-11-g052473b0
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -528,26 +528,51 @@ missing. This means we can represent a simple forward-differences gradient opera
 </pre></div>
 </div>
 </section>
-<section id="numpy-and-cupy-views">
-<h2>numpy and cupy views<a class="headerlink" href="#numpy-and-cupy-views" title="Link to this heading">¶</a></h2>
-<p>The multidimensional array representation of a field is accessible via the
-<cite>array</cite> method. For fields on the host (CPU), this returns a numpy array.
-For fields on the GPU, this returns a CuPy array. See the <a class="reference internal" href="GPU.html"><span class="doc">GPU Computing</span></a> chapter
+<section id="array-accessors">
+<h2>Array accessors<a class="headerlink" href="#array-accessors" title="Link to this heading">¶</a></h2>
+<p>Each field provides four accessors that return views into the underlying field data
+as multidimensional arrays. For fields on the host (CPU), these return numpy arrays.
+For fields on the GPU, these return CuPy arrays. See the <a class="reference internal" href="GPU.html"><span class="doc">GPU Computing</span></a> chapter
 for details on GPU computing.</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">IterUnit</span><span class="o">.</span><span class="n">SubPt</span><span class="p">)</span>
+<p>The accessors differ in two ways:</p>
+<ol class="arabic simple">
+<li><p><strong>Layout</strong>: SubPt (<code class="docutils literal notranslate"><span class="pre">s</span></code>) vs Pixel (<code class="docutils literal notranslate"><span class="pre">p</span></code>)</p></li>
+<li><p><strong>Ghost regions</strong>: Excluded (<code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">p</span></code>) vs Included (<code class="docutils literal notranslate"><span class="pre">sg</span></code>, <code class="docutils literal notranslate"><span class="pre">pg</span></code>)</p></li>
+</ol>
+<section id="subpt-vs-pixel-layout">
+<h3>SubPt vs Pixel layout<a class="headerlink" href="#subpt-vs-pixel-layout" title="Link to this heading">¶</a></h3>
+<p>The <strong>SubPt layout</strong> (<code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">sg</span></code>) exposes the sub-points as an explicit dimension:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span>  <span class="c1"># shape: (components, sub_pts, *spatial_dims)</span>
 </pre></div>
 </div>
-<p>yields the multidimensional array with the explicit sub-point dimension.
-The pixel-representation can be obtained by</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">=</span> <span class="n">displacement_field</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">IterUnit</span><span class="o">.</span><span class="n">Pixel</span><span class="p">)</span>
+<p>The <strong>Pixel layout</strong> (<code class="docutils literal notranslate"><span class="pre">p</span></code>, <code class="docutils literal notranslate"><span class="pre">pg</span></code>) folds the sub-points into the last
+dimension of the components:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">p</span>  <span class="c1"># shape: (components * sub_pts, *spatial_dims)</span>
 </pre></div>
 </div>
-<p>Because those operations are used to frequently, there are shortcuts already
-introduced in the examples above:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span>  <span class="c1"># sub-point representation</span>
-<span class="n">displacement_field</span><span class="o">.</span><span class="n">p</span>  <span class="c1"># pixel representation</span>
+<p>The SubPt layout is useful when you need to operate on sub-points separately,
+while the Pixel layout is convenient for operations that treat all sub-point
+values uniformly.</p>
+</section>
+<section id="with-vs-without-ghost-regions">
+<h3>With vs without ghost regions<a class="headerlink" href="#with-vs-without-ghost-regions" title="Link to this heading">¶</a></h3>
+<p>When using domain decomposition with ghost regions (for stencil operations),
+the accessors ending in <code class="docutils literal notranslate"><span class="pre">g</span></code> include the ghost cells:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Excluding ghost regions (interior domain only)</span>
+<span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span>   <span class="c1"># SubPt layout, no ghosts</span>
+<span class="n">displacement_field</span><span class="o">.</span><span class="n">p</span>   <span class="c1"># Pixel layout, no ghosts</span>
+
+<span class="c1"># Including ghost regions (full local domain with ghosts)</span>
+<span class="n">displacement_field</span><span class="o">.</span><span class="n">sg</span>  <span class="c1"># SubPt layout, with ghosts</span>
+<span class="n">displacement_field</span><span class="o">.</span><span class="n">pg</span>  <span class="c1"># Pixel layout, with ghosts</span>
 </pre></div>
 </div>
+<p>For fields without ghost regions, <code class="docutils literal notranslate"><span class="pre">s</span></code> and <code class="docutils literal notranslate"><span class="pre">sg</span></code> (and <code class="docutils literal notranslate"><span class="pre">p</span></code> and <code class="docutils literal notranslate"><span class="pre">pg</span></code>)
+return views of the same shape.</p>
+<p>The ghost-excluding accessors (<code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">p</span></code>) are typically used for computations
+on the interior domain, while ghost-including accessors (<code class="docutils literal notranslate"><span class="pre">sg</span></code>, <code class="docutils literal notranslate"><span class="pre">pg</span></code>) are
+used for operations that need to access or modify the full buffer including
+ghost cells.</p>
 <p>The entries of the field occur as the first indices in the multidimensional
 because a numerical code is typically vectorized of the spatial domain, i.e.
 we carry out the same operation on each pixel but not on each component.
@@ -566,6 +591,7 @@ for example normalizing the displacement field could look like:</p>
 </div>
 <p>Note that the default storage order of the field is column-major, which means the
 field components are stored next to each other in memory.</p>
+</section>
 </section>
 <section id="i-o">
 <h2>I/O<a class="headerlink" href="#i-o" title="Link to this heading">¶</a></h2>
@@ -690,7 +716,11 @@ from a field collection to disk:</p>
 <li><a class="reference internal" href="#components">Components</a></li>
 <li><a class="reference internal" href="#sub-points">Sub-points</a></li>
 <li><a class="reference internal" href="#convolutions">Convolutions</a></li>
-<li><a class="reference internal" href="#numpy-and-cupy-views">numpy and cupy views</a></li>
+<li><a class="reference internal" href="#array-accessors">Array accessors</a><ul>
+<li><a class="reference internal" href="#subpt-vs-pixel-layout">SubPt vs Pixel layout</a></li>
+<li><a class="reference internal" href="#with-vs-without-ghost-regions">With vs without ghost regions</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#i-o">I/O</a></li>
 </ul>
 </li>
@@ -703,7 +733,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=69663035"></script>
+</div><script src="_static/documentation_options.js?v=d5edd627"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
