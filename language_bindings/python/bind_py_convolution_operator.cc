@@ -433,7 +433,46 @@ void add_laplace_operator(py::module &mod) {
         .def_property_readonly("nb_stencil_pts", &LaplaceOperator::get_nb_stencil_pts,
              "Number of stencil points (5 for 2D, 7 for 3D)")
         .def_property_readonly("scale", &LaplaceOperator::get_scale,
-             "Scale factor applied to output");
+             "Scale factor applied to output")
+        .def_property_readonly("offset",
+            [](const LaplaceOperator & op) {
+                const auto& offset = op.get_pixel_offset();
+                return py::array_t<Index_t>(offset.size(), offset.data());
+            },
+            "Stencil offset in number of pixels")
+        .def_property_readonly("shape",
+            [](const LaplaceOperator & op) {
+                const auto& shape = op.get_conv_pts_shape();
+                return py::array_t<Index_t>(shape.size(), shape.data());
+            },
+            "Shape of the convolution stencil")
+        .def_property_readonly("coefficients",
+            [](const LaplaceOperator & op) {
+                const auto& flat_op = op.get_pixel_operator();
+                const auto& stencil_shape = op.get_conv_pts_shape();
+                const auto nb_operators = op.get_nb_operators();
+                const auto nb_quad_pts = op.get_nb_quad_pts();
+                const auto nb_nodal_pts = op.get_nb_nodal_pts();
+
+                // Build the full shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape)
+                std::vector<py::ssize_t> full_shape;
+                full_shape.push_back(nb_operators);
+                full_shape.push_back(nb_quad_pts);
+                full_shape.push_back(nb_nodal_pts);
+                for (const auto& dim : stencil_shape) {
+                    full_shape.push_back(dim);
+                }
+
+                // Create a Fortran-ordered (column-major) array
+                py::array_t<Real, py::array::f_style> result(full_shape);
+                auto result_ptr = result.mutable_data();
+
+                // Copy data
+                std::copy(flat_op.begin(), flat_op.end(), result_ptr);
+
+                return result;
+            },
+            "Stencil coefficients in reshaped form");
     // Note: spatial_dim, nb_operators, nb_quad_pts, nb_nodal_pts are inherited
     // from ConvolutionOperatorBase
 
@@ -504,7 +543,46 @@ void add_fem_gradient_operator(py::module &mod) {
         .def_property_readonly("grid_spacing", &FEMGradientOperator::get_grid_spacing,
              "Grid spacing in each direction")
         .def("get_quadrature_weights", &FEMGradientOperator::get_quadrature_weights,
-             "Get the quadrature weights (one per quadrature point)");
+             "Get the quadrature weights (one per quadrature point)")
+        .def_property_readonly("offset",
+            [](const FEMGradientOperator & op) {
+                const auto& offset = op.get_pixel_offset();
+                return py::array_t<Index_t>(offset.size(), offset.data());
+            },
+            "Stencil offset in number of pixels")
+        .def_property_readonly("shape",
+            [](const FEMGradientOperator & op) {
+                const auto& shape = op.get_conv_pts_shape();
+                return py::array_t<Index_t>(shape.size(), shape.data());
+            },
+            "Shape of the convolution stencil")
+        .def_property_readonly("coefficients",
+            [](const FEMGradientOperator & op) {
+                const auto& flat_op = op.get_pixel_operator();
+                const auto& stencil_shape = op.get_conv_pts_shape();
+                const auto nb_operators = op.get_nb_operators();
+                const auto nb_quad_pts = op.get_nb_quad_pts();
+                const auto nb_nodal_pts = op.get_nb_nodal_pts();
+
+                // Build the full shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape)
+                std::vector<py::ssize_t> full_shape;
+                full_shape.push_back(nb_operators);
+                full_shape.push_back(nb_quad_pts);
+                full_shape.push_back(nb_nodal_pts);
+                for (const auto& dim : stencil_shape) {
+                    full_shape.push_back(dim);
+                }
+
+                // Create a Fortran-ordered (column-major) array
+                py::array_t<Real, py::array::f_style> result(full_shape);
+                auto result_ptr = result.mutable_data();
+
+                // Copy data
+                std::copy(flat_op.begin(), flat_op.end(), result_ptr);
+
+                return result;
+            },
+            "Shape function gradients in reshaped form");
     // Note: spatial_dim, nb_operators, nb_quad_pts, nb_nodal_pts are inherited
     // from ConvolutionOperatorBase
 

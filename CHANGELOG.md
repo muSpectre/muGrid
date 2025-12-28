@@ -4,10 +4,11 @@ Change log for µGrid
 0.100.0 (28Dec25)
 -----------------
 
-- ENH: Added `offset` property to `ConvolutionOperator` Python interface for accessing stencil offset
-- ENH: Added `shape` property to `ConvolutionOperator` Python interface for accessing stencil dimensions
-- ENH: Added `coefficients` property to `ConvolutionOperator` for retrieving stencil coefficients in reshaped form
-- TEST: Comprehensive test suite for stencil property access in Python
+- ENH: Added `offset`, `shape`, and `coefficients` properties to all discrete convolution operators in Python
+  - `ConvolutionOperator`: Access generic stencil metadata and coefficients
+  - `LaplaceOperator`: Access hardcoded Laplacian stencil structure
+  - `FEMGradientOperator`: Access shape function gradients and node arrangement
+- TEST: Comprehensive test suite for stencil property access across all operator types
 
 0.99.0 (28Dec25)
 ----------------

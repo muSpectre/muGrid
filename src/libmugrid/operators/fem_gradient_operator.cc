@@ -195,6 +195,65 @@ namespace muGrid {
         }
     }
 
+    std::vector<Real> FEMGradientOperator::get_pixel_operator() const {
+        using namespace fem_gradient_kernels;
+
+        if (this->spatial_dim == 2) {
+            // Shape: (nb_operators=2, nb_quad_pts=2, nb_nodal_pts=1, 2, 2)
+            // Total size: 2 * 2 * 1 * 2 * 2 = 16
+            Real hx = this->grid_spacing[0];
+            Real hy = this->grid_spacing[1];
+            std::vector<Real> result;
+            result.reserve(16);
+
+            // Iterate: operators, quad_pts, nodal_pts (=1), stencil_y, stencil_x
+            for (Index_t d = 0; d < DIM_2D; ++d) {  // operator (direction)
+                for (Index_t q = 0; q < NB_QUAD_2D; ++q) {  // quad pt
+                    for (Index_t j = 0; j < 2; ++j) {  // stencil_y
+                        for (Index_t i = 0; i < 2; ++i) {  // stencil_x
+                            // Map (i,j) to node index: node = j*2 + i
+                            Index_t node = j * 2 + i;
+                            Real grad_val = B_2D_REF[d][q][node];
+                            // Scale by inverse grid spacing
+                            grad_val *= (d == 0) ? (1.0 / hx) : (1.0 / hy);
+                            result.push_back(grad_val);
+                        }
+                    }
+                }
+            }
+            return result;
+        } else {  // 3D
+            // Shape: (nb_operators=3, nb_quad_pts=5, nb_nodal_pts=1, 2, 2, 2)
+            // Total size: 3 * 5 * 1 * 2 * 2 * 2 = 120
+            Real hx = this->grid_spacing[0];
+            Real hy = this->grid_spacing[1];
+            Real hz = this->grid_spacing[2];
+            std::vector<Real> result;
+            result.reserve(120);
+
+            // Iterate: operators, quad_pts, nodal_pts (=1), stencil_z, stencil_y, stencil_x
+            for (Index_t d = 0; d < DIM_3D; ++d) {  // operator (direction)
+                for (Index_t q = 0; q < NB_QUAD_3D; ++q) {  // quad pt
+                    for (Index_t k = 0; k < 2; ++k) {  // stencil_z
+                        for (Index_t j = 0; j < 2; ++j) {  // stencil_y
+                            for (Index_t i = 0; i < 2; ++i) {  // stencil_x
+                                // Map (i,j,k) to node index: node = k*4 + j*2 + i
+                                Index_t node = k * 4 + j * 2 + i;
+                                Real grad_val = B_3D_REF[d][q][node];
+                                // Scale by inverse grid spacing
+                                if (d == 0) grad_val /= hx;
+                                else if (d == 1) grad_val /= hy;
+                                else grad_val /= hz;
+                                result.push_back(grad_val);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+    }
+
     void FEMGradientOperator::apply_impl(const TypedFieldBase<Real> &nodal_field,
                                           TypedFieldBase<Real> &gradient_field,
                                           Real alpha,

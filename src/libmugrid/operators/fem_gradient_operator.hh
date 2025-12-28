@@ -246,6 +246,32 @@ namespace muGrid {
          */
         std::vector<Real> get_quadrature_weights() const;
 
+        /**
+         * @brief Get the stencil offset.
+         * @return Stencil offset in pixels ([0,0] for 2D, [0,0,0] for 3D)
+         */
+        Shape_t get_pixel_offset() const {
+            return Shape_t(spatial_dim, 0);
+        }
+
+        /**
+         * @brief Get the stencil shape.
+         * @return Shape of the stencil ([2,2] for 2D, [2,2,2] for 3D)
+         */
+        Shape_t get_conv_pts_shape() const {
+            return Shape_t(spatial_dim, 2);
+        }
+
+        /**
+         * @brief Get the shape function gradients as pixel operator.
+         * @return Vector of shape function gradients [nb_ops * nb_quad * nb_nodal * conv_pts_size]
+         *
+         * Returns the shape function gradients scaled by grid spacing.
+         * Shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *conv_pts_shape)
+         * where conv_pts_shape is [2,2] for 2D or [2,2,2] for 3D.
+         */
+        std::vector<Real> get_pixel_operator() const;
+
     private:
         Index_t spatial_dim;
         std::vector<Real> grid_spacing;

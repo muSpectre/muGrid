@@ -854,6 +854,133 @@ class StencilAccessCheck(unittest.TestCase):
 
 
 # =============================================================================
+# Hardcoded operator stencil access tests
+# =============================================================================
+
+
+class LaplaceOperatorStencilAccess(unittest.TestCase):
+    """Test stencil property access for LaplaceOperator."""
+
+    def test_laplace_2d_properties(self):
+        """Test Laplace operator properties in 2D."""
+        op = muGrid.LaplaceOperator(2, scale=2.0)
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [-1, -1])
+        np.testing.assert_array_equal(op.shape, [3, 3])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        self.assertEqual(coeffs.shape, (1, 1, 1, 3, 3))
+
+        # Expected 2D Laplace stencil with scale=2.0
+        expected = np.array([[0, 2, 0], [2, -8, 2], [0, 2, 0]])
+        np.testing.assert_array_equal(coeffs[0, 0, 0, :, :], expected)
+
+    def test_laplace_3d_properties(self):
+        """Test Laplace operator properties in 3D."""
+        op = muGrid.LaplaceOperator(3, scale=1.5)
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [-1, -1, -1])
+        np.testing.assert_array_equal(op.shape, [3, 3, 3])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        self.assertEqual(coeffs.shape, (1, 1, 1, 3, 3, 3))
+
+        # Expected 3D Laplace stencil with scale=1.5
+        # Center at [1, 1, 1] should be -9.0, 6 neighbors should be 1.5
+        self.assertEqual(coeffs[0, 0, 0, 1, 1, 1], -9.0)
+        self.assertEqual(coeffs[0, 0, 0, 0, 1, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 2, 1, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 0, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 2, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 1, 0], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 1, 2], 1.5)
+
+    def test_laplace_consistency(self):
+        """Test consistency between properties."""
+        op = muGrid.LaplaceOperator(2, scale=1.0)
+
+        # Check dimensions
+        self.assertEqual(op.spatial_dim, 2)
+        self.assertEqual(op.nb_operators, 1)
+        self.assertEqual(op.nb_quad_pts, 1)
+        self.assertEqual(op.nb_nodal_pts, 1)
+
+        # Check total size
+        coeffs = op.coefficients
+        expected_size = 1 * 1 * 1 * 3 * 3
+        self.assertEqual(coeffs.size, expected_size)
+
+
+class FEMGradientOperatorStencilAccess(unittest.TestCase):
+    """Test stencil property access for FEMGradientOperator."""
+
+    def test_fem_2d_properties(self):
+        """Test FEM gradient operator properties in 2D."""
+        op = muGrid.FEMGradientOperator(2, grid_spacing=[2.0, 3.0])
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [0, 0])
+        np.testing.assert_array_equal(op.shape, [2, 2])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        # Shape: (nb_operators=2, nb_quad_pts=2, nb_nodal_pts=1, 2, 2)
+        self.assertEqual(coeffs.shape, (2, 2, 1, 2, 2))
+
+        # Check that we have x and y derivatives
+        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_quad_pts, 2)
+
+    def test_fem_3d_properties(self):
+        """Test FEM gradient operator properties in 3D."""
+        op = muGrid.FEMGradientOperator(3, grid_spacing=[1.0, 1.0, 1.0])
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [0, 0, 0])
+        np.testing.assert_array_equal(op.shape, [2, 2, 2])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        # Shape: (nb_operators=3, nb_quad_pts=5, nb_nodal_pts=1, 2, 2, 2)
+        self.assertEqual(coeffs.shape, (3, 5, 1, 2, 2, 2))
+
+        # Check that we have x, y, z derivatives
+        self.assertEqual(op.nb_operators, 3)
+        self.assertEqual(op.nb_quad_pts, 5)
+
+    def test_fem_consistency(self):
+        """Test consistency between properties."""
+        op = muGrid.FEMGradientOperator(2, grid_spacing=[1.0, 1.0])
+
+        # Check dimensions
+        self.assertEqual(op.spatial_dim, 2)
+        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_quad_pts, 2)
+        self.assertEqual(op.nb_nodal_pts, 1)
+
+        # Check total size
+        coeffs = op.coefficients
+        expected_size = 2 * 2 * 1 * 2 * 2
+        self.assertEqual(coeffs.size, expected_size)
+
+    def test_fem_grid_spacing_affects_coefficients(self):
+        """Test that grid spacing affects shape function gradients."""
+        op1 = muGrid.FEMGradientOperator(2, grid_spacing=[1.0, 1.0])
+        op2 = muGrid.FEMGradientOperator(2, grid_spacing=[2.0, 2.0])
+
+        coeffs1 = op1.coefficients
+        coeffs2 = op2.coefficients
+
+        # Coefficients should scale with inverse of grid spacing
+        # Since grid spacing is doubled, coefficients should be halved
+        np.testing.assert_array_almost_equal(coeffs2, coeffs1 * 0.5)
+
+
+# =============================================================================
 # GPU-specific convolution tests
 # =============================================================================
 
