@@ -13,6 +13,7 @@
    Python
    FFT
    GPU
+   Examples
    Cplusplus
    PythonAPI
    CplusplusAPI
