@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.8", "pybind11>=2.11", "numpy>=2.1"]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.11", "numpy>=2.1", "setuptools-scm>=8"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -39,12 +39,17 @@ repository = "https://github.com/muSpectre/muGrid"
 changelog = "https://github.com/muSpectre/muGrid/blob/main/CHANGELOG.md"
 
 [tool.scikit-build]
-cmake.minimum-version = "3.18"
+cmake.version = ">=3.18"
 cmake.build-type = "Release"
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.scikit-build.cmake.define]
 MUGRID_ENABLE_TESTS = "OFF"
 MUGRID_ENABLE_EXAMPLES = "OFF"
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "node-and-date"
 
 [[tool.cibuildwheel.overrides]]
 select = "*manylinux*"
@@ -65,6 +70,13 @@ select = "*musllinux*"
 before-all = [
     "apk add libexecinfo libexecinfo-dev"
 ]
+
+[tool.pytest.ini_options]
+python_files = "python_*_tests.py"
+testpaths = ["tests"]
+
+[tool.flake8]
+max-line-length = 88
 
 [tool.black]
 line-length = 88

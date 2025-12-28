@@ -1,3 +1,0 @@
-# Tags in this file will be replaced during git archive. git archive is used
-# by meson to create source packages.
-discover_version.py export-subst
