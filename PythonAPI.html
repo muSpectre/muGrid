@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ API Reference" href="CplusplusAPI.html"><link rel="prev" title="C++ Bindings" href="Cplusplus.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Python API Reference - µGrid 0.101.0 documentation</title>
+        <title>Python API Reference - µGrid 0.101.0-2-gb900eac2 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.101.0
+      <a href="index.html"><div class="brand">µGrid 0.101.0-2-gb900eac2
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.101.0
+  <span class="sidebar-brand-text">µGrid 0.101.0-2-gb900eac2
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -924,9 +924,59 @@ with MPI parallelization using pencil (2D) decomposition.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.register_real_space_field">
+<span class="sig-name descname"><span class="pre">register_real_space_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_components</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.FFTEngine.register_real_space_field" title="Link to this definition">¶</a></dt>
+<dd><p>Register a new real-space field.</p>
+<p>Raises an error if a field with the given name already exists.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Unique field name.</p></li>
+<li><p><strong>nb_components</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Number of components. Default is 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wrapped real-valued field with array accessors.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#muGrid.Field" title="muGrid.Field">Field</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If a field with the given name already exists.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.register_fourier_space_field">
+<span class="sig-name descname"><span class="pre">register_fourier_space_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_components</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.FFTEngine.register_fourier_space_field" title="Link to this definition">¶</a></dt>
+<dd><p>Register a new Fourier-space field.</p>
+<p>Raises an error if a field with the given name already exists.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Unique field name.</p></li>
+<li><p><strong>nb_components</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Number of components. Default is 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wrapped complex-valued field with array accessors.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#muGrid.Field" title="muGrid.Field">Field</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If a field with the given name already exists.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="muGrid.FFTEngine.real_space_field">
 <span class="sig-name descname"><span class="pre">real_space_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_components</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.FFTEngine.real_space_field" title="Link to this definition">¶</a></dt>
-<dd><p>Create a real-space field for FFT operations.</p>
+<dd><p>Get or create a real-space field for FFT operations.</p>
+<p>If a field with the given name already exists, returns it.
+Otherwise creates a new field with the specified number of components.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -946,7 +996,9 @@ with MPI parallelization using pencil (2D) decomposition.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="muGrid.FFTEngine.fourier_space_field">
 <span class="sig-name descname"><span class="pre">fourier_space_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_components</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.FFTEngine.fourier_space_field" title="Link to this definition">¶</a></dt>
-<dd><p>Create a Fourier-space field for FFT operations.</p>
+<dd><p>Get or create a Fourier-space field for FFT operations.</p>
+<p>If a field with the given name already exists, returns it.
+Otherwise creates a new field with the specified number of components.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -1461,6 +1513,8 @@ or if the Hessian is not positive definite.</p>
 <li><a class="reference internal" href="#muGrid.FFTEngine"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine</span></code></a><ul>
 <li><a class="reference internal" href="#muGrid.FFTEngine.fft"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.fft()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FFTEngine.ifft"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.ifft()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.register_real_space_field"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.register_real_space_field()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.register_fourier_space_field"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.register_fourier_space_field()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FFTEngine.real_space_field"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.real_space_field()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FFTEngine.fourier_space_field"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.fourier_space_field()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FFTEngine.normalisation"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.normalisation</span></code></a></li>
@@ -1542,7 +1596,7 @@ or if the Hessian is not positive definite.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=b9ef5f3c"></script>
+</div><script src="_static/documentation_options.js?v=58d7dfc9"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
