@@ -646,6 +646,341 @@ class FourierMethodCheck(unittest.TestCase):
 
 
 # =============================================================================
+# Stencil access tests
+# =============================================================================
+
+
+class StencilAccessCheck(unittest.TestCase):
+    """Test suite for accessing stencil coefficients and offset.
+
+    Tests verify that stencil properties (offset, shape, coefficients)
+    can be accessed correctly from the Python interface.
+    """
+
+    def test_offset_1d(self):
+        """Test that offset property works in 1D."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([-1], stencil)
+
+        offset = op.offset
+        np.testing.assert_array_equal(offset, [-1])
+
+    def test_offset_2d(self):
+        """Test that offset property works in 2D."""
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        offset = op.offset
+        np.testing.assert_array_equal(offset, [-1, -1])
+
+    def test_offset_2d_noncentered(self):
+        """Test offset with non-centered stencil."""
+        stencil = np.array([[1, 0], [0, 0]])
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        offset = op.offset
+        np.testing.assert_array_equal(offset, [0, 0])
+
+    def test_offset_3d(self):
+        """Test that offset property works in 3D."""
+        stencil = np.zeros((3, 3, 3))
+        stencil[1, 1, 1] = -6
+        stencil[0, 1, 1] = 1
+        stencil[2, 1, 1] = 1
+        stencil[1, 0, 1] = 1
+        stencil[1, 2, 1] = 1
+        stencil[1, 1, 0] = 1
+        stencil[1, 1, 2] = 1
+        op = muGrid.ConvolutionOperator([-1, -1, -1], stencil)
+
+        offset = op.offset
+        np.testing.assert_array_equal(offset, [-1, -1, -1])
+
+    def test_shape_1d(self):
+        """Test that shape property works in 1D."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([-1], stencil)
+
+        shape = op.shape
+        np.testing.assert_array_equal(shape, [3])
+
+    def test_shape_2d(self):
+        """Test that shape property works in 2D."""
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        shape = op.shape
+        np.testing.assert_array_equal(shape, [3, 3])
+
+    def test_shape_2d_nonsquare(self):
+        """Test shape with non-square 2D stencil."""
+        stencil = np.array([[1, 0, 0], [0, 0, 0]])  # 2x3
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        shape = op.shape
+        np.testing.assert_array_equal(shape, [2, 3])
+
+    def test_shape_3d(self):
+        """Test that shape property works in 3D."""
+        stencil = np.zeros((3, 3, 3))
+        op = muGrid.ConvolutionOperator([-1, -1, -1], stencil)
+
+        shape = op.shape
+        np.testing.assert_array_equal(shape, [3, 3, 3])
+
+    def test_coefficients_1d(self):
+        """Test coefficients property in 1D."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([-1], stencil)
+
+        reshaped = op.coefficients
+
+        # Should have shape (nb_operators=1, nb_quad_pts=1, nb_nodal_pts=1, 3)
+        self.assertEqual(reshaped.shape, (1, 1, 1, 3))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :], stencil)
+
+    def test_coefficients_2d_simple(self):
+        """Test coefficients property with simple 2D stencil."""
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        reshaped = op.coefficients
+
+        # Should have shape (nb_operators=1, nb_quad_pts=1, nb_nodal_pts=1, 3, 3)
+        self.assertEqual(reshaped.shape, (1, 1, 1, 3, 3))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :], stencil)
+
+    def test_coefficients_2d_multiple_operators(self):
+        """Test coefficients with multiple operators."""
+        # Create stencil with 2 operators
+        stencil_0 = np.array([[1, 0], [0, 0]])
+        stencil_1 = np.array([[0, 1], [0, 0]])
+        stencil = np.array([stencil_0, stencil_1])  # Shape (2, 2, 2)
+
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        reshaped = op.coefficients
+
+        # Should have shape (nb_operators=2, nb_quad_pts=1, nb_nodal_pts=1, 2, 2)
+        self.assertEqual(reshaped.shape, (2, 1, 1, 2, 2))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :], stencil_0)
+        np.testing.assert_array_equal(reshaped[1, 0, 0, :, :], stencil_1)
+
+    def test_coefficients_2d_multiple_quad_pts(self):
+        """Test coefficients with multiple quadrature points."""
+        # Create stencil with 2 quad pts
+        stencil = np.array(
+            [
+                [
+                    [[1, 0], [0, 0]],  # quad pt 0
+                    [[0, 1], [0, 0]],  # quad pt 1
+                ]
+            ]
+        )  # Shape (1, 2, 2, 2)
+
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        reshaped = op.coefficients
+
+        # Should have shape (nb_operators=1, nb_quad_pts=2, nb_nodal_pts=1, 2, 2)
+        self.assertEqual(reshaped.shape, (1, 2, 1, 2, 2))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :], [[1, 0], [0, 0]])
+        np.testing.assert_array_equal(reshaped[0, 1, 0, :, :], [[0, 1], [0, 0]])
+
+    def test_coefficients_roundtrip(self):
+        """Test that coefficients returns data consistent with pixel_operator."""
+        # Create a complex stencil with multiple dimensions
+        stencil = np.random.rand(2, 3, 3, 4)  # 2 ops, 3 quad pts, 3x4 stencil
+
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Get both flattened and reshaped versions
+        flat = np.array(op.pixel_operator)
+        reshaped = op.coefficients
+
+        # Should have shape (2, 3, 1, 3, 4)
+        self.assertEqual(reshaped.shape, (2, 3, 1, 3, 4))
+
+        # Flattened version of reshaped should match pixel_operator
+        np.testing.assert_array_equal(reshaped.ravel(order='F'), flat)
+
+    def test_coefficients_3d(self):
+        """Test coefficients property in 3D."""
+        stencil = np.zeros((2, 2, 2))
+        stencil[0, 0, 0] = 1.0
+        stencil[1, 1, 1] = -1.0
+
+        op = muGrid.ConvolutionOperator([0, 0, 0], stencil)
+
+        reshaped = op.coefficients
+
+        # Should have shape (nb_operators=1, nb_quad_pts=1, nb_nodal_pts=1, 2, 2, 2)
+        self.assertEqual(reshaped.shape, (1, 1, 1, 2, 2, 2))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :, :], stencil)
+
+    def test_properties_consistency(self):
+        """Test that stencil properties are consistent with each other."""
+        stencil = np.array(
+            [
+                [
+                    [[1, 0, 0], [0, 0, 0]],  # op 0, quad pt 0
+                    [[0, 1, 0], [0, 0, 0]],  # op 0, quad pt 1
+                ],
+                [
+                    [[0, 0, 1], [0, 0, 0]],  # op 1, quad pt 0
+                    [[0, 0, 0], [1, 0, 0]],  # op 1, quad pt 1
+                ],
+            ]
+        )  # Shape (2, 2, 2, 3)
+
+        op = muGrid.ConvolutionOperator([-1, 0], stencil)
+
+        # Check all properties
+        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_quad_pts, 2)
+        self.assertEqual(op.nb_nodal_pts, 1)
+        self.assertEqual(op.spatial_dim, 2)
+        np.testing.assert_array_equal(op.offset, [-1, 0])
+        np.testing.assert_array_equal(op.shape, [2, 3])
+
+        # Check that coefficients returns correct shape
+        reshaped = op.coefficients
+        self.assertEqual(reshaped.shape, (2, 2, 1, 2, 3))
+
+        # Check that the total number of elements is consistent
+        expected_size = 2 * 2 * 1 * 2 * 3  # ops * quad * nodal * stencil
+        self.assertEqual(len(op.pixel_operator), expected_size)
+        self.assertEqual(reshaped.size, expected_size)
+
+
+# =============================================================================
+# Hardcoded operator stencil access tests
+# =============================================================================
+
+
+class LaplaceOperatorStencilAccess(unittest.TestCase):
+    """Test stencil property access for LaplaceOperator."""
+
+    def test_laplace_2d_properties(self):
+        """Test Laplace operator properties in 2D."""
+        op = muGrid.LaplaceOperator(2, scale=2.0)
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [-1, -1])
+        np.testing.assert_array_equal(op.shape, [3, 3])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        self.assertEqual(coeffs.shape, (1, 1, 1, 3, 3))
+
+        # Expected 2D Laplace stencil with scale=2.0
+        expected = np.array([[0, 2, 0], [2, -8, 2], [0, 2, 0]])
+        np.testing.assert_array_equal(coeffs[0, 0, 0, :, :], expected)
+
+    def test_laplace_3d_properties(self):
+        """Test Laplace operator properties in 3D."""
+        op = muGrid.LaplaceOperator(3, scale=1.5)
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [-1, -1, -1])
+        np.testing.assert_array_equal(op.shape, [3, 3, 3])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        self.assertEqual(coeffs.shape, (1, 1, 1, 3, 3, 3))
+
+        # Expected 3D Laplace stencil with scale=1.5
+        # Center at [1, 1, 1] should be -9.0, 6 neighbors should be 1.5
+        self.assertEqual(coeffs[0, 0, 0, 1, 1, 1], -9.0)
+        self.assertEqual(coeffs[0, 0, 0, 0, 1, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 2, 1, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 0, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 2, 1], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 1, 0], 1.5)
+        self.assertEqual(coeffs[0, 0, 0, 1, 1, 2], 1.5)
+
+    def test_laplace_consistency(self):
+        """Test consistency between properties."""
+        op = muGrid.LaplaceOperator(2, scale=1.0)
+
+        # Check dimensions
+        self.assertEqual(op.spatial_dim, 2)
+        self.assertEqual(op.nb_operators, 1)
+        self.assertEqual(op.nb_quad_pts, 1)
+        self.assertEqual(op.nb_nodal_pts, 1)
+
+        # Check total size
+        coeffs = op.coefficients
+        expected_size = 1 * 1 * 1 * 3 * 3
+        self.assertEqual(coeffs.size, expected_size)
+
+
+class FEMGradientOperatorStencilAccess(unittest.TestCase):
+    """Test stencil property access for FEMGradientOperator."""
+
+    def test_fem_2d_properties(self):
+        """Test FEM gradient operator properties in 2D."""
+        op = muGrid.FEMGradientOperator(2, grid_spacing=[2.0, 3.0])
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [0, 0])
+        np.testing.assert_array_equal(op.shape, [2, 2])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        # Shape: (nb_operators=2, nb_quad_pts=2, nb_nodal_pts=1, 2, 2)
+        self.assertEqual(coeffs.shape, (2, 2, 1, 2, 2))
+
+        # Check that we have x and y derivatives
+        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_quad_pts, 2)
+
+    def test_fem_3d_properties(self):
+        """Test FEM gradient operator properties in 3D."""
+        op = muGrid.FEMGradientOperator(3, grid_spacing=[1.0, 1.0, 1.0])
+
+        # Check offset and shape
+        np.testing.assert_array_equal(op.offset, [0, 0, 0])
+        np.testing.assert_array_equal(op.shape, [2, 2, 2])
+
+        # Check coefficients
+        coeffs = op.coefficients
+        # Shape: (nb_operators=3, nb_quad_pts=5, nb_nodal_pts=1, 2, 2, 2)
+        self.assertEqual(coeffs.shape, (3, 5, 1, 2, 2, 2))
+
+        # Check that we have x, y, z derivatives
+        self.assertEqual(op.nb_operators, 3)
+        self.assertEqual(op.nb_quad_pts, 5)
+
+    def test_fem_consistency(self):
+        """Test consistency between properties."""
+        op = muGrid.FEMGradientOperator(2, grid_spacing=[1.0, 1.0])
+
+        # Check dimensions
+        self.assertEqual(op.spatial_dim, 2)
+        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_quad_pts, 2)
+        self.assertEqual(op.nb_nodal_pts, 1)
+
+        # Check total size
+        coeffs = op.coefficients
+        expected_size = 2 * 2 * 1 * 2 * 2
+        self.assertEqual(coeffs.size, expected_size)
+
+    def test_fem_grid_spacing_affects_coefficients(self):
+        """Test that grid spacing affects shape function gradients."""
+        op1 = muGrid.FEMGradientOperator(2, grid_spacing=[1.0, 1.0])
+        op2 = muGrid.FEMGradientOperator(2, grid_spacing=[2.0, 2.0])
+
+        coeffs1 = op1.coefficients
+        coeffs2 = op2.coefficients
+
+        # Coefficients should scale with inverse of grid spacing
+        # Since grid spacing is doubled, coefficients should be halved
+        np.testing.assert_array_almost_equal(coeffs2, coeffs1 * 0.5)
+
+
+# =============================================================================
 # GPU-specific convolution tests
 # =============================================================================
 

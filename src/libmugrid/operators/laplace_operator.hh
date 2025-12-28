@@ -208,6 +208,49 @@ namespace muGrid {
          */
         Real get_scale() const { return scale; }
 
+        /**
+         * @brief Get the stencil offset.
+         * @return Stencil offset in pixels (centered: [-1,-1] for 2D, [-1,-1,-1] for 3D)
+         */
+        Shape_t get_pixel_offset() const {
+            return Shape_t(spatial_dim, -1);
+        }
+
+        /**
+         * @brief Get the stencil shape.
+         * @return Shape of the stencil ([3,3] for 2D, [3,3,3] for 3D)
+         */
+        Shape_t get_conv_pts_shape() const {
+            return Shape_t(spatial_dim, 3);
+        }
+
+        /**
+         * @brief Get the stencil coefficients in reshaped form.
+         * @return Vector of stencil coefficients
+         *
+         * For 2D: [0, 1, 0, 1, -4, 1, 0, 1, 0] * scale
+         * For 3D: 7-point stencil with center=-6*scale, neighbors=1*scale
+         */
+        std::vector<Real> get_pixel_operator() const {
+            if (spatial_dim == 2) {
+                return {0.0, scale, 0.0,
+                        scale, -4.0*scale, scale,
+                        0.0, scale, 0.0};
+            } else {  // 3D
+                std::vector<Real> stencil(27, 0.0);
+                // Center point at [1,1,1] = index 13
+                stencil[13] = -6.0 * scale;
+                // 6 neighbors
+                stencil[13-1] = scale;   // [1,1,0]
+                stencil[13+1] = scale;   // [1,1,2]
+                stencil[13-3] = scale;   // [1,0,1]
+                stencil[13+3] = scale;   // [1,2,1]
+                stencil[13-9] = scale;   // [0,1,1]
+                stencil[13+9] = scale;   // [2,1,1]
+                return stencil;
+            }
+        }
+
     private:
         Index_t spatial_dim;
         Real scale;

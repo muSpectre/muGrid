@@ -248,6 +248,16 @@ namespace muGrid {
         const std::vector<Real> &get_pixel_operator() const;
 
         /**
+         * Return the stencil offset in number of pixels.
+         */
+        const Shape_t &get_pixel_offset() const;
+
+        /**
+         * Return the shape of the convolution stencil.
+         */
+        const Shape_t &get_conv_pts_shape() const;
+
+        /**
          * returns the number of quadrature points are associated with any
          * pixel/voxel (i.e., the sum of the number of quadrature points associated
          * with each element belonging to any pixel/voxel.
