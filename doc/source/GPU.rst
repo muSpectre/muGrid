@@ -5,6 +5,47 @@ GPU Computing
 Fields can be allocated on either host (CPU) or device (GPU) memory, and operations
 on GPU fields are executed on the GPU.
 
+Building with GPU support
+*************************
+
+To build *µ*\Grid with GPU support, enable the appropriate CMake option:
+
+.. code-block:: sh
+
+    # For CUDA
+    cmake -DMUGRID_ENABLE_CUDA=ON ..
+
+    # For ROCm/HIP
+    cmake -DMUGRID_ENABLE_HIP=ON ..
+
+You can also specify the GPU architectures to target:
+
+.. code-block:: sh
+
+    # CUDA architectures (e.g., 70=V100, 80=A100, 90=H100)
+    cmake -DMUGRID_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="70;80;90" ..
+
+    # HIP architectures (e.g., gfx906=MI50, gfx90a=MI200)
+    cmake -DMUGRID_ENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES="gfx906;gfx90a" ..
+
+Installing CuPy
+***************
+
+To work with GPU fields from Python, you need to install `CuPy <https://cupy.dev/>`_.
+See the `CuPy installation guide <https://docs.cupy.dev/en/stable/install.html>`_ for
+detailed instructions. A quick summary:
+
+.. code-block:: sh
+
+    # For CUDA 11.x
+    pip install cupy-cuda11x
+
+    # For CUDA 12.x
+    pip install cupy-cuda12x
+
+    # For ROCm
+    pip install cupy-rocm-5-0  # or appropriate ROCm version
+
 Checking GPU availability
 *************************
 
@@ -131,23 +172,6 @@ specify the memory location:
     # Access coordinates (returned as CuPy arrays on GPU)
     x, y = decomp.coords
 
-Installing CuPy
-***************
-
-To work with GPU fields, you need to install `CuPy <https://cupy.dev/>`_. The installation
-depends on your CUDA version:
-
-.. code-block:: sh
-
-    # For CUDA 11.x
-    pip install cupy-cuda11x
-
-    # For CUDA 12.x
-    pip install cupy-cuda12x
-
-    # For ROCm
-    pip install cupy-rocm-5-0  # or appropriate ROCm version
-
 Convolution operators on GPU
 ****************************
 
@@ -192,26 +216,3 @@ GPU acceleration is most beneficial when:
 
 For small grids or infrequent operations, the overhead of CPU-GPU data transfer may
 outweigh the benefits of GPU computation.
-
-Building with GPU support
-*************************
-
-To build *µ*\Grid with GPU support, enable the appropriate CMake option:
-
-.. code-block:: sh
-
-    # For CUDA
-    cmake -DMUGRID_ENABLE_CUDA=ON ..
-
-    # For ROCm/HIP
-    cmake -DMUGRID_ENABLE_HIP=ON ..
-
-You can also specify the GPU architectures to target:
-
-.. code-block:: sh
-
-    # CUDA architectures (e.g., 70=V100, 80=A100, 90=H100)
-    cmake -DMUGRID_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="70;80;90" ..
-
-    # HIP architectures (e.g., gfx906=MI50, gfx90a=MI200)
-    cmake -DMUGRID_ENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES="gfx906;gfx90a" ..

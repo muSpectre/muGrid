@@ -11,10 +11,11 @@
    Summary
    GettingStarted
    Python
-   PythonAPI
    FFT
    GPU
+   Examples
    Cplusplus
+   PythonAPI
    CplusplusAPI
    CodingConvention
 
