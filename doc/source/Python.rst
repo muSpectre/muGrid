@@ -203,11 +203,13 @@ missing. This means we can represent a simple forward-differences gradient opera
 .. literalinclude:: ../../examples/gradient.py
     :language: python
 
-numpy views
-***********
+numpy and cupy views
+********************
 
 The multidimensional array representation of a field is accessible via the
-`array` method.
+`array` method. For CPU fields, this returns a `numpy <https://numpy.org/>`_ array.
+For GPU fields, this returns a `CuPy <https://cupy.dev/>`_ array with the same interface.
+See the :doc:`GPU` chapter for details on GPU computing with *µ*\Grid.
 
 .. code-block:: Python
 
