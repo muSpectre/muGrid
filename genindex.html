@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#"><link rel="search" title="Search" href="search.html">
 
-    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 --><title>Index - µGrid 0.100.0 documentation</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 --><title>Index - µGrid 0.100.0-5-g5f7fa7f5 documentation</title>
 <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -159,7 +159,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.100.0
+      <a href="index.html"><div class="brand">µGrid 0.100.0-5-g5f7fa7f5
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.100.0
+  <span class="sidebar-brand-text">µGrid 0.100.0-5-g5f7fa7f5
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -387,17 +387,9 @@
         <ul>
           <li><a href="PythonAPI.html#muGrid.Communicator">muGrid.Communicator()</a>
 </li>
-          <li><a href="PythonAPI.html#muGrid.fft_freq">muGrid.fft_freq()</a>
-</li>
-          <li><a href="PythonAPI.html#muGrid.fft_freqind">muGrid.fft_freqind()</a>
-</li>
           <li><a href="PythonAPI.html#muGrid.fft_normalization">muGrid.fft_normalization()</a>
 </li>
           <li><a href="PythonAPI.html#muGrid.get_hermitian_grid_pts">muGrid.get_hermitian_grid_pts()</a>
-</li>
-          <li><a href="PythonAPI.html#muGrid.rfft_freq">muGrid.rfft_freq()</a>
-</li>
-          <li><a href="PythonAPI.html#muGrid.rfft_freqind">muGrid.rfft_freqind()</a>
 </li>
           <li><a href="PythonAPI.html#muGrid.wrap_field">muGrid.wrap_field()</a>
 </li>
@@ -414,11 +406,15 @@
 </li>
         <li><a href="PythonAPI.html#muGrid.CartesianDecomposition.communicate_ghosts">communicate_ghosts() (muGrid.CartesianDecomposition method)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="Cplusplus.html#_CPPv47Complex">Complex (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv47Complex">[1]</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="PythonAPI.html#muGrid.GlobalFieldCollection.complex_field">complex_field() (muGrid.GlobalFieldCollection method)</a>
+</li>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.coords">coords (muGrid.FFTEngine attribute)</a>
+</li>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.coordsg">coordsg (muGrid.FFTEngine attribute)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -458,6 +454,8 @@
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.fftfreq">fftfreq (muGrid.FFTEngine attribute)</a>
+</li>
         <li><a href="PythonAPI.html#muGrid.FFTEngine.fourier_space_field">fourier_space_field() (muGrid.FFTEngine method)</a>
 </li>
     </ul></td>
@@ -482,14 +480,20 @@
   <h2>I</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.icoords">icoords (muGrid.FFTEngine attribute)</a>
+</li>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.icoordsg">icoordsg (muGrid.FFTEngine attribute)</a>
+</li>
         <li><a href="PythonAPI.html#muGrid.FFTEngine.ifft">ifft() (muGrid.FFTEngine method)</a>
+</li>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.ifftfreq">ifftfreq (muGrid.FFTEngine attribute)</a>
 </li>
         <li><a href="Cplusplus.html#_CPPv47Index_t">Index_t (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv47Index_t">[1]</a>
 </li>
-        <li><a href="Cplusplus.html#_CPPv43Int">Int (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv43Int">[1]</a>
-</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="Cplusplus.html#_CPPv43Int">Int (C++ type)</a>, <a href="CplusplusAPI.html#_CPPv43Int">[1]</a>
+</li>
         <li><a href="PythonAPI.html#muGrid.GlobalFieldCollection.int_field">int_field() (muGrid.GlobalFieldCollection method)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv48IODiff_t">IODiff_t (C++ type)</a>
@@ -531,20 +535,6 @@
         <li><a href="PythonAPI.html#muGrid.FEMGradientOperator">muGrid.FEMGradientOperator (built-in class)</a>
 </li>
         <li>
-    muGrid.fft_freq()
-
-        <ul>
-          <li><a href="PythonAPI.html#muGrid.fft_freq">built-in function</a>
-</li>
-        </ul></li>
-        <li>
-    muGrid.fft_freqind()
-
-        <ul>
-          <li><a href="PythonAPI.html#muGrid.fft_freqind">built-in function</a>
-</li>
-        </ul></li>
-        <li>
     muGrid.fft_normalization()
 
         <ul>
@@ -582,20 +572,6 @@
 </li>
         <li><a href="PythonAPI.html#muGrid.LocalFieldCollection">muGrid.LocalFieldCollection (built-in class)</a>
 </li>
-        <li>
-    muGrid.rfft_freq()
-
-        <ul>
-          <li><a href="PythonAPI.html#muGrid.rfft_freq">built-in function</a>
-</li>
-        </ul></li>
-        <li>
-    muGrid.rfft_freqind()
-
-        <ul>
-          <li><a href="PythonAPI.html#muGrid.rfft_freqind">built-in function</a>
-</li>
-        </ul></li>
         <li>
     muGrid.Solvers
 
@@ -1408,9 +1384,9 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid8fft_freqE7Index_t4Real">muGrid::fft_freq (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid8fft_freqE7Index_t4Real">[1]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t">muGrid::fft_freqind (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t">[1]</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t">muGrid::fft_freqind (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t">[1]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t7Index_t">[2]</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid11fft_freqindE7Index_t7Index_t">[3]</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17fft_normalizationERK12DynGridIndex">muGrid::fft_normalization (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid17fft_normalizationERK12DynGridIndex">muGrid::fft_normalization (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid17fft_normalizationERK12DynGridIndex">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid12FFTBackend_tE">muGrid::FFTBackend_t (C++ type)</a>
 </li>
@@ -2242,7 +2218,7 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22get_device_fft_backendEv">muGrid::get_device_fft_backend (C++ function)</a>
 </li>
-        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22get_hermitian_grid_ptsERK12DynGridIndex7Index_t">muGrid::get_hermitian_grid_pts (C++ function)</a>
+        <li><a href="CplusplusAPI.html#_CPPv4N6muGrid22get_hermitian_grid_ptsERK12DynGridIndex7Index_t">muGrid::get_hermitian_grid_pts (C++ function)</a>, <a href="CplusplusAPI.html#_CPPv4N6muGrid22get_hermitian_grid_ptsERK12DynGridIndex7Index_t">[1]</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid20get_host_fft_backendEv">muGrid::get_host_fft_backend (C++ function)</a>
 </li>
@@ -2346,8 +2322,6 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams12total_pixelsE">muGrid::GridTraversalParams::total_pixels (C++ member)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid19GridTraversalParams19total_quad_elementsE">muGrid::GridTraversalParams::total_quad_elements (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackendE">muGrid::hipFFTBackend (C++ class)</a>
@@ -2360,6 +2334,8 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend19check_hipfft_resultE12hipfftResultPKc">muGrid::hipFFTBackend::check_hipfft_result (C++ function)</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend8get_planE13TransformType7Index_t7Index_t7Index_t7Index_t7Index_t7Index_t">muGrid::hipFFTBackend::get_plan (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid13hipFFTBackend13hipFFTBackendEv">muGrid::hipFFTBackend::hipFFTBackend (C++ function)</a>
@@ -3226,6 +3202,10 @@
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4IEN6muGrid15normalize_coordI3IntEE3Int3Int3Int">muGrid::normalize_coord&lt;Int&gt; (C++ function)</a>
 </li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid17normalize_fftfreqE1T3Int3Int">muGrid::normalize_fftfreq (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4IEN6muGrid17normalize_fftfreqI3IntEE3Int3Int3Int">muGrid::normalize_fftfreq&lt;Int&gt; (C++ function)</a>
+</li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid4oneDE">muGrid::oneD (C++ member)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid7OneNodeE">muGrid::OneNode (C++ member)</a>
@@ -3289,6 +3269,8 @@
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid16PocketFFTBackendD0Ev">muGrid::PocketFFTBackend::~PocketFFTBackend (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4I0_b0EN6muGrid9py_coordsEDaRK1C">muGrid::py_coords (C++ function)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I00EN6muGrid10py_fftfreqEDaRK6Engine">muGrid::py_fftfreq (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9RealFieldE">muGrid::RealField (C++ type)</a>
 </li>
@@ -3789,6 +3771,8 @@
         <li><a href="CplusplusAPI.html#_CPPv4I0_7Mapping_5Dim_t_5Dim_t_6size_t_8IterUnitEN6muGrid19TensorStateFieldMapE">muGrid::TensorStateFieldMap (C++ type)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid6threeDE">muGrid::threeD (C++ member)</a>
+</li>
+        <li><a href="CplusplusAPI.html#_CPPv4I0EN6muGrid8to_tupleEN2py5tupleERK1T">muGrid::to_tuple (C++ function)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4N6muGrid9TracebackE">muGrid::Traceback (C++ class)</a>
 </li>
@@ -4882,6 +4866,8 @@
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="PythonAPI.html#muGrid.FFTEngine.spatial_dim">spatial_dim (muGrid.FFTEngine attribute)</a>
+</li>
         <li><a href="PythonAPI.html#muGrid.Timer.start">start() (muGrid.Timer method)</a>
 </li>
         <li><a href="CplusplusAPI.html#_CPPv4St">std (C++ type)</a>
@@ -4960,7 +4946,7 @@
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=c83a1565"></script>
+</div><script src="_static/documentation_options.js?v=59e3b203"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

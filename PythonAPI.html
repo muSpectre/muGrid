@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ API Reference" href="CplusplusAPI.html"><link rel="prev" title="C++ Bindings" href="Cplusplus.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Python API Reference - µGrid 0.100.0 documentation</title>
+        <title>Python API Reference - µGrid 0.100.0-5-g5f7fa7f5 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.100.0
+      <a href="index.html"><div class="brand">µGrid 0.100.0-5-g5f7fa7f5
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.100.0
+  <span class="sidebar-brand-text">µGrid 0.100.0-5-g5f7fa7f5
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -975,85 +975,100 @@ to recover the original data.</p>
 </dl>
 </dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.spatial_dim">
+<span class="sig-name descname"><span class="pre">spatial_dim</span></span><a class="headerlink" href="#muGrid.FFTEngine.spatial_dim" title="Link to this definition">¶</a></dt>
+<dd><p>Spatial dimension of the grid (2 or 3).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.fftfreq">
+<span class="sig-name descname"><span class="pre">fftfreq</span></span><a class="headerlink" href="#muGrid.FFTEngine.fftfreq" title="Link to this definition">¶</a></dt>
+<dd><p>Normalized FFT frequencies for the local Fourier subdomain.</p>
+<p>Returns an array of shape <code class="docutils literal notranslate"><span class="pre">[dim,</span> <span class="pre">local_fx,</span> <span class="pre">local_fy,</span> <span class="pre">...]</span></code> where each
+element is the normalized frequency in range <code class="docutils literal notranslate"><span class="pre">[-0.5,</span> <span class="pre">0.5)</span></code>.</p>
+<p>For MPI-parallel runs, this returns only the frequencies for the local
+subdomain owned by this rank.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.ifftfreq">
+<span class="sig-name descname"><span class="pre">ifftfreq</span></span><a class="headerlink" href="#muGrid.FFTEngine.ifftfreq" title="Link to this definition">¶</a></dt>
+<dd><p>Integer FFT frequency indices for the local Fourier subdomain.</p>
+<p>Returns an array of shape <code class="docutils literal notranslate"><span class="pre">[dim,</span> <span class="pre">local_fx,</span> <span class="pre">local_fy,</span> <span class="pre">...]</span></code> where each
+element is the integer frequency index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.coords">
+<span class="sig-name descname"><span class="pre">coords</span></span><a class="headerlink" href="#muGrid.FFTEngine.coords" title="Link to this definition">¶</a></dt>
+<dd><p>Normalized real-space coordinates for the local subdomain (excluding ghost cells).</p>
+<p>Returns an array of shape <code class="docutils literal notranslate"><span class="pre">[dim,</span> <span class="pre">local_nx,</span> <span class="pre">local_ny,</span> <span class="pre">...]</span></code> where each
+element is the normalized coordinate in range <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.icoords">
+<span class="sig-name descname"><span class="pre">icoords</span></span><a class="headerlink" href="#muGrid.FFTEngine.icoords" title="Link to this definition">¶</a></dt>
+<dd><p>Integer real-space coordinate indices for the local subdomain (excluding ghost cells).</p>
+<p>Returns an array of shape <code class="docutils literal notranslate"><span class="pre">[dim,</span> <span class="pre">local_nx,</span> <span class="pre">local_ny,</span> <span class="pre">...]</span></code> where each
+element is the integer coordinate index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.coordsg">
+<span class="sig-name descname"><span class="pre">coordsg</span></span><a class="headerlink" href="#muGrid.FFTEngine.coordsg" title="Link to this definition">¶</a></dt>
+<dd><p>Normalized real-space coordinates including ghost cells.</p>
+<p>Same as <code class="docutils literal notranslate"><span class="pre">coords</span></code> but includes ghost cells if configured.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.FFTEngine.icoordsg">
+<span class="sig-name descname"><span class="pre">icoordsg</span></span><a class="headerlink" href="#muGrid.FFTEngine.icoordsg" title="Link to this definition">¶</a></dt>
+<dd><p>Integer real-space coordinate indices including ghost cells.</p>
+<p>Same as <code class="docutils literal notranslate"><span class="pre">icoords</span></code> but includes ghost cells if configured.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 </section>
 <section id="fft-utilities">
 <h3><a class="toc-backref" href="#id16" role="doc-backlink">FFT Utilities</a><a class="headerlink" href="#fft-utilities" title="Link to this heading">¶</a></h3>
-<dl class="py function">
-<dt class="sig sig-object py" id="muGrid.fft_freq">
-<span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">fft_freq</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lengths</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.fft_freq" title="Link to this definition">¶</a></dt>
-<dd><p>Return FFT sample frequencies for a given grid.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>nb_grid_pts</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of grid points in each dimension.</p></li>
-<li><p><strong>lengths</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Physical lengths in each dimension.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Array of frequency values.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="muGrid.fft_freqind">
-<span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">fft_freqind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.fft_freqind" title="Link to this definition">¶</a></dt>
-<dd><p>Return FFT frequency indices for a given grid.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>nb_grid_pts</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of grid points in each dimension.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Array of frequency indices.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="muGrid.rfft_freq">
-<span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">rfft_freq</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lengths</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.rfft_freq" title="Link to this definition">¶</a></dt>
-<dd><p>Return real FFT sample frequencies (Hermitian-symmetric) for a given grid.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>nb_grid_pts</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of grid points in each dimension.</p></li>
-<li><p><strong>lengths</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Physical lengths in each dimension.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Array of frequency values.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="muGrid.rfft_freqind">
-<span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">rfft_freqind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.rfft_freqind" title="Link to this definition">¶</a></dt>
-<dd><p>Return real FFT frequency indices for a given grid.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>nb_grid_pts</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of grid points in each dimension.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Array of frequency indices.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)">numpy.ndarray</a></p>
-</dd>
-</dl>
-</dd></dl>
-
 <dl class="py function">
 <dt class="sig sig-object py" id="muGrid.fft_normalization">
 <span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">fft_normalization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.fft_normalization" title="Link to this definition">¶</a></dt>
@@ -1449,15 +1464,18 @@ or if the Hessian is not positive definite.</p>
 <li><a class="reference internal" href="#muGrid.FFTEngine.real_space_field"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.real_space_field()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FFTEngine.fourier_space_field"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.fourier_space_field()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FFTEngine.normalisation"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.normalisation</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.spatial_dim"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.spatial_dim</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.fftfreq"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.fftfreq</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.ifftfreq"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.ifftfreq</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.coords"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.coords</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.icoords"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.icoords</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.coordsg"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.coordsg</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.FFTEngine.icoordsg"><code class="docutils literal notranslate"><span class="pre">muGrid.FFTEngine.icoordsg</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li><a class="reference internal" href="#fft-utilities">FFT Utilities</a><ul>
-<li><a class="reference internal" href="#muGrid.fft_freq"><code class="docutils literal notranslate"><span class="pre">muGrid.fft_freq()</span></code></a></li>
-<li><a class="reference internal" href="#muGrid.fft_freqind"><code class="docutils literal notranslate"><span class="pre">muGrid.fft_freqind()</span></code></a></li>
-<li><a class="reference internal" href="#muGrid.rfft_freq"><code class="docutils literal notranslate"><span class="pre">muGrid.rfft_freq()</span></code></a></li>
-<li><a class="reference internal" href="#muGrid.rfft_freqind"><code class="docutils literal notranslate"><span class="pre">muGrid.rfft_freqind()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.fft_normalization"><code class="docutils literal notranslate"><span class="pre">muGrid.fft_normalization()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.get_hermitian_grid_pts"><code class="docutils literal notranslate"><span class="pre">muGrid.get_hermitian_grid_pts()</span></code></a></li>
 </ul>
@@ -1524,7 +1542,7 @@ or if the Hessian is not positive definite.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=c83a1565"></script>
+</div><script src="_static/documentation_options.js?v=59e3b203"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

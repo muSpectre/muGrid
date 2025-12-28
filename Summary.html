@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Getting Started" href="GettingStarted.html"><link rel="prev" title="µGrid, MPI-parallel regular grids" href="index.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Summary - µGrid 0.100.0 documentation</title>
+        <title>Summary - µGrid 0.100.0-5-g5f7fa7f5 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.100.0
+      <a href="index.html"><div class="brand">µGrid 0.100.0-5-g5f7fa7f5
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -173,7 +173,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
       </label>
     </div>
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.100.0
+  <span class="sidebar-brand-text">µGrid 0.100.0-5-g5f7fa7f5
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -237,16 +237,49 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
           </label>
         </div>
         <article role="main" id="furo-main-content">
           <section id="summary">
 <span id="id1"></span><h1>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h1>
-<p><em>µ</em>Grid is a part of the project <em>µ</em>Spectre, which provides an open-source platform for efficient FFT-based continuum mesoscale modelling. Its development is funded by the <a class="reference external" href="https://snf.ch">Swiss National Science Foundation</a> within an Ambizione Project and by the <a class="reference external" href="https://erc.europa.eu">European Research Council</a> within <a class="reference external" href="https://cordis.europa.eu/project/id/757343">Starting Grant 757343</a>.</p>
-<p><em>µ</em>Grid is a C++ library for structured grid data and algorithms. It is designed to be used in combination with <em>µ</em>Spectre, but can also be used as a standalone library. The library provides a set of classes for Cartesian structured grid data and differentiation algorithms. The library is designed to be efficient and scalable, and to be used in combination with modern C++ features, such as template metaprogramming and parallelism.</p>
-<p><em>µ</em>Grid has language bindings for Python, which expose the grid through <a class="reference external" href="https://numpy.org/">numpy</a> arrays.</p>
+<p><em>µ</em>Grid is a C++17 library for discrete representation of fields on structured
+grids, with Python bindings. It provides efficient data structures and algorithms
+for solving partial differential equations on regular grids, with support for
+MPI parallelization and GPU acceleration.</p>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Field collections</strong>: Manage scalar, vector, and tensor fields on structured
+grids with flexible memory layouts (row-major, column-major, strided)</p></li>
+<li><p><strong>FFT engine</strong>: Built-in Fast Fourier Transform using <a class="reference external" href="https://github.com/mreineck/pocketfft">PocketFFT</a>
+with MPI-parallel support using pencil decomposition</p></li>
+<li><p><strong>Convolution operators</strong>: Discrete differential operators including Laplacian
+and FEM gradient operators for spectral methods</p></li>
+<li><p><strong>Domain decomposition</strong>: Cartesian decomposition with ghost cell communication
+for stencil operations</p></li>
+<li><p><strong>GPU support</strong>: Optional CUDA and HIP backends for GPU-accelerated computation</p></li>
+<li><p><strong>NetCDF I/O</strong>: Serial (Unidata NetCDF) and parallel (PnetCDF) file I/O for
+checkpointing and analysis</p></li>
+</ul>
+<p><em>µ</em>Grid has language bindings for Python via <a class="reference external" href="https://pybind11.readthedocs.io/">pybind11</a>,
+exposing fields through <a class="reference external" href="https://numpy.org/">NumPy</a> arrays and supporting
+interoperability with <a class="reference external" href="https://cupy.dev/">CuPy</a> for GPU arrays.</p>
+</section>
+<section id="history">
+<h2>History<a class="headerlink" href="#history" title="Link to this heading">¶</a></h2>
+<p><em>µ</em>Grid is part of the <em>µ</em>Spectre project, which provides an open-source
+platform for efficient FFT-based continuum mesoscale modelling. It was originally
+developed as the grid infrastructure for <em>µ</em>Spectre but is now a standalone
+library that can be used independently.</p>
+</section>
+<section id="funding">
+<h2>Funding<a class="headerlink" href="#funding" title="Link to this heading">¶</a></h2>
+<p>Development has been funded by the <a class="reference external" href="https://snf.ch">Swiss National Science Foundation</a>
+within an Ambizione Project and by the <a class="reference external" href="https://erc.europa.eu">European Research Council</a>
+within <a class="reference external" href="https://cordis.europa.eu/project/id/757343">Starting Grant 757343</a>.</p>
+</section>
 </section>
 
         </article>
@@ -292,13 +325,34 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Summary</a><ul>
+<li><a class="reference internal" href="#features">Features</a></li>
+<li><a class="reference internal" href="#history">History</a></li>
+<li><a class="reference internal" href="#funding">Funding</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=c83a1565"></script>
+</div><script src="_static/documentation_options.js?v=59e3b203"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

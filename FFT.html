@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="GPU Computing" href="GPU.html"><link rel="prev" title="Python Bindings" href="Python.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Fast Fourier Transform - µGrid 0.100.0 documentation</title>
+        <title>Fast Fourier Transform - µGrid 0.100.0-5-g5f7fa7f5 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.100.0
+      <a href="index.html"><div class="brand">µGrid 0.100.0-5-g5f7fa7f5
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.100.0
+  <span class="sidebar-brand-text">µGrid 0.100.0-5-g5f7fa7f5
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -333,28 +333,126 @@ after the inverse transform.</p>
 conventions (normalize forward, normalize inverse, or split between both), and
 different applications may prefer different choices.</p>
 </section>
-<section id="wavevector-utilities">
-<h2>Wavevector utilities<a class="headerlink" href="#wavevector-utilities" title="Link to this heading">¶</a></h2>
-<p><em>µ</em>Grid provides utility functions for working with FFT frequencies:</p>
+<section id="frequency-and-coordinate-arrays">
+<h2>Frequency and coordinate arrays<a class="headerlink" href="#frequency-and-coordinate-arrays" title="Link to this heading">¶</a></h2>
+<p>The FFT engine provides properties for accessing frequency and coordinate arrays
+that are correctly shaped for the local subdomain. This is particularly useful
+for MPI-parallel computations where each rank only handles a portion of the grid.</p>
+<section id="frequency-arrays">
+<h3>Frequency arrays<a class="headerlink" href="#frequency-arrays" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">fftfreq</span></code> and <code class="docutils literal notranslate"><span class="pre">ifftfreq</span></code> properties provide FFT frequency arrays:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="n">n</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
 
-<span class="c1"># Integer frequency indices (same as numpy.fft.fftfreq(n) * n)</span>
-<span class="n">freq_idx</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">fft_freqind</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">freq_idx</span><span class="p">)</span>  <span class="c1"># [0, 1, 2, 3, -4, -3, -2, -1]</span>
+<span class="c1"># Normalized frequencies (range [-0.5, 0.5))</span>
+<span class="n">qx</span><span class="p">,</span> <span class="n">qy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fftfreq shape: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># (2, 4, 4) for r2c transform</span>
 
-<span class="c1"># Frequency values with spacing dx</span>
-<span class="n">dx</span> <span class="o">=</span> <span class="mf">0.1</span>
-<span class="n">freqs</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">fft_freq</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">dx</span><span class="p">)</span>  <span class="c1"># Same as numpy.fft.fftfreq(n, dx)</span>
+<span class="c1"># Integer frequency indices</span>
+<span class="n">iqx</span><span class="p">,</span> <span class="n">iqy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">ifftfreq</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ifftfreq dtype: </span><span class="si">{</span><span class="n">iqx</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># integer type</span>
 
-<span class="c1"># For real FFT (half-complex output)</span>
-<span class="n">rfft_idx</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">rfft_freqind</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">rfft_idx</span><span class="p">)</span>  <span class="c1"># [0, 1, 2, 3, 4]</span>
-
-<span class="n">rfft_freqs</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">rfft_freq</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">dx</span><span class="p">)</span>  <span class="c1"># Same as numpy.fft.rfftfreq(n, dx)</span>
+<span class="c1"># These match numpy&#39;s frequency arrays (sliced for r2c transform)</span>
+<span class="n">freq_ref</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">]),</span> <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span>
+<span class="p">))</span>
+<span class="n">freq_ref</span> <span class="o">=</span> <span class="n">freq_ref</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">4</span><span class="p">,</span> <span class="p">:]</span>  <span class="c1"># Slice for half-complex</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">,</span> <span class="n">freq_ref</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>The frequency arrays have shape <code class="docutils literal notranslate"><span class="pre">[dim,</span> <span class="pre">local_fx,</span> <span class="pre">local_fy,</span> <span class="pre">...]</span></code> where the first
+axis indexes the spatial dimension and the remaining axes match the local Fourier
+subdomain dimensions.</p>
+</section>
+<section id="coordinate-arrays">
+<h3>Coordinate arrays<a class="headerlink" href="#coordinate-arrays" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">coords</span></code> and <code class="docutils literal notranslate"><span class="pre">icoords</span></code> properties provide real-space coordinate arrays:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+
+<span class="c1"># Normalized coordinates (range [0, 1))</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coords</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;coords shape: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">coords</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># (2, 7, 4)</span>
+
+<span class="c1"># Integer coordinate indices</span>
+<span class="n">ix</span><span class="p">,</span> <span class="n">iy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">icoords</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;icoords dtype: </span><span class="si">{</span><span class="n">ix</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># integer type</span>
+
+<span class="c1"># Verify: integer coords = fractional * n</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">ix</span><span class="p">,</span> <span class="n">x</span> <span class="o">*</span> <span class="mi">7</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">iy</span><span class="p">,</span> <span class="n">y</span> <span class="o">*</span> <span class="mi">4</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For fields with ghost regions, use <code class="docutils literal notranslate"><span class="pre">coordsg</span></code> and <code class="docutils literal notranslate"><span class="pre">icoordsg</span></code> to get coordinates
+including the ghost cells:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">(</span>
+    <span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="c1"># Coordinates without ghosts</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coords</span>
+
+<span class="c1"># Coordinates with ghosts (larger array)</span>
+<span class="n">xg</span><span class="p">,</span> <span class="n">yg</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coordsg</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Without ghosts: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">coords</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>   <span class="c1"># (2, local_nx, local_ny)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;With ghosts: </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">coordsg</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>     <span class="c1"># (2, local_nx+2, local_ny+2)</span>
+</pre></div>
+</div>
+</section>
+<section id="mpi-parallel-frequency-arrays">
+<h3>MPI-parallel frequency arrays<a class="headerlink" href="#mpi-parallel-frequency-arrays" title="Link to this heading">¶</a></h3>
+<p>In MPI-parallel runs, frequency and coordinate arrays return only the data for the
+local subdomain owned by each rank:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
+<span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">],</span> <span class="n">comm</span><span class="p">)</span>
+
+<span class="c1"># Each rank gets frequencies for its local Fourier subdomain</span>
+<span class="n">qx</span><span class="p">,</span> <span class="n">qy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">: fftfreq shape = </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Coordinates for local real-space subdomain</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coords</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">: coords shape = </span><span class="si">{</span><span class="n">engine</span><span class="o">.</span><span class="n">coords</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-fourier-space-operations">
+<h3>Example: Fourier-space operations<a class="headerlink" href="#example-fourier-space-operations" title="Link to this heading">¶</a></h3>
+<p>A common pattern is using frequency arrays to construct Fourier-space operators:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">])</span>
+<span class="n">qx</span><span class="p">,</span> <span class="n">qy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span>
+
+<span class="n">real_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;u&quot;</span><span class="p">)</span>
+<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;u_hat&quot;</span><span class="p">)</span>
+
+<span class="c1"># Initialize with a cosine wave</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coords</span>
+<span class="n">real_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># Forward FFT</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">real_field</span><span class="p">,</span> <span class="n">fourier_field</span><span class="p">)</span>
+
+<span class="c1"># Compute Laplacian in Fourier space: -4π²(qx² + qy²) * u_hat</span>
+<span class="n">laplacian_hat</span> <span class="o">=</span> <span class="o">-</span><span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">qx</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">qy</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">fourier_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c1"># Or use integer frequencies for identifying specific modes</span>
+<span class="n">iqx</span><span class="p">,</span> <span class="n">iqy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">ifftfreq</span>
+<span class="c1"># Find the (1, 0) mode</span>
+<span class="n">mode_mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">iqx</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">iqy</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 <section id="hermitian-grid-dimensions">
 <h2>Hermitian grid dimensions<a class="headerlink" href="#hermitian-grid-dimensions" title="Link to this heading">¶</a></h2>
@@ -385,12 +483,12 @@ grid size:</p>
 <p>A common use of FFTs is computing derivatives in Fourier space. Here’s an example
 computing the gradient of a 2D field:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
 <span class="c1"># Grid parameters</span>
 <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span> <span class="o">=</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span>
 <span class="n">Lx</span><span class="p">,</span> <span class="n">Ly</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
-<span class="n">dx</span><span class="p">,</span> <span class="n">dy</span> <span class="o">=</span> <span class="n">Lx</span> <span class="o">/</span> <span class="n">nx</span><span class="p">,</span> <span class="n">Ly</span> <span class="o">/</span> <span class="n">ny</span>
 
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">])</span>
 
@@ -401,19 +499,23 @@ computing the gradient of a 2D field:</p>
 <span class="n">grad_y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;grad_y&quot;</span><span class="p">)</span>
 <span class="n">grad_hat</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;grad_hat&quot;</span><span class="p">)</span>
 
-<span class="c1"># Initialize with a smooth function</span>
-<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Lx</span><span class="p">,</span> <span class="n">nx</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Ly</span><span class="p">,</span> <span class="n">ny</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">indexing</span><span class="o">=</span><span class="s1">&#39;ij&#39;</span><span class="p">)</span>
+<span class="c1"># Get real-space coordinates from engine</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coords</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">X</span> <span class="o">*</span> <span class="n">Lx</span>  <span class="c1"># Scale from [0, 1) to [0, Lx)</span>
+<span class="n">Y</span> <span class="o">=</span> <span class="n">Y</span> <span class="o">*</span> <span class="n">Ly</span>
+
+<span class="c1"># Initialize with a smooth function: f = sin(x) * cos(y)</span>
 <span class="n">f</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span>
 
 <span class="c1"># Forward FFT</span>
 <span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">f_hat</span><span class="p">)</span>
 
-<span class="c1"># Compute wavevectors</span>
-<span class="n">kx</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">rfft_freqind</span><span class="p">(</span><span class="n">nx</span><span class="p">))</span> <span class="o">/</span> <span class="n">Lx</span>
-<span class="n">ky</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">muGrid</span><span class="o">.</span><span class="n">fft_freqind</span><span class="p">(</span><span class="n">ny</span><span class="p">))</span> <span class="o">/</span> <span class="n">Ly</span>
-<span class="n">KX</span><span class="p">,</span> <span class="n">KY</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">kx</span><span class="p">,</span> <span class="n">ky</span><span class="p">,</span> <span class="n">indexing</span><span class="o">=</span><span class="s1">&#39;ij&#39;</span><span class="p">)</span>
+<span class="c1"># Get wavevectors from engine (integer indices, then scale)</span>
+<span class="c1"># fftfreq returns normalized frequencies in [-0.5, 0.5)</span>
+<span class="c1"># Multiply by 2*pi*n/L to get physical wavevectors</span>
+<span class="n">QX</span><span class="p">,</span> <span class="n">QY</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span>
+<span class="n">KX</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">QX</span> <span class="o">*</span> <span class="n">nx</span> <span class="o">/</span> <span class="n">Lx</span>  <span class="c1"># Physical wavevector</span>
+<span class="n">KY</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">QY</span> <span class="o">*</span> <span class="n">ny</span> <span class="o">/</span> <span class="n">Ly</span>
 
 <span class="c1"># Derivative in x: multiply by i*kx</span>
 <span class="n">grad_hat</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">KX</span> <span class="o">*</span> <span class="n">f_hat</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
@@ -428,6 +530,8 @@ computing the gradient of a 2D field:</p>
 <span class="c1"># Verify: d/dx[sin(x)cos(y)] = cos(x)cos(y)</span>
 <span class="n">expected_grad_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span>
 <span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">grad_x</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">expected_grad_x</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fourier derivative test passed!&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -579,7 +683,13 @@ you can transfer data between host and device fields as needed.</p>
 <li><a class="reference internal" href="#creating-fft-fields">Creating FFT fields</a></li>
 <li><a class="reference internal" href="#forward-and-inverse-transforms">Forward and inverse transforms</a></li>
 <li><a class="reference internal" href="#normalization">Normalization</a></li>
-<li><a class="reference internal" href="#wavevector-utilities">Wavevector utilities</a></li>
+<li><a class="reference internal" href="#frequency-and-coordinate-arrays">Frequency and coordinate arrays</a><ul>
+<li><a class="reference internal" href="#frequency-arrays">Frequency arrays</a></li>
+<li><a class="reference internal" href="#coordinate-arrays">Coordinate arrays</a></li>
+<li><a class="reference internal" href="#mpi-parallel-frequency-arrays">MPI-parallel frequency arrays</a></li>
+<li><a class="reference internal" href="#example-fourier-space-operations">Example: Fourier-space operations</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#hermitian-grid-dimensions">Hermitian grid dimensions</a></li>
 <li><a class="reference internal" href="#fft-normalization-factor">FFT normalization factor</a></li>
 <li><a class="reference internal" href="#example-fourier-derivative">Example: Fourier derivative</a></li>
@@ -601,7 +711,7 @@ you can transfer data between host and device fields as needed.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=c83a1565"></script>
+</div><script src="_static/documentation_options.js?v=59e3b203"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

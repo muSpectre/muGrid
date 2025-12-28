@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Summary" href="Summary.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>µGrid 0.100.0 documentation</title>
+        <title>µGrid 0.100.0-5-g5f7fa7f5 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="#"><div class="brand">µGrid 0.100.0
+      <a href="#"><div class="brand">µGrid 0.100.0-5-g5f7fa7f5
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
   
-  <span class="sidebar-brand-text">µGrid 0.100.0
+  <span class="sidebar-brand-text">µGrid 0.100.0-5-g5f7fa7f5
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -245,10 +245,22 @@
           <img alt="_images/logo_flat.png" src="_images/logo_flat.png" />
 <section id="grid-mpi-parallel-regular-grids">
 <h1><em>µ</em>Grid, MPI-parallel regular grids<a class="headerlink" href="#grid-mpi-parallel-regular-grids" title="Link to this heading">¶</a></h1>
+<p><em>µ</em>Grid is a C++17 library for discrete representation of fields on structured
+grids, with Python bindings. It provides efficient data structures and algorithms
+for solving partial differential equations on regular grids, with support for
+MPI parallelization and GPU acceleration.</p>
+<p>Key features include field collections for managing grid data, a built-in FFT
+engine with MPI-parallel support, convolution operators for spectral methods,
+domain decomposition with ghost cell communication, and NetCDF I/O.</p>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Summary.html#features">Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Summary.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Summary.html#funding">Funding</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="GettingStarted.html#python-quick-start">Python quick start</a></li>
 <li class="toctree-l2"><a class="reference internal" href="GettingStarted.html#obtaining-grid-s-source-code">Obtaining <em>µ</em>Grid’s source code</a></li>
@@ -274,7 +286,7 @@
 <li class="toctree-l2"><a class="reference internal" href="FFT.html#creating-fft-fields">Creating FFT fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="FFT.html#forward-and-inverse-transforms">Forward and inverse transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="FFT.html#normalization">Normalization</a></li>
-<li class="toctree-l2"><a class="reference internal" href="FFT.html#wavevector-utilities">Wavevector utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="FFT.html#frequency-and-coordinate-arrays">Frequency and coordinate arrays</a></li>
 <li class="toctree-l2"><a class="reference internal" href="FFT.html#hermitian-grid-dimensions">Hermitian grid dimensions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="FFT.html#fft-normalization-factor">FFT normalization factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="FFT.html#example-fourier-derivative">Example: Fourier derivative</a></li>
@@ -332,16 +344,15 @@
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#file-i-o">File I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#core-types">Core Types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#grid-utilities">Grid Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#fft-utilities">FFT Utilities</a></li>
 <li class="toctree-l2"><a class="reference internal" href="CplusplusAPI.html#full-index">Full Index</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#objectives-of-the-convention">Objectives of the Convention</a></li>
-<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#structure">Structure</a></li>
-<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#documentation">Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#automated-formatting">Automated Formatting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#c-conventions">C++ Conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#python-conventions">Python Conventions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#testing">Testing</a></li>
-<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#c-coding-style-and-convention">C++ Coding Style and Convention</a></li>
-<li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#python-coding-style">Python Coding Style</a></li>
 <li class="toctree-l2"><a class="reference internal" href="CodingConvention.html#references">References</a></li>
 </ul>
 </li>
@@ -408,7 +419,7 @@ Boston, MA 02111-1307, USA.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=c83a1565"></script>
+</div><script src="_static/documentation_options.js?v=59e3b203"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
