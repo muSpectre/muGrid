@@ -1,6 +1,15 @@
 Change log for µGrid
 ====================
 
+0.101.1 (28Dec25)
+-----------------
+
+- BUG: Fixed `real_space_field` and `fourier_space_field` on `FFTEngine` to return
+  existing fields if they already exist (consistent with `real_field` etc. on
+  `FieldCollection`)
+- API: Added `register_real_space_field` and `register_fourier_space_field` methods
+  to `FFTEngine` that throw an error if a field with that name already exists
+
 0.101.0 (28Dec25)
 -----------------
 

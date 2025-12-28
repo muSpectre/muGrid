@@ -103,17 +103,41 @@ class FFTEngineBase : public CartesianDecomposition {
 
   // === Field registration ===
 
+  /**
+   * Register a new real-space field. Throws if field already exists.
+   */
   Field & register_real_space_field(const std::string & name,
                                     Index_t nb_components = 1);
 
   Field & register_real_space_field(const std::string & name,
                                     const Shape_t & components);
 
+  /**
+   * Register a new Fourier-space field. Throws if field already exists.
+   */
   Field & register_fourier_space_field(const std::string & name,
                                        Index_t nb_components = 1);
 
   Field & register_fourier_space_field(const std::string & name,
                                        const Shape_t & components);
+
+  /**
+   * Get or create a real-space field. Returns existing field if present.
+   */
+  Field & real_space_field(const std::string & name,
+                           Index_t nb_components = 1);
+
+  Field & real_space_field(const std::string & name,
+                           const Shape_t & components);
+
+  /**
+   * Get or create a Fourier-space field. Returns existing field if present.
+   */
+  Field & fourier_space_field(const std::string & name,
+                              Index_t nb_components = 1);
+
+  Field & fourier_space_field(const std::string & name,
+                              const Shape_t & components);
 
   // === Collection access ===
 

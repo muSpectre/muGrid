@@ -659,9 +659,68 @@ class FFTEngine:
         """
         self._cpp.ifft(_unwrap(input_field), _unwrap(output_field))
 
+    def register_real_space_field(
+        self, name: str, nb_components: int = 1
+    ) -> Field:
+        """
+        Register a new real-space field.
+
+        Raises an error if a field with the given name already exists.
+
+        Parameters
+        ----------
+        name : str
+            Unique field name.
+        nb_components : int, optional
+            Number of components. Default is 1.
+
+        Returns
+        -------
+        Field
+            Wrapped real-valued field with array accessors.
+
+        Raises
+        ------
+        RuntimeError
+            If a field with the given name already exists.
+        """
+        cpp_field = self._cpp.register_real_space_field(name, nb_components)
+        return Field(cpp_field)
+
+    def register_fourier_space_field(
+        self, name: str, nb_components: int = 1
+    ) -> Field:
+        """
+        Register a new Fourier-space field.
+
+        Raises an error if a field with the given name already exists.
+
+        Parameters
+        ----------
+        name : str
+            Unique field name.
+        nb_components : int, optional
+            Number of components. Default is 1.
+
+        Returns
+        -------
+        Field
+            Wrapped complex-valued field with array accessors.
+
+        Raises
+        ------
+        RuntimeError
+            If a field with the given name already exists.
+        """
+        cpp_field = self._cpp.register_fourier_space_field(name, nb_components)
+        return Field(cpp_field)
+
     def real_space_field(self, name: str, nb_components: int = 1) -> Field:
         """
-        Create a real-space field for FFT operations.
+        Get or create a real-space field for FFT operations.
+
+        If a field with the given name already exists, returns it.
+        Otherwise creates a new field with the specified number of components.
 
         Parameters
         ----------
@@ -680,7 +739,10 @@ class FFTEngine:
 
     def fourier_space_field(self, name: str, nb_components: int = 1) -> Field:
         """
-        Create a Fourier-space field for FFT operations.
+        Get or create a Fourier-space field for FFT operations.
+
+        If a field with the given name already exists, returns it.
+        Otherwise creates a new field with the specified number of components.
 
         Parameters
         ----------
