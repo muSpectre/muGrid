@@ -495,9 +495,40 @@ FFTEngine
       :param output_field: Real-space field (must be in this engine's real collection).
       :type output_field: Field
 
+   .. py:method:: register_real_space_field(name, nb_components=1)
+
+      Register a new real-space field.
+
+      Raises an error if a field with the given name already exists.
+
+      :param name: Unique field name.
+      :type name: str
+      :param nb_components: Number of components. Default is 1.
+      :type nb_components: int, optional
+      :returns: Wrapped real-valued field with array accessors.
+      :rtype: Field
+      :raises RuntimeError: If a field with the given name already exists.
+
+   .. py:method:: register_fourier_space_field(name, nb_components=1)
+
+      Register a new Fourier-space field.
+
+      Raises an error if a field with the given name already exists.
+
+      :param name: Unique field name.
+      :type name: str
+      :param nb_components: Number of components. Default is 1.
+      :type nb_components: int, optional
+      :returns: Wrapped complex-valued field with array accessors.
+      :rtype: Field
+      :raises RuntimeError: If a field with the given name already exists.
+
    .. py:method:: real_space_field(name, nb_components=1)
 
-      Create a real-space field for FFT operations.
+      Get or create a real-space field for FFT operations.
+
+      If a field with the given name already exists, returns it.
+      Otherwise creates a new field with the specified number of components.
 
       :param name: Unique field name.
       :type name: str
@@ -508,7 +539,10 @@ FFTEngine
 
    .. py:method:: fourier_space_field(name, nb_components=1)
 
-      Create a Fourier-space field for FFT operations.
+      Get or create a Fourier-space field for FFT operations.
+
+      If a field with the given name already exists, returns it.
+      Otherwise creates a new field with the specified number of components.
 
       :param name: Unique field name.
       :type name: str

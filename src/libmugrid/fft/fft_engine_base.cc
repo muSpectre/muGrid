@@ -381,6 +381,26 @@ Field & FFTEngineBase::register_fourier_space_field(const std::string & name,
   return this->fourier_collection->register_complex_field(name, components);
 }
 
+Field & FFTEngineBase::real_space_field(const std::string & name,
+                                        Index_t nb_components) {
+  return this->get_collection().real_field(name, nb_components);
+}
+
+Field & FFTEngineBase::real_space_field(const std::string & name,
+                                        const Shape_t & components) {
+  return this->get_collection().real_field(name, components);
+}
+
+Field & FFTEngineBase::fourier_space_field(const std::string & name,
+                                           Index_t nb_components) {
+  return this->fourier_collection->complex_field(name, nb_components);
+}
+
+Field & FFTEngineBase::fourier_space_field(const std::string & name,
+                                           const Shape_t & components) {
+  return this->fourier_collection->complex_field(name, components);
+}
+
 GlobalFieldCollection & FFTEngineBase::get_real_space_collection() {
   return this->get_collection();
 }

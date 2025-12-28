@@ -263,14 +263,16 @@ void add_fft_engine(py::module & mod) {
                Real-space field (must be in this engine's real collection)
            )")
 
-      // Field registration
-      .def("real_space_field",
+      // Field registration - register_* versions throw if field exists
+      .def("register_real_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngine::register_real_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            R"(
-           Register a real-space field.
+           Register a new real-space field.
+
+           Raises an error if a field with the given name already exists.
 
            Parameters
            ----------
@@ -283,15 +285,22 @@ void add_fft_engine(py::module & mod) {
            -------
            Field
                Reference to the created field
+
+           Raises
+           ------
+           RuntimeError
+               If a field with the given name already exists
            )")
 
-      .def("fourier_space_field",
+      .def("register_fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngine::register_fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            R"(
-           Register a Fourier-space field.
+           Register a new Fourier-space field.
+
+           Raises an error if a field with the given name already exists.
 
            Parameters
            ----------
@@ -304,6 +313,60 @@ void add_fft_engine(py::module & mod) {
            -------
            Field
                Reference to the created field
+
+           Raises
+           ------
+           RuntimeError
+               If a field with the given name already exists
+           )")
+
+      // Field access - returns existing field if present
+      .def("real_space_field",
+           py::overload_cast<const std::string &, Index_t>(
+               &PyFFTEngine::real_space_field),
+           "name"_a, "nb_components"_a = 1,
+           py::return_value_policy::reference_internal,
+           R"(
+           Get or create a real-space field.
+
+           If a field with the given name already exists, returns it.
+           Otherwise creates a new field with the specified number of components.
+
+           Parameters
+           ----------
+           name : str
+               Unique field name
+           nb_components : int, optional
+               Number of components (default 1)
+
+           Returns
+           -------
+           Field
+               Reference to the field
+           )")
+
+      .def("fourier_space_field",
+           py::overload_cast<const std::string &, Index_t>(
+               &PyFFTEngine::fourier_space_field),
+           "name"_a, "nb_components"_a = 1,
+           py::return_value_policy::reference_internal,
+           R"(
+           Get or create a Fourier-space field.
+
+           If a field with the given name already exists, returns it.
+           Otherwise creates a new field with the specified number of components.
+
+           Parameters
+           ----------
+           name : str
+               Unique field name
+           nb_components : int, optional
+               Number of components (default 1)
+
+           Returns
+           -------
+           Field
+               Reference to the field
            )")
 
       // Collection access

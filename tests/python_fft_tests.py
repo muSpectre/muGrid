@@ -162,6 +162,52 @@ class FFTFieldTest(unittest.TestCase):
         field.p[:] = 2.0
         self.assertTrue(np.all(field.p == 2.0))
 
+    def test_real_space_field_returns_existing(self):
+        """Test that real_space_field returns existing field if present."""
+        field1 = self.engine_2d.real_space_field("shared_real")
+        field1.s[:] = 42.0
+
+        # Calling again with same name should return the same field
+        field2 = self.engine_2d.real_space_field("shared_real")
+
+        # Both should reference the same data
+        self.assertTrue(np.all(field2.s == 42.0))
+
+        # Modifying field2 should affect field1
+        field2.s[:] = 99.0
+        self.assertTrue(np.all(field1.s == 99.0))
+
+    def test_fourier_space_field_returns_existing(self):
+        """Test that fourier_space_field returns existing field if present."""
+        field1 = self.engine_2d.fourier_space_field("shared_fourier")
+        field1.s[:] = 42.0 + 0j
+
+        # Calling again with same name should return the same field
+        field2 = self.engine_2d.fourier_space_field("shared_fourier")
+
+        # Both should reference the same data
+        self.assertTrue(np.all(field2.s == 42.0 + 0j))
+
+        # Modifying field2 should affect field1
+        field2.s[:] = 99.0 + 1j
+        self.assertTrue(np.all(field1.s == 99.0 + 1j))
+
+    def test_register_real_space_field_throws_on_duplicate(self):
+        """Test that register_real_space_field throws if field exists."""
+        self.engine_2d.register_real_space_field("unique_real")
+
+        # Registering again should raise
+        with self.assertRaises(RuntimeError):
+            self.engine_2d.register_real_space_field("unique_real")
+
+    def test_register_fourier_space_field_throws_on_duplicate(self):
+        """Test that register_fourier_space_field throws if field exists."""
+        self.engine_2d.register_fourier_space_field("unique_fourier")
+
+        # Registering again should raise
+        with self.assertRaises(RuntimeError):
+            self.engine_2d.register_fourier_space_field("unique_fourier")
+
 
 class FFTRoundtripTest(unittest.TestCase):
     """Test FFT forward/inverse roundtrip."""
