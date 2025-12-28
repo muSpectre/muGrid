@@ -203,32 +203,62 @@ missing. This means we can represent a simple forward-differences gradient opera
 .. literalinclude:: ../../examples/gradient.py
     :language: python
 
-numpy and cupy views
-********************
+Array accessors
+***************
 
-The multidimensional array representation of a field is accessible via the
-`array` method. For fields on the host (CPU), this returns a numpy array.
-For fields on the GPU, this returns a CuPy array. See the :doc:`GPU` chapter
+Each field provides four accessors that return views into the underlying field data
+as multidimensional arrays. For fields on the host (CPU), these return numpy arrays.
+For fields on the GPU, these return CuPy arrays. See the :doc:`GPU` chapter
 for details on GPU computing.
 
-.. code-block:: Python
+The accessors differ in two ways:
 
-    a = displacement_field.array(muGrid.IterUnit.SubPt)
+1. **Layout**: SubPt (``s``) vs Pixel (``p``)
+2. **Ghost regions**: Excluded (``s``, ``p``) vs Included (``sg``, ``pg``)
 
-yields the multidimensional array with the explicit sub-point dimension.
-The pixel-representation can be obtained by
+SubPt vs Pixel layout
+---------------------
 
-.. code-block:: Python
-
-    a = displacement_field.array(muGrid.IterUnit.Pixel)
-
-Because those operations are used to frequently, there are shortcuts already
-introduced in the examples above:
+The **SubPt layout** (``s``, ``sg``) exposes the sub-points as an explicit dimension:
 
 .. code-block:: Python
 
-    displacement_field.s  # sub-point representation
-    displacement_field.p  # pixel representation
+    displacement_field.s  # shape: (components, sub_pts, *spatial_dims)
+
+The **Pixel layout** (``p``, ``pg``) folds the sub-points into the last
+dimension of the components:
+
+.. code-block:: Python
+
+    displacement_field.p  # shape: (components * sub_pts, *spatial_dims)
+
+The SubPt layout is useful when you need to operate on sub-points separately,
+while the Pixel layout is convenient for operations that treat all sub-point
+values uniformly.
+
+With vs without ghost regions
+-----------------------------
+
+When using domain decomposition with ghost regions (for stencil operations),
+the accessors ending in ``g`` include the ghost cells:
+
+.. code-block:: Python
+
+    # Excluding ghost regions (interior domain only)
+    displacement_field.s   # SubPt layout, no ghosts
+    displacement_field.p   # Pixel layout, no ghosts
+
+    # Including ghost regions (full local domain with ghosts)
+    displacement_field.sg  # SubPt layout, with ghosts
+    displacement_field.pg  # Pixel layout, with ghosts
+
+For fields without ghost regions, ``s`` and ``sg`` (and ``p`` and ``pg``)
+return views of the same shape.
+
+The ghost-excluding accessors (``s``, ``p``) are typically used for computations
+on the interior domain, while ghost-including accessors (``sg``, ``pg``) are
+used for operations that need to access or modify the full buffer including
+ghost cells.
 
 The entries of the field occur as the first indices in the multidimensional
 because a numerical code is typically vectorized of the spatial domain, i.e.
