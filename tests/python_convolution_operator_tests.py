@@ -646,6 +646,214 @@ class FourierMethodCheck(unittest.TestCase):
 
 
 # =============================================================================
+# Stencil access tests
+# =============================================================================
+
+
+class StencilAccessCheck(unittest.TestCase):
+    """Test suite for accessing stencil coefficients and offset.
+
+    Tests verify that stencil properties (offset, shape, coefficients)
+    can be accessed correctly from the Python interface.
+    """
+
+    def test_pixel_offset_1d(self):
+        """Test that pixel_offset property works in 1D."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([-1], stencil)
+
+        offset = op.pixel_offset
+        np.testing.assert_array_equal(offset, [-1])
+
+    def test_pixel_offset_2d(self):
+        """Test that pixel_offset property works in 2D."""
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        offset = op.pixel_offset
+        np.testing.assert_array_equal(offset, [-1, -1])
+
+    def test_pixel_offset_2d_noncentered(self):
+        """Test pixel_offset with non-centered stencil."""
+        stencil = np.array([[1, 0], [0, 0]])
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        offset = op.pixel_offset
+        np.testing.assert_array_equal(offset, [0, 0])
+
+    def test_pixel_offset_3d(self):
+        """Test that pixel_offset property works in 3D."""
+        stencil = np.zeros((3, 3, 3))
+        stencil[1, 1, 1] = -6
+        stencil[0, 1, 1] = 1
+        stencil[2, 1, 1] = 1
+        stencil[1, 0, 1] = 1
+        stencil[1, 2, 1] = 1
+        stencil[1, 1, 0] = 1
+        stencil[1, 1, 2] = 1
+        op = muGrid.ConvolutionOperator([-1, -1, -1], stencil)
+
+        offset = op.pixel_offset
+        np.testing.assert_array_equal(offset, [-1, -1, -1])
+
+    def test_stencil_shape_1d(self):
+        """Test that stencil_shape property works in 1D."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([-1], stencil)
+
+        shape = op.stencil_shape
+        np.testing.assert_array_equal(shape, [3])
+
+    def test_stencil_shape_2d(self):
+        """Test that stencil_shape property works in 2D."""
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        shape = op.stencil_shape
+        np.testing.assert_array_equal(shape, [3, 3])
+
+    def test_stencil_shape_2d_nonsquare(self):
+        """Test stencil_shape with non-square 2D stencil."""
+        stencil = np.array([[1, 0, 0], [0, 0, 0]])  # 2x3
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        shape = op.stencil_shape
+        np.testing.assert_array_equal(shape, [2, 3])
+
+    def test_stencil_shape_3d(self):
+        """Test that stencil_shape property works in 3D."""
+        stencil = np.zeros((3, 3, 3))
+        op = muGrid.ConvolutionOperator([-1, -1, -1], stencil)
+
+        shape = op.stencil_shape
+        np.testing.assert_array_equal(shape, [3, 3, 3])
+
+    def test_get_stencil_1d(self):
+        """Test get_stencil() method in 1D."""
+        stencil = np.array([-0.5, 0.0, 0.5])
+        op = muGrid.ConvolutionOperator([-1], stencil)
+
+        reshaped = op.get_stencil()
+
+        # Should have shape (nb_operators=1, nb_quad_pts=1, nb_nodal_pts=1, 3)
+        self.assertEqual(reshaped.shape, (1, 1, 1, 3))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :], stencil)
+
+    def test_get_stencil_2d_simple(self):
+        """Test get_stencil() method with simple 2D stencil."""
+        stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+
+        reshaped = op.get_stencil()
+
+        # Should have shape (nb_operators=1, nb_quad_pts=1, nb_nodal_pts=1, 3, 3)
+        self.assertEqual(reshaped.shape, (1, 1, 1, 3, 3))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :], stencil)
+
+    def test_get_stencil_2d_multiple_operators(self):
+        """Test get_stencil() with multiple operators."""
+        # Create stencil with 2 operators
+        stencil_0 = np.array([[1, 0], [0, 0]])
+        stencil_1 = np.array([[0, 1], [0, 0]])
+        stencil = np.array([stencil_0, stencil_1])  # Shape (2, 2, 2)
+
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        reshaped = op.get_stencil()
+
+        # Should have shape (nb_operators=2, nb_quad_pts=1, nb_nodal_pts=1, 2, 2)
+        self.assertEqual(reshaped.shape, (2, 1, 1, 2, 2))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :], stencil_0)
+        np.testing.assert_array_equal(reshaped[1, 0, 0, :, :], stencil_1)
+
+    def test_get_stencil_2d_multiple_quad_pts(self):
+        """Test get_stencil() with multiple quadrature points."""
+        # Create stencil with 2 quad pts
+        stencil = np.array(
+            [
+                [
+                    [[1, 0], [0, 0]],  # quad pt 0
+                    [[0, 1], [0, 0]],  # quad pt 1
+                ]
+            ]
+        )  # Shape (1, 2, 2, 2)
+
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        reshaped = op.get_stencil()
+
+        # Should have shape (nb_operators=1, nb_quad_pts=2, nb_nodal_pts=1, 2, 2)
+        self.assertEqual(reshaped.shape, (1, 2, 1, 2, 2))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :], [[1, 0], [0, 0]])
+        np.testing.assert_array_equal(reshaped[0, 1, 0, :, :], [[0, 1], [0, 0]])
+
+    def test_get_stencil_roundtrip(self):
+        """Test that get_stencil() returns data consistent with pixel_operator."""
+        # Create a complex stencil with multiple dimensions
+        stencil = np.random.rand(2, 3, 3, 4)  # 2 ops, 3 quad pts, 3x4 stencil
+
+        op = muGrid.ConvolutionOperator([0, 0], stencil)
+
+        # Get both flattened and reshaped versions
+        flat = np.array(op.pixel_operator)
+        reshaped = op.get_stencil()
+
+        # Should have shape (2, 3, 1, 3, 4)
+        self.assertEqual(reshaped.shape, (2, 3, 1, 3, 4))
+
+        # Flattened version of reshaped should match pixel_operator
+        np.testing.assert_array_equal(reshaped.ravel(order='F'), flat)
+
+    def test_get_stencil_3d(self):
+        """Test get_stencil() method in 3D."""
+        stencil = np.zeros((2, 2, 2))
+        stencil[0, 0, 0] = 1.0
+        stencil[1, 1, 1] = -1.0
+
+        op = muGrid.ConvolutionOperator([0, 0, 0], stencil)
+
+        reshaped = op.get_stencil()
+
+        # Should have shape (nb_operators=1, nb_quad_pts=1, nb_nodal_pts=1, 2, 2, 2)
+        self.assertEqual(reshaped.shape, (1, 1, 1, 2, 2, 2))
+        np.testing.assert_array_equal(reshaped[0, 0, 0, :, :, :], stencil)
+
+    def test_stencil_properties_consistency(self):
+        """Test that stencil properties are consistent with each other."""
+        stencil = np.array(
+            [
+                [
+                    [[1, 0, 0], [0, 0, 0]],  # op 0, quad pt 0
+                    [[0, 1, 0], [0, 0, 0]],  # op 0, quad pt 1
+                ],
+                [
+                    [[0, 0, 1], [0, 0, 0]],  # op 1, quad pt 0
+                    [[0, 0, 0], [1, 0, 0]],  # op 1, quad pt 1
+                ],
+            ]
+        )  # Shape (2, 2, 2, 3)
+
+        op = muGrid.ConvolutionOperator([-1, 0], stencil)
+
+        # Check all properties
+        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_quad_pts, 2)
+        self.assertEqual(op.nb_nodal_pts, 1)
+        self.assertEqual(op.spatial_dim, 2)
+        np.testing.assert_array_equal(op.pixel_offset, [-1, 0])
+        np.testing.assert_array_equal(op.stencil_shape, [2, 3])
+
+        # Check that get_stencil returns correct shape
+        reshaped = op.get_stencil()
+        self.assertEqual(reshaped.shape, (2, 2, 1, 2, 3))
+
+        # Check that the total number of elements is consistent
+        expected_size = 2 * 2 * 1 * 2 * 3  # ops * quad * nodal * stencil
+        self.assertEqual(len(op.pixel_operator), expected_size)
+        self.assertEqual(reshaped.size, expected_size)
+
+
+# =============================================================================
 # GPU-specific convolution tests
 # =============================================================================
 

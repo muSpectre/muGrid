@@ -309,6 +309,64 @@ void add_convolution_operator_default(py::module &mod) {
                  >>> coeffs = op.fourier(phases)  # Returns array of shape (10, 10)
                  )pbdoc")
             .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
+            .def_property_readonly("pixel_offset",
+                [](const ConvolutionOperator & op) {
+                    const auto& offset = op.get_pixel_offset();
+                    return py::array_t<Index_t>(offset.size(), offset.data());
+                },
+                "Stencil offset in number of pixels")
+            .def_property_readonly("stencil_shape",
+                [](const ConvolutionOperator & op) {
+                    const auto& shape = op.get_conv_pts_shape();
+                    return py::array_t<Index_t>(shape.size(), shape.data());
+                },
+                "Shape of the convolution stencil")
+            .def("get_stencil",
+                [](const ConvolutionOperator & op) {
+                    const auto& flat_op = op.get_pixel_operator();
+                    const auto& stencil_shape = op.get_conv_pts_shape();
+                    const auto nb_operators = op.get_nb_operators();
+                    const auto nb_quad_pts = op.get_nb_quad_pts();
+                    const auto nb_nodal_pts = op.get_nb_nodal_pts();
+
+                    // Build the full shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape)
+                    std::vector<py::ssize_t> full_shape;
+                    full_shape.push_back(nb_operators);
+                    full_shape.push_back(nb_quad_pts);
+                    full_shape.push_back(nb_nodal_pts);
+                    for (const auto& dim : stencil_shape) {
+                        full_shape.push_back(dim);
+                    }
+
+                    // Create a Fortran-ordered (column-major) array
+                    py::array_t<Real, py::array::f_style> result(full_shape);
+                    auto result_ptr = result.mutable_data();
+
+                    // Copy data
+                    std::copy(flat_op.begin(), flat_op.end(), result_ptr);
+
+                    return result;
+                },
+                R"pbdoc(
+                Get the stencil coefficients in reshaped form.
+
+                Returns the stencil coefficients with shape
+                (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape),
+                where stencil_shape contains the spatial dimensions of the stencil.
+
+                Returns
+                -------
+                numpy.ndarray
+                    Stencil coefficients with shape matching the original stencil structure.
+
+                Examples
+                --------
+                >>> # 2D Laplacian stencil
+                >>> stencil_2d = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+                >>> op = muGrid.ConvolutionOperator([-1, -1], stencil_2d)
+                >>> reshaped = op.get_stencil()
+                >>> reshaped.shape  # (1, 1, 1, 3, 3) for 1 operator, 1 quad pt, 1 nodal pt
+                )pbdoc")
             .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
             .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
             .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)

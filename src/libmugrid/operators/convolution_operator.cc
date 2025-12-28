@@ -751,6 +751,16 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    const Shape_t & ConvolutionOperator::get_pixel_offset() const {
+        return this->pixel_offset;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    const Shape_t & ConvolutionOperator::get_conv_pts_shape() const {
+        return this->conv_pts_shape;
+    }
+
+    /* ---------------------------------------------------------------------- */
     Index_t ConvolutionOperator::get_nb_quad_pts() const {
         return this->nb_quad_pts;
     }

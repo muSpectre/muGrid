@@ -1,6 +1,14 @@
 Change log for µGrid
 ====================
 
+0.100.0 (28Dec25)
+-----------------
+
+- ENH: Added `pixel_offset` property to `ConvolutionOperator` Python interface for accessing stencil offset
+- ENH: Added `stencil_shape` property to `ConvolutionOperator` Python interface for accessing stencil dimensions
+- ENH: Added `get_stencil()` method to `ConvolutionOperator` for retrieving stencil coefficients in reshaped form
+- TEST: Comprehensive test suite for stencil property access in Python
+
 0.99.0 (28Dec25)
 ----------------
 
