@@ -107,25 +107,12 @@ namespace muGrid {
      */
     enum class Mapping { Const, Mut };
 
-    /**
-     * Enum class for verbose-flag
-     */
-    enum class Verbosity { Silent = 0, Some = 1, Detailed = 2, Full = 3 };
-
     //! inserts `muGrid::IterUnit` into `std::ostream`s
     std::ostream & operator<<(std::ostream & os, const IterUnit & sub_division);
 
     //! inserts `muGrid::StorageOrder` into `std::ostream`s
     std::ostream & operator<<(std::ostream & os,
                               const StorageOrder & storage_order);
-
-    /**
-     * comparison operators for Verbosity-class
-     */
-    bool operator<(Verbosity v1, Verbosity v2);
-    bool operator>(Verbosity v1, Verbosity v2);
-    bool operator<=(Verbosity v1, Verbosity v2);
-    bool operator>=(Verbosity v1, Verbosity v2);
 
     /**
      * this tag is always defined to one in every field collection

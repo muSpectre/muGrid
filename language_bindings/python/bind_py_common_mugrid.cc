@@ -49,7 +49,6 @@ using muGrid::DynCoord;
 using muGrid::fourD;
 using muGrid::Index_t;
 using muGrid::Real;
-using muGrid::Verbosity;
 using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
@@ -75,12 +74,6 @@ void add_enums(py::module & mod) {
         .value("Pixel", muGrid::IterUnit::Pixel)
         .value("SubPt", muGrid::IterUnit::SubPt)
         .export_values();
-
-    py::enum_<Verbosity>(mod, "Verbosity")
-        .value("Silent", Verbosity::Silent)
-        .value("Some", Verbosity::Some)
-        .value("Detailed", Verbosity::Detailed)
-        .value("Full", Verbosity::Full);
 }
 
 template <size_t MaxDim, typename T = Index_t>

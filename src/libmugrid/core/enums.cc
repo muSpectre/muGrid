@@ -39,63 +39,43 @@
 #include "exception.hh"
 
 namespace muGrid {
-  /* ---------------------------------------------------------------------- */
-  bool operator<(Verbosity v1, Verbosity v2) {
-    using T = std::underlying_type_t<Verbosity>;
-    return static_cast<T>(v1) < static_cast<T>(v2);
-  }
 
-  bool operator>(Verbosity v1, Verbosity v2) {
-    using T = std::underlying_type_t<Verbosity>;
-    return static_cast<T>(v1) > static_cast<T>(v2);
-  }
+    std::ostream & operator<<(std::ostream & os,
+                              const IterUnit & sub_division) {
+        switch (sub_division) {
+        case IterUnit::Pixel: {
+            os << "free number of points";
+            break;
+        }
+        case IterUnit::SubPt: {
+            os << "Sub point";
+            break;
+        }
+        default:
+            throw RuntimeError("unknown pixel subdivision scheme");
+        }
+        return os;
+    }
 
-  bool operator<=(Verbosity v1, Verbosity v2) {
-    using T = std::underlying_type_t<Verbosity>;
-    return static_cast<T>(v1) <= static_cast<T>(v2);
-  }
-
-  bool operator>=(Verbosity v1, Verbosity v2) {
-    using T = std::underlying_type_t<Verbosity>;
-    return static_cast<T>(v1) >= static_cast<T>(v2);
-  }
-
-  std::ostream & operator<<(std::ostream & os,
-                            const IterUnit & sub_division) {
-    switch (sub_division) {
-    case IterUnit::Pixel: {
-      os << "free number of points";
-      break;
+    std::ostream & operator<<(std::ostream & os,
+                              const StorageOrder & storage_order) {
+        switch (storage_order) {
+        case StorageOrder::ColMajor: {
+            os << "column-major";
+            break;
+        }
+        case StorageOrder::RowMajor: {
+            os << "row-major";
+            break;
+        }
+        case StorageOrder::Automatic: {
+            os << "automatic";
+            break;
+        }
+        default:
+            throw RuntimeError("unknown storage order specification");
+        }
+        return os;
     }
-    case IterUnit::SubPt: {
-      os << "Sub point";
-      break;
-    }
-    default:
-      throw RuntimeError("unknown pixel subdivision scheme");
-    }
-    return os;
-  }
-
-  std::ostream & operator<<(std::ostream & os,
-                            const StorageOrder & storage_order) {
-    switch (storage_order) {
-    case StorageOrder::ColMajor: {
-      os << "column-major";
-      break;
-    }
-    case StorageOrder::RowMajor: {
-      os << "row-major";
-      break;
-    }
-    case StorageOrder::Automatic: {
-      os << "automatic";
-      break;
-    }
-    default:
-      throw RuntimeError("unknown storage order specification");
-    }
-    return os;
-  }
 
 }  // namespace muGrid
