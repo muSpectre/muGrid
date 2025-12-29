@@ -14,6 +14,7 @@ def conjugate_gradients(
     callback: callable = None,
     timer=None,
     check_positive_definite: bool = False,
+    profile_gpu: bool = False,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -49,6 +50,10 @@ def conjugate_gradients(
     check_positive_definite : bool, optional
         If True, check that the Hessian is positive definite each iteration.
         This adds GPU synchronization overhead. Default is False.
+    profile_gpu : bool, optional
+        If True, add explicit GPU synchronization around each operation for
+        accurate profiling. This adds overhead but shows true GPU time.
+        Default is False.
 
     Returns
     -------
@@ -70,6 +75,16 @@ def conjugate_gradients(
     def timed(name):
         return timer(name) if timer is not None else nullcontext()
 
+    # GPU sync function for profiling (no-op if not profiling or not on GPU)
+    def gpu_sync():
+        if profile_gpu:
+            # Try to sync GPU if available
+            try:
+                import cupy
+                cupy.cuda.Device().synchronize()
+            except (ImportError, Exception):
+                pass
+
     # Get spatial dimension from the field collection
     spatial_dim = len(fc.nb_grid_pts)
 
@@ -82,20 +97,36 @@ def conjugate_gradients(
     Ap = fc.real_field("cg-hessian-product", components_shape)
 
     # Initial residual: r = b - A*x
+    gpu_sync()
     hessp(x, Ap)
-    with timed("cg_vector_ops"):
+    gpu_sync()
+
+    with timed("cg_init_residual"):
+        gpu_sync()
         p.s[...] = b.s - Ap.s
+        gpu_sync()
+
+    with timed("cg_copy"):
+        gpu_sync()
         r = p.s.copy()
+        gpu_sync()
 
     if callback:
         callback(0, x.s, r, p.s)
 
-    with timed("cg_dot_products"):
-        rr = comm.sum(r.ravel().dot(r.ravel()))
+    with timed("cg_dot_rr"):
+        gpu_sync()
+        rr_local = r.ravel().dot(r.ravel())
+        gpu_sync()
 
-    # Initial convergence check (single sync point)
-    with timed("cg_convergence_check"):
+    with timed("cg_allreduce"):
+        gpu_sync()
+        rr = comm.sum(rr_local)
+        gpu_sync()
+
+    with timed("cg_sync_for_check"):
         rr_val = float(rr)
+
     if rr_val < tol_sq:
         return x
 
@@ -103,33 +134,57 @@ def conjugate_gradients(
         # Compute Hessian product: Ap = A * p
         hessp(p, Ap)
 
-        # Compute step size (stays on GPU, no sync)
-        with timed("cg_dot_products"):
-            pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
+        # Compute pAp for step size
+        with timed("cg_dot_pAp"):
+            gpu_sync()
+            pAp_local = p.s.ravel().dot(Ap.s.ravel())
+            gpu_sync()
+
+        with timed("cg_allreduce"):
+            gpu_sync()
+            pAp = comm.sum(pAp_local)
+            gpu_sync()
 
         # Optional positive-definiteness check (adds sync overhead)
         if check_positive_definite:
-            with timed("cg_convergence_check"):
+            with timed("cg_sync_for_check"):
                 if float(pAp) <= 0:
                     raise RuntimeError("Hessian is not positive definite")
 
-        # All arithmetic stays on GPU (no sync)
-        alpha = rr / pAp
+        # Compute alpha (stays on GPU if pAp is GPU array)
+        with timed("cg_scalar_div_alpha"):
+            gpu_sync()
+            alpha = rr / pAp
+            gpu_sync()
 
-        # Update solution and residual
-        with timed("cg_vector_ops"):
+        # Update solution: x += alpha * p
+        with timed("cg_update_x"):
+            gpu_sync()
             x.s[...] += alpha * p.s
+            gpu_sync()
+
+        # Update residual: r -= alpha * Ap
+        with timed("cg_update_r"):
+            gpu_sync()
             r -= alpha * Ap.s
+            gpu_sync()
 
         if callback:
             callback(iteration + 1, x.s, r, p.s)
 
-        # Compute next residual norm (stays on GPU)
-        with timed("cg_dot_products"):
-            next_rr = comm.sum(r.ravel().dot(r.ravel()))
+        # Compute next residual norm
+        with timed("cg_dot_rr"):
+            gpu_sync()
+            next_rr_local = r.ravel().dot(r.ravel())
+            gpu_sync()
 
-        # Single sync point per iteration: convergence check
-        with timed("cg_convergence_check"):
+        with timed("cg_allreduce"):
+            gpu_sync()
+            next_rr = comm.sum(next_rr_local)
+            gpu_sync()
+
+        # Sync to check convergence
+        with timed("cg_sync_for_check"):
             next_rr_val = float(next_rr)
 
         # Check for numerical issues (NaN indicates non-positive-definite H)
@@ -141,11 +196,24 @@ def conjugate_gradients(
         if next_rr_val < tol_sq:
             return x
 
-        # Update search direction (stays on GPU, no sync)
-        with timed("cg_vector_ops"):
+        # Compute beta
+        with timed("cg_scalar_div_beta"):
+            gpu_sync()
             beta = next_rr / rr
-            rr = next_rr
+            gpu_sync()
+
+        # Update rr for next iteration
+        rr = next_rr
+
+        # Update search direction: p = r + beta * p
+        with timed("cg_update_p_scale"):
+            gpu_sync()
             p.s[...] *= beta
+            gpu_sync()
+
+        with timed("cg_update_p_add"):
+            gpu_sync()
             p.s[...] += r
+            gpu_sync()
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")
