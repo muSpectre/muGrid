@@ -517,6 +517,25 @@ void add_field_collection(py::module & mod) {
                     "Create a CUDA device with optional device ID")
         .def_static("rocm", &Device::rocm, "device_id"_a = 0,
                     "Create a ROCm device with optional device ID")
+        .def_static("gpu", &Device::gpu, "device_id"_a = 0,
+                    R"pbdoc(
+            Create a GPU device using the default GPU backend.
+
+            Automatically selects the available GPU backend:
+            - Returns CUDA device if CUDA is available
+            - Returns ROCm device if ROCm is available (and CUDA is not)
+            - Returns CPU device if no GPU backend is available
+
+            Parameters
+            ----------
+            device_id : int, optional
+                GPU device ID (default: 0)
+
+            Returns
+            -------
+            Device
+                Device instance for the default GPU backend
+            )pbdoc")
         .def("is_device", &Device::is_device,
              "Check if this is a GPU device")
         .def("is_host", &Device::is_host,

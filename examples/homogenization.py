@@ -172,7 +172,7 @@ parser.add_argument(
 
 _devices = {
     "host": muGrid.Device.cpu(),
-    "device": muGrid.Device.cuda(),
+    "device": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
 }
 
 parser.add_argument(
@@ -180,7 +180,7 @@ parser.add_argument(
     "--memory",
     choices=_devices,
     default="host",
-    help="Memory space for allocation (default: host)",
+    help="Memory space for allocation: 'host' (CPU) or 'device' (GPU) (default: host)",
 )
 
 parser.add_argument(

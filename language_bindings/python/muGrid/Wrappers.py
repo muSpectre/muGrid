@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from .Parallel import Communicator
 
 # Type aliases
-DeviceStr = Literal["cpu", "cuda", "rocm", "host", "device"]
+DeviceStr = Literal["cpu", "cuda", "rocm", "gpu", "host", "device"]
 SubPtMap = Dict[str, int]
 Shape = Union[Tuple[int, ...], List[int], Sequence[int]]
 
@@ -221,7 +221,9 @@ def _parse_device(
         Device specification. Can be:
         - None: defaults to CPU
         - "cpu" or "host": CPU device
-        - "cuda" or "device": CUDA GPU (device 0)
+        - "gpu" or "device": Default GPU (auto-detects CUDA or ROCm)
+        - "gpu:N": Default GPU with device ID N
+        - "cuda": CUDA GPU (device 0)
         - "cuda:N": CUDA GPU with device ID N
         - "rocm": ROCm GPU (device 0)
         - "rocm:N": ROCm GPU with device ID N
@@ -245,7 +247,13 @@ def _parse_device(
         return device
     if device is None or device == "host" or device == "cpu":
         return Device.cpu()
-    elif device == "device" or device.startswith("cuda") or device.startswith("rocm"):
+    elif (
+        device == "gpu"
+        or device.startswith("gpu:")
+        or device == "device"
+        or device.startswith("cuda")
+        or device.startswith("rocm")
+    ):
         if not _muGrid.has_gpu:
             raise RuntimeError(
                 "GPU support is not available. "
@@ -257,14 +265,17 @@ def _parse_device(
             device_id = int(parts[1]) if len(parts) > 1 else 0
         else:
             device_id = 0
-        if device == "device" or device.startswith("cuda"):
+        # Auto-detect GPU backend for "gpu" or "device"
+        if device == "gpu" or device.startswith("gpu:") or device == "device":
+            return Device.gpu(device_id)
+        elif device.startswith("cuda"):
             return Device.cuda(device_id)
         else:
             return Device.rocm(device_id)
     else:
         raise ValueError(
             f"Invalid device: {device!r}. "
-            f"Must be 'cpu', 'cuda', 'cuda:N', 'rocm', or 'rocm:N'."
+            f"Must be 'cpu', 'gpu', 'cuda', 'cuda:N', 'rocm', or 'rocm:N'."
         )
 
 

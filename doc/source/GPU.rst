@@ -70,7 +70,9 @@ The device can be specified as a simple string or as a ``Device`` object:
 String values:
 
 * ``"cpu"`` or ``"host"``: Allocate fields in CPU memory (default)
-* ``"cuda"`` or ``"device"``: Allocate fields on CUDA GPU (device 0)
+* ``"gpu"`` or ``"device"``: Allocate on default GPU (auto-detects CUDA or ROCm)
+* ``"gpu:N"``: Allocate on default GPU with device ID N
+* ``"cuda"``: Allocate fields on CUDA GPU (device 0)
 * ``"cuda:N"``: Allocate on CUDA GPU with device ID N
 * ``"rocm"``: Allocate on ROCm GPU (device 0)
 * ``"rocm:N"``: Allocate on ROCm GPU with device ID N
@@ -81,11 +83,14 @@ Here is an example of creating a field collection on the GPU:
 
     import muGrid
 
-    # Create a GPU field collection using string
+    # Create a GPU field collection using auto-detection (recommended)
+    fc = muGrid.GlobalFieldCollection([64, 64], device="gpu")
+
+    # Or explicitly specify CUDA
     fc = muGrid.GlobalFieldCollection([64, 64], device="cuda")
 
-    # Or using Device object
-    fc = muGrid.GlobalFieldCollection([64, 64], device=muGrid.Device.cuda())
+    # Or using Device object for auto-detection
+    fc = muGrid.GlobalFieldCollection([64, 64], device=muGrid.Device.gpu())
 
     # Create a field on the GPU
     field = fc.real_field("my_field")

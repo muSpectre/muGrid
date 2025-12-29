@@ -792,6 +792,24 @@ Device
       :returns: A Device representing a ROCm GPU.
       :rtype: Device
 
+   .. py:staticmethod:: gpu(device_id=0)
+
+      Create a GPU device using the default backend.
+
+      Automatically selects the available GPU backend:
+
+      - Returns CUDA device if CUDA is available
+      - Returns ROCm device if ROCm is available (and CUDA is not)
+      - Returns CPU device if no GPU backend is available
+
+      This is the recommended way to request GPU execution without
+      hard-coding a specific backend.
+
+      :param device_id: GPU device ID. Default is 0.
+      :type device_id: int, optional
+      :returns: A Device for the default GPU backend.
+      :rtype: Device
+
    .. py:method:: is_host()
 
       Check if this is a host (CPU) device.

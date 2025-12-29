@@ -138,6 +138,30 @@ class Device {
         return Device{DeviceType::ROCm, id};
     }
 
+    /**
+     * Static factory for default GPU device.
+     *
+     * Returns the default GPU device based on compile-time configuration:
+     * - If CUDA is enabled, returns Device::cuda(0)
+     * - If HIP/ROCm is enabled (and CUDA is not), returns Device::rocm(0)
+     * - If no GPU backend is available, returns Device::cpu() as fallback
+     *
+     * This provides a portable way to request "any available GPU" without
+     * knowing which backend is compiled in.
+     */
+    static constexpr Device gpu(int id = 0) {
+#if defined(MUGRID_ENABLE_CUDA)
+        return Device{DeviceType::CUDA, id};
+#elif defined(MUGRID_ENABLE_HIP)
+        return Device{DeviceType::ROCm, id};
+#else
+        // Fallback to CPU if no GPU backend is available
+        // This allows code to compile without #ifdefs everywhere
+        (void)id;  // Suppress unused parameter warning
+        return Device{DeviceType::CPU, 0};
+#endif
+    }
+
    protected:
     DeviceType device_type;  //!< Type of device (CPU, CUDA, ROCm, etc.)
     int device_id;           //!< Device ID for multi-GPU systems
@@ -164,17 +188,23 @@ constexpr Device memory_space_to_device<HostSpace>() {
 
 #if defined(MUGRID_ENABLE_CUDA)
 // Specialization for CudaSpace
+// Note: Returns device 0 because this is a constexpr function evaluated at
+// compile time. The actual device ID for multi-GPU is a runtime concern
+// that must be handled when creating FieldCollections with specific devices.
 template <>
 constexpr Device memory_space_to_device<CudaSpace>() {
-    return Device::cuda(0);  // TODO: Get actual device ID for multi-GPU
+    return Device::cuda(0);
 }
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
 // Specialization for HIPSpace
+// Note: Returns device 0 because this is a constexpr function evaluated at
+// compile time. The actual device ID for multi-GPU is a runtime concern
+// that must be handled when creating FieldCollections with specific devices.
 template <>
 constexpr Device memory_space_to_device<HIPSpace>() {
-    return Device::rocm(0);  // TODO: Get actual device ID for multi-GPU
+    return Device::rocm(0);
 }
 #endif
 
