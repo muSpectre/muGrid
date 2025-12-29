@@ -52,6 +52,7 @@ using muGrid::LaplaceOperator;
 using muGrid::FEMGradientOperator;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
+using muGrid::Dim_t;
 using muGrid::Index_t;
 using muGrid::Shape_t;
 using muGrid::HostSpace;
@@ -145,7 +146,7 @@ public:
         );
     }
 
-    Index_t get_spatial_dim() const override {
+    Dim_t get_spatial_dim() const override {
         PYBIND11_OVERRIDE_PURE(
             Index_t,
             ConvolutionOperatorBase,

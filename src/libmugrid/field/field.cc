@@ -367,7 +367,7 @@ namespace muGrid {
            FieldCollection::ValidityDomain::Global;
   }
 
-  Index_t Field::get_spatial_dim() const {
+  Dim_t Field::get_spatial_dim() const {
     return this->collection.get_spatial_dim();
   }
 

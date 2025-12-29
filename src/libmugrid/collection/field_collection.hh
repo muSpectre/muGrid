@@ -54,39 +54,37 @@ namespace muGrid {
     class Field;
 
     //! forward declaration of the `muSpectre::TypedField`
-    template<typename T, typename MemorySpace = HostSpace>
+    template <typename T, typename MemorySpace = HostSpace>
     class TypedField;
 
     //! forward declaration of the state field
     class StateField;
 
     //! forward declaration of the state field
-    template<typename T>
+    template <typename T>
     class TypedStateField;
 
     //! forward declaration of the field collection
     class FieldCollection;
 
     //! forward declacation of the field's destructor-functor
-    template<class DefaultDestroyable>
+    template <class DefaultDestroyable>
     struct FieldDestructor {
         //! deletes the held field
-        void operator()(DefaultDestroyable *field);
+        void operator()(DefaultDestroyable * field);
     };
 
     /**
      * base class for field collection-related exceptions
      */
     class FieldCollectionError : public RuntimeError {
-    public:
+       public:
         //! constructor
-        explicit FieldCollectionError(const std::string &what)
-            : RuntimeError(what) {
-        }
+        explicit FieldCollectionError(const std::string & what)
+            : RuntimeError(what) {}
 
         //! constructor
-        explicit FieldCollectionError(const char *what) : RuntimeError(what) {
-        }
+        explicit FieldCollectionError(const char * what) : RuntimeError(what) {}
     };
 
     /**
@@ -96,14 +94,14 @@ namespace muGrid {
      * the same pixels).
      */
     class FieldCollection {
-    public:
+       public:
         //! unique_ptr for holding fields
-        using Field_ptr = std::unique_ptr<Field, FieldDestructor<Field> >;
+        using Field_ptr = std::unique_ptr<Field, FieldDestructor<Field>>;
         //! map to hold nb_sub_pts by tag
         using SubPtMap_t = std::map<std::string, Index_t>;
         //! unique_ptr for holding state fields
         using StateField_ptr =
-        std::unique_ptr<StateField, FieldDestructor<StateField> >;
+            std::unique_ptr<StateField, FieldDestructor<StateField>>;
 
         //! domain of validity of the managed fields
         enum class ValidityDomain { Global, Local };
@@ -115,56 +113,54 @@ namespace muGrid {
         //! convenience alias
         class PixelIndexIterable;
 
-    protected:
+       protected:
         /**
          * Constructor (not called by user, who constructs either a
          * LocalFieldCollection or a GlobalFieldCollection
          * @param domain Domain of validity, can be global or local
          * @param spatial_dimension spatial dimension of the field (can be
-         *                    muGrid::Unknown, e.g., in the case of the local fields
-         *                    for storing internal material variables)
-         * @param nb_sub_pts Specification of pixel subdivision. This is a map that
-         *                    of a string (the name of the subdivision scheme) to
-         *                    the number of subdivisions
-         * @param storage_order Storage order of the pixels vs subdivision portion
-         *                    of the field. In a column-major storage order, the
-         *                    pixel subdivision (i.e. the components of the field)
-         *                    are stored next to each other in memory, file in a
-         *                    row-major storage order for each component the
-         *                    pixels are stored next to each other in memory.
-         *                    (This is also sometimes called the array of structures
-         *                    vs. structure of arrays storage order.)
-         *                    Important: The pixels or subpoints have their own
-         *                    storage order that is not affected by this setting.
+         *                    muGrid::Unknown, e.g., in the case of the local
+         * fields for storing internal material variables)
+         * @param nb_sub_pts Specification of pixel subdivision. This is a map
+         * that of a string (the name of the subdivision scheme) to the number
+         * of subdivisions
+         * @param storage_order Storage order of the pixels vs subdivision
+         * portion of the field. In a column-major storage order, the pixel
+         * subdivision (i.e. the components of the field) are stored next to
+         * each other in memory, file in a row-major storage order for each
+         * component the pixels are stored next to each other in memory. (This
+         * is also sometimes called the array of structures vs. structure of
+         * arrays storage order.) Important: The pixels or subpoints have their
+         * own storage order that is not affected by this setting.
          */
         FieldCollection(
-            ValidityDomain domain, const Index_t &spatial_dimension,
-            const SubPtMap_t &nb_sub_pts,
+            ValidityDomain domain, Dim_t spatial_dimension,
+            const SubPtMap_t & nb_sub_pts,
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
             MemoryLocation memory_location = MemoryLocation::Host);
 
-    public:
+       public:
         //! Default constructor
         FieldCollection() = delete;
 
         //! Copy constructor
-        FieldCollection(const FieldCollection &other) = delete;
+        FieldCollection(const FieldCollection & other) = delete;
 
         //! Move constructor
-        FieldCollection(FieldCollection &&other) = default;
+        FieldCollection(FieldCollection && other) = default;
 
         //! Destructor
         virtual ~FieldCollection() = default;
 
         //! Copy assignment operator
-        FieldCollection &operator=(const FieldCollection &other) = delete;
+        FieldCollection & operator=(const FieldCollection & other) = delete;
 
         //! Move assignment operator
-        FieldCollection &operator=(FieldCollection &&other) = default;
+        FieldCollection & operator=(FieldCollection && other) = default;
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -172,22 +168,22 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        template<typename T>
-        Field &
-        register_field(const std::string &unique_name,
-                       const Index_t &nb_components,
-                       const std::string &sub_division_tag = PixelTag,
-                       const Unit &unit = Unit::unitless()) {
-            static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                          "You can only register fields templated with one of the "
-                          "numeric types Real, Complex, Int, or UInt");
+        template <typename T>
+        Field & register_field(const std::string & unique_name,
+                               const Index_t & nb_components,
+                               const std::string & sub_division_tag = PixelTag,
+                               const Unit & unit = Unit::unitless()) {
+            static_assert(
+                std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                "You can only register fields templated with one of the "
+                "numeric types Real, Complex, Int, or UInt");
             return this->register_field_helper<T>(unique_name, nb_components,
                                                   sub_division_tag, unit);
         }
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -195,15 +191,15 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        template<typename T>
-        Field &
-        register_field(const std::string &unique_name,
-                       const Shape_t &components_shape,
-                       const std::string &sub_division_tag = PixelTag,
-                       const Unit &unit = Unit::unitless()) {
-            static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                          "You can only register fields templated with one of the "
-                          "numeric types Real, Complex, Int, or Uint");
+        template <typename T>
+        Field & register_field(const std::string & unique_name,
+                               const Shape_t & components_shape,
+                               const std::string & sub_division_tag = PixelTag,
+                               const Unit & unit = Unit::unitless()) {
+            static_assert(
+                std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                "You can only register fields templated with one of the "
+                "numeric types Real, Complex, Int, or Uint");
             return this->register_field_helper<T>(unique_name, components_shape,
                                                   sub_division_tag, unit);
         }
@@ -224,17 +220,17 @@ namespace muGrid {
          *
          * @param storage_oder in-memory storage order of the components
          */
-        template<typename T>
+        template <typename T>
         Field_ptr
-        detached_field(const std::string &unique_name,
-                       const Shape_t &components_shape,
-                       const std::string &sub_division_tag = PixelTag,
-                       const Unit &unit = Unit::unitless());
+        detached_field(const std::string & unique_name,
+                       const Shape_t & components_shape,
+                       const std::string & sub_division_tag = PixelTag,
+                       const Unit & unit = Unit::unitless());
 
         /**
-         * place a new real-valued field  in the responsibility of this collection
-         * (Note, because fields have protected constructors, users can't create
-         * them
+         * place a new real-valued field  in the responsibility of this
+         * collection (Note, because fields have protected constructors, users
+         * can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -243,14 +239,14 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          */
         Field &
-        register_real_field(const std::string &unique_name,
-                            const Index_t &nb_components,
-                            const std::string &sub_division_tag = PixelTag,
-                            const Unit &unit = Unit::unitless());
+        register_real_field(const std::string & unique_name,
+                            const Index_t & nb_components,
+                            const std::string & sub_division_tag = PixelTag,
+                            const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -259,15 +255,15 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         Field &
-        register_real_field(const std::string &unique_name,
-                            const Shape_t &components_shape,
-                            const std::string &sub_division_tag = PixelTag,
-                            const Unit &unit = Unit::unitless());
+        register_real_field(const std::string & unique_name,
+                            const Shape_t & components_shape,
+                            const std::string & sub_division_tag = PixelTag,
+                            const Unit & unit = Unit::unitless());
 
         /**
          * place a new complex-valued field  in the responsibility of this
-         * collection (Note, because fields have protected constructors, users can't
-         * create them
+         * collection (Note, because fields have protected constructors, users
+         * can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -276,14 +272,14 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          */
         Field &
-        register_complex_field(const std::string &unique_name,
-                               const Index_t &nb_components,
-                               const std::string &sub_division_tag = PixelTag,
-                               const Unit &unit = Unit::unitless());
+        register_complex_field(const std::string & unique_name,
+                               const Index_t & nb_components,
+                               const std::string & sub_division_tag = PixelTag,
+                               const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -292,15 +288,15 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         Field &
-        register_complex_field(const std::string &unique_name,
-                               const Shape_t &components_shape,
-                               const std::string &sub_division_tag = PixelTag,
-                               const Unit &unit = Unit::unitless());
+        register_complex_field(const std::string & unique_name,
+                               const Shape_t & components_shape,
+                               const std::string & sub_division_tag = PixelTag,
+                               const Unit & unit = Unit::unitless());
 
         /**
          * place a new integer-valued field  in the responsibility of this
-         * collection (Note, because fields have protected constructors, users can't
-         * create them
+         * collection (Note, because fields have protected constructors, users
+         * can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -309,14 +305,14 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          */
         Field &
-        register_int_field(const std::string &unique_name,
-                           const Index_t &nb_components,
-                           const std::string &sub_division_tag = PixelTag,
-                           const Unit &unit = Unit::unitless());
+        register_int_field(const std::string & unique_name,
+                           const Index_t & nb_components,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -325,15 +321,15 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         Field &
-        register_int_field(const std::string &unique_name,
-                           const Shape_t &components_shape,
-                           const std::string &sub_division_tag = PixelTag,
-                           const Unit &unit = Unit::unitless());
+        register_int_field(const std::string & unique_name,
+                           const Shape_t & components_shape,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
 
         /**
-         * place a new unsigned integer-valued field  in the responsibility of this
-         * collection (Note, because fields have protected constructors, users can't
-         * create them
+         * place a new unsigned integer-valued field  in the responsibility of
+         * this collection (Note, because fields have protected constructors,
+         * users can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -342,14 +338,14 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          */
         Field &
-        register_uint_field(const std::string &unique_name,
-                            const Index_t &nb_components,
-                            const std::string &sub_division_tag = PixelTag,
-                            const Unit &unit = Unit::unitless());
+        register_uint_field(const std::string & unique_name,
+                            const Index_t & nb_components,
+                            const std::string & sub_division_tag = PixelTag,
+                            const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -358,83 +354,35 @@ namespace muGrid {
          * @param storage_oder in-memory storage order of the components
          */
         Field &
-        register_uint_field(const std::string &unique_name,
-                            const Shape_t &components_shape,
-                            const std::string &sub_division_tag = PixelTag,
-                            const Unit &unit = Unit::unitless());
+        register_uint_field(const std::string & unique_name,
+                            const Shape_t & components_shape,
+                            const std::string & sub_division_tag = PixelTag,
+                            const Unit & unit = Unit::unitless());
 
         /**
-         * place a new state field in the responsibility of this collection (Note,
-         * because state fields have protected constructors, users can't create them
+         * place a new state field in the responsibility of this collection
+         * (Note, because state fields have protected constructors, users can't
+         * create them
          */
-        template<typename T>
+        template <typename T>
         TypedStateField<T> &
-        register_state_field(const std::string &unique_prefix,
-                             const Index_t &nb_memory,
-                             const Index_t &nb_components,
-                             const std::string &sub_division_tag = PixelTag,
-                             const Unit &unit = Unit::unitless()) {
+        register_state_field(const std::string & unique_prefix,
+                             const Index_t & nb_memory,
+                             const Index_t & nb_components,
+                             const std::string & sub_division_tag = PixelTag,
+                             const Unit & unit = Unit::unitless()) {
             static_assert(
                 std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                 "You can only register state fields templated with one of the "
                 "numeric types Real, Complex, Int, or UInt");
             return this->register_state_field_helper<T>(
-                unique_prefix, nb_memory, nb_components, sub_division_tag, unit);
+                unique_prefix, nb_memory, nb_components, sub_division_tag,
+                unit);
         }
 
         /**
          * place a new real-valued state field in the responsibility of this
-         * collection (Note, because state fields have protected constructors, users
-         * can't create them
-         *
-         * @param unique_prefix unique idendifier for this state field
-         * @param nb_memory number of previous values of this field to store
-         * @param nb_components number of scalar components to store per
-         * quadrature point
-         */
-        TypedStateField<Real> &
-        register_real_state_field(const std::string &unique_prefix,
-                                  const Index_t &nb_memory,
-                                  const Index_t &nb_components,
-                                  const std::string &sub_division_tag = PixelTag,
-                                  const Unit &unit = Unit::unitless());
-
-        /**
-         * place a new complex-valued state field in the responsibility of this
-         * collection (Note, because state fields have protected constructors, users
-         * can't create them
-         *
-         * @param unique_prefix unique idendifier for this state field
-         * @param nb_memory number of previous values of this field to store
-         * @param nb_components number of scalar components to store per
-         * quadrature point
-         */
-        TypedStateField<Complex> &register_complex_state_field(
-            const std::string &unique_prefix, const Index_t &nb_memory,
-            const Index_t &nb_components,
-            const std::string &sub_division_tag = PixelTag,
-            const Unit &unit = Unit::unitless());
-
-        /**
-         * place a new integer-valued state field in the responsibility of this
-         * collection (Note, because state fields have protected constructors, users
-         * can't create them
-         *
-         * @param unique_prefix unique idendifier for this state field
-         * @param nb_memory number of previous values of this field to store
-         * @param nb_components number of scalar components to store per
-         * quadrature point
-         */
-        TypedStateField<Int> &
-        register_int_state_field(const std::string &unique_prefix,
-                                 const Index_t &nb_memory,
-                                 const Index_t &nb_components,
-                                 const std::string &sub_division_tag = PixelTag,
-                                 const Unit &unit = Unit::unitless());
-
-        /**
-         * place a new unsigned integer-valued state field in the responsibility of
-         * this collection (Note, because state fields have protected constructors,
+         * collection (Note, because state fields have protected constructors,
          * users can't create them
          *
          * @param unique_prefix unique idendifier for this state field
@@ -442,16 +390,63 @@ namespace muGrid {
          * @param nb_components number of scalar components to store per
          * quadrature point
          */
-        TypedStateField<Uint> &
-        register_uint_state_field(const std::string &unique_prefix,
-                                  const Index_t &nb_memory,
-                                  const Index_t &nb_components,
-                                  const std::string &sub_division_tag = PixelTag,
-                                  const Unit &unit = Unit::unitless());
+        TypedStateField<Real> & register_real_state_field(
+            const std::string & unique_prefix, const Index_t & nb_memory,
+            const Index_t & nb_components,
+            const std::string & sub_division_tag = PixelTag,
+            const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new complex-valued state field in the responsibility of this
+         * collection (Note, because state fields have protected constructors,
+         * users can't create them
+         *
+         * @param unique_prefix unique idendifier for this state field
+         * @param nb_memory number of previous values of this field to store
+         * @param nb_components number of scalar components to store per
+         * quadrature point
+         */
+        TypedStateField<Complex> & register_complex_state_field(
+            const std::string & unique_prefix, const Index_t & nb_memory,
+            const Index_t & nb_components,
+            const std::string & sub_division_tag = PixelTag,
+            const Unit & unit = Unit::unitless());
+
+        /**
+         * place a new integer-valued state field in the responsibility of this
+         * collection (Note, because state fields have protected constructors,
+         * users can't create them
+         *
+         * @param unique_prefix unique idendifier for this state field
+         * @param nb_memory number of previous values of this field to store
+         * @param nb_components number of scalar components to store per
+         * quadrature point
+         */
+        TypedStateField<Int> & register_int_state_field(
+            const std::string & unique_prefix, const Index_t & nb_memory,
+            const Index_t & nb_components,
+            const std::string & sub_division_tag = PixelTag,
+            const Unit & unit = Unit::unitless());
+
+        /**
+         * place a new unsigned integer-valued state field in the responsibility
+         * of this collection (Note, because state fields have protected
+         * constructors, users can't create them
+         *
+         * @param unique_prefix unique idendifier for this state field
+         * @param nb_memory number of previous values of this field to store
+         * @param nb_components number of scalar components to store per
+         * quadrature point
+         */
+        TypedStateField<Uint> & register_uint_state_field(
+            const std::string & unique_prefix, const Index_t & nb_memory,
+            const Index_t & nb_components,
+            const std::string & sub_division_tag = PixelTag,
+            const Unit & unit = Unit::unitless());
+
+        /**
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -459,22 +454,23 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        template<typename T>
-        Field &field(const std::string &unique_name,
-                     const Shape_t &components_shape,
-                     const std::string &sub_division_tag = PixelTag,
-                     const Unit &unit = Unit::unitless()) {
-            static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
-                          "You can only register fields templated with one of the "
-                          "numeric types Real, Complex, Int, or Uint");
+        template <typename T>
+        Field & field(const std::string & unique_name,
+                      const Shape_t & components_shape,
+                      const std::string & sub_division_tag = PixelTag,
+                      const Unit & unit = Unit::unitless()) {
+            static_assert(
+                std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                "You can only register fields templated with one of the "
+                "numeric types Real, Complex, Int, or Uint");
             return this->register_field_helper<T>(unique_name, components_shape,
                                                   sub_division_tag, unit, true);
         }
 
         /**
-         * place a new real-valued field  in the responsibility of this collection
-         * (Note, because fields have protected constructors, users can't create
-         * them
+         * place a new real-valued field  in the responsibility of this
+         * collection (Note, because fields have protected constructors, users
+         * can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -482,14 +478,14 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        Field &
-        real_field(const std::string &unique_name, const Index_t &nb_components,
-                   const std::string &sub_division_tag = PixelTag,
-                   const Unit &unit = Unit::unitless());
+        Field & real_field(const std::string & unique_name,
+                           const Index_t & nb_components,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -497,16 +493,15 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        Field &
-        real_field(const std::string &unique_name,
-                   const Shape_t &components_shape,
-                   const std::string &sub_division_tag = PixelTag,
-                   const Unit &unit = Unit::unitless());
+        Field & real_field(const std::string & unique_name,
+                           const Shape_t & components_shape,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
 
         /**
          * place a new complex-valued field  in the responsibility of this
-         * collection (Note, because fields have protected constructors, users can't
-         * create them
+         * collection (Note, because fields have protected constructors, users
+         * can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -514,15 +509,14 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        Field &
-        complex_field(const std::string &unique_name,
-                      const Index_t &nb_components,
-                      const std::string &sub_division_tag = PixelTag,
-                      const Unit &unit = Unit::unitless());
+        Field & complex_field(const std::string & unique_name,
+                              const Index_t & nb_components,
+                              const std::string & sub_division_tag = PixelTag,
+                              const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -530,16 +524,15 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        Field &
-        complex_field(const std::string &unique_name,
-                      const Shape_t &components_shape,
-                      const std::string &sub_division_tag = PixelTag,
-                      const Unit &unit = Unit::unitless());
+        Field & complex_field(const std::string & unique_name,
+                              const Shape_t & components_shape,
+                              const std::string & sub_division_tag = PixelTag,
+                              const Unit & unit = Unit::unitless());
 
         /**
          * place a new integer-valued field  in the responsibility of this
-         * collection (Note, because fields have protected constructors, users can't
-         * create them
+         * collection (Note, because fields have protected constructors, users
+         * can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -547,14 +540,14 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        Field &int_field(const std::string &unique_name,
-                         const Index_t &nb_components,
-                         const std::string &sub_division_tag = PixelTag,
-                         const Unit &unit = Unit::unitless());
+        Field & int_field(const std::string & unique_name,
+                          const Index_t & nb_components,
+                          const std::string & sub_division_tag = PixelTag,
+                          const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -562,15 +555,15 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        Field &int_field(const std::string &unique_name,
-                         const Shape_t &components_shape,
-                         const std::string &sub_division_tag = PixelTag,
-                         const Unit &unit = Unit::unitless());
+        Field & int_field(const std::string & unique_name,
+                          const Shape_t & components_shape,
+                          const std::string & sub_division_tag = PixelTag,
+                          const Unit & unit = Unit::unitless());
 
         /**
-         * place a new unsigned integer-valued field  in the responsibility of this
-         * collection (Note, because fields have protected constructors, users can't
-         * create them
+         * place a new unsigned integer-valued field  in the responsibility of
+         * this collection (Note, because fields have protected constructors,
+         * users can't create them
          * @param unique_name unique identifier for this field
          * @param nb_components number of components to be stored per sub-point
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
@@ -578,14 +571,14 @@ namespace muGrid {
          * @param sub_division_tag unique identifier of the subdivision scheme
          * @param unit phyiscal unit of this field
          */
-        Field &
-        uint_field(const std::string &unique_name, const Index_t &nb_components,
-                   const std::string &sub_division_tag = PixelTag,
-                   const Unit &unit = Unit::unitless());
+        Field & uint_field(const std::string & unique_name,
+                           const Index_t & nb_components,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
 
         /**
-         * place a new field in the responsibility of this collection (Note, because
-         * fields have protected constructors, users can't create them
+         * place a new field in the responsibility of this collection (Note,
+         * because fields have protected constructors, users can't create them
          * @param unique_name unique identifier for this field
          * @param components_shape number of components to store per quadrature
          * point
@@ -593,35 +586,35 @@ namespace muGrid {
          * @param unit phyiscal unit of this field
          * @param storage_oder in-memory storage order of the components
          */
-        Field &
-        uint_field(const std::string &unique_name,
-                   const Shape_t &components_shape,
-                   const std::string &sub_division_tag = PixelTag,
-                   const Unit &unit = Unit::unitless());
+        Field & uint_field(const std::string & unique_name,
+                           const Shape_t & components_shape,
+                           const std::string & sub_division_tag = PixelTag,
+                           const Unit & unit = Unit::unitless());
 
         /**
-         * place a new state field in the responsibility of this collection (Note,
-         * because state fields have protected constructors, users can't create them
+         * place a new state field in the responsibility of this collection
+         * (Note, because state fields have protected constructors, users can't
+         * create them
          */
-        template<typename T>
+        template <typename T>
         TypedStateField<T> &
-        state_field(const std::string &unique_prefix, const Index_t &nb_memory,
-                    const Index_t &nb_components,
-                    const std::string &sub_division_tag = PixelTag,
-                    const Unit &unit = Unit::unitless()) {
+        state_field(const std::string & unique_prefix,
+                    const Index_t & nb_memory, const Index_t & nb_components,
+                    const std::string & sub_division_tag = PixelTag,
+                    const Unit & unit = Unit::unitless()) {
             static_assert(
                 std::is_scalar<T>::value or std::is_same<T, Complex>::value,
                 "You can only register state fields templated with one of the "
                 "numeric types Real, Complex, Int, or UInt");
-            return this->register_state_field_helper<T>(unique_prefix, nb_memory,
-                                                        nb_components,
-                                                        sub_division_tag, unit, true);
+            return this->register_state_field_helper<T>(
+                unique_prefix, nb_memory, nb_components, sub_division_tag, unit,
+                true);
         }
 
         /**
          * place a new real-valued state field in the responsibility of this
-         * collection (Note, because state fields have protected constructors, users
-         * can't create them
+         * collection (Note, because state fields have protected constructors,
+         * users can't create them
          *
          * @param unique_prefix unique idendifier for this state field
          * @param nb_memory number of previous values of this field to store
@@ -629,15 +622,16 @@ namespace muGrid {
          * quadrature point
          */
         TypedStateField<Real> &
-        real_state_field(const std::string &unique_prefix,
-                         const Index_t &nb_memory, const Index_t &nb_components,
-                         const std::string &sub_division_tag = PixelTag,
-                         const Unit &unit = Unit::unitless());
+        real_state_field(const std::string & unique_prefix,
+                         const Index_t & nb_memory,
+                         const Index_t & nb_components,
+                         const std::string & sub_division_tag = PixelTag,
+                         const Unit & unit = Unit::unitless());
 
         /**
          * place a new complex-valued state field in the responsibility of this
-         * collection (Note, because state fields have protected constructors, users
-         * can't create them
+         * collection (Note, because state fields have protected constructors,
+         * users can't create them
          *
          * @param unique_prefix unique idendifier for this state field
          * @param nb_memory number of previous values of this field to store
@@ -645,31 +639,15 @@ namespace muGrid {
          * quadrature point
          */
         TypedStateField<Complex> &
-        complex_state_field(const std::string &unique_prefix,
-                            const Index_t &nb_memory,
-                            const Index_t &nb_components,
-                            const std::string &sub_division_tag = PixelTag,
-                            const Unit &unit = Unit::unitless());
+        complex_state_field(const std::string & unique_prefix,
+                            const Index_t & nb_memory,
+                            const Index_t & nb_components,
+                            const std::string & sub_division_tag = PixelTag,
+                            const Unit & unit = Unit::unitless());
 
         /**
          * place a new integer-valued state field in the responsibility of this
-         * collection (Note, because state fields have protected constructors, users
-         * can't create them
-         *
-         * @param unique_prefix unique idendifier for this state field
-         * @param nb_memory number of previous values of this field to store
-         * @param nb_components number of scalar components to store per
-         * quadrature point
-         */
-        TypedStateField<Int> &
-        int_state_field(const std::string &unique_prefix,
-                        const Index_t &nb_memory, const Index_t &nb_components,
-                        const std::string &sub_division_tag = PixelTag,
-                        const Unit &unit = Unit::unitless());
-
-        /**
-         * place a new unsigned integer-valued state field in the responsibility of
-         * this collection (Note, because state fields have protected constructors,
+         * collection (Note, because state fields have protected constructors,
          * users can't create them
          *
          * @param unique_prefix unique idendifier for this state field
@@ -677,66 +655,86 @@ namespace muGrid {
          * @param nb_components number of scalar components to store per
          * quadrature point
          */
+        TypedStateField<Int> &
+        int_state_field(const std::string & unique_prefix,
+                        const Index_t & nb_memory,
+                        const Index_t & nb_components,
+                        const std::string & sub_division_tag = PixelTag,
+                        const Unit & unit = Unit::unitless());
+
+        /**
+         * place a new unsigned integer-valued state field in the responsibility
+         * of this collection (Note, because state fields have protected
+         * constructors, users can't create them
+         *
+         * @param unique_prefix unique idendifier for this state field
+         * @param nb_memory number of previous values of this field to store
+         * @param nb_components number of scalar components to store per
+         * quadrature point
+         */
         TypedStateField<Uint> &
-        uint_state_field(const std::string &unique_prefix,
-                         const Index_t &nb_memory, const Index_t &nb_components,
-                         const std::string &sub_division_tag = PixelTag,
-                         const Unit &unit = Unit::unitless());
+        uint_state_field(const std::string & unique_prefix,
+                         const Index_t & nb_memory,
+                         const Index_t & nb_components,
+                         const std::string & sub_division_tag = PixelTag,
+                         const Unit & unit = Unit::unitless());
 
         //! check whether a field of name 'unique_name' has already been
         //! registered
-        bool field_exists(const std::string &unique_name) const;
+        bool field_exists(const std::string & unique_name) const;
 
         //! check whether a field of name 'unique_name' has already been
         //! registered
-        bool state_field_exists(const std::string &unique_prefix) const;
+        bool state_field_exists(const std::string & unique_prefix) const;
 
         //! returns the number of pixels present in the collection
         Index_t get_nb_pixels() const;
 
-        //! returns the number of pixels present in the collection without ghosts
+        //! returns the number of pixels present in the collection without
+        //! ghosts
         virtual Index_t get_nb_pixels_without_ghosts() const;
 
         /**
-         * returns the number of (virtual) pixels required to store the underlying
-         * data that may involve padding regions
+         * returns the number of (virtual) pixels required to store the
+         * underlying data that may involve padding regions
          */
         Index_t get_nb_buffer_pixels() const;
 
         /**
-         * Check whether the number of subdivision points peir pixel/voxel has been
-         * set for a given tags
+         * Check whether the number of subdivision points peir pixel/voxel has
+         * been set for a given tags
          */
-        bool has_nb_sub_pts(const std::string &tag) const;
+        bool has_nb_sub_pts(const std::string & tag) const;
 
         /**
-         * set the number of sub points per pixel/voxel for a given tag. Can only be
-         * done once per tag
+         * set the number of sub points per pixel/voxel for a given tag. Can
+         * only be done once per tag
          */
-        void set_nb_sub_pts(const std::string &tag,
-                            const Index_t &nb_sub_pts_per_pixel);
-
-        /**
-         * return the number of subpoints per pixel/voxel for a given tag
-         */
-        const Index_t &get_nb_sub_pts(const std::string &tag);
+        void set_nb_sub_pts(const std::string & tag,
+                            const Index_t & nb_sub_pts_per_pixel);
 
         /**
          * return the number of subpoints per pixel/voxel for a given tag
          */
-        const Index_t &get_nb_sub_pts(const std::string &tag) const;
+        Index_t get_nb_sub_pts(const std::string & tag);
+
+        /**
+         * return the number of subpoints per pixel/voxel for a given tag
+         */
+        Index_t get_nb_sub_pts(const std::string & tag) const;
 
         /**
          * return the spatial dimension of the underlying discretisation grid
          */
-        const Index_t &get_spatial_dim() const;
+        Dim_t get_spatial_dim() const;
 
         /**
-         * return the domain of validity (i.e., wher the fields are defined globally
+         * return the domain of validity (i.e., wher the fields are defined
+         * globally
          * (`muGrid::FieldCollection::ValidityDomain::Global`) or locally
          * (`muGrid::FieldCollection::ValidityDomain::Local`)
          */
-        const ValidityDomain &get_domain() const;
+        ValidityDomain get_domain() const;
 
         //! return shape of the pixels
         virtual Shape_t get_pixels_shape() const = 0;
@@ -751,62 +749,66 @@ namespace muGrid {
         virtual Shape_t get_pixels_strides(Index_t element_size = 1) const = 0;
 
         //! return the storage order of the pixels vs. subpoints
-        const StorageOrder &get_storage_order() const;
+        StorageOrder get_storage_order() const;
 
         //! return the memory location (host or device) of all fields
-        const MemoryLocation &get_memory_location() const;
+        MemoryLocation get_memory_location() const;
 
         //! check if fields in this collection are on a GPU device
         bool is_on_device() const;
 
         //! check whether two field collections have the same memory layout
-        bool has_same_memory_layout(const FieldCollection &other) const;
+        bool has_same_memory_layout(const FieldCollection & other) const;
 
         /**
-         * whether the collection has been properly initialised (i.e., it knows the
-         * number of quadrature points and all its pixels/voxels
+         * whether the collection has been properly initialised (i.e., it knows
+         * the number of quadrature points and all its pixels/voxels
          */
         bool is_initialised() const;
 
         /**
-         * return an iterable proxy to the collection which allows to efficiently
-         * iterate over the indices fo the collection's pixels
+         * return an iterable proxy to the collection which allows to
+         * efficiently iterate over the indices fo the collection's pixels
          */
         PixelIndexIterable get_pixel_indices() const;
 
         /**
-         * return an iterable proxy to the collection which allows to iterate over
-         * the indices fo the collection's quadrature points
+         * return an iterable proxy to the collection which allows to iterate
+         * over the indices fo the collection's quadrature points
          */
-        IndexIterable get_sub_pt_indices(const std::string &tag) const;
+        IndexIterable get_sub_pt_indices(const std::string & tag) const;
 
-        const std::vector<Index_t> &get_pixel_ids() { return this->pixel_indices; }
-
-        /**
-         * returns a (base-type) reference to the field identified by `unique_name`.
-         * Throws a `muGrid::FieldCollectionError` if the field does not exist.
-         */
-        Field &get_field(const std::string &unique_name);
+        const std::vector<Index_t> & get_pixel_ids() {
+            return this->pixel_indices;
+        }
 
         /**
-         * returns a (base-type) reference to the field identified by `unique_name`.
-         * Throws a `muGrid::FieldCollectionError` if the field does not exist.
+         * returns a (base-type) reference to the field identified by
+         * `unique_name`. Throws a `muGrid::FieldCollectionError` if the field
+         * does not exist.
          */
-        const Field &get_field(const std::string &unique_name) const;
+        Field & get_field(const std::string & unique_name);
 
         /**
-         * returns the unique ptr holding the field named unique_name. Warning: note
-         * that this effectively removes the field from the collection. You can use
-         * this to delete fields to free memory
+         * returns a (base-type) reference to the field identified by
+         * `unique_name`. Throws a `muGrid::FieldCollectionError` if the field
+         * does not exist.
          */
-        Field_ptr pop_field(const std::string &unique_name);
+        const Field & get_field(const std::string & unique_name) const;
+
+        /**
+         * returns the unique ptr holding the field named unique_name. Warning:
+         * note that this effectively removes the field from the collection. You
+         * can use this to delete fields to free memory
+         */
+        Field_ptr pop_field(const std::string & unique_name);
 
         /**
          * returns a (base-type) reference to the state field identified by
          * `unique_prefix`. Throws a `muGrid::FieldCollectionError` if the state
          * field does not exist.
          */
-        StateField &get_state_field(const std::string &unique_prefix);
+        StateField & get_state_field(const std::string & unique_prefix);
 
         //! returns a vector of all field names
         std::vector<std::string> list_fields() const;
@@ -816,34 +818,36 @@ namespace muGrid {
         std::vector<std::string> list_state_field_unique_prefixes() const;
 
         //! preregister a map for latent initialisation
-        void preregister_map(std::shared_ptr<std::function<void()> > &call_back);
+        void
+        preregister_map(std::shared_ptr<std::function<void()>> & call_back);
 
         /**
-         * run-time checker for nb_sub_pts: checks whether the number of sub-points
-         * (e.g., quadrature points) is compatible with the sub-division scheme).
-         * Attention: this does allow `Unknown`  as valid values for
-         * `IterUnit::SubPt`, if the tag is defined, since these values can
-         * be specified for the entire FieldCollection at a later point, before
-         * initialisation. Hence, this function cannot be used for checking
-         * nb_sub_pts for iterators, which need a known value. Use
+         * run-time checker for nb_sub_pts: checks whether the number of
+         * sub-points (e.g., quadrature points) is compatible with the
+         * sub-division scheme). Attention: this does allow `Unknown`  as valid
+         * values for `IterUnit::SubPt`, if the tag is defined, since these
+         * values can be specified for the entire FieldCollection at a later
+         * point, before initialisation. Hence, this function cannot be used for
+         * checking nb_sub_pts for iterators, which need a known value. Use
          * `check_initialised_nb_sub_pts()` instead for that.
          */
-        Index_t check_nb_sub_pts(const Index_t &nb_sub_pts,
-                                 const IterUnit &iteration_type,
-                                 const std::string &tag) const;
+        Index_t check_nb_sub_pts(const Index_t & nb_sub_pts,
+                                 const IterUnit & iteration_type,
+                                 const std::string & tag) const;
 
         /**
-         * run-time checker for nb_sub_pts: checks whether the number of sub-points
-         * (e.g., quadrature points) is compatible with the sub-division scheme),
-         * and set to a positive integer value (i.e., not `Unknown`).
+         * run-time checker for nb_sub_pts: checks whether the number of
+         * sub-points (e.g., quadrature points) is compatible with the
+         * sub-division scheme), and set to a positive integer value (i.e., not
+         * `Unknown`).
          */
-        size_t check_initialised_nb_sub_pts(const Index_t &nb_sub_pts,
-                                            const IterUnit &iteration_type,
-                                            const std::string &tag) const;
+        size_t check_initialised_nb_sub_pts(const Index_t & nb_sub_pts,
+                                            const IterUnit & iteration_type,
+                                            const std::string & tag) const;
 
         /**
-         * use this to obtain an unused unique name for a new field to register, if
-         * you do not care about what name you obtain.
+         * use this to obtain an unused unique name for a new field to register,
+         * if you do not care about what name you obtain.
          */
         std::string generate_unique_name() const;
 
@@ -852,35 +856,33 @@ namespace muGrid {
          * Creates a field in the collection's memory space (host or device).
          * Returns Field& to allow runtime polymorphism.
          */
-        template<typename T>
-        Field &register_field_helper(
-            const std::string &unique_name,
-            const Index_t &nb_components,
-            const std::string &sub_division_tag,
-            const Unit &unit,
-            bool allow_existing = false);
+        template <typename T>
+        Field & register_field_helper(const std::string & unique_name,
+                                      const Index_t & nb_components,
+                                      const std::string & sub_division_tag,
+                                      const Unit & unit,
+                                      bool allow_existing = false);
 
         /**
          * Internal worker function called by register_<T>_field.
          * Creates a field in the collection's memory space (host or device).
          * Returns Field& to allow runtime polymorphism.
          */
-        template<typename T>
-        Field &register_field_helper(
-            const std::string &unique_name,
-            const Shape_t &components_shape,
-            const std::string &sub_division_tag,
-            const Unit &unit,
-            bool allow_existing = false);
+        template <typename T>
+        Field & register_field_helper(const std::string & unique_name,
+                                      const Shape_t & components_shape,
+                                      const std::string & sub_division_tag,
+                                      const Unit & unit,
+                                      bool allow_existing = false);
 
         //! internal worker function called by register_<T>_state_field
-        template<typename T>
-        TypedStateField<T> &register_state_field_helper(
-            const std::string &unique_prefix, const Index_t &nb_memory,
-            const Index_t &nb_components, const std::string &sub_division_tag,
-            const Unit &unit, bool allow_existing = false);
+        template <typename T>
+        TypedStateField<T> & register_state_field_helper(
+            const std::string & unique_prefix, const Index_t & nb_memory,
+            const Index_t & nb_components, const std::string & sub_division_tag,
+            const Unit & unit, bool allow_existing = false);
 
-    protected:
+       protected:
         /**
          * loop through all fields and allocate their memory. Is exclusively
          * called by the daughter classes' `initialise` member function.
@@ -897,12 +899,13 @@ namespace muGrid {
         //! storage container for state fields
         std::map<std::string, StateField_ptr> state_fields{};
 
-        //! Maps registered before initialisation which will need their data_ptr set
-        std::vector<std::weak_ptr<std::function<void()> > > init_callbacks{};
+        //! Maps registered before initialisation which will need their data_ptr
+        //! set
+        std::vector<std::weak_ptr<std::function<void()>>> init_callbacks{};
         //! domain of validity
         ValidityDomain domain;
         //! spatial dimension
-        Index_t spatial_dim;
+        Dim_t spatial_dim;
 
         //! number of subpoints per pixel/voxel, stored by tag
         SubPtMap_t nb_sub_pts;
@@ -936,7 +939,7 @@ namespace muGrid {
      * `muGrid::FieldCollection`
      */
     class FieldCollection::PixelIndexIterable {
-    public:
+       public:
         //! stl
         using iterator = typename std::vector<Index_t>::const_iterator;
 
@@ -944,19 +947,20 @@ namespace muGrid {
         PixelIndexIterable() = delete;
 
         //! Copy constructor
-        PixelIndexIterable(const PixelIndexIterable &other) = delete;
+        PixelIndexIterable(const PixelIndexIterable & other) = delete;
 
         //! Move constructor
-        PixelIndexIterable(PixelIndexIterable &&other) = default;
+        PixelIndexIterable(PixelIndexIterable && other) = default;
 
         //! Destructor
         virtual ~PixelIndexIterable() = default;
 
         //! Copy assignment operator
-        PixelIndexIterable &operator=(const PixelIndexIterable &other) = delete;
+        PixelIndexIterable &
+        operator=(const PixelIndexIterable & other) = delete;
 
         //! Move assignment operator
-        PixelIndexIterable &operator=(PixelIndexIterable &&other) = delete;
+        PixelIndexIterable & operator=(PixelIndexIterable && other) = delete;
 
         //! stl
         iterator begin() const;
@@ -967,17 +971,17 @@ namespace muGrid {
         //! stl
         size_t size() const;
 
-    protected:
+       protected:
         //! allow field collections to call the protected constructor of this
         //! iterable
         friend FieldCollection;
 
         //! Constructor is protected, because no one ever need to construct this
         //! except the field collection
-        explicit PixelIndexIterable(const FieldCollection &collection);
+        explicit PixelIndexIterable(const FieldCollection & collection);
 
         //! reference back to the proxied collection
-        const FieldCollection &collection;
+        const FieldCollection & collection;
     };
 
     /**
@@ -986,26 +990,26 @@ namespace muGrid {
      * `muGrid::FieldCollection::get_quad_pt_indices`).
      */
     class FieldCollection::IndexIterable {
-    public:
+       public:
         class iterator;
 
         //! Default constructor
         IndexIterable() = delete;
 
         //! Copy constructor
-        IndexIterable(const IndexIterable &other) = delete;
+        IndexIterable(const IndexIterable & other) = delete;
 
         //! Move constructor
-        IndexIterable(IndexIterable &&other) = default;
+        IndexIterable(IndexIterable && other) = default;
 
         //! Destructor
         virtual ~IndexIterable() = default;
 
         //! Copy assignment operator
-        IndexIterable &operator=(const IndexIterable &other) = delete;
+        IndexIterable & operator=(const IndexIterable & other) = delete;
 
         //! Move assignment operator
-        IndexIterable &operator=(IndexIterable &&other) = delete;
+        IndexIterable & operator=(IndexIterable && other) = delete;
 
         //! stl
         iterator begin() const;
@@ -1016,7 +1020,7 @@ namespace muGrid {
         //! stl
         size_t size() const;
 
-    protected:
+       protected:
         /**
          * allow the field collection to create
          * `muGrid::FieldCollection::IndexIterable`s
@@ -1027,18 +1031,19 @@ namespace muGrid {
          * Constructor is protected, because no one ever need to construct this
          * except the fieldcollection. Constructor for sub_point iteration
          */
-        IndexIterable(const FieldCollection &collection, const std::string &tag,
-                      const Index_t &stride = Unknown);
+        IndexIterable(const FieldCollection & collection,
+                      const std::string & tag,
+                      const Index_t & stride = Unknown);
 
         /**
          * Constructor is protected, because no one ever need to construct this
          * except the fieldcollection. Constructor for pixel iteration
          */
-        explicit IndexIterable(const FieldCollection &collection,
-                               const Index_t &stride = Unknown);
+        explicit IndexIterable(const FieldCollection & collection,
+                               const Index_t & stride = Unknown);
 
         //! reference back to the proxied collection
-        const FieldCollection &collection;
+        const FieldCollection & collection;
 
         //! whether to iterate over pixels or quadrature points
         const IterUnit iteration_type;
@@ -1048,47 +1053,50 @@ namespace muGrid {
     };
 
     /**
-     * iterator class for iterating over quadrature point indices or pixel indices
-     * of a `muGrid::FieldCollection::IndexIterable`. Dereferences to an index.
+     * iterator class for iterating over quadrature point indices or pixel
+     * indices of a `muGrid::FieldCollection::IndexIterable`. Dereferences to an
+     * index.
      */
     class FieldCollection::IndexIterable::iterator final {
-    public:
+       public:
         //! convenience alias
-        using PixelIndexIterator_t = typename std::vector<Index_t>::const_iterator;
+        using PixelIndexIterator_t =
+            typename std::vector<Index_t>::const_iterator;
 
         //! Default constructor
         iterator() = delete;
 
         //! constructor
-        iterator(const PixelIndexIterator_t &pixel_index_iterator,
-                 const size_t &stride);
+        iterator(const PixelIndexIterator_t & pixel_index_iterator,
+                 const size_t & stride);
 
         //! Copy constructor
-        iterator(const iterator &other) = default;
+        iterator(const iterator & other) = default;
 
         //! Move constructor
-        iterator(iterator &&other) = default;
+        iterator(iterator && other) = default;
 
         //! Destructor
         ~iterator() = default;
 
         //! pre-increment
-        iterator &operator++() {
+        iterator & operator++() {
             // increment the offset and keep only the modulo
             (++this->offset) %= this->stride;
-            // conditionally increment the pixel if the offset has recycled to zero
+            // conditionally increment the pixel if the offset has recycled to
+            // zero
             this->pixel_index_iterator += size_t(this->offset == 0);
             return *this;
         }
 
         //! comparison
-        bool operator!=(const iterator &other) const {
+        bool operator!=(const iterator & other) const {
             return (this->pixel_index_iterator != other.pixel_index_iterator) or
                    (this->offset != other.offset);
         }
 
         //! comparison (required by akantu::iterators)
-        bool operator==(const iterator &other) const {
+        bool operator==(const iterator & other) const {
             return not(*this != other);
         }
 
@@ -1097,9 +1105,9 @@ namespace muGrid {
             return *(this->pixel_index_iterator) * this->stride + this->offset;
         }
 
-    protected:
+       protected:
         //! stride for the slow moving index
-        size_t stride; // store the value rather than the const ref in order
+        size_t stride;  // store the value rather than the const ref in order
         //  to allow the IndexIterable to be destroyed and still use
         //  the iterator
         //! fast-moving index
@@ -1109,12 +1117,10 @@ namespace muGrid {
     };
 
     /* ---------------------------------------------------------------------- */
-    template<typename T>
-    FieldCollection::Field_ptr
-    FieldCollection::detached_field(const std::string &unique_name,
-                                    const Shape_t &components_shape,
-                                    const std::string &sub_division_tag,
-                                    const Unit &unit) {
+    template <typename T>
+    FieldCollection::Field_ptr FieldCollection::detached_field(
+        const std::string & unique_name, const Shape_t & components_shape,
+        const std::string & sub_division_tag, const Unit & unit) {
         this->register_field<T>(unique_name, components_shape, sub_division_tag,
                                 unit);
         return this->pop_field(unique_name);
@@ -1126,8 +1132,8 @@ namespace muGrid {
      * `std::ostream`s
      */
     std::ostream &
-    operator<<(std::ostream &os,
-               const muGrid::FieldCollection::ValidityDomain &value);
-} // namespace muGrid
+    operator<<(std::ostream & os,
+               const muGrid::FieldCollection::ValidityDomain & value);
+}  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_FIELD_COLLECTION_HH_

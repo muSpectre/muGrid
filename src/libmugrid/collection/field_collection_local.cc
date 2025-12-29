@@ -37,30 +37,28 @@
 
 namespace muGrid {
     /* ---------------------------------------------------------------------- */
-    LocalFieldCollection::LocalFieldCollection(const Index_t &spatial_dimension,
-                                               const SubPtMap_t &nb_sub_pts,
+    LocalFieldCollection::LocalFieldCollection(Dim_t spatial_dimension,
+                                               const SubPtMap_t & nb_sub_pts,
                                                MemoryLocation memory_location)
         : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts,
                  StorageOrder::ArrayOfStructures, memory_location},
-          name{std::string{"LocalFieldCollectionName"}} {
-    }
+          name{std::string{"LocalFieldCollectionName"}} {}
 
     /* ---------------------------------------------------------------------- */
-    LocalFieldCollection::LocalFieldCollection(const Index_t &spatial_dimension,
-                                               const std::string &name,
-                                               const SubPtMap_t &nb_sub_pts,
+    LocalFieldCollection::LocalFieldCollection(Dim_t spatial_dimension,
+                                               const std::string & name,
+                                               const SubPtMap_t & nb_sub_pts,
                                                MemoryLocation memory_location)
         : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts,
                  StorageOrder::ArrayOfStructures, memory_location},
-          name{name} {
-    }
+          name{name} {}
 
     /* ---------------------------------------------------------------------- */
-    void LocalFieldCollection::add_pixel(const size_t &global_index) {
+    void LocalFieldCollection::add_pixel(const size_t & global_index) {
         if (this->initialised) {
-            throw FieldCollectionError(
-                "Cannot add pixels once the collection has been initialised (because "
-                "the fields all have been allocated)");
+            throw FieldCollectionError("Cannot add pixels once the collection "
+                                       "has been initialised (because "
+                                       "the fields all have been allocated)");
         }
         this->global_to_local_index_map.insert(
             std::make_pair(global_index, pixel_indices.size()));
@@ -76,17 +74,16 @@ namespace muGrid {
         this->nb_buffer_pixels = this->nb_pixels;
         this->allocate_fields();
         this->initialised = true;
-        this->initialise_maps(); // yes, this has to be after the previous line
+        this->initialise_maps();  // yes, this has to be after the previous line
     }
 
     /* ---------------------------------------------------------------------- */
-    LocalFieldCollection LocalFieldCollection::get_empty_clone(
-        const std::string &new_name) const {
-        LocalFieldCollection ret_val{
-            this->get_spatial_dim(), new_name,
-            this->nb_sub_pts, this->get_memory_location()
-        };
-        for (const auto &pixel_id: this->get_pixel_indices()) {
+    LocalFieldCollection
+    LocalFieldCollection::get_empty_clone(const std::string & new_name) const {
+        LocalFieldCollection ret_val{this->get_spatial_dim(), new_name,
+                                     this->nb_sub_pts,
+                                     this->get_memory_location()};
+        for (const auto & pixel_id : this->get_pixel_indices()) {
             ret_val.add_pixel(pixel_id);
         }
         return ret_val;
@@ -114,16 +111,17 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     Shape_t LocalFieldCollection::get_pixels_offset_without_ghosts() const {
-        return Shape_t{0}; // no offset for local fields
+        return Shape_t{0};  // no offset for local fields
     }
 
     /* ---------------------------------------------------------------------- */
-    Shape_t LocalFieldCollection::get_pixels_strides(Index_t element_size) const {
+    Shape_t
+    LocalFieldCollection::get_pixels_strides(Index_t element_size) const {
         return Shape_t{element_size};
     }
 
     /* ---------------------------------------------------------------------- */
-    const std::string &LocalFieldCollection::get_name() const {
+    const std::string & LocalFieldCollection::get_name() const {
         return this->name;
     }
-} // namespace muGrid
+}  // namespace muGrid

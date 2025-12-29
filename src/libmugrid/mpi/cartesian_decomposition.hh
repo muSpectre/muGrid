@@ -22,7 +22,7 @@ namespace muGrid {
          * @param memory_location where to allocate field memory (Host or Device)
          */
         CartesianDecomposition(const Communicator & comm,
-                               Index_t spatial_dimension,
+                               Dim_t spatial_dimension,
                                const SubPtMap_t & nb_sub_pts = {},
                                MemoryLocation memory_location = MemoryLocation::Host);
 
@@ -87,7 +87,7 @@ namespace muGrid {
         const GlobalFieldCollection & get_collection() const;
 
         //! get the spatial dimension
-        virtual Index_t get_spatial_dim() const;
+        virtual Dim_t get_spatial_dim() const;
 
         //! get the number of subdivisions
         const DynGridIndex & get_nb_subdivisions() const;

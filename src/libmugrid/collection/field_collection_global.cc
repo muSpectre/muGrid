@@ -39,7 +39,7 @@
 namespace muGrid {
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
-        const Index_t &spatial_dimension, const SubPtMap_t &nb_sub_pts,
+        Dim_t spatial_dimension, const SubPtMap_t &nb_sub_pts,
         StorageOrder storage_order, MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, spatial_dimension, nb_sub_pts,

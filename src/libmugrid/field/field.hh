@@ -339,7 +339,7 @@ namespace muGrid {
         /**
          * return the spatial dimension of the underlying discretisation grid
          */
-        Index_t get_spatial_dim() const;
+        Dim_t get_spatial_dim() const;
 
         //! check wether the number of pixel sub-divisions has been set
         bool has_nb_sub_pts() const;

@@ -53,6 +53,7 @@ using muGrid::Communicator;
 // Alias for Python binding - use HostSpace specialization
 using PyFFTEngine = FFTEngine<HostSpace>;
 using muGrid::Int;
+using muGrid::Dim_t;
 using muGrid::Index_t;
 using muGrid::DynGridIndex;
 using muGrid::Real;
@@ -84,8 +85,8 @@ auto py_fft_coords(const PyFFTEngine & eng) {
     const auto & pixels = with_ghosts
         ? real_collection.get_pixels_with_ghosts()
         : real_collection.get_pixels_without_ghosts();
-    const auto & nb_domain_grid_pts = eng.get_nb_domain_grid_pts();
-    const Index_t dim = eng.get_spatial_dim();
+    const auto & nb_domain_grid_pts {eng.get_nb_domain_grid_pts()};
+    const Dim_t dim{eng.get_spatial_dim()};
 
     // Shape: [dim, local_nx, local_ny, ...]
     std::vector<Index_t> shape;

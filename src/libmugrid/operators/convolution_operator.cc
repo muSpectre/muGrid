@@ -56,7 +56,7 @@ namespace muGrid {
         : Parent{}, pixel_offset{pixel_offset}, pixel_operator{pixel_operator.begin(), pixel_operator.end()},
           conv_pts_shape{conv_pts_shape}, nb_pixelnodal_pts{nb_pixelnodal_pts},
           nb_quad_pts{nb_quad_pts}, nb_operators{nb_operators},
-          spatial_dim{static_cast<Index_t>(conv_pts_shape.size())},
+          spatial_dim{static_cast<Dim_t>(conv_pts_shape.size())},
           nb_conv_pts{get_nb_from_shape(conv_pts_shape)} {
         // Check the dimension of the pixel operator
         if (pixel_operator.size() != this->nb_operators * this->nb_quad_pts * this->nb_pixelnodal_pts * this->nb_conv_pts) {
@@ -123,7 +123,7 @@ namespace muGrid {
         const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
         const auto min_ghosts_right{is_transpose ? apply_min_left : apply_min_right};
 
-        for (Index_t direction = 0; direction < collection.get_spatial_dim();
+        for (Dim_t direction{0}; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
                 std::stringstream err_msg{};
@@ -138,7 +138,7 @@ namespace muGrid {
             }
         }
 
-        for (Index_t direction = 0; direction < collection.get_spatial_dim();
+        for (Dim_t direction{0}; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
                 std::stringstream err_msg{};
@@ -223,7 +223,7 @@ namespace muGrid {
         const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
         const auto min_ghosts_right{is_transpose ? apply_min_left : apply_min_right};
 
-        for (Index_t direction = 0; direction < collection.get_spatial_dim();
+        for (Dim_t direction{0}; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
                 std::stringstream err_msg{};
@@ -238,7 +238,7 @@ namespace muGrid {
             }
         }
 
-        for (Index_t direction = 0; direction < collection.get_spatial_dim();
+        for (Dim_t direction{0}; direction < collection.get_spatial_dim();
              ++direction) {
             if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
                 std::stringstream err_msg{};
@@ -776,7 +776,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t ConvolutionOperator::get_spatial_dim() const {
+    Dim_t ConvolutionOperator::get_spatial_dim() const {
         return this->spatial_dim;
     }
 

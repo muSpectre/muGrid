@@ -192,7 +192,7 @@ namespace muGrid {
          * @brief Get the spatial dimension.
          * @return Spatial dimension (2 or 3)
          */
-        Index_t get_spatial_dim() const override { return spatial_dim; }
+        Dim_t get_spatial_dim() const override { return spatial_dim; }
 
         /**
          * @brief Get the number of stencil points.

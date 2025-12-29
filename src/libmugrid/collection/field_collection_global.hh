@@ -64,7 +64,7 @@ namespace muGrid {
          * @param memory_location where to allocate field memory (Host or Device)
          */
         GlobalFieldCollection(
-            const Index_t & spatial_dimension,
+            Dim_t spatial_dimension,
             const SubPtMap_t & nb_sub_pts = {},
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
             MemoryLocation memory_location = MemoryLocation::Host);

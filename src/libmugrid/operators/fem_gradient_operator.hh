@@ -56,7 +56,8 @@ namespace muGrid {
 
     /**
      * @class FEMGradientOperator
-     * @brief Hard-coded linear FEM gradient operator with optimized implementation.
+     * @brief Hard-coded linear FEM gradient operator with optimized
+     * implementation.
      *
      * This class provides optimized implementations of the gradient operator
      * for linear finite elements on structured grids:
@@ -74,13 +75,14 @@ namespace muGrid {
      * - 3 gradient components (d/dx, d/dy, d/dz)
      *
      * The apply() method computes the gradient (nodal → quadrature points).
-     * The transpose() method computes the divergence (quadrature → nodal points).
+     * The transpose() method computes the divergence (quadrature → nodal
+     * points).
      *
      * Shape function gradients are compile-time constants for linear elements,
      * enabling SIMD vectorization and optimal performance.
      */
     class FEMGradientOperator : public ConvolutionOperatorBase {
-    public:
+       public:
         using Parent = ConvolutionOperatorBase;
 
         /**
@@ -92,38 +94,40 @@ namespace muGrid {
          * For a grid with spacing (hx, hy), use scale = 1.0 and the
          * shape function gradients will be scaled by 1/h internally.
          */
-        explicit FEMGradientOperator(Index_t spatial_dim,
-                                      std::vector<Real> grid_spacing = {});
+        explicit FEMGradientOperator(Dim_t spatial_dim,
+                                     std::vector<Real> grid_spacing = {});
 
         //! Default constructor is deleted
         FEMGradientOperator() = delete;
 
         //! Copy constructor is deleted
-        FEMGradientOperator(const FEMGradientOperator &other) = delete;
+        FEMGradientOperator(const FEMGradientOperator & other) = delete;
 
         //! Move constructor
-        FEMGradientOperator(FEMGradientOperator &&other) = default;
+        FEMGradientOperator(FEMGradientOperator && other) = default;
 
         //! Destructor
         ~FEMGradientOperator() override = default;
 
         //! Copy assignment operator is deleted
-        FEMGradientOperator &operator=(const FEMGradientOperator &other) = delete;
+        FEMGradientOperator &
+        operator=(const FEMGradientOperator & other) = delete;
 
         //! Move assignment operator
-        FEMGradientOperator &operator=(FEMGradientOperator &&other) = default;
+        FEMGradientOperator & operator=(FEMGradientOperator && other) = default;
 
         /**
          * @brief Apply the gradient operator (nodal → quadrature).
          *
          * Input field: nodal values with shape [nb_nodal_pts, ...]
-         * Output field: gradient at quadrature points with shape [dim, nb_quad_pts, ...]
+         * Output field: gradient at quadrature points with shape [dim,
+         * nb_quad_pts, ...]
          *
          * @param nodal_field Input field at nodal points
          * @param gradient_field Output gradient field at quadrature points
          */
-        void apply(const TypedFieldBase<Real> &nodal_field,
-                   TypedFieldBase<Real> &gradient_field) const override;
+        void apply(const TypedFieldBase<Real> & nodal_field,
+                   TypedFieldBase<Real> & gradient_field) const override;
 
         /**
          * @brief Apply the gradient operator with increment.
@@ -134,12 +138,14 @@ namespace muGrid {
          * @param alpha Scaling factor for the increment
          * @param gradient_field Output gradient field to increment
          */
-        void apply_increment(const TypedFieldBase<Real> &nodal_field,
-                             const Real &alpha,
-                             TypedFieldBase<Real> &gradient_field) const override;
+        void
+        apply_increment(const TypedFieldBase<Real> & nodal_field,
+                        const Real & alpha,
+                        TypedFieldBase<Real> & gradient_field) const override;
 
         /**
-         * @brief Apply the transpose (divergence) operator (quadrature → nodal).
+         * @brief Apply the transpose (divergence) operator (quadrature →
+         * nodal).
          *
          * Computes: nodal_field = -div(gradient_field)
          *           (negative divergence for consistency with weak form)
@@ -148,9 +154,9 @@ namespace muGrid {
          * @param nodal_field Output field at nodal points
          * @param weights Quadrature weights (optional, default: equal weights)
          */
-        void transpose(const TypedFieldBase<Real> &gradient_field,
-                       TypedFieldBase<Real> &nodal_field,
-                       const std::vector<Real> &weights = {}) const override;
+        void transpose(const TypedFieldBase<Real> & gradient_field,
+                       TypedFieldBase<Real> & nodal_field,
+                       const std::vector<Real> & weights = {}) const override;
 
         /**
          * @brief Apply the transpose (divergence) with increment.
@@ -162,39 +168,43 @@ namespace muGrid {
          * @param nodal_field Output field at nodal points to increment
          * @param weights Quadrature weights (optional)
          */
-        void transpose_increment(const TypedFieldBase<Real> &gradient_field,
-                                 const Real &alpha,
-                                 TypedFieldBase<Real> &nodal_field,
-                                 const std::vector<Real> &weights = {}) const override;
+        void transpose_increment(
+            const TypedFieldBase<Real> & gradient_field, const Real & alpha,
+            TypedFieldBase<Real> & nodal_field,
+            const std::vector<Real> & weights = {}) const override;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
          * @brief Apply the gradient operator on device memory fields.
          */
-        void apply(const TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-                   TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field) const;
+        void
+        apply(const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+              TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field) const;
 
         /**
          * @brief Apply the gradient operator with increment on device memory.
          */
-        void apply_increment(const TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-                             const Real &alpha,
-                             TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field) const;
+        void apply_increment(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const Real & alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field) const;
 
         /**
          * @brief Apply the transpose on device memory.
          */
-        void transpose(const TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field,
-                       TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-                       const std::vector<Real> &weights = {}) const;
+        void transpose(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
+            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const std::vector<Real> & weights = {}) const;
 
         /**
          * @brief Apply the transpose with increment on device memory.
          */
-        void transpose_increment(const TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field,
-                                 const Real &alpha,
-                                 TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-                                 const std::vector<Real> &weights = {}) const;
+        void transpose_increment(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
+            const Real & alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const std::vector<Real> & weights = {}) const;
 #endif
 
         /**
@@ -219,23 +229,24 @@ namespace muGrid {
          * points, but the field itself has only 1 value per grid point.
          * Ghost communication handles the periodic boundary conditions.
          *
-         * @return 1 (one scalar value per grid point, neighbors accessed via ghosts)
+         * @return 1 (one scalar value per grid point, neighbors accessed via
+         * ghosts)
          */
-        Index_t get_nb_nodal_pts() const override {
-            return 1;
-        }
+        Index_t get_nb_nodal_pts() const override { return 1; }
 
         /**
          * @brief Get the spatial dimension.
          * @return Spatial dimension (2 or 3)
          */
-        Index_t get_spatial_dim() const override { return spatial_dim; }
+        Dim_t get_spatial_dim() const override { return spatial_dim; }
 
         /**
          * @brief Get the grid spacing.
          * @return Grid spacing vector
          */
-        const std::vector<Real>& get_grid_spacing() const { return grid_spacing; }
+        const std::vector<Real> & get_grid_spacing() const {
+            return grid_spacing;
+        }
 
         /**
          * @brief Get the quadrature weights.
@@ -250,21 +261,18 @@ namespace muGrid {
          * @brief Get the stencil offset.
          * @return Stencil offset in pixels ([0,0] for 2D, [0,0,0] for 3D)
          */
-        Shape_t get_pixel_offset() const {
-            return Shape_t(spatial_dim, 0);
-        }
+        Shape_t get_pixel_offset() const { return Shape_t(spatial_dim, 0); }
 
         /**
          * @brief Get the stencil shape.
          * @return Shape of the stencil ([2,2] for 2D, [2,2,2] for 3D)
          */
-        Shape_t get_conv_pts_shape() const {
-            return Shape_t(spatial_dim, 2);
-        }
+        Shape_t get_conv_pts_shape() const { return Shape_t(spatial_dim, 2); }
 
         /**
          * @brief Get the shape function gradients as pixel operator.
-         * @return Vector of shape function gradients [nb_ops * nb_quad * nb_nodal * conv_pts_size]
+         * @return Vector of shape function gradients [nb_ops * nb_quad *
+         * nb_nodal * conv_pts_size]
          *
          * Returns the shape function gradients scaled by grid spacing.
          * Shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *conv_pts_shape)
@@ -272,8 +280,8 @@ namespace muGrid {
          */
         std::vector<Real> get_pixel_operator() const;
 
-    private:
-        Index_t spatial_dim;
+       private:
+        Dim_t spatial_dim;
         std::vector<Real> grid_spacing;
 
         /**
@@ -283,39 +291,35 @@ namespace muGrid {
          * @param nb_components Output: number of components in nodal field
          * @throws RuntimeError if validation fails
          */
-        const GlobalFieldCollection& validate_fields(
-            const Field &nodal_field,
-            const Field &gradient_field,
-            Index_t &nb_components) const;
+        const GlobalFieldCollection &
+        validate_fields(const Field & nodal_field, const Field & gradient_field,
+                        Index_t & nb_components) const;
 
         /**
          * @brief Internal implementation of apply with optional increment.
          */
-        void apply_impl(const TypedFieldBase<Real> &nodal_field,
-                        TypedFieldBase<Real> &gradient_field,
-                        Real alpha,
+        void apply_impl(const TypedFieldBase<Real> & nodal_field,
+                        TypedFieldBase<Real> & gradient_field, Real alpha,
                         bool increment) const;
 
         /**
          * @brief Internal implementation of transpose with optional increment.
          */
-        void transpose_impl(const TypedFieldBase<Real> &gradient_field,
-                            TypedFieldBase<Real> &nodal_field,
-                            Real alpha,
+        void transpose_impl(const TypedFieldBase<Real> & gradient_field,
+                            TypedFieldBase<Real> & nodal_field, Real alpha,
                             bool increment,
-                            const std::vector<Real> &weights) const;
+                            const std::vector<Real> & weights) const;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        void apply_impl(const TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-                        TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field,
-                        Real alpha,
-                        bool increment) const;
+        void
+        apply_impl(const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+                   TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
+                   Real alpha, bool increment) const;
 
-        void transpose_impl(const TypedFieldBase<Real, DefaultDeviceSpace> &gradient_field,
-                            TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-                            Real alpha,
-                            bool increment,
-                            const std::vector<Real> &weights) const;
+        void transpose_impl(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
+            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field, Real alpha,
+            bool increment, const std::vector<Real> & weights) const;
 #endif
     };
 
@@ -360,15 +364,14 @@ namespace muGrid {
         constexpr Real B_2D_REF[DIM_2D][NB_QUAD_2D][NB_NODES_2D] = {
             // d/dx gradients
             {
-                {-1.0,  1.0,  0.0,  0.0},  // Triangle 0: nodes 0,1,2,3
-                { 0.0,  0.0, -1.0,  1.0}   // Triangle 1: nodes 0,1,2,3
+                {-1.0, 1.0, 0.0, 0.0},  // Triangle 0: nodes 0,1,2,3
+                {0.0, 0.0, -1.0, 1.0}   // Triangle 1: nodes 0,1,2,3
             },
             // d/dy gradients
             {
-                {-1.0,  0.0,  1.0,  0.0},  // Triangle 0
-                { 0.0, -1.0,  0.0,  1.0}   // Triangle 1
-            }
-        };
+                {-1.0, 0.0, 1.0, 0.0},  // Triangle 0
+                {0.0, -1.0, 0.0, 1.0}   // Triangle 1
+            }};
 
         // Node offsets within pixel for 2D [node][dim]
         // Node ordering: 0=(0,0), 1=(1,0), 2=(0,1), 3=(1,1)
@@ -396,7 +399,8 @@ namespace muGrid {
         //   Tet 2: Nodes 2, 4, 5, 6
         //   Tet 3: Nodes 1, 2, 3, 5
         //   Tet 4: Nodes 2, 3, 5, 7
-        //   (Note: Center tetrahedron connects nodes 2, 5 which is the main diagonal)
+        //   (Note: Center tetrahedron connects nodes 2, 5 which is the main
+        //   diagonal)
         //
         // =====================================================================
 
@@ -433,9 +437,10 @@ namespace muGrid {
         extern const Real B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D];
 
         // Quadrature weights for 3D (volume of each tet / total voxel volume)
-        // For Kuhn triangulation: 4 corner tets have volume 1/6, center tet has volume 1/3
-        // But with 5 tets: each corner tet = 1/6, total = 5/6... need to verify
-        // Actually for 5-tet Kuhn: volumes are 1/6, 1/6, 1/6, 1/6, 1/6 (all equal)
+        // For Kuhn triangulation: 4 corner tets have volume 1/6, center tet has
+        // volume 1/3 But with 5 tets: each corner tet = 1/6, total = 5/6...
+        // need to verify Actually for 5-tet Kuhn: volumes are 1/6, 1/6, 1/6,
+        // 1/6, 1/6 (all equal)
         constexpr Real QUAD_WEIGHT_3D[NB_QUAD_3D] = {0.2, 0.2, 0.2, 0.2, 0.2};
 
         // =====================================================================
@@ -446,7 +451,8 @@ namespace muGrid {
          * @brief Apply 2D FEM gradient operator on host.
          *
          * @param nodal_input Input nodal field [nb_nodes * nx * ny]
-         * @param gradient_output Output gradient field [dim * nb_quad * nx * ny]
+         * @param gradient_output Output gradient field [dim * nb_quad * nx *
+         * ny]
          * @param nx Grid size in x (including ghosts)
          * @param ny Grid size in y (including ghosts)
          * @param nodal_stride_x Stride for nodal field in x
@@ -461,161 +467,127 @@ namespace muGrid {
          * @param alpha Scale factor
          * @param increment If true, add to output; if false, overwrite
          */
-        void fem_gradient_2d_host(
-            const Real* MUGRID_RESTRICT nodal_input,
-            Real* MUGRID_RESTRICT gradient_output,
-            Index_t nx, Index_t ny,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
-            Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Real hx, Real hy,
-            Real alpha,
-            bool increment);
+        void fem_gradient_2d_host(const Real * MUGRID_RESTRICT nodal_input,
+                                  Real * MUGRID_RESTRICT gradient_output,
+                                  Index_t nx, Index_t ny,
+                                  Index_t nodal_stride_x,
+                                  Index_t nodal_stride_y,
+                                  Index_t nodal_stride_n, Index_t grad_stride_x,
+                                  Index_t grad_stride_y, Index_t grad_stride_q,
+                                  Index_t grad_stride_d, Real hx, Real hy,
+                                  Real alpha, bool increment);
 
         /**
          * @brief Apply 2D FEM transpose (divergence) operator on host.
          */
         void fem_divergence_2d_host(
-            const Real* MUGRID_RESTRICT gradient_input,
-            Real* MUGRID_RESTRICT nodal_output,
-            Index_t nx, Index_t ny,
-            Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
-            Real hx, Real hy,
-            const Real* quad_weights,
-            Real alpha,
-            bool increment);
+            const Real * MUGRID_RESTRICT gradient_input,
+            Real * MUGRID_RESTRICT nodal_output, Index_t nx, Index_t ny,
+            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_q,
+            Index_t grad_stride_d, Index_t nodal_stride_x,
+            Index_t nodal_stride_y, Index_t nodal_stride_n, Real hx, Real hy,
+            const Real * quad_weights, Real alpha, bool increment);
 
         /**
          * @brief Apply 3D FEM gradient operator on host.
          */
         void fem_gradient_3d_host(
-            const Real* MUGRID_RESTRICT nodal_input,
-            Real* MUGRID_RESTRICT gradient_output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n,
+            const Real * MUGRID_RESTRICT nodal_input,
+            Real * MUGRID_RESTRICT gradient_output, Index_t nx, Index_t ny,
+            Index_t nz, Index_t nodal_stride_x, Index_t nodal_stride_y,
+            Index_t nodal_stride_z, Index_t nodal_stride_n,
             Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Real hx, Real hy, Real hz,
-            Real alpha,
-            bool increment);
+            Index_t grad_stride_q, Index_t grad_stride_d, Real hx, Real hy,
+            Real hz, Real alpha, bool increment);
 
         /**
          * @brief Apply 3D FEM transpose (divergence) operator on host.
          */
         void fem_divergence_3d_host(
-            const Real* MUGRID_RESTRICT gradient_input,
-            Real* MUGRID_RESTRICT nodal_output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n,
-            Real hx, Real hy, Real hz,
-            const Real* quad_weights,
-            Real alpha,
-            bool increment);
+            const Real * MUGRID_RESTRICT gradient_input,
+            Real * MUGRID_RESTRICT nodal_output, Index_t nx, Index_t ny,
+            Index_t nz, Index_t grad_stride_x, Index_t grad_stride_y,
+            Index_t grad_stride_z, Index_t grad_stride_q, Index_t grad_stride_d,
+            Index_t nodal_stride_x, Index_t nodal_stride_y,
+            Index_t nodal_stride_z, Index_t nodal_stride_n, Real hx, Real hy,
+            Real hz, const Real * quad_weights, Real alpha, bool increment);
 
 #if defined(MUGRID_ENABLE_CUDA)
-        void fem_gradient_2d_cuda(
-            const Real* nodal_input,
-            Real* gradient_output,
-            Index_t nx, Index_t ny,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
-            Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Real hx, Real hy,
-            Real alpha,
-            bool increment);
+        void fem_gradient_2d_cuda(const Real * nodal_input,
+                                  Real * gradient_output, Index_t nx,
+                                  Index_t ny, Index_t nodal_stride_x,
+                                  Index_t nodal_stride_y,
+                                  Index_t nodal_stride_n, Index_t grad_stride_x,
+                                  Index_t grad_stride_y, Index_t grad_stride_q,
+                                  Index_t grad_stride_d, Real hx, Real hy,
+                                  Real alpha, bool increment);
 
-        void fem_divergence_2d_cuda(
-            const Real* gradient_input,
-            Real* nodal_output,
-            Index_t nx, Index_t ny,
-            Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
-            Real hx, Real hy,
-            const Real* quad_weights,
-            Real alpha,
-            bool increment);
+        void
+        fem_divergence_2d_cuda(const Real * gradient_input, Real * nodal_output,
+                               Index_t nx, Index_t ny, Index_t grad_stride_x,
+                               Index_t grad_stride_y, Index_t grad_stride_q,
+                               Index_t grad_stride_d, Index_t nodal_stride_x,
+                               Index_t nodal_stride_y, Index_t nodal_stride_n,
+                               Real hx, Real hy, const Real * quad_weights,
+                               Real alpha, bool increment);
 
-        void fem_gradient_3d_cuda(
-            const Real* nodal_input,
-            Real* gradient_output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n,
-            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Real hx, Real hy, Real hz,
-            Real alpha,
-            bool increment);
+        void
+        fem_gradient_3d_cuda(const Real * nodal_input, Real * gradient_output,
+                             Index_t nx, Index_t ny, Index_t nz,
+                             Index_t nodal_stride_x, Index_t nodal_stride_y,
+                             Index_t nodal_stride_z, Index_t nodal_stride_n,
+                             Index_t grad_stride_x, Index_t grad_stride_y,
+                             Index_t grad_stride_z, Index_t grad_stride_q,
+                             Index_t grad_stride_d, Real hx, Real hy, Real hz,
+                             Real alpha, bool increment);
 
         void fem_divergence_3d_cuda(
-            const Real* gradient_input,
-            Real* nodal_output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n,
-            Real hx, Real hy, Real hz,
-            const Real* quad_weights,
-            Real alpha,
-            bool increment);
+            const Real * gradient_input, Real * nodal_output, Index_t nx,
+            Index_t ny, Index_t nz, Index_t grad_stride_x,
+            Index_t grad_stride_y, Index_t grad_stride_z, Index_t grad_stride_q,
+            Index_t grad_stride_d, Index_t nodal_stride_x,
+            Index_t nodal_stride_y, Index_t nodal_stride_z,
+            Index_t nodal_stride_n, Real hx, Real hy, Real hz,
+            const Real * quad_weights, Real alpha, bool increment);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-        void fem_gradient_2d_hip(
-            const Real* nodal_input,
-            Real* gradient_output,
-            Index_t nx, Index_t ny,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
-            Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Real hx, Real hy,
-            Real alpha,
-            bool increment);
+        void fem_gradient_2d_hip(const Real * nodal_input,
+                                 Real * gradient_output, Index_t nx, Index_t ny,
+                                 Index_t nodal_stride_x, Index_t nodal_stride_y,
+                                 Index_t nodal_stride_n, Index_t grad_stride_x,
+                                 Index_t grad_stride_y, Index_t grad_stride_q,
+                                 Index_t grad_stride_d, Real hx, Real hy,
+                                 Real alpha, bool increment);
 
-        void fem_divergence_2d_hip(
-            const Real* gradient_input,
-            Real* nodal_output,
-            Index_t nx, Index_t ny,
-            Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_n,
-            Real hx, Real hy,
-            const Real* quad_weights,
-            Real alpha,
-            bool increment);
+        void fem_divergence_2d_hip(const Real * gradient_input,
+                                   Real * nodal_output, Index_t nx, Index_t ny,
+                                   Index_t grad_stride_x, Index_t grad_stride_y,
+                                   Index_t grad_stride_q, Index_t grad_stride_d,
+                                   Index_t nodal_stride_x,
+                                   Index_t nodal_stride_y,
+                                   Index_t nodal_stride_n, Real hx, Real hy,
+                                   const Real * quad_weights, Real alpha,
+                                   bool increment);
 
-        void fem_gradient_3d_hip(
-            const Real* nodal_input,
-            Real* gradient_output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n,
-            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Real hx, Real hy, Real hz,
-            Real alpha,
-            bool increment);
+        void fem_gradient_3d_hip(const Real * nodal_input,
+                                 Real * gradient_output, Index_t nx, Index_t ny,
+                                 Index_t nz, Index_t nodal_stride_x,
+                                 Index_t nodal_stride_y, Index_t nodal_stride_z,
+                                 Index_t nodal_stride_n, Index_t grad_stride_x,
+                                 Index_t grad_stride_y, Index_t grad_stride_z,
+                                 Index_t grad_stride_q, Index_t grad_stride_d,
+                                 Real hx, Real hy, Real hz, Real alpha,
+                                 bool increment);
 
         void fem_divergence_3d_hip(
-            const Real* gradient_input,
-            Real* nodal_output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n,
-            Real hx, Real hy, Real hz,
-            const Real* quad_weights,
-            Real alpha,
-            bool increment);
+            const Real * gradient_input, Real * nodal_output, Index_t nx,
+            Index_t ny, Index_t nz, Index_t grad_stride_x,
+            Index_t grad_stride_y, Index_t grad_stride_z, Index_t grad_stride_q,
+            Index_t grad_stride_d, Index_t nodal_stride_x,
+            Index_t nodal_stride_y, Index_t nodal_stride_z,
+            Index_t nodal_stride_n, Real hx, Real hy, Real hz,
+            const Real * quad_weights, Real alpha, bool increment);
 #endif
 
     }  // namespace fem_gradient_kernels
