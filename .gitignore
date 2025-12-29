@@ -23,6 +23,5 @@
 .ccls-cache
 .cache
 
-/subprojects/packagecache/*
-/subprojects/eigen-*/*
-/subprojects/pybind11-*/*
+/subprojects/*
+!/subprojects/*.wrap
