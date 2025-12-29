@@ -1,6 +1,15 @@
 Change log for µGrid
 ====================
 
+0.101.2 (29Dec25)
+-----------------
+
+- ENH: Optimized GPU divergence kernels (2D and 3D) using gather pattern,
+  eliminating atomic operations
+- ENH: Hand-unrolled 3D gradient computation exploiting B matrix sparsity
+- ENH: Shared memory optimization for 3D gradient kernel (cooperative node loading)
+- BUILD: Fixed HIP/CUDA build (missing `d_NODE_OFFSET_3D` constant, `nodiscard` warnings)
+
 0.101.1 (28Dec25)
 -----------------
 
