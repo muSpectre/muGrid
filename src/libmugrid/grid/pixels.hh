@@ -50,6 +50,11 @@ namespace muGrid {
          * Iteration over square (or cubic) discretisation grids. Duplicates
          * capabilities of `muGrid::CcoordOps::Pixels` without needing to be
          * templated with the spatial dimension. Iteration is slower, though.
+         *
+         * Iteration is provided through three explicit methods:
+         * - `indices()`: iterate over linear indices only (most efficient)
+         * - `coordinates()`: iterate over grid coordinates
+         * - `enumerate()`: iterate over (index, coordinate) tuples
          */
         class Pixels {
            public:
@@ -135,92 +140,6 @@ namespace muGrid {
                        this->subdomain_locations;
             }
 
-            /**
-             * Iterator class for `muSpectre::Pixels`
-             */
-            class iterator {
-               public:
-                //! stl
-                using value_type = DynGridIndex;
-                using const_value_type = const value_type;  //!< stl conformance
-                using pointer = value_type *;               //!< stl conformance
-                using difference_type = std::ptrdiff_t;     //!< stl conformance
-                using iterator_category = std::forward_iterator_tag;
-                //!< stl
-                //!< conformance
-
-                //! constructor
-                iterator(const Pixels & pixels, Size_t index)
-                    : pixels{pixels}, coord0{pixels.get_coord0(index)} {}
-
-                //! constructor
-                iterator(const Pixels & pixels, DynGridIndex coord0)
-                    : pixels{pixels}, coord0{coord0} {}
-
-                //! Default constructor
-                iterator() = delete;
-
-                //! Copy constructor
-                iterator(const iterator & other) = default;
-
-                //! Move constructor
-                iterator(iterator && other) = default;
-
-                //! Destructor
-                ~iterator() = default;
-
-                //! Copy assignment operator
-                iterator & operator=(const iterator & other) = delete;
-
-                //! Move assignment operator
-                iterator & operator=(iterator && other) = delete;
-
-                //! dereferencing
-                value_type operator*() const {
-                    return this->pixels.subdomain_locations + this->coord0;
-                }
-
-                //! pre-increment
-                iterator & operator++() {
-                    auto axis{this->pixels.axes_order[0]};
-                    // Increase fastest index
-                    ++this->coord0[axis];
-                    // Check whether coordinate is out of bounds
-                    Index_t aindex{0};
-                    while (aindex < this->pixels.dim - 1 &&
-                           this->coord0[axis] >=
-                               this->pixels.nb_subdomain_grid_pts[axis]) {
-                        this->coord0[axis] = 0;
-                        // Get next fastest axis
-                        axis = this->pixels.axes_order[++aindex];
-                        ++this->coord0[axis];
-                    }
-                    return *this;
-                }
-
-                //! inequality
-                bool operator!=(const iterator & other) const {
-                    return this->coord0 != other.coord0;
-                }
-
-                //! equality
-                bool operator==(const iterator & other) const {
-                    return not(*this != other);
-                }
-
-               protected:
-                const Pixels & pixels;  //!< ref to pixels in cell
-                DynGridIndex coord0;      //!< coordinate of current pixel
-            };
-
-            //! stl conformance
-            iterator begin() const { return iterator(*this, 0); }
-
-            //! stl conformance
-            iterator end() const {
-                return ++iterator(*this, this->nb_subdomain_grid_pts - 1);
-            }
-
             //! stl conformance
             size_t size() const {
                 return get_size(this->nb_subdomain_grid_pts);
@@ -254,7 +173,184 @@ namespace muGrid {
             const DynGridIndex & get_strides() const { return this->strides; }
 
             /**
-             * enumerator class for `muSpectre::Pixels`
+             * Base iterator class storing only a linear index.
+             * Coordinates are computed on-demand when needed.
+             */
+            class iterator {
+               public:
+                using difference_type = std::ptrdiff_t;
+                using iterator_category = std::forward_iterator_tag;
+
+                //! constructor
+                iterator(const Pixels & pixels, Size_t index)
+                    : pixels{pixels}, index{index} {}
+
+                //! Default constructor
+                iterator() = delete;
+
+                //! Copy constructor
+                iterator(const iterator & other) = default;
+
+                //! Move constructor
+                iterator(iterator && other) = default;
+
+                //! Destructor
+                ~iterator() = default;
+
+                //! Copy assignment operator
+                iterator & operator=(const iterator & other) = delete;
+
+                //! Move assignment operator
+                iterator & operator=(iterator && other) = delete;
+
+                //! pre-increment
+                iterator & operator++() {
+                    ++this->index;
+                    return *this;
+                }
+
+                //! inequality
+                bool operator!=(const iterator & other) const {
+                    return this->index != other.index;
+                }
+
+                //! equality
+                bool operator==(const iterator & other) const {
+                    return this->index == other.index;
+                }
+
+                //! get the current linear index
+                Size_t get_index() const { return this->index; }
+
+                //! get the current coordinate (computed on demand)
+                DynGridIndex get_coord() const {
+                    return this->pixels.get_coord(this->index);
+                }
+
+               protected:
+                const Pixels & pixels;  //!< ref to pixels in cell
+                Size_t index;           //!< current linear index
+            };
+
+            /**
+             * Range class for index-only iteration.
+             * Most efficient iteration mode - just returns linear indices.
+             */
+            class Indices final {
+               public:
+                //! Default constructor
+                Indices() = delete;
+
+                //! Constructor
+                explicit Indices(const Pixels & pixels) : pixels{pixels} {}
+
+                //! Copy constructor
+                Indices(const Indices & other) = default;
+
+                //! Move constructor
+                Indices(Indices && other) = default;
+
+                //! Destructor
+                ~Indices() = default;
+
+                //! Copy assignment operator
+                Indices & operator=(const Indices & other) = delete;
+
+                //! Move assignment operator
+                Indices & operator=(Indices && other) = delete;
+
+                /**
+                 * Iterator that dereferences to linear index only.
+                 */
+                class iterator final : public Pixels::iterator {
+                   public:
+                    using Parent = Pixels::iterator;
+                    using value_type = Size_t;
+                    using pointer = value_type *;
+                    using Parent::Parent;
+
+                    //! dereferencing returns the linear index
+                    value_type operator*() const {
+                        return this->index;
+                    }
+                };
+
+                //! stl conformance
+                iterator begin() const { return iterator{this->pixels, 0}; }
+
+                //! stl conformance
+                iterator end() const {
+                    return iterator{this->pixels, this->pixels.size()};
+                }
+
+                //! stl conformance
+                size_t size() const { return this->pixels.size(); }
+
+               protected:
+                const Pixels & pixels;
+            };
+
+            /**
+             * Range class for coordinate iteration.
+             * Coordinates are computed on-demand during dereference.
+             */
+            class Coordinates final {
+               public:
+                //! Default constructor
+                Coordinates() = delete;
+
+                //! Constructor
+                explicit Coordinates(const Pixels & pixels) : pixels{pixels} {}
+
+                //! Copy constructor
+                Coordinates(const Coordinates & other) = default;
+
+                //! Move constructor
+                Coordinates(Coordinates && other) = default;
+
+                //! Destructor
+                ~Coordinates() = default;
+
+                //! Copy assignment operator
+                Coordinates & operator=(const Coordinates & other) = delete;
+
+                //! Move assignment operator
+                Coordinates & operator=(Coordinates && other) = delete;
+
+                /**
+                 * Iterator that dereferences to grid coordinate.
+                 */
+                class iterator final : public Pixels::iterator {
+                   public:
+                    using Parent = Pixels::iterator;
+                    using value_type = DynGridIndex;
+                    using pointer = value_type *;
+                    using Parent::Parent;
+
+                    //! dereferencing returns the coordinate
+                    value_type operator*() const {
+                        return this->Parent::get_coord();
+                    }
+                };
+
+                //! stl conformance
+                iterator begin() const { return iterator{this->pixels, 0}; }
+
+                //! stl conformance
+                iterator end() const {
+                    return iterator{this->pixels, this->pixels.size()};
+                }
+
+                //! stl conformance
+                size_t size() const { return this->pixels.size(); }
+
+               protected:
+                const Pixels & pixels;
+            };
+
+            /**
+             * Range class for enumerated iteration.
+             * Returns tuples of (index, coordinate).
              */
             class Enumerator final {
                public:
@@ -271,7 +367,7 @@ namespace muGrid {
                 Enumerator(Enumerator && other) = default;
 
                 //! Destructor
-                virtual ~Enumerator() = default;
+                ~Enumerator() = default;
 
                 //! Copy assignment operator
                 Enumerator & operator=(const Enumerator & other) = delete;
@@ -280,40 +376,20 @@ namespace muGrid {
                 Enumerator & operator=(Enumerator && other) = delete;
 
                 /**
-                 * @class iterator
-                 * @brief A derived class from Pixels::iterator, used for
-                 * iterating over Pixels.
-                 *
-                 * This class is a final class, meaning it cannot be further
-                 * derived from. It provides a custom implementation of the
-                 * dereference operator (*).
-                 *
-                 * @tparam Parent Alias for the base class Pixels::iterator.
-                 *
-                 * @note The using Parent::Parent; statement is a C++11 feature
-                 * called "Inheriting Constructors" which means that this
-                 * derived class will have the same constructors as the base
-                 * class.
+                 * Iterator that dereferences to (index, coordinate) tuple.
                  */
                 class iterator final : public Pixels::iterator {
                    public:
                     using Parent = Pixels::iterator;
+                    using value_type = std::tuple<Index_t, DynGridIndex>;
+                    using pointer = value_type *;
                     using Parent::Parent;
 
-                    /**
-                     * @brief Overloaded dereference operator (*).
-                     *
-                     * This function returns a tuple containing the index of the
-                     * pixel and the pixel's coordinates.
-                     *
-                     * @return std::tuple<Index_t, Parent::value_type> A tuple
-                     * containing the index of the pixel and the pixel's
-                     * coordinates.
-                     */
-                    std::tuple<Index_t, Parent::value_type> operator*() const {
-                        auto && pixel{this->Parent::operator*()};
-                        return std::tuple<Index_t, Parent::value_type>{
-                            this->pixels.get_index(pixel), pixel};
+                    //! dereferencing returns tuple of index and coordinate
+                    value_type operator*() const {
+                        return value_type{
+                            static_cast<Index_t>(this->index),
+                            this->Parent::get_coord()};
                     }
                 };
 
@@ -322,10 +398,7 @@ namespace muGrid {
 
                 //! stl conformance
                 iterator end() const {
-                    iterator it{this->pixels,
-                                this->pixels.nb_subdomain_grid_pts - 1};
-                    ++it;
-                    return it;
+                    return iterator{this->pixels, this->pixels.size()};
                 }
 
                 //! stl conformance
@@ -340,9 +413,34 @@ namespace muGrid {
             };
 
             /**
-             * iterates in tuples of pixel index ond coordinate. Useful in
-             * parallel problems, where simple enumeration of the pixels would
-             * be incorrect
+             * Iterate over linear indices only. Most efficient iteration mode.
+             *
+             * Example:
+             *   for (auto index : pixels.indices()) {
+             *       data[index] = ...;
+             *   }
+             */
+            Indices indices() const { return Indices(*this); }
+
+            /**
+             * Iterate over grid coordinates.
+             *
+             * Example:
+             *   for (auto && coord : pixels.coordinates()) {
+             *       // coord is DynGridIndex
+             *   }
+             */
+            Coordinates coordinates() const { return Coordinates(*this); }
+
+            /**
+             * Iterate over tuples of (index, coordinate).
+             * Useful in parallel problems where simple enumeration would be
+             * incorrect.
+             *
+             * Example:
+             *   for (auto && [index, coord] : pixels.enumerate()) {
+             *       data[index] = f(coord);
+             *   }
              */
             Enumerator enumerate() const { return Enumerator(*this); }
 

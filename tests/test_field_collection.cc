@@ -184,11 +184,12 @@ namespace muGrid {
         Fix::fc.initialise(nb_domain_grid_pts, nb_subdomain_grid_pts),
         FieldCollectionError);
 
-    for (auto && tup : akantu::zip(Fix::fc.get_pixels_with_ghosts(), pixels)) {
-      auto && stored_id{std::get<0>(tup)};
-      auto && ref_id{std::get<1>(tup)};
+    // Compare stored pixel coordinates with reference
+    auto & fc_pixels = Fix::fc.get_pixels_with_ghosts();
+    for (auto && [idx, ref_coord] : pixels.enumerate()) {
+      auto stored_coord = fc_pixels.get_coord(idx);
       for (int i{0}; i < Fix::spatial_dimension(); ++i) {
-        BOOST_CHECK_EQUAL(stored_id[i], ref_id[i]);
+        BOOST_CHECK_EQUAL(stored_coord[i], ref_coord[i]);
       }
     }
   }

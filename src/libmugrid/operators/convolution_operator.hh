@@ -279,7 +279,7 @@ namespace muGrid {
         /**
          * return the spatial dimension of this gradient operator
          */
-        Index_t get_spatial_dim() const final;
+        Dim_t get_spatial_dim() const final;
 
         /**
          * Clear the cached sparse operator (useful if memory is a concern)
@@ -331,7 +331,7 @@ namespace muGrid {
          * the spatial dimension & number of the nodal points involved in the
          * convolution of one pixel.
          */
-        Index_t spatial_dim;
+        Dim_t spatial_dim;
         Index_t nb_conv_pts;
 
         //! Tolerance for considering operator values as zero

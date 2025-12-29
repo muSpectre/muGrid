@@ -39,7 +39,7 @@
 namespace muGrid {
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
-        const Index_t &spatial_dimension, const SubPtMap_t &nb_sub_pts,
+        Dim_t spatial_dimension, const SubPtMap_t &nb_sub_pts,
         StorageOrder storage_order, MemoryLocation memory_location)
         : Parent{
               ValidityDomain::Global, spatial_dimension, nb_sub_pts,
@@ -227,7 +227,7 @@ namespace muGrid {
         };
         // Compute pixel strides
         auto pixel_strides{
-            pixels_storage_order == StorageOrder::ColMajor
+            pixels_storage_order == StorageOrder::ArrayOfStructures
                 ? CcoordOps::get_col_major_strides(_nb_subdomain_grid_pts)
                 : CcoordOps::get_row_major_strides(_nb_subdomain_grid_pts)};
         // Calls the other initialise with pixel strides

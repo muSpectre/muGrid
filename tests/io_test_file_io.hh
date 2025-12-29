@@ -74,7 +74,7 @@ namespace muGrid {
     }
 
     Communicator comm{MPIContext::get_context().comm};
-    static constexpr Index_t spatial_dimension{twoD};
+    static constexpr Dim_t spatial_dimension{twoD};
     const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
     const DynGridIndex nb_subdomain_grid_pts{3, 4};
     const DynGridIndex nb_domain_grid_pts{3, 4};
@@ -137,7 +137,7 @@ namespace muGrid {
     Communicator comm{MPIContext::get_context().comm};
     const std::string pixel{"pixel"};
     const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{pixel, 1}};
-    static constexpr Index_t spatial_dimension{twoD};
+    static constexpr Dim_t spatial_dimension{twoD};
     const DynGridIndex nb_subdomain_grid_pts{3, 3};
     const DynGridIndex nb_domain_grid_pts{3, 3};
     const DynGridIndex subdomain_locations{0, 0};
@@ -158,8 +158,8 @@ namespace muGrid {
         t2_f_map;
   };
 
-  constexpr Index_t FileIOFixture::spatial_dimension;
-  constexpr Index_t FileIOFixtureIterator::spatial_dimension;
+  constexpr Dim_t FileIOFixture::spatial_dimension;
+  constexpr Dim_t FileIOFixtureIterator::spatial_dimension;
 }  // namespace muGrid
 
 #endif  // TESTS_LIBMUGRID_IO_TEST_FILE_IO_HH_

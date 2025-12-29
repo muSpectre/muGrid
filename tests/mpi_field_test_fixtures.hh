@@ -54,7 +54,7 @@ namespace muGrid {
     Communicator comm{MPIContext::get_context().comm};
     static constexpr Dim_t NbQuadPts{2};
     static constexpr Dim_t NbComponent{2};
-    static constexpr Index_t spatial_dimension{threeD};
+    static constexpr Dim_t spatial_dimension{threeD};
     const FieldCollection::SubPtMap_t nb_sub_pts{{"quad", NbQuadPts}};
     const DynGridIndex nb_subdomain_grid_pts{3, 3, 1};
     const DynGridIndex nb_subdomain_grid_pts_empty{0, 0, 0};
@@ -62,7 +62,7 @@ namespace muGrid {
   };
   constexpr Dim_t MpiFieldMapFixture::NbQuadPts;
   constexpr Dim_t MpiFieldMapFixture::NbComponent;
-  constexpr Index_t MpiFieldMapFixture::spatial_dimension;
+  constexpr Dim_t MpiFieldMapFixture::spatial_dimension;
 
   /* ---------------------------------------------------------------------- */
   struct MpiFieldMapFixtureEmptyProcs : public MpiFieldMapFixture {

@@ -5,7 +5,8 @@
  *
  * @date   19 Dec 2024
  *
- * @brief  GPU-portable array class
+ * @brief  One-dimensional array class for portable memory management on CPUs
+ *         and GPUs
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -54,7 +55,7 @@
 namespace muGrid {
 
     // Forward declaration
-    template<typename T, typename MemorySpace>
+    template <typename T, typename MemorySpace>
     class Array;
 
     namespace detail {
@@ -62,18 +63,17 @@ namespace muGrid {
         /**
          * Memory allocator for host space - uses standard allocation
          */
-        template<typename T>
+        template <typename T>
         struct HostAllocator {
-            static T* allocate(std::size_t n) {
-                if (n == 0) return nullptr;
+            static T * allocate(std::size_t n) {
+                if (n == 0)
+                    return nullptr;
                 return new T[n];
             }
 
-            static void deallocate(T* ptr) {
-                delete[] ptr;
-            }
+            static void deallocate(T * ptr) { delete[] ptr; }
 
-            static void memset(T* ptr, int value, std::size_t n) {
+            static void memset(T * ptr, int value, std::size_t n) {
                 std::memset(ptr, value, n * sizeof(T));
             }
         };
@@ -82,11 +82,12 @@ namespace muGrid {
         /**
          * Memory allocator for CUDA device space
          */
-        template<typename T>
+        template <typename T>
         struct CudaAllocator {
-            static T* allocate(std::size_t n) {
-                if (n == 0) return nullptr;
-                T* ptr = nullptr;
+            static T * allocate(std::size_t n) {
+                if (n == 0)
+                    return nullptr;
+                T * ptr = nullptr;
                 cudaError_t err = cudaMalloc(&ptr, n * sizeof(T));
                 if (err != cudaSuccess) {
                     throw std::runtime_error(
@@ -96,11 +97,12 @@ namespace muGrid {
                 return ptr;
             }
 
-            static void deallocate(T* ptr) {
-                if (ptr) (void)cudaFree(ptr);
+            static void deallocate(T * ptr) {
+                if (ptr)
+                    (void)cudaFree(ptr);
             }
 
-            static void memset(T* ptr, int value, std::size_t n) {
+            static void memset(T * ptr, int value, std::size_t n) {
                 (void)cudaMemset(ptr, value, n * sizeof(T));
             }
         };
@@ -111,11 +113,12 @@ namespace muGrid {
         /**
          * Memory allocator for HIP device space
          */
-        template<typename T>
+        template <typename T>
         struct HIPAllocator {
-            static T* allocate(std::size_t n) {
-                if (n == 0) return nullptr;
-                T* ptr = nullptr;
+            static T * allocate(std::size_t n) {
+                if (n == 0)
+                    return nullptr;
+                T * ptr = nullptr;
                 hipError_t err = hipMalloc(&ptr, n * sizeof(T));
                 if (err != hipSuccess) {
                     throw std::runtime_error(
@@ -125,11 +128,12 @@ namespace muGrid {
                 return ptr;
             }
 
-            static void deallocate(T* ptr) {
-                if (ptr) (void)hipFree(ptr);
+            static void deallocate(T * ptr) {
+                if (ptr)
+                    (void)hipFree(ptr);
             }
 
-            static void memset(T* ptr, int value, std::size_t n) {
+            static void memset(T * ptr, int value, std::size_t n) {
                 (void)hipMemset(ptr, value, n * sizeof(T));
             }
         };
@@ -139,26 +143,26 @@ namespace muGrid {
         /**
          * Type trait to select the correct allocator for a memory space
          */
-        template<typename T, typename MemorySpace>
+        template <typename T, typename MemorySpace>
         struct AllocatorSelector {
             using type = HostAllocator<T>;
         };
 
 #if defined(MUGRID_ENABLE_CUDA)
-        template<typename T>
+        template <typename T>
         struct AllocatorSelector<T, CudaSpace> {
             using type = CudaAllocator<T>;
         };
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-        template<typename T>
+        template <typename T>
         struct AllocatorSelector<T, HIPSpace> {
             using type = HIPAllocator<T>;
         };
 #endif
 
-        template<typename T, typename MemorySpace>
+        template <typename T, typename MemorySpace>
         using Allocator = typename AllocatorSelector<T, MemorySpace>::type;
 
     }  // namespace detail
@@ -170,11 +174,12 @@ namespace muGrid {
      * memory spaces (host, CUDA, HIP).
      *
      * @tparam T Element type
-     * @tparam MemorySpace Memory space tag (HostSpace, CudaSpace, HIPSpace, etc.)
+     * @tparam MemorySpace Memory space tag (HostSpace, CudaSpace, HIPSpace,
+     * etc.)
      */
-    template<typename T, typename MemorySpace = HostSpace>
+    template <typename T, typename MemorySpace = HostSpace>
     class Array {
-    public:
+       public:
         using value_type = T;
         using memory_space = MemorySpace;
         using allocator_type = detail::Allocator<T, MemorySpace>;
@@ -187,7 +192,7 @@ namespace muGrid {
         /**
          * Constructor with label (for debugging) - creates empty array
          */
-        explicit Array(const std::string& /* label */)
+        explicit Array(const std::string & /* label */)
             : data_(nullptr), size_(0) {}
 
         /**
@@ -199,7 +204,7 @@ namespace muGrid {
         /**
          * Constructor with label and size
          */
-        Array(const std::string& /* label */, std::size_t n)
+        Array(const std::string & /* label */, std::size_t n)
             : data_(allocator_type::allocate(n)), size_(n) {}
 
         /**
@@ -212,17 +217,17 @@ namespace muGrid {
         }
 
         // Non-copyable (to avoid accidental expensive copies)
-        Array(const Array&) = delete;
-        Array& operator=(const Array&) = delete;
+        Array(const Array &) = delete;
+        Array & operator=(const Array &) = delete;
 
         // Movable
-        Array(Array&& other) noexcept
+        Array(Array && other) noexcept
             : data_(other.data_), size_(other.size_) {
             other.data_ = nullptr;
             other.size_ = 0;
         }
 
-        Array& operator=(Array&& other) noexcept {
+        Array & operator=(Array && other) noexcept {
             if (this != &other) {
                 if (data_) {
                     allocator_type::deallocate(data_);
@@ -238,8 +243,8 @@ namespace muGrid {
         /**
          * Get raw pointer to data
          */
-        T* data() { return data_; }
-        const T* data() const { return data_; }
+        T * data() { return data_; }
+        const T * data() const { return data_; }
 
         /**
          * Get number of elements
@@ -256,7 +261,8 @@ namespace muGrid {
          * Note: Does NOT preserve existing data (unlike std::vector).
          */
         void resize(std::size_t new_size) {
-            if (new_size == size_) return;
+            if (new_size == size_)
+                return;
 
             if (data_) {
                 allocator_type::deallocate(data_);
@@ -277,42 +283,41 @@ namespace muGrid {
         /**
          * Element access (host-space only)
          */
-        template<typename M = MemorySpace>
-        std::enable_if_t<is_host_space_v<M>, T&>
-        operator[](std::size_t i) {
+        template <typename M = MemorySpace>
+        std::enable_if_t<is_host_space_v<M>, T &> operator[](std::size_t i) {
             return data_[i];
         }
 
-        template<typename M = MemorySpace>
-        std::enable_if_t<is_host_space_v<M>, const T&>
+        template <typename M = MemorySpace>
+        std::enable_if_t<is_host_space_v<M>, const T &>
         operator[](std::size_t i) const {
             return data_[i];
         }
 
-    private:
-        T* data_;
+       private:
+        T * data_;
         std::size_t size_;
     };
 
     /**
      * @brief Resize a Array (free function for compatibility)
      */
-    template<typename T, typename MemorySpace>
-    void resize(Array<T, MemorySpace>& arr, std::size_t new_size) {
+    template <typename T, typename MemorySpace>
+    void resize(Array<T, MemorySpace> & arr, std::size_t new_size) {
         arr.resize(new_size);
     }
 
     /**
      * @brief Deep copy between arrays, potentially in different memory spaces
      */
-    template<typename T, typename DstSpace, typename SrcSpace>
-    void deep_copy(Array<T, DstSpace>& dst,
-                   const Array<T, SrcSpace>& src) {
+    template <typename T, typename DstSpace, typename SrcSpace>
+    void deep_copy(Array<T, DstSpace> & dst, const Array<T, SrcSpace> & src) {
         if (dst.size() != src.size()) {
             throw std::runtime_error(
                 "deep_copy: destination and source sizes must match");
         }
-        if (src.size() == 0) return;
+        if (src.size() == 0)
+            return;
 
         // Host to Host
         if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
@@ -321,54 +326,55 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA)
         // Host to CUDA
         else if constexpr (is_host_space_v<SrcSpace> &&
-                          std::is_same_v<DstSpace, CudaSpace>) {
+                           std::is_same_v<DstSpace, CudaSpace>) {
             (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                            cudaMemcpyHostToDevice);
+                             cudaMemcpyHostToDevice);
         }
         // CUDA to Host
         else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
-                          is_host_space_v<DstSpace>) {
+                           is_host_space_v<DstSpace>) {
             (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                            cudaMemcpyDeviceToHost);
+                             cudaMemcpyDeviceToHost);
         }
         // CUDA to CUDA
         else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
-                          std::is_same_v<DstSpace, CudaSpace>) {
+                           std::is_same_v<DstSpace, CudaSpace>) {
             (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                            cudaMemcpyDeviceToDevice);
+                             cudaMemcpyDeviceToDevice);
         }
 #endif
 #if defined(MUGRID_ENABLE_HIP)
         // Host to HIP
         else if constexpr (is_host_space_v<SrcSpace> &&
-                          std::is_same_v<DstSpace, HIPSpace>) {
+                           std::is_same_v<DstSpace, HIPSpace>) {
             (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                           hipMemcpyHostToDevice);
+                            hipMemcpyHostToDevice);
         }
         // HIP to Host
         else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
-                          is_host_space_v<DstSpace>) {
+                           is_host_space_v<DstSpace>) {
             (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                           hipMemcpyDeviceToHost);
+                            hipMemcpyDeviceToHost);
         }
         // HIP to HIP
         else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
-                          std::is_same_v<DstSpace, HIPSpace>) {
+                           std::is_same_v<DstSpace, HIPSpace>) {
             (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                           hipMemcpyDeviceToDevice);
+                            hipMemcpyDeviceToDevice);
         }
 #endif
         else {
-            static_assert(is_host_space_v<DstSpace> || is_host_space_v<SrcSpace>,
-                         "Unsupported memory space combination for deep_copy");
+            static_assert(is_host_space_v<DstSpace> ||
+                              is_host_space_v<SrcSpace>,
+                          "Unsupported memory space combination for deep_copy");
         }
     }
 
     /**
      * @brief Fill array with a scalar value
      */
-    template<typename T, typename MemorySpace>
-    void deep_copy(Array<T, MemorySpace>& dst, const T& value) {
+    template <typename T, typename MemorySpace>
+    void deep_copy(Array<T, MemorySpace> & dst, const T & value) {
         if constexpr (is_host_space_v<MemorySpace>) {
             // Host: simple loop
             for (std::size_t i = 0; i < dst.size(); ++i) {
@@ -402,106 +408,114 @@ namespace muGrid {
 #endif
     }
 
-/**
- * @brief Deep copy between raw pointers in different memory spaces.
- *
- * This overload allows copying between raw pointers when the memory
- * spaces are known at compile time. Useful for FFT work buffers.
- *
- * @tparam T Element type
- * @tparam DstSpace Destination memory space
- * @tparam SrcSpace Source memory space
- * @param dst Destination pointer
- * @param src Source pointer
- * @param count Number of elements to copy
- */
-template <typename T, typename DstSpace, typename SrcSpace>
-void deep_copy(T * dst, const T * src, std::size_t count) {
-  if (count == 0) return;
+    /**
+     * @brief Deep copy between raw pointers in different memory spaces.
+     *
+     * This overload allows copying between raw pointers when the memory
+     * spaces are known at compile time. Useful for FFT work buffers.
+     *
+     * @tparam T Element type
+     * @tparam DstSpace Destination memory space
+     * @tparam SrcSpace Source memory space
+     * @param dst Destination pointer
+     * @param src Source pointer
+     * @param count Number of elements to copy
+     */
+    template <typename T, typename DstSpace, typename SrcSpace>
+    void deep_copy(T * dst, const T * src, std::size_t count) {
+        if (count == 0)
+            return;
 
-  // Host to Host
-  if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
-    std::memcpy(dst, src, count * sizeof(T));
-  }
+        // Host to Host
+        if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
+            std::memcpy(dst, src, count * sizeof(T));
+        }
 #if defined(MUGRID_ENABLE_CUDA)
-  // Host to CUDA
-  else if constexpr (is_host_space_v<SrcSpace> &&
-                     std::is_same_v<DstSpace, CudaSpace>) {
-    cudaError_t err =
-        cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-      throw std::runtime_error(std::string("CUDA memcpy H2D failed: ") +
-                               cudaGetErrorString(err));
-    }
-  }
-  // CUDA to Host
-  else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
-                     is_host_space_v<DstSpace>) {
-    cudaError_t err =
-        cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-      throw std::runtime_error(std::string("CUDA memcpy D2H failed: ") +
-                               cudaGetErrorString(err));
-    }
-  }
-  // CUDA to CUDA
-  else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
-                     std::is_same_v<DstSpace, CudaSpace>) {
-    cudaError_t err =
-        cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      throw std::runtime_error(std::string("CUDA memcpy D2D failed: ") +
-                               cudaGetErrorString(err));
-    }
-  }
+        // Host to CUDA
+        else if constexpr (is_host_space_v<SrcSpace> &&
+                           std::is_same_v<DstSpace, CudaSpace>) {
+            cudaError_t err =
+                cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) {
+                throw std::runtime_error(
+                    std::string("CUDA memcpy H2D failed: ") +
+                    cudaGetErrorString(err));
+            }
+        }
+        // CUDA to Host
+        else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
+                           is_host_space_v<DstSpace>) {
+            cudaError_t err =
+                cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyDeviceToHost);
+            if (err != cudaSuccess) {
+                throw std::runtime_error(
+                    std::string("CUDA memcpy D2H failed: ") +
+                    cudaGetErrorString(err));
+            }
+        }
+        // CUDA to CUDA
+        else if constexpr (std::is_same_v<SrcSpace, CudaSpace> &&
+                           std::is_same_v<DstSpace, CudaSpace>) {
+            cudaError_t err = cudaMemcpy(dst, src, count * sizeof(T),
+                                         cudaMemcpyDeviceToDevice);
+            if (err != cudaSuccess) {
+                throw std::runtime_error(
+                    std::string("CUDA memcpy D2D failed: ") +
+                    cudaGetErrorString(err));
+            }
+        }
 #endif
 #if defined(MUGRID_ENABLE_HIP)
-  // Host to HIP
-  else if constexpr (is_host_space_v<SrcSpace> &&
-                     std::is_same_v<DstSpace, HIPSpace>) {
-    hipError_t err =
-        hipMemcpy(dst, src, count * sizeof(T), hipMemcpyHostToDevice);
-    if (err != hipSuccess) {
-      throw std::runtime_error(std::string("HIP memcpy H2D failed: ") +
-                               hipGetErrorString(err));
-    }
-  }
-  // HIP to Host
-  else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
-                     is_host_space_v<DstSpace>) {
-    hipError_t err =
-        hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToHost);
-    if (err != hipSuccess) {
-      throw std::runtime_error(std::string("HIP memcpy D2H failed: ") +
-                               hipGetErrorString(err));
-    }
-  }
-  // HIP to HIP
-  else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
-                     std::is_same_v<DstSpace, HIPSpace>) {
-    hipError_t err =
-        hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToDevice);
-    if (err != hipSuccess) {
-      throw std::runtime_error(std::string("HIP memcpy D2D failed: ") +
-                               hipGetErrorString(err));
-    }
-  }
+        // Host to HIP
+        else if constexpr (is_host_space_v<SrcSpace> &&
+                           std::is_same_v<DstSpace, HIPSpace>) {
+            hipError_t err =
+                hipMemcpy(dst, src, count * sizeof(T), hipMemcpyHostToDevice);
+            if (err != hipSuccess) {
+                throw std::runtime_error(
+                    std::string("HIP memcpy H2D failed: ") +
+                    hipGetErrorString(err));
+            }
+        }
+        // HIP to Host
+        else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
+                           is_host_space_v<DstSpace>) {
+            hipError_t err =
+                hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToHost);
+            if (err != hipSuccess) {
+                throw std::runtime_error(
+                    std::string("HIP memcpy D2H failed: ") +
+                    hipGetErrorString(err));
+            }
+        }
+        // HIP to HIP
+        else if constexpr (std::is_same_v<SrcSpace, HIPSpace> &&
+                           std::is_same_v<DstSpace, HIPSpace>) {
+            hipError_t err =
+                hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToDevice);
+            if (err != hipSuccess) {
+                throw std::runtime_error(
+                    std::string("HIP memcpy D2D failed: ") +
+                    hipGetErrorString(err));
+            }
+        }
 #endif
-  else {
-    static_assert(is_host_space_v<DstSpace> || is_host_space_v<SrcSpace>,
-                  "Unsupported memory space combination for deep_copy");
-  }
-}
+        else {
+            static_assert(is_host_space_v<DstSpace> ||
+                              is_host_space_v<SrcSpace>,
+                          "Unsupported memory space combination for deep_copy");
+        }
+    }
 
-/**
- * @brief Deep copy within the same memory space (raw pointers).
- *
- * Convenience overload when source and destination are in the same space.
- */
-template <typename T, typename MemorySpace>
-void deep_copy(T * dst, const T * src, std::size_t count) {
-  deep_copy<T, MemorySpace, MemorySpace>(dst, src, count);
-}
+    /**
+     * @brief Deep copy within the same memory space (raw pointers).
+     *
+     * Convenience overload when source and destination are in the same space.
+     */
+    template <typename T, typename MemorySpace>
+    void deep_copy(T * dst, const T * src, std::size_t count) {
+        deep_copy<T, MemorySpace, MemorySpace>(dst, src, count);
+    }
 
 }  // namespace muGrid
 

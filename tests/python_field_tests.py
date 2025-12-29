@@ -186,9 +186,9 @@ class FieldCheck(unittest.TestCase):
             self.nb_grid_pts,
             self.nb_grid_pts,
             [0] * len(self.nb_grid_pts),
-            muGrid.StorageOrder.RowMajor,
+            muGrid.StorageOrder.StructureOfArrays,
             {},
-            muGrid.StorageOrder.RowMajor,
+            muGrid.StorageOrder.StructureOfArrays,
         )
         f_cpp = fc.register_real_field("test-field", dims)
         a = np.from_dlpack(f_cpp)

@@ -240,8 +240,8 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   Shape_t Field::get_components_strides(Index_t element_size) const {
-    if (this->get_storage_order() != StorageOrder::ColMajor and
-        this->get_storage_order() != StorageOrder::RowMajor) {
+    if (this->get_storage_order() != StorageOrder::ArrayOfStructures and
+        this->get_storage_order() != StorageOrder::StructureOfArrays) {
       std::stringstream s;
       s << "Don't know how to construct strides for storage order "
         << this->get_storage_order();
@@ -250,14 +250,14 @@ namespace muGrid {
     Shape_t strides{};
     Index_t accumulator{element_size};
     auto components_shape{this->get_components_shape()};
-    if (this->get_storage_order() == StorageOrder::RowMajor) {
+    if (this->get_storage_order() == StorageOrder::StructureOfArrays) {
       std::reverse(components_shape.begin(), components_shape.end());
     }
     for (auto && n : components_shape) {
       strides.push_back(accumulator);
       accumulator *= n;
     }
-    if (this->get_storage_order() == StorageOrder::RowMajor) {
+    if (this->get_storage_order() == StorageOrder::StructureOfArrays) {
       std::reverse(strides.begin(), strides.end());
     }
     return strides;
@@ -266,8 +266,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   Shape_t Field::get_sub_pt_strides(const IterUnit & iter_type,
                                     Index_t element_size) const {
-    if (this->get_storage_order() != StorageOrder::ColMajor and
-        this->get_storage_order() != StorageOrder::RowMajor) {
+    if (this->get_storage_order() != StorageOrder::ArrayOfStructures and
+        this->get_storage_order() != StorageOrder::StructureOfArrays) {
       std::stringstream s;
       s << "Don't know how to construct strides for storage order "
         << this->get_storage_order();
@@ -275,7 +275,7 @@ namespace muGrid {
     }
     Shape_t strides{get_components_strides(element_size)};
     if (iter_type != IterUnit::Pixel) {
-      if (this->get_storage_order() == StorageOrder::RowMajor) {
+      if (this->get_storage_order() == StorageOrder::StructureOfArrays) {
         for (auto && s : strides) {
           s *= this->get_nb_sub_pts();
         }
@@ -296,12 +296,12 @@ namespace muGrid {
   Shape_t Field::get_strides(const IterUnit & iter_type,
                              Index_t element_size) const {
     Shape_t strides{this->get_sub_pt_strides(iter_type, element_size)};
-    if (this->get_storage_order() == StorageOrder::ColMajor) {
+    if (this->get_storage_order() == StorageOrder::ArrayOfStructures) {
       for (auto && n : this->get_pixels_strides(element_size)) {
         strides.push_back(n * this->get_nb_dof_per_pixel());
       }
-    } else if (this->get_storage_order() == StorageOrder::RowMajor) {
-      // storage order is RowMajor, which means all pixels for each dof
+    } else if (this->get_storage_order() == StorageOrder::StructureOfArrays) {
+      // storage order is StructureOfArrays, which means all pixels for each dof
       for (auto && s : strides) {
         s *= this->collection.get_nb_buffer_pixels();
       }
@@ -367,7 +367,7 @@ namespace muGrid {
            FieldCollection::ValidityDomain::Global;
   }
 
-  Index_t Field::get_spatial_dim() const {
+  Dim_t Field::get_spatial_dim() const {
     return this->collection.get_spatial_dim();
   }
 

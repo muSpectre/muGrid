@@ -66,7 +66,7 @@ namespace muGrid {
         auto &gfc{dynamic_cast<const GlobalFieldCollection &>(fc)};
 
         std::vector<Index_t> shape{};
-        const Index_t dim{field_like.get_spatial_dim()};
+        const Dim_t dim{field_like.get_spatial_dim()};
         shape.push_back(dim);
         auto nb_subdomain_grid_pts{gfc.get_nb_subdomain_grid_pts_without_ghosts()};
         if (with_ghosts) {
@@ -153,7 +153,7 @@ namespace muGrid {
         const auto & fourier_collection = eng.get_fourier_space_collection();
         const auto & pixels = fourier_collection.get_pixels_without_ghosts();
         const auto & nb_domain_grid_pts = eng.get_nb_domain_grid_pts();
-        const Index_t dim = eng.get_spatial_dim();
+        const Dim_t dim{eng.get_spatial_dim()};
 
         // Shape: [dim, local_fx, local_fy, ...]
         std::vector<Index_t> shape;
@@ -173,7 +173,7 @@ namespace muGrid {
         T * ptr = static_cast<T *>(fftfreqs.request().ptr);
 
         // Iterate over local Fourier pixels and compute frequencies
-        for (auto && pix : pixels) {
+        for (auto && pix : pixels.coordinates()) {
             for (Index_t i = 0; i < dim; ++i) {
                 // pix[i] is the global coordinate
                 // fft_freqind converts position to frequency index

@@ -45,11 +45,11 @@ namespace muGrid {
     /**
      * Tag type for host (CPU) memory space.
      *
-     * Uses ArrayOfStructures (ColMajor) storage order for optimal CPU cache
+     * Uses ArrayOfStructures storage order for optimal CPU cache
      * locality when iterating over components within a pixel.
      */
     struct HostSpace {
-        static constexpr const char* name = "Host";
+        static constexpr const char * name = "Host";
         static constexpr StorageOrder storage_order =
             StorageOrder::ArrayOfStructures;
     };
@@ -58,11 +58,11 @@ namespace muGrid {
     /**
      * Tag type for CUDA device memory space.
      *
-     * Uses StructureOfArrays (RowMajor) storage order for optimal GPU memory
+     * Uses StructureOfArrays storage order for optimal GPU memory
      * coalescence when threads in a warp access adjacent pixels.
      */
     struct CudaSpace {
-        static constexpr const char* name = "Cuda";
+        static constexpr const char * name = "Cuda";
         static constexpr StorageOrder storage_order =
             StorageOrder::StructureOfArrays;
     };
@@ -72,11 +72,11 @@ namespace muGrid {
     /**
      * Tag type for HIP device memory space.
      *
-     * Uses StructureOfArrays (RowMajor) storage order for optimal GPU memory
+     * Uses StructureOfArrays storage order for optimal GPU memory
      * coalescence when threads in a warp access adjacent pixels.
      */
     struct HIPSpace {
-        static constexpr const char* name = "HIP";
+        static constexpr const char * name = "HIP";
         static constexpr StorageOrder storage_order =
             StorageOrder::StructureOfArrays;
     };
@@ -94,72 +94,74 @@ namespace muGrid {
     /**
      * Type trait to check if a memory space is host-accessible.
      */
-    template<typename MemorySpace>
+    template <typename MemorySpace>
     struct is_host_space : std::is_same<MemorySpace, HostSpace> {};
 
-    template<typename MemorySpace>
+    template <typename MemorySpace>
     inline constexpr bool is_host_space_v = is_host_space<MemorySpace>::value;
 
     /**
      * Type trait to check if a memory space is device (GPU) memory.
      */
-    template<typename MemorySpace>
+    template <typename MemorySpace>
     struct is_device_space : std::false_type {};
 
 #if defined(MUGRID_ENABLE_CUDA)
-    template<>
+    template <>
     struct is_device_space<CudaSpace> : std::true_type {};
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-    template<>
+    template <>
     struct is_device_space<HIPSpace> : std::true_type {};
 #endif
 
-    template<typename MemorySpace>
-    inline constexpr bool is_device_space_v = is_device_space<MemorySpace>::value;
+    template <typename MemorySpace>
+    inline constexpr bool is_device_space_v =
+        is_device_space<MemorySpace>::value;
 
     /**
      * DLPack device type constants (from dlpack/dlpack.h)
      */
     namespace DLPackDeviceType {
-        constexpr int CPU = 1;           // kDLCPU
-        constexpr int CUDA = 2;          // kDLCUDA
-        constexpr int CUDAHost = 3;      // kDLCUDAHost (pinned memory)
-        constexpr int ROCm = 10;         // kDLROCm
-        constexpr int ROCmHost = 11;     // kDLROCMHost
-    }
+        constexpr int CPU = 1;        // kDLCPU
+        constexpr int CUDA = 2;       // kDLCUDA
+        constexpr int CUDAHost = 3;   // kDLCUDAHost (pinned memory)
+        constexpr int ROCm = 10;      // kDLROCm
+        constexpr int ROCmHost = 11;  // kDLROCMHost
+    }  // namespace DLPackDeviceType
 
     /**
      * Type trait mapping memory spaces to DLPack device types.
      */
-    template<typename MemorySpace>
+    template <typename MemorySpace>
     struct dlpack_device_type {
         static constexpr int value = DLPackDeviceType::CPU;
     };
 
 #if defined(MUGRID_ENABLE_CUDA)
-    template<>
+    template <>
     struct dlpack_device_type<CudaSpace> {
         static constexpr int value = DLPackDeviceType::CUDA;
     };
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-    template<>
+    template <>
     struct dlpack_device_type<HIPSpace> {
         static constexpr int value = DLPackDeviceType::ROCm;
     };
 #endif
 
-    template<typename MemorySpace>
-    inline constexpr int dlpack_device_type_v = dlpack_device_type<MemorySpace>::value;
+    template <typename MemorySpace>
+    inline constexpr int dlpack_device_type_v =
+        dlpack_device_type<MemorySpace>::value;
 
     /**
      * Get device name string for a memory space.
      */
-    template<typename MemorySpace>
-    constexpr const char* device_name() {
+    template <typename MemorySpace>
+    constexpr const char * device_name() {
         if constexpr (is_host_space_v<MemorySpace>) {
             return "cpu";
         }

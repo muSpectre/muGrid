@@ -40,46 +40,6 @@
 namespace muGrid {
 
     namespace CcoordOps {
-        size_t get_buffer_size(const DynGridIndex & nb_grid_pts,
-                               const DynGridIndex & strides) {
-            const Dim_t & dim{nb_grid_pts.get_dim()};
-            if (strides.get_dim() != dim) {
-                std::stringstream error{};
-                error << "Dimension mismatch between nb_grid_pts (= "
-                      << nb_grid_pts << ") and strides (= " << strides << ")";
-                throw RuntimeError(error.str());
-            }
-            size_t buffer_size{0};
-            // We need to loop over the dimensions because the largest stride
-            // can occur anywhere. (It depends on the storage order.)
-            for (Dim_t i{0}; i < dim; ++i) {
-                buffer_size =
-                    std::max(buffer_size,
-                             static_cast<size_t>(nb_grid_pts[i] * strides[i]));
-            }
-            return buffer_size;
-        }
-
-        size_t get_buffer_size(const Shape_t & nb_grid_pts,
-                               const Shape_t & strides) {
-            const size_t & dim{nb_grid_pts.size()};
-            if (strides.size() != dim) {
-                std::stringstream error{};
-                error << "Dimension mismatch between nb_grid_pts (= "
-                      << nb_grid_pts << ") and strides (= " << strides << ")";
-                throw RuntimeError(error.str());
-            }
-            size_t buffer_size{0};
-            // We need to loop over the dimensions because the largest stride
-            // can occur anywhere. (It depends on the storage order.)
-            for (size_t i{0}; i < dim; ++i) {
-                buffer_size =
-                    std::max(buffer_size,
-                             static_cast<size_t>(nb_grid_pts[i] * strides[i]));
-            }
-            return buffer_size;
-        }
-
         /* ----------------------------------------------------------------------
          */
         Pixels::Pixels()

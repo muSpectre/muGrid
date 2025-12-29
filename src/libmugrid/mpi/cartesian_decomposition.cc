@@ -23,7 +23,7 @@
 
 namespace muGrid {
     CartesianDecomposition::CartesianDecomposition(
-        const Communicator & comm, Index_t spatial_dimension,
+        const Communicator & comm, Dim_t spatial_dimension,
         const SubPtMap_t & nb_sub_pts, MemoryLocation memory_location)
         : Parent_t{}, comm{comm},
           collection(spatial_dimension, nb_sub_pts,
@@ -104,7 +104,7 @@ namespace muGrid {
         this->recv_right_sequence.resize(this->get_spatial_dim());
         this->recv_left_sequence.resize(this->get_spatial_dim());
         this->nb_sendrecv_steps.resize(this->get_spatial_dim());
-        for (int direction{0}; direction < this->get_spatial_dim();
+        for (Dim_t direction{0}; direction < this->get_spatial_dim();
              ++direction) {
             // Compute the sequence of sendrecv events required to fill the
             // ghost buffer
@@ -178,7 +178,7 @@ namespace muGrid {
         auto coordinates{this->cart_comm->get_coordinates()};
         auto subdomain_locations{coordinates * nb_subdomain_grid_pts};
         auto nb_residual_grid_pts{nb_domain_grid_pts % nb_subdivisions};
-        for (int dim{0}; dim < spatial_dims; ++dim) {
+        for (Dim_t dim{0}; dim < spatial_dims; ++dim) {
             // Adjust domain decomposition for the residual grid points
             if (coordinates[dim] < nb_residual_grid_pts[dim]) {
                 nb_subdomain_grid_pts[dim] += 1;
@@ -233,7 +233,7 @@ namespace muGrid {
         // if the data layout is wrong.
 
         // For each direction...
-        for (int direction{0}; direction < spatial_dims; ++direction) {
+        for (Dim_t direction{0}; direction < spatial_dims; ++direction) {
             // Grid size
             auto nb_subdomain_grid_pts_without_ghosts{
                 this->get_nb_subdomain_grid_pts_without_ghosts()[direction]};
@@ -405,7 +405,7 @@ namespace muGrid {
 #endif
 
         // For each direction (in reverse order to handle corners correctly)
-        for (int direction{static_cast<int>(spatial_dims) - 1}; direction >= 0;
+        for (Dim_t direction{static_cast<int>(spatial_dims) - 1}; direction >= 0;
              --direction) {
             // Grid size
             auto nb_subdomain_grid_pts_without_ghosts{
@@ -536,7 +536,7 @@ namespace muGrid {
         return this->collection;
     }
 
-    Index_t CartesianDecomposition::get_spatial_dim() const {
+    Dim_t CartesianDecomposition::get_spatial_dim() const {
         return this->collection.get_spatial_dim();
     }
 

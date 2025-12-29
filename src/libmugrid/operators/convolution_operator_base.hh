@@ -219,7 +219,7 @@ namespace muGrid {
      * @return The spatial dimensionality of the operations performed by this
      *         gradient operator.
      */
-    virtual Index_t get_spatial_dim() const = 0;
+    virtual Dim_t get_spatial_dim() const = 0;
 
    protected:
   };

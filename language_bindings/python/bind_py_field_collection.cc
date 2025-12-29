@@ -512,7 +512,7 @@ void add_global_field_collection(py::module & mod) {
         sub_pts : dict, optional
             Mapping of sub-point names to counts (e.g., {"quad": 4})
         storage_order : StorageOrder, optional
-            Memory layout for field data (default: ColMajor)
+            Memory layout for field data (default: ArrayOfStructures)
         nb_ghosts_left : list of int, optional
             Ghost layers on low-index side of each dimension
         nb_ghosts_right : list of int, optional
@@ -535,7 +535,7 @@ void add_global_field_collection(py::module & mod) {
              "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = DynGridIndex{},
              "subdomain_locations"_a = DynGridIndex{},
              "sub_pts"_a = FieldCollection::SubPtMap_t{},
-             "storage_order"_a = StorageOrder::ColMajor,
+             "storage_order"_a = StorageOrder::ArrayOfStructures,
              "nb_ghosts_left"_a = DynGridIndex{},
              "nb_ghosts_right"_a = DynGridIndex{},
              "memory_location"_a = MemoryLocation::Host)
@@ -547,7 +547,7 @@ void add_global_field_collection(py::module & mod) {
                      MemoryLocation>(),
             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
             "subdomain_locations"_a, "pixels_strides"_a, "sub_pts"_a,
-            "storage_order"_a = StorageOrder::ColMajor,
+            "storage_order"_a = StorageOrder::ArrayOfStructures,
             "nb_ghosts_left"_a = DynGridIndex{},
             "nb_ghosts_right"_a = DynGridIndex{},
             "memory_location"_a = MemoryLocation::Host)
@@ -559,7 +559,7 @@ void add_global_field_collection(py::module & mod) {
                      MemoryLocation>(),
             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
             "subdomain_locations"_a, "pixels_storage_order"_a, "sub_pts"_a,
-            "storage_order"_a = StorageOrder::ColMajor,
+            "storage_order"_a = StorageOrder::ArrayOfStructures,
             "nb_ghosts_left"_a = DynGridIndex{},
             "nb_ghosts_right"_a = DynGridIndex{},
             "memory_location"_a = MemoryLocation::Host)
