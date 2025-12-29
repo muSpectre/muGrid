@@ -70,8 +70,8 @@ void add_state_field(py::module & mod) {
            py::return_value_policy::reference_internal)
       .def("old", &StateField::old, "nb_steps_ago"_a = 1,
            py::return_value_policy::reference_internal)
-      .def("get_nb_memory", &StateField::get_nb_memory)
-      .def("get_indices", &StateField::get_indices);
+      .def_property_readonly("nb_memory", &StateField::get_nb_memory)
+      .def_property_readonly("indices", &StateField::get_indices);
 }
 
 template <class T>

@@ -50,7 +50,6 @@
 
 using muGrid::Complex;
 using muGrid::Device;
-using muGrid::DeviceType;
 using muGrid::DynGridIndex;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
@@ -483,76 +482,6 @@ void add_field_collection(py::module & mod) {
         .value("Global", FieldCollection::ValidityDomain::Global)
         .value("Local", FieldCollection::ValidityDomain::Local)
         .export_values();
-
-    // Device type enumeration
-    py::enum_<DeviceType>(mod, "DeviceType")
-        .value("CPU", DeviceType::CPU)
-        .value("CUDA", DeviceType::CUDA)
-        .value("CUDAHost", DeviceType::CUDAHost)
-        .value("ROCm", DeviceType::ROCm)
-        .value("ROCmHost", DeviceType::ROCmHost)
-        .export_values();
-
-    // Device class for specifying where fields are allocated
-    py::class_<Device>(mod, "Device",
-        R"pbdoc(
-        Device specification for field memory allocation.
-
-        A Device specifies where field memory should be allocated. Use the
-        static factory methods to create Device instances:
-
-        - ``Device.cpu()`` - CPU/host memory
-        - ``Device.cuda(id)`` - CUDA GPU memory (with optional device ID)
-        - ``Device.rocm(id)`` - ROCm/HIP GPU memory (with optional device ID)
-
-        Examples
-        --------
-        >>> fc = GlobalFieldCollection([64, 64], device=Device.cpu())
-        >>> fc_gpu = GlobalFieldCollection([64, 64], device=Device.cuda(0))
-        )pbdoc")
-        .def(py::init<>())
-        .def(py::init<DeviceType, int>(), "device_type"_a, "device_id"_a = 0)
-        .def_static("cpu", &Device::cpu, "Create a CPU device")
-        .def_static("cuda", &Device::cuda, "device_id"_a = 0,
-                    "Create a CUDA device with optional device ID")
-        .def_static("rocm", &Device::rocm, "device_id"_a = 0,
-                    "Create a ROCm device with optional device ID")
-        .def_static("gpu", &Device::gpu, "device_id"_a = 0,
-                    R"pbdoc(
-            Create a GPU device using the default GPU backend.
-
-            Automatically selects the available GPU backend:
-            - Returns CUDA device if CUDA is available
-            - Returns ROCm device if ROCm is available (and CUDA is not)
-            - Returns CPU device if no GPU backend is available
-
-            Parameters
-            ----------
-            device_id : int, optional
-                GPU device ID (default: 0)
-
-            Returns
-            -------
-            Device
-                Device instance for the default GPU backend
-            )pbdoc")
-        .def("is_device", &Device::is_device,
-             "Check if this is a GPU device")
-        .def("is_host", &Device::is_host,
-             "Check if this is a host (CPU) device")
-        .def("get_type", &Device::get_type,
-             "Get the device type")
-        .def("get_device_id", &Device::get_device_id,
-             "Get the device ID")
-        .def("get_device_string", &Device::get_device_string,
-             "Get device string (e.g., 'cpu', 'cuda:0')")
-        .def("get_type_name", &Device::get_type_name,
-             "Get device type name (e.g., 'CPU', 'CUDA')")
-        .def("__repr__", [](const Device & d) {
-            return "<Device: " + d.get_device_string() + ">";
-        })
-        .def("__eq__", &Device::operator==)
-        .def("__ne__", &Device::operator!=);
 }
 
 void add_global_field_collection(py::module & mod) {

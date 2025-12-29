@@ -543,7 +543,7 @@ void add_fem_gradient_operator(py::module &mod) {
              "Apply the transpose (divergence) operator (quadrature -> nodal) to host fields")
         .def_property_readonly("grid_spacing", &FEMGradientOperator::get_grid_spacing,
              "Grid spacing in each direction")
-        .def("get_quadrature_weights", &FEMGradientOperator::get_quadrature_weights,
+        .def_property_readonly("quadrature_weights", &FEMGradientOperator::get_quadrature_weights,
              "Get the quadrature weights (one per quadrature point)")
         .def_property_readonly("offset",
             [](const FEMGradientOperator & op) {

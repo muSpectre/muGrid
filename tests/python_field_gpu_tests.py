@@ -89,7 +89,7 @@ class HostFieldDeviceInfoTests(unittest.TestCase):
 
     def test_host_collection_device(self):
         """Test that host collection reports CPU device."""
-        self.assertTrue(self.fc.device.is_host())
+        self.assertTrue(self.fc.device.is_host)
 
 
 class HostFieldAccessTests(unittest.TestCase):
@@ -135,7 +135,7 @@ class DeviceCollectionTests(unittest.TestCase):
 
     def test_device_collection_device(self):
         """Test that device collection reports CUDA/ROCm device."""
-        self.assertTrue(self.fc.device.is_device())
+        self.assertTrue(self.fc.device.is_device)
 
     def test_device_field_is_on_gpu(self):
         """Test that fields in device collection report is_on_gpu = True."""

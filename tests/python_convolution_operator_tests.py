@@ -1029,7 +1029,7 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
 
         # Verify host collection
         self.assertFalse(fc.is_on_device)
-        self.assertTrue(fc.device.is_host())
+        self.assertTrue(fc.device.is_host)
 
         # Create fields
         nodal = fc.real_field("nodal", (2,))
@@ -1103,7 +1103,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
         )
 
         self.assertTrue(fc.is_on_device)
-        self.assertTrue(fc.device.is_device())
+        self.assertTrue(fc.device.is_device)
 
     def test_device_field_properties(self):
         """Test that device fields have correct properties."""

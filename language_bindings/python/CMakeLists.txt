@@ -3,6 +3,7 @@ set(MUGRID_PYTHON_SOURCES
     bind_py_module.cc
     bind_py_common_mugrid.cc
     bind_py_communicator.cc
+    bind_py_device.cc
     bind_py_decomposition.cc
     bind_py_convolution_operator.cc
     bind_py_field.cc
