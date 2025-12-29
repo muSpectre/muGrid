@@ -236,6 +236,11 @@ elapsed_time = timer.get_time("conjugate_gradients")
 # Get number of hessp calls from timer
 nb_hessp_calls = timer.get_calls("hessp")
 
+# Lattice updates per second (LUPS)
+# One "lattice update" = one grid point processed in one hessp call
+total_lattice_updates = nb_grid_pts_total * nb_hessp_calls
+lups = total_lattice_updates / elapsed_time if elapsed_time > 0 else 0
+
 # Memory throughput estimate for the convolution operation:
 # - Read: nb_stencil_pts values per grid point (stencil neighborhood)
 # - Write: 1 value per grid point
@@ -257,6 +262,7 @@ arithmetic_intensity = total_flops / total_bytes if total_bytes > 0 else 0
 
 # Get apply time from timer
 apply_time = timer.get_time("conjugate_gradients/hessp/apply")
+apply_lups = total_lattice_updates / apply_time if apply_time > 0 else 0
 apply_throughput = total_bytes / apply_time if apply_time > 0 else 0
 apply_flops_rate = total_flops / apply_time if apply_time > 0 else 0
 
@@ -278,6 +284,9 @@ if args.json:
             "converged": converged,
             "iterations": int(nb_hessp_calls),
             "total_time_seconds": float(elapsed_time),
+            "total_lattice_updates": int(total_lattice_updates),
+            "MLUPS": float(lups / 1e6),
+            "GLUPS": float(lups / 1e9),
             "bytes_per_iteration": int(bytes_per_hessp),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
@@ -286,6 +295,8 @@ if args.json:
             "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
             "arithmetic_intensity": float(arithmetic_intensity),
             "apply_time_seconds": float(apply_time),
+            "apply_MLUPS": float(apply_lups / 1e6),
+            "apply_GLUPS": float(apply_lups / 1e9),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
             "apply_flops_rate_GFLOPs_estimated": float(apply_flops_rate / 1e9),
         },
@@ -307,6 +318,10 @@ else:
     print(f"Stencil points: {nb_stencil_pts}")
     print(f"CG iterations (hessp calls): {nb_hessp_calls}")
     print(f"Total time: {elapsed_time:.4f} seconds")
+
+    print("\nLattice updates per second:")
+    print(f"  Total lattice updates: {total_lattice_updates:,}")
+    print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
 
     print("\nMemory throughput (estimated):")
     print(f"  Bytes per hessp call: {bytes_per_hessp / 1e6:.2f} MB")

@@ -301,7 +301,7 @@ nb_quad = gradient_op.nb_quad_pts
 nb_nodes = gradient_op.nb_nodal_pts
 
 # Quadrature weights (area/volume of each element)
-quad_weights = np.array(gradient_op.get_quadrature_weights())
+quad_weights = np.array(gradient_op.quadrature_weights)
 
 # Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
@@ -754,6 +754,14 @@ apply_stiffness_time = (
     timer.get_time("total_solve/apply_stiffness") if nb_stiffness_calls > 0 else 0
 )
 
+# Lattice updates per second (LUPS)
+# One "lattice update" = one grid point processed in one stiffness call
+total_lattice_updates = nb_grid_pts_total * nb_stiffness_calls
+lups = total_lattice_updates / elapsed_time if elapsed_time > 0 else 0
+apply_lups = (
+    total_lattice_updates / apply_stiffness_time if apply_stiffness_time > 0 else 0
+)
+
 # Performance metrics
 # Memory throughput estimate:
 # - FEM gradient: reads neighbor values, writes gradient
@@ -805,6 +813,11 @@ if args.json and comm.rank == 0:
             "stiffness_calls": int(nb_stiffness_calls),
             "total_time_seconds": float(elapsed_time),
             "apply_stiffness_time_seconds": float(apply_stiffness_time),
+            "total_lattice_updates": int(total_lattice_updates),
+            "MLUPS": float(lups / 1e6),
+            "GLUPS": float(lups / 1e9),
+            "apply_MLUPS": float(apply_lups / 1e6),
+            "apply_GLUPS": float(apply_lups / 1e9),
             "bytes_per_call": int(bytes_per_call),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
@@ -858,6 +871,10 @@ elif comm.rank == 0:
     print(f"Total CG iterations: {total_iterations}")
     print(f"Stiffness operator calls: {nb_stiffness_calls}")
     print(f"Total time: {elapsed_time:.4f} seconds")
+
+    print("\nLattice updates per second:")
+    print(f"  Total lattice updates: {total_lattice_updates:,}")
+    print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
 
     print("\nMemory throughput (estimated):")
     print(f"  Bytes per stiffness call: {bytes_per_call / 1e6:.2f} MB")
