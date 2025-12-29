@@ -124,12 +124,20 @@ def conjugate_gradients(
         import cupy
 
         xp = cupy
+
+        # Use BLAS dot product (hipBLAS on ROCm) for better performance
+        def dot(a, b):
+            return cupy.cublas.dot(a.ravel(), b.ravel())
+
     else:
         xp = np
 
+        def dot(a, b):
+            return np.dot(a.ravel(), b.ravel())
+
     with timed("cg_dot_rr"):
         gpu_sync()
-        rr_local = xp.sum(r * r)
+        rr_local = dot(r, r)
         gpu_sync()
 
     with timed("cg_allreduce"):
@@ -153,7 +161,7 @@ def conjugate_gradients(
         # Compute pAp for step size
         with timed("cg_dot_pAp"):
             gpu_sync()
-            pAp_local = xp.sum(p.s * Ap.s)
+            pAp_local = dot(p.s, Ap.s)
             gpu_sync()
 
         with timed("cg_allreduce"):
@@ -191,7 +199,7 @@ def conjugate_gradients(
         # Compute next residual norm
         with timed("cg_dot_rr"):
             gpu_sync()
-            next_rr_local = xp.sum(r * r)
+            next_rr_local = dot(r, r)
             gpu_sync()
 
         with timed("cg_allreduce"):
