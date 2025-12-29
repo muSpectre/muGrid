@@ -239,17 +239,16 @@ __constant__ Real d_B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D] = {
     }
 };
 
-// Node offsets for 3D [node][dim]
-__constant__ Index_t d_NODE_OFFSET_3D[NB_NODES_3D][DIM_3D] = {
-    {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
-    {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}
-};
-
 /**
- * GPU kernel for 3D FEM gradient operator.
+ * GPU kernel for 3D FEM gradient operator with shared memory optimization.
  *
  * Computes gradient at 5 quadrature points per voxel from 8 nodal values.
- * Each thread processes one voxel.
+ * Uses shared memory to reduce redundant global memory loads - adjacent
+ * voxels share nodes, so we cooperatively load a tile of nodes.
+ *
+ * Hand-unrolled gradient computation exploits B matrix sparsity:
+ * - Each gradient component has only 2 non-zero terms per quadrature point
+ * - Avoids loop overhead and constant memory access latency
  */
 __global__ void fem_gradient_3d_kernel(
     const Real* MUGRID_RESTRICT nodal_input,
@@ -262,54 +261,191 @@ __global__ void fem_gradient_3d_kernel(
     Real inv_hx, Real inv_hy, Real inv_hz,
     bool increment) {
 
-    // Thread indices - each thread processes one voxel
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
-    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
+    // Shared memory for node values - needs (BLOCK+1)^3 to cover halo
+    // BLOCK_SIZE_3D = 8, so we need 9x9x9 = 729 entries
+    __shared__ Real s_nodes[BLOCK_SIZE_3D + 1][BLOCK_SIZE_3D + 1][BLOCK_SIZE_3D + 1];
 
-    // Check bounds
+    // Thread indices
+    const Index_t tx = threadIdx.x;
+    const Index_t ty = threadIdx.y;
+    const Index_t tz = threadIdx.z;
+
+    // Global voxel indices for this thread
+    const Index_t ix = blockIdx.x * blockDim.x + tx;
+    const Index_t iy = blockIdx.y * blockDim.y + ty;
+    const Index_t iz = blockIdx.z * blockDim.z + tz;
+
+    // Base index for this block's corner in global memory
+    const Index_t block_base_x = blockIdx.x * blockDim.x;
+    const Index_t block_base_y = blockIdx.y * blockDim.y;
+    const Index_t block_base_z = blockIdx.z * blockDim.z;
+
+    // Cooperatively load nodes into shared memory
+    // Each thread loads one node at its position
+    if (block_base_x + tx < nx && block_base_y + ty < ny && block_base_z + tz < nz) {
+        s_nodes[tx][ty][tz] = nodal_input[
+            (block_base_x + tx) * nodal_stride_x +
+            (block_base_y + ty) * nodal_stride_y +
+            (block_base_z + tz) * nodal_stride_z];
+    }
+
+    // Boundary threads load the extra halo nodes
+    // X-edge: threads with tx == BLOCK_SIZE_3D-1 load the +1 in x
+    if (tx == BLOCK_SIZE_3D - 1 && block_base_x + tx + 1 < nx &&
+        block_base_y + ty < ny && block_base_z + tz < nz) {
+        s_nodes[tx + 1][ty][tz] = nodal_input[
+            (block_base_x + tx + 1) * nodal_stride_x +
+            (block_base_y + ty) * nodal_stride_y +
+            (block_base_z + tz) * nodal_stride_z];
+    }
+    // Y-edge
+    if (ty == BLOCK_SIZE_3D - 1 && block_base_x + tx < nx &&
+        block_base_y + ty + 1 < ny && block_base_z + tz < nz) {
+        s_nodes[tx][ty + 1][tz] = nodal_input[
+            (block_base_x + tx) * nodal_stride_x +
+            (block_base_y + ty + 1) * nodal_stride_y +
+            (block_base_z + tz) * nodal_stride_z];
+    }
+    // Z-edge
+    if (tz == BLOCK_SIZE_3D - 1 && block_base_x + tx < nx &&
+        block_base_y + ty < ny && block_base_z + tz + 1 < nz) {
+        s_nodes[tx][ty][tz + 1] = nodal_input[
+            (block_base_x + tx) * nodal_stride_x +
+            (block_base_y + ty) * nodal_stride_y +
+            (block_base_z + tz + 1) * nodal_stride_z];
+    }
+    // XY-edge
+    if (tx == BLOCK_SIZE_3D - 1 && ty == BLOCK_SIZE_3D - 1 &&
+        block_base_x + tx + 1 < nx && block_base_y + ty + 1 < ny &&
+        block_base_z + tz < nz) {
+        s_nodes[tx + 1][ty + 1][tz] = nodal_input[
+            (block_base_x + tx + 1) * nodal_stride_x +
+            (block_base_y + ty + 1) * nodal_stride_y +
+            (block_base_z + tz) * nodal_stride_z];
+    }
+    // XZ-edge
+    if (tx == BLOCK_SIZE_3D - 1 && tz == BLOCK_SIZE_3D - 1 &&
+        block_base_x + tx + 1 < nx && block_base_y + ty < ny &&
+        block_base_z + tz + 1 < nz) {
+        s_nodes[tx + 1][ty][tz + 1] = nodal_input[
+            (block_base_x + tx + 1) * nodal_stride_x +
+            (block_base_y + ty) * nodal_stride_y +
+            (block_base_z + tz + 1) * nodal_stride_z];
+    }
+    // YZ-edge
+    if (ty == BLOCK_SIZE_3D - 1 && tz == BLOCK_SIZE_3D - 1 &&
+        block_base_x + tx < nx && block_base_y + ty + 1 < ny &&
+        block_base_z + tz + 1 < nz) {
+        s_nodes[tx][ty + 1][tz + 1] = nodal_input[
+            (block_base_x + tx) * nodal_stride_x +
+            (block_base_y + ty + 1) * nodal_stride_y +
+            (block_base_z + tz + 1) * nodal_stride_z];
+    }
+    // XYZ-corner
+    if (tx == BLOCK_SIZE_3D - 1 && ty == BLOCK_SIZE_3D - 1 &&
+        tz == BLOCK_SIZE_3D - 1 && block_base_x + tx + 1 < nx &&
+        block_base_y + ty + 1 < ny && block_base_z + tz + 1 < nz) {
+        s_nodes[tx + 1][ty + 1][tz + 1] = nodal_input[
+            (block_base_x + tx + 1) * nodal_stride_x +
+            (block_base_y + ty + 1) * nodal_stride_y +
+            (block_base_z + tz + 1) * nodal_stride_z];
+    }
+
+    __syncthreads();
+
+    // Check bounds for gradient computation (interior voxels only)
     if (ix < nx - 1 && iy < ny - 1 && iz < nz - 1) {
-        Index_t nodal_base = ix * nodal_stride_x +
-                             iy * nodal_stride_y +
-                             iz * nodal_stride_z;
+        // Get 8 nodal values from shared memory
+        // Node layout: n0=(0,0,0), n1=(1,0,0), n2=(0,1,0), n3=(1,1,0),
+        //              n4=(0,0,1), n5=(1,0,1), n6=(0,1,1), n7=(1,1,1)
+        const Real n0 = s_nodes[tx][ty][tz];
+        const Real n1 = s_nodes[tx + 1][ty][tz];
+        const Real n2 = s_nodes[tx][ty + 1][tz];
+        const Real n3 = s_nodes[tx + 1][ty + 1][tz];
+        const Real n4 = s_nodes[tx][ty][tz + 1];
+        const Real n5 = s_nodes[tx + 1][ty][tz + 1];
+        const Real n6 = s_nodes[tx][ty + 1][tz + 1];
+        const Real n7 = s_nodes[tx + 1][ty + 1][tz + 1];
+
         Index_t grad_base = ix * grad_stride_x +
                             iy * grad_stride_y +
                             iz * grad_stride_z;
 
-        // Get all 8 nodal values
-        Real n[NB_NODES_3D];
-        for (Index_t node = 0; node < NB_NODES_3D; ++node) {
-            Index_t ox = d_NODE_OFFSET_3D[node][0];
-            Index_t oy = d_NODE_OFFSET_3D[node][1];
-            Index_t oz = d_NODE_OFFSET_3D[node][2];
-            n[node] = nodal_input[nodal_base +
-                                  ox * nodal_stride_x +
-                                  oy * nodal_stride_y +
-                                  oz * nodal_stride_z];
-        }
+        // Hand-unrolled gradient computation exploiting B matrix sparsity
+        // Each quadrature point corresponds to a tetrahedron in the voxel
+        // B matrix has only 2 non-zero entries per gradient component per quad
 
-        // Compute gradients for each tetrahedron (quadrature point)
-        for (Index_t q = 0; q < NB_QUAD_3D; ++q) {
-            Real grad_x = 0.0, grad_y = 0.0, grad_z = 0.0;
-            for (Index_t node = 0; node < NB_NODES_3D; ++node) {
-                grad_x += d_B_3D_REF[0][q][node] * n[node];
-                grad_y += d_B_3D_REF[1][q][node] * n[node];
-                grad_z += d_B_3D_REF[2][q][node] * n[node];
-            }
-            grad_x *= inv_hx;
-            grad_y *= inv_hy;
-            grad_z *= inv_hz;
+        // Quad 0: tetrahedron with nodes 0,1,2,4
+        // grad_x = (-n0 + n1) / hx, grad_y = (-n0 + n2) / hy, grad_z = (-n0 + n4) / hz
+        Real gx0 = inv_hx * (-n0 + n1);
+        Real gy0 = inv_hy * (-n0 + n2);
+        Real gz0 = inv_hz * (-n0 + n4);
 
-            Index_t grad_idx = grad_base + q * grad_stride_q;
-            if (increment) {
-                gradient_output[grad_idx + 0 * grad_stride_d] += grad_x;
-                gradient_output[grad_idx + 1 * grad_stride_d] += grad_y;
-                gradient_output[grad_idx + 2 * grad_stride_d] += grad_z;
-            } else {
-                gradient_output[grad_idx + 0 * grad_stride_d] = grad_x;
-                gradient_output[grad_idx + 1 * grad_stride_d] = grad_y;
-                gradient_output[grad_idx + 2 * grad_stride_d] = grad_z;
-            }
+        // Quad 1: tetrahedron with nodes 1,2,4,5
+        // grad_x = (-n1 + n5) / hx, grad_y = (n2 - n4) / hy, grad_z = (-n1 + n5) / hz
+        Real gx1 = inv_hx * (-n1 + n5);
+        Real gy1 = inv_hy * (n2 - n4);
+        Real gz1 = inv_hz * (-n1 + n5);
+
+        // Quad 2: tetrahedron with nodes 2,4,5,6
+        // grad_x = (n5 - n6) / hx, grad_y = (-n2 + n6) / hy, grad_z = (-n4 + n6) / hz
+        Real gx2 = inv_hx * (n5 - n6);
+        Real gy2 = inv_hy * (-n2 + n6);
+        Real gz2 = inv_hz * (-n4 + n6);
+
+        // Quad 3: tetrahedron with nodes 1,2,3,5
+        // grad_x = (-n1 + n3) / hx, grad_y = (-n2 + n3) / hy, grad_z = (n5 - n6) / hz
+        Real gx3 = inv_hx * (-n1 + n3);
+        Real gy3 = inv_hy * (-n2 + n3);
+        Real gz3 = inv_hz * (n5 - n6);
+
+        // Quad 4: tetrahedron with nodes 2,3,5,7
+        // grad_x = (-n3 + n7) / hx, grad_y = (-n2 + n7) / hy, grad_z = (-n5 + n7) / hz
+        Real gx4 = inv_hx * (-n3 + n7);
+        Real gy4 = inv_hy * (-n2 + n7);
+        Real gz4 = inv_hz * (-n5 + n7);
+
+        // Store gradients
+        if (increment) {
+            gradient_output[grad_base + 0 * grad_stride_q + 0 * grad_stride_d] += gx0;
+            gradient_output[grad_base + 0 * grad_stride_q + 1 * grad_stride_d] += gy0;
+            gradient_output[grad_base + 0 * grad_stride_q + 2 * grad_stride_d] += gz0;
+
+            gradient_output[grad_base + 1 * grad_stride_q + 0 * grad_stride_d] += gx1;
+            gradient_output[grad_base + 1 * grad_stride_q + 1 * grad_stride_d] += gy1;
+            gradient_output[grad_base + 1 * grad_stride_q + 2 * grad_stride_d] += gz1;
+
+            gradient_output[grad_base + 2 * grad_stride_q + 0 * grad_stride_d] += gx2;
+            gradient_output[grad_base + 2 * grad_stride_q + 1 * grad_stride_d] += gy2;
+            gradient_output[grad_base + 2 * grad_stride_q + 2 * grad_stride_d] += gz2;
+
+            gradient_output[grad_base + 3 * grad_stride_q + 0 * grad_stride_d] += gx3;
+            gradient_output[grad_base + 3 * grad_stride_q + 1 * grad_stride_d] += gy3;
+            gradient_output[grad_base + 3 * grad_stride_q + 2 * grad_stride_d] += gz3;
+
+            gradient_output[grad_base + 4 * grad_stride_q + 0 * grad_stride_d] += gx4;
+            gradient_output[grad_base + 4 * grad_stride_q + 1 * grad_stride_d] += gy4;
+            gradient_output[grad_base + 4 * grad_stride_q + 2 * grad_stride_d] += gz4;
+        } else {
+            gradient_output[grad_base + 0 * grad_stride_q + 0 * grad_stride_d] = gx0;
+            gradient_output[grad_base + 0 * grad_stride_q + 1 * grad_stride_d] = gy0;
+            gradient_output[grad_base + 0 * grad_stride_q + 2 * grad_stride_d] = gz0;
+
+            gradient_output[grad_base + 1 * grad_stride_q + 0 * grad_stride_d] = gx1;
+            gradient_output[grad_base + 1 * grad_stride_q + 1 * grad_stride_d] = gy1;
+            gradient_output[grad_base + 1 * grad_stride_q + 2 * grad_stride_d] = gz1;
+
+            gradient_output[grad_base + 2 * grad_stride_q + 0 * grad_stride_d] = gx2;
+            gradient_output[grad_base + 2 * grad_stride_q + 1 * grad_stride_d] = gy2;
+            gradient_output[grad_base + 2 * grad_stride_q + 2 * grad_stride_d] = gz2;
+
+            gradient_output[grad_base + 3 * grad_stride_q + 0 * grad_stride_d] = gx3;
+            gradient_output[grad_base + 3 * grad_stride_q + 1 * grad_stride_d] = gy3;
+            gradient_output[grad_base + 3 * grad_stride_q + 2 * grad_stride_d] = gz3;
+
+            gradient_output[grad_base + 4 * grad_stride_q + 0 * grad_stride_d] = gx4;
+            gradient_output[grad_base + 4 * grad_stride_q + 1 * grad_stride_d] = gy4;
+            gradient_output[grad_base + 4 * grad_stride_q + 2 * grad_stride_d] = gz4;
         }
     }
 }
