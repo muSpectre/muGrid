@@ -50,7 +50,7 @@ namespace muGrid {
                                                 iter_type)},
         nb_rows{this->field.get_default_nb_rows(iter_type)},
         nb_cols{this->field.get_default_nb_cols(iter_type)} {
-    if (field.get_storage_order() != StorageOrder::ColMajor) {
+    if (field.get_storage_order() != StorageOrder::ArrayOfStructures) {
       std::stringstream s;
       s << "FieldMap requires column-major storage order, but storage order of "
         << "field '" << field.get_name() << "' is "
@@ -74,7 +74,7 @@ namespace muGrid {
       : field{field}, iteration{iter_type}, stride{this->field.get_stride(
                                                 iter_type)},
         nb_rows{nb_rows_}, nb_cols{this->stride / nb_rows_} {
-    if (field.get_storage_order() != StorageOrder::ColMajor) {
+    if (field.get_storage_order() != StorageOrder::ArrayOfStructures) {
       std::stringstream s;
       s << "FieldMap requires column-major storage order, but storage order of "
         << "field '" << field.get_name() << "' is "
@@ -105,7 +105,7 @@ namespace muGrid {
       : field{other.field}, iteration{other.iteration}, stride{other.stride},
         nb_rows{other.nb_rows}, nb_cols{other.nb_cols},
         data_ptr{other.data_ptr}, is_initialised{other.is_initialised} {
-    if (field.get_storage_order() != StorageOrder::ColMajor) {
+    if (field.get_storage_order() != StorageOrder::ArrayOfStructures) {
       std::stringstream s;
       s << "FieldMap requires column-major storage order, but storage order of "
         << "field '" << field.get_name() << "' is "

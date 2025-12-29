@@ -66,8 +66,8 @@ void add_version(py::module & mod) {
 
 void add_enums(py::module & mod) {
     py::enum_<muGrid::StorageOrder>(mod, "StorageOrder")
-        .value("ColMajor", muGrid::StorageOrder::ColMajor)
-        .value("RowMajor", muGrid::StorageOrder::RowMajor)
+        .value("ArrayOfStructures", muGrid::StorageOrder::ArrayOfStructures)
+        .value("StructureOfArrays", muGrid::StorageOrder::StructureOfArrays)
         .export_values();
 
     py::enum_<muGrid::IterUnit>(mod, "IterUnit")

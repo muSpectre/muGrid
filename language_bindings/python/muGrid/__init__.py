@@ -96,7 +96,6 @@ Pixel = _muGrid.Pixel
 StorageOrder = _muGrid.StorageOrder
 SubPt = _muGrid.SubPt
 Unit = _muGrid.Unit
-Verbosity = _muGrid.Verbosity
 
 # FFT utility functions
 # Note: fft_freq, fft_freqind, rfft_freq, rfft_freqind are now properties

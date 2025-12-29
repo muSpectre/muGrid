@@ -38,7 +38,6 @@
 
 #include <ostream>
 #include <string>
-#include <type_traits>
 
 namespace muGrid {
 
@@ -66,29 +65,22 @@ namespace muGrid {
      * @enum StorageOrder
      * @brief An enumeration class for storage orders of field components.
      *
-     * This enumeration class defines six types of storage orders: ColMajor,
-     * ArrayOfStructures, RowMajor, StructurOfArrays, Unknown, and Automatic.
+     * This enumeration class defines three types of storage orders:
+     * ArrayOfStructures, StructureOfArrays and Automatic.
      * These storage orders can be used to determine the order in which field
      * components are stored in memory.
      *
-     * @var ColMajor Represents a column-major storage order. In this order, the
-     * first index changes fastest, and the last index changes slowest.
-     * @var ArrayOfStructures Represents an array of structures storage order.
-     * In this order, components are consecutive in memory. It is equivalent to
-     * ColMajor.
-     * @var RowMajor Represents a row-major storage order. In this order, the
-     * last index changes fastest, and the first index changes slowest.
-     * @var StructurOfArrays Represents a structure of arrays storage order. In
-     * this order, pixels are consecutive in memory. It is equivalent to
-     * RowMajor.
+     * @var ArrayOfStructures Represents a column-major storage order. In this
+     * order, the first index changes fastest, and the last index changes
+     * slowest.
+     * @var StructureOfArrays Represents a structure of arrays storage order. In
+     * this order, pixels are consecutive in memory.
      * @var Automatic Represents an automatic storage order. In this order, the
      * storage order is inherited from `FieldCollection`.
      */
     enum class StorageOrder {
-        ColMajor,  //!< column-major storage order (first index is fast)
-        ArrayOfStructures = ColMajor,  //!< components are consecutive in memory
-        RowMajor,  //!< row-major storage order (last index is fast)
-        StructureOfArrays = RowMajor,  //< pixels are consecutive in memory
+        ArrayOfStructures,  //!< components are consecutive in memory
+        StructureOfArrays,  //< pixels are consecutive in memory
         Automatic  //!< inherit storage order from `FieldCollection`
     };
 

@@ -60,12 +60,12 @@ namespace muGrid {
     std::ostream & operator<<(std::ostream & os,
                               const StorageOrder & storage_order) {
         switch (storage_order) {
-        case StorageOrder::ColMajor: {
-            os << "column-major";
+        case StorageOrder::ArrayOfStructures: {
+            os << "array of structures";
             break;
         }
-        case StorageOrder::RowMajor: {
-            os << "row-major";
+        case StorageOrder::StructureOfArrays: {
+            os << "structure of arrays";
             break;
         }
         case StorageOrder::Automatic: {

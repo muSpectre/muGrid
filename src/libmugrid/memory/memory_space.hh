@@ -45,7 +45,7 @@ namespace muGrid {
     /**
      * Tag type for host (CPU) memory space.
      *
-     * Uses ArrayOfStructures (ColMajor) storage order for optimal CPU cache
+     * Uses ArrayOfStructures storage order for optimal CPU cache
      * locality when iterating over components within a pixel.
      */
     struct HostSpace {
@@ -58,7 +58,7 @@ namespace muGrid {
     /**
      * Tag type for CUDA device memory space.
      *
-     * Uses StructureOfArrays (RowMajor) storage order for optimal GPU memory
+     * Uses StructureOfArrays storage order for optimal GPU memory
      * coalescence when threads in a warp access adjacent pixels.
      */
     struct CudaSpace {
@@ -72,7 +72,7 @@ namespace muGrid {
     /**
      * Tag type for HIP device memory space.
      *
-     * Uses StructureOfArrays (RowMajor) storage order for optimal GPU memory
+     * Uses StructureOfArrays storage order for optimal GPU memory
      * coalescence when threads in a warp access adjacent pixels.
      */
     struct HIPSpace {

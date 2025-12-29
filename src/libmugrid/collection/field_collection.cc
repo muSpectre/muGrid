@@ -58,7 +58,7 @@ namespace muGrid {
                                    StorageOrder storage_order,
                                    MemoryLocation memory_location)
       : domain{domain}, spatial_dim{spatial_dimension}, nb_sub_pts{nb_sub_pts},
-        // Use StructureOfArrays (RowMajor) storage order for device memory
+        // Use StructureOfArrays storage order for device memory
         // to ensure optimal memory coalescing on GPU
         storage_order{memory_location == MemoryLocation::Device
                       ? StorageOrder::StructureOfArrays
