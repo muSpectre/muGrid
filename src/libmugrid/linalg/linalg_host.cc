@@ -295,11 +295,13 @@ Real vecdot<Real, HostSpace>(const TypedField<Real, HostSpace>& a,
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const Index_t nb_components_per_pixel =
             a.get_nb_components() * a.get_nb_sub_pts();
-        return internal::vecdot_impl(a.data(), b.data(), global_coll,
-                                     nb_components_per_pixel);
+        // Compute full buffer dot with Eigen (fast), subtract ghost contributions
+        Real full_dot = a.eigen_vec().dot(b.eigen_vec());
+        Real ghost_dot = internal::ghost_vecdot(a.data(), b.data(), global_coll,
+                                                nb_components_per_pixel);
+        return full_dot - ghost_dot;
     } else {
-        // LocalFieldCollection: no ghosts, use full buffer
-        // Use Eigen for efficiency
+        // LocalFieldCollection: no ghosts, use Eigen
         return a.eigen_vec().dot(b.eigen_vec());
     }
 }
@@ -325,11 +327,13 @@ Complex vecdot<Complex, HostSpace>(const TypedField<Complex, HostSpace>& a,
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const Index_t nb_components_per_pixel =
             a.get_nb_components() * a.get_nb_sub_pts();
-        return internal::vecdot_impl(a.data(), b.data(), global_coll,
-                                     nb_components_per_pixel);
+        // Compute full buffer dot with Eigen (fast), subtract ghost contributions
+        Complex full_dot = a.eigen_vec().dot(b.eigen_vec());
+        Complex ghost_dot = internal::ghost_vecdot(a.data(), b.data(), global_coll,
+                                                   nb_components_per_pixel);
+        return full_dot - ghost_dot;
     } else {
-        // LocalFieldCollection: no ghosts, use full buffer
-        // Use Eigen for efficiency
+        // LocalFieldCollection: no ghosts, use Eigen
         return a.eigen_vec().dot(b.eigen_vec());
     }
 }
