@@ -322,7 +322,7 @@ namespace muGrid {
         //! number of entries in the field (= nb_pixel × nb_sub_pts)
         Index_t get_current_nb_entries() const;
 
-        //! size of the internal buffer including the pad region (in scalars)
+        //! size of the internal buffer (in scalars)
         virtual size_t get_buffer_size() const = 0;
 
         /**
