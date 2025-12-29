@@ -219,7 +219,7 @@ class FieldCheck(unittest.TestCase):
         field_array = np.from_dlpack(field_cpp)
         field_array[:] = 5  # assigne value 5 to pixel 1
 
-        self.assertEqual(fc.get_name(), lfc_name)
+        self.assertEqual(fc.name, lfc_name)
 
     def test_accessors(self):
         fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
