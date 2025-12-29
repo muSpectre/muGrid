@@ -2,6 +2,8 @@
 Collection of simple parallel solvers
 """
 
+import numpy as np
+
 
 def conjugate_gradients(
     comm,
@@ -116,9 +118,18 @@ def conjugate_gradients(
     if callback:
         callback(0, x.s, r, p.s)
 
+    # Get array module (numpy or cupy) from the residual array
+    xp = type(r).__module__.split(".")[0]
+    if xp == "cupy":
+        import cupy
+
+        xp = cupy
+    else:
+        xp = np
+
     with timed("cg_dot_rr"):
         gpu_sync()
-        rr_local = r.ravel().dot(r.ravel())
+        rr_local = xp.sum(r * r)
         gpu_sync()
 
     with timed("cg_allreduce"):
@@ -142,7 +153,7 @@ def conjugate_gradients(
         # Compute pAp for step size
         with timed("cg_dot_pAp"):
             gpu_sync()
-            pAp_local = p.s.ravel().dot(Ap.s.ravel())
+            pAp_local = xp.sum(p.s * Ap.s)
             gpu_sync()
 
         with timed("cg_allreduce"):
@@ -180,7 +191,7 @@ def conjugate_gradients(
         # Compute next residual norm
         with timed("cg_dot_rr"):
             gpu_sync()
-            next_rr_local = r.ravel().dot(r.ravel())
+            next_rr_local = xp.sum(r * r)
             gpu_sync()
 
         with timed("cg_allreduce"):
