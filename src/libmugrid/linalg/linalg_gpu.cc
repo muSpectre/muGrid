@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   29 Dec 2024
+ * @date   29 Dec 2025
  *
  * @brief  Unified CUDA/HIP implementations of linear algebra operations
  *
@@ -48,22 +48,22 @@
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
         kernel<<<grid, block>>>(__VA_ARGS__)
     #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
-    #define GPU_MALLOC(ptr, size) cudaMalloc(ptr, size)
-    #define GPU_FREE(ptr) cudaFree(ptr)
+    #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
+    #define GPU_FREE(ptr) (void)cudaFree(ptr)
     #define GPU_MEMCPY_D2H(dst, src, size) \
-        cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
-    #define GPU_MEMSET(ptr, value, size) cudaMemset(ptr, value, size)
+        (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
+    #define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
     using DeviceSpace = muGrid::CudaSpace;
 #elif defined(MUGRID_ENABLE_HIP)
     #include <hip/hip_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
         hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
     #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
-    #define GPU_MALLOC(ptr, size) hipMalloc(ptr, size)
-    #define GPU_FREE(ptr) hipFree(ptr)
+    #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
+    #define GPU_FREE(ptr) (void)hipFree(ptr)
     #define GPU_MEMCPY_D2H(dst, src, size) \
-        hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
-    #define GPU_MEMSET(ptr, value, size) hipMemset(ptr, value, size)
+        (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
+    #define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
     using DeviceSpace = muGrid::HIPSpace;
 #endif
 

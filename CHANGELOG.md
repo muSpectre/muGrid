@@ -1,9 +1,22 @@
 Change log for µGrid
 ====================
 
-0.102.0 (29Dec25)
+0.102.0 (30Dec25)
 -----------------
 
+- ENH: Added `linalg` module with efficient linear algebra operations for muGrid fields
+  - `vecdot(a, b)`: Vector dot product (interior only, excludes ghost regions)
+  - `norm_sq(x)`: Squared L2 norm (interior only)
+  - `axpy(alpha, x, y)`: y = alpha * x + y (full buffer)
+  - `scal(alpha, x)`: x = alpha * x (full buffer)
+  - `axpby(alpha, x, beta, y)`: y = alpha * x + beta * y (full buffer, fused operation)
+  - `copy(src, dst)`: dst = src (full buffer)
+  - Avoids GB-scale memory copies from non-contiguous array views in CG solver
+  - CPU implementation using Eigen, GPU implementation for CUDA and HIP
+- ENH: Updated conjugate gradient solver to use new `linalg` module
+  - Uses `axpby` for fused update_p step (2 reads + 1 write instead of 3 reads + 2 writes)
+  - Improved arithmetic intensity from 0.125 to 0.139 FLOP/byte
+- BUILD: Fixed `nodiscard` warnings in HIP linalg implementation
 - API: Replaced `MemoryLocation` enum with new `Device` class for device selection
   - New `Device` class with factory methods: `Device.cpu()`, `Device.cuda(id)`, `Device.rocm(id)`, `Device.gpu(id)`
   - New `DeviceType` enum following DLPack conventions (CPU, CUDA, CUDAHost, ROCm, ROCmHost)
