@@ -720,9 +720,6 @@ namespace muGrid {
     std::vector<IOSize_t> compute_start_vector_global(
         const Index_t & frame) const;
 
-    //! Convert a "std::type_info"  into a NetCDF "nc_type" type.
-    static nc_type typeid_to_nc_type(const std::type_info & type_id);
-
     //! Compile-time type to nc_type mapping for supported types
     //! This uses the pre-computed netcdf_type<T>() values
     template <typename T>

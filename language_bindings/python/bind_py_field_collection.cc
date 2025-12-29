@@ -423,7 +423,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name)
                 -> muGrid::TypedFieldBase<Real> & {
                 auto & field{collection.get_field(unique_name)};
-                field.assert_typeid(typeid(Real));
+                field.assert_type_descriptor(muGrid::type_to_descriptor<Real>());
                 return static_cast<muGrid::TypedFieldBase<Real> &>(field);
             },
             "unique_name"_a, py::return_value_policy::reference_internal)
@@ -432,7 +432,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name)
                 -> muGrid::TypedFieldBase<Complex> & {
                 auto & field{collection.get_field(unique_name)};
-                field.assert_typeid(typeid(Complex));
+                field.assert_type_descriptor(muGrid::type_to_descriptor<Complex>());
                 return static_cast<muGrid::TypedFieldBase<Complex> &>(field);
             },
             "unique_name"_a, py::return_value_policy::reference_internal)
@@ -441,7 +441,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name)
                 -> muGrid::TypedFieldBase<Int> & {
                 auto & field{collection.get_field(unique_name)};
-                field.assert_typeid(typeid(Int));
+                field.assert_type_descriptor(muGrid::type_to_descriptor<Int>());
                 return static_cast<muGrid::TypedFieldBase<Int> &>(field);
             },
             "unique_name"_a, py::return_value_policy::reference_internal)
@@ -450,7 +450,7 @@ void add_field_collection(py::module & mod) {
             [](FieldCollection & collection, const std::string & unique_name)
                 -> muGrid::TypedFieldBase<Uint> & {
                 auto & field{collection.get_field(unique_name)};
-                field.assert_typeid(typeid(Uint));
+                field.assert_type_descriptor(muGrid::type_to_descriptor<Uint>());
                 return static_cast<muGrid::TypedFieldBase<Uint> &>(field);
             },
             "unique_name"_a, py::return_value_policy::reference_internal)

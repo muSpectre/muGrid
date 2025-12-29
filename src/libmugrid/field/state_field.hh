@@ -48,16 +48,13 @@
 #define SRC_LIBMUGRID_STATE_FIELD_HH_
 
 #include "core/types.hh"
+#include "core/type_descriptor.hh"
 #include "util/ref_vector.hh"
 #include "field/state_field_map.hh"
 
 #include <string>
 #include <vector>
 #include <utility>
-
-#ifdef WITH_MPI
-#include "mpi.h"
-#endif
 
 namespace muGrid {
 
@@ -114,21 +111,16 @@ namespace muGrid {
     //! returns the physical unit of the values stored in the field
     const Unit & get_physical_unit() const;
 
-    //! return type_id of stored type
-    virtual const std::type_info & get_typeid() const = 0;
+    //! return the unified type descriptor for this state field's element type
+    virtual TypeDescriptor get_type_descriptor() const = 0;
 
     //! return the size of the elementary field entry in bytes
     virtual std::size_t get_element_size_in_bytes() const = 0;
 
-#ifdef WITH_MPI
-    //! return the MPI representation of the stored type
-    virtual MPI_Datatype get_mpi_type() const = 0;
-#endif
-
     /**
-     * assert that the stored type corresponds to the given type id
+     * assert that the stored type corresponds to the given type descriptor
      */
-    void assert_typeid(const std::type_info & type) const;
+    void assert_type_descriptor(TypeDescriptor type_desc) const;
 
     /**
      * cycle the fields (current becomes old, old becomes older,
@@ -252,13 +244,8 @@ namespace muGrid {
     //! Move assignment operator
     TypedStateField & operator=(TypedStateField && other) = delete;
 
-    //! return type_id of stored type
-    const std::type_info & get_typeid() const final;
-
-#ifdef WITH_MPI
-    //! return the MPI representation of the stored type
-    MPI_Datatype get_mpi_type() const final;
-#endif
+    //! return the unified type descriptor for this state field's element type
+    TypeDescriptor get_type_descriptor() const final;
 
     //! return the size of the elementary field entry in bytes
     std::size_t get_element_size_in_bytes() const final;
@@ -311,7 +298,7 @@ namespace muGrid {
     if (this->state_field_exists(unique_prefix)) {
       if (allow_existing) {
         auto & field{*this->state_fields[unique_prefix]};
-        field.assert_typeid(typeid(T));
+        field.assert_type_descriptor(type_to_descriptor<T>());
         if (field.get_nb_memory() != nb_memory) {
           throw FieldCollectionError(
               "You can't change the number of memory steps of a state field "

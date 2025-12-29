@@ -23,6 +23,7 @@ set(MUGRID_SOURCES
     core/exception.cc
     core/enums.cc
     core/units.cc
+    core/type_descriptor.cc
     # grid/
     grid/index_ops.cc
     grid/pixels.cc
@@ -61,6 +62,12 @@ set(MUGRID_SOURCES
 # Add NetCDF source if available
 if(MUGRID_ENABLE_NETCDF)
     list(APPEND MUGRID_SOURCES io/file_io_netcdf.cc)
+    list(APPEND MUGRID_SOURCES io/type_descriptor_netcdf.cc)
+endif()
+
+# Add MPI-specific sources
+if(MUGRID_ENABLE_MPI)
+    list(APPEND MUGRID_SOURCES mpi/type_descriptor_mpi.cc)
 endif()
 
 # Add GPU backend sources if CUDA or HIP is available

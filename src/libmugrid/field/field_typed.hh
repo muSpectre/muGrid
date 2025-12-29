@@ -46,11 +46,6 @@
 #include <type_traits>
 #include <memory>
 
-#ifdef WITH_MPI
-#include "mpi.h"
-#include "mpi/communicator.hh"
-#endif
-
 namespace muGrid {
 
   //! forward declaration
@@ -173,13 +168,10 @@ namespace muGrid {
     //! subtraction assignment
     TypedFieldBase & operator-=(const TypedFieldBase & other);
 
-    //! return type of the stored data
-    const std::type_info & get_typeid() const final { return typeid(T); }
-
-#ifdef WITH_MPI
-    //! return the MPI representation of the stored type
-    MPI_Datatype get_mpi_type() const final { return mpi_type<T>(); }
-#endif
+    //! return the unified type descriptor for this field's element type
+    TypeDescriptor get_type_descriptor() const final {
+      return type_to_descriptor<T>();
+    }
 
     //! return the size of the elementary field entry in bytes
     std::size_t get_element_size_in_bytes() const final {
@@ -594,7 +586,7 @@ namespace muGrid {
     if (this->field_exists(unique_name)) {
       if (allow_existing) {
         auto & field{*this->fields[unique_name]};
-        field.assert_typeid(typeid(T));
+        field.assert_type_descriptor(type_to_descriptor<T>());
         if (field.get_nb_components() != nb_components) {
           std::stringstream error{};
           error << "You can't change the number of components of a field "
@@ -661,7 +653,7 @@ namespace muGrid {
     if (this->field_exists(unique_name)) {
       if (allow_existing) {
         auto & field{*this->fields[unique_name]};
-        field.assert_typeid(typeid(T));
+        field.assert_type_descriptor(type_to_descriptor<T>());
         if (field.get_components_shape() != components_shape) {
           throw FieldCollectionError(
               "You can't change the shape of a field by re-registering it.");

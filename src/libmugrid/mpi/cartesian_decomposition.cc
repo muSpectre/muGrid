@@ -16,6 +16,7 @@
 
 #include "core/coordinates.hh"
 #include "core/enums.hh"
+#include "core/type_descriptor.hh"
 #include "field/field.hh"
 #include "collection/field_collection_global.hh"
 #include "mpi/cartesian_communicator.hh"
@@ -218,12 +219,8 @@ namespace muGrid {
         auto element_size{
             static_cast<Index_t>(field.get_element_size_in_bytes())};
 
-#ifdef WITH_MPI
-        MPI_Datatype mpi_type{field.get_mpi_type()};
-        void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
-#else
-        void * mpi_type_ptr{nullptr};
-#endif
+        // Get type descriptor for communication
+        TypeDescriptor type_desc{field.get_type_descriptor()};
 
         // FIXME! The code below assumes a specific form of data layout,
         // essentially column-major but with potentially varying slides
@@ -323,7 +320,7 @@ namespace muGrid {
                     // stride in send direction
                     block_len,
                     // type information
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     // device memory flag for serial GPU memory copy
                     is_device_memory);
 
@@ -351,7 +348,7 @@ namespace muGrid {
                     // stride in send direction
                     block_len,
                     // type information
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     // device memory flag for serial GPU memory copy
                     is_device_memory);
 
@@ -397,12 +394,8 @@ namespace muGrid {
         auto element_size{
             static_cast<Index_t>(field.get_element_size_in_bytes())};
 
-#ifdef WITH_MPI
-        MPI_Datatype mpi_type{field.get_mpi_type()};
-        void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
-#else
-        void * mpi_type_ptr{nullptr};
-#endif
+        // Get type descriptor for communication
+        TypeDescriptor type_desc{field.get_type_descriptor()};
 
         // For each direction (in reverse order to handle corners correctly)
         for (Dim_t direction{static_cast<int>(spatial_dims) - 1}; direction >= 0;
@@ -455,7 +448,7 @@ namespace muGrid {
                         nb_ghosts_left,
                     data,
                     block_len,
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     is_device_memory);
             }
 
@@ -475,7 +468,7 @@ namespace muGrid {
                     nb_ghosts_left,
                     data,
                     block_len,
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     is_device_memory);
             }
 

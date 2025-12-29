@@ -40,6 +40,7 @@
 #include "core/units.hh"
 #include "util/math.hh"
 #include "field/state_field.hh"
+#include "io/type_descriptor_netcdf.hh"
 
 #include "io/file_io_netcdf.hh"
 
@@ -2108,30 +2109,6 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  nc_type NetCDFVarBase::typeid_to_nc_type(const std::type_info & type_id) {
-    // Dispatch to compile-time type mapping using netcdf_type<T>()
-    // This is a runtime wrapper that uses type_id comparison but maps to
-    // the pre-computed compile-time values
-    if (type_id == typeid(char)) {
-      return MU_NC_CHAR;
-    } else if (type_id == typeid(muGrid::Int)) {
-      return MU_NC_INT;
-    } else if (type_id == typeid(muGrid::Uint)) {
-      return MU_NC_UINT;
-    } else if (type_id == typeid(muGrid::Index_t)) {
-      return MU_NC_INDEX_T;
-    } else if (type_id == typeid(muGrid::Real)) {
-      return MU_NC_REAL;
-    } else {
-      std::string name{type_id.name()};
-      throw FileIOError("The given type_id '" + name +
-                        "' can not be associated with a NetCDF nc_type. "
-                        "Supported types are: char, muGrid::Int, muGrid::Uint, "
-                        "muGrid::Index_t, and muGrid::Real.");
-    }
-  }
-
-  /* ---------------------------------------------------------------------- */
 #ifdef WITH_MPI
   MPI_Datatype
   NetCDFVarBase::nc_type_to_mpi_datatype(const nc_type & data_type) {
@@ -3058,8 +3035,7 @@ namespace muGrid {
       muGrid::Field & var_field,
       const std::vector<std::shared_ptr<NetCDFDim>> & var_dims, bool hidden) {
     std::string var_name{var_field.get_name()};
-    const std::type_info & type_id{var_field.get_typeid()};
-    nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
+    nc_type var_data_type{descriptor_to_nc_type(var_field.get_type_descriptor())};
     IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
 
     this->var_vector.push_back(std::make_shared<NetCDFVarField>(
@@ -3073,9 +3049,7 @@ namespace muGrid {
       muGrid::StateField & var_state_field,
       const std::vector<std::shared_ptr<NetCDFDim>> & var_dims) {
     std::string var_name{var_state_field.get_unique_prefix()};
-    const std::type_info & type_id{
-        var_state_field.current().get_typeid()};
-    nc_type var_data_type{NetCDFVarBase::typeid_to_nc_type(type_id)};
+    nc_type var_data_type{descriptor_to_nc_type(var_state_field.get_type_descriptor())};
     IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
 
     this->var_vector.push_back(std::make_shared<NetCDFVarStateField>(

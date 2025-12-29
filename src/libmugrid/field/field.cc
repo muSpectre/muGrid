@@ -67,11 +67,12 @@ namespace muGrid {
   FieldCollection & Field::get_collection() const { return this->collection; }
 
   /* ---------------------------------------------------------------------- */
-  void Field::assert_typeid(const std::type_info & type) const {
-    if (this->get_typeid() != type) {
+  void Field::assert_type_descriptor(TypeDescriptor type_desc) const {
+    if (this->get_type_descriptor() != type_desc) {
       std::stringstream s;
-      s << "Field stores data of type `" << this->get_typeid().name()
-        << "`, which differs from `" << typeid(Int).name() << "`.";
+      s << "Field stores data of type `"
+        << type_descriptor_name(this->get_type_descriptor())
+        << "`, which differs from `" << type_descriptor_name(type_desc) << "`.";
       throw std::runtime_error(s.str());
     }
   }

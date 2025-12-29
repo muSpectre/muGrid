@@ -40,13 +40,9 @@
 #include "core/types.hh"
 #include "core/enums.hh"
 #include "core/units.hh"
-
-#ifdef WITH_MPI
-#include "mpi.h"
-#endif
+#include "core/type_descriptor.hh"
 
 #include <string>
-#include <typeinfo>
 
 namespace muGrid {
     /**
@@ -288,17 +284,10 @@ namespace muGrid {
         Index_t get_default_nb_cols(const IterUnit & iter_type) const;
 
         /**
-         * return the type information of the stored scalar (for compatibility
-         * checking)
+         * return the unified type descriptor for this field's element type.
+         * This can be converted to MPI_Datatype or nc_type as needed.
          */
-        virtual const std::type_info & get_typeid() const = 0;
-
-#ifdef WITH_MPI
-        /**
-         * return the MPI representation of the stored type
-         */
-        virtual MPI_Datatype get_mpi_type() const = 0;
-#endif
+        virtual TypeDescriptor get_type_descriptor() const = 0;
 
         /**
          * return the size of the elementary field entry in bytes
@@ -306,9 +295,9 @@ namespace muGrid {
         virtual std::size_t get_element_size_in_bytes() const = 0;
 
         /**
-         * assert that the stored type corresponds to the given type id
+         * assert that the stored type corresponds to the given type descriptor
          */
-        void assert_typeid(const std::type_info & type) const;
+        void assert_type_descriptor(TypeDescriptor type_desc) const;
 
         /**
          * return a pointer to the raw data

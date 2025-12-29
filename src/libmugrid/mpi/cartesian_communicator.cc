@@ -1,5 +1,6 @@
 #ifdef WITH_MPI
 #include <mpi.h>
+#include "mpi/type_descriptor_mpi.hh"
 #endif
 
 #include "core/coordinates.hh"
@@ -93,12 +94,12 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory [[maybe_unused]]) const {
         // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
         // handles device pointers directly.
-        // Cast void pointer to MPI_Datatype for MPI implementation
-        MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
+        // Convert TypeDescriptor to MPI_Datatype
+        MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
         MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
                         mpi_datatype, &send_buffer_mpi_t);
@@ -124,12 +125,12 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory [[maybe_unused]]) const {
         // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
         // handles device pointers directly.
-        // Cast void pointer to MPI_Datatype for MPI implementation
-        MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
+        // Convert TypeDescriptor to MPI_Datatype
+        MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
         MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
                         mpi_datatype, &send_buffer_mpi_t);
@@ -155,10 +156,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory [[maybe_unused]]) const {
-        // Cast void pointer to MPI_Datatype for MPI implementation
-        MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
+        // Convert TypeDescriptor to MPI_Datatype
+        MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
         // Create send type
         MPI_Datatype send_buffer_mpi_t;
@@ -205,10 +206,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory [[maybe_unused]]) const {
-        // Cast void pointer to MPI_Datatype for MPI implementation
-        MPI_Datatype mpi_datatype{*static_cast<MPI_Datatype *>(elem_mpi_t)};
+        // Convert TypeDescriptor to MPI_Datatype
+        MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
         // Create send type
         MPI_Datatype send_buffer_mpi_t;
@@ -289,10 +290,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: elem_mpi_t and direction are not used in serial mode
-        (void)elem_mpi_t;
+        // Note: type_desc and direction are not used in serial mode
+        (void)type_desc;
         (void)direction;
         if (nb_send_blocks != nb_recv_blocks) {
             throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
@@ -315,10 +316,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: elem_mpi_t and direction are not used in serial mode
-        (void)elem_mpi_t;
+        // Note: type_desc and direction are not used in serial mode
+        (void)type_desc;
         (void)direction;
         if (nb_send_blocks != nb_recv_blocks) {
             throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
@@ -398,10 +399,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: elem_mpi_t and direction are not used in serial mode
-        (void)elem_mpi_t;
+        // Note: type_desc and direction are not used in serial mode
+        (void)type_desc;
         (void)direction;
         if (nb_send_blocks != nb_recv_blocks) {
             throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
@@ -425,10 +426,10 @@ namespace muGrid {
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, void * elem_mpi_t,
+        int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: elem_mpi_t and direction are not used in serial mode
-        (void)elem_mpi_t;
+        // Note: type_desc and direction are not used in serial mode
+        (void)type_desc;
         (void)direction;
         if (nb_send_blocks != nb_recv_blocks) {
             throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
