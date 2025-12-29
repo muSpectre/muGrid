@@ -222,6 +222,7 @@ with timer("conjugate_gradients"):
             tol=1e-6,
             callback=callback,
             maxiter=args.maxiter,
+            timer=timer,
         )
         converged = True
         if not args.quiet:

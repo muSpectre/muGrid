@@ -677,6 +677,7 @@ with timer("total_solve"):
                     tol=args.tol,
                     callback=callback,
                     maxiter=args.maxiter,
+                    timer=timer,
                 )
                 converged = True
             except RuntimeError as e:

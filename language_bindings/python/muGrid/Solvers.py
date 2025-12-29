@@ -12,6 +12,7 @@ def conjugate_gradients(
     tol: float = 1e-6,
     maxiter: int = 1000,
     callback: callable = None,
+    timer=None,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -41,6 +42,9 @@ def conjugate_gradients(
     callback : callable, optional
         Function to call after each iteration with signature:
         callback(iteration, x_array, residual_array, search_direction_array)
+    timer : muGrid.Timer, optional
+        Timer object for performance profiling. If provided, the solver will
+        record timing for internal operations (dot products, vector updates).
 
     Returns
     -------
@@ -55,6 +59,12 @@ def conjugate_gradients(
     """
     tol_sq = tol * tol
 
+    # Timer context manager (no-op if timer is None)
+    from contextlib import nullcontext
+
+    def timed(name):
+        return timer(name) if timer is not None else nullcontext()
+
     # Get spatial dimension from the field collection
     spatial_dim = len(fc.nb_grid_pts)
 
@@ -68,13 +78,15 @@ def conjugate_gradients(
 
     # Initial residual: r = b - A*x
     hessp(x, Ap)
-    p.s[...] = b.s - Ap.s
-    r = p.s.copy()
+    with timed("cg_vector_ops"):
+        p.s[...] = b.s - Ap.s
+        r = p.s.copy()
 
     if callback:
         callback(0, x.s, r, p.s)
 
-    rr = comm.sum(r.ravel().dot(r.ravel()))
+    with timed("cg_dot_products"):
+        rr = comm.sum(r.ravel().dot(r.ravel()))
     if rr < tol_sq:
         return x
 
@@ -83,28 +95,32 @@ def conjugate_gradients(
         hessp(p, Ap)
 
         # Compute step size
-        pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
+        with timed("cg_dot_products"):
+            pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
         if pAp <= 0:
             raise RuntimeError("Hessian is not positive definite")
 
         alpha = rr / pAp
 
         # Update solution and residual
-        x.s[...] += alpha * p.s
-        r -= alpha * Ap.s
+        with timed("cg_vector_ops"):
+            x.s[...] += alpha * p.s
+            r -= alpha * Ap.s
 
         if callback:
             callback(iteration + 1, x.s, r, p.s)
 
         # Check convergence
-        next_rr = comm.sum(r.ravel().dot(r.ravel()))
+        with timed("cg_dot_products"):
+            next_rr = comm.sum(r.ravel().dot(r.ravel()))
         if next_rr < tol_sq:
             return x
 
         # Update search direction
-        beta = next_rr / rr
-        rr = next_rr
-        p.s[...] *= beta
-        p.s[...] += r
+        with timed("cg_vector_ops"):
+            beta = next_rr / rr
+            rr = next_rr
+            p.s[...] *= beta
+            p.s[...] += r
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")
