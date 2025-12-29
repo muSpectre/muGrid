@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   21 Dec 2024
+ * @date   21 Dec 2025
  *
  * @brief  Non-templated base class for distributed FFT engine
  *
@@ -47,8 +47,8 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                              const DynGridIndex & nb_ghosts_left,
                              const DynGridIndex & nb_ghosts_right,
                              const SubPtMap_t & nb_sub_pts,
-                             MemoryLocation memory_location)
-    : Parent_t{comm, nb_domain_grid_pts.get_dim(), nb_sub_pts, memory_location},
+                             Device device)
+    : Parent_t{comm, nb_domain_grid_pts.get_dim(), nb_sub_pts, device},
       spatial_dim{nb_domain_grid_pts.get_dim()} {
   // Validate dimensions
   if (spatial_dim != 2 && spatial_dim != 3) {
@@ -156,7 +156,7 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
       this->nb_fourier_grid_pts, this->nb_fourier_subdomain_grid_pts,
       this->fourier_subdomain_locations, nb_sub_pts,
       StorageOrder::ArrayOfStructures, fourier_no_ghosts,
-      fourier_no_ghosts, memory_location);
+      fourier_no_ghosts, device);
 
   // Compute normalization factor
   this->norm_factor = fft_normalization(nb_domain_grid_pts);
@@ -167,7 +167,7 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
 
 void FFTEngineBase::initialise_fft_base() {
   const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
-  auto memory_location = this->get_memory_location();
+  auto device = this->get_device();
 
   // Get local real-space dimensions (without ghosts)
   DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
@@ -192,7 +192,7 @@ void FFTEngineBase::initialise_fft_base() {
   this->work_zpencil = std::make_unique<GlobalFieldCollection>(
       get_hermitian_grid_pts(nb_grid_pts, 0), zpencil_shape, zpencil_loc,
       SubPtMap_t{}, StorageOrder::ArrayOfStructures,
-      no_ghosts, no_ghosts, memory_location);
+      no_ghosts, no_ghosts, device);
 
   if (this->spatial_dim == 3) {
     // For 3D, we need additional work buffers for the Y-FFT step
@@ -223,7 +223,7 @@ void FFTEngineBase::initialise_fft_base() {
     this->work_ypencil = std::make_unique<GlobalFieldCollection>(
         ypencil_global, ypencil_shape, ypencil_loc, SubPtMap_t{},
         StorageOrder::ArrayOfStructures, no_ghosts,
-        no_ghosts, memory_location);
+        no_ghosts, device);
 
     // Set up Y-gather transpose configuration (within row communicator)
     // Note: This is a Y-gather operation. Within a row, all ranks have the

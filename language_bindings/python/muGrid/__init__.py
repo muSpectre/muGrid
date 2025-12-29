@@ -60,6 +60,10 @@ has_netcdf = _muGrid.has_netcdf
 host_arch = _muGrid.host_arch
 device_arch = _muGrid.device_arch
 
+# Device abstraction
+Device = _muGrid.Device
+DeviceType = _muGrid.DeviceType
+
 # Import Python wrappers for main classes (these accept wrapped Field objects)
 from .Wrappers import (  # noqa: E402
     CartesianDecomposition,

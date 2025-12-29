@@ -12,19 +12,18 @@ namespace muGrid {
        public:
         using Parent_t = Decomposition;
         using SubPtMap_t = FieldCollection::SubPtMap_t;
-        using MemoryLocation = FieldCollection::MemoryLocation;
 
         /*
          * Constructor with deferred initialization
          * @param comm communicator
          * @param spatial_dimension spatial dimension of the problem
          * @param nb_sub_pts number of sub-points per pixel
-         * @param memory_location where to allocate field memory (Host or Device)
+         * @param device where to allocate field memory
          */
         CartesianDecomposition(const Communicator & comm,
                                Dim_t spatial_dimension,
                                const SubPtMap_t & nb_sub_pts = {},
-                               MemoryLocation memory_location = MemoryLocation::Host);
+                               Device device = Device::cpu());
 
         /*
          * Constructor with immediate initialization
@@ -34,7 +33,7 @@ namespace muGrid {
          * @param nb_ghosts_left number of ghost cells on the left side
          * @param nb_ghosts_right number of ghost cells on the right side
          * @param nb_sub_pts number of sub-points per pixel
-         * @param memory_location where to allocate field memory (Host or Device)
+         * @param device where to allocate field memory
          */
         CartesianDecomposition(const Communicator & comm,
                                const DynGridIndex & nb_domain_grid_pts,
@@ -42,7 +41,7 @@ namespace muGrid {
                                const DynGridIndex & nb_ghosts_left,
                                const DynGridIndex & nb_ghosts_right,
                                const SubPtMap_t & nb_sub_pts = {},
-                               MemoryLocation memory_location = MemoryLocation::Host);
+                               Device device = Device::cpu());
 
         CartesianDecomposition() = delete;
 
@@ -122,9 +121,9 @@ namespace muGrid {
             return this->collection.is_on_device();
         }
 
-        //! get the memory location of the field collection
-        MemoryLocation get_memory_location() const {
-            return this->collection.get_memory_location();
+        //! get the device of the field collection
+        Device get_device() const {
+            return this->collection.get_device();
         }
 
        protected:

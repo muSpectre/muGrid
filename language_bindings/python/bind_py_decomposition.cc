@@ -4,6 +4,7 @@
 #include "mpi/cartesian_decomposition.hh"
 #include "field/field.hh"
 #include "collection/field_collection.hh"
+#include "memory/device.hh"
 #include "util/python_helpers.hh"
 
 #include <pybind11/pybind11.h>
@@ -13,6 +14,7 @@
 using muGrid::Decomposition;
 using muGrid::CartesianDecomposition;
 using muGrid::Communicator;
+using muGrid::Device;
 using muGrid::Int;
 using muGrid::Index_t;
 using muGrid::DynGridIndex;
@@ -121,7 +123,6 @@ void add_decomposition(py::module & mod) {
 
 // Bind class Cartesian Decomposition
 void add_cartesian_decomposition(py::module & mod) {
-    using MemoryLocation = muGrid::FieldCollection::MemoryLocation;
     py::class_<CartesianDecomposition, Decomposition>(mod,
                                                       "CartesianDecomposition",
         R"pbdoc(
@@ -148,8 +149,8 @@ void add_cartesian_decomposition(py::module & mod) {
             Ghost layers on high-index side of each dimension
         sub_pts : dict, optional
             Mapping of sub-point names to counts (e.g., {"quad": 4})
-        memory_location : MemoryLocation, optional
-            Where to allocate field memory (Host or Device)
+        device : Device, optional
+            Where to allocate field memory (default: Device.cpu())
 
         Attributes
         ----------
@@ -184,11 +185,11 @@ void add_cartesian_decomposition(py::module & mod) {
                       const DynGridIndex &, const DynGridIndex &,
                       const DynGridIndex &,
                       const muGrid::FieldCollection::SubPtMap_t &,
-                      MemoryLocation>(),
+                      Device>(),
              "comm"_a, "nb_domain_grid_pts"_a, "nb_subdivisions"_a,
              "nb_ghosts_left"_a, "nb_ghosts_right"_a,
              "sub_pts"_a = muGrid::FieldCollection::SubPtMap_t{},
-             "memory_location"_a = MemoryLocation::Host)
+             "device"_a = Device::cpu())
         .def_property_readonly(
             "collection",
             py::overload_cast<>(&CartesianDecomposition::get_collection,
@@ -255,9 +256,9 @@ void add_cartesian_decomposition(py::module & mod) {
         .def_property_readonly("is_on_device",
                                &CartesianDecomposition::is_on_device,
                                "True if field data is on GPU device.")
-        .def_property_readonly("memory_location",
-                               &CartesianDecomposition::get_memory_location,
-                               "Memory location (Host or Device).");
+        .def_property_readonly("device",
+                               &CartesianDecomposition::get_device,
+                               "Device where field data is allocated.");
 }
 
 // Combined binding function

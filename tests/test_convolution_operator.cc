@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   09 Dec 2024
+ * @date   09 Dec 2025
  *
  * @brief  Tests for the ConvolutionOperator with GPU support
  *

@@ -1,6 +1,21 @@
 Change log for µGrid
 ====================
 
+0.102.0 (29Dec25)
+-----------------
+
+- API: Replaced `MemoryLocation` enum with new `Device` class for device selection
+  - New `Device` class with factory methods: `Device.cpu()`, `Device.cuda(id)`, `Device.rocm(id)`
+  - New `DeviceType` enum following DLPack conventions (CPU, CUDA, CUDAHost, ROCm, ROCmHost)
+  - Supports multi-GPU systems with device IDs (e.g., `Device.cuda(1)` for GPU 1)
+- API: Renamed `memory_location` parameter to `device` in Python wrappers
+  - Affects `GlobalFieldCollection`, `LocalFieldCollection`, `CartesianDecomposition`
+  - Accepts strings (`"cpu"`, `"cuda"`, `"cuda:N"`, `"rocm"`, `"rocm:N"`) or `Device` objects
+- API: Pythonic string-based parameter handling
+  - `device`: `"cpu"`, `"host"`, `"cuda"`, `"cuda:0"`, `"rocm:1"`, etc.
+  - `open_mode` (FileIONetCDF): `"read"`, `"write"`, `"overwrite"`, `"append"`
+- DOC: Updated GPU and Python API documentation for new device selection interface
+
 0.101.2 (29Dec25)
 -----------------
 

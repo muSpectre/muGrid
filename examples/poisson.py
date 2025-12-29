@@ -22,66 +22,71 @@ except ImportError:
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 parser = argparse.ArgumentParser(
-    prog="Poisson",
-    description="Solve the Poisson equation"
+    prog="Poisson", description="Solve the Poisson equation"
 )
 
 parser.add_argument(
-    "-n", "--nb-grid-pts",
+    "-n",
+    "--nb-grid-pts",
     default=[32, 32],
     type=lambda s: [int(x) for x in s.split(",")],
-    help="Grid points as nx,ny or nx,ny,nz (default: 32,32)"
+    help="Grid points as nx,ny or nx,ny,nz (default: 32,32)",
 )
 
-_memory_locations = {
-    "host": muGrid.GlobalFieldCollection.MemoryLocation.Host,
-    "device": muGrid.GlobalFieldCollection.MemoryLocation.Device,
+_devices = {
+    "host": muGrid.Device.cpu(),
+    "device": muGrid.Device.cuda(),
 }
 
 parser.add_argument(
-    "-m", "--memory",
-    choices=_memory_locations,
+    "-m",
+    "--memory",
+    choices=_devices,
     default="host",
-    help="Memory space for allocation (default: host)"
+    help="Memory space for allocation (default: host)",
 )
 
 parser.add_argument(
-    "-i", "--maxiter",
+    "-i",
+    "--maxiter",
     type=int,
     default=1000,
-    help="Maximum number of CG iterations (default: 1000)"
+    help="Maximum number of CG iterations (default: 1000)",
 )
 
 parser.add_argument(
-    "-p", "--plot",
+    "-p",
+    "--plot",
     action="store_true",
-    help="Show plot of RHS and solution (default: off)"
+    help="Show plot of RHS and solution (default: off)",
 )
 
 parser.add_argument(
-    "-s", "--stencil",
+    "-s",
+    "--stencil",
     choices=["generic", "hardcoded"],
     default="generic",
     help="Stencil implementation: 'generic' (sparse convolution) or "
-         "'hardcoded' (optimized Laplace operator) (default: generic)"
+    "'hardcoded' (optimized Laplace operator) (default: generic)",
 )
 
 parser.add_argument(
-    "-q", "--quiet",
+    "-q",
+    "--quiet",
     action="store_true",
-    help="Suppress per-iteration output (default: off)"
+    help="Suppress per-iteration output (default: off)",
 )
 
 parser.add_argument(
     "--json",
     action="store_true",
-    help="Output results in JSON format (implies --quiet)"
+    help="Output results in JSON format (implies --quiet)",
 )
 
 parser.add_argument(
     "--papi",
     action="store_true",
-    help="Use PAPI hardware counters for performance measurement (requires pypapi)"
+    help="Use PAPI hardware counters for performance measurement (requires pypapi)",
 )
 
 args = parser.parse_args()
@@ -95,7 +100,7 @@ if args.memory == "host":
 else:
     import cupy as arr
 
-args.memory = _memory_locations[args.memory]
+args.memory = _devices[args.memory]
 
 dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
@@ -107,9 +112,9 @@ s = suggest_subdivisions(dim, comm.size)
 left_ghosts = (1,) * dim
 right_ghosts = (1,) * dim
 
-decomposition = muGrid.CartesianDecomposition(comm, args.nb_grid_pts, s,
-                                              left_ghosts, right_ghosts,
-                                              memory_location=args.memory)
+decomposition = muGrid.CartesianDecomposition(
+    comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=args.memory
+)
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 # FD-stencil for the Laplacian
@@ -162,8 +167,10 @@ if dim == 2:
     rhs.p[...] = arr.asarray((1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10)
 else:
     x, y, z = coords
-    rhs.p[...] = arr.asarray((1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y) *
-                              np.cos(2 * np.pi * z)) ** 10)
+    rhs.p[...] = arr.asarray(
+        (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y) * np.cos(2 * np.pi * z))
+        ** 10
+    )
 rhs.p[...] -= arr.mean(rhs.p)
 
 # Performance counters
@@ -171,10 +178,12 @@ nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
 # Create global timer for hierarchical timing
 # PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and args.memory == _memory_locations["host"]
-if args.papi and args.memory != _memory_locations["host"]:
+use_papi = args.papi and args.memory == _devices["host"]
+if args.papi and args.memory != _devices["host"]:
     if not args.quiet:
-        print("Warning: PAPI not available for device memory (GPU). Using estimates only.")
+        print(
+            "Warning: PAPI not available for device memory (GPU). Using estimates only."
+        )
 timer = muGrid.Timer(use_papi=use_papi)
 
 
@@ -261,7 +270,7 @@ if args.json:
             "stencil": args.stencil,
             "stencil_name": stencil_name,
             "nb_stencil_pts": int(nb_stencil_pts),
-            "memory": "host" if args.memory == _memory_locations["host"] else "device",
+            "memory": "host" if args.memory == _devices["host"] else "device",
             "maxiter": int(args.maxiter),
         },
         "results": {
@@ -287,8 +296,10 @@ else:
     print(f"\n{'='*60}")
     print("Performance Summary")
     print(f"{'='*60}")
-    print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
-          f"{nb_grid_pts_total:,} points")
+    print(
+        f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
+        f"{nb_grid_pts_total:,} points"
+    )
     print(f"Dimensions: {dim}D")
     print(f"Stencil implementation: {stencil_name}")
     print(f"Stencil points: {nb_stencil_pts}")

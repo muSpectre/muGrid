@@ -40,10 +40,10 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection::GlobalFieldCollection(
         Dim_t spatial_dimension, const SubPtMap_t &nb_sub_pts,
-        StorageOrder storage_order, MemoryLocation memory_location)
+        StorageOrder storage_order, Device device)
         : Parent{
               ValidityDomain::Global, spatial_dimension, nb_sub_pts,
-              storage_order, memory_location
+              storage_order, device
           },
           nb_ghosts_left{DynGridIndex(spatial_dimension)},
           nb_ghosts_right{DynGridIndex(spatial_dimension)} {
@@ -56,10 +56,10 @@ namespace muGrid {
         const DynGridIndex &subdomain_locations_with_ghosts,
         const SubPtMap_t &nb_sub_pts, StorageOrder storage_order,
         const DynGridIndex &nb_ghosts_left, const DynGridIndex &nb_ghosts_right,
-        MemoryLocation memory_location)
+        Device device)
         : Parent{
               ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
-              nb_sub_pts, storage_order, memory_location
+              nb_sub_pts, storage_order, device
           } {
         this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts_with_ghosts,
                          subdomain_locations_with_ghosts, storage_order,
@@ -73,10 +73,10 @@ namespace muGrid {
         const DynGridIndex &subdomain_locations_with_ghosts,
         const DynGridIndex &pixels_strides, const SubPtMap_t &nb_sub_pts,
         StorageOrder storage_order, const DynGridIndex &nb_ghosts_left,
-        const DynGridIndex &nb_ghosts_right, MemoryLocation memory_location)
+        const DynGridIndex &nb_ghosts_right, Device device)
         : Parent{
               ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
-              nb_sub_pts, storage_order, memory_location
+              nb_sub_pts, storage_order, device
           } {
         this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts_with_ghosts,
                          subdomain_locations_with_ghosts, pixels_strides,
@@ -90,10 +90,10 @@ namespace muGrid {
         const DynGridIndex &subdomain_locations_with_ghosts,
         StorageOrder pixels_storage_order, const SubPtMap_t &nb_sub_pts,
         StorageOrder storage_order, const DynGridIndex &nb_ghosts_left,
-        const DynGridIndex &nb_ghosts_right, MemoryLocation memory_location)
+        const DynGridIndex &nb_ghosts_right, Device device)
         : Parent{
             ValidityDomain::Global, nb_domain_grid_pts.get_dim(),
-            nb_sub_pts, storage_order, memory_location
+            nb_sub_pts, storage_order, device
         } {
         this->initialise(nb_domain_grid_pts, nb_subdomain_grid_pts_with_ghosts,
                          subdomain_locations_with_ghosts, pixels_storage_order,
@@ -262,7 +262,7 @@ namespace muGrid {
             this->get_spatial_dim(),
             this->nb_sub_pts,
             this->get_storage_order(),
-            this->get_memory_location()
+            this->get_device()
         };
         ret_val.initialise(this->nb_domain_grid_pts,
                            this->pixels_with_ghosts.get_nb_subdomain_grid_pts(),

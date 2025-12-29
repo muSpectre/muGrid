@@ -39,18 +39,18 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     LocalFieldCollection::LocalFieldCollection(Dim_t spatial_dimension,
                                                const SubPtMap_t & nb_sub_pts,
-                                               MemoryLocation memory_location)
+                                               Device device)
         : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts,
-                 StorageOrder::ArrayOfStructures, memory_location},
+                 StorageOrder::ArrayOfStructures, device},
           name{std::string{"LocalFieldCollectionName"}} {}
 
     /* ---------------------------------------------------------------------- */
     LocalFieldCollection::LocalFieldCollection(Dim_t spatial_dimension,
                                                const std::string & name,
                                                const SubPtMap_t & nb_sub_pts,
-                                               MemoryLocation memory_location)
+                                               Device device)
         : Parent{ValidityDomain::Local, spatial_dimension, nb_sub_pts,
-                 StorageOrder::ArrayOfStructures, memory_location},
+                 StorageOrder::ArrayOfStructures, device},
           name{name} {}
 
     /* ---------------------------------------------------------------------- */
@@ -82,7 +82,7 @@ namespace muGrid {
     LocalFieldCollection::get_empty_clone(const std::string & new_name) const {
         LocalFieldCollection ret_val{this->get_spatial_dim(), new_name,
                                      this->nb_sub_pts,
-                                     this->get_memory_location()};
+                                     this->get_device()};
         for (const auto & pixel_id : this->get_pixel_indices()) {
             ret_val.add_pixel(pixel_id);
         }

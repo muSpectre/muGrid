@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   18 Dec 2024
+ * @date   18 Dec 2025
  *
  * @brief  Explicit template instantiations for FFTEngine
  *

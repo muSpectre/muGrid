@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   29 Dec 2024
+ * @date   29 Dec 2025
  *
  * @brief  Runtime implementations for TypeDescriptor utilities
  *

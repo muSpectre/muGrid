@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   09 Dec 2024
+ * @date   09 Dec 2025
  *
  * @brief  Testing GPU (device) field functionality
  *
@@ -37,6 +37,7 @@
 #include "field/field_typed.hh"
 #include "collection/field_collection_global.hh"
 #include "memory/memory_space.hh"
+#include "memory/device.hh"
 #include "util/math.hh"
 
 namespace muGrid {
@@ -119,8 +120,12 @@ namespace muGrid {
     constexpr Index_t len{4};
 
     // Create a device collection
-    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures,
-                             FieldCollection::MemoryLocation::Device};
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device = Device::cuda();
+#elif defined(MUGRID_ENABLE_HIP)
+    auto device = Device::rocm();
+#endif
+    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures, device};
     fc.initialise(CcoordOps::get_cube<SDim>(len),
                   CcoordOps::get_cube<SDim>(len), {});
 
@@ -157,8 +162,12 @@ namespace muGrid {
     constexpr Index_t SDim{twoD};
     constexpr Index_t len{4};
 
-    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures,
-                             FieldCollection::MemoryLocation::Device};
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device = Device::cuda();
+#elif defined(MUGRID_ENABLE_HIP)
+    auto device = Device::rocm();
+#endif
+    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures, device};
     fc.initialise(CcoordOps::get_cube<SDim>(len),
                   CcoordOps::get_cube<SDim>(len), {});
 
@@ -178,8 +187,13 @@ namespace muGrid {
     fc_host.initialise(CcoordOps::get_cube<SDim>(len),
                        CcoordOps::get_cube<SDim>(len), {});
 
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device = Device::cuda();
+#elif defined(MUGRID_ENABLE_HIP)
+    auto device = Device::rocm();
+#endif
     GlobalFieldCollection fc_device{SDim, {}, StorageOrder::ArrayOfStructures,
-                                    FieldCollection::MemoryLocation::Device};
+                                    device};
     fc_device.initialise(CcoordOps::get_cube<SDim>(len),
                          CcoordOps::get_cube<SDim>(len), {});
 
@@ -221,8 +235,12 @@ namespace muGrid {
     constexpr Index_t SDim{twoD};
     constexpr Index_t len{4};
 
-    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures,
-                             FieldCollection::MemoryLocation::Device};
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device = Device::cuda();
+#elif defined(MUGRID_ENABLE_HIP)
+    auto device = Device::rocm();
+#endif
+    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures, device};
     fc.initialise(CcoordOps::get_cube<SDim>(len),
                   CcoordOps::get_cube<SDim>(len), {});
 
@@ -238,8 +256,12 @@ namespace muGrid {
     constexpr Index_t SDim{twoD};
     constexpr Index_t len{4};
 
-    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures,
-                             FieldCollection::MemoryLocation::Device};
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device = Device::cuda();
+#elif defined(MUGRID_ENABLE_HIP)
+    auto device = Device::rocm();
+#endif
+    GlobalFieldCollection fc{SDim, {}, StorageOrder::ArrayOfStructures, device};
     fc.initialise(CcoordOps::get_cube<SDim>(len),
                   CcoordOps::get_cube<SDim>(len), {});
 

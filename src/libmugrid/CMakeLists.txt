@@ -48,6 +48,8 @@ set(MUGRID_SOURCES
     operators/fem_gradient_operator.cc
     # io/
     io/file_io_base.cc
+    # memory/
+    memory/device.cc
     # util/
     # fft/
     fft/fft_backend_factory.cc

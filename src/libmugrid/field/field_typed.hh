@@ -625,7 +625,7 @@ namespace muGrid {
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
     Field * raw_ptr{nullptr};
-    if (this->memory_location == MemoryLocation::Device) {
+    if (this->device.is_device()) {
       raw_ptr = new TypedField<T, DefaultDeviceSpace>{
           unique_name, *this, nb_components, sub_division_tag, unit};
     } else {
@@ -687,7 +687,7 @@ namespace muGrid {
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
     Field * raw_ptr{nullptr};
-    if (this->memory_location == MemoryLocation::Device) {
+    if (this->device.is_device()) {
       raw_ptr = new TypedField<T, DefaultDeviceSpace>{
           unique_name, *this, components_shape, sub_division_tag, unit};
     } else {

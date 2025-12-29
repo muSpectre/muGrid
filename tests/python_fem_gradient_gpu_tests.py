@@ -70,7 +70,7 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         # Create nodal and gradient fields
@@ -90,7 +90,7 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -118,7 +118,7 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts, self.nb_z_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -136,7 +136,7 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts, self.nb_z_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -167,7 +167,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -203,7 +203,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -243,7 +243,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -284,7 +284,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -325,7 +325,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -356,7 +356,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal_in = fc.real_field("nodal_in", (1,))

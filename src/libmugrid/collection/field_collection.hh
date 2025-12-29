@@ -41,6 +41,7 @@
 #include "core/enums.hh"
 #include "core/units.hh"
 #include "memory/memory_space.hh"
+#include "memory/device.hh"
 
 #include <functional>
 #include <map>
@@ -106,9 +107,6 @@ namespace muGrid {
         //! domain of validity of the managed fields
         enum class ValidityDomain { Global, Local };
 
-        //! memory location for all fields in this collection
-        enum class MemoryLocation { Host, Device };
-
         class IndexIterable;
         //! convenience alias
         class PixelIndexIterable;
@@ -137,7 +135,7 @@ namespace muGrid {
             ValidityDomain domain, Dim_t spatial_dimension,
             const SubPtMap_t & nb_sub_pts,
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
        public:
         //! Default constructor
@@ -751,8 +749,8 @@ namespace muGrid {
         //! return the storage order of the pixels vs. subpoints
         StorageOrder get_storage_order() const;
 
-        //! return the memory location (host or device) of all fields
-        MemoryLocation get_memory_location() const;
+        //! return the device for all fields in this collection
+        Device get_device() const;
 
         //! check if fields in this collection are on a GPU device
         bool is_on_device() const;
@@ -919,8 +917,8 @@ namespace muGrid {
         //! storage oder
         StorageOrder storage_order;
 
-        //! memory location (host or device) for all fields in this collection
-        MemoryLocation memory_location;
+        //! device for all fields in this collection
+        Device device;
 
         //! keeps track of whether the collection has already been initialised
         bool initialised{false};

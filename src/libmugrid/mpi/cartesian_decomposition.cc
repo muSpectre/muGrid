@@ -25,19 +25,19 @@
 namespace muGrid {
     CartesianDecomposition::CartesianDecomposition(
         const Communicator & comm, Dim_t spatial_dimension,
-        const SubPtMap_t & nb_sub_pts, MemoryLocation memory_location)
+        const SubPtMap_t & nb_sub_pts, Device device)
         : Parent_t{}, comm{comm},
           collection(spatial_dimension, nb_sub_pts,
-                     StorageOrder::ArrayOfStructures, memory_location) {}
+                     StorageOrder::ArrayOfStructures, device) {}
 
     CartesianDecomposition::CartesianDecomposition(
         const Communicator & comm, const DynGridIndex & nb_domain_grid_pts,
         const DynGridIndex & nb_subdivisions, const DynGridIndex & nb_ghosts_left,
         const DynGridIndex & nb_ghosts_right, const SubPtMap_t & nb_sub_pts,
-        MemoryLocation memory_location)
+        Device device)
         : Parent_t{}, comm{comm},
           collection(nb_domain_grid_pts.size(), nb_sub_pts,
-                     StorageOrder::ArrayOfStructures, memory_location) {
+                     StorageOrder::ArrayOfStructures, device) {
         this->initialise(nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left,
                          nb_ghosts_right);
     }

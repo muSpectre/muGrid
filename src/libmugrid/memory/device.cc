@@ -1,11 +1,11 @@
 /**
- * @file   fft/fft_backend_factory.cc
+ * @file   device.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   20 Dec 2025
+ * @date   29 Dec 2025
  *
- * @brief  Factory functions for FFT backends
+ * @brief  Device abstraction layer implementation
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -33,29 +33,40 @@
  *
  */
 
-#include "fft_1d_backend.hh"
-#include "pocketfft_backend.hh"
-
-#if defined(MUGRID_ENABLE_CUDA)
-#include "cufft_backend.hh"
-#elif defined(MUGRID_ENABLE_HIP)
-#include "hipfft_backend.hh"
-#endif
+#include "device.hh"
 
 namespace muGrid {
 
-std::unique_ptr<FFT1DBackend> get_host_fft_backend() {
-  return std::make_unique<PocketFFTBackend>();
+std::string Device::get_device_string() const {
+    switch (this->device_type) {
+        case DeviceType::CPU:
+            return "cpu";
+        case DeviceType::CUDA:
+        case DeviceType::CUDAHost:
+            return "cuda:" + std::to_string(this->device_id);
+        case DeviceType::ROCm:
+        case DeviceType::ROCmHost:
+            return "rocm:" + std::to_string(this->device_id);
+        default:
+            return "unknown";
+    }
 }
 
-std::unique_ptr<FFT1DBackend> get_device_fft_backend() {
-#if defined(MUGRID_ENABLE_CUDA)
-  return std::make_unique<cuFFTBackend>();
-#elif defined(MUGRID_ENABLE_HIP)
-  return std::make_unique<hipFFTBackend>();
-#else
-  return nullptr;
-#endif
+const char * Device::get_type_name() const {
+    switch (this->device_type) {
+        case DeviceType::CPU:
+            return "CPU";
+        case DeviceType::CUDA:
+            return "CUDA";
+        case DeviceType::CUDAHost:
+            return "CUDAHost";
+        case DeviceType::ROCm:
+            return "ROCm";
+        case DeviceType::ROCmHost:
+            return "ROCmHost";
+        default:
+            return "Unknown";
+    }
 }
 
 }  // namespace muGrid

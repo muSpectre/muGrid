@@ -61,13 +61,13 @@ namespace muGrid {
          * 3, or Unknown
          * @param nb_sub_pts number of quadrature points per pixel/voxel
          * @param storage_order storage order for field components
-         * @param memory_location where to allocate field memory (Host or Device)
+         * @param device where to allocate field memory
          */
         GlobalFieldCollection(
             Dim_t spatial_dimension,
             const SubPtMap_t & nb_sub_pts = {},
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
         /**
          * Constructor with initialization
@@ -76,7 +76,7 @@ namespace muGrid {
          * @param subdomain_locations_with_ghosts location of the current
          * subdomain within the global grid
          * @param nb_sub_pts number of quadrature points per pixel/voxel
-         * @param memory_location where to allocate field memory (Host or Device)
+         * @param device where to allocate field memory
          */
         GlobalFieldCollection(
             const DynGridIndex & nb_domain_grid_pts,
@@ -86,7 +86,7 @@ namespace muGrid {
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
             const DynGridIndex & nb_ghosts_left = {},
             const DynGridIndex & nb_ghosts_right = {},
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
         /**
          * Constructor with initialisation
@@ -103,7 +103,7 @@ namespace muGrid {
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
          * own storage order that is not affected by this setting.
-         * @param memory_location where to allocate field memory (Host or Device)
+         * @param device where to allocate field memory
          */
         GlobalFieldCollection(
             const DynGridIndex & nb_domain_grid_pts,
@@ -114,7 +114,7 @@ namespace muGrid {
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
             const DynGridIndex & nb_ghosts_left = {},
             const DynGridIndex & nb_ghosts_right = {},
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
         /**
          * Constructor with initialisation
@@ -131,7 +131,7 @@ namespace muGrid {
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
          * own storage order that is not affected by this setting.
-         * @param memory_location where to allocate field memory (Host or Device)
+         * @param device where to allocate field memory
          */
         GlobalFieldCollection(
             const DynGridIndex & nb_domain_grid_pts,
@@ -142,7 +142,7 @@ namespace muGrid {
             StorageOrder storage_order = StorageOrder::ArrayOfStructures,
             const DynGridIndex & nb_ghosts_left = {},
             const DynGridIndex & nb_ghosts_right = {},
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
         //! Copy constructor
         GlobalFieldCollection(const GlobalFieldCollection & other) = delete;

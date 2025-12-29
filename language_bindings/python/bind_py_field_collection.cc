@@ -44,10 +44,13 @@
 #include "collection/field_collection_global.hh"
 #include "collection/field_collection_local.hh"
 #include "field/state_field.hh"
+#include "memory/device.hh"
 
 #include <map>
 
 using muGrid::Complex;
+using muGrid::Device;
+using muGrid::DeviceType;
 using muGrid::DynGridIndex;
 using muGrid::FieldCollection;
 using muGrid::GlobalFieldCollection;
@@ -459,8 +462,7 @@ void add_field_collection(py::module & mod) {
         .def("keys", &FieldCollection::list_fields)
         .def_property_readonly("field_names", &FieldCollection::list_fields)
         .def_property_readonly("is_on_device", &FieldCollection::is_on_device)
-        .def_property_readonly("memory_location",
-                               &FieldCollection::get_memory_location);
+        .def_property_readonly("device", &FieldCollection::get_device);
 
     py::class_<muGrid::FieldCollection::IndexIterable>(mod, "IndexIterable")
         .def("__len__", &muGrid::FieldCollection::IndexIterable::size)
@@ -482,15 +484,59 @@ void add_field_collection(py::module & mod) {
         .value("Local", FieldCollection::ValidityDomain::Local)
         .export_values();
 
-    py::enum_<FieldCollection::MemoryLocation>(field_collection,
-                                               "MemoryLocation")
-        .value("Host", FieldCollection::MemoryLocation::Host)
-        .value("Device", FieldCollection::MemoryLocation::Device)
+    // Device type enumeration
+    py::enum_<DeviceType>(mod, "DeviceType")
+        .value("CPU", DeviceType::CPU)
+        .value("CUDA", DeviceType::CUDA)
+        .value("CUDAHost", DeviceType::CUDAHost)
+        .value("ROCm", DeviceType::ROCm)
+        .value("ROCmHost", DeviceType::ROCmHost)
         .export_values();
+
+    // Device class for specifying where fields are allocated
+    py::class_<Device>(mod, "Device",
+        R"pbdoc(
+        Device specification for field memory allocation.
+
+        A Device specifies where field memory should be allocated. Use the
+        static factory methods to create Device instances:
+
+        - ``Device.cpu()`` - CPU/host memory
+        - ``Device.cuda(id)`` - CUDA GPU memory (with optional device ID)
+        - ``Device.rocm(id)`` - ROCm/HIP GPU memory (with optional device ID)
+
+        Examples
+        --------
+        >>> fc = GlobalFieldCollection([64, 64], device=Device.cpu())
+        >>> fc_gpu = GlobalFieldCollection([64, 64], device=Device.cuda(0))
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<DeviceType, int>(), "device_type"_a, "device_id"_a = 0)
+        .def_static("cpu", &Device::cpu, "Create a CPU device")
+        .def_static("cuda", &Device::cuda, "device_id"_a = 0,
+                    "Create a CUDA device with optional device ID")
+        .def_static("rocm", &Device::rocm, "device_id"_a = 0,
+                    "Create a ROCm device with optional device ID")
+        .def("is_device", &Device::is_device,
+             "Check if this is a GPU device")
+        .def("is_host", &Device::is_host,
+             "Check if this is a host (CPU) device")
+        .def("get_type", &Device::get_type,
+             "Get the device type")
+        .def("get_device_id", &Device::get_device_id,
+             "Get the device ID")
+        .def("get_device_string", &Device::get_device_string,
+             "Get device string (e.g., 'cpu', 'cuda:0')")
+        .def("get_type_name", &Device::get_type_name,
+             "Get device type name (e.g., 'CPU', 'CUDA')")
+        .def("__repr__", [](const Device & d) {
+            return "<Device: " + d.get_device_string() + ">";
+        })
+        .def("__eq__", &Device::operator==)
+        .def("__ne__", &Device::operator!=);
 }
 
 void add_global_field_collection(py::module & mod) {
-    using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<GlobalFieldCollection, FieldCollection>(mod,
                                                        "GlobalFieldCollection",
         R"pbdoc(
@@ -517,8 +563,8 @@ void add_global_field_collection(py::module & mod) {
             Ghost layers on low-index side of each dimension
         nb_ghosts_right : list of int, optional
             Ghost layers on high-index side of each dimension
-        memory_location : MemoryLocation, optional
-            Where to allocate field memory (Host or Device)
+        device : Device, optional
+            Where to allocate field memory (default: Device.cpu())
 
         Examples
         --------
@@ -531,43 +577,42 @@ void add_global_field_collection(py::module & mod) {
         .def(py::init<const DynGridIndex &, const DynGridIndex &,
                       const DynGridIndex &, const FieldCollection::SubPtMap_t &,
                       StorageOrder, const DynGridIndex &, const DynGridIndex &,
-                      MemoryLocation>(),
+                      Device>(),
              "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a = DynGridIndex{},
              "subdomain_locations"_a = DynGridIndex{},
              "sub_pts"_a = FieldCollection::SubPtMap_t{},
              "storage_order"_a = StorageOrder::ArrayOfStructures,
              "nb_ghosts_left"_a = DynGridIndex{},
              "nb_ghosts_right"_a = DynGridIndex{},
-             "memory_location"_a = MemoryLocation::Host)
+             "device"_a = Device::cpu())
         // Constructor with explicit pixel strides
         .def(
             py::init<const DynGridIndex &, const DynGridIndex &, const DynGridIndex &,
                      const DynGridIndex &, const FieldCollection::SubPtMap_t &,
                      StorageOrder, const DynGridIndex &, const DynGridIndex &,
-                     MemoryLocation>(),
+                     Device>(),
             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
             "subdomain_locations"_a, "pixels_strides"_a, "sub_pts"_a,
             "storage_order"_a = StorageOrder::ArrayOfStructures,
             "nb_ghosts_left"_a = DynGridIndex{},
             "nb_ghosts_right"_a = DynGridIndex{},
-            "memory_location"_a = MemoryLocation::Host)
+            "device"_a = Device::cpu())
         // Constructor with explicit pixel storage order
         .def(
             py::init<const DynGridIndex &, const DynGridIndex &, const DynGridIndex &,
                      StorageOrder, const FieldCollection::SubPtMap_t &,
                      StorageOrder, const DynGridIndex &, const DynGridIndex &,
-                     MemoryLocation>(),
+                     Device>(),
             "nb_domain_grid_pts"_a, "nb_subdomain_grid_pts"_a,
             "subdomain_locations"_a, "pixels_storage_order"_a, "sub_pts"_a,
             "storage_order"_a = StorageOrder::ArrayOfStructures,
             "nb_ghosts_left"_a = DynGridIndex{},
             "nb_ghosts_right"_a = DynGridIndex{},
-            "memory_location"_a = MemoryLocation::Host)
+            "device"_a = Device::cpu())
         .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels_with_ghosts);
 }
 
 void add_local_field_collection(py::module & mod) {
-    using MemoryLocation = FieldCollection::MemoryLocation;
     py::class_<LocalFieldCollection, FieldCollection> fc_local(
         mod, "LocalFieldCollection",
         R"pbdoc(
@@ -588,8 +633,8 @@ void add_local_field_collection(py::module & mod) {
             Name for this collection (for identification)
         nb_sub_pts : dict, optional
             Mapping of sub-point names to counts
-        memory_location : MemoryLocation, optional
-            Where to allocate field memory (Host or Device)
+        device : Device, optional
+            Where to allocate field memory (default: Device.cpu())
 
         Examples
         --------
@@ -602,16 +647,16 @@ void add_local_field_collection(py::module & mod) {
     fc_local
         .def(py::init<const Index_t &,
                       const muGrid::FieldCollection::SubPtMap_t &,
-                      MemoryLocation>(),
+                      Device>(),
              "spatial_dimension"_a,
              "nb_sub_pts"_a = std::map<std::string, Index_t>{},
-             "memory_location"_a = MemoryLocation::Host)
+             "device"_a = Device::cpu())
         .def(py::init<const Index_t &, const std::string &,
                       const muGrid::FieldCollection::SubPtMap_t &,
-                      MemoryLocation>(),
+                      Device>(),
              "spatial_dimension"_a, "name"_a,
              "nb_sub_pts"_a = std::map<std::string, Index_t>{},
-             "memory_location"_a = MemoryLocation::Host)
+             "device"_a = Device::cpu())
         .def(
             "add_pixel",
             [](LocalFieldCollection & fc_local, const size_t & global_index) {

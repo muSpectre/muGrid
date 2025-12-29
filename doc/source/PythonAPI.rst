@@ -17,7 +17,7 @@ Field collections manage groups of fields on structured grids.
 GlobalFieldCollection
 ---------------------
 
-.. py:class:: muGrid.GlobalFieldCollection(nb_grid_pts, nb_sub_pts=None, nb_ghosts_left=None, nb_ghosts_right=None, memory_location=None)
+.. py:class:: muGrid.GlobalFieldCollection(nb_grid_pts, nb_sub_pts=None, nb_ghosts_left=None, nb_ghosts_right=None, device=None)
 
    A GlobalFieldCollection manages a set of fields that share the same
    global grid structure. It can allocate fields in either host (CPU)
@@ -31,8 +31,9 @@ GlobalFieldCollection
    :type nb_ghosts_left: sequence of int, optional
    :param nb_ghosts_right: Ghost cells on high-index side. Default is no ghosts.
    :type nb_ghosts_right: sequence of int, optional
-   :param memory_location: Memory location for field data: ``"host"`` (CPU) or ``"device"`` (GPU). Default is ``"host"``.
-   :type memory_location: str, optional
+   :param device: Device for field allocation. Can be a string (``"cpu"``, ``"cuda"``, ``"cuda:N"``,
+      ``"rocm"``, ``"rocm:N"``) or a ``Device`` instance. Default is ``"cpu"``.
+   :type device: str or Device, optional
 
    **Example**::
 
@@ -41,7 +42,7 @@ GlobalFieldCollection
        >>> field.p[:] = 300.0  # Set temperature to 300K
 
        >>> # GPU field collection
-       >>> fc_gpu = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
+       >>> fc_gpu = muGrid.GlobalFieldCollection([64, 64], device="cuda")
 
    .. py:method:: real_field(name, components=(), sub_pt="pixel")
 
@@ -98,7 +99,7 @@ GlobalFieldCollection
 LocalFieldCollection
 --------------------
 
-.. py:class:: muGrid.LocalFieldCollection(spatial_dim, name="", nb_sub_pts=None, memory_location=None)
+.. py:class:: muGrid.LocalFieldCollection(spatial_dim, name="", nb_sub_pts=None, device=None)
 
    A LocalFieldCollection manages fields on a subset of pixels, typically
    used for material-specific data in heterogeneous simulations.
@@ -109,8 +110,9 @@ LocalFieldCollection
    :type name: str, optional
    :param nb_sub_pts: Number of sub-points per pixel for each sub-point type.
    :type nb_sub_pts: dict, optional
-   :param memory_location: Memory location: ``"host"`` or ``"device"``. Default is ``"host"``.
-   :type memory_location: str, optional
+   :param device: Device for field allocation. Can be a string (``"cpu"``, ``"cuda"``, ``"cuda:N"``,
+      ``"rocm"``, ``"rocm:N"``) or a ``Device`` instance. Default is ``"cpu"``.
+   :type device: str or Device, optional
 
    The field creation methods (``real_field``, ``complex_field``, ``int_field``, ``uint_field``)
    are the same as for ``GlobalFieldCollection``.
@@ -196,7 +198,7 @@ Classes for parallel domain decomposition with MPI.
 CartesianDecomposition
 ----------------------
 
-.. py:class:: muGrid.CartesianDecomposition(communicator, nb_domain_grid_pts, nb_subdivisions=None, nb_ghosts_left=None, nb_ghosts_right=None, nb_sub_pts=None, memory_location=None)
+.. py:class:: muGrid.CartesianDecomposition(communicator, nb_domain_grid_pts, nb_subdivisions=None, nb_ghosts_left=None, nb_ghosts_right=None, nb_sub_pts=None, device=None)
 
    CartesianDecomposition manages domain decomposition for MPI-parallel
    computations on structured grids, including ghost buffer regions for
@@ -214,8 +216,9 @@ CartesianDecomposition
    :type nb_ghosts_right: sequence of int, optional
    :param nb_sub_pts: Number of sub-points per pixel for each sub-point type.
    :type nb_sub_pts: dict, optional
-   :param memory_location: Memory location: ``"host"`` or ``"device"``. Default is ``"host"``.
-   :type memory_location: str, optional
+   :param device: Device for field allocation. Can be a string (``"cpu"``, ``"cuda"``, ``"cuda:N"``,
+      ``"rocm"``, ``"rocm:N"``) or a ``Device`` instance. Default is ``"cpu"``.
+   :type device: str or Device, optional
 
    **Example**::
 
@@ -224,6 +227,7 @@ CartesianDecomposition
        >>> decomp = CartesianDecomposition(
        ...     comm,
        ...     nb_domain_grid_pts=[128, 128],
+       ...     nb_subdivisions=[1, 1],
        ...     nb_ghosts_left=[1, 1],
        ...     nb_ghosts_right=[1, 1]
        ... )
@@ -747,6 +751,116 @@ The Solvers module provides simple parallel iterative solvers.
    :rtype: muGrid.Field
    :raises RuntimeError: If the algorithm does not converge within ``maxiter`` iterations,
       or if the Hessian is not positive definite.
+
+Device Selection
+****************
+
+The ``Device`` class and ``DeviceType`` enum provide a Pythonic way to specify
+where field data should be allocated.
+
+Device
+------
+
+.. py:class:: muGrid.Device
+
+   Represents a compute device (CPU or GPU) for field allocation.
+
+   Factory methods provide convenient construction:
+
+   .. py:staticmethod:: cpu()
+
+      Create a CPU device.
+
+      :returns: A Device representing the CPU.
+      :rtype: Device
+
+   .. py:staticmethod:: cuda(device_id=0)
+
+      Create a CUDA GPU device.
+
+      :param device_id: GPU device ID. Default is 0.
+      :type device_id: int, optional
+      :returns: A Device representing a CUDA GPU.
+      :rtype: Device
+
+   .. py:staticmethod:: rocm(device_id=0)
+
+      Create a ROCm GPU device.
+
+      :param device_id: GPU device ID. Default is 0.
+      :type device_id: int, optional
+      :returns: A Device representing a ROCm GPU.
+      :rtype: Device
+
+   .. py:method:: is_host()
+
+      Check if this is a host (CPU) device.
+
+      :returns: ``True`` if CPU device, ``False`` otherwise.
+      :rtype: bool
+
+   .. py:method:: is_device()
+
+      Check if this is a device (GPU) memory location.
+
+      :returns: ``True`` if GPU device, ``False`` otherwise.
+      :rtype: bool
+
+   .. py:method:: get_type()
+
+      Get the device type.
+
+      :returns: The device type enum value.
+      :rtype: DeviceType
+
+   .. py:method:: get_device_id()
+
+      Get the device ID for multi-GPU systems.
+
+      :returns: Device ID (0 for single-GPU or CPU).
+      :rtype: int
+
+   **Example**::
+
+       >>> import muGrid
+       >>> # Create devices
+       >>> cpu = muGrid.Device.cpu()
+       >>> gpu0 = muGrid.Device.cuda()
+       >>> gpu1 = muGrid.Device.cuda(1)
+       >>> # Check device type
+       >>> cpu.is_host()
+       True
+       >>> gpu0.is_device()
+       True
+       >>> # Use with field collections
+       >>> fc = muGrid.GlobalFieldCollection([64, 64], device=muGrid.Device.cuda())
+
+DeviceType
+----------
+
+.. py:class:: muGrid.DeviceType
+
+   Enumeration for device types. Values follow DLPack conventions.
+
+   .. py:attribute:: CPU
+
+      CPU device (value 1).
+
+   .. py:attribute:: CUDA
+
+      NVIDIA CUDA GPU device (value 2).
+
+   .. py:attribute:: CUDAHost
+
+      CUDA pinned host memory (value 3).
+
+   .. py:attribute:: ROCm
+
+      AMD ROCm GPU device (value 10).
+
+   .. py:attribute:: ROCmHost
+
+      ROCm pinned host memory (value 11).
 
 Enumerations
 ************

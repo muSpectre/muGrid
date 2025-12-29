@@ -61,12 +61,11 @@ namespace muGrid {
          *                    muGrid::Unknown, e.g., in the case of the local
          * fields for storing internal material variables)
          * @param nb_sub_pts number of sub-points per pixel
-         * @param memory_location where to allocate field memory (Host or
-         * Device)
+         * @param device where to allocate field memory
          */
         LocalFieldCollection(
             Dim_t spatial_dimension, const SubPtMap_t & nb_sub_pts = {},
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
         /**
          * Constructor with explicit given name for the field collection. This
@@ -78,13 +77,12 @@ namespace muGrid {
          * @param spatial_dimension spatial dimension of the field
          * @param name unique name for the field collection
          * @param nb_sub_pts number of sub-points per pixel
-         * @param memory_location where to allocate field memory (Host or
-         * Device)
+         * @param device where to allocate field memory
          */
         LocalFieldCollection(
             Dim_t spatial_dimension, const std::string & name,
             const SubPtMap_t & nb_sub_pts = {},
-            MemoryLocation memory_location = MemoryLocation::Host);
+            Device device = Device::cpu());
 
         //! Copy constructor
         LocalFieldCollection(const LocalFieldCollection & other) = delete;

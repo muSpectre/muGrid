@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   25 Dec 2024
+ * @date   25 Dec 2025
  *
  * @brief  Unified CUDA/HIP implementation of hard-coded FEM gradient operator
  *

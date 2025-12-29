@@ -37,6 +37,7 @@
 #define SRC_LIBMUGRID_FFT_FFT_BACKEND_TRAITS_HH_
 
 #include "memory/memory_space.hh"
+#include "memory/device.hh"
 #include "fft_1d_backend.hh"
 #include "pocketfft_backend.hh"
 
@@ -124,14 +125,14 @@ constexpr const char * fft_backend_name() {
 }
 
 /**
- * Convert MemorySpace to FieldCollection::MemoryLocation enum.
+ * Convert MemorySpace to Device.
  */
 template <typename MemorySpace>
-constexpr FieldCollection::MemoryLocation memory_location() {
+constexpr Device memory_space_to_device() {
   if constexpr (is_host_space_v<MemorySpace>) {
-    return FieldCollection::MemoryLocation::Host;
+    return Device::cpu();
   } else {
-    return FieldCollection::MemoryLocation::Device;
+    return Device::cuda();  // or Device::rocm() depending on build config
   }
 }
 
