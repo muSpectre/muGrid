@@ -44,12 +44,12 @@
     #include <cuda_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
         kernel<<<grid, block>>>(__VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() cudaDeviceSynchronize()
+    #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
 #elif defined(MUGRID_ENABLE_HIP)
     #include <hip/hip_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
         hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() hipDeviceSynchronize()
+    #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
 #endif
 
 namespace muGrid {
@@ -237,6 +237,13 @@ __constant__ Real d_B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D] = {
         { 0.0,  0.0,  0.0,  0.0,  0.0,  1.0, -1.0,  0.0},
         { 0.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0}
     }
+};
+
+// Node corner offsets for 3D - used by divergence kernel to map corner index
+// to voxel offset (needed to implement gather pattern)
+__constant__ Index_t d_NODE_OFFSET_3D[NB_NODES_3D][DIM_3D] = {
+    {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+    {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}
 };
 
 /**
