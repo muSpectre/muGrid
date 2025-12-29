@@ -101,6 +101,9 @@ StorageOrder = _muGrid.StorageOrder
 SubPt = _muGrid.SubPt
 Unit = _muGrid.Unit
 
+# Linear algebra operations on fields
+linalg = _muGrid.linalg
+
 # FFT utility functions
 # Note: fft_freq, fft_freqind, rfft_freq, rfft_freqind are now properties
 # on the FFTEngine class (fftfreq, ifftfreq). Use engine.fftfreq instead.
@@ -167,4 +170,6 @@ __all__ = [
     "Verbosity",
     # Utilities
     "Timer",
+    # Linear algebra
+    "linalg",
 ]

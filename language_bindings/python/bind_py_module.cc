@@ -49,6 +49,7 @@ PYBIND11_MODULE(_muGrid, mod) {
   add_decomposition_classes(mod);
   add_convolution_operator_classes(mod);
   add_fft_classes(mod);  // FFT support
+  add_linalg_functions(mod);  // Linear algebra on fields
 #ifdef WITH_NETCDF_IO
   add_file_io_classes(mod);
 #endif

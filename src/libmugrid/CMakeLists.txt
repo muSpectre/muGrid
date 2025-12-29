@@ -51,6 +51,8 @@ set(MUGRID_SOURCES
     # memory/
     memory/device.cc
     # util/
+    # linalg/
+    linalg/linalg_host.cc
     # fft/
     fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
@@ -126,6 +128,7 @@ target_include_directories(muGrid
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/memory>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fft>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/linalg>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/benchmark>
         $<INSTALL_INTERFACE:include>
 )
@@ -206,7 +209,7 @@ install(TARGETS ${_MUGRID_INSTALL_TARGETS}
 )
 
 # Install header files for each subdirectory
-foreach(subdir core grid field collection mpi operators io util memory fft benchmark)
+foreach(subdir core grid field collection mpi operators io util memory fft linalg benchmark)
     file(GLOB MUGRID_${subdir}_HEADERS "${subdir}/*.hh")
     install(FILES ${MUGRID_${subdir}_HEADERS}
         DESTINATION include/libmugrid/${subdir}
