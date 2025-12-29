@@ -81,7 +81,9 @@ def conjugate_gradients(
             # Try to sync GPU if available
             try:
                 import cupy
-                cupy.cuda.Device().synchronize()
+
+                # Use stream synchronize for more reliable sync on ROCm/HIP
+                cupy.cuda.get_current_stream().synchronize()
             except (ImportError, Exception):
                 pass
 
@@ -132,7 +134,10 @@ def conjugate_gradients(
 
     for iteration in range(maxiter):
         # Compute Hessian product: Ap = A * p
-        hessp(p, Ap)
+        with timed("cg_hessp_wrapper"):
+            gpu_sync()
+            hessp(p, Ap)
+            gpu_sync()
 
         # Compute pAp for step size
         with timed("cg_dot_pAp"):
