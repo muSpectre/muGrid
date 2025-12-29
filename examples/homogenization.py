@@ -171,16 +171,17 @@ parser.add_argument(
 )
 
 _devices = {
-    "host": muGrid.Device.cpu(),
-    "device": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
+    "cpu": muGrid.Device.cpu(),
+    "gpu": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
 }
 
 parser.add_argument(
-    "-m",
-    "--memory",
+    "-d",
+    "--device",
     choices=_devices,
-    default="host",
-    help="Memory space for allocation: 'host' (CPU) or 'device' (GPU) (default: host)",
+    default="cpu",
+    help="Device for computation: 'cpu' or 'gpu' (auto-detect CUDA/ROCm) "
+    "(default: cpu)",
 )
 
 parser.add_argument(
@@ -267,12 +268,12 @@ if args.json:
     args.quiet = True
 
 # Select array library based on memory location
-if args.memory == "host":
+if args.device == "cpu":
     import numpy as arr
 else:
     import cupy as arr
 
-device = _devices[args.memory]
+device = _devices[args.device]
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
@@ -348,7 +349,7 @@ if comm.rank == 0 and not args.quiet:
     print(f"Grid size: {args.nb_grid_pts}")
     print(f"Dimensions: {dim}D")
     print(f"Grid spacing: {grid_spacing}")
-    print(f"Memory location: {args.memory}")
+    print(f"Device: {device.device_string}")
     print(f"Number of quadrature points per pixel: {nb_quad}")
     print(f"Number of nodal points per pixel: {nb_nodes}")
     print(f"Quadrature weights: {quad_weights}")
@@ -390,8 +391,8 @@ C_field = arr.asarray(C_field_np)
 
 # Create global timer for hierarchical timing
 # PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and args.memory == "host"
-if args.papi and args.memory != "host":
+use_papi = args.papi and device.is_host
+if args.papi and not device.is_host:
     if comm.rank == 0 and not args.quiet:
         print(
             "Warning: PAPI not available for device memory (GPU). Using estimates only."
@@ -509,7 +510,7 @@ def compute_stress(strain, stress, C):
         eps_voigt = strain_to_voigt(strain)
 
         # Compute stress in Voigt: sig = C @ eps
-        if args.memory == "host":
+        if device.is_host:
             sig_voigt = np.einsum("ijq...,jq...->iq...", C, eps_voigt)
         else:
             # CuPy einsum
@@ -710,7 +711,7 @@ with timer("total_solve"):
             for L in range(dim):
                 local_sum = 0.0
                 for q in range(nb_quad):
-                    if args.memory == "host":
+                    if device.is_host:
                         local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
                     else:
                         local_sum += quad_weights[q] * float(
@@ -789,7 +790,7 @@ if args.json and comm.rank == 0:
             "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
             "nb_grid_pts_total": int(nb_grid_pts_total),
             "dimensions": int(dim),
-            "memory": args.memory,
+            "device": device.device_string,
             "maxiter": int(args.maxiter),
             "tolerance": float(args.tol),
             "E_matrix": float(args.E_matrix),
@@ -853,7 +854,7 @@ elif comm.rank == 0:
         f"{nb_grid_pts_total:,} points"
     )
     print(f"Dimensions: {dim}D")
-    print(f"Memory location: {args.memory}")
+    print(f"Device: {device.device_string}")
     print(f"Total CG iterations: {total_iterations}")
     print(f"Stiffness operator calls: {nb_stiffness_calls}")
     print(f"Total time: {elapsed_time:.4f} seconds")
@@ -889,7 +890,7 @@ if args.plot and comm.rank == 0:
 
         # Stress xx from last load case (convert to numpy if on device)
         ax = axes[1]
-        if args.memory == "host":
+        if device.is_host:
             sig_xx_avg = np.mean(stress_arr[0, 0, ...], axis=0)
         else:
             sig_xx_avg = np.mean(arr.asnumpy(stress_arr[0, 0, ...]), axis=0)
@@ -899,7 +900,7 @@ if args.plot and comm.rank == 0:
 
         # Displacement magnitude from last load case
         ax = axes[2]
-        if args.memory == "host":
+        if device.is_host:
             u_mag = np.sqrt(u_field.s[0, 0, ...] ** 2 + u_field.s[1, 0, ...] ** 2)
         else:
             u_s = arr.asnumpy(u_field.s)

@@ -34,16 +34,17 @@ parser.add_argument(
 )
 
 _devices = {
-    "host": muGrid.Device.cpu(),
-    "device": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
+    "cpu": muGrid.Device.cpu(),
+    "gpu": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
 }
 
 parser.add_argument(
-    "-m",
-    "--memory",
+    "-d",
+    "--device",
     choices=_devices,
-    default="host",
-    help="Memory space for allocation: 'host' (CPU) or 'device' (GPU) (default: host)",
+    default="cpu",
+    help="Device for computation: 'cpu' or 'gpu' (auto-detect CUDA/ROCm) "
+    "(default: cpu)",
 )
 
 parser.add_argument(
@@ -65,9 +66,9 @@ parser.add_argument(
     "-s",
     "--stencil",
     choices=["generic", "hardcoded"],
-    default="generic",
+    default="hardcoded",
     help="Stencil implementation: 'generic' (sparse convolution) or "
-    "'hardcoded' (optimized Laplace operator) (default: generic)",
+    "'hardcoded' (optimized Laplace operator) (default: hardcoded)",
 )
 
 parser.add_argument(
@@ -95,12 +96,12 @@ args = parser.parse_args()
 if args.json:
     args.quiet = True
 
-if args.memory == "host":
+if args.device == "cpu":
     import numpy as arr
 else:
     import cupy as arr
 
-args.memory = _devices[args.memory]
+device = _devices[args.device]
 
 dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
@@ -113,7 +114,7 @@ left_ghosts = (1,) * dim
 right_ghosts = (1,) * dim
 
 decomposition = muGrid.CartesianDecomposition(
-    comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=args.memory
+    comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=device
 )
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
@@ -178,8 +179,8 @@ nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
 # Create global timer for hierarchical timing
 # PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and args.memory == _devices["host"]
-if args.papi and args.memory != _devices["host"]:
+use_papi = args.papi and device.is_host
+if args.papi and not device.is_host:
     if not args.quiet:
         print(
             "Warning: PAPI not available for device memory (GPU). Using estimates only."
@@ -270,7 +271,7 @@ if args.json:
             "stencil": args.stencil,
             "stencil_name": stencil_name,
             "nb_stencil_pts": int(nb_stencil_pts),
-            "memory": "host" if args.memory == _devices["host"] else "device",
+            "device": device.device_string,
             "maxiter": int(args.maxiter),
         },
         "results": {
@@ -301,6 +302,7 @@ else:
         f"{nb_grid_pts_total:,} points"
     )
     print(f"Dimensions: {dim}D")
+    print(f"Device: {device.device_string}")
     print(f"Stencil implementation: {stencil_name}")
     print(f"Stencil points: {nb_stencil_pts}")
     print(f"CG iterations (hessp calls): {nb_hessp_calls}")
