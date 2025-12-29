@@ -53,7 +53,7 @@
     #define GPU_MEMCPY_D2H(dst, src, size) \
         cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
     #define GPU_MEMSET(ptr, value, size) cudaMemset(ptr, value, size)
-    using DeviceSpace = CudaSpace;
+    using DeviceSpace = muGrid::CudaSpace;
 #elif defined(MUGRID_ENABLE_HIP)
     #include <hip/hip_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
@@ -64,7 +64,7 @@
     #define GPU_MEMCPY_D2H(dst, src, size) \
         hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
     #define GPU_MEMSET(ptr, value, size) hipMemset(ptr, value, size)
-    using DeviceSpace = HIPSpace;
+    using DeviceSpace = muGrid::HIPSpace;
 #endif
 
 namespace muGrid {
@@ -409,7 +409,7 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
     // Full buffer reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      a.data(), b.data(), d_partial, n);
+                      a.view().data(), b.view().data(), d_partial, n);
 
     // Final reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
@@ -447,7 +447,7 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::ghost_dot_2d_kernel,
                                   ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  a.data(), b.data(), d_partial,
+                                  a.view().data(), b.view().data(), d_partial,
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
@@ -483,7 +483,7 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
     // Full buffer reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::norm_sq_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      x.data(), d_partial, n);
+                      x.view().data(), d_partial, n);
 
     // Final reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
@@ -520,7 +520,7 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
                                   ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  x.data(), d_partial,
+                                  x.view().data(), d_partial,
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
@@ -558,7 +558,7 @@ void axpy<Real, DeviceSpace>(Real alpha,
 
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha, x.data(), y.data(), n);
+                      alpha, x.view().data(), y.view().data(), n);
     GPU_DEVICE_SYNCHRONIZE();
 }
 
@@ -570,7 +570,7 @@ void scal<Real, DeviceSpace>(Real alpha, TypedField<Real, DeviceSpace>& x) {
 
     GPU_LAUNCH_KERNEL(gpu_kernels::scal_kernel,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha, x.data(), n);
+                      alpha, x.view().data(), n);
     GPU_DEVICE_SYNCHRONIZE();
 }
 
@@ -590,7 +590,7 @@ void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
 
     GPU_LAUNCH_KERNEL(gpu_kernels::copy_kernel,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
-                      src.data(), dst.data(), n);
+                      src.view().data(), dst.view().data(), n);
     GPU_DEVICE_SYNCHRONIZE();
 }
 
