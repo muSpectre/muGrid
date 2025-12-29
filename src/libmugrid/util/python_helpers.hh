@@ -173,7 +173,7 @@ namespace muGrid {
         T * ptr = static_cast<T *>(fftfreqs.request().ptr);
 
         // Iterate over local Fourier pixels and compute frequencies
-        for (auto && pix : pixels) {
+        for (auto && pix : pixels.coordinates()) {
             for (Index_t i = 0; i < dim; ++i) {
                 // pix[i] is the global coordinate
                 // fft_freqind converts position to frequency index

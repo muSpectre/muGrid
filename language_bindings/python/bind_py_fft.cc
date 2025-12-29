@@ -105,7 +105,7 @@ auto py_fft_coords(const PyFFTEngine & eng) {
     T * ptr = static_cast<T *>(coords.request().ptr);
 
     // Iterate over local pixels and compute coordinates
-    for (auto && pix : pixels) {
+    for (auto && pix : pixels.coordinates()) {
         for (Index_t i = 0; i < dim; ++i) {
             // pix[i] is the global coordinate (may be negative for ghosts)
             ptr[i] = muGrid::normalize_coord<T>(pix[i], nb_domain_grid_pts[i]);
