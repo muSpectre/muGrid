@@ -101,6 +101,28 @@ template <typename T, typename MemorySpace>
 void scal(T alpha, TypedField<T, MemorySpace>& x);
 
 /**
+ * AXPBY operation: y = alpha * x + beta * y
+ *
+ * Combined scale-and-add that is more efficient than separate scal + axpy
+ * because it reads and writes each element only once.
+ *
+ * Operates on the FULL buffer (including ghost regions) for efficiency.
+ *
+ * @tparam T Scalar type (Real, Complex, etc.)
+ * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @param alpha Scalar multiplier for x
+ * @param x Input field
+ * @param beta Scalar multiplier for y
+ * @param y Input/output field (modified in place)
+ * @throws FieldError if fields have incompatible shapes
+ */
+template <typename T, typename MemorySpace>
+void axpby(T alpha,
+           const TypedField<T, MemorySpace>& x,
+           T beta,
+           TypedField<T, MemorySpace>& y);
+
+/**
  * Copy operation: dst = src
  *
  * Operates on the FULL buffer.

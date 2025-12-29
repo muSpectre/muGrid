@@ -159,6 +159,28 @@ void add_linalg_functions(py::module &mod) {
             Input/output field (modified in place)
         )pbdoc");
 
+    linalg.def("axpby",
+        static_cast<void (*)(Real, const RealFieldHost&, Real, RealFieldHost&)>(
+            &muGrid::linalg::axpby<Real, HostSpace>),
+        "alpha"_a, "x"_a, "beta"_a, "y"_a,
+        R"pbdoc(
+        AXPBY operation: y = alpha * x + beta * y (full buffer).
+
+        Combined scale-and-add that is more efficient than separate scal + axpy
+        because it reads and writes each element only once.
+
+        Parameters
+        ----------
+        alpha : float
+            Scalar multiplier for x
+        x : RealField
+            Input field (host memory)
+        beta : float
+            Scalar multiplier for y
+        y : RealField
+            Input/output field (modified in place)
+        )pbdoc");
+
     linalg.def("copy",
         static_cast<void (*)(const RealFieldHost&, RealFieldHost&)>(
             &muGrid::linalg::copy<Real, HostSpace>),
@@ -200,6 +222,12 @@ void add_linalg_functions(py::module &mod) {
         "alpha"_a, "x"_a,
         "Scale operation for complex fields: x = alpha * x.");
 
+    linalg.def("axpby",
+        static_cast<void (*)(Complex, const ComplexFieldHost&, Complex, ComplexFieldHost&)>(
+            &muGrid::linalg::axpby<Complex, HostSpace>),
+        "alpha"_a, "x"_a, "beta"_a, "y"_a,
+        "AXPBY operation for complex fields: y = alpha * x + beta * y.");
+
     linalg.def("copy",
         static_cast<void (*)(const ComplexFieldHost&, ComplexFieldHost&)>(
             &muGrid::linalg::copy<Complex, HostSpace>),
@@ -233,6 +261,12 @@ void add_linalg_functions(py::module &mod) {
         "alpha"_a, "x"_a,
         "Scale operation on device (GPU): x = alpha * x.");
 
+    linalg.def("axpby",
+        static_cast<void (*)(Real, const RealFieldDevice&, Real, RealFieldDevice&)>(
+            &muGrid::linalg::axpby<Real, DeviceSpace>),
+        "alpha"_a, "x"_a, "beta"_a, "y"_a,
+        "AXPBY operation on device (GPU): y = alpha * x + beta * y.");
+
     linalg.def("copy",
         static_cast<void (*)(const RealFieldDevice&, RealFieldDevice&)>(
             &muGrid::linalg::copy<Real, DeviceSpace>),
@@ -264,6 +298,12 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::scal<Complex, DeviceSpace>),
         "alpha"_a, "x"_a,
         "Scale operation for complex fields on device (GPU): x = alpha * x.");
+
+    linalg.def("axpby",
+        static_cast<void (*)(Complex, const ComplexFieldDevice&, Complex, ComplexFieldDevice&)>(
+            &muGrid::linalg::axpby<Complex, DeviceSpace>),
+        "alpha"_a, "x"_a, "beta"_a, "y"_a,
+        "AXPBY operation for complex fields on device (GPU): y = alpha * x + beta * y.");
 
     linalg.def("copy",
         static_cast<void (*)(const ComplexFieldDevice&, ComplexFieldDevice&)>(

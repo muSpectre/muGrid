@@ -110,6 +110,16 @@ __global__ void copy_kernel(const Real* src, Real* dst, Index_t n) {
     }
 }
 
+/**
+ * AXPBY kernel: y = alpha * x + beta * y
+ */
+__global__ void axpby_kernel(Real alpha, const Real* x, Real beta, Real* y, Index_t n) {
+    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+        y[idx] = alpha * x[idx] + beta * y[idx];
+    }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Reduction kernels                                                       */
 /* ---------------------------------------------------------------------- */
@@ -575,6 +585,28 @@ void scal<Real, DeviceSpace>(Real alpha, TypedField<Real, DeviceSpace>& x) {
 }
 
 template <>
+void axpby<Real, DeviceSpace>(Real alpha,
+                               const TypedField<Real, DeviceSpace>& x,
+                               Real beta,
+                               TypedField<Real, DeviceSpace>& y) {
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpby: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries()) {
+        throw FieldError("axpby: fields must have the same number of entries");
+    }
+
+    const Index_t n = x.get_nb_entries();
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpby_kernel,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      alpha, x.view().data(), beta, y.view().data(), n);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+template <>
 void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
                               TypedField<Real, DeviceSpace>& dst) {
     if (&src.get_collection() != &dst.get_collection()) {
@@ -618,6 +650,14 @@ void axpy<Complex, DeviceSpace>(Complex alpha,
 template <>
 void scal<Complex, DeviceSpace>(Complex alpha,
                                  TypedField<Complex, DeviceSpace>& x) {
+    throw FieldError("Complex GPU linalg not yet implemented");
+}
+
+template <>
+void axpby<Complex, DeviceSpace>(Complex alpha,
+                                  const TypedField<Complex, DeviceSpace>& x,
+                                  Complex beta,
+                                  TypedField<Complex, DeviceSpace>& y) {
     throw FieldError("Complex GPU linalg not yet implemented");
 }
 

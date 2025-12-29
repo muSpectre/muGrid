@@ -147,7 +147,6 @@ def conjugate_gradients(
 
         # Update search direction: p = r + beta * p
         with timed("update_p"):
-            linalg.scal(beta, p)
-            linalg.axpy(1.0, r, p)
+            linalg.axpby(1.0, r, beta, p)
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")

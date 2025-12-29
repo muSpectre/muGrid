@@ -104,6 +104,27 @@ def scal(alpha, x):
     _linalg.scal(alpha, _get_cpp(x))
 
 
+def axpby(alpha, x, beta, y):
+    """
+    AXPBY operation: y = alpha * x + beta * y (full buffer).
+
+    Combined scale-and-add that is more efficient than separate scal + axpy
+    because it reads and writes each element only once.
+
+    Parameters
+    ----------
+    alpha : float or complex
+        Scalar multiplier for x
+    x : Field
+        Input field
+    beta : float or complex
+        Scalar multiplier for y
+    y : Field
+        Input/output field (modified in place)
+    """
+    _linalg.axpby(alpha, _get_cpp(x), beta, _get_cpp(y))
+
+
 def copy(src, dst):
     """
     Copy operation: dst = src (full buffer).
@@ -118,4 +139,4 @@ def copy(src, dst):
     _linalg.copy(_get_cpp(src), _get_cpp(dst))
 
 
-__all__ = ["vecdot", "norm_sq", "axpy", "scal", "copy"]
+__all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy"]

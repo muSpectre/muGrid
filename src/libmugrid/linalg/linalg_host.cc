@@ -59,7 +59,28 @@ T ghost_vecdot(const T* a_data, const T* b_data,
 
     T result = T{0};
 
-    if (spatial_dim == 2) {
+    if (spatial_dim == 1) {
+        const Index_t nx_total = nb_pts[0];
+        const Index_t gx_left = nb_ghosts_left[0];
+        const Index_t gx_right = nb_ghosts_right[0];
+        const Index_t sx = strides[0];
+
+        // Left ghost region
+        for (Index_t ix = 0; ix < gx_left; ++ix) {
+            const Index_t offset = ix * sx * nb_components_per_pixel;
+            for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                result += a_data[offset + c] * b_data[offset + c];
+            }
+        }
+
+        // Right ghost region
+        for (Index_t ix = nx_total - gx_right; ix < nx_total; ++ix) {
+            const Index_t offset = ix * sx * nb_components_per_pixel;
+            for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                result += a_data[offset + c] * b_data[offset + c];
+            }
+        }
+    } else if (spatial_dim == 2) {
         const Index_t nx_total = nb_pts[0];
         const Index_t ny_total = nb_pts[1];
         const Index_t gx_left = nb_ghosts_left[0];
@@ -170,7 +191,30 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
 
     T result = T{0};
 
-    if (spatial_dim == 2) {
+    if (spatial_dim == 1) {
+        const Index_t nx_total = nb_pts[0];
+        const Index_t gx_left = nb_ghosts_left[0];
+        const Index_t gx_right = nb_ghosts_right[0];
+        const Index_t sx = strides[0];
+
+        // Left ghost region
+        for (Index_t ix = 0; ix < gx_left; ++ix) {
+            const Index_t offset = ix * sx * nb_components_per_pixel;
+            for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                const T val = data[offset + c];
+                result += val * val;
+            }
+        }
+
+        // Right ghost region
+        for (Index_t ix = nx_total - gx_right; ix < nx_total; ++ix) {
+            const Index_t offset = ix * sx * nb_components_per_pixel;
+            for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                const T val = data[offset + c];
+                result += val * val;
+            }
+        }
+    } else if (spatial_dim == 2) {
         const Index_t nx_total = nb_pts[0];
         const Index_t ny_total = nb_pts[1];
         const Index_t gx_left = nb_ghosts_left[0];
@@ -380,6 +424,39 @@ template <>
 void scal<Complex, HostSpace>(Complex alpha, TypedField<Complex, HostSpace>& x) {
     // Operate on full buffer using Eigen
     x.eigen_vec() *= alpha;
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void axpby<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
+                             Real beta, TypedField<Real, HostSpace>& y) {
+    // Verify fields are compatible
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpby: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries()) {
+        throw FieldError("axpby: fields must have the same number of entries");
+    }
+
+    // Operate on full buffer using Eigen (contiguous, fast)
+    // y = alpha * x + beta * y
+    y.eigen_vec() = alpha * x.eigen_vec() + beta * y.eigen_vec();
+}
+
+template <>
+void axpby<Complex, HostSpace>(Complex alpha, const TypedField<Complex, HostSpace>& x,
+                                Complex beta, TypedField<Complex, HostSpace>& y) {
+    // Verify fields are compatible
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpby: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries()) {
+        throw FieldError("axpby: fields must have the same number of entries");
+    }
+
+    // Operate on full buffer using Eigen (contiguous, fast)
+    // y = alpha * x + beta * y
+    y.eigen_vec() = alpha * x.eigen_vec() + beta * y.eigen_vec();
 }
 
 /* ---------------------------------------------------------------------- */
