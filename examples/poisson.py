@@ -188,12 +188,12 @@ if args.papi and not device.is_host:
 timer = muGrid.Timer(use_papi=use_papi)
 
 
-def callback(it, x, r, p):
+def callback(iteration, state):
     """
-    Callback function to print the current solution, residual, and search direction.
+    Callback function to print the iteration and squared residual norm.
     """
     if not args.quiet:
-        print(f"{it:5} {arr.dot(r.ravel(), r.ravel()):.5}")
+        print(f"{iteration:5} {state['rr']:.5}")
 
 
 def hessp(x, Ax):

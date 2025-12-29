@@ -86,6 +86,7 @@ install(TARGETS _muGrid
 install(FILES
     muGrid/__init__.py
     muGrid/Field.py
+    muGrid/linalg.py
     muGrid/Parallel.py
     muGrid/Solvers.py
     muGrid/Timer.py

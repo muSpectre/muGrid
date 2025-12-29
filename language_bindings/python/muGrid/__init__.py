@@ -101,8 +101,8 @@ StorageOrder = _muGrid.StorageOrder
 SubPt = _muGrid.SubPt
 Unit = _muGrid.Unit
 
-# Linear algebra operations on fields
-linalg = _muGrid.linalg
+# Linear algebra operations on fields (Python wrapper with automatic _cpp extraction)
+from . import linalg  # noqa: E402
 
 # FFT utility functions
 # Note: fft_freq, fft_freqind, rfft_freq, rfft_freqind are now properties

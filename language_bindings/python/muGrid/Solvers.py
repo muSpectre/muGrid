@@ -43,7 +43,11 @@ def conjugate_gradients(
         Maximum number of iterations. The default is 1000.
     callback : callable, optional
         Function to call after each iteration with signature:
-        callback(iteration, x_array, residual_array, search_direction_array)
+        callback(iteration, state_dict) where state_dict contains:
+        - "x": solution field
+        - "r": residual field
+        - "p": search direction field
+        - "rr": squared residual norm (float)
     timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
         record timing for the hessp (Hessian-vector product) operations.
@@ -67,48 +71,35 @@ def conjugate_gradients(
     def timed(name):
         return timer(name) if timer is not None else nullcontext()
 
-    # Get spatial dimension from the field collection
-    spatial_dim = len(fc.nb_grid_pts)
+    with timed("startup"):
+        # Create temporary fields with matching component shape
+        # r: residual field
+        # p: search direction field
+        # Ap: Hessian product field
+        r = fc.real_field("cg-residual", b.components_shape)
+        p = fc.real_field("cg-search-direction", b.components_shape)
+        Ap = fc.real_field("cg-hessian-product", b.components_shape)
 
-    # Extract component shape from b: b.s.shape = (*components, nb_sub_pts, *spatial)
-    # The +1 accounts for the nb_sub_pts dimension
-    components_shape = b.s.shape[: -(spatial_dim + 1)]
+        # Initial residual: r = b - A*x
+        hessp(x, Ap)
+        # r = b (copy)
+        linalg.copy(b, r)
+        # r = r - Ap = b - A*x (axpy with alpha=-1)
+        linalg.axpy(-1.0, Ap, r)
 
-    # Create temporary fields with matching component shape
-    # r: residual field
-    # p: search direction field
-    # Ap: Hessian product field
-    r = fc.real_field("cg-residual", components_shape)
-    p = fc.real_field("cg-search-direction", components_shape)
-    Ap = fc.real_field("cg-hessian-product", components_shape)
+        # Initial search direction: p = r
+        linalg.copy(r, p)
 
-    # Get underlying C++ field objects for efficient linalg operations
-    # (avoids Python wrapper overhead in the hot loop)
-    b_cpp = b._cpp
-    x_cpp = x._cpp
-    r_cpp = r._cpp
-    p_cpp = p._cpp
-    Ap_cpp = Ap._cpp
+        if callback:
+            rr = comm.sum(linalg.norm_sq(r))
+            callback(0, {"x": x, "r": r, "p": p, "rr": rr})
 
-    # Initial residual: r = b - A*x
-    hessp(x, Ap)
-    # r = b (copy)
-    linalg.copy(b_cpp, r_cpp)
-    # r = r - Ap = b - A*x (axpy with alpha=-1)
-    linalg.axpy(-1.0, Ap_cpp, r_cpp)
+        with timed("dot_rr"):
+            rr = comm.sum(linalg.norm_sq(r))
+        rr_val = float(rr)
 
-    # Initial search direction: p = r
-    linalg.copy(r_cpp, p_cpp)
-
-    if callback:
-        callback(0, x.s, r.s, p.s)
-
-    with timed("dot_rr"):
-        rr = comm.sum(linalg.norm_sq(r_cpp))
-    rr_val = float(rr)
-
-    if rr_val < tol_sq:
-        return x
+        if rr_val < tol_sq:
+            return x
 
     for iteration in range(maxiter):
         # Compute Hessian product: Ap = A * p
@@ -117,25 +108,26 @@ def conjugate_gradients(
 
         # Compute pAp for step size
         with timed("dot_pAp"):
-            pAp = comm.sum(linalg.vecdot(p_cpp, Ap_cpp))
+            pAp = comm.sum(linalg.vecdot(p, Ap))
 
         # Compute alpha
         alpha = rr / pAp
 
         # Update solution: x += alpha * p
         with timed("update_x"):
-            linalg.axpy(alpha, p_cpp, x_cpp)
+            linalg.axpy(alpha, p, x)
 
         # Update residual: r -= alpha * Ap
         with timed("update_r"):
-            linalg.axpy(-alpha, Ap_cpp, r_cpp)
+            linalg.axpy(-alpha, Ap, r)
 
         if callback:
-            callback(iteration + 1, x.s, r.s, p.s)
+            with timed("callback"):
+                callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": rr})
 
         # Compute next residual norm
         with timed("dot_rr"):
-            next_rr = comm.sum(linalg.norm_sq(r_cpp))
+            next_rr = comm.sum(linalg.norm_sq(r))
         next_rr_val = float(next_rr)
 
         # Check for numerical issues (NaN indicates non-positive-definite H)
@@ -155,7 +147,7 @@ def conjugate_gradients(
 
         # Update search direction: p = r + beta * p
         with timed("update_p"):
-            linalg.scal(beta, p_cpp)
-            linalg.axpy(1.0, r_cpp, p_cpp)
+            linalg.scal(beta, p)
+            linalg.axpy(1.0, r, p)
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")

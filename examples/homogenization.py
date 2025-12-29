@@ -657,13 +657,12 @@ with timer("total_solve"):
         # CG callback
         iteration_count = [0]  # Use list to allow modification in nested function
 
-        def callback(it, x, r, p):
-            iteration_count[0] = it
+        def callback(iteration, state):
+            iteration_count[0] = iteration
             if not args.quiet:
-                r_flat = r.ravel()
-                res_norm = float(arr.sqrt(comm.sum(arr.dot(r_flat, r_flat))))
-                if comm.rank == 0 and it % 10 == 0:
-                    print(f"  CG iteration {it}: |r| = {res_norm:.6e}")
+                res_norm = float(arr.sqrt(state["rr"]))
+                if comm.rank == 0 and iteration % 10 == 0:
+                    print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
 
         # Solve K u = f using conjugate_gradients from Solvers.py
         with timer(f"cg_case_{case_idx}"):

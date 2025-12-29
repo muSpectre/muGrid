@@ -87,11 +87,11 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
 
     rhs.p[...] = np.sin(2 * np.pi * x)
 
-    def callback(it, x, r, p):
+    def callback(iteration, state):
         """
-        Callback function to print the current solution, residual, and search direction.
+        Callback function to print the iteration and squared residual norm.
         """
-        print(it, np.dot(r.ravel(), r.ravel()))
+        print(iteration, state["rr"])
 
     def hessp(x_field, Ax_field):
         """

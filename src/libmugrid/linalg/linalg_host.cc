@@ -44,71 +44,228 @@ namespace linalg {
 namespace internal {
 
 /**
- * Helper function to compute dot product over interior region.
- * Handles 2D and 3D cases with proper stride computation.
+ * Helper to compute dot product of ghost region only.
+ * We compute full buffer dot with Eigen, then subtract ghosts.
  */
 template <typename T>
-T vecdot_interior(const T* a_data, const T* b_data,
-                  const GlobalFieldCollection& coll,
-                  Index_t nb_components_per_pixel) {
+T ghost_vecdot(const T* a_data, const T* b_data,
+               const GlobalFieldCollection& coll,
+               Index_t nb_components_per_pixel) {
     const auto spatial_dim = coll.get_spatial_dim();
-    const auto& nb_pts_with_ghosts = coll.get_nb_subdomain_grid_pts_with_ghosts();
+    const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
     const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
     const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
     const auto& strides = coll.get_pixels_with_ghosts().get_strides();
 
-    // Compute interior shape (without ghosts)
-    DynGridIndex nb_interior(spatial_dim);
-    for (Dim_t d = 0; d < spatial_dim; ++d) {
-        nb_interior[d] = nb_pts_with_ghosts[d] - nb_ghosts_left[d] - nb_ghosts_right[d];
-    }
-
     T result = T{0};
 
     if (spatial_dim == 2) {
-        const Index_t nx = nb_interior[0];
-        const Index_t ny = nb_interior[1];
-        const Index_t gx = nb_ghosts_left[0];
-        const Index_t gy = nb_ghosts_left[1];
+        const Index_t nx_total = nb_pts[0];
+        const Index_t ny_total = nb_pts[1];
+        const Index_t gx_left = nb_ghosts_left[0];
+        const Index_t gx_right = nb_ghosts_right[0];
+        const Index_t gy_left = nb_ghosts_left[1];
+        const Index_t gy_right = nb_ghosts_right[1];
         const Index_t sx = strides[0];
         const Index_t sy = strides[1];
 
-        #pragma omp parallel for reduction(+:result) collapse(2)
-        for (Index_t iy = 0; iy < ny; ++iy) {
-            for (Index_t ix = 0; ix < nx; ++ix) {
-                const Index_t pixel_offset =
-                    ((gx + ix) * sx + (gy + iy) * sy) * nb_components_per_pixel;
+        // Left ghost columns (full height)
+        for (Index_t iy = 0; iy < ny_total; ++iy) {
+            for (Index_t ix = 0; ix < gx_left; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result += a_data[pixel_offset + c] * b_data[pixel_offset + c];
+                    result += a_data[offset + c] * b_data[offset + c];
+                }
+            }
+        }
+
+        // Right ghost columns (full height)
+        for (Index_t iy = 0; iy < ny_total; ++iy) {
+            for (Index_t ix = nx_total - gx_right; ix < nx_total; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    result += a_data[offset + c] * b_data[offset + c];
+                }
+            }
+        }
+
+        // Top ghost rows (excluding corners already counted)
+        for (Index_t iy = 0; iy < gy_left; ++iy) {
+            for (Index_t ix = gx_left; ix < nx_total - gx_right; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    result += a_data[offset + c] * b_data[offset + c];
+                }
+            }
+        }
+
+        // Bottom ghost rows (excluding corners already counted)
+        for (Index_t iy = ny_total - gy_right; iy < ny_total; ++iy) {
+            for (Index_t ix = gx_left; ix < nx_total - gx_right; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    result += a_data[offset + c] * b_data[offset + c];
                 }
             }
         }
     } else if (spatial_dim == 3) {
-        const Index_t nx = nb_interior[0];
-        const Index_t ny = nb_interior[1];
-        const Index_t nz = nb_interior[2];
-        const Index_t gx = nb_ghosts_left[0];
-        const Index_t gy = nb_ghosts_left[1];
-        const Index_t gz = nb_ghosts_left[2];
+        const Index_t nx_total = nb_pts[0];
+        const Index_t ny_total = nb_pts[1];
+        const Index_t nz_total = nb_pts[2];
+        const Index_t gx_left = nb_ghosts_left[0];
+        const Index_t gx_right = nb_ghosts_right[0];
+        const Index_t gy_left = nb_ghosts_left[1];
+        const Index_t gy_right = nb_ghosts_right[1];
+        const Index_t gz_left = nb_ghosts_left[2];
+        const Index_t gz_right = nb_ghosts_right[2];
         const Index_t sx = strides[0];
         const Index_t sy = strides[1];
         const Index_t sz = strides[2];
 
-        #pragma omp parallel for reduction(+:result) collapse(3)
-        for (Index_t iz = 0; iz < nz; ++iz) {
-            for (Index_t iy = 0; iy < ny; ++iy) {
-                for (Index_t ix = 0; ix < nx; ++ix) {
-                    const Index_t pixel_offset =
-                        ((gx + ix) * sx + (gy + iy) * sy + (gz + iz) * sz) *
-                        nb_components_per_pixel;
+        // Interior bounds
+        const Index_t x_start = gx_left;
+        const Index_t x_end = nx_total - gx_right;
+        const Index_t y_start = gy_left;
+        const Index_t y_end = ny_total - gy_right;
+        const Index_t z_start = gz_left;
+        const Index_t z_end = nz_total - gz_right;
+
+        // Iterate over all ghost pixels
+        for (Index_t iz = 0; iz < nz_total; ++iz) {
+            for (Index_t iy = 0; iy < ny_total; ++iy) {
+                for (Index_t ix = 0; ix < nx_total; ++ix) {
+                    // Skip interior pixels
+                    if (ix >= x_start && ix < x_end &&
+                        iy >= y_start && iy < y_end &&
+                        iz >= z_start && iz < z_end) {
+                        continue;
+                    }
+                    const Index_t offset =
+                        (ix * sx + iy * sy + iz * sz) * nb_components_per_pixel;
                     for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                        result += a_data[pixel_offset + c] * b_data[pixel_offset + c];
+                        result += a_data[offset + c] * b_data[offset + c];
                     }
                 }
             }
         }
     } else {
-        throw FieldError("vecdot only supports 2D and 3D fields");
+        throw FieldError("ghost_vecdot only supports 2D and 3D fields");
+    }
+
+    return result;
+}
+
+/**
+ * Helper to compute squared norm of ghost region only.
+ * We compute full buffer norm with Eigen, then subtract ghosts.
+ */
+template <typename T>
+T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
+                Index_t nb_components_per_pixel) {
+    const auto spatial_dim = coll.get_spatial_dim();
+    const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
+    const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
+    const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
+    const auto& strides = coll.get_pixels_with_ghosts().get_strides();
+
+    T result = T{0};
+
+    if (spatial_dim == 2) {
+        const Index_t nx_total = nb_pts[0];
+        const Index_t ny_total = nb_pts[1];
+        const Index_t gx_left = nb_ghosts_left[0];
+        const Index_t gx_right = nb_ghosts_right[0];
+        const Index_t gy_left = nb_ghosts_left[1];
+        const Index_t gy_right = nb_ghosts_right[1];
+        const Index_t sx = strides[0];
+        const Index_t sy = strides[1];
+
+        // Left ghost columns (full height)
+        for (Index_t iy = 0; iy < ny_total; ++iy) {
+            for (Index_t ix = 0; ix < gx_left; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    const T val = data[offset + c];
+                    result += val * val;
+                }
+            }
+        }
+
+        // Right ghost columns (full height)
+        for (Index_t iy = 0; iy < ny_total; ++iy) {
+            for (Index_t ix = nx_total - gx_right; ix < nx_total; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    const T val = data[offset + c];
+                    result += val * val;
+                }
+            }
+        }
+
+        // Top ghost rows (excluding corners already counted)
+        for (Index_t iy = 0; iy < gy_left; ++iy) {
+            for (Index_t ix = gx_left; ix < nx_total - gx_right; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    const T val = data[offset + c];
+                    result += val * val;
+                }
+            }
+        }
+
+        // Bottom ghost rows (excluding corners already counted)
+        for (Index_t iy = ny_total - gy_right; iy < ny_total; ++iy) {
+            for (Index_t ix = gx_left; ix < nx_total - gx_right; ++ix) {
+                const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    const T val = data[offset + c];
+                    result += val * val;
+                }
+            }
+        }
+    } else if (spatial_dim == 3) {
+        const Index_t nx_total = nb_pts[0];
+        const Index_t ny_total = nb_pts[1];
+        const Index_t nz_total = nb_pts[2];
+        const Index_t gx_left = nb_ghosts_left[0];
+        const Index_t gx_right = nb_ghosts_right[0];
+        const Index_t gy_left = nb_ghosts_left[1];
+        const Index_t gy_right = nb_ghosts_right[1];
+        const Index_t gz_left = nb_ghosts_left[2];
+        const Index_t gz_right = nb_ghosts_right[2];
+        const Index_t sx = strides[0];
+        const Index_t sy = strides[1];
+        const Index_t sz = strides[2];
+
+        // Interior bounds
+        const Index_t x_start = gx_left;
+        const Index_t x_end = nx_total - gx_right;
+        const Index_t y_start = gy_left;
+        const Index_t y_end = ny_total - gy_right;
+        const Index_t z_start = gz_left;
+        const Index_t z_end = nz_total - gz_right;
+
+        // Iterate over all ghost pixels (those outside the interior box)
+        for (Index_t iz = 0; iz < nz_total; ++iz) {
+            for (Index_t iy = 0; iy < ny_total; ++iy) {
+                for (Index_t ix = 0; ix < nx_total; ++ix) {
+                    // Skip interior pixels
+                    if (ix >= x_start && ix < x_end &&
+                        iy >= y_start && iy < y_end &&
+                        iz >= z_start && iz < z_end) {
+                        continue;
+                    }
+                    const Index_t offset =
+                        (ix * sx + iy * sy + iz * sz) * nb_components_per_pixel;
+                    for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                        const T val = data[offset + c];
+                        result += val * val;
+                    }
+                }
+            }
+        }
+    } else {
+        throw FieldError("ghost_norm_sq only supports 2D and 3D fields");
     }
 
     return result;
@@ -138,8 +295,8 @@ Real vecdot<Real, HostSpace>(const TypedField<Real, HostSpace>& a,
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const Index_t nb_components_per_pixel =
             a.get_nb_components() * a.get_nb_sub_pts();
-        return internal::vecdot_interior(a.data(), b.data(), global_coll,
-                                         nb_components_per_pixel);
+        return internal::vecdot_impl(a.data(), b.data(), global_coll,
+                                     nb_components_per_pixel);
     } else {
         // LocalFieldCollection: no ghosts, use full buffer
         // Use Eigen for efficiency
@@ -168,8 +325,8 @@ Complex vecdot<Complex, HostSpace>(const TypedField<Complex, HostSpace>& a,
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const Index_t nb_components_per_pixel =
             a.get_nb_components() * a.get_nb_sub_pts();
-        return internal::vecdot_interior(a.data(), b.data(), global_coll,
-                                         nb_components_per_pixel);
+        return internal::vecdot_impl(a.data(), b.data(), global_coll,
+                                     nb_components_per_pixel);
     } else {
         // LocalFieldCollection: no ghosts, use full buffer
         // Use Eigen for efficiency
@@ -255,12 +412,42 @@ void copy<Complex, HostSpace>(const TypedField<Complex, HostSpace>& src,
 /* ---------------------------------------------------------------------- */
 template <>
 Real norm_sq<Real, HostSpace>(const TypedField<Real, HostSpace>& x) {
-    return vecdot<Real, HostSpace>(x, x);
+    const auto& coll = x.get_collection();
+
+    // Check if this is a GlobalFieldCollection (has ghost regions)
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        const Index_t nb_components_per_pixel =
+            x.get_nb_components() * x.get_nb_sub_pts();
+        // Compute full buffer norm with Eigen (fast), subtract ghost contributions
+        Real full_norm = x.eigen_vec().squaredNorm();
+        Real ghost_norm = internal::ghost_norm_sq(x.data(), global_coll,
+                                                  nb_components_per_pixel);
+        return full_norm - ghost_norm;
+    } else {
+        // LocalFieldCollection: no ghosts, use Eigen
+        return x.eigen_vec().squaredNorm();
+    }
 }
 
 template <>
 Complex norm_sq<Complex, HostSpace>(const TypedField<Complex, HostSpace>& x) {
-    return vecdot<Complex, HostSpace>(x, x);
+    const auto& coll = x.get_collection();
+
+    // Check if this is a GlobalFieldCollection (has ghost regions)
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        const Index_t nb_components_per_pixel =
+            x.get_nb_components() * x.get_nb_sub_pts();
+        // Compute full buffer norm with Eigen (fast), subtract ghost contributions
+        Complex full_norm = x.eigen_vec().squaredNorm();
+        Complex ghost_norm = internal::ghost_norm_sq(x.data(), global_coll,
+                                                     nb_components_per_pixel);
+        return full_norm - ghost_norm;
+    } else {
+        // LocalFieldCollection: no ghosts, use Eigen
+        return x.eigen_vec().squaredNorm();
+    }
 }
 
 }  // namespace linalg
