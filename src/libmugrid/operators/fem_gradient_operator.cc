@@ -674,10 +674,10 @@ namespace muGrid {
                        quad_weights.size() * sizeof(Real),
                        cudaMemcpyHostToDevice);
 #elif defined(MUGRID_ENABLE_HIP)
-            hipMalloc(&d_quad_weights, quad_weights.size() * sizeof(Real));
-            hipMemcpy(d_quad_weights, quad_weights.data(),
-                      quad_weights.size() * sizeof(Real),
-                      hipMemcpyHostToDevice);
+            (void)hipMalloc(&d_quad_weights, quad_weights.size() * sizeof(Real));
+            (void)hipMemcpy(d_quad_weights, quad_weights.data(),
+                            quad_weights.size() * sizeof(Real),
+                            hipMemcpyHostToDevice);
 #endif
 
             // Process each component independently
@@ -701,7 +701,7 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA)
             cudaFree(d_quad_weights);
 #elif defined(MUGRID_ENABLE_HIP)
-            hipFree(d_quad_weights);
+            (void)hipFree(d_quad_weights);
 #endif
         }
     }

@@ -366,10 +366,10 @@ namespace muGrid {
                 cudaMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
                            cudaMemcpyDeviceToHost);
 #elif defined(MUGRID_ENABLE_HIP)
-                hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
-                          hipMemcpyDeviceToHost);
-                hipMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
-                          hipMemcpyDeviceToHost);
+                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
+                                hipMemcpyDeviceToHost);
+                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
+                                hipMemcpyDeviceToHost);
 #endif
                 for (size_t i{0}; i < nb_elements; ++i) {
                     host_dst[i] += host_src[i];
@@ -378,8 +378,8 @@ namespace muGrid {
                 cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
                            cudaMemcpyHostToDevice);
 #elif defined(MUGRID_ENABLE_HIP)
-                hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
-                          hipMemcpyHostToDevice);
+                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
+                                hipMemcpyHostToDevice);
 #endif
 #else
                 // Fallback: should not happen

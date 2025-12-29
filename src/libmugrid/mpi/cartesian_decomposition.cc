@@ -482,8 +482,8 @@ namespace muGrid {
                         cudaMemset(data + offset * element_size, 0,
                                    block_len * element_size);
 #elif defined(MUGRID_ENABLE_HIP)
-                        hipMemset(data + offset * element_size, 0,
-                                  block_len * element_size);
+                        (void)hipMemset(data + offset * element_size, 0,
+                                        block_len * element_size);
 #endif
                     } else {
                         std::memset(data + offset * element_size, 0,
@@ -503,8 +503,8 @@ namespace muGrid {
                         cudaMemset(data + offset * element_size, 0,
                                    block_len * element_size);
 #elif defined(MUGRID_ENABLE_HIP)
-                        hipMemset(data + offset * element_size, 0,
-                                  block_len * element_size);
+                        (void)hipMemset(data + offset * element_size, 0,
+                                        block_len * element_size);
 #endif
                     } else {
                         std::memset(data + offset * element_size, 0,
