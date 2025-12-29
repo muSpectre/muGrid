@@ -1,5 +1,5 @@
 /**
- * @file   fft/cufft_backend.cu
+ * @file   fft/cufft_backend.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *

@@ -41,7 +41,7 @@
 #include "convolution_kernels_cpu.hh"
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-#include "convolution_kernels_gpu.hpp"
+#include "convolution_kernels_gpu.hh"
 #endif
 
 namespace muGrid {

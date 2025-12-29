@@ -1,5 +1,5 @@
 /**
- * @file   fft/hipfft_backend.cpp
+ * @file   fft/hipfft_backend.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *

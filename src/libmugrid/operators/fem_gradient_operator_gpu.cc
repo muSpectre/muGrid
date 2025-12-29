@@ -1,5 +1,5 @@
 /**
- * @file   fem_gradient_operator_gpu.cpp
+ * @file   fem_gradient_operator_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *

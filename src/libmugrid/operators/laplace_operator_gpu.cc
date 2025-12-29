@@ -1,5 +1,5 @@
 /**
- * @file   laplace_operator_gpu.cpp
+ * @file   laplace_operator_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *

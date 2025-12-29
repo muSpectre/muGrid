@@ -612,7 +612,7 @@ void add_local_field_collection(py::module & mod) {
             },
             "global_index"_a)
         .def("initialise", &LocalFieldCollection::initialise)
-        .def("get_name", &LocalFieldCollection::get_name);
+        .def_property_readonly("name", &LocalFieldCollection::get_name);
 }
 
 void add_field_collection_classes(py::module & mod) {
