@@ -140,10 +140,10 @@ void TracebackEntry::discover_name_and_file() {
             this->file = line.FileName;
         } else {
             // If we can't get the source file, use the module name
-            IMAGEHLP_MODULE64 module;
-            module.SizeOfStruct = sizeof(IMAGEHLP_MODULE64);
-            if (SymGetModuleInfo64(process, address64, &module)) {
-                this->file = module.ImageName;
+            IMAGEHLP_MODULE64 module_info;
+            module_info.SizeOfStruct = sizeof(IMAGEHLP_MODULE64);
+            if (SymGetModuleInfo64(process, address64, &module_info)) {
+                this->file = module_info.ImageName;
             }
         }
     }
