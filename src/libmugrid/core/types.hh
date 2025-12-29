@@ -97,10 +97,10 @@ namespace muGrid {
     /**@}*/
 
     //! Dimension constants
-    constexpr Index_t oneD{1};    //!< constant for a one-dimensional problem
-    constexpr Index_t twoD{2};    //!< constant for a two-dimensional problem
-    constexpr Index_t threeD{3};  //!< constant for a three-dimensional problem
-    constexpr Index_t fourD{4};   //!< constant for a four-dimensional problem
+    constexpr Dim_t oneD{1};    //!< constant for a one-dimensional problem
+    constexpr Dim_t twoD{2};    //!< constant for a two-dimensional problem
+    constexpr Dim_t threeD{3};  //!< constant for a three-dimensional problem
+    constexpr Dim_t fourD{4};   //!< constant for a four-dimensional problem
 
     //! Tensor order constants
     constexpr Index_t zerothOrder{0};  //!< constant for scalars

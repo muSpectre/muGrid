@@ -118,7 +118,7 @@ namespace muGrid {
         //! returns a grid of equal number of grid points in each direction
         template <size_t MaxDim = fourD>  // 4 to ease alignment
         DynCoord<MaxDim> get_cube(const Dim_t & dim,
-                                   const Index_t & nb_grid_pts) {
+                                  const Index_t & nb_grid_pts) {
             switch (dim) {
             case oneD: {
                 return DynCoord<MaxDim>{get_cube<oneD>(nb_grid_pts)};
@@ -134,7 +134,8 @@ namespace muGrid {
             }
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a column-major grid
         template <size_t Dim>
         constexpr GridIndex<Dim>
@@ -143,7 +144,8 @@ namespace muGrid {
                 nb_grid_pts, std::make_index_sequence<Dim>{});
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a column-major grid
         template <size_t MaxDim>
         constexpr DynCoord<MaxDim>
@@ -174,7 +176,8 @@ namespace muGrid {
             }
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a row-major grid
         template <size_t Dim>
         constexpr GridIndex<Dim>
@@ -183,7 +186,8 @@ namespace muGrid {
                 nb_grid_pts, std::make_index_sequence<Dim>{});
         }
 
-        /* ---------------------------------------------------------------------- */
+        /* ----------------------------------------------------------------------
+         */
         //! get all strides from a row-major grid
         template <size_t MaxDim>
         constexpr DynCoord<MaxDim>
@@ -231,7 +235,7 @@ namespace muGrid {
         //! compute the order of the axes given strides, fastest first
         template <size_t dim>
         GridIndex<dim> compute_axes_order(const GridIndex<dim> & shape,
-                                         const GridIndex<dim> & strides) {
+                                          const GridIndex<dim> & strides) {
             GridIndex<dim> axes_order;
             std::iota(axes_order.begin(), axes_order.end(), 0);
             std::sort(axes_order.begin(), axes_order.end(),
@@ -252,7 +256,8 @@ namespace muGrid {
             }
             // Forward declare - will be in index_ops.hh
             auto compute_volume = [](const T & lengths) {
-                typename std::remove_cv<typename std::remove_reference<decltype(lengths[0])>::type>::type vol{};
+                typename std::remove_cv<typename std::remove_reference<
+                    decltype(lengths[0])>::type>::type vol{};
                 vol++;
                 for (auto && length : lengths) {
                     vol *= length;

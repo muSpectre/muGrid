@@ -26,6 +26,7 @@ set(MUGRID_SOURCES
     # grid/
     grid/index_ops.cc
     grid/pixels.cc
+    grid/strides.cc
     # field/
     field/field.cc
     field/field_typed.cc
