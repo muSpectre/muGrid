@@ -101,52 +101,53 @@ def conjugate_gradients(
         if rr_val < tol_sq:
             return x
 
-    for iteration in range(maxiter):
-        # Compute Hessian product: Ap = A * p
-        with timed("hessp"):
-            hessp(p, Ap)
+    with timed("iteration"):
+        for iteration in range(maxiter):
+            # Compute Hessian product: Ap = A * p
+            with timed("hessp"):
+                hessp(p, Ap)
 
-        # Compute pAp for step size
-        with timed("dot_pAp"):
-            pAp = comm.sum(linalg.vecdot(p, Ap))
+            # Compute pAp for step size
+            with timed("dot_pAp"):
+                pAp = comm.sum(linalg.vecdot(p, Ap))
 
-        # Compute alpha
-        alpha = rr / pAp
+            # Compute alpha
+            alpha = rr / pAp
 
-        # Update solution: x += alpha * p
-        with timed("update_x"):
-            linalg.axpy(alpha, p, x)
+            # Update solution: x += alpha * p
+            with timed("update_x"):
+                linalg.axpy(alpha, p, x)
 
-        # Update residual: r -= alpha * Ap
-        with timed("update_r"):
-            linalg.axpy(-alpha, Ap, r)
+            # Update residual: r -= alpha * Ap
+            with timed("update_r"):
+                linalg.axpy(-alpha, Ap, r)
 
-        if callback:
-            with timed("callback"):
-                callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": rr})
+            if callback:
+                with timed("callback"):
+                    callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": rr})
 
-        # Compute next residual norm
-        with timed("dot_rr"):
-            next_rr = comm.sum(linalg.norm_sq(r))
-        next_rr_val = float(next_rr)
+            # Compute next residual norm
+            with timed("dot_rr"):
+                next_rr = comm.sum(linalg.norm_sq(r))
+            next_rr_val = float(next_rr)
 
-        # Check for numerical issues (NaN indicates non-positive-definite H)
-        if next_rr_val != next_rr_val:  # NaN check
-            raise RuntimeError(
-                "Residual became NaN - Hessian may not be positive definite"
-            )
+            # Check for numerical issues (NaN indicates non-positive-definite H)
+            if next_rr_val != next_rr_val:  # NaN check
+                raise RuntimeError(
+                    "Residual became NaN - Hessian may not be positive definite"
+                )
 
-        if next_rr_val < tol_sq:
-            return x
+            if next_rr_val < tol_sq:
+                return x
 
-        # Compute beta
-        beta = next_rr / rr
+            # Compute beta
+            beta = next_rr / rr
 
-        # Update rr for next iteration
-        rr = next_rr
+            # Update rr for next iteration
+            rr = next_rr
 
-        # Update search direction: p = r + beta * p
-        with timed("update_p"):
-            linalg.axpby(1.0, r, beta, p)
+            # Update search direction: p = r + beta * p
+            with timed("update_p"):
+                linalg.axpby(1.0, r, beta, p)
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")
