@@ -56,27 +56,25 @@ using Complex = std::complex<double>;
  * @enum TypeDescriptor
  * @brief Unified type identifier that works across C++, MPI, and NetCDF.
  *
- * This enum provides a single, unified way to describe numeric types
- * that can be converted to MPI_Datatype (when WITH_MPI is defined) or
+ * This enum provides a single, unified way to describe the muGrid scalar
+ * types that can be converted to MPI_Datatype (when WITH_MPI is defined) or
  * nc_type (when NetCDF is available). It eliminates the need for void*
  * type passing in communication routines.
+ *
+ * The supported types correspond to the muGrid scalar types:
+ * - Int: signed integer (int)
+ * - Uint: unsigned integer (unsigned int)
+ * - Real: double precision floating point (double)
+ * - Complex: complex double (std::complex<double>)
+ * - Index: signed index type (std::ptrdiff_t)
  */
 enum class TypeDescriptor : std::uint8_t {
     Unknown = 0,
-    Char,
-    SignedChar,
-    UnsignedChar,
-    Short,
-    UnsignedShort,
-    Int,
-    UnsignedInt,
-    Long,
-    UnsignedLong,
-    LongLong,
-    UnsignedLongLong,
-    Float,
-    Double,
-    Complex  // std::complex<double>
+    Int,      // int (muGrid::Int)
+    Uint,     // unsigned int (muGrid::Uint)
+    Real,     // double (muGrid::Real)
+    Complex,  // std::complex<double> (muGrid::Complex)
+    Index     // std::ptrdiff_t (muGrid::Index_t)
 };
 
 /**
@@ -87,28 +85,16 @@ enum class TypeDescriptor : std::uint8_t {
  */
 constexpr std::size_t type_descriptor_size(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Char:
-        case TypeDescriptor::SignedChar:
-        case TypeDescriptor::UnsignedChar:
-            return sizeof(char);
-        case TypeDescriptor::Short:
-        case TypeDescriptor::UnsignedShort:
-            return sizeof(short);
         case TypeDescriptor::Int:
-        case TypeDescriptor::UnsignedInt:
             return sizeof(int);
-        case TypeDescriptor::Long:
-        case TypeDescriptor::UnsignedLong:
-            return sizeof(long);
-        case TypeDescriptor::LongLong:
-        case TypeDescriptor::UnsignedLongLong:
-            return sizeof(long long);
-        case TypeDescriptor::Float:
-            return sizeof(float);
-        case TypeDescriptor::Double:
+        case TypeDescriptor::Uint:
+            return sizeof(unsigned int);
+        case TypeDescriptor::Real:
             return sizeof(double);
         case TypeDescriptor::Complex:
             return sizeof(std::complex<double>);
+        case TypeDescriptor::Index:
+            return sizeof(std::ptrdiff_t);
         default:
             return 0;
     }
@@ -122,15 +108,10 @@ constexpr std::size_t type_descriptor_size(TypeDescriptor td) {
  */
 constexpr bool is_signed(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Char:  // char signedness is implementation-defined
-        case TypeDescriptor::SignedChar:
-        case TypeDescriptor::Short:
         case TypeDescriptor::Int:
-        case TypeDescriptor::Long:
-        case TypeDescriptor::LongLong:
-        case TypeDescriptor::Float:
-        case TypeDescriptor::Double:
+        case TypeDescriptor::Real:
         case TypeDescriptor::Complex:
+        case TypeDescriptor::Index:
             return true;
         default:
             return false;
@@ -145,17 +126,9 @@ constexpr bool is_signed(TypeDescriptor td) {
  */
 constexpr bool is_integer(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Char:
-        case TypeDescriptor::SignedChar:
-        case TypeDescriptor::UnsignedChar:
-        case TypeDescriptor::Short:
-        case TypeDescriptor::UnsignedShort:
         case TypeDescriptor::Int:
-        case TypeDescriptor::UnsignedInt:
-        case TypeDescriptor::Long:
-        case TypeDescriptor::UnsignedLong:
-        case TypeDescriptor::LongLong:
-        case TypeDescriptor::UnsignedLongLong:
+        case TypeDescriptor::Uint:
+        case TypeDescriptor::Index:
             return true;
         default:
             return false;
@@ -169,13 +142,7 @@ constexpr bool is_integer(TypeDescriptor td) {
  * @return true if floating point, false otherwise
  */
 constexpr bool is_floating_point(TypeDescriptor td) {
-    switch (td) {
-        case TypeDescriptor::Float:
-        case TypeDescriptor::Double:
-            return true;
-        default:
-            return false;
-    }
+    return td == TypeDescriptor::Real;
 }
 
 /**
@@ -191,41 +158,27 @@ constexpr bool is_complex(TypeDescriptor td) {
 /**
  * @brief Get the TypeDescriptor for a C++ type (compile-time).
  *
+ * Only muGrid scalar types are supported: Int (int), Uint (unsigned int),
+ * Real (double), Complex (std::complex<double>), Index_t (std::ptrdiff_t).
+ *
  * @tparam T The C++ type
  * @return The corresponding TypeDescriptor
  */
 template <typename T>
 constexpr TypeDescriptor type_to_descriptor() {
-    if constexpr (std::is_same_v<T, char>) {
-        return TypeDescriptor::Char;
-    } else if constexpr (std::is_same_v<T, signed char>) {
-        return TypeDescriptor::SignedChar;
-    } else if constexpr (std::is_same_v<T, unsigned char>) {
-        return TypeDescriptor::UnsignedChar;
-    } else if constexpr (std::is_same_v<T, short>) {
-        return TypeDescriptor::Short;
-    } else if constexpr (std::is_same_v<T, unsigned short>) {
-        return TypeDescriptor::UnsignedShort;
-    } else if constexpr (std::is_same_v<T, int>) {
+    if constexpr (std::is_same_v<T, int>) {
         return TypeDescriptor::Int;
     } else if constexpr (std::is_same_v<T, unsigned int>) {
-        return TypeDescriptor::UnsignedInt;
-    } else if constexpr (std::is_same_v<T, long>) {
-        return TypeDescriptor::Long;
-    } else if constexpr (std::is_same_v<T, unsigned long>) {
-        return TypeDescriptor::UnsignedLong;
-    } else if constexpr (std::is_same_v<T, long long>) {
-        return TypeDescriptor::LongLong;
-    } else if constexpr (std::is_same_v<T, unsigned long long>) {
-        return TypeDescriptor::UnsignedLongLong;
-    } else if constexpr (std::is_same_v<T, float>) {
-        return TypeDescriptor::Float;
+        return TypeDescriptor::Uint;
     } else if constexpr (std::is_same_v<T, double>) {
-        return TypeDescriptor::Double;
+        return TypeDescriptor::Real;
     } else if constexpr (std::is_same_v<T, std::complex<double>>) {
         return TypeDescriptor::Complex;
+    } else if constexpr (std::is_same_v<T, std::ptrdiff_t>) {
+        return TypeDescriptor::Index;
     } else {
-        static_assert(sizeof(T) == 0, "Unsupported type for TypeDescriptor");
+        static_assert(sizeof(T) == 0, "Unsupported type for TypeDescriptor. "
+                      "Only Int, Uint, Real, Complex, and Index_t are supported.");
         return TypeDescriptor::Unknown;
     }
 }

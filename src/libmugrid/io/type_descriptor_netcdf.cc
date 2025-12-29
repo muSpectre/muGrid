@@ -45,57 +45,13 @@ namespace muGrid {
 
 nc_type descriptor_to_nc_type(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Char:
-            return NC_CHAR;
-        case TypeDescriptor::SignedChar:
-            return NC_BYTE;
-        case TypeDescriptor::UnsignedChar:
-            return NC_UBYTE;
-        case TypeDescriptor::Short:
-            return NC_SHORT;
-        case TypeDescriptor::UnsignedShort:
-            return NC_USHORT;
         case TypeDescriptor::Int:
-            // int size is platform-dependent, map based on size
-            if constexpr (sizeof(int) == 4) {
-                return NC_INT;
-            } else if constexpr (sizeof(int) == 8) {
-                return NC_INT64;
-            } else {
-                return NC_INT;  // fallback
-            }
-        case TypeDescriptor::UnsignedInt:
-            if constexpr (sizeof(unsigned int) == 4) {
-                return NC_UINT;
-            } else if constexpr (sizeof(unsigned int) == 8) {
-                return NC_UINT64;
-            } else {
-                return NC_UINT;  // fallback
-            }
-        case TypeDescriptor::Long:
-            // long size is platform-dependent (4 on Windows, 8 on Unix)
-            if constexpr (sizeof(long) == 4) {
-                return NC_INT;
-            } else if constexpr (sizeof(long) == 8) {
-                return NC_INT64;
-            } else {
-                return NC_INT64;  // fallback
-            }
-        case TypeDescriptor::UnsignedLong:
-            if constexpr (sizeof(unsigned long) == 4) {
-                return NC_UINT;
-            } else if constexpr (sizeof(unsigned long) == 8) {
-                return NC_UINT64;
-            } else {
-                return NC_UINT64;  // fallback
-            }
-        case TypeDescriptor::LongLong:
-            return NC_INT64;
-        case TypeDescriptor::UnsignedLongLong:
-            return NC_UINT64;
-        case TypeDescriptor::Float:
-            return NC_FLOAT;
-        case TypeDescriptor::Double:
+            // int is always 4 bytes on common platforms
+            return NC_INT;
+        case TypeDescriptor::Uint:
+            // unsigned int is always 4 bytes on common platforms
+            return NC_UINT;
+        case TypeDescriptor::Real:
             return NC_DOUBLE;
         case TypeDescriptor::Complex:
             // NetCDF doesn't have a native complex type
@@ -108,6 +64,9 @@ nc_type descriptor_to_nc_type(TypeDescriptor td) {
                        "parts.";
                 throw FileIOError(err.str());
             }
+        case TypeDescriptor::Index:
+            // Index is std::ptrdiff_t which is 64-bit on 64-bit platforms
+            return NC_INT64;
         default: {
             std::stringstream err{};
             err << "Cannot convert TypeDescriptor '"
@@ -119,41 +78,19 @@ nc_type descriptor_to_nc_type(TypeDescriptor td) {
 
 TypeDescriptor nc_type_to_descriptor(nc_type nc) {
     switch (nc) {
-        case NC_CHAR:
-            return TypeDescriptor::Char;
-        case NC_BYTE:
-            return TypeDescriptor::SignedChar;
-        case NC_UBYTE:
-            return TypeDescriptor::UnsignedChar;
-        case NC_SHORT:
-            return TypeDescriptor::Short;
-        case NC_USHORT:
-            return TypeDescriptor::UnsignedShort;
         case NC_INT:
-            // Map to the type that matches int's size on this platform
-            if constexpr (sizeof(int) == 4) {
-                return TypeDescriptor::Int;
-            } else {
-                return TypeDescriptor::Long;  // unlikely but handle it
-            }
+            return TypeDescriptor::Int;
         case NC_UINT:
-            if constexpr (sizeof(unsigned int) == 4) {
-                return TypeDescriptor::UnsignedInt;
-            } else {
-                return TypeDescriptor::UnsignedLong;
-            }
-        case NC_INT64:
-            // Map to long long (always 64-bit)
-            return TypeDescriptor::LongLong;
-        case NC_UINT64:
-            return TypeDescriptor::UnsignedLongLong;
-        case NC_FLOAT:
-            return TypeDescriptor::Float;
+            return TypeDescriptor::Uint;
         case NC_DOUBLE:
-            return TypeDescriptor::Double;
+            return TypeDescriptor::Real;
+        case NC_INT64:
+            return TypeDescriptor::Index;
         default: {
             std::stringstream err{};
-            err << "Unrecognized nc_type value: " << nc;
+            err << "Unrecognized nc_type value: " << nc
+                << ". Only NC_INT, NC_UINT, NC_DOUBLE, and NC_INT64 "
+                << "are supported.";
             throw FileIOError(err.str());
         }
     }

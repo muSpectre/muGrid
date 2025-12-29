@@ -1526,17 +1526,6 @@ namespace muGrid {
             "'FileIOBase::OpenMode::Append'.");
       }
 
-      // for safety reasons the file should be in data mode because there the
-      // header space cannot be expanded which might be time consuming.
-      if (this->netcdf_mode != FileIONetCDF::NetCDFMode::DataMode) {
-        // switch automatic into data mode and do not turn back into old mode
-        int status_enddef{ncmu_enddef(this->netcdf_id)};
-        if (status_enddef != NC_NOERR and status_enddef != NC_ENOTINDEFINE) {
-          throw FileIOError(ncmu_strerror(status_enddef));
-        }
-        this->netcdf_mode = NetCDFMode::DataMode;
-      }
-
       // find the old NetCDFGlobalAtt
       std::shared_ptr<NetCDFGlobalAtt> old_netcdf_global_attribute{
           this->global_attributes.set_global_attribute(old_att_name)};
@@ -1575,6 +1564,22 @@ namespace muGrid {
       old_netcdf_global_attribute->update_global_attribute(new_att_name,
                                                            new_att_value);
 
+      // PnetCDF requires define mode for ncmpi_put_att. We need to detect the
+      // actual file state (which may differ from netcdf_mode tracking variable
+      // when a file is opened vs created). Try to switch to define mode - if
+      // already in define mode, ncmu_redef returns NC_EINDEFINE.
+      bool was_in_data_mode{false};
+      int status_redef{ncmu_redef(this->netcdf_id)};
+      if (status_redef == NC_NOERR) {
+        // Successfully switched to define mode - was in data mode before
+        was_in_data_mode = true;
+        this->netcdf_mode = NetCDFMode::DefineMode;
+      } else if (status_redef != NC_EINDEFINE) {
+        // Unexpected error
+        throw FileIOError(ncmu_strerror(status_redef));
+      }
+      // If NC_EINDEFINE, we're already in define mode - nothing to do
+
       // rename the global attribute if the name has changed
       if (old_att_name != new_att_name) {
         int status{ncmu_rename_att(this->netcdf_id, NC_GLOBAL,
@@ -1592,6 +1597,16 @@ namespace muGrid {
       if (status != NC_NOERR) {
         throw FileIOError(ncmu_strerror(status));
       }
+
+      // Return to data mode if we were in data mode before
+      if (was_in_data_mode) {
+        int status_enddef{ncmu_enddef(this->netcdf_id)};
+        if (status_enddef != NC_NOERR && status_enddef != NC_ENOTINDEFINE) {
+          throw FileIOError(ncmu_strerror(status_enddef));
+        }
+        this->netcdf_mode = NetCDFMode::DataMode;
+      }
+
       this->netcdf_file_changes();
     }
 

@@ -37,42 +37,26 @@
 #include "exception.hh"
 
 #include <complex>
+#include <cstddef>
 #include <sstream>
 
 namespace muGrid {
 
 TypeDescriptor typeid_to_descriptor(const std::type_info & type_id) {
-    if (type_id == typeid(char)) {
-        return TypeDescriptor::Char;
-    } else if (type_id == typeid(signed char)) {
-        return TypeDescriptor::SignedChar;
-    } else if (type_id == typeid(unsigned char)) {
-        return TypeDescriptor::UnsignedChar;
-    } else if (type_id == typeid(short)) {
-        return TypeDescriptor::Short;
-    } else if (type_id == typeid(unsigned short)) {
-        return TypeDescriptor::UnsignedShort;
-    } else if (type_id == typeid(int)) {
+    if (type_id == typeid(int)) {
         return TypeDescriptor::Int;
     } else if (type_id == typeid(unsigned int)) {
-        return TypeDescriptor::UnsignedInt;
-    } else if (type_id == typeid(long)) {
-        return TypeDescriptor::Long;
-    } else if (type_id == typeid(unsigned long)) {
-        return TypeDescriptor::UnsignedLong;
-    } else if (type_id == typeid(long long)) {
-        return TypeDescriptor::LongLong;
-    } else if (type_id == typeid(unsigned long long)) {
-        return TypeDescriptor::UnsignedLongLong;
-    } else if (type_id == typeid(float)) {
-        return TypeDescriptor::Float;
+        return TypeDescriptor::Uint;
     } else if (type_id == typeid(double)) {
-        return TypeDescriptor::Double;
+        return TypeDescriptor::Real;
     } else if (type_id == typeid(std::complex<double>)) {
         return TypeDescriptor::Complex;
+    } else if (type_id == typeid(std::ptrdiff_t)) {
+        return TypeDescriptor::Index;
     } else {
         std::stringstream err{};
-        err << "Unsupported type for TypeDescriptor: " << type_id.name();
+        err << "Unsupported type for TypeDescriptor: " << type_id.name()
+            << ". Only Int, Uint, Real, Complex, and Index_t are supported.";
         throw RuntimeError(err.str());
     }
 }
@@ -81,34 +65,16 @@ const char * type_descriptor_name(TypeDescriptor td) {
     switch (td) {
         case TypeDescriptor::Unknown:
             return "Unknown";
-        case TypeDescriptor::Char:
-            return "char";
-        case TypeDescriptor::SignedChar:
-            return "signed char";
-        case TypeDescriptor::UnsignedChar:
-            return "unsigned char";
-        case TypeDescriptor::Short:
-            return "short";
-        case TypeDescriptor::UnsignedShort:
-            return "unsigned short";
         case TypeDescriptor::Int:
-            return "int";
-        case TypeDescriptor::UnsignedInt:
-            return "unsigned int";
-        case TypeDescriptor::Long:
-            return "long";
-        case TypeDescriptor::UnsignedLong:
-            return "unsigned long";
-        case TypeDescriptor::LongLong:
-            return "long long";
-        case TypeDescriptor::UnsignedLongLong:
-            return "unsigned long long";
-        case TypeDescriptor::Float:
-            return "float";
-        case TypeDescriptor::Double:
-            return "double";
+            return "Int";
+        case TypeDescriptor::Uint:
+            return "Uint";
+        case TypeDescriptor::Real:
+            return "Real";
         case TypeDescriptor::Complex:
-            return "complex<double>";
+            return "Complex";
+        case TypeDescriptor::Index:
+            return "Index";
         default:
             return "Invalid";
     }

@@ -367,6 +367,9 @@ class FileIOTest(unittest.TestCase):
         for k in global_att_dic.keys():
             self.assertTrue(global_att_dic[k] == global_att_ref_dic[k])
 
+        # close the read handle before opening in append mode
+        file_io_object_r.close()
+
         # --- change global attribute in append mode --- #
         file_io_object_a = muGrid.FileIONetCDF(
             self.file_ga_name, muGrid.OpenMode.Append, self.comm

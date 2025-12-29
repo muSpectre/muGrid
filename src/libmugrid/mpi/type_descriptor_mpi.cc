@@ -39,40 +39,30 @@
 
 #include "core/exception.hh"
 
+#include <cstddef>
 #include <sstream>
 
 namespace muGrid {
 
 MPI_Datatype descriptor_to_mpi_type(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Char:
-            return MPI_CHAR;
-        case TypeDescriptor::SignedChar:
-            return MPI_SIGNED_CHAR;
-        case TypeDescriptor::UnsignedChar:
-            return MPI_UNSIGNED_CHAR;
-        case TypeDescriptor::Short:
-            return MPI_SHORT;
-        case TypeDescriptor::UnsignedShort:
-            return MPI_UNSIGNED_SHORT;
         case TypeDescriptor::Int:
             return MPI_INT;
-        case TypeDescriptor::UnsignedInt:
+        case TypeDescriptor::Uint:
             return MPI_UNSIGNED;
-        case TypeDescriptor::Long:
-            return MPI_LONG;
-        case TypeDescriptor::UnsignedLong:
-            return MPI_UNSIGNED_LONG;
-        case TypeDescriptor::LongLong:
-            return MPI_LONG_LONG_INT;
-        case TypeDescriptor::UnsignedLongLong:
-            return MPI_UNSIGNED_LONG_LONG;
-        case TypeDescriptor::Float:
-            return MPI_FLOAT;
-        case TypeDescriptor::Double:
+        case TypeDescriptor::Real:
             return MPI_DOUBLE;
         case TypeDescriptor::Complex:
             return MPI_DOUBLE_COMPLEX;
+        case TypeDescriptor::Index:
+            // Index is std::ptrdiff_t, which is platform-dependent:
+            // - LP64 (Unix 64-bit): long (8 bytes) -> MPI_LONG
+            // - LLP64 (Windows 64-bit): long long (8 bytes) -> MPI_LONG_LONG_INT
+            if constexpr (sizeof(std::ptrdiff_t) == sizeof(long)) {
+                return MPI_LONG;
+            } else {
+                return MPI_LONG_LONG_INT;
+            }
         default: {
             std::stringstream err{};
             err << "Cannot convert TypeDescriptor '"
@@ -83,36 +73,21 @@ MPI_Datatype descriptor_to_mpi_type(TypeDescriptor td) {
 }
 
 TypeDescriptor mpi_type_to_descriptor(MPI_Datatype mpi_type) {
-    if (mpi_type == MPI_CHAR) {
-        return TypeDescriptor::Char;
-    } else if (mpi_type == MPI_SIGNED_CHAR) {
-        return TypeDescriptor::SignedChar;
-    } else if (mpi_type == MPI_UNSIGNED_CHAR) {
-        return TypeDescriptor::UnsignedChar;
-    } else if (mpi_type == MPI_SHORT) {
-        return TypeDescriptor::Short;
-    } else if (mpi_type == MPI_UNSIGNED_SHORT) {
-        return TypeDescriptor::UnsignedShort;
-    } else if (mpi_type == MPI_INT) {
+    if (mpi_type == MPI_INT) {
         return TypeDescriptor::Int;
     } else if (mpi_type == MPI_UNSIGNED) {
-        return TypeDescriptor::UnsignedInt;
-    } else if (mpi_type == MPI_LONG) {
-        return TypeDescriptor::Long;
-    } else if (mpi_type == MPI_UNSIGNED_LONG) {
-        return TypeDescriptor::UnsignedLong;
-    } else if (mpi_type == MPI_LONG_LONG_INT) {
-        return TypeDescriptor::LongLong;
-    } else if (mpi_type == MPI_UNSIGNED_LONG_LONG) {
-        return TypeDescriptor::UnsignedLongLong;
-    } else if (mpi_type == MPI_FLOAT) {
-        return TypeDescriptor::Float;
+        return TypeDescriptor::Uint;
     } else if (mpi_type == MPI_DOUBLE) {
-        return TypeDescriptor::Double;
+        return TypeDescriptor::Real;
     } else if (mpi_type == MPI_DOUBLE_COMPLEX) {
         return TypeDescriptor::Complex;
+    } else if (mpi_type == MPI_LONG || mpi_type == MPI_LONG_LONG_INT) {
+        // Both map to Index (std::ptrdiff_t) which is platform-dependent
+        return TypeDescriptor::Index;
     } else {
-        throw RuntimeError("Unrecognized MPI_Datatype for TypeDescriptor");
+        throw RuntimeError("Unrecognized MPI_Datatype for TypeDescriptor. "
+                           "Only types corresponding to Int, Uint, Real, "
+                           "Complex, and Index are supported.");
     }
 }
 
