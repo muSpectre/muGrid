@@ -13,6 +13,7 @@ def conjugate_gradients(
     maxiter: int = 1000,
     callback: callable = None,
     timer=None,
+    check_positive_definite: bool = False,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -45,6 +46,9 @@ def conjugate_gradients(
     timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
         record timing for internal operations (dot products, vector updates).
+    check_positive_definite : bool, optional
+        If True, check that the Hessian is positive definite each iteration.
+        This adds GPU synchronization overhead. Default is False.
 
     Returns
     -------
@@ -55,7 +59,8 @@ def conjugate_gradients(
     ------
     RuntimeError
         If the algorithm does not converge within maxiter iterations,
-        or if the Hessian is not positive definite.
+        or if the Hessian is not positive definite (when check_positive_definite=True),
+        or if the residual becomes NaN (indicating numerical issues).
     """
     tol_sq = tol * tol
 
@@ -87,19 +92,28 @@ def conjugate_gradients(
 
     with timed("cg_dot_products"):
         rr = comm.sum(r.ravel().dot(r.ravel()))
-    if rr < tol_sq:
+
+    # Initial convergence check (single sync point)
+    with timed("cg_convergence_check"):
+        rr_val = float(rr)
+    if rr_val < tol_sq:
         return x
 
     for iteration in range(maxiter):
         # Compute Hessian product: Ap = A * p
         hessp(p, Ap)
 
-        # Compute step size
+        # Compute step size (stays on GPU, no sync)
         with timed("cg_dot_products"):
             pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
-        if pAp <= 0:
-            raise RuntimeError("Hessian is not positive definite")
 
+        # Optional positive-definiteness check (adds sync overhead)
+        if check_positive_definite:
+            with timed("cg_convergence_check"):
+                if float(pAp) <= 0:
+                    raise RuntimeError("Hessian is not positive definite")
+
+        # All arithmetic stays on GPU (no sync)
         alpha = rr / pAp
 
         # Update solution and residual
@@ -110,13 +124,24 @@ def conjugate_gradients(
         if callback:
             callback(iteration + 1, x.s, r, p.s)
 
-        # Check convergence
+        # Compute next residual norm (stays on GPU)
         with timed("cg_dot_products"):
             next_rr = comm.sum(r.ravel().dot(r.ravel()))
-        if next_rr < tol_sq:
+
+        # Single sync point per iteration: convergence check
+        with timed("cg_convergence_check"):
+            next_rr_val = float(next_rr)
+
+        # Check for numerical issues (NaN indicates non-positive-definite H)
+        if next_rr_val != next_rr_val:  # NaN check
+            raise RuntimeError(
+                "Residual became NaN - Hessian may not be positive definite"
+            )
+
+        if next_rr_val < tol_sq:
             return x
 
-        # Update search direction
+        # Update search direction (stays on GPU, no sync)
         with timed("cg_vector_ops"):
             beta = next_rr / rr
             rr = next_rr
