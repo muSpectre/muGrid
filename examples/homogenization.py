@@ -261,13 +261,6 @@ parser.add_argument(
     help="Use PAPI hardware counters for performance measurement (requires pypapi)",
 )
 
-parser.add_argument(
-    "--profile-gpu",
-    action="store_true",
-    help="Add explicit GPU synchronization around each CG operation for accurate "
-    "profiling. Shows true GPU time per operation but adds sync overhead.",
-)
-
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -685,7 +678,6 @@ with timer("total_solve"):
                     callback=callback,
                     maxiter=args.maxiter,
                     timer=timer,
-                    profile_gpu=args.profile_gpu,
                 )
                 converged = True
             except RuntimeError as e:
