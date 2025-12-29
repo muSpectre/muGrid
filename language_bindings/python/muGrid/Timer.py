@@ -99,10 +99,10 @@ class Timer:
     PAPI_EVENTS = [
         "PAPI_TOT_CYC",  # Total cycles
         "PAPI_TOT_INS",  # Total instructions
-        "PAPI_FP_OPS",   # Floating point operations
-        "PAPI_L1_DCM",   # L1 data cache misses
-        "PAPI_L2_DCM",   # L2 data cache misses
-        "PAPI_L3_TCM",   # L3 total cache misses
+        "PAPI_FP_OPS",  # Floating point operations
+        "PAPI_L1_DCM",  # L1 data cache misses
+        "PAPI_L2_DCM",  # L2 data cache misses
+        "PAPI_L3_TCM",  # L3 total cache misses
     ]
 
     def __init__(self, use_papi=False):
@@ -113,9 +113,11 @@ class Timer:
             use_papi: If True, enable PAPI hardware counter measurement.
                       Requires pypapi to be installed. Only works on CPU.
         """
-        self._timers = {}  # name -> {"total": float, "calls": int, "children": list, "papi": dict}
-        self._stack = []   # stack of (name, start_time, papi_start) for nesting
-        self._roots = []   # top-level timer names in order of first use
+        self._timers = (
+            {}
+        )  # name -> {"total": float, "calls": int, "children": list, "papi": dict}
+        self._stack = []  # stack of (name, start_time, papi_start) for nesting
+        self._roots = []  # top-level timer names in order of first use
 
         # Initialize PAPI if requested
         self._use_papi = use_papi and PAPI_AVAILABLE
@@ -123,6 +125,7 @@ class Timer:
 
         if use_papi and not PAPI_AVAILABLE:
             import warnings
+
             warnings.warn(
                 "PAPI requested but pypapi not available. "
                 "Install with: pip install pypapi"
@@ -138,6 +141,7 @@ class Timer:
                 self._papi_enabled = True
             except Exception as e:
                 import warnings
+
                 warnings.warn(f"Could not initialize PAPI: {e}")
                 self._use_papi = False
 
@@ -197,14 +201,18 @@ class Timer:
                 "total": 0.0,
                 "calls": 0,
                 "children": [],
-                "papi": {
-                    "cycles": 0,
-                    "instructions": 0,
-                    "fp_ops": 0,
-                    "l1_dcm": 0,
-                    "l2_dcm": 0,
-                    "l3_tcm": 0,
-                } if self._papi_enabled else None
+                "papi": (
+                    {
+                        "cycles": 0,
+                        "instructions": 0,
+                        "fp_ops": 0,
+                        "l1_dcm": 0,
+                        "l2_dcm": 0,
+                        "l3_tcm": 0,
+                    }
+                    if self._papi_enabled
+                    else None
+                ),
             }
             # Track as root or as child of parent
             if self._stack:
@@ -321,15 +329,15 @@ class Timer:
         self._roots.clear()
 
     def _format_time(self, seconds):
-        """Format time with appropriate units, fixed width."""
+        """Format time with appropriate units, fixed width (12 chars)."""
         if seconds < 1e-6:
-            return f"{seconds * 1e9:8.2f} ns"
+            return f"{seconds * 1e9:9.2f} ns"
         elif seconds < 1e-3:
-            return f"{seconds * 1e6:8.2f} us"
+            return f"{seconds * 1e6:9.2f} us"
         elif seconds < 1:
-            return f"{seconds * 1e3:8.2f} ms"
+            return f"{seconds * 1e3:9.2f} ms"
         else:
-            return f"{seconds:8.4f} s "
+            return f"{seconds:9.4f} s "
 
     def _collect_rows(self, name, indent=0, parent_time=None, rows=None):
         """Recursively collect timing data as rows for tabular display."""
@@ -360,17 +368,19 @@ class Timer:
         short_name = name.split("/")[-1]
 
         # Add row for this timer
-        rows.append({
-            "indent": indent,
-            "name": short_name,
-            "total": total,
-            "calls": calls,
-            "avg": avg if calls > 1 else None,
-            "pct": pct,
-            "gflops": gflops,
-            "ipc": ipc,
-            "papi": papi,
-        })
+        rows.append(
+            {
+                "indent": indent,
+                "name": short_name,
+                "total": total,
+                "calls": calls,
+                "avg": avg if calls > 1 else None,
+                "pct": pct,
+                "gflops": gflops,
+                "ipc": ipc,
+                "papi": papi,
+            }
+        )
 
         # Collect children
         for child in info["children"]:
@@ -397,18 +407,22 @@ class Timer:
                     if other_time > 0:
                         other_gflops = (other_papi["fp_ops"] / 1e9) / other_time
                         if other_papi["cycles"] > 0:
-                            other_ipc = other_papi["instructions"] / other_papi["cycles"]
-                rows.append({
-                    "indent": indent + 1,
-                    "name": "(other)",
-                    "total": other_time,
-                    "calls": None,
-                    "avg": None,
-                    "pct": other_pct,
-                    "gflops": other_gflops,
-                    "ipc": other_ipc,
-                    "papi": other_papi,
-                })
+                            other_ipc = (
+                                other_papi["instructions"] / other_papi["cycles"]
+                            )
+                rows.append(
+                    {
+                        "indent": indent + 1,
+                        "name": "(other)",
+                        "total": other_time,
+                        "calls": None,
+                        "avg": None,
+                        "pct": other_pct,
+                        "gflops": other_gflops,
+                        "ipc": other_ipc,
+                        "papi": other_papi,
+                    }
+                )
 
         return rows
 
@@ -442,17 +456,23 @@ class Timer:
             print(f"\n{'=' * line_width}")
             print(title)
             print(f"{'=' * line_width}")
-            print(f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
-                  f"{'% Parent':>10} {'GFLOP/s':>10} {'IPC':>8} {'FP ops':>12}")
-            print(f"{'-' * name_width} {'-' * 12} {'-' * 8} "
-                  f"{'-' * 10} {'-' * 10} {'-' * 8} {'-' * 12}")
+            print(
+                f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
+                f"{'% Parent':>10} {'GFLOP/s':>10} {'IPC':>8} {'FP ops':>12}"
+            )
+            print(
+                f"{'-' * name_width} {'-' * 12} {'-' * 8} "
+                f"{'-' * 10} {'-' * 10} {'-' * 8} {'-' * 12}"
+            )
         else:
             line_width = 78
             print(f"\n{'=' * line_width}")
             print(title)
             print(f"{'=' * line_width}")
-            print(f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
-                  f"{'Average':>12} {'% Parent':>10}")
+            print(
+                f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
+                f"{'Average':>12} {'% Parent':>10}"
+            )
             print(f"{'-' * name_width} {'-' * 12} {'-' * 8} {'-' * 12} {'-' * 10}")
 
         # Print rows
@@ -461,7 +481,7 @@ class Timer:
             prefix = "  " * row["indent"]
             name = f"{prefix}{row['name']}"
             if len(name) > name_width:
-                name = name[:name_width - 3] + "..."
+                name = name[: name_width - 3] + "..."
 
             # Format columns
             total_str = self._format_time(row["total"])
@@ -502,8 +522,10 @@ class Timer:
                 else:
                     fp_ops_str = f"{'-':>12}"
 
-                print(f"{name:<{name_width}} {total_str} {calls_str} "
-                      f"{pct_str} {gflops_str} {ipc_str} {fp_ops_str}")
+                print(
+                    f"{name:<{name_width}} {total_str} {calls_str} "
+                    f"{pct_str} {gflops_str} {ipc_str} {fp_ops_str}"
+                )
             else:
                 # Standard output (no PAPI)
                 if row["avg"] is not None:
@@ -511,7 +533,9 @@ class Timer:
                 else:
                     avg_str = f"{'-':>12}"
 
-                print(f"{name:<{name_width}} {total_str} {calls_str} {avg_str} {pct_str}")
+                print(
+                    f"{name:<{name_width}} {total_str} {calls_str} {avg_str} {pct_str}"
+                )
 
         print(f"{'=' * line_width}")
 
@@ -543,9 +567,7 @@ class Timer:
                 result["ipc"] = 0.0
 
         if info["children"]:
-            result["children"] = [
-                self._build_tree(child) for child in info["children"]
-            ]
+            result["children"] = [self._build_tree(child) for child in info["children"]]
             children_time = sum(self._timers[c]["total"] for c in info["children"])
             other_time = total - children_time
             if other_time > 1e-9:
@@ -560,9 +582,7 @@ class Timer:
         Returns:
             Dictionary with hierarchical timer structure suitable for JSON export.
         """
-        result = {
-            "timers": [self._build_tree(root) for root in self._roots]
-        }
+        result = {"timers": [self._build_tree(root) for root in self._roots]}
         if self._papi_enabled:
             result["papi_enabled"] = True
         return result
@@ -593,7 +613,7 @@ class Timer:
                 "total": info["total"],
                 "calls": info["calls"],
                 "avg": info["total"] / info["calls"] if info["calls"] > 0 else 0,
-                "children": list(info["children"])
+                "children": list(info["children"]),
             }
             papi = info.get("papi")
             if papi is not None:

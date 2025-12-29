@@ -84,8 +84,8 @@ def conjugate_gradients(
     if callback:
         callback(0, x.s, r, p.s)
 
-    rr_local = r.ravel().dot(r.ravel())
-    rr = comm.sum(rr_local)
+    with timed("dot_rr"):
+        rr = comm.sum(r.ravel().dot(r.ravel()))
     rr_val = float(rr)
 
     if rr_val < tol_sq:
@@ -96,25 +96,28 @@ def conjugate_gradients(
         with timed("hessp"):
             hessp(p, Ap)
 
-        # Compute pAp for step size
-        pAp_local = p.s.ravel().dot(Ap.s.ravel())
-        pAp = comm.sum(pAp_local)
+        # Compute pAp for step size (use sum to avoid ravel copy on non
+        # contiguous arrays)
+        with timed("dot_pAp"):
+            pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
 
         # Compute alpha
         alpha = rr / pAp
 
         # Update solution: x += alpha * p
-        x.s[...] += alpha * p.s
+        with timed("update_x"):
+            x.sg[...] += alpha * p.sg
 
         # Update residual: r -= alpha * Ap
-        r -= alpha * Ap.s
+        with timed("update_r"):
+            r -= alpha * Ap.s
 
         if callback:
             callback(iteration + 1, x.s, r, p.s)
 
         # Compute next residual norm
-        next_rr_local = r.ravel().dot(r.ravel())
-        next_rr = comm.sum(next_rr_local)
+        with timed("dot_rr"):
+            next_rr = comm.sum(r.ravel().dot(r.ravel()))
         next_rr_val = float(next_rr)
 
         # Check for numerical issues (NaN indicates non-positive-definite H)
@@ -133,7 +136,8 @@ def conjugate_gradients(
         rr = next_rr
 
         # Update search direction: p = r + beta * p
-        p.s[...] *= beta
-        p.s[...] += r
+        with timed("update_p"):
+            p.s[...] *= beta
+            p.s[...] += r
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")

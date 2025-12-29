@@ -202,11 +202,10 @@ def hessp(x, Ax):
     The Hessian is represented by the convolution operator.
     The scale factor (grid spacing and sign) is already folded into the operator.
     """
-    with timer("hessp"):
-        with timer("communicate_ghosts"):
-            decomposition.communicate_ghosts(x)
-        with timer("apply"):
-            laplace.apply(x, Ax)
+    with timer("communicate_ghosts"):
+        decomposition.communicate_ghosts(x)
+    with timer("apply"):
+        laplace.apply(x, Ax)
     return Ax
 
 
