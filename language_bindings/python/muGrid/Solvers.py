@@ -82,8 +82,8 @@ def conjugate_gradients(
             try:
                 import cupy
 
-                # Use stream synchronize for more reliable sync on ROCm/HIP
-                cupy.cuda.get_current_stream().synchronize()
+                # Use device synchronize for full GPU sync (more reliable on ROCm/HIP)
+                cupy.cuda.runtime.deviceSynchronize()
             except (ImportError, Exception):
                 pass
 
