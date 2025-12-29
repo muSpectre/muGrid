@@ -258,30 +258,54 @@ namespace muGrid {
 
     namespace {
         /**
-         * @brief Copy memory block using appropriate method for memory space.
+         * @brief Copy strided memory blocks using appropriate method.
          *
-         * Uses CUDA/HIP runtime for device memory copies. This is necessary
-         * because std::memcpy cannot access GPU device memory.
+         * Copies nb_blocks blocks of data, each of size block_len bytes,
+         * with blocks separated by pitch bytes in both source and destination.
+         *
+         * For GPU memory, uses hipMemcpy2D/cudaMemcpy2D for efficiency.
+         * For host memory, falls back to individual memcpy calls.
          *
          * @param dst Destination address
          * @param src Source address
-         * @param size_in_bytes Number of bytes to copy
+         * @param block_len Size of each block in bytes (width)
+         * @param nb_blocks Number of blocks to copy (height)
+         * @param pitch Stride between blocks in bytes
          * @param is_device_memory If true, use GPU device copy
          */
-        void device_memcpy(void * dst, const void * src, size_t size_in_bytes,
-                           bool is_device_memory) {
+        void device_memcpy_strided(void * dst, const void * src,
+                                   size_t block_len, size_t nb_blocks,
+                                   size_t pitch, bool is_device_memory) {
             if (is_device_memory) {
 #if defined(MUGRID_ENABLE_CUDA)
-                (void)cudaMemcpy(dst, src, size_in_bytes, cudaMemcpyDeviceToDevice);
+                // Use cudaMemcpy2D for efficient strided copy
+                // cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
+                (void)cudaMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
+                                   cudaMemcpyDeviceToDevice);
 #elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(dst, src, size_in_bytes, hipMemcpyDeviceToDevice);
+                // Use hipMemcpy2D for efficient strided copy
+                // hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
+                (void)hipMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
+                                  hipMemcpyDeviceToDevice);
 #else
-                // Fallback to memcpy if no GPU backend (shouldn't happen if
-                // is_device_memory is true, but handle gracefully)
-                std::memcpy(dst, src, size_in_bytes);
+                // Fallback to loop if no GPU backend
+                auto * dst_ptr = static_cast<char *>(dst);
+                auto * src_ptr = static_cast<const char *>(src);
+                for (size_t i{0}; i < nb_blocks; ++i) {
+                    std::memcpy(dst_ptr, src_ptr, block_len);
+                    dst_ptr += pitch;
+                    src_ptr += pitch;
+                }
 #endif
             } else {
-                std::memcpy(dst, src, size_in_bytes);
+                // Host memory: use loop of memcpy
+                auto * dst_ptr = static_cast<char *>(dst);
+                auto * src_ptr = static_cast<const char *>(src);
+                for (size_t i{0}; i < nb_blocks; ++i) {
+                    std::memcpy(dst_ptr, src_ptr, block_len);
+                    dst_ptr += pitch;
+                    src_ptr += pitch;
+                }
             }
         }
     }  // anonymous namespace
@@ -301,15 +325,15 @@ namespace muGrid {
         if (send_block_len != recv_block_len) {
             throw std::runtime_error("send_block_len != recv_block_len");
         }
-        for (int count{0}; count < nb_send_blocks; ++count) {
-            auto recv_addr{static_cast<void *>(
-                data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-            auto send_addr{static_cast<void *>(
-                data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            device_memcpy(recv_addr, send_addr,
-                          send_block_len * elem_size_in_bytes, is_device_memory);
-            data += block_stride * elem_size_in_bytes;
-        }
+        auto * recv_addr{data +
+                         recv_offset * stride_in_direction * elem_size_in_bytes};
+        auto * send_addr{data +
+                         send_offset * stride_in_direction * elem_size_in_bytes};
+        auto block_len_bytes{static_cast<size_t>(send_block_len) *
+                             elem_size_in_bytes};
+        auto pitch_bytes{static_cast<size_t>(block_stride) * elem_size_in_bytes};
+        device_memcpy_strided(recv_addr, send_addr, block_len_bytes,
+                              nb_send_blocks, pitch_bytes, is_device_memory);
     }
 
     void CartesianCommunicator::sendrecv_left(
@@ -327,15 +351,15 @@ namespace muGrid {
         if (send_block_len != recv_block_len) {
             throw std::runtime_error("send_block_len != recv_block_len");
         }
-        for (int count{0}; count < nb_send_blocks; ++count) {
-            auto recv_addr{static_cast<void *>(
-                data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-            auto send_addr{static_cast<void *>(
-                data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            device_memcpy(recv_addr, send_addr,
-                          send_block_len * elem_size_in_bytes, is_device_memory);
-            data += block_stride * elem_size_in_bytes;
-        }
+        auto * recv_addr{data +
+                         recv_offset * stride_in_direction * elem_size_in_bytes};
+        auto * send_addr{data +
+                         send_offset * stride_in_direction * elem_size_in_bytes};
+        auto block_len_bytes{static_cast<size_t>(send_block_len) *
+                             elem_size_in_bytes};
+        auto pitch_bytes{static_cast<size_t>(block_stride) * elem_size_in_bytes};
+        device_memcpy_strided(recv_addr, send_addr, block_len_bytes,
+                              nb_send_blocks, pitch_bytes, is_device_memory);
     }
 
     namespace {
