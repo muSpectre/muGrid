@@ -233,38 +233,59 @@ with timer("conjugate_gradients"):
 elapsed_time = timer.get_time("conjugate_gradients")
 
 # Performance metrics calculations
-# Get number of hessp calls from timer
-nb_hessp_calls = timer.get_calls("hessp")
+# Get number of hessp calls from timer (= number of CG iterations)
+nb_iterations = timer.get_calls("hessp")
 
 # Lattice updates per second (LUPS)
-# One "lattice update" = one grid point processed in one hessp call
-total_lattice_updates = nb_grid_pts_total * nb_hessp_calls
+# One "lattice update" = one grid point processed in one CG iteration
+total_lattice_updates = nb_grid_pts_total * nb_iterations
 lups = total_lattice_updates / elapsed_time if elapsed_time > 0 else 0
 
-# Memory throughput estimate for the convolution operation:
-# - Read: nb_stencil_pts values per grid point (stencil neighborhood)
-# - Write: 1 value per grid point
+# Memory and FLOPS estimates per CG iteration:
 # Each value is 8 bytes (double precision)
-bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8  # bytes
-total_bytes = nb_hessp_calls * bytes_per_hessp
+#
+# Per CG iteration (excluding ghost communication):
+#   hessp (apply):   read nb_stencil_pts, write 1, FLOPs 2*nb_stencil_pts
+#   dot_pAp:         read 2 (p, Ap),       FLOPs 2 (mul + add)
+#   update_x (axpy): read 2, write 1,      FLOPs 2
+#   update_r (axpy): read 2, write 1,      FLOPs 2
+#   dot_rr:          read 1,               FLOPs 2
+#   update_p:        read 3, write 2,      FLOPs 2 (scal: mul, axpy: add)
+#
+# Total reads:  nb_stencil_pts + 2 + 2 + 2 + 1 + 3 = nb_stencil_pts + 10
+# Total writes: 1 + 0 + 1 + 1 + 0 + 2 = 5
+# Total FLOPs:  2*nb_stencil_pts + 2 + 2 + 2 + 2 + 2 = 2*nb_stencil_pts + 10
+
+reads_per_iteration = nb_stencil_pts + 10  # values read per grid point
+writes_per_iteration = 5  # values written per grid point
+flops_per_iteration = 2 * nb_stencil_pts + 10  # FLOPs per grid point
+
+bytes_per_iteration = (
+    nb_grid_pts_total * (reads_per_iteration + writes_per_iteration) * 8
+)
+total_bytes = nb_iterations * bytes_per_iteration
 memory_throughput = total_bytes / elapsed_time if elapsed_time > 0 else 0
 
-# FLOPS estimate for the convolution operation:
-# - nb_stencil_pts multiplications and nb_stencil_pts-1 additions per grid point
-# - Plus 1 division for scaling (counted as 1 FLOP)
-# Total: 2 * nb_stencil_pts FLOPs per grid point (approx)
-flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
-total_flops = nb_hessp_calls * flops_per_hessp
+flops_per_cg_iteration = nb_grid_pts_total * flops_per_iteration
+total_flops = nb_iterations * flops_per_cg_iteration
 flops_rate = total_flops / elapsed_time if elapsed_time > 0 else 0
 
 # Arithmetic intensity (FLOPs per byte)
-arithmetic_intensity = total_flops / total_bytes if total_bytes > 0 else 0
+arithmetic_intensity = flops_per_iteration / (
+    (reads_per_iteration + writes_per_iteration) * 8
+)
 
-# Get apply time from timer
+# Breakdown: hessp (apply) only
+bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8
+flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
 apply_time = timer.get_time("conjugate_gradients/hessp/apply")
 apply_lups = total_lattice_updates / apply_time if apply_time > 0 else 0
-apply_throughput = total_bytes / apply_time if apply_time > 0 else 0
-apply_flops_rate = total_flops / apply_time if apply_time > 0 else 0
+apply_throughput = (
+    (nb_iterations * bytes_per_hessp) / apply_time if apply_time > 0 else 0
+)
+apply_flops_rate = (
+    (nb_iterations * flops_per_hessp) / apply_time if apply_time > 0 else 0
+)
 
 if args.json:
     # JSON output (convert numpy types to Python types for JSON serialization)
@@ -282,23 +303,25 @@ if args.json:
         },
         "results": {
             "converged": converged,
-            "iterations": int(nb_hessp_calls),
+            "iterations": int(nb_iterations),
             "total_time_seconds": float(elapsed_time),
             "total_lattice_updates": int(total_lattice_updates),
             "MLUPS": float(lups / 1e6),
             "GLUPS": float(lups / 1e9),
-            "bytes_per_iteration": int(bytes_per_hessp),
+            "reads_per_grid_point": int(reads_per_iteration),
+            "writes_per_grid_point": int(writes_per_iteration),
+            "bytes_per_iteration": int(bytes_per_iteration),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_iteration_estimated": int(flops_per_hessp),
-            "total_flops_estimated": int(total_flops),
-            "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
+            "flops_per_grid_point": int(flops_per_iteration),
+            "flops_per_iteration": int(flops_per_cg_iteration),
+            "total_flops": int(total_flops),
+            "flops_rate_GFLOPs": float(flops_rate / 1e9),
             "arithmetic_intensity": float(arithmetic_intensity),
             "apply_time_seconds": float(apply_time),
             "apply_MLUPS": float(apply_lups / 1e6),
-            "apply_GLUPS": float(apply_lups / 1e9),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
-            "apply_flops_rate_GFLOPs_estimated": float(apply_flops_rate / 1e9),
+            "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
         },
         "timing": timer.to_dict(),
     }
@@ -316,21 +339,39 @@ else:
     print(f"Device: {device.device_string}")
     print(f"Stencil implementation: {stencil_name}")
     print(f"Stencil points: {nb_stencil_pts}")
-    print(f"CG iterations (hessp calls): {nb_hessp_calls}")
+    print(f"CG iterations: {nb_iterations}")
     print(f"Total time: {elapsed_time:.4f} seconds")
 
     print("\nLattice updates per second:")
     print(f"  Total lattice updates: {total_lattice_updates:,}")
     print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
 
-    print("\nMemory throughput (estimated):")
-    print(f"  Bytes per hessp call: {bytes_per_hessp / 1e6:.2f} MB")
-    print(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB")
+    print("\nMemory traffic per CG iteration (estimated):")
+    print(
+        f"  Per grid point: {reads_per_iteration} reads + "
+        f"{writes_per_iteration} writes "
+        f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes"
+    )
+    print(f"    hessp:    {nb_stencil_pts} reads, 1 write")
+    print("    dot_pAp:  2 reads")
+    print("    update_x: 2 reads, 1 write")
+    print("    update_r: 2 reads, 1 write")
+    print("    dot_rr:   1 read")
+    print("    update_p: 3 reads, 2 writes")
+    print(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB")
+    print(f"  Total: {total_bytes / 1e9:.2f} GB")
     print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
 
-    print("\nFLOPS (estimated for convolution only):")
-    print(f"  FLOPs per hessp call: {flops_per_hessp / 1e6:.2f} MFLOP")
-    print(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP")
+    print("\nFLOPs per CG iteration (estimated):")
+    print(f"  Per grid point: {flops_per_iteration} FLOPs")
+    print(f"    hessp:    {2 * nb_stencil_pts} FLOPs")
+    print("    dot_pAp:  2 FLOPs")
+    print("    update_x: 2 FLOPs")
+    print("    update_r: 2 FLOPs")
+    print("    dot_rr:   2 FLOPs")
+    print("    update_p: 2 FLOPs")
+    print(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP")
+    print(f"  Total: {total_flops / 1e9:.2f} GFLOP")
     print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
 
     print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")

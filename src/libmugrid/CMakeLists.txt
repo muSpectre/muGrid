@@ -80,12 +80,14 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/cufft_backend.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE CUDA
     )
 elseif(MUGRID_ENABLE_HIP)
@@ -93,12 +95,14 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/hipfft_backend.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE HIP
     )
 endif()
