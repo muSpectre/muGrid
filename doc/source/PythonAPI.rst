@@ -693,26 +693,62 @@ Utilities
 Timer
 -----
 
-.. py:class:: muGrid.Timer(name="")
+.. py:class:: muGrid.Timer()
 
-   Timer utility for performance measurement.
+   Hierarchical timer utility for performance measurement with context manager support.
 
-   :param name: Name for the timer. Default is ``""``.
-   :type name: str, optional
+   The Timer supports nested timing regions and can be used as a context manager
+   for convenient timing of code blocks.
 
-   .. py:method:: start()
+   **Example**::
 
-      Start the timer.
+       >>> timer = muGrid.Timer()
+       >>> with timer("outer"):
+       ...     with timer("inner"):
+       ...         # ... some computation ...
+       ...         pass
+       >>> timer.print_summary()
+       Timer Summary:
+         outer: 0.1234s (1 calls)
+           inner: 0.0567s (1 calls)
 
-   .. py:method:: stop()
+   .. py:method:: __call__(name)
 
-      Stop the timer.
+      Context manager for timing a named code block.
 
-   .. py:method:: elapsed()
+      :param name: Name of the timing region.
+      :type name: str
+      :returns: Context manager that times the enclosed block.
 
-      Return elapsed time in seconds.
+   .. py:method:: get_time(name)
 
+      Get total elapsed time for a timing region.
+
+      :param name: Name of the timing region (use ``"/"`` for nested regions,
+         e.g., ``"outer/inner"``).
+      :type name: str
+      :returns: Total elapsed time in seconds.
       :rtype: float
+
+   .. py:method:: get_calls(name)
+
+      Get the number of times a timing region was entered.
+
+      :param name: Name of the timing region.
+      :type name: str
+      :returns: Number of calls.
+      :rtype: int
+
+   .. py:method:: print_summary()
+
+      Print a formatted summary of all timing regions.
+
+   .. py:method:: to_dict()
+
+      Export timer data as a dictionary (useful for JSON serialization).
+
+      :returns: Dictionary with timing data.
+      :rtype: dict
 
 Solvers
 -------
@@ -721,7 +757,7 @@ Solvers
 
 The Solvers module provides simple parallel iterative solvers.
 
-.. py:function:: muGrid.Solvers.conjugate_gradients(comm, fc, hessp, b, x, tol=1e-6, maxiter=1000, callback=None)
+.. py:function:: muGrid.Solvers.conjugate_gradients(comm, fc, b, x, hessp, tol=1e-6, maxiter=1000, callback=None, timer=None)
 
    Conjugate gradient method for matrix-free solution of the linear problem
    ``Ax = b``, where ``A`` is represented by the function ``hessp`` (which computes the
@@ -733,20 +769,24 @@ The Solvers module provides simple parallel iterative solvers.
    :type comm: muGrid.Communicator
    :param fc: Collection for creating temporary fields used by the CG algorithm.
    :type fc: muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or muGrid.CartesianDecomposition
-   :param hessp: Function that computes the product of the Hessian matrix ``A`` with a vector.
-      Signature: ``hessp(input_field, output_field)`` where both are ``muGrid.Field``.
-   :type hessp: callable
    :param b: Right-hand side vector.
    :type b: muGrid.Field
    :param x: Initial guess for the solution (modified in place).
    :type x: muGrid.Field
+   :param hessp: Function that computes the product of the Hessian matrix ``A`` with a vector.
+      Signature: ``hessp(input_field, output_field)`` where both are ``muGrid.Field``.
+   :type hessp: callable
    :param tol: Tolerance for convergence. Default is ``1e-6``.
    :type tol: float, optional
    :param maxiter: Maximum number of iterations. Default is ``1000``.
    :type maxiter: int, optional
    :param callback: Function to call after each iteration with signature:
-      ``callback(iteration, x_array, residual_array, search_direction_array)``.
+      ``callback(iteration, state_dict)`` where ``state_dict`` contains keys
+      ``"x"``, ``"r"``, ``"p"``, and ``"rr"`` (squared residual norm).
    :type callback: callable, optional
+   :param timer: Timer object for performance profiling. If provided, the solver
+      will record timing for various operations (hessp, dot products, updates).
+   :type timer: muGrid.Timer, optional
    :returns: Solution to the system ``Ax = b`` (same as input field ``x``).
    :rtype: muGrid.Field
    :raises RuntimeError: If the algorithm does not converge within ``maxiter`` iterations,
