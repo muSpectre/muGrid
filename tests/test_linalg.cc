@@ -436,11 +436,10 @@ BOOST_AUTO_TEST_CASE(axpy_norm_sq_device_with_ghosts_2d) {
 /* ---------------------------------------------------------------------- */
 
 /**
- * Test deep_copy from CPU (AoS) to GPU (SoA) with constant values.
+ * Test deep_copy from CPU (AoS) to GPU (SoA) with layout conversion.
  *
- * Note: deep_copy does a byte-for-byte transfer. Since CPU uses AoS layout
- * and GPU uses SoA layout, non-constant values would be reinterpreted
- * differently. Using constant values ensures logical equivalence after copy.
+ * deep_copy now performs automatic layout conversion between AoS (CPU) and
+ * SoA (GPU) formats, so logical field values are preserved across the copy.
  */
 BOOST_AUTO_TEST_CASE(deep_copy_cpu_to_gpu_constant_values) {
     constexpr Index_t len{8};
@@ -498,6 +497,9 @@ BOOST_AUTO_TEST_CASE(deep_copy_cpu_to_gpu_constant_values) {
 
 /**
  * Test round-trip deep_copy: CPU -> GPU -> CPU preserves values.
+ *
+ * This test uses non-constant values to verify that layout conversion
+ * correctly transforms between AoS (CPU) and SoA (GPU) formats and back.
  */
 BOOST_AUTO_TEST_CASE(deep_copy_round_trip_cpu_gpu_cpu) {
     constexpr Index_t len{8};
@@ -561,12 +563,65 @@ BOOST_AUTO_TEST_CASE(deep_copy_round_trip_cpu_gpu_cpu) {
 }
 
 /**
+ * Test deep_copy with non-constant values and verify via norm_sq.
+ *
+ * This test fills the CPU field with a pattern, copies to GPU (with automatic
+ * AoS->SoA layout conversion), and verifies that norm_sq produces the same
+ * result on both devices.
+ */
+BOOST_AUTO_TEST_CASE(deep_copy_cpu_to_gpu_varying_values) {
+    constexpr Index_t len{8};
+    constexpr Index_t nb_components{3};
+
+    DynGridIndex nb_domain_grid_pts{len, len};
+    DynGridIndex nb_subdivisions{1, 1};
+    DynGridIndex nb_ghosts_left{1, 1};
+    DynGridIndex nb_ghosts_right{1, 1};
+
+    // Create CPU decomposition (AoS layout)
+    Communicator comm_cpu{};
+    CartesianDecomposition decomp_cpu{comm_cpu, nb_domain_grid_pts,
+                                      nb_subdivisions, nb_ghosts_left,
+                                      nb_ghosts_right};
+    auto & cpu_collection{decomp_cpu.get_collection()};
+    auto & cpu_field{dynamic_cast<RealField &>(
+        cpu_collection.real_field("cpu_field", nb_components))};
+
+    // Create GPU decomposition (SoA layout)
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device = Device::cuda();
+#elif defined(MUGRID_ENABLE_HIP)
+    auto device = Device::rocm();
+#endif
+    Communicator comm_gpu{};
+    CartesianDecomposition decomp_gpu{comm_gpu, nb_domain_grid_pts,
+                                      nb_subdivisions, nb_ghosts_left,
+                                      nb_ghosts_right, {}, device};
+    auto & gpu_collection{decomp_gpu.get_collection()};
+    auto & gpu_field{dynamic_cast<RealFieldDevice &>(
+        gpu_collection.real_field("gpu_field", nb_components))};
+
+    // Fill CPU field with varying values
+    auto * cpu_data = cpu_field.data();
+    for (Index_t i = 0; i < cpu_field.get_buffer_size(); ++i) {
+        cpu_data[i] = static_cast<Real>((i % 17) + 1) * 0.5;
+    }
+
+    // Compute expected norm_sq from CPU field
+    Real cpu_norm = linalg::norm_sq(cpu_field);
+
+    // Deep copy to GPU (with layout conversion)
+    gpu_field.deep_copy_from(cpu_field);
+
+    // Compute norm_sq on GPU - should match CPU if layout conversion worked
+    Real gpu_norm = linalg::norm_sq(gpu_field);
+
+    BOOST_CHECK_CLOSE(cpu_norm, gpu_norm, 1e-10);
+}
+
+/**
  * Test that CPU and GPU produce identical results for norm_sq with ghosts.
  * This is a critical regression test for the SoA memory layout fix.
- *
- * Note: We use constant values because CPU (AoS) and GPU (SoA) have different
- * memory layouts, so byte-identical data would represent different logical values.
- * Constant values ensure the same logical field content on both devices.
  */
 BOOST_AUTO_TEST_CASE(norm_sq_cpu_gpu_match_2d) {
     constexpr Index_t len{16};

@@ -563,6 +563,13 @@ namespace muGrid {
 
   /**
    * Free function for deep copying between fields in different memory spaces.
+   *
+   * This function handles layout conversion between AoS (Array of Structures,
+   * used by host/CPU) and SoA (Structure of Arrays, used by device/GPU).
+   *
+   * For same-space copies (host-host or device-device), a fast byte copy is
+   * used. For cross-space copies (host-device or device-host), layout
+   * conversion is performed so that the logical field values are preserved.
    */
   template <typename T, typename DstSpace, typename SrcSpace>
   void deep_copy(TypedFieldBase<T, DstSpace> & dst,
@@ -570,8 +577,66 @@ namespace muGrid {
     if (dst.view().size() != src.view().size()) {
       throw FieldError("Size mismatch in deep_copy");
     }
-    // Use muGrid::deep_copy from array.hh
-    muGrid::deep_copy(dst.view(), src.view());
+
+    const auto src_order = src.get_storage_order();
+    const auto dst_order = dst.get_storage_order();
+
+    // Same storage order: use fast byte copy
+    if (src_order == dst_order) {
+      muGrid::deep_copy(dst.view(), src.view());
+      return;
+    }
+
+    // Different storage orders: need layout conversion
+    // This happens when copying between host (AoS) and device (SoA)
+
+    const Index_t nb_buffer_pixels =
+        src.get_collection().get_nb_buffer_pixels();
+    const Index_t nb_components = src.get_nb_components();
+    const Index_t nb_sub_pts = src.get_nb_sub_pts();
+    const Index_t nb_dof_per_pixel = nb_components * nb_sub_pts;
+    const Index_t total_size = nb_buffer_pixels * nb_dof_per_pixel;
+
+    if (total_size == 0) {
+      return;
+    }
+
+    // Allocate temporary host buffer for conversion
+    Array<T, HostSpace> tmp(total_size);
+
+    if constexpr (is_host_space_v<SrcSpace> && is_device_space_v<DstSpace>) {
+      // Host (AoS) -> Device (SoA): Convert on host, then copy to device
+      // AoS: data[pixel * nb_dof_per_pixel + dof]
+      // SoA: data[dof * nb_buffer_pixels + pixel]
+      const T * src_data = src.view().data();
+      T * tmp_data = tmp.data();
+      for (Index_t pixel = 0; pixel < nb_buffer_pixels; ++pixel) {
+        for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
+          tmp_data[dof * nb_buffer_pixels + pixel] =
+              src_data[pixel * nb_dof_per_pixel + dof];
+        }
+      }
+      // Copy converted SoA data to device
+      muGrid::deep_copy(dst.view(), tmp);
+    } else if constexpr (is_device_space_v<SrcSpace> &&
+                         is_host_space_v<DstSpace>) {
+      // Device (SoA) -> Host (AoS): Copy to host, then convert
+      // Copy SoA data from device to temp buffer
+      muGrid::deep_copy(tmp, src.view());
+      // Convert SoA -> AoS
+      const T * tmp_data = tmp.data();
+      T * dst_data = dst.view().data();
+      for (Index_t pixel = 0; pixel < nb_buffer_pixels; ++pixel) {
+        for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
+          dst_data[pixel * nb_dof_per_pixel + dof] =
+              tmp_data[dof * nb_buffer_pixels + pixel];
+        }
+      }
+    } else {
+      // Should not reach here - both host or both device with different orders
+      throw FieldError(
+          "Unexpected storage order mismatch in same-space deep_copy");
+    }
   }
 
   /* ---------------------------------------------------------------------- */

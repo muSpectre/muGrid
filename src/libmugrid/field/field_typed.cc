@@ -888,6 +888,18 @@ namespace muGrid {
   TypedField<Index_t, HostSpace>::push_back_single<HostSpace>(
       const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
 
+  // Same-space deep_copy_from instantiations (host -> host)
+  template void TypedFieldBase<Real, HostSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Real, HostSpace> &);
+  template void TypedFieldBase<Complex, HostSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Complex, HostSpace> &);
+  template void TypedFieldBase<Int, HostSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Int, HostSpace> &);
+  template void TypedFieldBase<Uint, HostSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Uint, HostSpace> &);
+  template void TypedFieldBase<Index_t, HostSpace>::deep_copy_from<HostSpace>(
+      const TypedFieldBase<Index_t, HostSpace> &);
+
   // Device-space explicit template instantiations (for CUDA/HIP builds)
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
   // Base class instantiations for device space
@@ -903,6 +915,18 @@ namespace muGrid {
   template class TypedField<Int, DefaultDeviceSpace>;
   template class TypedField<Uint, DefaultDeviceSpace>;
   template class TypedField<Index_t, DefaultDeviceSpace>;
+
+  // Same-space deep_copy_from instantiations (device -> device)
+  template void TypedFieldBase<Real, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Real, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Complex, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Complex, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Int, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Int, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Uint, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Uint, DefaultDeviceSpace> &);
+  template void TypedFieldBase<Index_t, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
+      const TypedFieldBase<Index_t, DefaultDeviceSpace> &);
 
   // Cross-space deep_copy_from instantiations (host -> device)
   template void TypedFieldBase<Real, DefaultDeviceSpace>::deep_copy_from<HostSpace>(

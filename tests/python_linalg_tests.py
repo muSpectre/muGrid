@@ -377,10 +377,118 @@ class AsymmetricGhostTests(unittest.TestCase):
         self.assertAlmostEqual(cpu_result, expected, places=10)
 
 
-# Note: deep_copy_from method is not exposed in Python bindings.
-# deep_copy tests are only available in the C++ test suite (test_linalg.cc).
-# If deep_copy functionality is needed from Python in the future, the binding
-# would need to be added to language_bindings/python/bind_py_*.cc
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU support not available")
+class DeepCopyTests(unittest.TestCase):
+    """Test deep_copy between CPU and GPU fields.
+
+    deep_copy performs automatic layout conversion between AoS (CPU) and SoA
+    (GPU) formats, so logical field values are preserved across the copy.
+    """
+
+    def setUp(self):
+        self.nb_grid_pts = [8, 8]
+        self.spatial_dim = 2
+        self.nb_components = 3
+        self.nb_ghosts_left = (1,) * self.spatial_dim
+        self.nb_ghosts_right = (1,) * self.spatial_dim
+
+        self.comm = muGrid.Communicator()
+
+        # CPU decomposition
+        self.decomp_cpu = muGrid.CartesianDecomposition(
+            self.comm,
+            self.nb_grid_pts,
+            nb_subdivisions=(1,) * self.spatial_dim,
+            nb_ghosts_left=self.nb_ghosts_left,
+            nb_ghosts_right=self.nb_ghosts_right,
+        )
+
+        # GPU decomposition
+        self.device = muGrid.Device.cuda(0)
+        self.decomp_gpu = muGrid.CartesianDecomposition(
+            self.comm,
+            self.nb_grid_pts,
+            nb_subdivisions=(1,) * self.spatial_dim,
+            nb_ghosts_left=self.nb_ghosts_left,
+            nb_ghosts_right=self.nb_ghosts_right,
+            device=self.device,
+        )
+
+    def test_deep_copy_cpu_to_gpu_constant_values(self):
+        """Test deep_copy from CPU to GPU with constant values."""
+        cpu_field = self.decomp_cpu.real_field("cpu", (self.nb_components,))
+        gpu_field = self.decomp_gpu.real_field("gpu", (self.nb_components,))
+
+        fill_value = 2.5
+        cpu_field.s[...] = fill_value
+
+        # Copy CPU -> GPU (with layout conversion)
+        gpu_field._cpp.deep_copy_from(cpu_field._cpp)
+
+        # Both should give identical norm_sq
+        cpu_norm = linalg.norm_sq(cpu_field)
+        gpu_norm = linalg.norm_sq(gpu_field)
+
+        self.assertAlmostEqual(cpu_norm, gpu_norm, places=10)
+
+        # Verify expected value
+        expected = (
+            self.nb_grid_pts[0] * self.nb_grid_pts[1] * self.nb_components *
+            fill_value * fill_value
+        )
+        self.assertAlmostEqual(cpu_norm, expected, places=10)
+
+    def test_deep_copy_cpu_to_gpu_varying_values(self):
+        """Test deep_copy from CPU to GPU with varying values.
+
+        This verifies that layout conversion correctly transposes the data.
+        """
+        cpu_field = self.decomp_cpu.real_field("cpu", (self.nb_components,))
+        gpu_field = self.decomp_gpu.real_field("gpu", (self.nb_components,))
+
+        # Fill CPU field with varying values
+        arr = np.asarray(cpu_field.s)
+        for i in range(arr.size):
+            arr.flat[i] = (i % 17 + 1) * 0.5
+
+        # Compute expected norm_sq from CPU field
+        cpu_norm = linalg.norm_sq(cpu_field)
+
+        # Copy CPU -> GPU (with layout conversion)
+        gpu_field._cpp.deep_copy_from(cpu_field._cpp)
+
+        # GPU norm_sq should match CPU if layout conversion worked correctly
+        gpu_norm = linalg.norm_sq(gpu_field)
+
+        self.assertAlmostEqual(cpu_norm, gpu_norm, places=10)
+
+    def test_deep_copy_round_trip_cpu_gpu_cpu(self):
+        """Test round-trip deep_copy: CPU -> GPU -> CPU preserves values."""
+        cpu_field1 = self.decomp_cpu.real_field("cpu1", (self.nb_components,))
+        gpu_field = self.decomp_gpu.real_field("gpu", (self.nb_components,))
+        cpu_field2 = self.decomp_cpu.real_field("cpu2", (self.nb_components,))
+
+        # Fill with varying values
+        arr = np.asarray(cpu_field1.s)
+        for i in range(arr.size):
+            arr.flat[i] = (i % 13 + 1) * 0.3
+
+        # Round trip: CPU -> GPU -> CPU
+        gpu_field._cpp.deep_copy_from(cpu_field1._cpp)
+        cpu_field2._cpp.deep_copy_from(gpu_field._cpp)
+
+        # Original and final CPU fields should have identical values
+        cpu1_norm = linalg.norm_sq(cpu_field1)
+        cpu2_norm = linalg.norm_sq(cpu_field2)
+
+        self.assertAlmostEqual(cpu1_norm, cpu2_norm, places=10)
+
+        # Verify bytes are identical
+        np.testing.assert_array_almost_equal(
+            np.asarray(cpu_field1.s).flat,
+            np.asarray(cpu_field2.s).flat,
+            decimal=14
+        )
 
 
 if __name__ == "__main__":
