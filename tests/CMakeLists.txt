@@ -28,6 +28,7 @@ if(Boost_FOUND)
         test_field_collection.cc
         test_field_map.cc
         test_goodies.cc
+        test_linalg.cc
         test_mapped_fields.cc
         test_mapped_state_fields.cc
         test_state_field_maps.cc

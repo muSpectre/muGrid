@@ -266,13 +266,14 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
 /**
  * Compute dot product over ghost region only (2D).
  * Ghost region = left/right columns + top/bottom rows (excluding corners).
+ * Uses field data strides directly for correct SoA layout handling.
  */
 __global__ void ghost_dot_2d_kernel(
     const Real* a, const Real* b, Real* partial_sums,
     Index_t nx_total, Index_t ny_total,
     Index_t gx_left, Index_t gx_right,
     Index_t gy_left, Index_t gy_right,
-    Index_t stride_x, Index_t stride_y,
+    Index_t field_stride_c, Index_t field_stride_x, Index_t field_stride_y,
     Index_t nb_components) {
 
     __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
@@ -283,7 +284,6 @@ __global__ void ghost_dot_2d_kernel(
     // Interior bounds
     Index_t x_start = gx_left;
     Index_t x_end = nx_total - gx_right;
-    Index_t y_start = gy_left;
     Index_t y_end = ny_total - gy_right;
 
     // Count total ghost pixels
@@ -325,9 +325,11 @@ __global__ void ghost_dot_2d_kernel(
             iy = y_end + local_idx % gy_right;
         }
 
-        Index_t pixel_offset = (ix * stride_x + iy * stride_y) * nb_components;
+        // Use field strides for correct SoA layout handling
+        // field[c, x, y] = base + c * field_stride_c + x * field_stride_x + y * field_stride_y
         for (Index_t c = 0; c < nb_components; ++c) {
-            sum += a[pixel_offset + c] * b[pixel_offset + c];
+            Index_t offset = c * field_stride_c + ix * field_stride_x + iy * field_stride_y;
+            sum += a[offset] * b[offset];
         }
     }
 
@@ -349,13 +351,14 @@ __global__ void ghost_dot_2d_kernel(
 
 /**
  * Compute squared norm over ghost region only (2D).
+ * Uses field data strides directly for correct SoA layout handling.
  */
 __global__ void ghost_norm_sq_2d_kernel(
     const Real* x, Real* partial_sums,
     Index_t nx_total, Index_t ny_total,
     Index_t gx_left, Index_t gx_right,
     Index_t gy_left, Index_t gy_right,
-    Index_t stride_x, Index_t stride_y,
+    Index_t field_stride_c, Index_t field_stride_x, Index_t field_stride_y,
     Index_t nb_components) {
 
     __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
@@ -401,9 +404,11 @@ __global__ void ghost_norm_sq_2d_kernel(
             iy = y_end + local_idx % gy_right;
         }
 
-        Index_t pixel_offset = (ix * stride_x + iy * stride_y) * nb_components;
+        // Use field strides for correct SoA layout handling
+        // field[c, x, y] = base + c * field_stride_c + x * field_stride_x + y * field_stride_y
         for (Index_t c = 0; c < nb_components; ++c) {
-            Real val = x[pixel_offset + c];
+            Index_t offset = c * field_stride_c + ix * field_stride_x + iy * field_stride_y;
+            Real val = x[offset];
             sum += val * val;
         }
     }
@@ -478,7 +483,11 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
             const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            const auto& strides = global_coll.get_pixels_with_ghosts().get_strides();
+            // Get field data strides (for SoA layout)
+            const auto field_strides = a.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 2];
+            const Index_t field_stride_y = field_strides[field_strides.size() - 1];
 
             // Count ghost pixels for block sizing
             Index_t x_start = nb_ghosts_left[0];
@@ -499,7 +508,8 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
-                                  strides[0], strides[1], nb_components_per_pixel);
+                                  field_stride_c, field_stride_x, field_stride_y,
+                                  nb_components_per_pixel);
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                                   1, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -554,7 +564,12 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
             const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            const auto& strides = global_coll.get_pixels_with_ghosts().get_strides();
+            // Get field data strides (for SoA layout: [comp_stride, sub_pt_stride, x_stride, y_stride])
+            const auto field_strides = x.get_strides(IterUnit::Pixel);
+            // Component stride is first, spatial strides come after component and sub_pt dimensions
+            const Index_t field_stride_c = field_strides[0];  // component stride
+            const Index_t field_stride_x = field_strides[field_strides.size() - 2];  // x stride
+            const Index_t field_stride_y = field_strides[field_strides.size() - 1];  // y stride
 
             Index_t x_start = nb_ghosts_left[0];
             Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
@@ -574,7 +589,8 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
-                                  strides[0], strides[1], nb_components_per_pixel);
+                                  field_stride_c, field_stride_x, field_stride_y,
+                                  nb_components_per_pixel);
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                                   1, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -716,7 +732,11 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
             const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            const auto& strides = global_coll.get_pixels_with_ghosts().get_strides();
+            // Get field data strides from y (for SoA layout)
+            const auto field_strides = y.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 2];
+            const Index_t field_stride_y = field_strides[field_strides.size() - 1];
 
             Index_t x_start = nb_ghosts_left[0];
             Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
@@ -736,7 +756,8 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
-                                  strides[0], strides[1], nb_components_per_pixel);
+                                  field_stride_c, field_stride_x, field_stride_y,
+                                  nb_components_per_pixel);
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                                   1, gpu_kernels::REDUCE_BLOCK_SIZE,

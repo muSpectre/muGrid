@@ -840,12 +840,13 @@ namespace muGrid {
             const Real w1_inv_hy = alpha * quad_weights[1] / hy;
 
             // Initialize output if not incrementing
-            // Output has shape [nb_sub, nx, ny] where nb_sub = 1 for continuous
-            // FEM
+            // Must use strided access matching the kernel's memory access pattern
             if (!increment) {
-                Index_t total_size = nx * ny;  // One scalar per grid point
-                for (Index_t i = 0; i < total_size; ++i) {
-                    nodal_output[i] = 0.0;
+                for (Index_t iy = 0; iy < ny; ++iy) {
+                    for (Index_t ix = 0; ix < nx; ++ix) {
+                        nodal_output[ix * nodal_stride_x +
+                                     iy * nodal_stride_y] = 0.0;
+                    }
                 }
             }
 
@@ -987,10 +988,16 @@ namespace muGrid {
             Real hz, const Real * quad_weights, Real alpha, bool increment) {
 
             // Initialize output if not incrementing
+            // Must use strided access matching the kernel's memory access pattern
             if (!increment) {
-                Index_t total_size = nx * ny * nz;
-                for (Index_t i = 0; i < total_size; ++i) {
-                    nodal_output[i] = 0.0;
+                for (Index_t iz = 0; iz < nz; ++iz) {
+                    for (Index_t iy = 0; iy < ny; ++iy) {
+                        for (Index_t ix = 0; ix < nx; ++ix) {
+                            nodal_output[ix * nodal_stride_x +
+                                         iy * nodal_stride_y +
+                                         iz * nodal_stride_z] = 0.0;
+                        }
+                    }
                 }
             }
 
