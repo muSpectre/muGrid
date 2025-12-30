@@ -245,18 +245,20 @@ lups = total_lattice_updates / elapsed_time if elapsed_time > 0 else 0
 # Each value is 8 bytes (double precision)
 #
 # Per CG iteration (excluding ghost communication):
-#   hessp (apply):    read nb_stencil_pts, write 1, FLOPs 2*nb_stencil_pts
-#   dot_pAp:          read 2 (p, Ap),       FLOPs 2 (mul + add)
-#   update_x (axpy):  read 2, write 1,      FLOPs 2
-#   update_r (axpy):  read 2, write 1,      FLOPs 2
-#   dot_rr:           read 1,               FLOPs 2
-#   update_p (axpby): read 2, write 1,      FLOPs 2 (mul + mul + add)
+#   hessp (apply):         read nb_stencil_pts, write 1, FLOPs 2*nb_stencil_pts
+#   dot_pAp:               read 2 (p, Ap),       FLOPs 2 (mul + add)
+#   update_x (axpy):       read 2, write 1,      FLOPs 2
+#   update_r (axpy_norm_sq): read 2, write 1,    FLOPs 4 (fused axpy + norm)
+#   update_p (axpby):      read 2, write 1,      FLOPs 2 (mul + mul + add)
 #
-# Total reads:  nb_stencil_pts + 2 + 2 + 2 + 1 + 2 = nb_stencil_pts + 9
-# Total writes: 1 + 0 + 1 + 1 + 0 + 1 = 4
-# Total FLOPs:  2*nb_stencil_pts + 2 + 2 + 2 + 2 + 2 = 2*nb_stencil_pts + 10
+# The fused axpy_norm_sq saves 1 read compared to separate axpy + norm_sq,
+# because the norm is computed during the write pass without re-reading y.
+#
+# Total reads:  nb_stencil_pts + 2 + 2 + 2 + 2 = nb_stencil_pts + 8
+# Total writes: 1 + 0 + 1 + 1 + 1 = 4
+# Total FLOPs:  2*nb_stencil_pts + 2 + 2 + 4 + 2 = 2*nb_stencil_pts + 10
 
-reads_per_iteration = nb_stencil_pts + 9  # values read per grid point
+reads_per_iteration = nb_stencil_pts + 8  # values read per grid point
 writes_per_iteration = 4  # values written per grid point
 flops_per_iteration = 2 * nb_stencil_pts + 10  # FLOPs per grid point
 
@@ -355,8 +357,7 @@ else:
     print(f"    hessp:    {nb_stencil_pts} reads, 1 write")
     print("    dot_pAp:  2 reads")
     print("    update_x: 2 reads, 1 write")
-    print("    update_r: 2 reads, 1 write")
-    print("    dot_rr:   1 read")
+    print("    update_r: 2 reads, 1 write (fused axpy_norm_sq)")
     print("    update_p: 2 reads, 1 write")
     print(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB")
     print(f"  Total: {total_bytes / 1e9:.2f} GB")
@@ -367,8 +368,7 @@ else:
     print(f"    hessp:    {2 * nb_stencil_pts} FLOPs")
     print("    dot_pAp:  2 FLOPs")
     print("    update_x: 2 FLOPs")
-    print("    update_r: 2 FLOPs")
-    print("    dot_rr:   2 FLOPs")
+    print("    update_r: 4 FLOPs (fused axpy_norm_sq)")
     print("    update_p: 2 FLOPs")
     print(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP")
     print(f"  Total: {total_flops / 1e9:.2f} GFLOP")

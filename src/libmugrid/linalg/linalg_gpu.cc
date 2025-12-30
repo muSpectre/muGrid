@@ -120,6 +120,42 @@ __global__ void axpby_kernel(Real alpha, const Real* x, Real beta, Real* y, Inde
     }
 }
 
+/**
+ * Fused AXPY + norm_sq kernel: y = alpha * x + y, returns partial ||y||²
+ * Each block computes AXPY for its elements AND accumulates partial norm.
+ */
+__global__ void axpy_norm_sq_kernel(Real alpha, const Real* x, Real* y,
+                                    Real* partial_sums, Index_t n) {
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Fused: update y AND accumulate squared norm
+    Real sum = 0.0;
+    while (idx < n) {
+        Real new_y = y[idx] + alpha * x[idx];
+        y[idx] = new_y;
+        sum += new_y * new_y;
+        idx += blockDim.x * gridDim.x;
+    }
+    shared_data[tid] = sum;
+    __syncthreads();
+
+    // Reduce within block
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_data[tid] += shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    // Write block result
+    if (tid == 0) {
+        partial_sums[blockIdx.x] = shared_data[0];
+    }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Reduction kernels                                                       */
 /* ---------------------------------------------------------------------- */
@@ -408,7 +444,10 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
     }
 
     const auto& coll = a.get_collection();
-    const Index_t n = a.get_nb_entries();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t nb_components_per_pixel =
+        a.get_nb_components() * a.get_nb_sub_pts();
+    const Index_t n = a.get_nb_entries() * nb_components_per_pixel;
 
     // Allocate device memory for partial sums
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
@@ -440,7 +479,6 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
             const auto& strides = global_coll.get_pixels_with_ghosts().get_strides();
-            const Index_t nb_components = a.get_nb_components() * a.get_nb_sub_pts();
 
             // Count ghost pixels for block sizing
             Index_t x_start = nb_ghosts_left[0];
@@ -461,7 +499,7 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
-                                  strides[0], strides[1], nb_components);
+                                  strides[0], strides[1], nb_components_per_pixel);
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                                   1, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -482,7 +520,10 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
 template <>
 Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
     const auto& coll = x.get_collection();
-    const Index_t n = x.get_nb_entries();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t nb_components_per_pixel =
+        x.get_nb_components() * x.get_nb_sub_pts();
+    const Index_t n = x.get_nb_entries() * nb_components_per_pixel;
 
     // Allocate device memory for partial sums
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
@@ -514,7 +555,6 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
             const auto& strides = global_coll.get_pixels_with_ghosts().get_strides();
-            const Index_t nb_components = x.get_nb_components() * x.get_nb_sub_pts();
 
             Index_t x_start = nb_ghosts_left[0];
             Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
@@ -534,7 +574,7 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
                                   nb_pts[0], nb_pts[1],
                                   nb_ghosts_left[0], nb_ghosts_right[0],
                                   nb_ghosts_left[1], nb_ghosts_right[1],
-                                  strides[0], strides[1], nb_components);
+                                  strides[0], strides[1], nb_components_per_pixel);
 
                 GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                                   1, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -562,7 +602,8 @@ void axpy<Real, DeviceSpace>(Real alpha,
         throw FieldError("axpy: fields must have the same number of entries");
     }
 
-    const Index_t n = x.get_nb_entries();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t n = x.get_nb_entries() * x.get_nb_components() * x.get_nb_sub_pts();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -574,7 +615,8 @@ void axpy<Real, DeviceSpace>(Real alpha,
 
 template <>
 void scal<Real, DeviceSpace>(Real alpha, TypedField<Real, DeviceSpace>& x) {
-    const Index_t n = x.get_nb_entries();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t n = x.get_nb_entries() * x.get_nb_components() * x.get_nb_sub_pts();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -596,7 +638,8 @@ void axpby<Real, DeviceSpace>(Real alpha,
         throw FieldError("axpby: fields must have the same number of entries");
     }
 
-    const Index_t n = x.get_nb_entries();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t n = x.get_nb_entries() * x.get_nb_components() * x.get_nb_sub_pts();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -616,7 +659,8 @@ void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
         throw FieldError("copy: fields must have the same number of entries");
     }
 
-    const Index_t n = src.get_nb_entries();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t n = src.get_nb_entries() * src.get_nb_components() * src.get_nb_sub_pts();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -624,6 +668,89 @@ void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       src.view().data(), dst.view().data(), n);
     GPU_DEVICE_SYNCHRONIZE();
+}
+
+template <>
+Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
+                                      const TypedField<Real, DeviceSpace>& x,
+                                      TypedField<Real, DeviceSpace>& y) {
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries()) {
+        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
+    }
+
+    const auto& coll = x.get_collection();
+    // Total number of scalar elements = pixels * components * sub_pts
+    const Index_t nb_components_per_pixel =
+        x.get_nb_components() * x.get_nb_sub_pts();
+    const Index_t n = x.get_nb_entries() * nb_components_per_pixel;
+
+    // Allocate device memory for partial sums
+    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                           gpu_kernels::REDUCE_BLOCK_SIZE;
+    Real* d_partial;
+    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+
+    // Fused AXPY + norm_sq kernel
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel,
+                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      alpha, x.view().data(), y.view().data(), d_partial, n);
+
+    // Final reduction
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      d_partial, num_blocks);
+
+    // Copy result back
+    Real full_norm;
+    GPU_MEMCPY_D2H(&full_norm, d_partial, sizeof(Real));
+
+    // For GlobalFieldCollection, subtract ghost contributions
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        const auto spatial_dim = global_coll.get_spatial_dim();
+
+        if (spatial_dim == 2) {
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            const auto& strides = global_coll.get_pixels_with_ghosts().get_strides();
+
+            Index_t x_start = nb_ghosts_left[0];
+            Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
+            Index_t ghost_pixels =
+                nb_ghosts_left[0] * nb_pts[1] +
+                nb_ghosts_right[0] * nb_pts[1] +
+                (x_end - x_start) * nb_ghosts_left[1] +
+                (x_end - x_start) * nb_ghosts_right[1];
+
+            if (ghost_pixels > 0) {
+                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                                   gpu_kernels::REDUCE_BLOCK_SIZE;
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
+                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  y.view().data(), d_partial,
+                                  nb_pts[0], nb_pts[1],
+                                  nb_ghosts_left[0], nb_ghosts_right[0],
+                                  nb_ghosts_left[1], nb_ghosts_right[1],
+                                  strides[0], strides[1], nb_components_per_pixel);
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  d_partial, ghost_blocks);
+
+                Real ghost_norm;
+                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
+                full_norm -= ghost_norm;
+            }
+        }
+    }
+
+    GPU_FREE(d_partial);
+    return full_norm;
 }
 
 // Complex versions would follow the same pattern but with Complex type
@@ -664,6 +791,13 @@ void axpby<Complex, DeviceSpace>(Complex alpha,
 template <>
 void copy<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& src,
                                  TypedField<Complex, DeviceSpace>& dst) {
+    throw FieldError("Complex GPU linalg not yet implemented");
+}
+
+template <>
+Complex axpy_norm_sq<Complex, DeviceSpace>(Complex alpha,
+                                            const TypedField<Complex, DeviceSpace>& x,
+                                            TypedField<Complex, DeviceSpace>& y) {
     throw FieldError("Complex GPU linalg not yet implemented");
 }
 

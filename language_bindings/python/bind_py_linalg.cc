@@ -196,6 +196,32 @@ void add_linalg_functions(py::module &mod) {
             Destination field (modified in place)
         )pbdoc");
 
+    linalg.def("axpy_norm_sq",
+        static_cast<Real (*)(Real, const RealFieldHost&, RealFieldHost&)>(
+            &muGrid::linalg::axpy_norm_sq<Real, HostSpace>),
+        "alpha"_a, "x"_a, "y"_a,
+        R"pbdoc(
+        Fused AXPY + norm_sq: y = alpha * x + y, returns ||y||² (interior only).
+
+        This fused operation computes both the AXPY update and the squared norm
+        of the result in a single pass through memory. More efficient than
+        separate axpy() + norm_sq() calls.
+
+        Parameters
+        ----------
+        alpha : float
+            Scalar multiplier
+        x : RealField
+            Input field (host memory)
+        y : RealField
+            Input/output field (modified in place)
+
+        Returns
+        -------
+        float
+            Squared norm of y after update (local, not MPI-reduced)
+        )pbdoc");
+
     // --- Complex field operations (host) ---
 
     linalg.def("vecdot",
@@ -233,6 +259,12 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::copy<Complex, HostSpace>),
         "src"_a, "dst"_a,
         "Copy operation for complex fields: dst = src.");
+
+    linalg.def("axpy_norm_sq",
+        static_cast<Complex (*)(Complex, const ComplexFieldHost&, ComplexFieldHost&)>(
+            &muGrid::linalg::axpy_norm_sq<Complex, HostSpace>),
+        "alpha"_a, "x"_a, "y"_a,
+        "Fused AXPY + norm_sq for complex fields: y = alpha * x + y, returns ||y||².");
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---
@@ -273,6 +305,12 @@ void add_linalg_functions(py::module &mod) {
         "src"_a, "dst"_a,
         "Copy operation on device (GPU): dst = src.");
 
+    linalg.def("axpy_norm_sq",
+        static_cast<Real (*)(Real, const RealFieldDevice&, RealFieldDevice&)>(
+            &muGrid::linalg::axpy_norm_sq<Real, DeviceSpace>),
+        "alpha"_a, "x"_a, "y"_a,
+        "Fused AXPY + norm_sq on device (GPU): y = alpha * x + y, returns ||y||².");
+
     // --- Complex field operations (device) ---
 
     linalg.def("vecdot",
@@ -310,5 +348,11 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::copy<Complex, DeviceSpace>),
         "src"_a, "dst"_a,
         "Copy operation for complex fields on device (GPU): dst = src.");
+
+    linalg.def("axpy_norm_sq",
+        static_cast<Complex (*)(Complex, const ComplexFieldDevice&, ComplexFieldDevice&)>(
+            &muGrid::linalg::axpy_norm_sq<Complex, DeviceSpace>),
+        "alpha"_a, "x"_a, "y"_a,
+        "Fused AXPY + norm_sq for complex fields on device (GPU): y = alpha * x + y, returns ||y||².");
 #endif
 }

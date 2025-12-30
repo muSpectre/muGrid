@@ -118,18 +118,14 @@ def conjugate_gradients(
             with timed("update_x"):
                 linalg.axpy(alpha, p, x)
 
-            # Update residual: r -= alpha * Ap
+            # Update residual and compute norm in one pass: r -= alpha * Ap
             with timed("update_r"):
-                linalg.axpy(-alpha, Ap, r)
+                next_rr = comm.sum(linalg.axpy_norm_sq(-alpha, Ap, r))
+            next_rr_val = float(next_rr)
 
             if callback:
                 with timed("callback"):
-                    callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": rr})
-
-            # Compute next residual norm
-            with timed("dot_rr"):
-                next_rr = comm.sum(linalg.norm_sq(r))
-            next_rr_val = float(next_rr)
+                    callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": next_rr})
 
             # Check for numerical issues (NaN indicates non-positive-definite H)
             if next_rr_val != next_rr_val:  # NaN check

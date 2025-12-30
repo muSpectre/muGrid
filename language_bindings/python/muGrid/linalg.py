@@ -139,4 +139,31 @@ def copy(src, dst):
     _linalg.copy(_get_cpp(src), _get_cpp(dst))
 
 
-__all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy"]
+def axpy_norm_sq(alpha, x, y):
+    """
+    Fused AXPY + norm_sq: y = alpha * x + y, returns ||y||² (interior only).
+
+    This fused operation computes both the AXPY update and the squared norm
+    of the result in a single pass through memory. More efficient than
+    separate axpy() + norm_sq() calls because:
+    - axpy + norm_sq: 2 reads of x, 2 reads of y, 1 write of y
+    - axpy_norm_sq:   1 read of x, 1 read of y, 1 write of y
+
+    Parameters
+    ----------
+    alpha : float or complex
+        Scalar multiplier
+    x : Field
+        Input field
+    y : Field
+        Input/output field (modified in place)
+
+    Returns
+    -------
+    float or complex
+        Squared norm of y after update (local, not MPI-reduced)
+    """
+    return _linalg.axpy_norm_sq(alpha, _get_cpp(x), _get_cpp(y))
+
+
+__all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy", "axpy_norm_sq"]

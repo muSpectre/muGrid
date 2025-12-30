@@ -151,6 +151,31 @@ void copy(const TypedField<T, MemorySpace>& src,
 template <typename T, typename MemorySpace>
 T norm_sq(const TypedField<T, MemorySpace>& x);
 
+/**
+ * Fused AXPY + norm_sq: y = alpha * x + y, returns ||y||² (interior only)
+ *
+ * This fused operation computes both the AXPY update and the squared norm
+ * of the result in a single pass through memory. This is more efficient
+ * than separate axpy() + norm_sq() calls because:
+ * - axpy + norm_sq: 2 reads of x, 2 reads of y, 1 write of y
+ * - axpy_norm_sq:   1 read of x, 1 read of y, 1 write of y
+ *
+ * The AXPY operates on the FULL buffer, while the norm is computed only
+ * over interior pixels (excludes ghost regions for MPI correctness).
+ *
+ * @tparam T Scalar type (Real, Complex, etc.)
+ * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @param alpha Scalar multiplier
+ * @param x Input field
+ * @param y Input/output field (modified in place)
+ * @return Squared norm of y after update (local, not MPI-reduced)
+ * @throws FieldError if fields have incompatible shapes
+ */
+template <typename T, typename MemorySpace>
+T axpy_norm_sq(T alpha,
+               const TypedField<T, MemorySpace>& x,
+               TypedField<T, MemorySpace>& y);
+
 }  // namespace linalg
 }  // namespace muGrid
 
