@@ -428,6 +428,158 @@ __global__ void ghost_norm_sq_2d_kernel(
     }
 }
 
+/**
+ * Compute dot product over ghost region only (3D).
+ * Ghost region = all pixels outside the interior box.
+ * Uses a simple approach: iterate all pixels, skip interior ones.
+ * Uses field strides for correct SoA layout handling.
+ */
+__global__ void ghost_dot_3d_kernel(
+    const Real* a, const Real* b, Real* partial_sums,
+    Index_t nx_total, Index_t ny_total, Index_t nz_total,
+    Index_t gx_left, Index_t gx_right,
+    Index_t gy_left, Index_t gy_right,
+    Index_t gz_left, Index_t gz_right,
+    Index_t field_stride_c, Index_t field_stride_x,
+    Index_t field_stride_y, Index_t field_stride_z,
+    Index_t nb_components) {
+
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Interior bounds
+    Index_t x_start = gx_left;
+    Index_t x_end = nx_total - gx_right;
+    Index_t y_start = gy_left;
+    Index_t y_end = ny_total - gy_right;
+    Index_t z_start = gz_left;
+    Index_t z_end = nz_total - gz_right;
+
+    // Total pixels in the domain
+    Index_t total_pixels = nx_total * ny_total * nz_total;
+
+    Real sum = 0.0;
+
+    // Each thread processes multiple pixels
+    for (Index_t pixel_idx = global_tid; pixel_idx < total_pixels;
+         pixel_idx += blockDim.x * gridDim.x) {
+
+        Index_t ix = pixel_idx / (ny_total * nz_total);
+        Index_t rem = pixel_idx % (ny_total * nz_total);
+        Index_t iy = rem / nz_total;
+        Index_t iz = rem % nz_total;
+
+        // Skip interior pixels
+        if (ix >= x_start && ix < x_end &&
+            iy >= y_start && iy < y_end &&
+            iz >= z_start && iz < z_end) {
+            continue;
+        }
+
+        // Use field strides for correct SoA layout handling
+        // field[c, x, y, z] = base + c * stride_c + x * stride_x + y * stride_y + z * stride_z
+        for (Index_t c = 0; c < nb_components; ++c) {
+            Index_t offset = c * field_stride_c +
+                             ix * field_stride_x +
+                             iy * field_stride_y +
+                             iz * field_stride_z;
+            sum += a[offset] * b[offset];
+        }
+    }
+
+    shared_data[tid] = sum;
+    __syncthreads();
+
+    // Reduce within block
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_data[tid] += shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        partial_sums[blockIdx.x] = shared_data[0];
+    }
+}
+
+/**
+ * Compute squared norm over ghost region only (3D).
+ * Uses a simple approach: iterate all pixels, skip interior ones.
+ * Uses field strides for correct SoA layout handling.
+ */
+__global__ void ghost_norm_sq_3d_kernel(
+    const Real* x, Real* partial_sums,
+    Index_t nx_total, Index_t ny_total, Index_t nz_total,
+    Index_t gx_left, Index_t gx_right,
+    Index_t gy_left, Index_t gy_right,
+    Index_t gz_left, Index_t gz_right,
+    Index_t field_stride_c, Index_t field_stride_x,
+    Index_t field_stride_y, Index_t field_stride_z,
+    Index_t nb_components) {
+
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Interior bounds
+    Index_t x_start = gx_left;
+    Index_t x_end = nx_total - gx_right;
+    Index_t y_start = gy_left;
+    Index_t y_end = ny_total - gy_right;
+    Index_t z_start = gz_left;
+    Index_t z_end = nz_total - gz_right;
+
+    // Total pixels in the domain
+    Index_t total_pixels = nx_total * ny_total * nz_total;
+
+    Real sum = 0.0;
+
+    for (Index_t pixel_idx = global_tid; pixel_idx < total_pixels;
+         pixel_idx += blockDim.x * gridDim.x) {
+
+        Index_t ix = pixel_idx / (ny_total * nz_total);
+        Index_t rem = pixel_idx % (ny_total * nz_total);
+        Index_t iy = rem / nz_total;
+        Index_t iz = rem % nz_total;
+
+        // Skip interior pixels
+        if (ix >= x_start && ix < x_end &&
+            iy >= y_start && iy < y_end &&
+            iz >= z_start && iz < z_end) {
+            continue;
+        }
+
+        // Use field strides for correct SoA layout handling
+        // field[c, x, y, z] = base + c * stride_c + x * stride_x + y * stride_y + z * stride_z
+        for (Index_t c = 0; c < nb_components; ++c) {
+            Index_t offset = c * field_stride_c +
+                             ix * field_stride_x +
+                             iy * field_stride_y +
+                             iz * field_stride_z;
+            Real val = x[offset];
+            sum += val * val;
+        }
+    }
+
+    shared_data[tid] = sum;
+    __syncthreads();
+
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_data[tid] += shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        partial_sums[blockIdx.x] = shared_data[0];
+    }
+}
+
 }  // namespace gpu_kernels
 
 /* ---------------------------------------------------------------------- */
@@ -519,8 +671,41 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
                 GPU_MEMCPY_D2H(&ghost_dot, d_partial, sizeof(Real));
                 full_dot -= ghost_dot;
             }
+        } else if (spatial_dim == 3) {
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            // Get field data strides (for SoA layout)
+            const auto field_strides = a.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 3];
+            const Index_t field_stride_y = field_strides[field_strides.size() - 2];
+            const Index_t field_stride_z = field_strides[field_strides.size() - 1];
+
+            // Total pixels for block count
+            Index_t total_pixels = nb_pts[0] * nb_pts[1] * nb_pts[2];
+            int ghost_blocks = (total_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                               gpu_kernels::REDUCE_BLOCK_SIZE;
+
+            GPU_LAUNCH_KERNEL(gpu_kernels::ghost_dot_3d_kernel,
+                              ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                              a.view().data(), b.view().data(), d_partial,
+                              nb_pts[0], nb_pts[1], nb_pts[2],
+                              nb_ghosts_left[0], nb_ghosts_right[0],
+                              nb_ghosts_left[1], nb_ghosts_right[1],
+                              nb_ghosts_left[2], nb_ghosts_right[2],
+                              field_stride_c, field_stride_x,
+                              field_stride_y, field_stride_z,
+                              nb_components_per_pixel);
+
+            GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                              1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                              d_partial, ghost_blocks);
+
+            Real ghost_dot;
+            GPU_MEMCPY_D2H(&ghost_dot, d_partial, sizeof(Real));
+            full_dot -= ghost_dot;
         }
-        // 3D case would be similar but more complex - skip for now
     }
 
     GPU_FREE(d_partial);
@@ -600,6 +785,40 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
                 GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
                 full_norm -= ghost_norm;
             }
+        } else if (spatial_dim == 3) {
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            // Get field data strides (for SoA layout)
+            const auto field_strides = x.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 3];
+            const Index_t field_stride_y = field_strides[field_strides.size() - 2];
+            const Index_t field_stride_z = field_strides[field_strides.size() - 1];
+
+            // Total pixels for block count
+            Index_t total_pixels = nb_pts[0] * nb_pts[1] * nb_pts[2];
+            int ghost_blocks = (total_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                               gpu_kernels::REDUCE_BLOCK_SIZE;
+
+            GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_3d_kernel,
+                              ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                              x.view().data(), d_partial,
+                              nb_pts[0], nb_pts[1], nb_pts[2],
+                              nb_ghosts_left[0], nb_ghosts_right[0],
+                              nb_ghosts_left[1], nb_ghosts_right[1],
+                              nb_ghosts_left[2], nb_ghosts_right[2],
+                              field_stride_c, field_stride_x,
+                              field_stride_y, field_stride_z,
+                              nb_components_per_pixel);
+
+            GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                              1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                              d_partial, ghost_blocks);
+
+            Real ghost_norm;
+            GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
+            full_norm -= ghost_norm;
         }
     }
 
@@ -767,6 +986,40 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
                 GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
                 full_norm -= ghost_norm;
             }
+        } else if (spatial_dim == 3) {
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            // Get field data strides from y (for SoA layout)
+            const auto field_strides = y.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 3];
+            const Index_t field_stride_y = field_strides[field_strides.size() - 2];
+            const Index_t field_stride_z = field_strides[field_strides.size() - 1];
+
+            // Total pixels for block count
+            Index_t total_pixels = nb_pts[0] * nb_pts[1] * nb_pts[2];
+            int ghost_blocks = (total_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                               gpu_kernels::REDUCE_BLOCK_SIZE;
+
+            GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_3d_kernel,
+                              ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                              y.view().data(), d_partial,
+                              nb_pts[0], nb_pts[1], nb_pts[2],
+                              nb_ghosts_left[0], nb_ghosts_right[0],
+                              nb_ghosts_left[1], nb_ghosts_right[1],
+                              nb_ghosts_left[2], nb_ghosts_right[2],
+                              field_stride_c, field_stride_x,
+                              field_stride_y, field_stride_z,
+                              nb_components_per_pixel);
+
+            GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                              1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                              d_partial, ghost_blocks);
+
+            Real ghost_norm;
+            GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
+            full_norm -= ghost_norm;
         }
     }
 
