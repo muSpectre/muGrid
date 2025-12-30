@@ -262,8 +262,6 @@ namespace muGrid {
     Real LaplaceOperator::apply_vecdot(
         const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
         TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
-        // Apply the operator
-        this->apply(input_field, output_field);
 
         // Get collection for dimensions
         const auto& collection = this->validate_fields(input_field, output_field);
@@ -271,38 +269,31 @@ namespace muGrid {
 
         // Get raw device data pointers via view()
         const Real* input = input_field.view().data();
-        const Real* output = output_field.view().data();
+        Real* output = output_field.view().data();
 
-        // For GPU, we need a device reduction. For now, use a simple host-side
-        // computation by copying data back. A proper implementation would use
-        // a GPU reduction kernel.
-        // TODO: Implement fused apply+vecdot GPU kernel for better performance
-
-        // Use existing host implementation by copying to host
-        // (This is suboptimal - a proper GPU kernel would be faster)
+        // Use fused kernel that computes Laplace AND dot product in single pass
         Real dot_product = 0.0;
 
         if (this->spatial_dim == 2) {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
-            // Interior: [1, nx-1) x [1, ny-1)
 #if defined(MUGRID_ENABLE_CUDA)
-            dot_product = laplace_kernels::laplace_2d_vecdot_cuda(
-                input, output, nx, ny, 1, nx);
+            dot_product = laplace_kernels::laplace_2d_apply_vecdot_cuda(
+                input, output, nx, ny, 1, nx, this->scale);
 #elif defined(MUGRID_ENABLE_HIP)
-            dot_product = laplace_kernels::laplace_2d_vecdot_hip(
-                input, output, nx, ny, 1, nx);
+            dot_product = laplace_kernels::laplace_2d_apply_vecdot_hip(
+                input, output, nx, ny, 1, nx, this->scale);
 #endif
         } else {
             Index_t nx = nb_grid_pts[0];
             Index_t ny = nb_grid_pts[1];
             Index_t nz = nb_grid_pts[2];
 #if defined(MUGRID_ENABLE_CUDA)
-            dot_product = laplace_kernels::laplace_3d_vecdot_cuda(
-                input, output, nx, ny, nz, 1, nx, nx * ny);
+            dot_product = laplace_kernels::laplace_3d_apply_vecdot_cuda(
+                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
 #elif defined(MUGRID_ENABLE_HIP)
-            dot_product = laplace_kernels::laplace_3d_vecdot_hip(
-                input, output, nx, ny, nz, 1, nx, nx * ny);
+            dot_product = laplace_kernels::laplace_3d_apply_vecdot_hip(
+                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
 #endif
         }
 

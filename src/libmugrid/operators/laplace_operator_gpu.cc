@@ -407,7 +407,119 @@ __global__ void vecdot_3d_kernel(
     }
 }
 
-// Launch wrapper for 2D vecdot
+// Fused launch wrapper for 2D apply_vecdot
+#if defined(MUGRID_ENABLE_CUDA)
+Real laplace_2d_apply_vecdot_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+Real laplace_2d_apply_vecdot_hip(
+#endif
+    const Real* input,
+    Real* output,
+    Index_t nx, Index_t ny,
+    Index_t stride_x, Index_t stride_y,
+    Real scale) {
+
+    // Compute grid dimensions (for interior points only)
+    Index_t interior_nx = nx - 2;
+    Index_t interior_ny = ny - 2;
+
+    dim3 block(BLOCK_SIZE_2D, BLOCK_SIZE_2D);
+    dim3 grid(
+        (interior_nx + block.x - 1) / block.x,
+        (interior_ny + block.y - 1) / block.y
+    );
+
+    Index_t num_blocks = grid.x * grid.y;
+    Index_t shared_mem_size = block.x * block.y * sizeof(Real);
+
+    // Allocate device memory for partial sums
+    Real* d_partial_sums;
+#if defined(MUGRID_ENABLE_CUDA)
+    (void)cudaMalloc(&d_partial_sums, num_blocks * sizeof(Real));
+#elif defined(MUGRID_ENABLE_HIP)
+    (void)hipMalloc(&d_partial_sums, num_blocks * sizeof(Real));
+#endif
+
+    GPU_LAUNCH_KERNEL_SHMEM(laplace_2d_vecdot_kernel, grid, block, shared_mem_size,
+        input, output, d_partial_sums, nx, ny, stride_x, stride_y, scale);
+
+    // Copy partial sums to host and accumulate
+    std::vector<Real> h_partial_sums(num_blocks);
+#if defined(MUGRID_ENABLE_CUDA)
+    (void)cudaMemcpy(h_partial_sums.data(), d_partial_sums,
+                     num_blocks * sizeof(Real), cudaMemcpyDeviceToHost);
+    (void)cudaFree(d_partial_sums);
+#elif defined(MUGRID_ENABLE_HIP)
+    (void)hipMemcpy(h_partial_sums.data(), d_partial_sums,
+                    num_blocks * sizeof(Real), hipMemcpyDeviceToHost);
+    (void)hipFree(d_partial_sums);
+#endif
+
+    Real result = 0.0;
+    for (Index_t i = 0; i < num_blocks; ++i) {
+        result += h_partial_sums[i];
+    }
+    return result;
+}
+
+// Fused launch wrapper for 3D apply_vecdot
+#if defined(MUGRID_ENABLE_CUDA)
+Real laplace_3d_apply_vecdot_cuda(
+#elif defined(MUGRID_ENABLE_HIP)
+Real laplace_3d_apply_vecdot_hip(
+#endif
+    const Real* input,
+    Real* output,
+    Index_t nx, Index_t ny, Index_t nz,
+    Index_t stride_x, Index_t stride_y, Index_t stride_z,
+    Real scale) {
+
+    // Compute grid dimensions (for interior points only)
+    Index_t interior_nx = nx - 2;
+    Index_t interior_ny = ny - 2;
+    Index_t interior_nz = nz - 2;
+
+    dim3 block(BLOCK_SIZE_3D, BLOCK_SIZE_3D, BLOCK_SIZE_3D);
+    dim3 grid(
+        (interior_nx + block.x - 1) / block.x,
+        (interior_ny + block.y - 1) / block.y,
+        (interior_nz + block.z - 1) / block.z
+    );
+
+    Index_t num_blocks = grid.x * grid.y * grid.z;
+    Index_t shared_mem_size = block.x * block.y * block.z * sizeof(Real);
+
+    // Allocate device memory for partial sums
+    Real* d_partial_sums;
+#if defined(MUGRID_ENABLE_CUDA)
+    (void)cudaMalloc(&d_partial_sums, num_blocks * sizeof(Real));
+#elif defined(MUGRID_ENABLE_HIP)
+    (void)hipMalloc(&d_partial_sums, num_blocks * sizeof(Real));
+#endif
+
+    GPU_LAUNCH_KERNEL_SHMEM(laplace_3d_vecdot_kernel, grid, block, shared_mem_size,
+        input, output, d_partial_sums, nx, ny, nz, stride_x, stride_y, stride_z, scale);
+
+    // Copy partial sums to host and accumulate
+    std::vector<Real> h_partial_sums(num_blocks);
+#if defined(MUGRID_ENABLE_CUDA)
+    (void)cudaMemcpy(h_partial_sums.data(), d_partial_sums,
+                     num_blocks * sizeof(Real), cudaMemcpyDeviceToHost);
+    (void)cudaFree(d_partial_sums);
+#elif defined(MUGRID_ENABLE_HIP)
+    (void)hipMemcpy(h_partial_sums.data(), d_partial_sums,
+                    num_blocks * sizeof(Real), hipMemcpyDeviceToHost);
+    (void)hipFree(d_partial_sums);
+#endif
+
+    Real result = 0.0;
+    for (Index_t i = 0; i < num_blocks; ++i) {
+        result += h_partial_sums[i];
+    }
+    return result;
+}
+
+// Launch wrapper for 2D vecdot (separate, for when apply was already done)
 #if defined(MUGRID_ENABLE_CUDA)
 Real laplace_2d_vecdot_cuda(
 #elif defined(MUGRID_ENABLE_HIP)
