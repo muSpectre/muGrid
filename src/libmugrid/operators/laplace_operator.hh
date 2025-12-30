@@ -402,6 +402,28 @@ namespace muGrid {
             bool increment = false);
 
         /**
+         * @brief Fused apply + vecdot on CUDA device (2D).
+         * Computes output = scale * Laplace(input) AND returns input · output.
+         */
+        Real laplace_2d_apply_vecdot_cuda(
+            const Real* input,
+            Real* output,
+            Index_t nx, Index_t ny,
+            Index_t stride_x, Index_t stride_y,
+            Real scale);
+
+        /**
+         * @brief Fused apply + vecdot on CUDA device (3D).
+         * Computes output = scale * Laplace(input) AND returns input · output.
+         */
+        Real laplace_3d_apply_vecdot_cuda(
+            const Real* input,
+            Real* output,
+            Index_t nx, Index_t ny, Index_t nz,
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            Real scale);
+
+        /**
          * @brief Compute interior dot product on CUDA device (2D).
          */
         Real laplace_2d_vecdot_cuda(
@@ -442,6 +464,28 @@ namespace muGrid {
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
             Real scale,
             bool increment = false);
+
+        /**
+         * @brief Fused apply + vecdot on HIP device (2D).
+         * Computes output = scale * Laplace(input) AND returns input · output.
+         */
+        Real laplace_2d_apply_vecdot_hip(
+            const Real* input,
+            Real* output,
+            Index_t nx, Index_t ny,
+            Index_t stride_x, Index_t stride_y,
+            Real scale);
+
+        /**
+         * @brief Fused apply + vecdot on HIP device (3D).
+         * Computes output = scale * Laplace(input) AND returns input · output.
+         */
+        Real laplace_3d_apply_vecdot_hip(
+            const Real* input,
+            Real* output,
+            Index_t nx, Index_t ny, Index_t nz,
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            Real scale);
 
         /**
          * @brief Compute interior dot product on HIP device (2D).
