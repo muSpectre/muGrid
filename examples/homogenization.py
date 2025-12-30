@@ -665,14 +665,17 @@ with timer("total_solve"):
                     print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
 
         # Solve K u = f using conjugate_gradients from Solvers.py
+        # Note: For homogenization, the stiffness operator K = B^T C B is a
+        # composite operation, so we use the separate hessp interface rather
+        # than hessp_vecdot (which would require a custom implementation).
         with timer(f"cg_case_{case_idx}"):
             try:
                 conjugate_gradients(
                     comm,
                     decomposition,
-                    apply_stiffness,
                     rhs_field,
                     u_field,
+                    hessp=apply_stiffness,
                     tol=args.tol,
                     callback=callback,
                     maxiter=args.maxiter,

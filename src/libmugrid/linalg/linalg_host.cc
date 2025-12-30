@@ -544,30 +544,24 @@ Real axpy_norm_sq<Real, HostSpace>(Real alpha,
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
 
-    const auto& coll = x.get_collection();
-    // Total number of scalar elements = pixels * components * sub_pts
-    const Index_t nb_components_per_pixel =
-        x.get_nb_components() * x.get_nb_sub_pts();
-    const Index_t n = x.get_nb_entries() * nb_components_per_pixel;
-    Real* y_data = y.data();
-    const Real* x_data = x.data();
+    // Use Eigen's optimized vectorized operations (two passes, but fast)
+    // A true single-pass fusion would require breaking Eigen's vectorization
+    y.eigen_vec() += alpha * x.eigen_vec();
 
-    // Fused AXPY + full norm in single pass
-    Real full_norm = 0;
-    for (Index_t i = 0; i < n; ++i) {
-        y_data[i] += alpha * x_data[i];
-        full_norm += y_data[i] * y_data[i];
-    }
+    const auto& coll = x.get_collection();
 
     // For GlobalFieldCollection, subtract ghost contributions
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        Real ghost_norm = internal::ghost_norm_sq(y_data, global_coll,
+        const Index_t nb_components_per_pixel =
+            x.get_nb_components() * x.get_nb_sub_pts();
+        Real full_norm = y.eigen_vec().squaredNorm();
+        Real ghost_norm = internal::ghost_norm_sq(y.data(), global_coll,
                                                   nb_components_per_pixel);
         return full_norm - ghost_norm;
     }
 
-    return full_norm;
+    return y.eigen_vec().squaredNorm();
 }
 
 template <>
@@ -582,30 +576,24 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
 
-    const auto& coll = x.get_collection();
-    // Total number of scalar elements = pixels * components * sub_pts
-    const Index_t nb_components_per_pixel =
-        x.get_nb_components() * x.get_nb_sub_pts();
-    const Index_t n = x.get_nb_entries() * nb_components_per_pixel;
-    Complex* y_data = y.data();
-    const Complex* x_data = x.data();
+    // Use Eigen's optimized vectorized operations (two passes, but fast)
+    // A true single-pass fusion would require breaking Eigen's vectorization
+    y.eigen_vec() += alpha * x.eigen_vec();
 
-    // Fused AXPY + full norm in single pass
-    Complex full_norm = 0;
-    for (Index_t i = 0; i < n; ++i) {
-        y_data[i] += alpha * x_data[i];
-        full_norm += std::norm(y_data[i]);  // |z|² for complex
-    }
+    const auto& coll = x.get_collection();
 
     // For GlobalFieldCollection, subtract ghost contributions
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        Complex ghost_norm = internal::ghost_norm_sq(y_data, global_coll,
+        const Index_t nb_components_per_pixel =
+            x.get_nb_components() * x.get_nb_sub_pts();
+        Complex full_norm = y.eigen_vec().squaredNorm();
+        Complex ghost_norm = internal::ghost_norm_sq(y.data(), global_coll,
                                                      nb_components_per_pixel);
         return full_norm - ghost_norm;
     }
 
-    return full_norm;
+    return y.eigen_vec().squaredNorm();
 }
 
 }  // namespace linalg

@@ -173,6 +173,28 @@ namespace muGrid {
             TypedFieldBase<Real> & nodal_field,
             const std::vector<Real> & weights = {}) const override;
 
+        /**
+         * @brief Apply gradient and return dot product of input with output.
+         *
+         * @param nodal_field Input field at nodal points
+         * @param gradient_field Output gradient field at quadrature points
+         * @return Local (not MPI-reduced) dot product of input with output
+         */
+        Real apply_vecdot(const TypedFieldBase<Real> & nodal_field,
+                          TypedFieldBase<Real> & gradient_field) const override;
+
+        /**
+         * @brief Apply transpose and return dot product of input with output.
+         *
+         * @param gradient_field Input gradient field at quadrature points
+         * @param nodal_field Output field at nodal points
+         * @param weights Quadrature weights (optional)
+         * @return Local (not MPI-reduced) dot product of input with output
+         */
+        Real transpose_vecdot(const TypedFieldBase<Real> & gradient_field,
+                              TypedFieldBase<Real> & nodal_field,
+                              const std::vector<Real> & weights = {}) const override;
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
          * @brief Apply the gradient operator on device memory fields.
@@ -203,6 +225,21 @@ namespace muGrid {
         void transpose_increment(
             const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
             const Real & alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const std::vector<Real> & weights = {}) const;
+
+        /**
+         * @brief Apply gradient and return dot product on device memory.
+         */
+        Real apply_vecdot(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field) const;
+
+        /**
+         * @brief Apply transpose and return dot product on device memory.
+         */
+        Real transpose_vecdot(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
             TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
             const std::vector<Real> & weights = {}) const;
 #endif

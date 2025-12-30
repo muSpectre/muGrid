@@ -481,6 +481,164 @@ namespace muGrid {
         this->transpose_impl(gradient_field, nodal_field, alpha, true, weights);
     }
 
+    Real FEMGradientOperator::apply_vecdot(
+        const TypedFieldBase<Real> & nodal_field,
+        TypedFieldBase<Real> & gradient_field) const {
+        // Apply the operator
+        this->apply(nodal_field, gradient_field);
+
+        // For gradient operators, input and output have different shapes:
+        // - nodal: [components, nodal_pts=1, x, y, z]
+        // - gradient: [components, operators=dim, quad_pts, x, y, z]
+        // We compute the dot product over the nodal components only (first elements
+        // of each pixel's output match with the input).
+        Index_t nb_components;
+        const auto & collection =
+            this->validate_fields(nodal_field, gradient_field, nb_components);
+        auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
+
+        const Real* input = nodal_field.data();
+        const Real* output = gradient_field.data();
+
+        Real dot_product = 0.0;
+
+        if (this->spatial_dim == 2) {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+            Index_t nb_nodes = this->get_nb_nodal_pts();  // 1
+            Index_t nb_quad = this->get_nb_quad_pts();    // 2
+            Index_t dim = this->spatial_dim;               // 2
+
+            // AoS strides
+            Index_t nodal_stride_x = nb_components * nb_nodes;
+            Index_t nodal_stride_y = nb_components * nb_nodes * nx;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
+
+            // Iterate over interior (excluding ghost layer for FEM which uses adjacent pixels)
+            for (Index_t iy = 0; iy < ny - 1; ++iy) {
+                for (Index_t ix = 0; ix < nx - 1; ++ix) {
+                    Index_t nodal_base = ix * nodal_stride_x + iy * nodal_stride_y;
+                    Index_t grad_base = ix * grad_stride_x + iy * grad_stride_y;
+                    // Compute partial dot product over components only
+                    for (Index_t c = 0; c < nb_components; ++c) {
+                        dot_product += input[nodal_base + c] * output[grad_base + c];
+                    }
+                }
+            }
+        } else {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+            Index_t nz = nb_grid_pts[2];
+            Index_t nb_nodes = this->get_nb_nodal_pts();  // 1
+            Index_t nb_quad = this->get_nb_quad_pts();    // 5
+            Index_t dim = this->spatial_dim;               // 3
+
+            // AoS strides
+            Index_t nodal_stride_x = nb_components * nb_nodes;
+            Index_t nodal_stride_y = nb_components * nb_nodes * nx;
+            Index_t nodal_stride_z = nb_components * nb_nodes * nx * ny;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
+            Index_t grad_stride_z = nb_components * dim * nb_quad * nx * ny;
+
+            for (Index_t iz = 0; iz < nz - 1; ++iz) {
+                for (Index_t iy = 0; iy < ny - 1; ++iy) {
+                    for (Index_t ix = 0; ix < nx - 1; ++ix) {
+                        Index_t nodal_base = ix * nodal_stride_x +
+                                             iy * nodal_stride_y +
+                                             iz * nodal_stride_z;
+                        Index_t grad_base = ix * grad_stride_x +
+                                            iy * grad_stride_y +
+                                            iz * grad_stride_z;
+                        for (Index_t c = 0; c < nb_components; ++c) {
+                            dot_product += input[nodal_base + c] * output[grad_base + c];
+                        }
+                    }
+                }
+            }
+        }
+
+        return dot_product;
+    }
+
+    Real FEMGradientOperator::transpose_vecdot(
+        const TypedFieldBase<Real> & gradient_field,
+        TypedFieldBase<Real> & nodal_field,
+        const std::vector<Real> & weights) const {
+        // Apply transpose
+        this->transpose(gradient_field, nodal_field, weights);
+
+        // For transpose, input is gradient and output is nodal.
+        // Compute dot product over nodal components only.
+        Index_t nb_components;
+        const auto & collection =
+            this->validate_fields(nodal_field, gradient_field, nb_components);
+        auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
+
+        const Real* input = gradient_field.data();
+        const Real* output = nodal_field.data();
+
+        Real dot_product = 0.0;
+
+        if (this->spatial_dim == 2) {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+            Index_t nb_nodes = this->get_nb_nodal_pts();  // 1
+            Index_t nb_quad = this->get_nb_quad_pts();    // 2
+            Index_t dim = this->spatial_dim;               // 2
+
+            // AoS strides
+            Index_t nodal_stride_x = nb_components * nb_nodes;
+            Index_t nodal_stride_y = nb_components * nb_nodes * nx;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
+
+            for (Index_t iy = 0; iy < ny - 1; ++iy) {
+                for (Index_t ix = 0; ix < nx - 1; ++ix) {
+                    Index_t nodal_base = ix * nodal_stride_x + iy * nodal_stride_y;
+                    Index_t grad_base = ix * grad_stride_x + iy * grad_stride_y;
+                    for (Index_t c = 0; c < nb_components; ++c) {
+                        dot_product += input[grad_base + c] * output[nodal_base + c];
+                    }
+                }
+            }
+        } else {
+            Index_t nx = nb_grid_pts[0];
+            Index_t ny = nb_grid_pts[1];
+            Index_t nz = nb_grid_pts[2];
+            Index_t nb_nodes = this->get_nb_nodal_pts();  // 1
+            Index_t nb_quad = this->get_nb_quad_pts();    // 5
+            Index_t dim = this->spatial_dim;               // 3
+
+            // AoS strides
+            Index_t nodal_stride_x = nb_components * nb_nodes;
+            Index_t nodal_stride_y = nb_components * nb_nodes * nx;
+            Index_t nodal_stride_z = nb_components * nb_nodes * nx * ny;
+            Index_t grad_stride_x = nb_components * dim * nb_quad;
+            Index_t grad_stride_y = nb_components * dim * nb_quad * nx;
+            Index_t grad_stride_z = nb_components * dim * nb_quad * nx * ny;
+
+            for (Index_t iz = 0; iz < nz - 1; ++iz) {
+                for (Index_t iy = 0; iy < ny - 1; ++iy) {
+                    for (Index_t ix = 0; ix < nx - 1; ++ix) {
+                        Index_t nodal_base = ix * nodal_stride_x +
+                                             iy * nodal_stride_y +
+                                             iz * nodal_stride_z;
+                        Index_t grad_base = ix * grad_stride_x +
+                                            iy * grad_stride_y +
+                                            iz * grad_stride_z;
+                        for (Index_t c = 0; c < nb_components; ++c) {
+                            dot_product += input[grad_base + c] * output[nodal_base + c];
+                        }
+                    }
+                }
+            }
+        }
+
+        return dot_product;
+    }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     void FEMGradientOperator::apply_impl(
         const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,

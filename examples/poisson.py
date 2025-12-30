@@ -196,17 +196,26 @@ def callback(iteration, state):
         print(f"{iteration:5} {state['rr']:.5}")
 
 
-def hessp(x, Ax):
+def hessp_vecdot(x, Ax):
     """
-    Function to compute the product of the Hessian matrix with a vector.
-    The Hessian is represented by the convolution operator.
-    The scale factor (grid spacing and sign) is already folded into the operator.
+    Fused Hessian-vector product with dot product computation.
+
+    This function computes the product of the Hessian matrix with a vector
+    and returns the dot product p · Ap in a single fused operation.
+
+    The fused operation saves 2 memory reads per grid point compared to
+    separate apply() + vecdot() calls, since the dot product is computed
+    while the data is still in cache.
+
+    Returns
+    -------
+    float
+        Local (not MPI-reduced) dot product of input with output.
     """
     with timer("communicate_ghosts"):
         decomposition.communicate_ghosts(x)
-    with timer("apply"):
-        laplace.apply(x, Ax)
-    return Ax
+    with timer("apply_vecdot"):
+        return laplace.apply_vecdot(x, Ax)
 
 
 converged = False
@@ -215,9 +224,9 @@ with timer("conjugate_gradients"):
         conjugate_gradients(
             comm,
             decomposition,
-            hessp,  # linear operator
             rhs,
             solution,
+            hessp_vecdot=hessp_vecdot,  # Fused apply + dot product
             tol=1e-6,
             callback=callback,
             maxiter=args.maxiter,

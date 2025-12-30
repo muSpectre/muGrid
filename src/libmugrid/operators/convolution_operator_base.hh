@@ -181,6 +181,45 @@ namespace muGrid {
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights = {}) const = 0;
 
+    /**
+     * @brief Applies the gradient operation and returns dot product with input.
+     *
+     * This fused operation computes the gradient and simultaneously computes
+     * the dot product of the input field with the output field. This is useful
+     * for conjugate gradient solvers where p·Ap is needed after computing Ap.
+     *
+     * The dot product is computed over the interior region only (excluding
+     * ghost cells) for correct MPI-parallel semantics.
+     *
+     * @param nodal_field The input field from which the gradient is computed.
+     *                    Defined on nodal points.
+     * @param quadrature_point_field The output field where the gradient is
+     *                               written. Defined on quadrature points.
+     * @return Local (not MPI-reduced) dot product of input with output.
+     */
+    virtual Real
+    apply_vecdot(const TypedFieldBase<Real> & nodal_field,
+                 TypedFieldBase<Real> & quadrature_point_field) const = 0;
+
+    /**
+     * @brief Applies the transpose operation and returns dot product with input.
+     *
+     * This fused operation computes the transpose (divergence) and
+     * simultaneously computes the dot product of the input field with the
+     * output field.
+     *
+     * @param quadrature_point_field The input field from which the divergence
+     * is computed. Defined on quadrature points.
+     * @param nodal_field The output field where the divergence is written.
+     *                    Defined on nodal points.
+     * @param weights Optional Gaussian quadrature weights.
+     * @return Local (not MPI-reduced) dot product of input with output.
+     */
+    virtual Real
+    transpose_vecdot(const TypedFieldBase<Real> & quadrature_point_field,
+                     TypedFieldBase<Real> & nodal_field,
+                     const std::vector<Real> & weights = {}) const = 0;
+
       /**
        * @brief Returns the number of operators per pixel/voxel.
        *
