@@ -10,12 +10,23 @@ Change log for µGrid
   - `axpy(alpha, x, y)`: y = alpha * x + y (full buffer)
   - `scal(alpha, x)`: x = alpha * x (full buffer)
   - `axpby(alpha, x, beta, y)`: y = alpha * x + beta * y (full buffer, fused operation)
+  - `axpy_norm_sq(alpha, x, y)`: y = alpha * x + y, returns ||y||^2 (fused axpy + norm)
   - `copy(src, dst)`: dst = src (full buffer)
   - Avoids GB-scale memory copies from non-contiguous array views in CG solver
   - CPU implementation using Eigen, GPU implementation for CUDA and HIP
 - ENH: Updated conjugate gradient solver to use new `linalg` module
   - Uses `axpby` for fused update_p step (2 reads + 1 write instead of 3 reads + 2 writes)
+  - Uses `axpy_norm_sq` for fused residual update (saves 1 memory read per iteration)
   - Improved arithmetic intensity from 0.125 to 0.139 FLOP/byte
+- API: Simplified CG solver interface - removed `hessp_vecdot` parameter
+  - CG solver now uses only `hessp` for the Hessian-vector product
+  - Fused operations handled internally via `axpy_norm_sq` in linalg module
+- API: Removed `apply_vecdot` and `transpose_vecdot` from convolution operators
+  - Removed from `ConvolutionOperatorBase`, `ConvolutionOperator`, `LaplaceOperator`, `FEMGradientOperator`
+  - Performance testing showed negligible benefit; simplifies operator interface
+- API: Removed PAPI hardware counter support from Timer class
+  - Timer now provides time-based measurements only
+  - Removes pypapi dependency and cross-platform compatibility issues
 - BUILD: Fixed `nodiscard` warnings in HIP linalg implementation
 - API: Replaced `MemoryLocation` enum with new `Device` class for device selection
   - New `Device` class with factory methods: `Device.cpu()`, `Device.cuda(id)`, `Device.rocm(id)`, `Device.gpu(id)`
@@ -102,7 +113,7 @@ Change log for µGrid
 - ENH: **3D Poisson solver example**: New example demonstrating 3D Poisson solver usage
 - ENH: **Benchmark suite**: Automatic Poisson benchmark suite with fine-grained timing and GFLOP/s metrics
 - ENH: **FEM gradient operator**: New FEM gradient operator with homogenization example
-- ENH: **PAPI hardware counters**: Optional PAPI hardware counter support in Timer class for performance analysis
+- ENH: **Hierarchical Timer**: Timer class with hierarchical timing and context manager support
 - ENH: **Multi-component fields**: Added multi-component field support in FEMGradientOperator
 - ENH: **reduce_ghosts**: Added reduce_ghosts operation to CartesianDecomposition
 - API: Removed standalone FFT field creation functions

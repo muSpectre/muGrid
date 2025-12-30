@@ -142,9 +142,9 @@ The conjugate gradient solver requires a function that applies the linear operat
     conjugate_gradients(
         comm,
         decomposition,
-        apply_laplacian,
         rhs,
         solution,
+        hessp=apply_laplacian,
         tol=1e-6,
         maxiter=1000,
     )
@@ -194,8 +194,8 @@ Here is the complete, minimal Poisson solver:
         laplace.apply(x, Ax)
 
     # Solve
-    conjugate_gradients(comm, decomposition, apply_laplacian, rhs, solution,
-                        tol=1e-6, maxiter=1000)
+    conjugate_gradients(comm, decomposition, rhs, solution,
+                        hessp=apply_laplacian, tol=1e-6, maxiter=1000)
 
     print(f"Solved! Solution range: [{solution.p.min():.4f}, {solution.p.max():.4f}]")
 
@@ -454,9 +454,9 @@ measure the resulting average stress:
     conjugate_gradients(
         comm,
         decomposition,
-        apply_stiffness,
         f_field,
         u_field,
+        hessp=apply_stiffness,
         tol=1e-6,
         maxiter=500,
     )
