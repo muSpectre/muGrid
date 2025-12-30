@@ -38,29 +38,6 @@ import json
 import time
 from contextlib import contextmanager
 
-# Try to import pypapi for hardware counter access (optional)
-# Supports both flozz/pypapi (current) and firedrakeproject/PyPAPI (legacy)
-PAPI_AVAILABLE = False
-PAPI_API_TYPE = None  # "low_level" or "high_level"
-
-try:
-    from pypapi import events as papi_events
-    from pypapi import papi
-
-    PAPI_AVAILABLE = True
-    PAPI_API_TYPE = "low_level"  # flozz/pypapi uses low-level API
-except ImportError:
-    try:
-        # Try legacy firedrakeproject/PyPAPI API
-        import pypapi
-        from pypapi import events as papi_events
-
-        if hasattr(pypapi, "papi_high") and hasattr(pypapi.papi_high, "start_counters"):
-            PAPI_AVAILABLE = True
-            PAPI_API_TYPE = "high_level"
-    except ImportError:
-        pass
-
 
 class Timer:
     """
@@ -71,7 +48,6 @@ class Timer:
     - Accumulation of time across multiple calls to the same timer
     - Call counting for repeated operations
     - Hierarchical summary output in tabular format
-    - Optional PAPI hardware counter integration for FLOP measurement
 
     Example usage:
         from muGrid import Timer
@@ -97,150 +73,18 @@ class Timer:
           inner                            5.00 ms        2     2.50 ms      50.0%
           (other)                          5.00 ms        -            -      50.0%
         ==============================================================================
-
-    With PAPI enabled (use_papi=True), additional columns show GFLOP/s:
-        ==============================================================================
-        Timing Summary (with PAPI hardware counters)
-        ==============================================================================
-        Name                            Total    Calls    GFLOP/s        IPC
-        ------------------------------ -------- -------- ---------- ----------
-        outer                          10.00 ms        1       2.50       1.85
-          inner                         5.00 ms        2       3.10       2.01
-        ==============================================================================
     """
-
-    # PAPI events we track (in order)
-    PAPI_EVENTS = [
-        "PAPI_TOT_CYC",  # Total cycles
-        "PAPI_TOT_INS",  # Total instructions
-        "PAPI_FP_OPS",  # Floating point operations
-        "PAPI_L1_DCM",  # L1 data cache misses
-        "PAPI_L2_DCM",  # L2 data cache misses
-        "PAPI_L3_TCM",  # L3 total cache misses
-    ]
 
     def __init__(self, use_papi=False):
         """
         Initialize the timer.
 
         Args:
-            use_papi: If True, enable PAPI hardware counter measurement.
-                      Requires pypapi to be installed. Only works on CPU.
+            use_papi: Ignored (PAPI support has been removed).
         """
-        self._timers = (
-            {}
-        )  # name -> {"total": float, "calls": int, "children": list, "papi": dict}
-        self._stack = []  # stack of (name, start_time, papi_start) for nesting
+        self._timers = {}  # name -> {"total": float, "calls": int, "children": list}
+        self._stack = []  # stack of (name, start_time) for nesting
         self._roots = []  # top-level timer names in order of first use
-
-        # Initialize PAPI if requested
-        self._use_papi = use_papi and PAPI_AVAILABLE
-        self._papi_enabled = False
-        self._papi_eventset = None  # For low-level API
-
-        if use_papi and not PAPI_AVAILABLE:
-            import warnings
-
-            warnings.warn(
-                "PAPI requested but pypapi not available. "
-                "Install with: pip install pypapi"
-            )
-
-        if self._use_papi:
-            try:
-                # Build list of available events (some may not be available on
-                # all systems)
-                self._papi_events_list = []
-                self._papi_event_names = []
-                for name in self.PAPI_EVENTS:
-                    try:
-                        event_code = getattr(papi_events, name)
-                        self._papi_events_list.append(event_code)
-                        self._papi_event_names.append(name)
-                    except AttributeError:
-                        pass  # Event not available
-
-                if not self._papi_events_list:
-                    raise RuntimeError("No PAPI events available")
-
-                if PAPI_API_TYPE == "low_level":
-                    # flozz/pypapi: use low-level API
-                    papi.library_init()
-                    self._papi_eventset = papi.create_eventset()
-                    for event_code in self._papi_events_list:
-                        try:
-                            papi.add_event(self._papi_eventset, event_code)
-                        except Exception:
-                            # Event may not be available, remove from list
-                            idx = self._papi_events_list.index(event_code)
-                            self._papi_events_list.remove(event_code)
-                            self._papi_event_names.pop(idx)
-                    if self._papi_events_list:
-                        papi.start(self._papi_eventset)
-                        self._papi_enabled = True
-                else:
-                    # Legacy firedrakeproject/PyPAPI: use high-level API
-                    import pypapi
-
-                    pypapi.papi_high.start_counters(self._papi_events_list)
-                    self._papi_enabled = True
-            except Exception as e:
-                import warnings
-
-                warnings.warn(f"Could not initialize PAPI: {e}")
-                self._use_papi = False
-
-    def __del__(self):
-        """Clean up PAPI counters on destruction."""
-        if self._papi_enabled:
-            try:
-                if PAPI_API_TYPE == "low_level" and self._papi_eventset is not None:
-                    papi.stop(self._papi_eventset)
-                    papi.cleanup_eventset(self._papi_eventset)
-                    papi.destroy_eventset(self._papi_eventset)
-                elif PAPI_API_TYPE == "high_level":
-                    import pypapi
-
-                    pypapi.papi_high.stop_counters()
-            except Exception:
-                pass  # Ignore errors during cleanup
-
-    def _read_papi_counters(self):
-        """Read current PAPI counter values."""
-        if not self._papi_enabled:
-            return None
-        try:
-            # Read counters without stopping them
-            if PAPI_API_TYPE == "low_level":
-                counters = papi.read(self._papi_eventset)
-            else:
-                import pypapi
-
-                counters = pypapi.papi_high.read_counters()
-
-            # Map counters to dictionary based on which events are active
-            result = {
-                "cycles": 0,
-                "instructions": 0,
-                "fp_ops": 0,
-                "l1_dcm": 0,
-                "l2_dcm": 0,
-                "l3_tcm": 0,
-            }
-            event_to_key = {
-                "PAPI_TOT_CYC": "cycles",
-                "PAPI_TOT_INS": "instructions",
-                "PAPI_FP_OPS": "fp_ops",
-                "PAPI_L1_DCM": "l1_dcm",
-                "PAPI_L2_DCM": "l2_dcm",
-                "PAPI_L3_TCM": "l3_tcm",
-            }
-            for i, name in enumerate(self._papi_event_names):
-                if i < len(counters) and name in event_to_key:
-                    result[event_to_key[name]] = counters[i]
-            return result
-        except Exception:
-            return None
 
     @contextmanager
     def __call__(self, name):
@@ -272,18 +116,6 @@ class Timer:
                 "total": 0.0,
                 "calls": 0,
                 "children": [],
-                "papi": (
-                    {
-                        "cycles": 0,
-                        "instructions": 0,
-                        "fp_ops": 0,
-                        "l1_dcm": 0,
-                        "l2_dcm": 0,
-                        "l3_tcm": 0,
-                    }
-                    if self._papi_enabled
-                    else None
-                ),
             }
             # Track as root or as child of parent
             if self._stack:
@@ -294,29 +126,18 @@ class Timer:
                 if full_name not in self._roots:
                     self._roots.append(full_name)
 
-        # Read PAPI counters at start
-        papi_start = self._read_papi_counters()
-
         # Push onto stack and start timing
         start = time.perf_counter()
-        self._stack.append((full_name, start, papi_start))
+        self._stack.append((full_name, start))
 
         try:
             yield
         finally:
             # Pop from stack and accumulate time
             elapsed = time.perf_counter() - start
-            _, _, papi_start = self._stack.pop()
+            self._stack.pop()
             self._timers[full_name]["total"] += elapsed
             self._timers[full_name]["calls"] += 1
-
-            # Accumulate PAPI counters
-            if papi_start is not None:
-                papi_end = self._read_papi_counters()
-                if papi_end is not None:
-                    papi_data = self._timers[full_name]["papi"]
-                    for key in papi_data:
-                        papi_data[key] += papi_end[key] - papi_start[key]
 
     def get_time(self, name):
         """
@@ -354,47 +175,8 @@ class Timer:
                 return self._timers[full_name]["calls"]
         return 0
 
-    def get_papi(self, name):
-        """
-        Get PAPI counter data for a timer.
-
-        Args:
-            name: Timer name (can be short name or full hierarchical name)
-
-        Returns:
-            Dictionary with PAPI counter values, or None if not available
-        """
-        timer_info = None
-        if name in self._timers:
-            timer_info = self._timers[name]
-        else:
-            for full_name in self._timers:
-                if full_name.endswith("/" + name) or full_name == name:
-                    timer_info = self._timers[full_name]
-                    break
-
-        if timer_info is None or timer_info.get("papi") is None:
-            return None
-
-        papi = timer_info["papi"]
-        total_time = timer_info["total"]
-
-        # Calculate derived metrics
-        result = dict(papi)  # Copy the raw counters
-        if total_time > 0:
-            result["gflops"] = (papi["fp_ops"] / 1e9) / total_time
-        else:
-            result["gflops"] = 0.0
-
-        if papi["cycles"] > 0:
-            result["ipc"] = papi["instructions"] / papi["cycles"]
-        else:
-            result["ipc"] = 0.0
-
-        return result
-
     def reset(self):
-        """Clear all timing data (PAPI counters continue running if enabled)."""
+        """Clear all timing data."""
         self._timers.clear()
         self._stack.clear()
         self._roots.clear()
@@ -426,15 +208,6 @@ class Timer:
         else:
             pct = None
 
-        # Calculate PAPI-derived metrics
-        papi = info.get("papi")
-        gflops = None
-        ipc = None
-        if papi is not None and total > 0:
-            gflops = (papi["fp_ops"] / 1e9) / total
-            if papi["cycles"] > 0:
-                ipc = papi["instructions"] / papi["cycles"]
-
         # Extract short name (last component)
         short_name = name.split("/")[-1]
 
@@ -447,9 +220,6 @@ class Timer:
                 "calls": calls,
                 "avg": avg if calls > 1 else None,
                 "pct": pct,
-                "gflops": gflops,
-                "ipc": ipc,
-                "papi": papi,
             }
         )
 
@@ -463,24 +233,6 @@ class Timer:
             other_time = total - children_time
             if other_time > 1e-9:  # Only show if meaningful
                 other_pct = 100.0 * other_time / total if total > 0 else 0
-                # Calculate "other" PAPI by subtracting children from parent
-                other_papi = None
-                other_gflops = None
-                other_ipc = None
-                if papi is not None:
-                    other_papi = {}
-                    for key in papi:
-                        children_val = sum(
-                            self._timers[c].get("papi", {}).get(key, 0) or 0
-                            for c in info["children"]
-                        )
-                        other_papi[key] = papi[key] - children_val
-                    if other_time > 0:
-                        other_gflops = (other_papi["fp_ops"] / 1e9) / other_time
-                        if other_papi["cycles"] > 0:
-                            other_ipc = (
-                                other_papi["instructions"] / other_papi["cycles"]
-                            )
                 rows.append(
                     {
                         "indent": indent + 1,
@@ -489,9 +241,6 @@ class Timer:
                         "calls": None,
                         "avg": None,
                         "pct": other_pct,
-                        "gflops": other_gflops,
-                        "ipc": other_ipc,
-                        "papi": other_papi,
                     }
                 )
 
@@ -502,7 +251,7 @@ class Timer:
         Print hierarchical timing summary in tabular format.
 
         Args:
-            title: Title for the summary section (auto-detected if None)
+            title: Title for the summary section (default: "Timing Summary")
             name_width: Width of the name column (default: 30)
         """
         if not self._timers:
@@ -514,37 +263,19 @@ class Timer:
         for root in self._roots:
             self._collect_rows(root, rows=all_rows)
 
-        # Check if PAPI data is available
-        has_papi = self._papi_enabled and any(row.get("papi") for row in all_rows)
-
         # Determine title
         if title is None:
-            title = "Timing Summary (with PAPI)" if has_papi else "Timing Summary"
+            title = "Timing Summary"
 
-        # Print header - different format depending on PAPI availability
-        if has_papi:
-            line_width = 94
-            print(f"\n{'=' * line_width}")
-            print(title)
-            print(f"{'=' * line_width}")
-            print(
-                f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
-                f"{'% Parent':>10} {'GFLOP/s':>10} {'IPC':>8} {'FP ops':>12}"
-            )
-            print(
-                f"{'-' * name_width} {'-' * 12} {'-' * 8} "
-                f"{'-' * 10} {'-' * 10} {'-' * 8} {'-' * 12}"
-            )
-        else:
-            line_width = 78
-            print(f"\n{'=' * line_width}")
-            print(title)
-            print(f"{'=' * line_width}")
-            print(
-                f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
-                f"{'Average':>12} {'% Parent':>10}"
-            )
-            print(f"{'-' * name_width} {'-' * 12} {'-' * 8} {'-' * 12} {'-' * 10}")
+        line_width = 78
+        print(f"\n{'=' * line_width}")
+        print(title)
+        print(f"{'=' * line_width}")
+        print(
+            f"{'Name':<{name_width}} {'Total':>12} {'Calls':>8} "
+            f"{'Average':>12} {'% Parent':>10}"
+        )
+        print(f"{'-' * name_width} {'-' * 12} {'-' * 8} {'-' * 12} {'-' * 10}")
 
         # Print rows
         for row in all_rows:
@@ -567,46 +298,14 @@ class Timer:
             else:
                 pct_str = f"{'-':>10}"
 
-            if has_papi:
-                # PAPI-enabled output
-                if row.get("gflops") is not None:
-                    gflops_str = f"{row['gflops']:>10.2f}"
-                else:
-                    gflops_str = f"{'-':>10}"
-
-                if row.get("ipc") is not None:
-                    ipc_str = f"{row['ipc']:>8.2f}"
-                else:
-                    ipc_str = f"{'-':>8}"
-
-                papi = row.get("papi")
-                if papi is not None and papi.get("fp_ops", 0) > 0:
-                    fp_ops = papi["fp_ops"]
-                    if fp_ops >= 1e9:
-                        fp_ops_str = f"{fp_ops / 1e9:>10.2f} G"
-                    elif fp_ops >= 1e6:
-                        fp_ops_str = f"{fp_ops / 1e6:>10.2f} M"
-                    elif fp_ops >= 1e3:
-                        fp_ops_str = f"{fp_ops / 1e3:>10.2f} K"
-                    else:
-                        fp_ops_str = f"{fp_ops:>12}"
-                else:
-                    fp_ops_str = f"{'-':>12}"
-
-                print(
-                    f"{name:<{name_width}} {total_str} {calls_str} "
-                    f"{pct_str} {gflops_str} {ipc_str} {fp_ops_str}"
-                )
+            if row["avg"] is not None:
+                avg_str = self._format_time(row["avg"])
             else:
-                # Standard output (no PAPI)
-                if row["avg"] is not None:
-                    avg_str = self._format_time(row["avg"])
-                else:
-                    avg_str = f"{'-':>12}"
+                avg_str = f"{'-':>12}"
 
-                print(
-                    f"{name:<{name_width}} {total_str} {calls_str} {avg_str} {pct_str}"
-                )
+            print(
+                f"{name:<{name_width}} {total_str} {calls_str} {avg_str} {pct_str}"
+            )
 
         print(f"{'=' * line_width}")
 
@@ -623,22 +322,10 @@ class Timer:
             "avg_seconds": total / calls if calls > 0 else 0,
         }
 
-        # Add PAPI data if available
-        papi = info.get("papi")
-        if papi is not None:
-            result["papi"] = dict(papi)
-            # Add derived metrics
-            if total > 0:
-                result["gflops"] = (papi["fp_ops"] / 1e9) / total
-            else:
-                result["gflops"] = 0.0
-            if papi["cycles"] > 0:
-                result["ipc"] = papi["instructions"] / papi["cycles"]
-            else:
-                result["ipc"] = 0.0
-
         if info["children"]:
-            result["children"] = [self._build_tree(child) for child in info["children"]]
+            result["children"] = [
+                self._build_tree(child) for child in info["children"]
+            ]
             children_time = sum(self._timers[c]["total"] for c in info["children"])
             other_time = total - children_time
             if other_time > 1e-9:
@@ -653,10 +340,7 @@ class Timer:
         Returns:
             Dictionary with hierarchical timer structure suitable for JSON export.
         """
-        result = {"timers": [self._build_tree(root) for root in self._roots]}
-        if self._papi_enabled:
-            result["papi_enabled"] = True
-        return result
+        return {"timers": [self._build_tree(root) for root in self._roots]}
 
     def to_json(self, indent=2):
         """
@@ -676,7 +360,7 @@ class Timer:
 
         Returns:
             Dictionary with timer names as keys and dicts containing
-            'total', 'calls', 'children', and optionally 'papi' as values.
+            'total', 'calls', and 'children' as values.
         """
         result = {}
         for name, info in self._timers.items():
@@ -686,17 +370,5 @@ class Timer:
                 "avg": info["total"] / info["calls"] if info["calls"] > 0 else 0,
                 "children": list(info["children"]),
             }
-            papi = info.get("papi")
-            if papi is not None:
-                entry["papi"] = dict(papi)
-                total = info["total"]
-                if total > 0:
-                    entry["gflops"] = (papi["fp_ops"] / 1e9) / total
-                else:
-                    entry["gflops"] = 0.0
-                if papi["cycles"] > 0:
-                    entry["ipc"] = papi["instructions"] / papi["cycles"]
-                else:
-                    entry["ipc"] = 0.0
             result[name] = entry
         return result

@@ -153,27 +153,6 @@ public:
             get_spatial_dim,
         );
     }
-
-    Real apply_vecdot(const TypedFieldBase<Real> &nodal_field,
-                      TypedFieldBase<Real> &quadrature_point_field) const override {
-        PYBIND11_OVERRIDE_PURE(
-            Real,
-            ConvolutionOperatorBase,
-            apply_vecdot,
-            nodal_field, quadrature_point_field
-        );
-    }
-
-    Real transpose_vecdot(const TypedFieldBase<Real> &quadrature_point_field,
-                          TypedFieldBase<Real> &nodal_field,
-                          const std::vector<Real> &weights = {}) const override {
-        PYBIND11_OVERRIDE_PURE(
-            Real,
-            ConvolutionOperatorBase,
-            transpose_vecdot,
-            quadrature_point_field, nodal_field, weights
-        );
-    }
 };
 
 
@@ -182,13 +161,6 @@ void add_convolution_operator_base(py::module &mod) {
     py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
             .def(py::init<>())
             .def("apply", &ConvolutionOperatorBase::apply, "nodal_field"_a, "quadrature_point_field"_a)
-            .def("apply_vecdot", &ConvolutionOperatorBase::apply_vecdot,
-                 "nodal_field"_a, "quadrature_point_field"_a,
-                 "Apply operator and return dot product of input with output")
-            .def("transpose_vecdot", &ConvolutionOperatorBase::transpose_vecdot,
-                 "quadrature_point_field"_a, "nodal_field"_a,
-                 "weights"_a = std::vector<Real>{},
-                 "Apply transpose and return dot product of input with output")
             .def_property_readonly("nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
             .def_property_readonly("nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
             .def_property_readonly("nb_operators", &ConvolutionOperatorBase::get_nb_operators)
@@ -250,52 +222,6 @@ void add_convolution_operator_default(py::module &mod) {
                  "quadrature_point_field"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
                  "Apply transpose convolution to host (CPU) fields")
-            .def("apply_vecdot",
-                 &ConvolutionOperator::apply_vecdot,
-                 "nodal_field"_a, "quadrature_point_field"_a,
-                 R"pbdoc(
-                 Apply convolution and return dot product of input with output.
-
-                 This fused operation applies the convolution and computes the
-                 dot product input · output in a single call, which can save
-                 memory bandwidth compared to separate apply() + vecdot() calls.
-
-                 Parameters
-                 ----------
-                 nodal_field : TypedField
-                     Input field at nodal points
-                 quadrature_point_field : TypedField
-                     Output field at quadrature points (modified in place)
-
-                 Returns
-                 -------
-                 float
-                     Local (not MPI-reduced) dot product of input with output
-                 )pbdoc")
-            .def("transpose_vecdot",
-                 &ConvolutionOperator::transpose_vecdot,
-                 "quadrature_point_field"_a, "nodal_field"_a,
-                 "weights"_a = std::vector<Real>{},
-                 R"pbdoc(
-                 Apply transpose and return dot product of input with output.
-
-                 This fused operation applies the transpose (divergence) and
-                 computes the dot product input · output in a single call.
-
-                 Parameters
-                 ----------
-                 quadrature_point_field : TypedField
-                     Input field at quadrature points
-                 nodal_field : TypedField
-                     Output field at nodal points (modified in place)
-                 weights : list[float], optional
-                     Quadrature weights (default: empty)
-
-                 Returns
-                 -------
-                 float
-                     Local (not MPI-reduced) dot product of input with output
-                 )pbdoc")
             .def("fourier",
                  [](const ConvolutionOperator & op,
                     py::array_t<Real, py::array::f_style> phases) {
@@ -505,51 +431,6 @@ void add_laplace_operator(py::module &mod) {
              static_cast<ApplyHostFn>(&LaplaceOperator::apply),
              "input_field"_a, "output_field"_a,
              "Apply the Laplace operator to host (CPU) fields")
-        .def("apply_vecdot",
-             &LaplaceOperator::apply_vecdot,
-             "input_field"_a, "output_field"_a,
-             R"pbdoc(
-             Apply Laplace operator and return dot product of input with output.
-
-             This fused operation applies the Laplacian and computes the
-             dot product p · Lp in a single call. Useful for conjugate
-             gradient solvers where pAp is needed.
-
-             Parameters
-             ----------
-             input_field : TypedField
-                 Input field (with ghost layers populated)
-             output_field : TypedField
-                 Output field (modified in place)
-
-             Returns
-             -------
-             float
-                 Local (not MPI-reduced) dot product of input with output
-             )pbdoc")
-        .def("transpose_vecdot",
-             &LaplaceOperator::transpose_vecdot,
-             "input_field"_a, "output_field"_a,
-             "weights"_a = std::vector<Real>{},
-             R"pbdoc(
-             Apply transpose and return dot product (same as apply_vecdot for Laplacian).
-
-             Since the Laplacian is self-adjoint, this is identical to apply_vecdot.
-
-             Parameters
-             ----------
-             input_field : TypedField
-                 Input field
-             output_field : TypedField
-                 Output field (modified in place)
-             weights : list[float], optional
-                 Ignored (no quadrature weighting for Laplacian)
-
-             Returns
-             -------
-             float
-                 Local (not MPI-reduced) dot product of input with output
-             )pbdoc")
         .def_property_readonly("nb_stencil_pts", &LaplaceOperator::get_nb_stencil_pts,
              "Number of stencil points (5 for 2D, 7 for 3D)")
         .def_property_readonly("scale", &LaplaceOperator::get_scale,
@@ -600,18 +481,12 @@ void add_laplace_operator(py::module &mod) {
     // Device field overloads (only when GPU backend is enabled)
     using ApplyDeviceFn = void (LaplaceOperator::*)(
         const RealFieldDevice&, RealFieldDevice&) const;
-    using ApplyVecdotDeviceFn = Real (LaplaceOperator::*)(
-        const RealFieldDevice&, RealFieldDevice&) const;
 
     laplace_op
         .def("apply",
              static_cast<ApplyDeviceFn>(&LaplaceOperator::apply),
              "input_field"_a, "output_field"_a,
-             "Apply the Laplace operator to device (GPU) fields")
-        .def("apply_vecdot",
-             static_cast<ApplyVecdotDeviceFn>(&LaplaceOperator::apply_vecdot),
-             "input_field"_a, "output_field"_a,
-             "Apply Laplace operator and return dot product (GPU version)");
+             "Apply the Laplace operator to device (GPU) fields");
 #endif
 }
 
@@ -666,53 +541,6 @@ void add_fem_gradient_operator(py::module &mod) {
              "gradient_field"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
              "Apply the transpose (divergence) operator (quadrature -> nodal) to host fields")
-        .def("apply_vecdot",
-             &FEMGradientOperator::apply_vecdot,
-             "nodal_field"_a, "gradient_field"_a,
-             R"pbdoc(
-             Apply gradient and return partial dot product.
-
-             Note: For gradient operators, input (nodal) and output (gradient) have
-             different shapes, so the dot product is computed only over the
-             compatible (nodal) components.
-
-             Parameters
-             ----------
-             nodal_field : TypedField
-                 Input field at nodal points
-             gradient_field : TypedField
-                 Output field at quadrature points (modified in place)
-
-             Returns
-             -------
-             float
-                 Local (not MPI-reduced) partial dot product
-             )pbdoc")
-        .def("transpose_vecdot",
-             &FEMGradientOperator::transpose_vecdot,
-             "gradient_field"_a, "nodal_field"_a,
-             "weights"_a = std::vector<Real>{},
-             R"pbdoc(
-             Apply divergence and return partial dot product.
-
-             Note: For transpose operators, input (gradient) and output (nodal) have
-             different shapes, so the dot product is computed only over the
-             compatible (nodal) components.
-
-             Parameters
-             ----------
-             gradient_field : TypedField
-                 Input field at quadrature points
-             nodal_field : TypedField
-                 Output field at nodal points (modified in place)
-             weights : list[float], optional
-                 Quadrature weights (default: standard weights)
-
-             Returns
-             -------
-             float
-                 Local (not MPI-reduced) partial dot product
-             )pbdoc")
         .def_property_readonly("grid_spacing", &FEMGradientOperator::get_grid_spacing,
              "Grid spacing in each direction")
         .def_property_readonly("quadrature_weights", &FEMGradientOperator::get_quadrature_weights,

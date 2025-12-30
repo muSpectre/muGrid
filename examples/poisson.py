@@ -84,12 +84,6 @@ parser.add_argument(
     help="Output results in JSON format (implies --quiet)",
 )
 
-parser.add_argument(
-    "--papi",
-    action="store_true",
-    help="Use PAPI hardware counters for performance measurement (requires pypapi)",
-)
-
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -178,14 +172,7 @@ rhs.p[...] -= arr.mean(rhs.p)
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
 # Create global timer for hierarchical timing
-# PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and device.is_host
-if args.papi and not device.is_host:
-    if not args.quiet:
-        print(
-            "Warning: PAPI not available for device memory (GPU). Using estimates only."
-        )
-timer = muGrid.Timer(use_papi=use_papi)
+timer = muGrid.Timer()
 
 
 def callback(iteration, state):
@@ -196,26 +183,16 @@ def callback(iteration, state):
         print(f"{iteration:5} {state['rr']:.5}")
 
 
-def hessp_vecdot(x, Ax):
+def hessp(x, Ax):
     """
-    Fused Hessian-vector product with dot product computation.
+    Hessian-vector product function for CG solver.
 
-    This function computes the product of the Hessian matrix with a vector
-    and returns the dot product p · Ap in a single fused operation.
-
-    The fused operation saves 2 memory reads per grid point compared to
-    separate apply() + vecdot() calls, since the dot product is computed
-    while the data is still in cache.
-
-    Returns
-    -------
-    float
-        Local (not MPI-reduced) dot product of input with output.
+    This function computes the product of the Hessian matrix with a vector.
     """
     with timer("communicate_ghosts"):
         decomposition.communicate_ghosts(x)
-    with timer("apply_vecdot"):
-        return laplace.apply_vecdot(x, Ax)
+    with timer("apply"):
+        laplace.apply(x, Ax)
 
 
 converged = False
@@ -226,7 +203,7 @@ with timer("conjugate_gradients"):
             decomposition,
             rhs,
             solution,
-            hessp_vecdot=hessp_vecdot,  # Fused apply + dot product
+            hessp=hessp,
             tol=1e-6,
             callback=callback,
             maxiter=args.maxiter,
@@ -243,7 +220,7 @@ elapsed_time = timer.get_time("conjugate_gradients")
 
 # Performance metrics calculations
 # Get number of hessp calls from timer (= number of CG iterations)
-nb_iterations = timer.get_calls("hessp")
+nb_iterations = timer.get_calls("conjugate_gradients/iteration/hessp")
 
 # Lattice updates per second (LUPS)
 # One "lattice update" = one grid point processed in one CG iteration
@@ -289,7 +266,7 @@ arithmetic_intensity = flops_per_iteration / (
 # Breakdown: hessp (apply) only
 bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8
 flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
-apply_time = timer.get_time("conjugate_gradients/hessp/apply")
+apply_time = timer.get_time("conjugate_gradients/iteration/hessp/apply")
 apply_lups = total_lattice_updates / apply_time if apply_time > 0 else 0
 apply_throughput = (
     (nb_iterations * bytes_per_hessp) / apply_time if apply_time > 0 else 0

@@ -620,7 +620,6 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
         laplace.apply(x_field, Ax_field)
         Ax = wrap_field(Ax_field)
         Ax.s[...] /= scale_factor
-        return Ax_field
 
     # Time the solver
     if use_device and HAS_CUPY:
@@ -633,9 +632,9 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
     conjugate_gradients(
         comm,
         fc,
-        hessp_mugrid,
         rhs,
         solution,
+        hessp=hessp_mugrid,
         tol=1e-6,
         maxiter=1000,
     )
@@ -711,15 +710,14 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
         Ax = wrap_field(Ax_field)
         Ax.p[...] = (laplace_sparse @ x_arr.p.reshape(-1)).reshape(nb_grid_pts)
         Ax.s[...] /= -np.mean(grid_spacing) ** 2
-        return Ax_field
 
     t_scipy = -time.perf_counter()
     conjugate_gradients(
         comm,
         fc,
-        hessp_scipy,
         rhs,
         solution,
+        hessp=hessp_scipy,
         tol=1e-6,
         maxiter=1000,
     )

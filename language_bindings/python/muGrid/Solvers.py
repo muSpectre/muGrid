@@ -10,12 +10,11 @@ def conjugate_gradients(
     fc,
     b,
     x,
-    hessp: callable = None,
+    hessp: callable,
     tol: float = 1e-6,
     maxiter: int = 1000,
     callback: callable = None,
     timer=None,
-    hessp_vecdot: callable = None,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -35,10 +34,9 @@ def conjugate_gradients(
         Right-hand side vector.
     x : muGrid.Field
         Initial guess for the solution (modified in place).
-    hessp : callable, optional
+    hessp : callable
         Function that computes the product of the Hessian matrix A with a vector.
         Signature: hessp(input_field, output_field) where both are muGrid.Field.
-        Either hessp or hessp_vecdot (or both) must be provided.
     tol : float, optional
         Tolerance for convergence. The default is 1e-6.
     maxiter : int, optional
@@ -53,14 +51,6 @@ def conjugate_gradients(
     timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
         record timing for the hessp (Hessian-vector product) operations.
-    hessp_vecdot : callable, optional
-        Fused Hessian-vector product with dot product computation.
-        Signature: hessp_vecdot(input_field, output_field) -> float
-        Returns local (not MPI-reduced) dot product of input with output.
-        If provided, this is used instead of separate hessp + vecdot calls,
-        which can improve memory bandwidth efficiency. Typically this is
-        the apply_vecdot method of a ConvolutionOperator or LaplaceOperator.
-        Either hessp or hessp_vecdot (or both) must be provided.
 
     Returns
     -------
@@ -69,14 +59,10 @@ def conjugate_gradients(
 
     Raises
     ------
-    ValueError
-        If neither hessp nor hessp_vecdot is provided.
     RuntimeError
         If the algorithm does not converge within maxiter iterations,
         or if the residual becomes NaN (indicating numerical issues).
     """
-    if hessp is None and hessp_vecdot is None:
-        raise ValueError("Either hessp or hessp_vecdot must be provided")
     tol_sq = tol * tol
 
     # Timer context manager (no-op if timer is None)
@@ -95,10 +81,7 @@ def conjugate_gradients(
         Ap = fc.real_field("cg-hessian-product", b.components_shape)
 
         # Initial residual: r = b - A*x
-        if hessp is not None:
-            hessp(x, Ap)
-        else:
-            hessp_vecdot(x, Ap)  # Discard the dot product result
+        hessp(x, Ap)
         # r = b (copy)
         linalg.copy(b, r)
         # r = r - Ap = b - A*x (axpy with alpha=-1)
@@ -120,19 +103,13 @@ def conjugate_gradients(
 
     with timed("iteration"):
         for iteration in range(maxiter):
-            # Compute Hessian product: Ap = A * p, and pAp for step size
-            if hessp_vecdot is not None:
-                # Fused operation: apply operator and compute dot product in one call
-                with timed("hessp_vecdot"):
-                    pAp = comm.sum(hessp_vecdot(p, Ap))
-            else:
-                # Separate operations (hessp must be provided if hessp_vecdot is None)
-                with timed("hessp"):
-                    hessp(p, Ap)
+            # Compute Hessian product: Ap = A * p
+            with timed("hessp"):
+                hessp(p, Ap)
 
-                # Compute pAp for step size
-                with timed("dot_pAp"):
-                    pAp = comm.sum(linalg.vecdot(p, Ap))
+            # Compute pAp for step size
+            with timed("dot_pAp"):
+                pAp = comm.sum(linalg.vecdot(p, Ap))
 
             # Compute alpha
             alpha = rr / pAp

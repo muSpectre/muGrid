@@ -255,12 +255,6 @@ parser.add_argument(
     help="Output results in JSON format (implies --quiet)",
 )
 
-parser.add_argument(
-    "--papi",
-    action="store_true",
-    help="Use PAPI hardware counters for performance measurement (requires pypapi)",
-)
-
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -390,14 +384,7 @@ for q in range(nb_quad):
 C_field = arr.asarray(C_field_np)
 
 # Create global timer for hierarchical timing
-# PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and device.is_host
-if args.papi and not device.is_host:
-    if comm.rank == 0 and not args.quiet:
-        print(
-            "Warning: PAPI not available for device memory (GPU). Using estimates only."
-        )
-timer = muGrid.Timer(use_papi=use_papi)
+timer = muGrid.Timer()
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
@@ -668,9 +655,6 @@ with timer("total_solve"):
                     print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
 
         # Solve K u = f using conjugate_gradients from Solvers.py
-        # Note: For homogenization, the stiffness operator K = B^T C B is a
-        # composite operation, so we use the separate hessp interface rather
-        # than hessp_vecdot (which would require a custom implementation).
         with timer(f"cg_case_{case_idx}"):
             try:
                 conjugate_gradients(

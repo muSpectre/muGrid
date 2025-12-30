@@ -148,34 +148,6 @@ namespace muGrid {
                                  TypedFieldBase<Real> &output_field,
                                  const std::vector<Real> &weights = {}) const override;
 
-        /**
-         * @brief Apply and return dot product of input with output.
-         *
-         * This fused operation computes output = scale * Laplace(input) and
-         * returns input · output in a single pass (on GPU) or two optimized
-         * passes (on CPU).
-         *
-         * @param input_field Input field (with ghost layers populated)
-         * @param output_field Output field
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real apply_vecdot(const TypedFieldBase<Real> &input_field,
-                          TypedFieldBase<Real> &output_field) const override;
-
-        /**
-         * @brief Apply transpose and return dot product (same as apply_vecdot).
-         *
-         * Since the Laplacian is self-adjoint, this is identical to apply_vecdot.
-         *
-         * @param input_field Input field
-         * @param output_field Output field
-         * @param weights Ignored for Laplacian
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real transpose_vecdot(const TypedFieldBase<Real> &input_field,
-                              TypedFieldBase<Real> &output_field,
-                              const std::vector<Real> &weights = {}) const override;
-
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
          * @brief Apply the Laplace operator on device memory fields.
@@ -196,16 +168,6 @@ namespace muGrid {
         void apply_increment(const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
                              const Real &alpha,
                              TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const;
-
-        /**
-         * @brief Apply and return dot product on device memory.
-         *
-         * @param input_field Input field in device memory
-         * @param output_field Output field in device memory
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real apply_vecdot(const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
-                          TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const;
 #endif
 
         /**
@@ -400,46 +362,6 @@ namespace muGrid {
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
             Real scale,
             bool increment = false);
-
-        /**
-         * @brief Fused apply + vecdot on CUDA device (2D).
-         * Computes output = scale * Laplace(input) AND returns input · output.
-         */
-        Real laplace_2d_apply_vecdot_cuda(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale);
-
-        /**
-         * @brief Fused apply + vecdot on CUDA device (3D).
-         * Computes output = scale * Laplace(input) AND returns input · output.
-         */
-        Real laplace_3d_apply_vecdot_cuda(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale);
-
-        /**
-         * @brief Compute interior dot product on CUDA device (2D).
-         */
-        Real laplace_2d_vecdot_cuda(
-            const Real* input,
-            const Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y);
-
-        /**
-         * @brief Compute interior dot product on CUDA device (3D).
-         */
-        Real laplace_3d_vecdot_cuda(
-            const Real* input,
-            const Real* output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
@@ -464,46 +386,6 @@ namespace muGrid {
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
             Real scale,
             bool increment = false);
-
-        /**
-         * @brief Fused apply + vecdot on HIP device (2D).
-         * Computes output = scale * Laplace(input) AND returns input · output.
-         */
-        Real laplace_2d_apply_vecdot_hip(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale);
-
-        /**
-         * @brief Fused apply + vecdot on HIP device (3D).
-         * Computes output = scale * Laplace(input) AND returns input · output.
-         */
-        Real laplace_3d_apply_vecdot_hip(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale);
-
-        /**
-         * @brief Compute interior dot product on HIP device (2D).
-         */
-        Real laplace_2d_vecdot_hip(
-            const Real* input,
-            const Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y);
-
-        /**
-         * @brief Compute interior dot product on HIP device (3D).
-         */
-        Real laplace_3d_vecdot_hip(
-            const Real* input,
-            const Real* output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z);
 #endif
 
     }  // namespace laplace_kernels

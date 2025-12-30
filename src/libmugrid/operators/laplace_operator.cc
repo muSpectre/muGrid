@@ -150,58 +150,6 @@ namespace muGrid {
         this->apply_increment(input_field, alpha, output_field);
     }
 
-    Real LaplaceOperator::apply_vecdot(const TypedFieldBase<Real> &input_field,
-                                        TypedFieldBase<Real> &output_field) const {
-        // Apply the operator
-        this->apply(input_field, output_field);
-
-        // Get collection for dimensions
-        const auto& collection = this->validate_fields(input_field, output_field);
-        auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
-
-        // Get raw data pointers
-        const Real* input = input_field.data();
-        const Real* output = output_field.data();
-
-        // Compute interior-only dot product: input · output
-        Real dot_product = 0.0;
-
-        if (this->spatial_dim == 2) {
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            // Interior: [1, nx-1) x [1, ny-1)
-            for (Index_t iy = 1; iy < ny - 1; ++iy) {
-                for (Index_t ix = 1; ix < nx - 1; ++ix) {
-                    Index_t idx = ix + iy * nx;
-                    dot_product += input[idx] * output[idx];
-                }
-            }
-        } else {
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            Index_t nz = nb_grid_pts[2];
-            // Interior: [1, nx-1) x [1, ny-1) x [1, nz-1)
-            for (Index_t iz = 1; iz < nz - 1; ++iz) {
-                for (Index_t iy = 1; iy < ny - 1; ++iy) {
-                    for (Index_t ix = 1; ix < nx - 1; ++ix) {
-                        Index_t idx = ix + iy * nx + iz * nx * ny;
-                        dot_product += input[idx] * output[idx];
-                    }
-                }
-            }
-        }
-
-        return dot_product;
-    }
-
-    Real LaplaceOperator::transpose_vecdot(const TypedFieldBase<Real> &input_field,
-                                            TypedFieldBase<Real> &output_field,
-                                            const std::vector<Real> &weights) const {
-        // Laplacian is self-adjoint, so transpose_vecdot = apply_vecdot
-        (void)weights;
-        return this->apply_vecdot(input_field, output_field);
-    }
-
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     void LaplaceOperator::apply_impl(
         const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
@@ -257,47 +205,6 @@ namespace muGrid {
         const Real &alpha,
         TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
         this->apply_impl(input_field, output_field, alpha, true);
-    }
-
-    Real LaplaceOperator::apply_vecdot(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
-        TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
-
-        // Get collection for dimensions
-        const auto& collection = this->validate_fields(input_field, output_field);
-        auto nb_grid_pts = collection.get_nb_subdomain_grid_pts_with_ghosts();
-
-        // Get raw device data pointers via view()
-        const Real* input = input_field.view().data();
-        Real* output = output_field.view().data();
-
-        // Use fused kernel that computes Laplace AND dot product in single pass
-        Real dot_product = 0.0;
-
-        if (this->spatial_dim == 2) {
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-#if defined(MUGRID_ENABLE_CUDA)
-            dot_product = laplace_kernels::laplace_2d_apply_vecdot_cuda(
-                input, output, nx, ny, 1, nx, this->scale);
-#elif defined(MUGRID_ENABLE_HIP)
-            dot_product = laplace_kernels::laplace_2d_apply_vecdot_hip(
-                input, output, nx, ny, 1, nx, this->scale);
-#endif
-        } else {
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            Index_t nz = nb_grid_pts[2];
-#if defined(MUGRID_ENABLE_CUDA)
-            dot_product = laplace_kernels::laplace_3d_apply_vecdot_cuda(
-                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
-#elif defined(MUGRID_ENABLE_HIP)
-            dot_product = laplace_kernels::laplace_3d_apply_vecdot_hip(
-                input, output, nx, ny, nz, 1, nx, nx * ny, this->scale);
-#endif
-        }
-
-        return dot_product;
     }
 #endif
 

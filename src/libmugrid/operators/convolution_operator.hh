@@ -187,32 +187,6 @@ namespace muGrid {
             TypedFieldBase<Real> &nodal_field,
             const std::vector<Real> &weights = {}) const final;
 
-        /**
-         * Evaluates the gradient of nodal_field into quadrature_point_field
-         * and returns the dot product of input with output (interior only).
-         *
-         * This fused operation is useful for CG solvers where p·Ap is needed.
-         *
-         * @param nodal_field input field of which to take gradient
-         * @param quadrature_point_field output field to write gradient into
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real apply_vecdot(const TypedFieldBase<Real> &nodal_field,
-                          TypedFieldBase<Real> &quadrature_point_field) const final;
-
-        /**
-         * Evaluates the discretised divergence and returns the dot product
-         * of input with output (interior only).
-         *
-         * @param quadrature_point_field input field of which to take divergence
-         * @param nodal_field output field into which divergence is written
-         * @param weights Gaussian quadrature weights
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real transpose_vecdot(const TypedFieldBase<Real> &quadrature_point_field,
-                              TypedFieldBase<Real> &nodal_field,
-                              const std::vector<Real> &weights = {}) const final;
-
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
          * Evaluates the gradient of nodal_field into quadrature_point_field
@@ -263,30 +237,6 @@ namespace muGrid {
         void transpose_increment(
             const TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field,
             const Real &alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-            const std::vector<Real> &weights = {}) const;
-
-        /**
-         * Evaluates the gradient and returns dot product on device (GPU) memory.
-         *
-         * @param nodal_field input field in device memory
-         * @param quadrature_point_field output field in device memory
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real apply_vecdot(
-            const TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
-            TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field) const;
-
-        /**
-         * Evaluates the transpose and returns dot product on device (GPU) memory.
-         *
-         * @param quadrature_point_field input field in device memory
-         * @param nodal_field output field in device memory
-         * @param weights Gaussian quadrature weights (currently ignored for device)
-         * @return Local (not MPI-reduced) dot product of input with output
-         */
-        Real transpose_vecdot(
-            const TypedFieldBase<Real, DefaultDeviceSpace> &quadrature_point_field,
             TypedFieldBase<Real, DefaultDeviceSpace> &nodal_field,
             const std::vector<Real> &weights = {}) const;
 #endif

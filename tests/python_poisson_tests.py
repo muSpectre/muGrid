@@ -104,14 +104,13 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         # definite, but the conjugate-gradients solver assumes a
         # positive-definite operator.
         Ax_field.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-        return Ax_field
 
     conjugate_gradients(
         comm,
         decomposition,
-        hessp,  # linear operator
         rhs,
         solution,
+        hessp=hessp,
         tol=1e-6,
         callback=callback,
         maxiter=10,
