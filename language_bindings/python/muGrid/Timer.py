@@ -39,13 +39,27 @@ import time
 from contextlib import contextmanager
 
 # Try to import pypapi for hardware counter access (optional)
+# Supports both flozz/pypapi (current) and firedrakeproject/PyPAPI (legacy)
+PAPI_AVAILABLE = False
+PAPI_API_TYPE = None  # "low_level" or "high_level"
+
 try:
-    import pypapi
     from pypapi import events as papi_events
+    from pypapi import papi
 
     PAPI_AVAILABLE = True
+    PAPI_API_TYPE = "low_level"  # flozz/pypapi uses low-level API
 except ImportError:
-    PAPI_AVAILABLE = False
+    try:
+        # Try legacy firedrakeproject/PyPAPI API
+        import pypapi
+        from pypapi import events as papi_events
+
+        if hasattr(pypapi, "papi_high") and hasattr(pypapi.papi_high, "start_counters"):
+            PAPI_AVAILABLE = True
+            PAPI_API_TYPE = "high_level"
+    except ImportError:
+        pass
 
 
 class Timer:
@@ -122,6 +136,7 @@ class Timer:
         # Initialize PAPI if requested
         self._use_papi = use_papi and PAPI_AVAILABLE
         self._papi_enabled = False
+        self._papi_eventset = None  # For low-level API
 
         if use_papi and not PAPI_AVAILABLE:
             import warnings
@@ -133,12 +148,42 @@ class Timer:
 
         if self._use_papi:
             try:
-                self._papi_events_list = [
-                    getattr(papi_events, name) for name in self.PAPI_EVENTS
-                ]
-                # Start PAPI counters - they run continuously
-                pypapi.papi_high.start_counters(self._papi_events_list)
-                self._papi_enabled = True
+                # Build list of available events (some may not be available on
+                # all systems)
+                self._papi_events_list = []
+                self._papi_event_names = []
+                for name in self.PAPI_EVENTS:
+                    try:
+                        event_code = getattr(papi_events, name)
+                        self._papi_events_list.append(event_code)
+                        self._papi_event_names.append(name)
+                    except AttributeError:
+                        pass  # Event not available
+
+                if not self._papi_events_list:
+                    raise RuntimeError("No PAPI events available")
+
+                if PAPI_API_TYPE == "low_level":
+                    # flozz/pypapi: use low-level API
+                    papi.library_init()
+                    self._papi_eventset = papi.create_eventset()
+                    for event_code in self._papi_events_list:
+                        try:
+                            papi.add_event(self._papi_eventset, event_code)
+                        except Exception:
+                            # Event may not be available, remove from list
+                            idx = self._papi_events_list.index(event_code)
+                            self._papi_events_list.remove(event_code)
+                            self._papi_event_names.pop(idx)
+                    if self._papi_events_list:
+                        papi.start(self._papi_eventset)
+                        self._papi_enabled = True
+                else:
+                    # Legacy firedrakeproject/PyPAPI: use high-level API
+                    import pypapi
+
+                    pypapi.papi_high.start_counters(self._papi_events_list)
+                    self._papi_enabled = True
             except Exception as e:
                 import warnings
 
@@ -149,7 +194,14 @@ class Timer:
         """Clean up PAPI counters on destruction."""
         if self._papi_enabled:
             try:
-                pypapi.papi_high.stop_counters()
+                if PAPI_API_TYPE == "low_level" and self._papi_eventset is not None:
+                    papi.stop(self._papi_eventset)
+                    papi.cleanup_eventset(self._papi_eventset)
+                    papi.destroy_eventset(self._papi_eventset)
+                elif PAPI_API_TYPE == "high_level":
+                    import pypapi
+
+                    pypapi.papi_high.stop_counters()
             except Exception:
                 pass  # Ignore errors during cleanup
 
@@ -159,15 +211,34 @@ class Timer:
             return None
         try:
             # Read counters without stopping them
-            counters = pypapi.papi_high.read_counters()
-            return {
-                "cycles": counters[0],
-                "instructions": counters[1],
-                "fp_ops": counters[2],
-                "l1_dcm": counters[3],
-                "l2_dcm": counters[4],
-                "l3_tcm": counters[5],
+            if PAPI_API_TYPE == "low_level":
+                counters = papi.read(self._papi_eventset)
+            else:
+                import pypapi
+
+                counters = pypapi.papi_high.read_counters()
+
+            # Map counters to dictionary based on which events are active
+            result = {
+                "cycles": 0,
+                "instructions": 0,
+                "fp_ops": 0,
+                "l1_dcm": 0,
+                "l2_dcm": 0,
+                "l3_tcm": 0,
             }
+            event_to_key = {
+                "PAPI_TOT_CYC": "cycles",
+                "PAPI_TOT_INS": "instructions",
+                "PAPI_FP_OPS": "fp_ops",
+                "PAPI_L1_DCM": "l1_dcm",
+                "PAPI_L2_DCM": "l2_dcm",
+                "PAPI_L3_TCM": "l3_tcm",
+            }
+            for i, name in enumerate(self._papi_event_names):
+                if i < len(counters) and name in event_to_key:
+                    result[event_to_key[name]] = counters[i]
+            return result
         except Exception:
             return None
 
