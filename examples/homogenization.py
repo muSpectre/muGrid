@@ -572,14 +572,17 @@ def apply_stiffness(u_in, f_out):
         Output force field with (dim, nb_nodes) components (modified in place)
     """
     with timer("apply_stiffness"):
-        # Compute strain eps = B * u
-        compute_strain(u_in, strain_arr)
+        with timer("strain"):
+            # Compute strain eps = B * u
+            compute_strain(u_in, strain_arr)
 
-        # Compute stress sig = C : eps
-        compute_stress(strain_arr, stress_arr, C_field)
+        with timer("stress"):
+            # Compute stress sig = C : eps
+            compute_stress(strain_arr, stress_arr, C_field)
 
-        # Compute force f = B^T * sig
-        compute_divergence(stress_arr, f_out)
+        with timer("divergence"):
+            # Compute force f = B^T * sig
+            compute_divergence(stress_arr, f_out)
 
 
 def compute_rhs(E_macro, rhs_out):
