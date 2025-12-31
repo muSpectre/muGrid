@@ -204,7 +204,11 @@ void IsotropicStiffnessOperator2D::apply_impl(
             "right side of displacement/force fields (nb_ghosts_right >= (1, 1))");
     }
 
-    // Material field dimensions = number of elements (no ghosts on material field)
+    // Get material field ghost configuration
+    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+
+    // Material field dimensions = number of elements (interior, without ghosts)
     auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nelx = nb_elements[0];
     Index_t nely = nb_elements[1];
@@ -244,11 +248,20 @@ void IsotropicStiffnessOperator2D::apply_impl(
             std::to_string(nny) + ")");
     }
 
-    // For periodic BC, need left ghosts to access wrap-around displacement
+    // For periodic BC, need left ghosts on displacement/force fields
     if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1)) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D with periodic BC requires at least 1 "
             "ghost cell on the left side of displacement/force fields");
+    }
+
+    // For periodic BC, material field should also have left ghosts
+    // (filled via communicate_ghosts once before calling apply)
+    if (periodic && (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1)) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator2D with periodic BC requires at least 1 "
+            "ghost cell on the left side of material fields (lambda, mu). "
+            "Call communicate_ghosts on material fields once before apply.");
     }
 
     // Node dimensions (for displacement/force fields with ghosts)
@@ -257,17 +270,21 @@ void IsotropicStiffnessOperator2D::apply_impl(
     Index_t ny = nb_nodes[1];
 
     // Ghost offsets (interior starts at this offset in the ghosted array)
-    // nb_ghosts_left was already retrieved above for validation
-    Index_t ghost_offset_x = nb_ghosts_left[0];
-    Index_t ghost_offset_y = nb_ghosts_left[1];
+    Index_t disp_ghost_offset_x = nb_ghosts_left[0];
+    Index_t disp_ghost_offset_y = nb_ghosts_left[1];
+    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
+    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
 
     // Compute strides (AoS layout for host)
     Index_t disp_stride_d = 1;
     Index_t disp_stride_x = NB_DOFS_PER_NODE;
     Index_t disp_stride_y = NB_DOFS_PER_NODE * nx;
 
+    // Material field strides (with ghosts if present)
+    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
     Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = nelx;
+    Index_t mat_stride_y = mat_nx;
 
     Index_t force_stride_d = 1;
     Index_t force_stride_x = NB_DOFS_PER_NODE;
@@ -275,14 +292,16 @@ void IsotropicStiffnessOperator2D::apply_impl(
 
     // Offset data pointers to account for left ghosts
     // Interior data starts at position (ghost_offset_x, ghost_offset_y)
-    Index_t disp_offset = ghost_offset_x * disp_stride_x +
-                          ghost_offset_y * disp_stride_y;
-    Index_t force_offset = ghost_offset_x * force_stride_x +
-                           ghost_offset_y * force_stride_y;
+    Index_t disp_offset = disp_ghost_offset_x * disp_stride_x +
+                          disp_ghost_offset_y * disp_stride_y;
+    Index_t force_offset = disp_ghost_offset_x * force_stride_x +
+                           disp_ghost_offset_y * force_stride_y;
+    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
+                         mat_ghost_offset_y * mat_stride_y;
 
     const Real* disp_data = displacement.data() + disp_offset;
-    const Real* lambda_data = lambda.data();
-    const Real* mu_data = mu.data();
+    const Real* lambda_data = lambda.data() + mat_offset;
+    const Real* mu_data = mu.data() + mat_offset;
     Real* force_data = force.data() + force_offset;
 
     isotropic_stiffness_kernels::isotropic_stiffness_2d_host(
@@ -499,7 +518,11 @@ void IsotropicStiffnessOperator3D::apply_impl(
             "right side of displacement/force fields (nb_ghosts_right >= (1, 1, 1))");
     }
 
-    // Material field dimensions = number of elements (no ghosts on material field)
+    // Get material field ghost configuration
+    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+
+    // Material field dimensions = number of elements (interior, without ghosts)
     auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nelx = nb_elements[0];
     Index_t nely = nb_elements[1];
@@ -532,11 +555,20 @@ void IsotropicStiffnessOperator3D::apply_impl(
             std::to_string(nnz - 1) + ") for non-periodic BC");
     }
 
-    // For periodic BC, need left ghosts to access wrap-around displacement
+    // For periodic BC, need left ghosts on displacement/force fields
     if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1)) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D with periodic BC requires at least 1 "
             "ghost cell on the left side of displacement/force fields");
+    }
+
+    // For periodic BC, material field should also have left ghosts
+    if (periodic && (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 ||
+                     mat_nb_ghosts_left[2] < 1)) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator3D with periodic BC requires at least 1 "
+            "ghost cell on the left side of material fields (lambda, mu). "
+            "Call communicate_ghosts on material fields once before apply.");
     }
 
     // Node dimensions (for displacement/force fields with ghosts)
@@ -546,10 +578,12 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t nz = nb_nodes[2];
 
     // Ghost offsets (interior starts at this offset in the ghosted array)
-    // nb_ghosts_left was already retrieved above for validation
-    Index_t ghost_offset_x = nb_ghosts_left[0];
-    Index_t ghost_offset_y = nb_ghosts_left[1];
-    Index_t ghost_offset_z = nb_ghosts_left[2];
+    Index_t disp_ghost_offset_x = nb_ghosts_left[0];
+    Index_t disp_ghost_offset_y = nb_ghosts_left[1];
+    Index_t disp_ghost_offset_z = nb_ghosts_left[2];
+    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
+    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
+    Index_t mat_ghost_offset_z = mat_nb_ghosts_left[2];
 
     // Compute strides (AoS layout for host)
     Index_t disp_stride_d = 1;
@@ -557,9 +591,13 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t disp_stride_y = NB_DOFS_PER_NODE * nx;
     Index_t disp_stride_z = NB_DOFS_PER_NODE * nx * ny;
 
+    // Material field strides (with ghosts if present)
+    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
+    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
     Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = nelx;
-    Index_t mat_stride_z = nelx * nely;
+    Index_t mat_stride_y = mat_nx;
+    Index_t mat_stride_z = mat_nx * mat_ny;
 
     Index_t force_stride_d = 1;
     Index_t force_stride_x = NB_DOFS_PER_NODE;
@@ -567,17 +605,19 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t force_stride_z = NB_DOFS_PER_NODE * nx * ny;
 
     // Offset data pointers to account for left ghosts
-    // Interior data starts at position (ghost_offset_x, ghost_offset_y, ghost_offset_z)
-    Index_t disp_offset = ghost_offset_x * disp_stride_x +
-                          ghost_offset_y * disp_stride_y +
-                          ghost_offset_z * disp_stride_z;
-    Index_t force_offset = ghost_offset_x * force_stride_x +
-                           ghost_offset_y * force_stride_y +
-                           ghost_offset_z * force_stride_z;
+    Index_t disp_offset = disp_ghost_offset_x * disp_stride_x +
+                          disp_ghost_offset_y * disp_stride_y +
+                          disp_ghost_offset_z * disp_stride_z;
+    Index_t force_offset = disp_ghost_offset_x * force_stride_x +
+                           disp_ghost_offset_y * force_stride_y +
+                           disp_ghost_offset_z * force_stride_z;
+    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
+                         mat_ghost_offset_y * mat_stride_y +
+                         mat_ghost_offset_z * mat_stride_z;
 
     const Real* disp_data = displacement.data() + disp_offset;
-    const Real* lambda_data = lambda.data();
-    const Real* mu_data = mu.data();
+    const Real* lambda_data = lambda.data() + mat_offset;
+    const Real* mu_data = mu.data() + mat_offset;
     Real* force_data = force.data() + force_offset;
 
     isotropic_stiffness_kernels::isotropic_stiffness_3d_host(
@@ -646,17 +686,14 @@ void isotropic_stiffness_2d_host(
                 Index_t ey = iy + ELEM_OFFSETS[elem][1];
                 Index_t local_node = ELEM_OFFSETS[elem][2];
 
-                // Handle periodic wrapping or skip out-of-bounds
-                if (periodic) {
-                    // Wrap element indices
-                    ex = (ex + nelx) % nelx;
-                    ey = (ey + nely) % nely;
-                } else {
-                    // Skip if element is out of bounds
-                    if (ex < 0 || ex >= nelx || ey < 0 || ey >= nely) continue;
+                // Handle boundary: skip out-of-bounds elements for non-periodic BC
+                // For periodic BC, ghost cells contain wrap-around data, so no skip needed
+                if (!periodic && (ex < 0 || ex >= nelx || ey < 0 || ey >= nely)) {
+                    continue;
                 }
 
                 // Get material parameters for this element
+                // For periodic BC with ghost cells: ex=-1 accesses left ghost (contains last element)
                 Real lam = lambda[ex * mat_stride_x + ey * mat_stride_y];
                 Real mu_val = mu[ex * mat_stride_x + ey * mat_stride_y];
 
@@ -749,18 +786,16 @@ void isotropic_stiffness_3d_host(
                     Index_t ez = iz + ELEM_OFFSETS[elem][2];
                     Index_t local_node = ELEM_OFFSETS[elem][3];
 
-                    // Handle periodic wrapping or skip out-of-bounds
-                    if (periodic) {
-                        ex = (ex + nelx) % nelx;
-                        ey = (ey + nely) % nely;
-                        ez = (ez + nelz) % nelz;
-                    } else {
-                        if (ex < 0 || ex >= nelx ||
-                            ey < 0 || ey >= nely ||
-                            ez < 0 || ez >= nelz) continue;
+                    // Handle boundary: skip out-of-bounds elements for non-periodic BC
+                    // For periodic BC, ghost cells contain wrap-around data, so no skip needed
+                    if (!periodic && (ex < 0 || ex >= nelx ||
+                                      ey < 0 || ey >= nely ||
+                                      ez < 0 || ez >= nelz)) {
+                        continue;
                     }
 
                     // Get material parameters
+                    // For periodic BC with ghost cells: ex=-1 accesses left ghost (contains last element)
                     Index_t mat_idx = ex * mat_stride_x + ey * mat_stride_y +
                                       ez * mat_stride_z;
                     Real lam = lambda[mat_idx];
