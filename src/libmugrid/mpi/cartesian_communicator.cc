@@ -22,6 +22,175 @@
 #endif
 
 namespace muGrid {
+
+    namespace {
+        /**
+         * @brief Copy strided memory blocks using appropriate method.
+         *
+         * Copies nb_blocks blocks of data, each of size block_len bytes,
+         * with blocks separated by pitch bytes in both source and destination.
+         *
+         * For GPU memory, uses hipMemcpy2D/cudaMemcpy2D for efficiency.
+         * For host memory, falls back to individual memcpy calls.
+         *
+         * @param dst Destination address
+         * @param src Source address
+         * @param block_len Size of each block in bytes (width)
+         * @param nb_blocks Number of blocks to copy (height)
+         * @param pitch Stride between blocks in bytes
+         * @param is_device_memory If true, use GPU device copy
+         */
+        void device_memcpy_strided(void * dst, const void * src,
+                                   size_t block_len, size_t nb_blocks,
+                                   size_t pitch, bool is_device_memory) {
+            if (is_device_memory) {
+#if defined(MUGRID_ENABLE_CUDA)
+                // Use cudaMemcpy2D for efficient strided copy
+                // cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
+                (void)cudaMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
+                                   cudaMemcpyDeviceToDevice);
+#elif defined(MUGRID_ENABLE_HIP)
+                // Use hipMemcpy2D for efficient strided copy
+                // hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
+                (void)hipMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
+                                  hipMemcpyDeviceToDevice);
+#else
+                // Fallback to loop if no GPU backend
+                auto * dst_ptr = static_cast<char *>(dst);
+                auto * src_ptr = static_cast<const char *>(src);
+                for (size_t i{0}; i < nb_blocks; ++i) {
+                    std::memcpy(dst_ptr, src_ptr, block_len);
+                    dst_ptr += pitch;
+                    src_ptr += pitch;
+                }
+#endif
+            } else {
+                // Host memory: use loop of memcpy
+                auto * dst_ptr = static_cast<char *>(dst);
+                auto * src_ptr = static_cast<const char *>(src);
+                for (size_t i{0}; i < nb_blocks; ++i) {
+                    std::memcpy(dst_ptr, src_ptr, block_len);
+                    dst_ptr += pitch;
+                    src_ptr += pitch;
+                }
+            }
+        }
+
+        /**
+         * @brief Accumulate (add) memory block using appropriate method for
+         * memory space.
+         *
+         * For host memory, adds source values to destination.
+         * For device memory, uses GPU kernels.
+         *
+         * @param dst Destination address (values are added here)
+         * @param src Source address
+         * @param nb_elements Number of Real elements to accumulate
+         * @param is_device_memory If true, use GPU device accumulation
+         */
+        void device_accumulate(Real * dst, const Real * src, size_t nb_elements,
+                               bool is_device_memory) {
+            if (is_device_memory) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                // For device memory, copy to host, accumulate, copy back
+                // This is not optimal but works for correctness.
+                // A proper implementation would use a GPU kernel.
+                std::vector<Real> host_dst(nb_elements);
+                std::vector<Real> host_src(nb_elements);
+#if defined(MUGRID_ENABLE_CUDA)
+                cudaMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
+                           cudaMemcpyDeviceToHost);
+                cudaMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
+                           cudaMemcpyDeviceToHost);
+#elif defined(MUGRID_ENABLE_HIP)
+                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
+                                hipMemcpyDeviceToHost);
+                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
+                                hipMemcpyDeviceToHost);
+#endif
+                for (size_t i{0}; i < nb_elements; ++i) {
+                    host_dst[i] += host_src[i];
+                }
+#if defined(MUGRID_ENABLE_CUDA)
+                cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
+                           cudaMemcpyHostToDevice);
+#elif defined(MUGRID_ENABLE_HIP)
+                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
+                                hipMemcpyHostToDevice);
+#endif
+#else
+                // Fallback: should not happen
+                for (size_t i{0}; i < nb_elements; ++i) {
+                    dst[i] += src[i];
+                }
+#endif
+            } else {
+                for (size_t i{0}; i < nb_elements; ++i) {
+                    dst[i] += src[i];
+                }
+            }
+        }
+
+        /**
+         * @brief Serial implementation of sendrecv (local copy).
+         *
+         * Used when MPI is not available or not initialized.
+         */
+        void serial_sendrecv(
+            int block_stride, int nb_send_blocks, int send_block_len,
+            Index_t send_offset, int nb_recv_blocks, int recv_block_len,
+            Index_t recv_offset, char * data, int stride_in_direction,
+            int elem_size_in_bytes, bool is_device_memory) {
+            if (nb_send_blocks != nb_recv_blocks) {
+                throw std::runtime_error(
+                    "serial_sendrecv: nb_send_blocks != nb_recv_blocks");
+            }
+            if (send_block_len != recv_block_len) {
+                throw std::runtime_error(
+                    "serial_sendrecv: send_block_len != recv_block_len");
+            }
+            auto * recv_addr{data +
+                             recv_offset * stride_in_direction * elem_size_in_bytes};
+            auto * send_addr{data +
+                             send_offset * stride_in_direction * elem_size_in_bytes};
+            auto block_len_bytes{static_cast<size_t>(send_block_len) *
+                                 elem_size_in_bytes};
+            auto pitch_bytes{static_cast<size_t>(block_stride) * elem_size_in_bytes};
+            device_memcpy_strided(recv_addr, send_addr, block_len_bytes,
+                                  nb_send_blocks, pitch_bytes, is_device_memory);
+        }
+
+        /**
+         * @brief Serial implementation of sendrecv with accumulation.
+         *
+         * Used when MPI is not available or not initialized.
+         */
+        void serial_sendrecv_accumulate(
+            int block_stride, int nb_send_blocks, int send_block_len,
+            Index_t send_offset, int nb_recv_blocks, int recv_block_len,
+            Index_t recv_offset, char * data, int stride_in_direction,
+            int elem_size_in_bytes, bool is_device_memory) {
+            if (nb_send_blocks != nb_recv_blocks) {
+                throw std::runtime_error(
+                    "serial_sendrecv_accumulate: nb_send_blocks != nb_recv_blocks");
+            }
+            if (send_block_len != recv_block_len) {
+                throw std::runtime_error(
+                    "serial_sendrecv_accumulate: send_block_len != recv_block_len");
+            }
+            char * base_data{data};
+            for (int count{0}; count < nb_send_blocks; ++count) {
+                auto recv_addr{reinterpret_cast<Real *>(
+                    base_data + recv_offset * stride_in_direction * elem_size_in_bytes)};
+                auto send_addr{reinterpret_cast<Real *>(
+                    base_data + send_offset * stride_in_direction * elem_size_in_bytes)};
+                device_accumulate(recv_addr, send_addr, send_block_len,
+                                  is_device_memory);
+                base_data += block_stride * elem_size_in_bytes;
+            }
+        }
+    }  // anonymous namespace
+
 #ifdef WITH_MPI
     CartesianCommunicator::CartesianCommunicator(
         const Parent_t & parent, const DynGridIndex & nb_subdivisions)
@@ -95,7 +264,15 @@ namespace muGrid {
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory [[maybe_unused]]) const {
+        bool is_device_memory) const {
+        // Check if MPI is available (comm may be NULL if MPI was not initialized)
+        if (this->comm == MPI_COMM_NULL) {
+            serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
+                            send_offset, nb_recv_blocks, recv_block_len,
+                            recv_offset, data, stride_in_direction,
+                            elem_size_in_bytes, is_device_memory);
+            return;
+        }
         // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
         // handles device pointers directly.
         // Convert TypeDescriptor to MPI_Datatype
@@ -126,7 +303,15 @@ namespace muGrid {
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory [[maybe_unused]]) const {
+        bool is_device_memory) const {
+        // Check if MPI is available (comm may be NULL if MPI was not initialized)
+        if (this->comm == MPI_COMM_NULL) {
+            serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
+                            send_offset, nb_recv_blocks, recv_block_len,
+                            recv_offset, data, stride_in_direction,
+                            elem_size_in_bytes, is_device_memory);
+            return;
+        }
         // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
         // handles device pointers directly.
         // Convert TypeDescriptor to MPI_Datatype
@@ -157,7 +342,15 @@ namespace muGrid {
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory [[maybe_unused]]) const {
+        bool is_device_memory) const {
+        // Check if MPI is available (comm may be NULL if MPI was not initialized)
+        if (this->comm == MPI_COMM_NULL) {
+            serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
+                                       send_offset, nb_recv_blocks, recv_block_len,
+                                       recv_offset, data, stride_in_direction,
+                                       elem_size_in_bytes, is_device_memory);
+            return;
+        }
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
@@ -207,7 +400,15 @@ namespace muGrid {
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory [[maybe_unused]]) const {
+        bool is_device_memory) const {
+        // Check if MPI is available (comm may be NULL if MPI was not initialized)
+        if (this->comm == MPI_COMM_NULL) {
+            serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
+                                       send_offset, nb_recv_blocks, recv_block_len,
+                                       recv_offset, data, stride_in_direction,
+                                       elem_size_in_bytes, is_device_memory);
+            return;
+        }
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
@@ -256,84 +457,18 @@ namespace muGrid {
         : Parent_t{}, parent{parent}, nb_subdivisions{nb_subdivisions},
           coordinates(nb_subdivisions.size(), 0) {}
 
-    namespace {
-        /**
-         * @brief Copy strided memory blocks using appropriate method.
-         *
-         * Copies nb_blocks blocks of data, each of size block_len bytes,
-         * with blocks separated by pitch bytes in both source and destination.
-         *
-         * For GPU memory, uses hipMemcpy2D/cudaMemcpy2D for efficiency.
-         * For host memory, falls back to individual memcpy calls.
-         *
-         * @param dst Destination address
-         * @param src Source address
-         * @param block_len Size of each block in bytes (width)
-         * @param nb_blocks Number of blocks to copy (height)
-         * @param pitch Stride between blocks in bytes
-         * @param is_device_memory If true, use GPU device copy
-         */
-        void device_memcpy_strided(void * dst, const void * src,
-                                   size_t block_len, size_t nb_blocks,
-                                   size_t pitch, bool is_device_memory) {
-            if (is_device_memory) {
-#if defined(MUGRID_ENABLE_CUDA)
-                // Use cudaMemcpy2D for efficient strided copy
-                // cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
-                (void)cudaMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
-                                   cudaMemcpyDeviceToDevice);
-#elif defined(MUGRID_ENABLE_HIP)
-                // Use hipMemcpy2D for efficient strided copy
-                // hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
-                (void)hipMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
-                                  hipMemcpyDeviceToDevice);
-#else
-                // Fallback to loop if no GPU backend
-                auto * dst_ptr = static_cast<char *>(dst);
-                auto * src_ptr = static_cast<const char *>(src);
-                for (size_t i{0}; i < nb_blocks; ++i) {
-                    std::memcpy(dst_ptr, src_ptr, block_len);
-                    dst_ptr += pitch;
-                    src_ptr += pitch;
-                }
-#endif
-            } else {
-                // Host memory: use loop of memcpy
-                auto * dst_ptr = static_cast<char *>(dst);
-                auto * src_ptr = static_cast<const char *>(src);
-                for (size_t i{0}; i < nb_blocks; ++i) {
-                    std::memcpy(dst_ptr, src_ptr, block_len);
-                    dst_ptr += pitch;
-                    src_ptr += pitch;
-                }
-            }
-        }
-    }  // anonymous namespace
-
     void CartesianCommunicator::sendrecv_right(
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
         Index_t send_offset, int nb_recv_blocks, int recv_block_len,
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: type_desc and direction are not used in serial mode
         (void)type_desc;
         (void)direction;
-        if (nb_send_blocks != nb_recv_blocks) {
-            throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
-        }
-        if (send_block_len != recv_block_len) {
-            throw std::runtime_error("send_block_len != recv_block_len");
-        }
-        auto * recv_addr{data +
-                         recv_offset * stride_in_direction * elem_size_in_bytes};
-        auto * send_addr{data +
-                         send_offset * stride_in_direction * elem_size_in_bytes};
-        auto block_len_bytes{static_cast<size_t>(send_block_len) *
-                             elem_size_in_bytes};
-        auto pitch_bytes{static_cast<size_t>(block_stride) * elem_size_in_bytes};
-        device_memcpy_strided(recv_addr, send_addr, block_len_bytes,
-                              nb_send_blocks, pitch_bytes, is_device_memory);
+        serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
+                        send_offset, nb_recv_blocks, recv_block_len,
+                        recv_offset, data, stride_in_direction,
+                        elem_size_in_bytes, is_device_memory);
     }
 
     void CartesianCommunicator::sendrecv_left(
@@ -342,82 +477,13 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: type_desc and direction are not used in serial mode
         (void)type_desc;
         (void)direction;
-        if (nb_send_blocks != nb_recv_blocks) {
-            throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
-        }
-        if (send_block_len != recv_block_len) {
-            throw std::runtime_error("send_block_len != recv_block_len");
-        }
-        auto * recv_addr{data +
-                         recv_offset * stride_in_direction * elem_size_in_bytes};
-        auto * send_addr{data +
-                         send_offset * stride_in_direction * elem_size_in_bytes};
-        auto block_len_bytes{static_cast<size_t>(send_block_len) *
-                             elem_size_in_bytes};
-        auto pitch_bytes{static_cast<size_t>(block_stride) * elem_size_in_bytes};
-        device_memcpy_strided(recv_addr, send_addr, block_len_bytes,
-                              nb_send_blocks, pitch_bytes, is_device_memory);
+        serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
+                        send_offset, nb_recv_blocks, recv_block_len,
+                        recv_offset, data, stride_in_direction,
+                        elem_size_in_bytes, is_device_memory);
     }
-
-    namespace {
-        /**
-         * @brief Accumulate (add) memory block using appropriate method for
-         * memory space.
-         *
-         * For host memory, adds source values to destination.
-         * For device memory, uses GPU kernels.
-         *
-         * @param dst Destination address (values are added here)
-         * @param src Source address
-         * @param nb_elements Number of Real elements to accumulate
-         * @param is_device_memory If true, use GPU device accumulation
-         */
-        void device_accumulate(Real * dst, const Real * src, size_t nb_elements,
-                               bool is_device_memory) {
-            if (is_device_memory) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-                // For device memory, copy to host, accumulate, copy back
-                // This is not optimal but works for correctness.
-                // A proper implementation would use a GPU kernel.
-                std::vector<Real> host_dst(nb_elements);
-                std::vector<Real> host_src(nb_elements);
-#if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
-                           cudaMemcpyDeviceToHost);
-                cudaMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
-                           cudaMemcpyDeviceToHost);
-#elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
-                                hipMemcpyDeviceToHost);
-                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
-                                hipMemcpyDeviceToHost);
-#endif
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    host_dst[i] += host_src[i];
-                }
-#if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
-                           cudaMemcpyHostToDevice);
-#elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
-                                hipMemcpyHostToDevice);
-#endif
-#else
-                // Fallback: should not happen
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    dst[i] += src[i];
-                }
-#endif
-            } else {
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    dst[i] += src[i];
-                }
-            }
-        }
-    }  // anonymous namespace
 
     void CartesianCommunicator::sendrecv_right_accumulate(
         int direction, int block_stride, int nb_send_blocks, int send_block_len,
@@ -425,25 +491,12 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: type_desc and direction are not used in serial mode
         (void)type_desc;
         (void)direction;
-        if (nb_send_blocks != nb_recv_blocks) {
-            throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
-        }
-        if (send_block_len != recv_block_len) {
-            throw std::runtime_error("send_block_len != recv_block_len");
-        }
-        char * base_data{data};
-        for (int count{0}; count < nb_send_blocks; ++count) {
-            auto recv_addr{reinterpret_cast<Real *>(
-                base_data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-            auto send_addr{reinterpret_cast<Real *>(
-                base_data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            device_accumulate(recv_addr, send_addr, send_block_len,
-                              is_device_memory);
-            base_data += block_stride * elem_size_in_bytes;
-        }
+        serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
+                                   send_offset, nb_recv_blocks, recv_block_len,
+                                   recv_offset, data, stride_in_direction,
+                                   elem_size_in_bytes, is_device_memory);
     }
 
     void CartesianCommunicator::sendrecv_left_accumulate(
@@ -452,25 +505,12 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Note: type_desc and direction are not used in serial mode
         (void)type_desc;
         (void)direction;
-        if (nb_send_blocks != nb_recv_blocks) {
-            throw std::runtime_error("nb_send_blocks != nb_recv_blocks");
-        }
-        if (send_block_len != recv_block_len) {
-            throw std::runtime_error("send_block_len != recv_block_len");
-        }
-        char * base_data{data};
-        for (int count{0}; count < nb_send_blocks; ++count) {
-            auto recv_addr{reinterpret_cast<Real *>(
-                base_data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-            auto send_addr{reinterpret_cast<Real *>(
-                base_data + send_offset * stride_in_direction * elem_size_in_bytes)};
-            device_accumulate(recv_addr, send_addr, send_block_len,
-                              is_device_memory);
-            base_data += block_stride * elem_size_in_bytes;
-        }
+        serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
+                                   send_offset, nb_recv_blocks, recv_block_len,
+                                   recv_offset, data, stride_in_direction,
+                                   elem_size_in_bytes, is_device_memory);
     }
 #endif  // WITH_MPI
 

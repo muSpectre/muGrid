@@ -261,6 +261,11 @@ namespace muGrid {
         template <typename T>
         T sendrecv_right(int direction, T data) const {
 #ifdef WITH_MPI
+            // Check if MPI is available (comm may be NULL if MPI was not
+            // initialized)
+            if (this->comm == MPI_COMM_NULL) {
+                return data;
+            }
             MPI_Status status;
             T value;
             MPI_Sendrecv(&data, 1, mpi_type<T>(), this->right_ranks[direction],
@@ -291,6 +296,11 @@ namespace muGrid {
         template <typename T>
         T sendrecv_left(int direction, T data) const {
 #ifdef WITH_MPI
+            // Check if MPI is available (comm may be NULL if MPI was not
+            // initialized)
+            if (this->comm == MPI_COMM_NULL) {
+                return data;
+            }
             MPI_Status status;
             T value;
             MPI_Sendrecv(&data, 1, mpi_type<T>(), this->left_ranks[direction],
