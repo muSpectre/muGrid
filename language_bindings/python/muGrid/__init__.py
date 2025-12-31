@@ -93,6 +93,10 @@ if hasattr(_muGrid, "FileIONetCDF"):
 # Base classes and utilities (always C++ objects)
 ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
 Decomposition = _muGrid.Decomposition
+
+# Isotropic stiffness operators (fused elliptic kernels)
+IsotropicStiffnessOperator2D = _muGrid.IsotropicStiffnessOperator2D
+IsotropicStiffnessOperator3D = _muGrid.IsotropicStiffnessOperator3D
 DynCoord = _muGrid.DynCoord
 DynRcoord = _muGrid.DynRcoord
 IterUnit = _muGrid.IterUnit
@@ -158,6 +162,8 @@ __all__ = [
     "ConvolutionOperatorBase",
     "LaplaceOperator",
     "FEMGradientOperator",
+    "IsotropicStiffnessOperator2D",
+    "IsotropicStiffnessOperator3D",
     "Decomposition",
     "DynCoord",
     "DynRcoord",

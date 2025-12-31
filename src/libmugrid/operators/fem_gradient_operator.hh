@@ -422,12 +422,15 @@ namespace muGrid {
         };
 
         // Tetrahedra node indices [tet][4 nodes]
+        // 5-tet decomposition: 1 central tetrahedron + 4 corner tetrahedra
+        // Central tet connects nodes on the main diagonal: (1,0,0), (0,1,0), (0,0,1), (1,1,1)
+        // Corner tets fill the remaining space at each corner of the cube
         constexpr Index_t TET_NODES[NB_QUAD_3D][4] = {
-            {0, 1, 2, 4},  // Tet 0
-            {1, 2, 4, 5},  // Tet 1
-            {2, 4, 5, 6},  // Tet 2
-            {1, 2, 3, 5},  // Tet 3
-            {2, 3, 5, 7}   // Tet 4 (using node 7 instead of 6 for proper Kuhn)
+            {1, 2, 4, 7},  // Tet 0: Central tetrahedron (volume 1/3)
+            {0, 1, 2, 4},  // Tet 1: Corner at (0,0,0) (volume 1/6)
+            {1, 2, 3, 7},  // Tet 2: Corner at (1,1,0) (volume 1/6)
+            {1, 4, 5, 7},  // Tet 3: Corner at (1,0,1) (volume 1/6)
+            {2, 4, 6, 7}   // Tet 4: Corner at (0,1,1) (volume 1/6)
         };
 
         // Shape function gradients for 3D [dim][quad][node]
@@ -437,11 +440,16 @@ namespace muGrid {
         extern const Real B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D];
 
         // Quadrature weights for 3D (volume of each tet / total voxel volume)
-        // For Kuhn triangulation: 4 corner tets have volume 1/6, center tet has
-        // volume 1/3 But with 5 tets: each corner tet = 1/6, total = 5/6...
-        // need to verify Actually for 5-tet Kuhn: volumes are 1/6, 1/6, 1/6,
-        // 1/6, 1/6 (all equal)
-        constexpr Real QUAD_WEIGHT_3D[NB_QUAD_3D] = {0.2, 0.2, 0.2, 0.2, 0.2};
+        // 5-tet decomposition: central tetrahedron has volume 1/3,
+        // four corner tetrahedra each have volume 1/6
+        // Total: 1/3 + 4*(1/6) = 1/3 + 2/3 = 1
+        constexpr Real QUAD_WEIGHT_3D[NB_QUAD_3D] = {
+            1.0 / 3.0,  // Tet 0: Central tetrahedron
+            1.0 / 6.0,  // Tet 1: Corner at (0,0,0)
+            1.0 / 6.0,  // Tet 2: Corner at (1,1,0)
+            1.0 / 6.0,  // Tet 3: Corner at (1,0,1)
+            1.0 / 6.0   // Tet 4: Corner at (0,1,1)
+        };
 
         // =====================================================================
         // Host Kernel Declarations

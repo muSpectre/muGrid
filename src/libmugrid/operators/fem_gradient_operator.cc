@@ -64,41 +64,47 @@ namespace muGrid {
     namespace fem_gradient_kernels {
 
         // 3D shape function gradients [dim][quad][node]
-        // Pre-computed for Kuhn triangulation
+        // Pre-computed for 5-tet decomposition:
+        //   Tet 0: Central tetrahedron with nodes {1,2,4,7} at (1,0,0), (0,1,0), (0,0,1), (1,1,1)
+        //   Tet 1-4: Corner tetrahedra at each corner of the cube
+        //
+        // Central tetrahedron uses all 4 vertices for derivatives:
+        //   dx = 0.5*(n7 + n1 - n2 - n4), dy = 0.5*(n7 - n1 + n2 - n4), dz = 0.5*(n7 - n1 - n2 + n4)
+        // Corner tetrahedra use simple forward differences along edges.
         const Real B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D] = {
             // d/dx gradients (scaled by 1/hx at runtime)
-            {// Tet 0: nodes 0,1,2,4 → active nodes contribute
+            {// Tet 0: Central tetrahedron (nodes 1,2,4,7)
+             {0.0, 0.5, -0.5, 0.0, -0.5, 0.0, 0.0, 0.5},
+             // Tet 1: Corner at (0,0,0) - nodes 0,1,2,4
              {-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-             // Tet 1: nodes 1,2,4,5
-             {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0},
-             // Tet 2: nodes 2,4,5,6
-             {0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 0.0},
-             // Tet 3: nodes 1,2,3,5
-             {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},
-             // Tet 4: nodes 2,3,5,7
-             {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}},
-            // d/dy gradients (scaled by 1/hy at runtime)
-            {// Tet 0: nodes 0,1,2,4
-             {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-             // Tet 1: nodes 1,2,4,5
-             {0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0},
-             // Tet 2: nodes 2,4,5,6
-             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0},
-             // Tet 3: nodes 1,2,3,5
+             // Tet 2: Corner at (1,1,0) - nodes 1,2,3,7
              {0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},
-             // Tet 4: nodes 2,3,5,7
-             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0}},
+             // Tet 3: Corner at (1,0,1) - nodes 1,4,5,7
+             {0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},
+             // Tet 4: Corner at (0,1,1) - nodes 2,4,6,7
+             {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0}},
+            // d/dy gradients (scaled by 1/hy at runtime)
+            {// Tet 0: Central tetrahedron (nodes 1,2,4,7)
+             {0.0, -0.5, 0.5, 0.0, -0.5, 0.0, 0.0, 0.5},
+             // Tet 1: Corner at (0,0,0) - nodes 0,1,2,4
+             {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+             // Tet 2: Corner at (1,1,0) - nodes 1,2,3,7
+             {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},
+             // Tet 3: Corner at (1,0,1) - nodes 1,4,5,7
+             {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+             // Tet 4: Corner at (0,1,1) - nodes 2,4,6,7
+             {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0}},
             // d/dz gradients (scaled by 1/hz at runtime)
-            {// Tet 0: nodes 0,1,2,4
+            {// Tet 0: Central tetrahedron (nodes 1,2,4,7)
+             {0.0, -0.5, -0.5, 0.0, 0.5, 0.0, 0.0, 0.5},
+             // Tet 1: Corner at (0,0,0) - nodes 0,1,2,4
              {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0},
-             // Tet 1: nodes 1,2,4,5
+             // Tet 2: Corner at (1,1,0) - nodes 1,2,3,7
+             {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0},
+             // Tet 3: Corner at (1,0,1) - nodes 1,4,5,7
              {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0},
-             // Tet 2: nodes 2,4,5,6
-             {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0},
-             // Tet 3: nodes 1,2,3,5
-             {0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 0.0},
-             // Tet 4: nodes 2,3,5,7
-             {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0}}};
+             // Tet 4: Corner at (0,1,1) - nodes 2,4,6,7
+             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}}};
 
     }  // namespace fem_gradient_kernels
 
@@ -184,11 +190,17 @@ namespace muGrid {
             Real pixel_area = this->grid_spacing[0] * this->grid_spacing[1];
             return {0.5 * pixel_area, 0.5 * pixel_area};
         } else {
-            // 5 tetrahedra, each with volume = 1/5 of voxel
+            // 5-tet decomposition:
+            // - Central tetrahedron (tet 0): volume = 1/3 of voxel
+            // - Corner tetrahedra (tet 1-4): volume = 1/6 of voxel each
+            // Total: 1/3 + 4*(1/6) = 1/3 + 2/3 = 1
             Real voxel_volume = this->grid_spacing[0] * this->grid_spacing[1] *
                                 this->grid_spacing[2];
-            return {0.2 * voxel_volume, 0.2 * voxel_volume, 0.2 * voxel_volume,
-                    0.2 * voxel_volume, 0.2 * voxel_volume};
+            return {voxel_volume / 3.0,   // Tet 0: Central
+                    voxel_volume / 6.0,   // Tet 1: Corner (0,0,0)
+                    voxel_volume / 6.0,   // Tet 2: Corner (1,1,0)
+                    voxel_volume / 6.0,   // Tet 3: Corner (1,0,1)
+                    voxel_volume / 6.0};  // Tet 4: Corner (0,1,1)
         }
     }
 

@@ -255,6 +255,12 @@ parser.add_argument(
     help="Output results in JSON format (implies --quiet)",
 )
 
+parser.add_argument(
+    "--fused",
+    action="store_true",
+    help="Use fused IsotropicStiffnessOperator instead of generic gradient/stress/divergence",
+)
+
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -382,6 +388,44 @@ for q in range(nb_quad):
 
 # Convert to device array if using GPU
 C_field = arr.asarray(C_field_np)
+
+# For fused kernel: create Lamé parameter fields
+if args.fused:
+    # Compute Lamé parameters from Young's modulus and Poisson's ratio
+    lam_matrix = args.E_matrix * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
+    mu_matrix = args.E_matrix / (2 * (1 + args.nu))
+    lam_inclusion = args.E_inclusion * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
+    mu_inclusion = args.E_inclusion / (2 * (1 + args.nu))
+
+    # Create element-based field collection
+    # For periodic BC: N elements for N nodes (element N-1 wraps from node N-1 to node 0)
+    element_shape = tuple(args.nb_grid_pts)
+    element_fc = muGrid.GlobalFieldCollection(element_shape, device=device)
+
+    # Create lambda and mu fields
+    lambda_field = element_fc.real_field("lambda", (1,))
+    mu_field = element_fc.real_field("mu", (1,))
+
+    # Set spatially varying material properties based on phase
+    # Phase is defined at grid points, element properties taken at grid points
+    # (for element (i,j), use material at grid point (i,j))
+    lambda_field.s[0, ...] = arr.asarray(
+        lam_matrix * (1 - phase) + lam_inclusion * phase
+    )
+    mu_field.s[0, ...] = arr.asarray(
+        mu_matrix * (1 - phase) + mu_inclusion * phase
+    )
+
+    # Create the fused isotropic stiffness operator
+    if dim == 2:
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(list(grid_spacing))
+    else:
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
+
+    if comm.rank == 0 and not args.quiet:
+        print(f"Using fused IsotropicStiffnessOperator{dim}D")
+        print(f"  Lambda (matrix): {lam_matrix:.4f}, Mu (matrix): {mu_matrix:.4f}")
+        print(f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}")
 
 # Create global timer for hierarchical timing
 timer = muGrid.Timer()
@@ -547,9 +591,9 @@ strain_arr = arr.zeros(strain_shape)
 stress_arr = arr.zeros(strain_shape)
 
 
-def apply_stiffness(u_in, f_out):
+def apply_stiffness_generic(u_in, f_out):
     """
-    Apply K = B^T C B to displacement vector.
+    Apply K = B^T C B to displacement vector using generic gradient/stress/divergence.
 
     Parameters
     ----------
@@ -570,6 +614,37 @@ def apply_stiffness(u_in, f_out):
         with timer("divergence"):
             # Compute force f = B^T * sig
             compute_divergence(stress_arr, f_out)
+
+
+def apply_stiffness_fused(u_in, f_out):
+    """
+    Apply K = B^T C B to displacement vector using fused isotropic stiffness operator.
+
+    This is more memory-efficient for isotropic materials as it only stores
+    two Lamé parameters (λ, μ) per element instead of the full stiffness tensor.
+
+    Parameters
+    ----------
+    u_in : Field
+        Input displacement field with (dim, nb_nodes) components
+    f_out : Field
+        Output force field with (dim, nb_nodes) components (modified in place)
+    """
+    with timer("apply_stiffness"):
+        with timer("communicate_ghosts"):
+            # Fill ghost values for periodic BC
+            decomposition.communicate_ghosts(u_in)
+
+        with timer("fused_kernel"):
+            # Apply fused stiffness operator: f = K @ u
+            fused_stiffness_op.apply(u_in, lambda_field, mu_field, f_out)
+
+
+# Select the stiffness application method
+if args.fused:
+    apply_stiffness = apply_stiffness_fused
+else:
+    apply_stiffness = apply_stiffness_generic
 
 
 def compute_rhs(E_macro, rhs_out):
@@ -795,6 +870,7 @@ if args.json and comm.rank == 0:
             "inclusion_type": args.inclusion_type,
             "inclusion_radius": float(args.inclusion_radius),
             "volume_fraction": float(v_f),
+            "fused_kernel": args.fused,
         },
         "results": {
             "total_cg_iterations": int(total_iterations),

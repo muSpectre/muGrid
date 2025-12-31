@@ -39,6 +39,7 @@
 #include "operators/convolution_operator.hh"
 #include "operators/laplace_operator.hh"
 #include "operators/fem_gradient_operator.hh"
+#include "operators/solids/isotropic_stiffness_operator.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -50,6 +51,8 @@ using muGrid::ConvolutionOperatorBase;
 using muGrid::ConvolutionOperator;
 using muGrid::LaplaceOperator;
 using muGrid::FEMGradientOperator;
+using muGrid::IsotropicStiffnessOperator2D;
+using muGrid::IsotropicStiffnessOperator3D;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Dim_t;
@@ -608,9 +611,169 @@ void add_fem_gradient_operator(py::module &mod) {
 }
 
 
+// Bind class IsotropicStiffnessOperator2D
+void add_isotropic_stiffness_operator_2d(py::module &mod) {
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldHost&, const RealFieldHost&, const RealFieldHost&,
+        RealFieldHost&) const;
+    using ApplyIncrementHostFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldHost&, const RealFieldHost&, const RealFieldHost&,
+        Real, RealFieldHost&) const;
+
+    auto op = py::class_<IsotropicStiffnessOperator2D>(mod, "IsotropicStiffnessOperator2D",
+        R"pbdoc(
+        Fused stiffness operator for 2D isotropic linear elastic materials.
+
+        This operator computes K @ u = B^T C B @ u for 2D linear triangular
+        elements, where C is the isotropic elasticity tensor parameterized by
+        Lamé constants λ (lambda) and μ (mu).
+
+        Instead of storing the full stiffness matrix K, it exploits the
+        isotropic structure: K = 2μ G + λ V, where G and V are geometry-only
+        matrices precomputed at construction time.
+
+        This reduces memory from O(N × 64) for full K storage to O(N × 2) for
+        spatially-varying isotropic materials, plus O(1) for the shared G and V.
+
+        Parameters
+        ----------
+        grid_spacing : list of float
+            Grid spacing [hx, hy] in each direction.
+
+        Notes
+        -----
+        - Displacement field shape: [2, nx, ny] (2 DOFs per node)
+        - Material fields (lambda, mu) shape: [nx-1, ny-1] (one value per pixel)
+        - Force field shape: [2, nx, ny] (same as displacement)
+        )pbdoc")
+        .def(py::init<const std::vector<Real>&>(),
+             "grid_spacing"_a,
+             "Construct with grid spacing [hx, hy]")
+        .def("apply",
+             static_cast<ApplyHostFn>(&IsotropicStiffnessOperator2D::apply),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+             "Apply stiffness operator: force = K @ displacement")
+        .def("apply_increment",
+             static_cast<ApplyIncrementHostFn>(&IsotropicStiffnessOperator2D::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a, "force"_a,
+             "Apply with increment: force += alpha * K @ displacement")
+        .def_property_readonly("G",
+            [](const IsotropicStiffnessOperator2D& op) {
+                const auto& G = op.get_G();
+                return py::array_t<Real>({8, 8}, G.data());
+            },
+            "Precomputed G matrix (shear stiffness geometry)")
+        .def_property_readonly("V",
+            [](const IsotropicStiffnessOperator2D& op) {
+                const auto& V = op.get_V();
+                return py::array_t<Real>({8, 8}, V.data());
+            },
+            "Precomputed V matrix (volumetric stiffness geometry)");
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldDevice&, const RealFieldDevice&, const RealFieldDevice&,
+        RealFieldDevice&) const;
+    using ApplyIncrementDeviceFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldDevice&, const RealFieldDevice&, const RealFieldDevice&,
+        Real, RealFieldDevice&) const;
+
+    op
+        .def("apply",
+             static_cast<ApplyDeviceFn>(&IsotropicStiffnessOperator2D::apply),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+             "Apply stiffness operator to device (GPU) fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(&IsotropicStiffnessOperator2D::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a, "force"_a,
+             "Apply with increment to device (GPU) fields");
+#endif
+}
+
+
+// Bind class IsotropicStiffnessOperator3D
+void add_isotropic_stiffness_operator_3d(py::module &mod) {
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldHost&, const RealFieldHost&, const RealFieldHost&,
+        RealFieldHost&) const;
+    using ApplyIncrementHostFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldHost&, const RealFieldHost&, const RealFieldHost&,
+        Real, RealFieldHost&) const;
+
+    auto op = py::class_<IsotropicStiffnessOperator3D>(mod, "IsotropicStiffnessOperator3D",
+        R"pbdoc(
+        Fused stiffness operator for 3D isotropic linear elastic materials.
+
+        This operator computes K @ u = B^T C B @ u for 3D linear tetrahedral
+        elements using a 5-tetrahedra decomposition per voxel (Kuhn triangulation).
+
+        The isotropic structure K = 2μ G + λ V is exploited to reduce memory
+        requirements from O(N × 576) for full K storage to O(N × 2) for
+        spatially-varying isotropic materials.
+
+        Parameters
+        ----------
+        grid_spacing : list of float
+            Grid spacing [hx, hy, hz] in each direction.
+
+        Notes
+        -----
+        - Displacement field shape: [3, nx, ny, nz] (3 DOFs per node)
+        - Material fields (lambda, mu) shape: [nx-1, ny-1, nz-1] (one value per voxel)
+        - Force field shape: [3, nx, ny, nz] (same as displacement)
+        )pbdoc")
+        .def(py::init<const std::vector<Real>&>(),
+             "grid_spacing"_a,
+             "Construct with grid spacing [hx, hy, hz]")
+        .def("apply",
+             static_cast<ApplyHostFn>(&IsotropicStiffnessOperator3D::apply),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+             "Apply stiffness operator: force = K @ displacement")
+        .def("apply_increment",
+             static_cast<ApplyIncrementHostFn>(&IsotropicStiffnessOperator3D::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a, "force"_a,
+             "Apply with increment: force += alpha * K @ displacement")
+        .def_property_readonly("G",
+            [](const IsotropicStiffnessOperator3D& op) {
+                const auto& G = op.get_G();
+                return py::array_t<Real>({24, 24}, G.data());
+            },
+            "Precomputed G matrix (shear stiffness geometry)")
+        .def_property_readonly("V",
+            [](const IsotropicStiffnessOperator3D& op) {
+                const auto& V = op.get_V();
+                return py::array_t<Real>({24, 24}, V.data());
+            },
+            "Precomputed V matrix (volumetric stiffness geometry)");
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldDevice&, const RealFieldDevice&, const RealFieldDevice&,
+        RealFieldDevice&) const;
+    using ApplyIncrementDeviceFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldDevice&, const RealFieldDevice&, const RealFieldDevice&,
+        Real, RealFieldDevice&) const;
+
+    op
+        .def("apply",
+             static_cast<ApplyDeviceFn>(&IsotropicStiffnessOperator3D::apply),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+             "Apply stiffness operator to device (GPU) fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(&IsotropicStiffnessOperator3D::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a, "force"_a,
+             "Apply with increment to device (GPU) fields");
+#endif
+}
+
+
 void add_convolution_operator_classes(py::module &mod) {
     add_convolution_operator_base(mod);
     add_convolution_operator_default(mod);
     add_laplace_operator(mod);
     add_fem_gradient_operator(mod);
+    add_isotropic_stiffness_operator_2d(mod);
+    add_isotropic_stiffness_operator_3d(mod);
 }

@@ -46,6 +46,7 @@ set(MUGRID_SOURCES
     operators/convolution_operator.cc
     operators/laplace_operator.cc
     operators/fem_gradient_operator.cc
+    operators/solids/isotropic_stiffness_operator.cc
     # io/
     io/file_io_base.cc
     # memory/
@@ -80,6 +81,7 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as CUDA
     set_source_files_properties(
@@ -87,6 +89,7 @@ if(MUGRID_ENABLE_CUDA)
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE CUDA
     )
@@ -95,6 +98,7 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
@@ -102,6 +106,7 @@ elseif(MUGRID_ENABLE_HIP)
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE HIP
     )
@@ -128,6 +133,7 @@ target_include_directories(muGrid
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/collection>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mpi>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/operators>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/operators/solids>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/util>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/memory>
@@ -223,4 +229,10 @@ endforeach()
 # Install pocketfft header
 install(FILES fft/pocketfft/pocketfft_hdronly.h
     DESTINATION include/libmugrid/fft/pocketfft
+)
+
+# Install operators/solids headers
+file(GLOB MUGRID_SOLIDS_HEADERS "operators/solids/*.hh")
+install(FILES ${MUGRID_SOLIDS_HEADERS}
+    DESTINATION include/libmugrid/operators/solids
 )
