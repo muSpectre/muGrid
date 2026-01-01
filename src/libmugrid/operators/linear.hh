@@ -37,13 +37,13 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 
-#ifndef SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
-#define SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
+#ifndef SRC_LIBMUGRID_LINEAR_OPERATOR_BASE_HH_
+#define SRC_LIBMUGRID_LINEAR_OPERATOR_BASE_HH_
 
 namespace muGrid {
 
   /**
-   * @class GradientOperator
+   * @class LinearOperator
    * @brief Base class for gradient and divergence operations.
    *
    * This class defines the interface for performing gradient and divergence
@@ -56,7 +56,7 @@ namespace muGrid {
    * operations. It includes constructors, a destructor, and assignment
    * operators to manage object lifecycle and ensure proper resource management.
    */
-  class GradientOperator {
+  class LinearOperator {
    public:
     /**
      * @brief Default constructor.
@@ -65,7 +65,7 @@ namespace muGrid {
      * constructor is defaulted, indicating that it performs no special
      * actions other than initializing the object.
      */
-    GradientOperator() = default;
+    LinearOperator() = default;
 
     /**
      * @brief Copy constructor (deleted).
@@ -74,7 +74,7 @@ namespace muGrid {
      * This ensures that a GradientOperator object cannot be copied,
      * enforcing unique ownership of its resources.
      */
-    GradientOperator(const GradientOperator & other) = delete;
+    LinearOperator(const LinearOperator & other) = delete;
 
     /**
      * @brief Move constructor.
@@ -83,7 +83,7 @@ namespace muGrid {
      * allows the efficient transfer of resources from one object to another
      * without copying.
      */
-    GradientOperator(GradientOperator && other) = default;
+    LinearOperator(LinearOperator && other) = default;
 
     /**
      * @brief Virtual destructor.
@@ -91,7 +91,7 @@ namespace muGrid {
      * Ensures that derived classes can be properly cleaned up through pointers
      * to the base class. This destructor is defaulted.
      */
-    virtual ~GradientOperator() = default;
+    virtual ~LinearOperator() = default;
 
     /**
      * @brief Copy assignment operator (deleted).
@@ -100,8 +100,8 @@ namespace muGrid {
      * This prevents the accidental or intentional copying of an instance,
      * enforcing unique ownership of its resources.
      */
-    GradientOperator &
-    operator=(const GradientOperator & other) = delete;
+    LinearOperator &
+    operator=(const LinearOperator & other) = delete;
 
     /**
      * @brief Move assignment operator.
@@ -109,7 +109,7 @@ namespace muGrid {
      * Enables the move assignment of GradientOperator instances, allowing
      * resources to be transferred between objects without copying.
      */
-    GradientOperator & operator=(GradientOperator && other) = default;
+    LinearOperator & operator=(LinearOperator && other) = default;
 
     /**
      * @brief Applies the gradient operation.
@@ -225,4 +225,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
+#endif  // SRC_LIBMUGRID_LINEAR_OPERATOR_BASE_HH_

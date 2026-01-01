@@ -87,7 +87,7 @@ We create this with a ``ConvolutionOperator``:
     ])
     stencil_offset = [-1, -1]  # Stencil origin relative to center
 
-    laplace_generic = muGrid.ConvolutionOperator(stencil_offset, stencil)
+    laplace_generic = muGrid.GenericLinearOperator(stencil_offset, stencil)
 
 **Hard-coded Laplacian operator:**
 
@@ -492,7 +492,7 @@ The ``ConvolutionOperator`` class accepts arbitrary stencils:
 
     # Any stencil shape and values
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    op = muGrid.ConvolutionOperator([-1, -1], stencil)
+    op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
 **Advantages:**
 
@@ -592,7 +592,7 @@ Example: comparing both approaches
 
     # Generic operator
     stencil = scale * np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    generic_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+    generic_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
     # Hard-coded operator
     hardcoded_op = muGrid.LaplaceOperator(2, scale)

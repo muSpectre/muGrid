@@ -70,14 +70,11 @@ from .Wrappers import (  # noqa: E402
     FEMGradientOperator,
     FFTEngine,
     FileIONetCDF,
+    GenericLinearOperator,
     GlobalFieldCollection,
     LaplaceOperator,
     LocalFieldCollection,
-    StencilGradientOperator,
 )
-
-# Backwards compatibility alias
-ConvolutionOperator = StencilGradientOperator
 
 # Expose OpenMode for FileIONetCDF if available
 if hasattr(_muGrid, "FileIONetCDF"):
@@ -86,15 +83,12 @@ if hasattr(_muGrid, "FileIONetCDF"):
 # Low-level C++ classes (for advanced use cases)
 # These are prefixed with underscore to indicate they're internal
 _CartesianDecomposition = _muGrid.CartesianDecomposition
-_StencilGradientOperator = _muGrid.StencilGradientOperator
+_GenericLinearOperator = _muGrid.GenericLinearOperator
 _FFTEngine = _muGrid.FFTEngine
 _GlobalFieldCollection = _muGrid.GlobalFieldCollection
 _LocalFieldCollection = _muGrid.LocalFieldCollection
 if hasattr(_muGrid, "FileIONetCDF"):
     _FileIONetCDF = _muGrid.FileIONetCDF
-
-# Backwards compatibility alias for internal class
-_ConvolutionOperator = _StencilGradientOperator
 
 # Base classes and utilities (always C++ objects)
 GradientOperator = _muGrid.GradientOperator
@@ -152,8 +146,7 @@ __all__ = [
     # Main classes (Python wrappers)
     "CartesianDecomposition",
     "Communicator",
-    "StencilGradientOperator",
-    "ConvolutionOperator",  # Backwards compatibility alias
+    "GenericLinearOperator",
     "FFTEngine",
     "Field",
     "FileIONetCDF",

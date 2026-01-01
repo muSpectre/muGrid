@@ -293,7 +293,7 @@ Discrete operators for stencil-based computations.
 ConvolutionOperator
 -------------------
 
-.. py:class:: muGrid.ConvolutionOperator(offset, stencil)
+.. py:class:: muGrid.GenericLinearOperator(offset, stencil)
 
    Applies convolution (stencil) operations to fields. Useful for computing
    gradients, Laplacians, and other discrete differential operators.
@@ -308,7 +308,7 @@ ConvolutionOperator
        >>> # Create a 2D Laplacian stencil
        >>> import numpy as np
        >>> stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-       >>> laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+       >>> laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
        >>> laplace.apply(input_field, output_field)
 
    .. py:method:: apply(nodal_field, quadrature_point_field)

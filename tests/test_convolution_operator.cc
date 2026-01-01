@@ -5,7 +5,7 @@
  *
  * @date   09 Dec 2025
  *
- * @brief  Tests for the StencilGradientOperator with GPU support
+ * @brief  Tests for the GenericLinearOperator with GPU support
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -36,7 +36,7 @@
 #include "tests.hh"
 #include "test_goodies.hh"
 
-#include "operators/stencil_gradient.hh"
+#include "operators/generic.hh"
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "field/field_map.hh"
@@ -120,7 +120,7 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
-    StencilGradientOperator op{
+    GenericLinearOperator op{
         get_offset(),
         get_coefficients(),
         get_stencil_shape(),
@@ -147,7 +147,7 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
-    StencilGradientOperator op{
+    GenericLinearOperator op{
         get_offset(),
         get_coefficients(),
         get_stencil_shape(),
@@ -176,7 +176,7 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
-    StencilGradientOperator op{
+    GenericLinearOperator op{
         get_offset(),
         get_coefficients(),
         get_stencil_shape(),
@@ -202,7 +202,7 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
-    StencilGradientOperator op{
+    GenericLinearOperator op{
         get_offset(),
         get_coefficients(),
         get_stencil_shape(),
@@ -914,7 +914,7 @@ namespace muGrid {
     Shape_t stencil_shape{3};  // 3 points in stencil
     std::vector<Real> coefficients{-0.5, 0.0, 0.5};  // central difference
 
-    StencilGradientOperator op{offset, coefficients, stencil_shape,
+    GenericLinearOperator op{offset, coefficients, stencil_shape,
                                1, 1, 1};  // 1 input comp, 1 quad pt, 1 output comp
 
     // Test at several phase values
@@ -942,7 +942,7 @@ namespace muGrid {
     Shape_t stencil_shape{3};
     std::vector<Real> coefficients{-1.0, 1.0, 0.0};  // backward difference
 
-    StencilGradientOperator op{offset, coefficients, stencil_shape,
+    GenericLinearOperator op{offset, coefficients, stencil_shape,
                                1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
@@ -970,7 +970,7 @@ namespace muGrid {
     Shape_t stencil_shape{3};
     std::vector<Real> coefficients{1.0, -2.0, 1.0};  // second derivative
 
-    StencilGradientOperator op{offset, coefficients, stencil_shape,
+    GenericLinearOperator op{offset, coefficients, stencil_shape,
                                1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
@@ -999,7 +999,7 @@ namespace muGrid {
     // Operator coefficients for x-derivative: [-1/2, 0, 1/2] at y=0
     std::vector<Real> coefficients{-0.5, 0.0, 0.5};
 
-    StencilGradientOperator op{offset, coefficients, stencil_shape,
+    GenericLinearOperator op{offset, coefficients, stencil_shape,
                                1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
@@ -1027,7 +1027,7 @@ namespace muGrid {
     Shape_t stencil_shape{1, 3};  // 1 point in x, 3 in y
     std::vector<Real> coefficients{-0.5, 0.0, 0.5};
 
-    StencilGradientOperator op{offset, coefficients, stencil_shape,
+    GenericLinearOperator op{offset, coefficients, stencil_shape,
                                1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
@@ -1064,7 +1064,7 @@ namespace muGrid {
       0.0, 1.0, 0.0     // x=1:  (y=-1,y=0,y=1)
     };
 
-    StencilGradientOperator op{offset, coefficients, stencil_shape,
+    GenericLinearOperator op{offset, coefficients, stencil_shape,
                                1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;

@@ -729,7 +729,7 @@ class UnitImpulseTest2D(unittest.TestCase):
         grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
-        conv_op = muGrid.ConvolutionOperator([0, 0], grad_op.coefficients)
+        conv_op = muGrid.GenericLinearOperator([0, 0], grad_op.coefficients)
         quad_weights = grad_op.quadrature_weights
 
         # Use CartesianDecomposition for ghost handling
@@ -833,7 +833,7 @@ class UnitImpulseTest2D(unittest.TestCase):
         grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
-        conv_op = muGrid.ConvolutionOperator([0, 0], grad_op.coefficients)
+        conv_op = muGrid.GenericLinearOperator([0, 0], grad_op.coefficients)
         quad_weights = grad_op.quadrature_weights
 
         # Use CartesianDecomposition to handle ghost communication for periodic BC
@@ -1026,7 +1026,7 @@ class UnitImpulseTest3D(unittest.TestCase):
         grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
-        conv_op = muGrid.ConvolutionOperator([0, 0, 0], grad_op.coefficients)
+        conv_op = muGrid.GenericLinearOperator([0, 0, 0], grad_op.coefficients)
         quad_weights = grad_op.quadrature_weights
 
         # Use CartesianDecomposition for ghost handling
@@ -1127,7 +1127,7 @@ class UnitImpulseTest3D(unittest.TestCase):
         grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
-        conv_op = muGrid.ConvolutionOperator([0, 0, 0], grad_op.coefficients)
+        conv_op = muGrid.GenericLinearOperator([0, 0, 0], grad_op.coefficients)
         quad_weights = grad_op.quadrature_weights
 
         # Use CartesianDecomposition to handle ghost communication for periodic BC

@@ -39,7 +39,7 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
-#include "operators/gradient.hh"
+#include "operators/linear.hh"
 
 namespace muGrid {
 
@@ -66,9 +66,9 @@ namespace muGrid {
      * Since the Laplacian is self-adjoint (symmetric), the transpose operation
      * is identical to the forward apply operation.
      */
-    class LaplaceOperator3D : public GradientOperator {
+    class LaplaceOperator3D : public LinearOperator {
     public:
-        using Parent = GradientOperator;
+        using Parent = LinearOperator;
 
         //! Number of stencil points (compile-time constant for 3D)
         static constexpr Index_t NB_STENCIL_PTS = 7;

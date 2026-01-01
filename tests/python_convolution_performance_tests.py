@@ -253,7 +253,7 @@ def measure_convolution_performance(
 
     Parameters
     ----------
-    conv_op : muGrid.ConvolutionOperator
+    conv_op : muGrid.GenericLinearOperator
         The convolution operator to benchmark
     nodal_field : muGrid.Field
         Input nodal field
@@ -390,7 +390,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create field collection
         nb_ghosts = (1, 1)
@@ -443,7 +443,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
             nb_operators, nb_quad_pts, 1, nb_stencil_x, nb_stencil_y
         )
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create field collection
         comm = muGrid.Communicator()
@@ -498,7 +498,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
             # Create stencil
             stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
 
-            conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+            conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
             # Create field collection
             nb_ghosts = (1, 1)
@@ -606,7 +606,7 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
 
     # Create Laplace operator
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
 
     # Get device string for reporting
     device_str = rhs.device
@@ -883,7 +883,7 @@ def run_quad_triangle_mugrid(nb_grid_pts, use_device=False):
 
     # Create operator
     kernel = get_quad_triangle_kernel()
-    op_mugrid = muGrid.ConvolutionOperator([0, 0], kernel)
+    op_mugrid = muGrid.GenericLinearOperator([0, 0], kernel)
 
     device_str = nodal_field_cpp.device
 
@@ -1002,7 +1002,7 @@ def test_quad_triangle_device_vs_host():
     nodal_field.pg[...] = cp.asarray(padded_field)
 
     kernel = get_quad_triangle_kernel()
-    op_mugrid = muGrid.ConvolutionOperator([0, 0], kernel)
+    op_mugrid = muGrid.GenericLinearOperator([0, 0], kernel)
     device_str = nodal_field_cpp.device
 
     # Time device operation
@@ -1082,7 +1082,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create device field collection
         nb_ghosts = (1, 1)
@@ -1143,7 +1143,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
             nb_operators, nb_quad_pts, 1, nb_stencil_x, nb_stencil_y
         )
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create device field collection
         nb_ghosts = (1, 1)
@@ -1205,7 +1205,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
 
             # Create stencil
             stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
-            conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+            conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
             # Host field collection
             fc_host = muGrid.GlobalFieldCollection(
@@ -1300,7 +1300,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
 
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create host fields
         fc_host = muGrid.GlobalFieldCollection(

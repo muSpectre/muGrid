@@ -5,7 +5,7 @@
  *
  * @date   19 Dec 2025
  *
- * @brief  GPU implementations of StencilGradientOperator methods for device memory
+ * @brief  GPU implementations of GenericLinearOperator methods for device memory
  *
  * This file is compiled with the CUDA or HIP compiler depending on which
  * GPU backend is enabled. The implementation uses DefaultDeviceSpace which
@@ -40,13 +40,13 @@
 // Include cassert first as some headers use assert
 #include <cassert>
 
-#include "operators/stencil_gradient.hh"
+#include "operators/generic.hh"
 #include "collection/field_collection_global.hh"
 
 namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::apply(
+    void GenericLinearOperator::apply(
         const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
         TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field) const {
         quadrature_point_field.set_zero();
@@ -54,7 +54,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::apply_increment(
+    void GenericLinearOperator::apply_increment(
         const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
         const Real & alpha,
         TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field) const {
@@ -85,7 +85,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::transpose(
+    void GenericLinearOperator::transpose(
         const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
         TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
@@ -95,7 +95,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::transpose_increment(
+    void GenericLinearOperator::transpose_increment(
         const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
         const Real & alpha,
         TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,

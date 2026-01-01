@@ -208,7 +208,7 @@ on the GPU when both input and output fields are on the GPU:
 
     # Create Laplacian stencil (defined on CPU as numpy array)
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
 
     # Create fields
     input_field = fc.real_field("input")

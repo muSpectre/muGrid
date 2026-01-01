@@ -34,7 +34,7 @@
  *
  */
 
-#include "operators/stencil_gradient.hh"
+#include "operators/generic.hh"
 #include "core/types.hh"
 #include "collection/field_collection_global.hh"
 #include "grid/index_ops.hh"
@@ -49,7 +49,7 @@
 namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
-    StencilGradientOperator::StencilGradientOperator(
+    GenericLinearOperator::GenericLinearOperator(
         const Shape_t & offset, std::span<const Real> coefficients,
         const Shape_t & stencil_shape, const Index_t & nb_pixel_input_components,
         const Index_t & nb_quad_pts, const Index_t & nb_output_components)
@@ -70,7 +70,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const GlobalFieldCollection& StencilGradientOperator::validate_fields(
+    const GlobalFieldCollection& GenericLinearOperator::validate_fields(
         const TypedFieldBase<Real> &nodal_field,
         const TypedFieldBase<Real> &quad_field,
         bool is_transpose) const {
@@ -173,7 +173,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const GlobalFieldCollection& StencilGradientOperator::validate_fields_generic(
+    const GlobalFieldCollection& GenericLinearOperator::validate_fields_generic(
         const Field &nodal_field,
         const Field &quad_field,
         bool is_transpose) const {
@@ -274,7 +274,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
-    GridTraversalParams StencilGradientOperator::compute_traversal_params(
+    GridTraversalParams GenericLinearOperator::compute_traversal_params(
         const GlobalFieldCollection& collection,
         Index_t nb_nodal_components,
         Index_t nb_quad_components) const {
@@ -353,16 +353,16 @@ namespace muGrid {
     }
 
     // Explicit template instantiations
-    template GridTraversalParams StencilGradientOperator::compute_traversal_params<
+    template GridTraversalParams GenericLinearOperator::compute_traversal_params<
         StorageOrder::ArrayOfStructures>(
         const GlobalFieldCollection&, Index_t, Index_t) const;
-    template GridTraversalParams StencilGradientOperator::compute_traversal_params<
+    template GridTraversalParams GenericLinearOperator::compute_traversal_params<
         StorageOrder::StructureOfArrays>(
         const GlobalFieldCollection&, Index_t, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
-    StencilGradientOperator::get_apply_operator(
+    GenericLinearOperator::get_apply_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
@@ -384,7 +384,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
-    StencilGradientOperator::get_transpose_operator(
+    GenericLinearOperator::get_transpose_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
@@ -407,7 +407,7 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
-    StencilGradientOperator::create_apply_operator(
+    GenericLinearOperator::create_apply_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between col-major index and coordinate
@@ -500,16 +500,16 @@ namespace muGrid {
 
     // Explicit template instantiations for create_apply_operator
     template SparseOperatorSoA<HostSpace>
-    StencilGradientOperator::create_apply_operator<StorageOrder::ArrayOfStructures>(
+    GenericLinearOperator::create_apply_operator<StorageOrder::ArrayOfStructures>(
         const DynGridIndex&, Index_t) const;
     template SparseOperatorSoA<HostSpace>
-    StencilGradientOperator::create_apply_operator<StorageOrder::StructureOfArrays>(
+    GenericLinearOperator::create_apply_operator<StorageOrder::StructureOfArrays>(
         const DynGridIndex&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
-    StencilGradientOperator::create_transpose_operator(
+    GenericLinearOperator::create_transpose_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between index and coordinates
@@ -600,14 +600,14 @@ namespace muGrid {
 
     // Explicit template instantiations for create_transpose_operator
     template SparseOperatorSoA<HostSpace>
-    StencilGradientOperator::create_transpose_operator<StorageOrder::ArrayOfStructures>(
+    GenericLinearOperator::create_transpose_operator<StorageOrder::ArrayOfStructures>(
         const DynGridIndex&, Index_t) const;
     template SparseOperatorSoA<HostSpace>
-    StencilGradientOperator::create_transpose_operator<StorageOrder::StructureOfArrays>(
+    GenericLinearOperator::create_transpose_operator<StorageOrder::StructureOfArrays>(
         const DynGridIndex&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::clear_cache() const {
+    void GenericLinearOperator::clear_cache() const {
         this->cached_apply_op_.reset();
         this->cached_transpose_op_.reset();
         this->cached_key_.reset();
@@ -616,7 +616,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    Complex StencilGradientOperator::fourier(const Eigen::VectorXd & phase) const {
+    Complex GenericLinearOperator::fourier(const Eigen::VectorXd & phase) const {
         // Validate phase vector dimension
         if (phase.size() != this->spatial_dim_) {
             std::stringstream err_msg{};
@@ -665,7 +665,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::apply(
+    void GenericLinearOperator::apply(
         const TypedFieldBase<Real> & nodal_field,
         TypedFieldBase<Real> & quadrature_point_field) const {
         quadrature_point_field.set_zero();
@@ -673,7 +673,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::apply_increment(
+    void GenericLinearOperator::apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const {
         // Validate fields and get collection
@@ -703,7 +703,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::transpose(
+    void GenericLinearOperator::transpose(
         const TypedFieldBase<Real> & quadrature_point_field,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
@@ -714,7 +714,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void StencilGradientOperator::transpose_increment(
+    void GenericLinearOperator::transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
@@ -746,37 +746,37 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const std::vector<Real> & StencilGradientOperator::get_coefficients() const {
+    const std::vector<Real> & GenericLinearOperator::get_coefficients() const {
         return this->coefficients_;
     }
 
     /* ---------------------------------------------------------------------- */
-    const Shape_t & StencilGradientOperator::get_offset() const {
+    const Shape_t & GenericLinearOperator::get_offset() const {
         return this->offset_;
     }
 
     /* ---------------------------------------------------------------------- */
-    const Shape_t & StencilGradientOperator::get_stencil_shape() const {
+    const Shape_t & GenericLinearOperator::get_stencil_shape() const {
         return this->stencil_shape_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t StencilGradientOperator::get_nb_quad_pts() const {
+    Index_t GenericLinearOperator::get_nb_quad_pts() const {
         return this->nb_quad_pts_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t StencilGradientOperator::get_nb_output_components() const {
+    Index_t GenericLinearOperator::get_nb_output_components() const {
         return this->nb_output_components_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t StencilGradientOperator::get_nb_input_components() const {
+    Index_t GenericLinearOperator::get_nb_input_components() const {
         return this->nb_pixel_input_components_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Dim_t StencilGradientOperator::get_spatial_dim() const {
+    Dim_t GenericLinearOperator::get_spatial_dim() const {
         return this->spatial_dim_;
     }
 

@@ -45,7 +45,7 @@ def test_fd_stencil():
     stencil = np.array(
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
     assert laplace.nb_output_components == 1
     assert laplace.nb_quad_pts == 1
 
@@ -74,7 +74,7 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     stencil = np.array(
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
     assert laplace.nb_output_components == 1
     assert laplace.nb_quad_pts == 1
 
@@ -145,7 +145,7 @@ def test_unit_impulse(
             ],
         ],
     )
-    gradient_op = muGrid.ConvolutionOperator([0, 0], gradient)
+    gradient_op = muGrid.GenericLinearOperator([0, 0], gradient)
 
     # Get nodal field
     nodal_field_cpp = fc.real_field("nodal-field", (1,), "nodal_points")

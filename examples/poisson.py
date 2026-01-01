@@ -142,7 +142,7 @@ if args.stencil == "generic":
         stencil[1, 1, 2] = 1  # z+1
         stencil *= laplace_scale
         stencil_offset = [-1, -1, -1]
-    laplace = muGrid.ConvolutionOperator(stencil_offset, stencil)
+    laplace = muGrid.GenericLinearOperator(stencil_offset, stencil)
     stencil_name = "Generic sparse convolution"
 else:
     # Hard-coded optimized Laplace operator (for benchmarking)

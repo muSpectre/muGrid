@@ -46,7 +46,7 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
-#include "operators/gradient.hh"
+#include "operators/linear.hh"
 
 #include <array>
 #include <vector>
@@ -77,9 +77,9 @@ namespace muGrid {
      * Shape function gradients are compile-time constants for linear elements,
      * enabling SIMD vectorization and optimal performance.
      */
-    class FEMGradientOperator2D : public GradientOperator {
+    class FEMGradientOperator2D : public LinearOperator {
        public:
-        using Parent = GradientOperator;
+        using Parent = LinearOperator;
 
         //! Number of nodes per pixel (compile-time constant for 2D)
         static constexpr Index_t NB_NODES = 4;
