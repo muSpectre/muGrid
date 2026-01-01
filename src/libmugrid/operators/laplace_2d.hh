@@ -33,8 +33,8 @@
  *
  */
 
-#ifndef SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_2D_HH_
-#define SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_2D_HH_
+#ifndef SRC_LIBMUGRID_OPERATORS_LAPLACE_2D_HH_
+#define SRC_LIBMUGRID_OPERATORS_LAPLACE_2D_HH_
 
 #include "core/types.hh"
 #include "field/field_typed.hh"
@@ -323,4 +323,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_2D_HH_
+#endif  // SRC_LIBMUGRID_OPERATORS_LAPLACE_2D_HH_

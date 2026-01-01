@@ -41,7 +41,8 @@
 #include "operators/laplace_3d.hh"
 #include "operators/fem_gradient_2d.hh"
 #include "operators/fem_gradient_3d.hh"
-#include "operators/solids/isotropic_stiffness_operator.hh"
+#include "operators/solids/isotropic_stiffness_2d.hh"
+#include "operators/solids/isotropic_stiffness_3d.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>

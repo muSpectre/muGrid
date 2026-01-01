@@ -33,7 +33,7 @@
  *
  */
 
-#include "isotropic_stiffness_operator.hh"
+#include "isotropic_stiffness_3d.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 

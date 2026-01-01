@@ -48,7 +48,8 @@ set(MUGRID_SOURCES
         operators/laplace_3d.cc
         operators/fem_gradient_2d.cc
         operators/fem_gradient_3d.cc
-    operators/solids/isotropic_stiffness_operator.cc
+        operators/solids/isotropic_stiffness_2d.cc
+        operators/solids/isotropic_stiffness_3d.cc
     # io/
     io/file_io_base.cc
     # memory/
@@ -83,7 +84,7 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES operators/stencil_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
-    list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as CUDA
     set_source_files_properties(
@@ -91,7 +92,7 @@ if(MUGRID_ENABLE_CUDA)
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/stencil_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_operator_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE CUDA
     )
@@ -100,7 +101,7 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES operators/stencil_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
-    list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
@@ -108,7 +109,7 @@ elseif(MUGRID_ENABLE_HIP)
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/stencil_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_operator_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE HIP
     )
