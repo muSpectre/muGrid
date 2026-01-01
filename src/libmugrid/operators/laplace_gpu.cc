@@ -37,7 +37,7 @@
  *
  */
 
-#include "laplace_operator.hh"
+#include "core/types.hh"
 
 #include <vector>
 
