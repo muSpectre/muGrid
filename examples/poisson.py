@@ -63,11 +63,11 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "-s",
-    "--stencil",
+    "-k",
+    "--kernel",
     choices=["generic", "hardcoded"],
     default="hardcoded",
-    help="Stencil implementation: 'generic' (sparse convolution) or "
+    help="Kernel implementation: 'generic' (sparse convolution) or "
     "'hardcoded' (optimized Laplace operator) (default: hardcoded)",
 )
 
@@ -124,7 +124,7 @@ else:
 laplace_scale = -1.0 / np.mean(grid_spacing) ** 2
 
 # Create the Laplace operator based on the selected implementation
-if args.stencil == "generic":
+if args.kernel == "generic":
     # Generic sparse convolution operator
     if dim == 2:
         # 5-point stencil for 2D
@@ -283,7 +283,7 @@ if args.json:
             "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
             "nb_grid_pts_total": int(nb_grid_pts_total),
             "dimensions": int(dim),
-            "stencil": args.stencil,
+            "kernel": args.kernel,
             "stencil_name": stencil_name,
             "nb_stencil_pts": int(nb_stencil_pts),
             "device": device.device_string,

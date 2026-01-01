@@ -256,9 +256,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--fused",
-    action="store_true",
-    help="Use fused IsotropicStiffnessOperator instead of generic gradient/stress/divergence",
+    "-k",
+    "--kernel",
+    choices=["fused", "generic"],
+    default="fused",
+    help="Kernel implementation: 'fused' (IsotropicStiffnessOperator) or "
+    "'generic' (gradient/stress/divergence) (default: fused)",
 )
 
 args = parser.parse_args()
@@ -296,9 +299,10 @@ else:
 # Create the FEM gradient operator first to get accurate quadrature info
 gradient_op = muGrid.FEMGradientOperator(dim, list(grid_spacing))
 
-# Number of quadrature points and nodal points from the operator
+# Number of quadrature points from the operator
+# Number of nodes per element: 4 for 2D (corners of pixel), 8 for 3D (corners of voxel)
 nb_quad = gradient_op.nb_quad_pts
-nb_nodes = gradient_op.nb_nodal_pts
+nb_nodes = 2**dim
 
 # Quadrature weights (area/volume of each element)
 quad_weights = np.array(gradient_op.quadrature_weights)
@@ -390,31 +394,36 @@ for q in range(nb_quad):
 C_field = arr.asarray(C_field_np)
 
 # For fused kernel: create Lamé parameter fields
-if args.fused:
+if args.kernel == "fused":
     # Compute Lamé parameters from Young's modulus and Poisson's ratio
     lam_matrix = args.E_matrix * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
     mu_matrix = args.E_matrix / (2 * (1 + args.nu))
     lam_inclusion = args.E_inclusion * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
     mu_inclusion = args.E_inclusion / (2 * (1 + args.nu))
 
-    # Create element-based field collection
-    # For periodic BC: N elements for N nodes (element N-1 wraps from node N-1 to node 0)
-    element_shape = tuple(args.nb_grid_pts)
-    element_fc = muGrid.GlobalFieldCollection(element_shape, device=device)
+    # Create element-based CartesianDecomposition with ghost cells
+    element_decomposition = muGrid.CartesianDecomposition(
+        comm,
+        args.nb_grid_pts,
+        nb_subdivisions=(1,) * dim,
+        nb_ghosts_left=(1,) * dim,
+        nb_ghosts_right=(1,) * dim,
+        device=device,
+    )
 
     # Create lambda and mu fields
-    lambda_field = element_fc.real_field("lambda", (1,))
-    mu_field = element_fc.real_field("mu", (1,))
+    lambda_field = element_decomposition.real_field("lambda")
+    mu_field = element_decomposition.real_field("mu")
 
     # Set spatially varying material properties based on phase
     # Phase is defined at grid points, element properties taken at grid points
     # (for element (i,j), use material at grid point (i,j))
-    lambda_field.s[0, ...] = arr.asarray(
-        lam_matrix * (1 - phase) + lam_inclusion * phase
-    )
-    mu_field.s[0, ...] = arr.asarray(
-        mu_matrix * (1 - phase) + mu_inclusion * phase
-    )
+    lambda_field.p[...] = arr.asarray(lam_matrix * (1 - phase) + lam_inclusion * phase)
+    mu_field.p[...] = arr.asarray(mu_matrix * (1 - phase) + mu_inclusion * phase)
+
+    # Fill ghost cells for material fields (only needs to be done once)
+    element_decomposition.communicate_ghosts(lambda_field)
+    element_decomposition.communicate_ghosts(mu_field)
 
     # Create the fused isotropic stiffness operator
     if dim == 2:
@@ -425,7 +434,9 @@ if args.fused:
     if comm.rank == 0 and not args.quiet:
         print(f"Using fused IsotropicStiffnessOperator{dim}D")
         print(f"  Lambda (matrix): {lam_matrix:.4f}, Mu (matrix): {mu_matrix:.4f}")
-        print(f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}")
+        print(
+            f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}"
+        )
 
 # Create global timer for hierarchical timing
 timer = muGrid.Timer()
@@ -641,7 +652,7 @@ def apply_stiffness_fused(u_in, f_out):
 
 
 # Select the stiffness application method
-if args.fused:
+if args.kernel == "fused":
     apply_stiffness = apply_stiffness_fused
 else:
     apply_stiffness = apply_stiffness_generic
@@ -870,7 +881,7 @@ if args.json and comm.rank == 0:
             "inclusion_type": args.inclusion_type,
             "inclusion_radius": float(args.inclusion_radius),
             "volume_fraction": float(v_f),
-            "fused_kernel": args.fused,
+            "kernel": args.kernel,
         },
         "results": {
             "total_cg_iterations": int(total_iterations),
