@@ -215,12 +215,13 @@ namespace muGrid {
             std::vector<Real> result;
             result.reserve(16);
 
-            // Iterate: operators, quad_pts, nodal_pts (=1), stencil_y,
-            // stencil_x
-            for (Index_t d = 0; d < DIM_2D; ++d) {  // operator (direction)
-                for (Index_t q = 0; q < NB_QUAD_2D; ++q) {  // quad pt
-                    for (Index_t j = 0; j < 2; ++j) {       // stencil_y
-                        for (Index_t i = 0; i < 2; ++i) {   // stencil_x
+            // Fortran-order: first index (operators) varies fastest
+            // Iterate: stencil_y, stencil_x, nodal_pts (=1), quad_pts, operators
+            for (Index_t j = 0; j < 2; ++j) {              // stencil_y (outermost)
+                for (Index_t i = 0; i < 2; ++i) {          // stencil_x
+                    // nodal_pts = 1, skip loop
+                    for (Index_t q = 0; q < NB_QUAD_2D; ++q) {  // quad pt
+                        for (Index_t d = 0; d < DIM_2D; ++d) {  // operator (innermost)
                             // Map (i,j) to node index: node = j*2 + i
                             Index_t node = j * 2 + i;
                             Real grad_val = B_2D_REF[d][q][node];
@@ -241,15 +242,16 @@ namespace muGrid {
             std::vector<Real> result;
             result.reserve(120);
 
-            // Iterate: operators, quad_pts, nodal_pts (=1), stencil_z,
-            // stencil_y, stencil_x
-            for (Index_t d = 0; d < DIM_3D; ++d) {  // operator (direction)
-                for (Index_t q = 0; q < NB_QUAD_3D; ++q) {     // quad pt
-                    for (Index_t k = 0; k < 2; ++k) {          // stencil_z
-                        for (Index_t j = 0; j < 2; ++j) {      // stencil_y
-                            for (Index_t i = 0; i < 2; ++i) {  // stencil_x
-                                // Map (i,j,k) to node index: node = k*4 + j*2 +
-                                // i
+            // Fortran-order: first index (operators) varies fastest
+            // Iterate: stencil_z, stencil_y, stencil_x, nodal_pts (=1),
+            // quad_pts, operators
+            for (Index_t k = 0; k < 2; ++k) {                  // stencil_z (outermost)
+                for (Index_t j = 0; j < 2; ++j) {              // stencil_y
+                    for (Index_t i = 0; i < 2; ++i) {          // stencil_x
+                        // nodal_pts = 1, skip loop
+                        for (Index_t q = 0; q < NB_QUAD_3D; ++q) {     // quad pt
+                            for (Index_t d = 0; d < DIM_3D; ++d) {     // operator (innermost)
+                                // Map (i,j,k) to node index: node = k*4 + j*2 + i
                                 Index_t node = k * 4 + j * 2 + i;
                                 Real grad_val = B_3D_REF[d][q][node];
                                 // Scale by inverse grid spacing

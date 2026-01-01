@@ -35,8 +35,8 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import unittest
+
 import numpy as np
-import pytest
 
 import muGrid
 
@@ -74,10 +74,7 @@ class IsotropicStiffnessOperator2DTest(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
 
         # Create field collection with ghost cells
-        fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_right=(1, 1)
-        )
+        fc = muGrid.GlobalFieldCollection((nx, ny), nb_ghosts_right=(1, 1))
 
         # Create fields
         displacement = fc.real_field("displacement", (2,))
@@ -97,7 +94,7 @@ class IsotropicStiffnessOperator2DTest(unittest.TestCase):
         # Set a simple displacement field (linear in x)
         x = np.arange(nx) * grid_spacing[0]
         y = np.arange(ny) * grid_spacing[1]
-        X, Y = np.meshgrid(x, y, indexing='ij')
+        X, Y = np.meshgrid(x, y, indexing="ij")
         displacement.p[0, ...] = X  # u_x = x
         displacement.p[1, ...] = 0  # u_y = 0
 
@@ -139,15 +136,25 @@ class IsotropicStiffnessOperator2DTest(unittest.TestCase):
             nb_subdivisions=(1, 1),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            nb_sub_pts={"quad": grad_op.nb_quad_pts}
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
 
-        # Create material field collection (periodic: nel = nn)
-        fc_mat = muGrid.GlobalFieldCollection((nel, nel))
+        # Create material field collection with ghost cells for periodic BC
+        # (ghost cells are filled via communicate_ghosts once before apply)
+        fc_mat = muGrid.GlobalFieldCollection(
+            (nel, nel), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
+        )
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
-        lambda_field.s[...] = lam
-        mu_field.s[...] = mu
+        lambda_field.p[...] = lam
+        mu_field.p[...] = mu
+
+        # Fill ghost cells with periodic copies
+        # (This is done once if material field doesn't change during simulation)
+        lambda_field.pg[...] = np.pad(
+            lambda_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap"
+        )
+        mu_field.pg[...] = np.pad(mu_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap")
 
         # Create displacement field
         displacement = decomposition.real_field("displacement", (2,))
@@ -229,10 +236,7 @@ class IsotropicStiffnessOperator3DTest(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
 
         # Create field collection with ghost cells
-        fc = muGrid.GlobalFieldCollection(
-            (nx, ny, nz),
-            nb_ghosts_right=(1, 1, 1)
-        )
+        fc = muGrid.GlobalFieldCollection((nx, ny, nz), nb_ghosts_right=(1, 1, 1))
 
         # Create fields
         displacement = fc.real_field("displacement", (3,))
@@ -253,7 +257,7 @@ class IsotropicStiffnessOperator3DTest(unittest.TestCase):
         x = np.arange(nx) * grid_spacing[0]
         y = np.arange(ny) * grid_spacing[1]
         z = np.arange(nz) * grid_spacing[2]
-        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
         displacement.p[0, ...] = X  # u_x = x
         displacement.p[1, ...] = 0  # u_y = 0
         displacement.p[2, ...] = 0  # u_z = 0
@@ -296,15 +300,25 @@ class IsotropicStiffnessOperator3DTest(unittest.TestCase):
             nb_subdivisions=(1, 1, 1),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            nb_sub_pts={"quad": grad_op.nb_quad_pts}
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
 
-        # Create material field collection (periodic: nel = nn)
-        fc_mat = muGrid.GlobalFieldCollection((nel, nel, nel))
+        # Create material field collection with ghost cells for periodic BC
+        fc_mat = muGrid.GlobalFieldCollection(
+            (nel, nel, nel), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
+        )
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
-        lambda_field.s[...] = lam
-        mu_field.s[...] = mu
+        lambda_field.p[...] = lam
+        mu_field.p[...] = mu
+
+        # Fill ghost cells with periodic copies
+        lambda_field.pg[...] = np.pad(
+            lambda_field.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
+        )
+        mu_field.pg[...] = np.pad(
+            mu_field.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
+        )
 
         # Create displacement field
         displacement = decomposition.real_field("displacement", (3,))
@@ -436,6 +450,7 @@ GPU_AVAILABLE = muGrid.has_gpu
 
 try:
     import cupy as cp
+
     HAS_CUPY = True
 except ImportError:
     HAS_CUPY = False
@@ -455,13 +470,10 @@ class IsotropicStiffnessOperatorGPUTest(unittest.TestCase):
 
         # Create device field collections
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda()
+            (nx, ny), nb_ghosts_right=(1, 1), device=muGrid.Device.cuda()
         )
         fc_mat = muGrid.GlobalFieldCollection(
-            (nx - 1, ny - 1),
-            device=muGrid.Device.cuda()
+            (nx - 1, ny - 1), device=muGrid.Device.cuda()
         )
 
         displacement = fc.real_field("displacement", (2,))
@@ -489,13 +501,10 @@ class IsotropicStiffnessOperatorGPUTest(unittest.TestCase):
 
         # Create device field collections
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny, nz),
-            nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda()
+            (nx, ny, nz), nb_ghosts_right=(1, 1, 1), device=muGrid.Device.cuda()
         )
         fc_mat = muGrid.GlobalFieldCollection(
-            (nx - 1, ny - 1, nz - 1),
-            device=muGrid.Device.cuda()
+            (nx - 1, ny - 1, nz - 1), device=muGrid.Device.cuda()
         )
 
         displacement = fc.real_field("displacement", (3,))
@@ -578,9 +587,7 @@ class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
 
         # CPU field collections
-        fc_cpu = muGrid.GlobalFieldCollection(
-            (nx, ny, nz), nb_ghosts_right=(1, 1, 1)
-        )
+        fc_cpu = muGrid.GlobalFieldCollection((nx, ny, nz), nb_ghosts_right=(1, 1, 1))
         fc_mat_cpu = muGrid.GlobalFieldCollection((nx - 1, ny - 1, nz - 1))
 
         disp_cpu = fc_cpu.real_field("displacement", (3,))
@@ -633,7 +640,7 @@ class UnitImpulseTest2D(unittest.TestCase):
     """Test fused operator matches generic operator for unit impulses in 2D."""
 
     def _generic_apply(self, decomposition, displacement, force, lam, mu, grad_op):
-        """Apply generic B^T C B operator."""
+        """Apply generic B^T C B operator using FEMGradientOperator."""
         gradient = decomposition.real_field("gradient", (2, 2), "quad")
         stress = decomposition.real_field("stress", (2, 2), "quad")
 
@@ -660,8 +667,55 @@ class UnitImpulseTest2D(unittest.TestCase):
         quad_weights = grad_op.quadrature_weights
         grad_op.transpose(stress, force, quad_weights)
 
+    def _convolution_apply(
+        self, decomposition, displacement, force, lam, mu, conv_op, quad_weights
+    ):
+        """Apply B^T C B operator using ConvolutionOperator.
+
+        This uses a ConvolutionOperator created from FEMGradientOperator.coefficients
+        to verify that both gradient operators produce identical results.
+
+        Note: ConvolutionOperator.transpose doesn't apply quadrature weights internally,
+        so we pre-multiply the stress by weights before calling transpose.
+        """
+        gradient = decomposition.real_field("gradient_conv", (2, 2), "quad")
+        stress = decomposition.real_field("stress_conv", (2, 2), "quad")
+
+        conv_op.apply(displacement, gradient)
+        grad = gradient.s
+
+        # Symmetric strain (same as _generic_apply)
+        eps_xx = grad[0, 0, ...]
+        eps_yy = grad[1, 1, ...]
+        eps_xy = 0.5 * (grad[0, 1, ...] + grad[1, 0, ...])
+        trace = eps_xx + eps_yy
+
+        # Stress (isotropic constitutive law)
+        stress.s[0, 0, ...] = lam * trace + 2 * mu * eps_xx
+        stress.s[1, 1, ...] = lam * trace + 2 * mu * eps_yy
+        stress.s[0, 1, ...] = 2 * mu * eps_xy
+        stress.s[1, 0, ...] = 2 * mu * eps_xy
+
+        # Pre-multiply stress by quadrature weights (ConvolutionOperator.transpose
+        # doesn't apply weights internally like FEMGradientOperator does)
+        for q in range(len(quad_weights)):
+            stress.s[:, :, q, ...] *= quad_weights[q]
+
+        # Fill stress ghost cells for periodic contributions
+        decomposition.communicate_ghosts(stress)
+
+        # Divergence using transpose of ConvolutionOperator (without weights)
+        force.pg[...] = 0.0
+        conv_op.transpose(stress, force, [])
+
     def test_unit_impulse_non_periodic(self):
-        """Test unit impulse response for non-periodic BC (N-1 elements)."""
+        """Test unit impulse response for non-periodic BC (N-1 elements).
+
+        Compares three approaches:
+        1. Fused IsotropicStiffnessOperator2D
+        2. Generic FEMGradientOperator
+        3. ConvolutionOperator with FEMGradientOperator.coefficients
+        """
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
@@ -671,6 +725,10 @@ class UnitImpulseTest2D(unittest.TestCase):
         fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
         grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
 
+        # Create ConvolutionOperator from FEMGradientOperator coefficients
+        conv_op = muGrid.ConvolutionOperator([0, 0], grad_op.coefficients)
+        quad_weights = grad_op.quadrature_weights
+
         # Use CartesianDecomposition for ghost handling
         comm = muGrid.Communicator()
         decomposition = muGrid.CartesianDecomposition(
@@ -679,7 +737,7 @@ class UnitImpulseTest2D(unittest.TestCase):
             nb_subdivisions=(1, 1),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            nb_sub_pts={"quad": grad_op.nb_quad_pts}
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
 
         # Non-periodic: material field has N-1 elements
@@ -688,6 +746,7 @@ class UnitImpulseTest2D(unittest.TestCase):
         displacement = decomposition.real_field("displacement", (2,))
         force_fused = decomposition.real_field("force_fused", (2,))
         force_generic = decomposition.real_field("force_generic", (2,))
+        force_convolution = decomposition.real_field("force_convolution", (2,))
 
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
@@ -706,17 +765,50 @@ class UnitImpulseTest2D(unittest.TestCase):
 
                 force_fused.p[...] = 0.0
                 force_generic.p[...] = 0.0
+                force_convolution.p[...] = 0.0
 
                 fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(decomposition, displacement, force_generic, lam, mu, grad_op)
+                self._generic_apply(
+                    decomposition, displacement, force_generic, lam, mu, grad_op
+                )
+                self._convolution_apply(
+                    decomposition,
+                    displacement,
+                    force_convolution,
+                    lam,
+                    mu,
+                    conv_op,
+                    quad_weights,
+                )
 
+                # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
-                    force_fused.p, force_generic.p, rtol=1e-10, atol=1e-14,
-                    err_msg=f"Mismatch at node ({ix}, {iy}), direction {d}"
+                    force_fused.p,
+                    force_generic.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"Fused vs generic mismatch at node ({ix}, {iy}), "
+                    f"direction {d}",
+                )
+
+                # Compare generic FEMGradientOperator vs ConvolutionOperator
+                np.testing.assert_allclose(
+                    force_generic.p,
+                    force_convolution.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"Generic vs convolution mismatch at node ({ix}, {iy}), "
+                    f"direction {d}",
                 )
 
     def test_unit_impulse_periodic(self):
-        """Test unit impulse response for periodic BC (N elements for N nodes)."""
+        """Test unit impulse response for periodic BC (N elements for N nodes).
+
+        Compares three approaches:
+        1. Fused IsotropicStiffnessOperator2D
+        2. Generic FEMGradientOperator
+        3. ConvolutionOperator with FEMGradientOperator.coefficients
+        """
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
@@ -726,6 +818,10 @@ class UnitImpulseTest2D(unittest.TestCase):
         fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
         grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
 
+        # Create ConvolutionOperator from FEMGradientOperator coefficients
+        conv_op = muGrid.ConvolutionOperator([0, 0], grad_op.coefficients)
+        quad_weights = grad_op.quadrature_weights
+
         # Use CartesianDecomposition to handle ghost communication for periodic BC
         comm = muGrid.Communicator()
         decomposition = muGrid.CartesianDecomposition(
@@ -734,20 +830,29 @@ class UnitImpulseTest2D(unittest.TestCase):
             nb_subdivisions=(1, 1),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            nb_sub_pts={"quad": grad_op.nb_quad_pts}
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
 
-        # Periodic: material field has N elements (same as nodes)
-        fc_mat = muGrid.GlobalFieldCollection((nx, ny))
+        # Periodic: material field has N elements (same as nodes) with ghost cells
+        fc_mat = muGrid.GlobalFieldCollection(
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
+        )
 
         displacement = decomposition.real_field("displacement", (2,))
         force_fused = decomposition.real_field("force_fused", (2,))
         force_generic = decomposition.real_field("force_generic", (2,))
+        force_convolution = decomposition.real_field("force_convolution", (2,))
 
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
-        lambda_field.s[...] = lam
-        mu_field.s[...] = mu
+        lambda_field.p[...] = lam
+        mu_field.p[...] = mu
+
+        # Fill ghost cells with periodic copies
+        lambda_field.pg[...] = np.pad(
+            lambda_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap"
+        )
+        mu_field.pg[...] = np.pad(mu_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap")
 
         # Test unit impulses at various nodes including boundaries
         # For periodic BC, boundary nodes should also match
@@ -763,22 +868,48 @@ class UnitImpulseTest2D(unittest.TestCase):
 
                 force_fused.p[...] = 0.0
                 force_generic.p[...] = 0.0
+                force_convolution.p[...] = 0.0
 
                 fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(decomposition, displacement, force_generic, lam, mu, grad_op)
+                self._generic_apply(
+                    decomposition, displacement, force_generic, lam, mu, grad_op
+                )
+                self._convolution_apply(
+                    decomposition,
+                    displacement,
+                    force_convolution,
+                    lam,
+                    mu,
+                    conv_op,
+                    quad_weights,
+                )
 
+                # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
-                    force_fused.p, force_generic.p, rtol=1e-10, atol=1e-14,
-                    err_msg=f"Mismatch at node ({ix}, {iy}), direction {d}"
+                    force_fused.p,
+                    force_generic.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"Fused vs generic mismatch at node ({ix}, {iy}), "
+                    f"direction {d}",
+                )
+
+                # Compare generic FEMGradientOperator vs ConvolutionOperator
+                np.testing.assert_allclose(
+                    force_generic.p,
+                    force_convolution.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"Generic vs convolution mismatch at node ({ix}, {iy}), "
+                    f"direction {d}",
                 )
 
 
-@unittest.skip("3D fused vs generic comparison needs further investigation")
 class UnitImpulseTest3D(unittest.TestCase):
     """Test fused operator matches generic operator for unit impulses in 3D."""
 
     def _generic_apply(self, decomposition, displacement, force, lam, mu, grad_op):
-        """Apply generic B^T C B operator."""
+        """Apply generic B^T C B operator using FEMGradientOperator."""
         gradient = decomposition.real_field("gradient", (3, 3), "quad")
         stress = decomposition.real_field("stress", (3, 3), "quad")
 
@@ -808,8 +939,58 @@ class UnitImpulseTest3D(unittest.TestCase):
         quad_weights = grad_op.quadrature_weights
         grad_op.transpose(stress, force, quad_weights)
 
+    def _convolution_apply(
+        self, decomposition, displacement, force, lam, mu, conv_op, quad_weights
+    ):
+        """Apply B^T C B operator using ConvolutionOperator.
+
+        This uses a ConvolutionOperator created from FEMGradientOperator.coefficients
+        to verify that both gradient operators produce identical results.
+
+        Note: ConvolutionOperator.transpose doesn't apply quadrature weights internally,
+        so we pre-multiply the stress by weights before calling transpose.
+        """
+        gradient = decomposition.real_field("gradient_conv", (3, 3), "quad")
+        stress = decomposition.real_field("stress_conv", (3, 3), "quad")
+
+        conv_op.apply(displacement, gradient)
+        grad = gradient.s
+
+        # Symmetric strain (same as _generic_apply)
+        eps = np.zeros_like(stress.s)
+        for i in range(3):
+            for j in range(3):
+                eps[i, j, ...] = 0.5 * (grad[i, j, ...] + grad[j, i, ...])
+
+        trace = eps[0, 0, ...] + eps[1, 1, ...] + eps[2, 2, ...]
+
+        # Stress (isotropic constitutive law)
+        for i in range(3):
+            for j in range(3):
+                stress.s[i, j, ...] = 2 * mu * eps[i, j, ...]
+                if i == j:
+                    stress.s[i, j, ...] += lam * trace
+
+        # Pre-multiply stress by quadrature weights (ConvolutionOperator.transpose
+        # doesn't apply weights internally like FEMGradientOperator does)
+        for q in range(len(quad_weights)):
+            stress.s[:, :, q, ...] *= quad_weights[q]
+
+        # Fill stress ghost cells for periodic contributions
+        decomposition.communicate_ghosts(stress)
+
+        # Divergence using transpose of ConvolutionOperator (without weights)
+        force.pg[...] = 0.0
+        conv_op.transpose(stress, force, [])
+
     def test_unit_impulse_non_periodic(self):
-        """Test unit impulse response for non-periodic BC in 3D."""
+        """Test unit impulse response for non-periodic BC in 3D.
+
+        Compares three approaches:
+        1. Fused IsotropicStiffnessOperator3D
+        2. Generic FEMGradientOperator
+        3. ConvolutionOperator with FEMGradientOperator.coefficients
+        """
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
@@ -819,6 +1000,10 @@ class UnitImpulseTest3D(unittest.TestCase):
         fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
         grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
 
+        # Create ConvolutionOperator from FEMGradientOperator coefficients
+        conv_op = muGrid.ConvolutionOperator([0, 0, 0], grad_op.coefficients)
+        quad_weights = grad_op.quadrature_weights
+
         # Use CartesianDecomposition for ghost handling
         comm = muGrid.Communicator()
         decomposition = muGrid.CartesianDecomposition(
@@ -827,7 +1012,7 @@ class UnitImpulseTest3D(unittest.TestCase):
             nb_subdivisions=(1, 1, 1),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            nb_sub_pts={"quad": grad_op.nb_quad_pts}
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
 
         fc_mat = muGrid.GlobalFieldCollection((nx - 1, ny - 1, nz - 1))
@@ -835,6 +1020,7 @@ class UnitImpulseTest3D(unittest.TestCase):
         displacement = decomposition.real_field("displacement", (3,))
         force_fused = decomposition.real_field("force_fused", (3,))
         force_generic = decomposition.real_field("force_generic", (3,))
+        force_convolution = decomposition.real_field("force_convolution", (3,))
 
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
@@ -852,17 +1038,51 @@ class UnitImpulseTest3D(unittest.TestCase):
 
                 force_fused.p[...] = 0.0
                 force_generic.p[...] = 0.0
+                force_convolution.p[...] = 0.0
 
                 fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(decomposition, displacement, force_generic, lam, mu, grad_op)
+                self._generic_apply(
+                    decomposition, displacement, force_generic, lam, mu, grad_op
+                )
+                self._convolution_apply(
+                    decomposition,
+                    displacement,
+                    force_convolution,
+                    lam,
+                    mu,
+                    conv_op,
+                    quad_weights,
+                )
 
+                # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
-                    force_fused.p, force_generic.p, rtol=1e-10, atol=1e-14,
-                    err_msg=f"Mismatch at node ({ix}, {iy}, {iz}), direction {d}"
+                    force_fused.p,
+                    force_generic.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"Fused vs generic mismatch at node ({ix}, {iy}, {iz}), "
+                    f"direction {d}",
+                )
+
+                # Compare generic FEMGradientOperator vs ConvolutionOperator
+                np.testing.assert_allclose(
+                    force_generic.p,
+                    force_convolution.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg="Generic vs convolution mismatch at node "
+                    f"({ix}, {iy}, {iz}), "
+                    f"direction {d}",
                 )
 
     def test_unit_impulse_periodic(self):
-        """Test unit impulse response for periodic BC in 3D."""
+        """Test unit impulse response for periodic BC in 3D.
+
+        Compares three approaches:
+        1. Fused IsotropicStiffnessOperator3D
+        2. Generic FEMGradientOperator
+        3. ConvolutionOperator with FEMGradientOperator.coefficients
+        """
         nx, ny, nz = 5, 5, 5
         grid_spacing = [0.25, 0.25, 0.25]
 
@@ -872,6 +1092,10 @@ class UnitImpulseTest3D(unittest.TestCase):
         fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
         grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
 
+        # Create ConvolutionOperator from FEMGradientOperator coefficients
+        conv_op = muGrid.ConvolutionOperator([0, 0, 0], grad_op.coefficients)
+        quad_weights = grad_op.quadrature_weights
+
         # Use CartesianDecomposition to handle ghost communication for periodic BC
         comm = muGrid.Communicator()
         decomposition = muGrid.CartesianDecomposition(
@@ -880,19 +1104,31 @@ class UnitImpulseTest3D(unittest.TestCase):
             nb_subdivisions=(1, 1, 1),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            nb_sub_pts={"quad": grad_op.nb_quad_pts}
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
 
-        fc_mat = muGrid.GlobalFieldCollection((nx, ny, nz))  # Periodic
+        # Periodic: material field with ghost cells
+        fc_mat = muGrid.GlobalFieldCollection(
+            (nx, ny, nz), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
+        )
 
         displacement = decomposition.real_field("displacement", (3,))
         force_fused = decomposition.real_field("force_fused", (3,))
         force_generic = decomposition.real_field("force_generic", (3,))
+        force_convolution = decomposition.real_field("force_convolution", (3,))
 
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
-        lambda_field.s[...] = lam
-        mu_field.s[...] = mu
+        lambda_field.p[...] = lam
+        mu_field.p[...] = mu
+
+        # Fill ghost cells with periodic copies
+        lambda_field.pg[...] = np.pad(
+            lambda_field.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
+        )
+        mu_field.pg[...] = np.pad(
+            mu_field.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
+        )
 
         # Test boundary and interior nodes
         test_positions = [(0, 0, 0), (4, 4, 4), (2, 3, 1)]
@@ -907,13 +1143,41 @@ class UnitImpulseTest3D(unittest.TestCase):
 
                 force_fused.p[...] = 0.0
                 force_generic.p[...] = 0.0
+                force_convolution.p[...] = 0.0
 
                 fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(decomposition, displacement, force_generic, lam, mu, grad_op)
+                self._generic_apply(
+                    decomposition, displacement, force_generic, lam, mu, grad_op
+                )
+                self._convolution_apply(
+                    decomposition,
+                    displacement,
+                    force_convolution,
+                    lam,
+                    mu,
+                    conv_op,
+                    quad_weights,
+                )
 
+                # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
-                    force_fused.p, force_generic.p, rtol=1e-10, atol=1e-14,
-                    err_msg=f"Mismatch at node ({ix}, {iy}, {iz}), direction {d}"
+                    force_fused.p,
+                    force_generic.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"Fused vs generic mismatch at node ({ix}, {iy}, {iz}), "
+                    f"direction {d}",
+                )
+
+                # Compare generic FEMGradientOperator vs ConvolutionOperator
+                np.testing.assert_allclose(
+                    force_generic.p,
+                    force_convolution.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg="Generic vs convolution mismatch at node "
+                    f"({ix}, {iy}, {iz}), "
+                    f"direction {d}",
                 )
 
 
@@ -934,9 +1198,7 @@ class ValidationGuardTest2D(unittest.TestCase):
 
         # Displacement field with proper ghosts
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_left=(1, 1),
-            nb_ghosts_right=(1, 1)
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
         )
         displacement = fc.real_field("displacement", (2,))
         force = fc.real_field("force", (2,))
@@ -953,7 +1215,7 @@ class ValidationGuardTest2D(unittest.TestCase):
         err_msg = str(context.exception).lower()
         self.assertTrue(
             "material field" in err_msg or "interior nodes" in err_msg,
-            f"Expected error about material field dimensions, got: {context.exception}"
+            f"Expected error about material field dimensions, got: {context.exception}",
         )
 
     def test_missing_left_ghosts_periodic(self):
@@ -965,9 +1227,7 @@ class ValidationGuardTest2D(unittest.TestCase):
 
         # Only right ghosts - this is invalid for periodic BC which needs left ghosts
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_left=(0, 0),
-            nb_ghosts_right=(1, 1)
+            (nx, ny), nb_ghosts_left=(0, 0), nb_ghosts_right=(1, 1)
         )
         displacement = fc.real_field("displacement", (2,))
         force = fc.real_field("force", (2,))
@@ -984,7 +1244,7 @@ class ValidationGuardTest2D(unittest.TestCase):
         err_msg = str(context.exception).lower()
         self.assertTrue(
             "ghost" in err_msg or "ghosts" in err_msg,
-            f"Expected error about ghost cells, got: {context.exception}"
+            f"Expected error about ghost cells, got: {context.exception}",
         )
 
     def test_missing_right_ghosts(self):
@@ -996,9 +1256,7 @@ class ValidationGuardTest2D(unittest.TestCase):
 
         # No right ghosts
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_left=(1, 1),
-            nb_ghosts_right=(0, 0)
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(0, 0)
         )
         displacement = fc.real_field("displacement", (2,))
         force = fc.real_field("force", (2,))
@@ -1022,9 +1280,7 @@ class ValidationGuardTest2D(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
 
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_left=(1, 1),
-            nb_ghosts_right=(1, 1)
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
         )
         displacement = fc.real_field("displacement", (2,))
         force = fc.real_field("force", (2,))
@@ -1046,18 +1302,25 @@ class ValidationGuardTest2D(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
 
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_left=(1, 1),
-            nb_ghosts_right=(1, 1)
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
         )
         displacement = fc.real_field("displacement", (2,))
         force = fc.real_field("force", (2,))
 
-        fc_mat = muGrid.GlobalFieldCollection((nx, ny))  # Periodic config
+        # Periodic config: material field also needs ghost cells
+        fc_mat = muGrid.GlobalFieldCollection(
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
+        )
         lambda_field = fc_mat.real_field("lambda", (1,))
         mu_field = fc_mat.real_field("mu", (1,))
-        lambda_field.s[...] = 1.0
-        mu_field.s[...] = 1.0
+        lambda_field.p[...] = 1.0
+        mu_field.p[...] = 1.0
+
+        # Fill ghost cells with periodic copies
+        lambda_field.pg[...] = np.pad(
+            lambda_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap"
+        )
+        mu_field.pg[...] = np.pad(mu_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap")
 
         # Should not raise
         op.apply(displacement, lambda_field, mu_field, force)
@@ -1074,9 +1337,7 @@ class ValidationGuardTest3D(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
 
         fc = muGrid.GlobalFieldCollection(
-            (nx, ny, nz),
-            nb_ghosts_left=(1, 1, 1),
-            nb_ghosts_right=(1, 1, 1)
+            (nx, ny, nz), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
         )
         displacement = fc.real_field("displacement", (3,))
         force = fc.real_field("force", (3,))
@@ -1093,7 +1354,7 @@ class ValidationGuardTest3D(unittest.TestCase):
         err_msg = str(context.exception).lower()
         self.assertTrue(
             "material field" in err_msg or "interior nodes" in err_msg,
-            f"Expected error about material field dimensions, got: {context.exception}"
+            f"Expected error about material field dimensions, got: {context.exception}",
         )
 
     def test_missing_ghosts(self):
@@ -1137,9 +1398,7 @@ class GPUUnitImpulseTest(unittest.TestCase):
 
         # CPU setup
         fc_cpu = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            nb_ghosts_left=(1, 1),
-            nb_ghosts_right=(1, 1)
+            (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
         )
         fc_mat_cpu = muGrid.GlobalFieldCollection((nx, ny))  # Periodic
 
@@ -1156,12 +1415,9 @@ class GPUUnitImpulseTest(unittest.TestCase):
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.cuda(),
         )
-        fc_mat_gpu = muGrid.GlobalFieldCollection(
-            (nx, ny),
-            device=muGrid.Device.cuda()
-        )
+        fc_mat_gpu = muGrid.GlobalFieldCollection((nx, ny), device=muGrid.Device.cuda())
 
         disp_gpu = fc_gpu.real_field("displacement", (2,))
         force_gpu = fc_gpu.real_field("force", (2,))
@@ -1188,8 +1444,11 @@ class GPUUnitImpulseTest(unittest.TestCase):
 
                 force_gpu_np = cp.asnumpy(force_gpu.p)
                 np.testing.assert_allclose(
-                    force_gpu_np, force_cpu.p, rtol=1e-10, atol=1e-14,
-                    err_msg=f"GPU mismatch at node ({ix}, {iy}), direction {d}"
+                    force_gpu_np,
+                    force_cpu.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"GPU mismatch at node ({ix}, {iy}), direction {d}",
                 )
 
     def test_gpu_unit_impulse_3d(self):
@@ -1201,9 +1460,7 @@ class GPUUnitImpulseTest(unittest.TestCase):
 
         # CPU setup
         fc_cpu = muGrid.GlobalFieldCollection(
-            (nx, ny, nz),
-            nb_ghosts_left=(1, 1, 1),
-            nb_ghosts_right=(1, 1, 1)
+            (nx, ny, nz), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
         )
         fc_mat_cpu = muGrid.GlobalFieldCollection((nx, ny, nz))  # Periodic
 
@@ -1220,11 +1477,10 @@ class GPUUnitImpulseTest(unittest.TestCase):
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.cuda(),
         )
         fc_mat_gpu = muGrid.GlobalFieldCollection(
-            (nx, ny, nz),
-            device=muGrid.Device.cuda()
+            (nx, ny, nz), device=muGrid.Device.cuda()
         )
 
         disp_gpu = fc_gpu.real_field("displacement", (3,))
@@ -1252,8 +1508,11 @@ class GPUUnitImpulseTest(unittest.TestCase):
 
                 force_gpu_np = cp.asnumpy(force_gpu.p)
                 np.testing.assert_allclose(
-                    force_gpu_np, force_cpu.p, rtol=1e-10, atol=1e-14,
-                    err_msg=f"GPU mismatch at node ({ix}, {iy}, {iz}), direction {d}"
+                    force_gpu_np,
+                    force_cpu.p,
+                    rtol=1e-10,
+                    atol=1e-14,
+                    err_msg=f"GPU mismatch at node ({ix}, {iy}, {iz}), direction {d}",
                 )
 
 
