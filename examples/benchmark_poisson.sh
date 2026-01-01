@@ -6,12 +6,13 @@
 # implementations, comparing performance between generic and hard-coded kernels.
 #
 # Usage:
-#   ./benchmark_poisson.sh [cpu|gpu] [2d|3d] [maxiter]
+#   ./benchmark_poisson.sh [cpu|gpu] [2d|3d] [maxiter] [maxgrid] [maxiter] [maxgrid]
 #
 # Arguments:
 #   cpu|gpu      - Device for computation (default: cpu)
 #   2d|3d        - Grid dimensionality (default: 3d)
 #   maxiter      - Maximum CG iterations (default: 50)
+#   maxgrid      - Maximum grid points in one direction (default: 128)
 #
 # Environment variables:
 #   PYTHON       - Python interpreter to use (default: python3)
@@ -28,6 +29,7 @@ set -e
 DEVICE="${1:-cpu}"
 DIM="${2:-3d}"
 MAXITER="${3:-50}"  # Limit iterations for consistent benchmarking
+MAXGRID="${4:-128}"  # Maximum grid points in one direction
 
 # Use PYTHON environment variable or default to python3
 PYTHON="${PYTHON:-python3}"
@@ -35,13 +37,13 @@ PYTHON="${PYTHON:-python3}"
 # Validate arguments
 if [[ "$DEVICE" != "cpu" && "$DEVICE" != "gpu" ]]; then
     echo "Error: First argument must be 'cpu' or 'gpu'"
-    echo "Usage: $0 [cpu|gpu] [2d|3d]"
+    echo "Usage: $0 [cpu|gpu] [2d|3d] [maxiter] [maxgrid]"
     exit 1
 fi
 
 if [[ "$DIM" != "2d" && "$DIM" != "3d" ]]; then
     echo "Error: Second argument must be '2d' or '3d'"
-    echo "Usage: $0 [cpu|gpu] [2d|3d]"
+    echo "Usage: $0 [cpu|gpu] [2d|3d] [maxiter] [maxgrid]"
     exit 1
 fi
 
@@ -61,11 +63,20 @@ if [[ ! -f "$POISSON_PY" ]]; then
     exit 1
 fi
 
-# Define grid sizes based on dimensionality
+# Define grid sizes based on dimensionality and MAXGRID
+GRID_SIZES=()
 if [[ "$DIM" == "2d" ]]; then
-    GRID_SIZES=("32,32" "64,64" "128,128" "256,256" "512,512" "1024,1024")
+    for n in 32 64 128 256 512 1024 2048 4096 8192; do
+        if [[ $n -le $MAXGRID ]]; then
+            GRID_SIZES+=("$n,$n")
+        fi
+    done
 else
-    GRID_SIZES=("16,16,16" "32,32,32" "48,48,48" "64,64,64" "96,96,96" "128,128,128")
+    for n in 16 32 48 64 96 128 192 256 512 1024 2048; do
+        if [[ $n -le $MAXGRID ]]; then
+            GRID_SIZES+=("$n,$n,$n")
+        fi
+    done
 fi
 
 # Kernel implementations to compare
@@ -82,6 +93,7 @@ echo "Python:      $PYTHON"
 echo "Device:      $DEVICE"
 echo "Dimensions:  $DIM"
 echo "Max iter:    $MAXITER"
+echo "Max grid:    $MAXGRID"
 echo "Grid sizes:  ${GRID_SIZES[*]}"
 echo "============================================================"
 echo ""

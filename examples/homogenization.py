@@ -711,122 +711,128 @@ if comm.rank == 0 and not args.quiet:
 
 total_iterations = 0
 
-for case_idx, (i, j) in enumerate(strain_cases):
-    # Create unit macroscopic strain
-    E_macro = arr.zeros((dim, dim))
-    E_macro[i, j] = 1.0
-    if i != j:
-        E_macro[j, i] = 1.0  # Symmetric
+with timer("total_solve"):
+    for case_idx, (i, j) in enumerate(strain_cases):
+        # Create unit macroscopic strain
+        E_macro = arr.zeros((dim, dim))
+        E_macro[i, j] = 1.0
+        if i != j:
+            E_macro[j, i] = 1.0  # Symmetric
 
-    voigt_col = voigt_index(dim, i, j)
+        voigt_col = voigt_index(dim, i, j)
 
-    if comm.rank == 0 and not args.quiet:
-        print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
+        if comm.rank == 0 and not args.quiet:
+            print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
 
-    # Compute RHS into rhs_field
-    compute_rhs(E_macro, rhs_field)
+        # Compute RHS into rhs_field
+        compute_rhs(E_macro, rhs_field)
 
-    # Initialize displacement to zero
-    u_field.s[...] = 0.0
+        # Initialize displacement to zero
+        u_field.s[...] = 0.0
 
-    # CG callback
-    iteration_count = [0]  # Use list to allow modification in nested function
+        # CG callback
+        iteration_count = [0]  # Use list to allow modification in nested function
 
-    def callback(iteration, state):
-        iteration_count[0] = iteration
-        if not args.quiet:
-            res_norm = float(arr.sqrt(state["rr"]))
-            if comm.rank == 0 and iteration % 10 == 0:
-                print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
+        def callback(iteration, state):
+            iteration_count[0] = iteration
+            if not args.quiet:
+                res_norm = float(arr.sqrt(state["rr"]))
+                if comm.rank == 0 and iteration % 10 == 0:
+                    print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
 
-    # Solve K u = f using conjugate_gradients from Solvers.py
-    try:
-        conjugate_gradients(
-            comm,
-            decomposition,
-            rhs_field,
-            u_field,
-            hessp=apply_stiffness,
-            tol=args.tol,
-            callback=callback,
-            maxiter=args.maxiter,
-            timer=timer,
-        )
-        converged = True
-    except RuntimeError as e:
-        if "did not converge" in str(e):
-            converged = False
-        else:
-            raise
-
-    total_iterations += iteration_count[0]
-
-    if comm.rank == 0 and not args.quiet:
-        if converged:
-            print(f"  CG converged in {iteration_count[0]} iterations")
-        else:
-            print(f"  CG did not converge after {args.maxiter} iterations")
-
-    # Compute strain from solution
-    compute_strain(u_field, strain_arr)
-
-    # Add macroscopic strain to get total strain
-    for ii in range(dim):
-        for jj in range(dim):
-            strain_arr[ii, jj, ...] += E_macro[ii, jj]
-
-    # Compute stress from total strain
-    compute_stress(strain_arr, stress_arr, C_field)
-
-    # Compute average stress (homogenized stress)
-    # Σ_kl = (1/V) ∫ σ_kl dV = (1/V) Σ_q w_q * σ_kl(q)
-    sig_avg = np.zeros((dim, dim))
-    for k in range(dim):
-        for L in range(dim):
-            local_sum = 0.0
-            for q in range(nb_quad):
-                if device.is_host:
-                    local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
-                else:
-                    local_sum += quad_weights[q] * float(
-                        arr.sum(stress_arr[k, L, q, ...])
-                    )
-            sig_avg[k, L] = comm.sum(local_sum)
-
-    # Normalize by total volume
-    total_volume = np.prod(domain_size)
-    sig_avg /= total_volume
-
-    # Store in homogenized stiffness (column voigt_col)
-    for k in range(dim):
-        for L in range(dim):
-            voigt_row = voigt_index(dim, k, L)
-            # Only store unique components (upper triangle in tensor, all in Voigt)
-            if k <= L:
-                C_eff[voigt_row, voigt_col] = sig_avg[k, L]
-
-    if comm.rank == 0 and not args.quiet:
-        if dim == 2:
-            print(
-                f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
-                f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
+        # Solve K u = f using conjugate_gradients from Solvers.py
+        try:
+            conjugate_gradients(
+                comm,
+                decomposition,
+                rhs_field,
+                u_field,
+                hessp=apply_stiffness,
+                tol=args.tol,
+                callback=callback,
+                maxiter=args.maxiter,
+                timer=timer,
             )
-        else:
-            print(
-                f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
-                f"yy={sig_avg[1, 1]:.6f}, zz={sig_avg[2, 2]:.6f}"
-            )
-            print(
-                f"                  yz={sig_avg[1, 2]:.6f}, "
-                f"xz={sig_avg[0, 2]:.6f}, xy={sig_avg[0, 1]:.6f}"
-            )
+            converged = True
+        except RuntimeError as e:
+            if "did not converge" in str(e):
+                converged = False
+            else:
+                raise
+
+        total_iterations += iteration_count[0]
+
+        if comm.rank == 0 and not args.quiet:
+            if converged:
+                print(f"  CG converged in {iteration_count[0]} iterations")
+            else:
+                print(f"  CG did not converge after {args.maxiter} iterations")
+
+        # Compute strain from solution
+        compute_strain(u_field, strain_arr)
+
+        # Add macroscopic strain to get total strain
+        for ii in range(dim):
+            for jj in range(dim):
+                strain_arr[ii, jj, ...] += E_macro[ii, jj]
+
+        # Compute stress from total strain
+        compute_stress(strain_arr, stress_arr, C_field)
+
+        # Compute average stress (homogenized stress)
+        # Σ_kl = (1/V) ∫ σ_kl dV = (1/V) Σ_q w_q * σ_kl(q)
+        sig_avg = np.zeros((dim, dim))
+        for k in range(dim):
+            for L in range(dim):
+                local_sum = 0.0
+                for q in range(nb_quad):
+                    if device.is_host:
+                        local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
+                    else:
+                        local_sum += quad_weights[q] * float(
+                            arr.sum(stress_arr[k, L, q, ...])
+                        )
+                sig_avg[k, L] = comm.sum(local_sum)
+
+        # Normalize by total volume
+        total_volume = np.prod(domain_size)
+        sig_avg /= total_volume
+
+        # Store in homogenized stiffness (column voigt_col)
+        for k in range(dim):
+            for L in range(dim):
+                voigt_row = voigt_index(dim, k, L)
+                # Only store unique components (upper triangle in tensor, all in Voigt)
+                if k <= L:
+                    C_eff[voigt_row, voigt_col] = sig_avg[k, L]
+
+        if comm.rank == 0 and not args.quiet:
+            if dim == 2:
+                print(
+                    f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
+                    f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
+                )
+            else:
+                print(
+                    f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
+                    f"yy={sig_avg[1, 1]:.6f}, zz={sig_avg[2, 2]:.6f}"
+                )
+                print(
+                    f"                  yz={sig_avg[1, 2]:.6f}, "
+                    f"xz={sig_avg[0, 2]:.6f}, xy={sig_avg[0, 1]:.6f}"
+                )
 
 # Get timing information
 elapsed_time = timer.get_time("total_solve")
-nb_stiffness_calls = timer.get_calls("apply_stiffness")
-apply_stiffness_time = (
-    timer.get_time("total_solve/apply_stiffness") if nb_stiffness_calls > 0 else 0
+# Stiffness is called in both startup and iteration phases
+nb_stiffness_calls_startup = timer.get_calls("total_solve/startup/apply_stiffness")
+nb_stiffness_calls_iter = timer.get_calls("total_solve/iteration/hessp/apply_stiffness")
+nb_stiffness_calls = nb_stiffness_calls_startup + nb_stiffness_calls_iter
+apply_stiffness_time_startup = timer.get_time("total_solve/startup/apply_stiffness")
+apply_stiffness_time_iter = timer.get_time(
+    "total_solve/iteration/hessp/apply_stiffness"
 )
+apply_stiffness_time = apply_stiffness_time_startup + apply_stiffness_time_iter
 
 # Lattice updates per second (LUPS)
 # One "lattice update" = one grid point processed in one stiffness call
