@@ -39,6 +39,7 @@ import unittest
 import numpy as np
 
 import muGrid
+from muGrid import Timer
 
 
 class IsotropicStiffnessOperator2DTest(unittest.TestCase):
@@ -715,6 +716,8 @@ class UnitImpulseTest2D(unittest.TestCase):
         1. Fused IsotropicStiffnessOperator2D
         2. Generic FEMGradientOperator
         3. ConvolutionOperator with FEMGradientOperator.coefficients
+
+        Also outputs timing information for the generic vs convolution approaches.
         """
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
@@ -753,6 +756,8 @@ class UnitImpulseTest2D(unittest.TestCase):
         lambda_field.s[...] = lam
         mu_field.s[...] = mu
 
+        timer = Timer()
+
         # Test unit impulses at a few interior nodes
         test_positions = [(2, 3), (4, 4), (5, 2)]
         for ix, iy in test_positions:
@@ -767,19 +772,24 @@ class UnitImpulseTest2D(unittest.TestCase):
                 force_generic.p[...] = 0.0
                 force_convolution.p[...] = 0.0
 
-                fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(
-                    decomposition, displacement, force_generic, lam, mu, grad_op
-                )
-                self._convolution_apply(
-                    decomposition,
-                    displacement,
-                    force_convolution,
-                    lam,
-                    mu,
-                    conv_op,
-                    quad_weights,
-                )
+                with timer("fused"):
+                    fused_op.apply(displacement, lambda_field, mu_field, force_fused)
+
+                with timer("FEMGradientOperator"):
+                    self._generic_apply(
+                        decomposition, displacement, force_generic, lam, mu, grad_op
+                    )
+
+                with timer("ConvolutionOperator"):
+                    self._convolution_apply(
+                        decomposition,
+                        displacement,
+                        force_convolution,
+                        lam,
+                        mu,
+                        conv_op,
+                        quad_weights,
+                    )
 
                 # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
@@ -801,6 +811,8 @@ class UnitImpulseTest2D(unittest.TestCase):
                     f"direction {d}",
                 )
 
+        timer.print_summary(title=f"2D Non-periodic ({nx}x{ny} grid)")
+
     def test_unit_impulse_periodic(self):
         """Test unit impulse response for periodic BC (N elements for N nodes).
 
@@ -808,6 +820,8 @@ class UnitImpulseTest2D(unittest.TestCase):
         1. Fused IsotropicStiffnessOperator2D
         2. Generic FEMGradientOperator
         3. ConvolutionOperator with FEMGradientOperator.coefficients
+
+        Also outputs timing information for the generic vs convolution approaches.
         """
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
@@ -854,6 +868,8 @@ class UnitImpulseTest2D(unittest.TestCase):
         )
         mu_field.pg[...] = np.pad(mu_field.p, ((0, 0), (1, 1), (1, 1)), mode="wrap")
 
+        timer = Timer()
+
         # Test unit impulses at various nodes including boundaries
         # For periodic BC, boundary nodes should also match
         test_positions = [(0, 0), (7, 7), (0, 4), (4, 0), (3, 5)]
@@ -870,19 +886,24 @@ class UnitImpulseTest2D(unittest.TestCase):
                 force_generic.p[...] = 0.0
                 force_convolution.p[...] = 0.0
 
-                fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(
-                    decomposition, displacement, force_generic, lam, mu, grad_op
-                )
-                self._convolution_apply(
-                    decomposition,
-                    displacement,
-                    force_convolution,
-                    lam,
-                    mu,
-                    conv_op,
-                    quad_weights,
-                )
+                with timer("fused"):
+                    fused_op.apply(displacement, lambda_field, mu_field, force_fused)
+
+                with timer("FEMGradientOperator"):
+                    self._generic_apply(
+                        decomposition, displacement, force_generic, lam, mu, grad_op
+                    )
+
+                with timer("ConvolutionOperator"):
+                    self._convolution_apply(
+                        decomposition,
+                        displacement,
+                        force_convolution,
+                        lam,
+                        mu,
+                        conv_op,
+                        quad_weights,
+                    )
 
                 # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
@@ -903,6 +924,8 @@ class UnitImpulseTest2D(unittest.TestCase):
                     err_msg=f"Generic vs convolution mismatch at node ({ix}, {iy}), "
                     f"direction {d}",
                 )
+
+        timer.print_summary(title=f"2D Periodic ({nx}x{ny} grid)")
 
 
 class UnitImpulseTest3D(unittest.TestCase):
@@ -990,6 +1013,8 @@ class UnitImpulseTest3D(unittest.TestCase):
         1. Fused IsotropicStiffnessOperator3D
         2. Generic FEMGradientOperator
         3. ConvolutionOperator with FEMGradientOperator.coefficients
+
+        Also outputs timing information for the generic vs convolution approaches.
         """
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
@@ -1027,6 +1052,8 @@ class UnitImpulseTest3D(unittest.TestCase):
         lambda_field.s[...] = lam
         mu_field.s[...] = mu
 
+        timer = Timer()
+
         # Test a few interior nodes
         test_positions = [(2, 2, 2), (3, 2, 4)]
         for ix, iy, iz in test_positions:
@@ -1040,19 +1067,24 @@ class UnitImpulseTest3D(unittest.TestCase):
                 force_generic.p[...] = 0.0
                 force_convolution.p[...] = 0.0
 
-                fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(
-                    decomposition, displacement, force_generic, lam, mu, grad_op
-                )
-                self._convolution_apply(
-                    decomposition,
-                    displacement,
-                    force_convolution,
-                    lam,
-                    mu,
-                    conv_op,
-                    quad_weights,
-                )
+                with timer("fused"):
+                    fused_op.apply(displacement, lambda_field, mu_field, force_fused)
+
+                with timer("FEMGradientOperator"):
+                    self._generic_apply(
+                        decomposition, displacement, force_generic, lam, mu, grad_op
+                    )
+
+                with timer("ConvolutionOperator"):
+                    self._convolution_apply(
+                        decomposition,
+                        displacement,
+                        force_convolution,
+                        lam,
+                        mu,
+                        conv_op,
+                        quad_weights,
+                    )
 
                 # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
@@ -1074,6 +1106,8 @@ class UnitImpulseTest3D(unittest.TestCase):
                     f"({ix}, {iy}, {iz}), "
                     f"direction {d}",
                 )
+
+        timer.print_summary(title=f"3D Non-periodic ({nx}x{ny}x{nz} grid)")
 
     def test_unit_impulse_periodic(self):
         """Test unit impulse response for periodic BC in 3D.
@@ -1130,6 +1164,8 @@ class UnitImpulseTest3D(unittest.TestCase):
             mu_field.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
         )
 
+        timer = Timer()
+
         # Test boundary and interior nodes
         test_positions = [(0, 0, 0), (4, 4, 4), (2, 3, 1)]
         for ix, iy, iz in test_positions:
@@ -1145,19 +1181,24 @@ class UnitImpulseTest3D(unittest.TestCase):
                 force_generic.p[...] = 0.0
                 force_convolution.p[...] = 0.0
 
-                fused_op.apply(displacement, lambda_field, mu_field, force_fused)
-                self._generic_apply(
-                    decomposition, displacement, force_generic, lam, mu, grad_op
-                )
-                self._convolution_apply(
-                    decomposition,
-                    displacement,
-                    force_convolution,
-                    lam,
-                    mu,
-                    conv_op,
-                    quad_weights,
-                )
+                with timer("fused"):
+                    fused_op.apply(displacement, lambda_field, mu_field, force_fused)
+
+                with timer("FEMGradientOperator"):
+                    self._generic_apply(
+                        decomposition, displacement, force_generic, lam, mu, grad_op
+                    )
+
+                with timer("ConvolutionOperator"):
+                    self._convolution_apply(
+                        decomposition,
+                        displacement,
+                        force_convolution,
+                        lam,
+                        mu,
+                        conv_op,
+                        quad_weights,
+                    )
 
                 # Compare fused vs generic FEMGradientOperator
                 np.testing.assert_allclose(
@@ -1179,6 +1220,8 @@ class UnitImpulseTest3D(unittest.TestCase):
                     f"({ix}, {iy}, {iz}), "
                     f"direction {d}",
                 )
+
+        timer.print_summary(title=f"3D Periodic ({nx}x{ny}x{nz} grid)")
 
 
 # =============================================================================

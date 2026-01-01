@@ -49,28 +49,28 @@
 namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
-    ConvolutionOperator::ConvolutionOperator(
-        const Shape_t & pixel_offset, std::span<const Real> pixel_operator,
-        const Shape_t & conv_pts_shape, const Index_t & nb_pixelnodal_pts,
-        const Index_t & nb_quad_pts, const Index_t & nb_operators)
-        : Parent{}, pixel_offset{pixel_offset}, pixel_operator{pixel_operator.begin(), pixel_operator.end()},
-          conv_pts_shape{conv_pts_shape}, nb_pixelnodal_pts{nb_pixelnodal_pts},
-          nb_quad_pts{nb_quad_pts}, nb_operators{nb_operators},
-          spatial_dim{static_cast<Dim_t>(conv_pts_shape.size())},
-          nb_conv_pts{get_nb_from_shape(conv_pts_shape)} {
-        // Check the dimension of the pixel operator
-        if (pixel_operator.size() != this->nb_operators * this->nb_quad_pts * this->nb_pixelnodal_pts * this->nb_conv_pts) {
+    StencilGradientOperator::StencilGradientOperator(
+        const Shape_t & offset, std::span<const Real> coefficients,
+        const Shape_t & stencil_shape, const Index_t & nb_pixel_input_components,
+        const Index_t & nb_quad_pts, const Index_t & nb_output_components)
+        : Parent{}, offset_{offset}, coefficients_{coefficients.begin(), coefficients.end()},
+          stencil_shape_{stencil_shape}, nb_pixel_input_components_{nb_pixel_input_components},
+          nb_quad_pts_{nb_quad_pts}, nb_output_components_{nb_output_components},
+          spatial_dim_{static_cast<Dim_t>(stencil_shape.size())},
+          nb_stencil_pts_{get_nb_from_shape(stencil_shape)} {
+        // Check the dimension of the coefficients array
+        if (coefficients.size() != this->nb_output_components_ * this->nb_quad_pts_ * this->nb_pixel_input_components_ * this->nb_stencil_pts_) {
             std::stringstream err_msg{};
             err_msg << "Size mismatch: Expected the operator has "
-                    << this->nb_operators * this->nb_quad_pts * this->nb_pixelnodal_pts * this->nb_conv_pts
+                    << this->nb_output_components_ * this->nb_quad_pts_ * this->nb_pixel_input_components_ * this->nb_stencil_pts_
                     << " entries. but received an operator with "
-                    << pixel_operator.size() << " entries";
+                    << coefficients.size() << " entries";
             throw RuntimeError{err_msg.str()};
         }
     }
 
     /* ---------------------------------------------------------------------- */
-    const GlobalFieldCollection& ConvolutionOperator::validate_fields(
+    const GlobalFieldCollection& StencilGradientOperator::validate_fields(
         const TypedFieldBase<Real> &nodal_field,
         const TypedFieldBase<Real> &quad_field,
         bool is_transpose) const {
@@ -95,13 +95,13 @@ namespace muGrid {
         }
 
         // Check that fields have the same spatial dimensions as operator
-        if (collection.get_spatial_dim() != this->spatial_dim) {
+        if (collection.get_spatial_dim() != this->spatial_dim_) {
             std::stringstream err_msg{};
             err_msg << "Spatial dimension mismatch: nodal_field and "
                        "quadrature_point_field are defined in "
                     << collection.get_spatial_dim()
                     << "D space, but this convolution operator is defined in "
-                    << this->spatial_dim << "D space";
+                    << this->spatial_dim_ << "D space";
             throw RuntimeError{err_msg.str()};
         }
 
@@ -113,11 +113,11 @@ namespace muGrid {
         const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
 
         // Base requirements for apply operation
-        const auto apply_min_left{DynGridIndex(this->spatial_dim, 0) -
-                                  DynGridIndex(this->pixel_offset)};
-        const auto apply_min_right{DynGridIndex(this->conv_pts_shape) -
-                                   DynGridIndex(this->spatial_dim, 1) +
-                                   DynGridIndex(this->pixel_offset)};
+        const auto apply_min_left{DynGridIndex(this->spatial_dim_, 0) -
+                                  DynGridIndex(this->offset_)};
+        const auto apply_min_right{DynGridIndex(this->stencil_shape_) -
+                                   DynGridIndex(this->spatial_dim_, 1) +
+                                   DynGridIndex(this->offset_)};
 
         // For transpose, swap left/right requirements
         const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
@@ -158,12 +158,12 @@ namespace muGrid {
         Index_t nb_quad_components{quad_field.get_nb_components()};
 
         // check if they match
-        if (nb_quad_components != this->nb_operators * nb_nodal_components) {
+        if (nb_quad_components != this->nb_output_components_ * nb_nodal_components) {
             std::stringstream err_msg{};
             err_msg
                 << "Size mismatch: Expected a quadrature field with "
-                << this->nb_operators * nb_nodal_components << " components ("
-                << this->nb_operators << " operators × " << nb_nodal_components
+                << this->nb_output_components_ * nb_nodal_components << " components ("
+                << this->nb_output_components_ << " operators × " << nb_nodal_components
                 << " components in the nodal field) but received a field with "
                 << nb_quad_components << " components.";
             throw RuntimeError{err_msg.str()};
@@ -173,7 +173,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const GlobalFieldCollection& ConvolutionOperator::validate_fields_generic(
+    const GlobalFieldCollection& StencilGradientOperator::validate_fields_generic(
         const Field &nodal_field,
         const Field &quad_field,
         bool is_transpose) const {
@@ -198,13 +198,13 @@ namespace muGrid {
         }
 
         // Check that fields have the same spatial dimensions as operator
-        if (collection.get_spatial_dim() != this->spatial_dim) {
+        if (collection.get_spatial_dim() != this->spatial_dim_) {
             std::stringstream err_msg{};
             err_msg << "Spatial dimension mismatch: nodal_field and "
                        "quadrature_point_field are defined in "
                     << collection.get_spatial_dim()
                     << "D space, but this convolution operator is defined in "
-                    << this->spatial_dim << "D space";
+                    << this->spatial_dim_ << "D space";
             throw RuntimeError{err_msg.str()};
         }
 
@@ -213,11 +213,11 @@ namespace muGrid {
         const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
 
         // Base requirements for apply operation
-        const auto apply_min_left{DynGridIndex(this->spatial_dim, 0) -
-                                  DynGridIndex(this->pixel_offset)};
-        const auto apply_min_right{DynGridIndex(this->conv_pts_shape) -
-                                   DynGridIndex(this->spatial_dim, 1) +
-                                   DynGridIndex(this->pixel_offset)};
+        const auto apply_min_left{DynGridIndex(this->spatial_dim_, 0) -
+                                  DynGridIndex(this->offset_)};
+        const auto apply_min_right{DynGridIndex(this->stencil_shape_) -
+                                   DynGridIndex(this->spatial_dim_, 1) +
+                                   DynGridIndex(this->offset_)};
 
         // For transpose, swap left/right requirements
         const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
@@ -258,12 +258,12 @@ namespace muGrid {
         Index_t nb_quad_components{quad_field.get_nb_components()};
 
         // check if they match
-        if (nb_quad_components != this->nb_operators * nb_nodal_components) {
+        if (nb_quad_components != this->nb_output_components_ * nb_nodal_components) {
             std::stringstream err_msg{};
             err_msg
                 << "Size mismatch: Expected a quadrature field with "
-                << this->nb_operators * nb_nodal_components << " components ("
-                << this->nb_operators << " operators × " << nb_nodal_components
+                << this->nb_output_components_ * nb_nodal_components << " components ("
+                << this->nb_output_components_ << " operators × " << nb_nodal_components
                 << " components in the nodal field) but received a field with "
                 << nb_quad_components << " components.";
             throw RuntimeError{err_msg.str()};
@@ -274,7 +274,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
-    GridTraversalParams ConvolutionOperator::compute_traversal_params(
+    GridTraversalParams StencilGradientOperator::compute_traversal_params(
         const GlobalFieldCollection& collection,
         Index_t nb_nodal_components,
         Index_t nb_quad_components) const {
@@ -293,8 +293,8 @@ namespace muGrid {
         // For SoA: each plane has separate pixels, so elems_per_pixel = 1
         if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
             params.nodal_elems_per_pixel = nb_nodal_components *
-                                           this->nb_pixelnodal_pts;
-            params.quad_elems_per_pixel = nb_quad_components * this->nb_quad_pts;
+                                           this->nb_pixel_input_components_;
+            params.quad_elems_per_pixel = nb_quad_components * this->nb_quad_pts_;
         } else {
             // SoA: base offset is just the pixel index
             params.nodal_elems_per_pixel = 1;
@@ -320,9 +320,9 @@ namespace muGrid {
 
         // Total elements in buffers (for SoA indexing)
         params.total_nodal_elements = total_buffer_pixels *
-                                      this->nb_pixelnodal_pts;
+                                      this->nb_pixel_input_components_;
         params.total_quad_elements = total_buffer_pixels *
-                                     this->nb_quad_pts * this->nb_operators;
+                                     this->nb_quad_pts_ * this->nb_output_components_;
 
         // Strides depend on storage order
         if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
@@ -353,66 +353,66 @@ namespace muGrid {
     }
 
     // Explicit template instantiations
-    template GridTraversalParams ConvolutionOperator::compute_traversal_params<
+    template GridTraversalParams StencilGradientOperator::compute_traversal_params<
         StorageOrder::ArrayOfStructures>(
         const GlobalFieldCollection&, Index_t, Index_t) const;
-    template GridTraversalParams ConvolutionOperator::compute_traversal_params<
+    template GridTraversalParams StencilGradientOperator::compute_traversal_params<
         StorageOrder::StructureOfArrays>(
         const GlobalFieldCollection&, Index_t, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
-    ConvolutionOperator::get_apply_operator(
+    StencilGradientOperator::get_apply_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
         SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
-        if (this->cached_apply_op.has_value() &&
-            this->cached_key.has_value() &&
-            this->cached_key.value() == key) {
-            return this->cached_apply_op.value();
+        if (this->cached_apply_op_.has_value() &&
+            this->cached_key_.has_value() &&
+            this->cached_key_.value() == key) {
+            return this->cached_apply_op_.value();
         }
 
         // Cache invalidated - clear both operators and rebuild
         // Use HostSpace::storage_order (ArrayOfStructures) for host operators
-        this->cached_apply_op = this->create_apply_operator<HostSpace::storage_order>(
+        this->cached_apply_op_ = this->create_apply_operator<HostSpace::storage_order>(
             nb_grid_pts, nb_nodal_components);
-        this->cached_transpose_op.reset();
-        this->cached_key = key;
-        return this->cached_apply_op.value();
+        this->cached_transpose_op_.reset();
+        this->cached_key_ = key;
+        return this->cached_apply_op_.value();
     }
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
-    ConvolutionOperator::get_transpose_operator(
+    StencilGradientOperator::get_transpose_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Check if we have a cached operator with matching parameters
         SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
-        if (this->cached_transpose_op.has_value() &&
-            this->cached_key.has_value() &&
-            this->cached_key.value() == key) {
-            return this->cached_transpose_op.value();
+        if (this->cached_transpose_op_.has_value() &&
+            this->cached_key_.has_value() &&
+            this->cached_key_.value() == key) {
+            return this->cached_transpose_op_.value();
         }
 
         // Cache invalidated - clear both operators and rebuild
         // Use HostSpace::storage_order (ArrayOfStructures) for host operators
-        this->cached_transpose_op = this->create_transpose_operator<HostSpace::storage_order>(
+        this->cached_transpose_op_ = this->create_transpose_operator<HostSpace::storage_order>(
             nb_grid_pts, nb_nodal_components);
-        this->cached_apply_op.reset();
-        this->cached_key = key;
-        return this->cached_transpose_op.value();
+        this->cached_apply_op_.reset();
+        this->cached_key_ = key;
+        return this->cached_transpose_op_.value();
     }
 
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_apply_operator(
+    StencilGradientOperator::create_apply_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between col-major index and coordinate
-        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->conv_pts_shape),
-                                              DynGridIndex(this->pixel_offset)};
+        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->stencil_shape_),
+                                              DynGridIndex(this->offset_)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
 
         // For SoA storage order, we need total element counts
@@ -421,13 +421,13 @@ namespace muGrid {
             total_pixels *= dim;
         }
         const Index_t total_nodal_elements = total_pixels *
-                                             this->nb_pixelnodal_pts;
+                                             this->nb_pixel_input_components_;
         const Index_t total_quad_elements = total_pixels *
-                                            this->nb_quad_pts * this->nb_operators;
+                                            this->nb_quad_pts_ * this->nb_output_components_;
 
         // First pass: count non-zero entries
         Index_t nnz = 0;
-        for (const Real& value: this->pixel_operator) {
+        for (const Real& value: this->coefficients_) {
             if (std::abs(value) > this->zero_tolerance) {
                 nnz += nb_nodal_components;
             }
@@ -445,15 +445,15 @@ namespace muGrid {
         // locality for apply_increment (scatter to quad_data on GPU).
         Index_t entry_idx = 0;
         // The indices on quadrature field (to write) come first
-        for (Index_t i_quad=0; i_quad < this->nb_quad_pts; ++i_quad) {
-            for (Index_t i_operator=0; i_operator < this->nb_operators; ++i_operator) {
+        for (Index_t i_quad=0; i_quad < this->nb_quad_pts_; ++i_quad) {
+            for (Index_t i_operator=0; i_operator < this->nb_output_components_; ++i_operator) {
                 // The indices on nodal field (to read)
-                for (Index_t i_stencil=0; i_stencil < this->nb_conv_pts; ++i_stencil) {
-                    for (Index_t i_node=0; i_node < this->nb_pixelnodal_pts; ++i_node) {
+                for (Index_t i_stencil=0; i_stencil < this->nb_stencil_pts_; ++i_stencil) {
+                    for (Index_t i_node=0; i_node < this->nb_pixel_input_components_; ++i_node) {
                         // Get the entry via col-major index
-                        const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
-                                             * this->nb_operators + i_operator};
-                        const auto op_value{this->pixel_operator[op_index]};
+                        const auto op_index{((i_stencil * this->nb_pixel_input_components_ + i_node) * this->nb_quad_pts_ + i_quad)
+                                             * this->nb_output_components_ + i_operator};
+                        const auto op_value{this->coefficients_[op_index]};
                         // If this is non-zero
                         if(std::abs(op_value) > this->zero_tolerance) {
                             // For each component
@@ -466,9 +466,9 @@ namespace muGrid {
                                 Index_t index_diff_nodal, index_diff_quad;
                                 if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
                                     // AoS: (pixel_offset * pts + pt) * comps + comp
-                                    index_diff_nodal = (pixel_count * this->nb_pixelnodal_pts + i_node)
+                                    index_diff_nodal = (pixel_count * this->nb_pixel_input_components_ + i_node)
                                                        * nb_nodal_components + i_component;
-                                    index_diff_quad = (i_quad * this->nb_operators + i_operator)
+                                    index_diff_quad = (i_quad * this->nb_output_components_ + i_operator)
                                                       * nb_nodal_components + i_component;
                                 } else {
                                     // SoA: pixels are consecutive within each component/subpoint plane
@@ -478,9 +478,9 @@ namespace muGrid {
                                     //       + quad * total_pixels
                                     //       + pixel_offset (added by kernel)
                                     index_diff_nodal = i_component * total_nodal_elements
-                                                       + pixel_count * this->nb_pixelnodal_pts + i_node;
+                                                       + pixel_count * this->nb_pixel_input_components_ + i_node;
                                     index_diff_quad = i_component * total_quad_elements
-                                                      + i_operator * (total_pixels * this->nb_quad_pts)
+                                                      + i_operator * (total_pixels * this->nb_quad_pts_)
                                                       + i_quad * total_pixels;
                                 }
 
@@ -500,21 +500,21 @@ namespace muGrid {
 
     // Explicit template instantiations for create_apply_operator
     template SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_apply_operator<StorageOrder::ArrayOfStructures>(
+    StencilGradientOperator::create_apply_operator<StorageOrder::ArrayOfStructures>(
         const DynGridIndex&, Index_t) const;
     template SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_apply_operator<StorageOrder::StructureOfArrays>(
+    StencilGradientOperator::create_apply_operator<StorageOrder::StructureOfArrays>(
         const DynGridIndex&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
     template<StorageOrder storage_order>
     SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_transpose_operator(
+    StencilGradientOperator::create_transpose_operator(
         const DynGridIndex & nb_grid_pts,
         const Index_t nb_nodal_components) const {
         // Helpers for conversion between index and coordinates
-        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->conv_pts_shape),
-                                              DynGridIndex(this->pixel_offset)};
+        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->stencil_shape_),
+                                              DynGridIndex(this->offset_)};
         const CcoordOps::Pixels grid_pixels{nb_grid_pts};
 
         // For SoA storage order, we need total element counts
@@ -523,13 +523,13 @@ namespace muGrid {
             total_pixels *= dim;
         }
         const Index_t total_nodal_elements = total_pixels *
-                                             this->nb_pixelnodal_pts;
+                                             this->nb_pixel_input_components_;
         const Index_t total_quad_elements = total_pixels *
-                                            this->nb_quad_pts * this->nb_operators;
+                                            this->nb_quad_pts_ * this->nb_output_components_;
 
         // First pass: count non-zero entries
         Index_t nnz = 0;
-        for (const Real& value: this->pixel_operator) {
+        for (const Real& value: this->coefficients_) {
             if (std::abs(value) > this->zero_tolerance) {
                 nnz += nb_nodal_components;
             }
@@ -547,15 +547,15 @@ namespace muGrid {
         // locality for transpose_increment (scatter to nodal_data on GPU).
         Index_t entry_idx = 0;
         // The indices on nodal field (to write) come first
-        for (Index_t i_node=0; i_node < this->nb_pixelnodal_pts; ++i_node) {
+        for (Index_t i_node=0; i_node < this->nb_pixel_input_components_; ++i_node) {
             // The indices on quadrature field (to read)
-            for (Index_t i_stencil=0; i_stencil < this->nb_conv_pts; ++i_stencil) {
-                for (Index_t i_quad=0; i_quad < this->nb_quad_pts; ++i_quad) {
-                    for (Index_t i_operator=0; i_operator < this->nb_operators; ++i_operator) {
+            for (Index_t i_stencil=0; i_stencil < this->nb_stencil_pts_; ++i_stencil) {
+                for (Index_t i_quad=0; i_quad < this->nb_quad_pts_; ++i_quad) {
+                    for (Index_t i_operator=0; i_operator < this->nb_output_components_; ++i_operator) {
                         // Get the entry via col-major index
-                        const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) * this-> nb_quad_pts + i_quad)
-                                             * this->nb_operators + i_operator};
-                        const auto op_value{this->pixel_operator[op_index]};
+                        const auto op_index{((i_stencil * this->nb_pixel_input_components_ + i_node) * this->nb_quad_pts_ + i_quad)
+                                             * this->nb_output_components_ + i_operator};
+                        const auto op_value{this->coefficients_[op_index]};
                         // If this is non-zero
                         if(std::abs(op_value) > this->zero_tolerance) {
                             // For each component
@@ -569,8 +569,8 @@ namespace muGrid {
                                 if constexpr (storage_order == StorageOrder::ArrayOfStructures) {
                                     // AoS: (pixel_offset * pts + pt) * comps + comp
                                     // NOTE: pixel_count is negated for transpose (inverse mapping)
-                                    index_diff_quad = ((-pixel_count * this->nb_quad_pts + i_quad) *
-                                                       this->nb_operators + i_operator) *
+                                    index_diff_quad = ((-pixel_count * this->nb_quad_pts_ + i_quad) *
+                                                       this->nb_output_components_ + i_operator) *
                                                       nb_nodal_components + i_component;
                                     index_diff_nodal = i_node * nb_nodal_components + i_component;
                                 } else {
@@ -578,7 +578,7 @@ namespace muGrid {
                                     // NOTE: pixel_count is negated for transpose (inverse mapping)
                                     // We read from quad at the stencil offset position
                                     index_diff_quad = i_component * total_quad_elements
-                                                      + i_operator * (total_pixels * this->nb_quad_pts)
+                                                      + i_operator * (total_pixels * this->nb_quad_pts_)
                                                       + i_quad * total_pixels
                                                       - pixel_count;
                                     index_diff_nodal = i_component * total_nodal_elements + i_node;
@@ -600,28 +600,28 @@ namespace muGrid {
 
     // Explicit template instantiations for create_transpose_operator
     template SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_transpose_operator<StorageOrder::ArrayOfStructures>(
+    StencilGradientOperator::create_transpose_operator<StorageOrder::ArrayOfStructures>(
         const DynGridIndex&, Index_t) const;
     template SparseOperatorSoA<HostSpace>
-    ConvolutionOperator::create_transpose_operator<StorageOrder::StructureOfArrays>(
+    StencilGradientOperator::create_transpose_operator<StorageOrder::StructureOfArrays>(
         const DynGridIndex&, Index_t) const;
 
     /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::clear_cache() const {
-        this->cached_apply_op.reset();
-        this->cached_transpose_op.reset();
-        this->cached_key.reset();
-        this->cached_device_apply_op.reset();
-        this->cached_device_transpose_op.reset();
+    void StencilGradientOperator::clear_cache() const {
+        this->cached_apply_op_.reset();
+        this->cached_transpose_op_.reset();
+        this->cached_key_.reset();
+        this->cached_device_apply_op_.reset();
+        this->cached_device_transpose_op_.reset();
     }
 
     /* ---------------------------------------------------------------------- */
-    Complex ConvolutionOperator::fourier(const Eigen::VectorXd & phase) const {
+    Complex StencilGradientOperator::fourier(const Eigen::VectorXd & phase) const {
         // Validate phase vector dimension
-        if (phase.size() != this->spatial_dim) {
+        if (phase.size() != this->spatial_dim_) {
             std::stringstream err_msg{};
             err_msg << "Phase dimension mismatch: expected phase vector of size "
-                    << this->spatial_dim << " but received size " << phase.size();
+                    << this->spatial_dim_ << " but received size " << phase.size();
             throw RuntimeError{err_msg.str()};
         }
 
@@ -629,30 +629,30 @@ namespace muGrid {
         Complex s{0.0, 0.0};
 
         // Helper for conversion between index and coordinates
-        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->conv_pts_shape),
-                                              DynGridIndex(this->pixel_offset)};
+        const CcoordOps::Pixels kernel_pixels{DynGridIndex(this->stencil_shape_),
+                                              DynGridIndex(this->offset_)};
 
         // Loop through all stencil points
-        for (Index_t i_stencil = 0; i_stencil < this->nb_conv_pts; ++i_stencil) {
+        for (Index_t i_stencil = 0; i_stencil < this->nb_stencil_pts_; ++i_stencil) {
             // Get the coordinate of this stencil point
             const auto stencil_coord{kernel_pixels.get_coord(i_stencil)};
 
             // Compute the dot product: phase · coordinate
             Real arg{0.0};
-            for (Index_t i = 0; i < this->spatial_dim; ++i) {
+            for (Index_t i = 0; i < this->spatial_dim_; ++i) {
                 arg += phase(i) * static_cast<Real>(stencil_coord[i]);
             }
 
             // Sum all operator values for this stencil point
             Real operator_sum{0.0};
-            for (Index_t i_node = 0; i_node < this->nb_pixelnodal_pts; ++i_node) {
-                for (Index_t i_quad = 0; i_quad < this->nb_quad_pts; ++i_quad) {
-                    for (Index_t i_operator = 0; i_operator < this->nb_operators; ++i_operator) {
+            for (Index_t i_node = 0; i_node < this->nb_pixel_input_components_; ++i_node) {
+                for (Index_t i_quad = 0; i_quad < this->nb_quad_pts_; ++i_quad) {
+                    for (Index_t i_operator = 0; i_operator < this->nb_output_components_; ++i_operator) {
                         // Get the entry via col-major index
-                        const auto op_index{((i_stencil * this->nb_pixelnodal_pts + i_node) *
-                                             this->nb_quad_pts + i_quad) *
-                                             this->nb_operators + i_operator};
-                        operator_sum += this->pixel_operator[op_index];
+                        const auto op_index{((i_stencil * this->nb_pixel_input_components_ + i_node) *
+                                             this->nb_quad_pts_ + i_quad) *
+                                             this->nb_output_components_ + i_operator};
+                        operator_sum += this->coefficients_[op_index];
                     }
                 }
             }
@@ -665,7 +665,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::apply(
+    void StencilGradientOperator::apply(
         const TypedFieldBase<Real> & nodal_field,
         TypedFieldBase<Real> & quadrature_point_field) const {
         quadrature_point_field.set_zero();
@@ -673,7 +673,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::apply_increment(
+    void StencilGradientOperator::apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
         TypedFieldBase<Real> & quadrature_point_field) const {
         // Validate fields and get collection
@@ -703,7 +703,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::transpose(
+    void StencilGradientOperator::transpose(
         const TypedFieldBase<Real> & quadrature_point_field,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
@@ -714,7 +714,7 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    void ConvolutionOperator::transpose_increment(
+    void StencilGradientOperator::transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
@@ -746,38 +746,38 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const std::vector<Real> & ConvolutionOperator::get_pixel_operator() const {
-        return this->pixel_operator;
+    const std::vector<Real> & StencilGradientOperator::get_coefficients() const {
+        return this->coefficients_;
     }
 
     /* ---------------------------------------------------------------------- */
-    const Shape_t & ConvolutionOperator::get_pixel_offset() const {
-        return this->pixel_offset;
+    const Shape_t & StencilGradientOperator::get_offset() const {
+        return this->offset_;
     }
 
     /* ---------------------------------------------------------------------- */
-    const Shape_t & ConvolutionOperator::get_conv_pts_shape() const {
-        return this->conv_pts_shape;
+    const Shape_t & StencilGradientOperator::get_stencil_shape() const {
+        return this->stencil_shape_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t ConvolutionOperator::get_nb_quad_pts() const {
-        return this->nb_quad_pts;
+    Index_t StencilGradientOperator::get_nb_quad_pts() const {
+        return this->nb_quad_pts_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t ConvolutionOperator::get_nb_operators() const {
-        return this->nb_operators;
+    Index_t StencilGradientOperator::get_nb_output_components() const {
+        return this->nb_output_components_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Index_t ConvolutionOperator::get_nb_nodal_pts() const {
-        return this->nb_pixelnodal_pts;
+    Index_t StencilGradientOperator::get_nb_input_components() const {
+        return this->nb_pixel_input_components_;
     }
 
     /* ---------------------------------------------------------------------- */
-    Dim_t ConvolutionOperator::get_spatial_dim() const {
-        return this->spatial_dim;
+    Dim_t StencilGradientOperator::get_spatial_dim() const {
+        return this->spatial_dim_;
     }
 
 }  // namespace muGrid

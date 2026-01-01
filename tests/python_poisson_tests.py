@@ -46,7 +46,7 @@ def test_fd_stencil():
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
     laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
-    assert laplace.nb_operators == 1
+    assert laplace.nb_output_components == 1
     assert laplace.nb_quad_pts == 1
 
     nb_ghosts = (1, 1)
@@ -75,7 +75,7 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
     laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
-    assert laplace.nb_operators == 1
+    assert laplace.nb_output_components == 1
     assert laplace.nb_quad_pts == 1
 
     # np.testing.assert_array_equal(decomposition.nb_subdivisions, s)

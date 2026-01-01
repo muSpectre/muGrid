@@ -67,14 +67,17 @@ DeviceType = _muGrid.DeviceType
 # Import Python wrappers for main classes (these accept wrapped Field objects)
 from .Wrappers import (  # noqa: E402
     CartesianDecomposition,
-    ConvolutionOperator,
     FEMGradientOperator,
     FFTEngine,
     FileIONetCDF,
     GlobalFieldCollection,
     LaplaceOperator,
     LocalFieldCollection,
+    StencilGradientOperator,
 )
+
+# Backwards compatibility alias
+ConvolutionOperator = StencilGradientOperator
 
 # Expose OpenMode for FileIONetCDF if available
 if hasattr(_muGrid, "FileIONetCDF"):
@@ -83,15 +86,20 @@ if hasattr(_muGrid, "FileIONetCDF"):
 # Low-level C++ classes (for advanced use cases)
 # These are prefixed with underscore to indicate they're internal
 _CartesianDecomposition = _muGrid.CartesianDecomposition
-_ConvolutionOperator = _muGrid.ConvolutionOperator
+_StencilGradientOperator = _muGrid.StencilGradientOperator
 _FFTEngine = _muGrid.FFTEngine
 _GlobalFieldCollection = _muGrid.GlobalFieldCollection
 _LocalFieldCollection = _muGrid.LocalFieldCollection
 if hasattr(_muGrid, "FileIONetCDF"):
     _FileIONetCDF = _muGrid.FileIONetCDF
 
+# Backwards compatibility alias for internal class
+_ConvolutionOperator = _StencilGradientOperator
+
 # Base classes and utilities (always C++ objects)
-ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
+GradientOperator = _muGrid.GradientOperator
+# Backwards compatibility alias
+ConvolutionOperatorBase = GradientOperator
 Decomposition = _muGrid.Decomposition
 
 # Isotropic stiffness operators (fused elliptic kernels)
@@ -144,7 +152,8 @@ __all__ = [
     # Main classes (Python wrappers)
     "CartesianDecomposition",
     "Communicator",
-    "ConvolutionOperator",
+    "StencilGradientOperator",
+    "ConvolutionOperator",  # Backwards compatibility alias
     "FFTEngine",
     "Field",
     "FileIONetCDF",
@@ -159,7 +168,8 @@ __all__ = [
     "get_domain_ccoord",
     "get_domain_index",
     # Enums and types
-    "ConvolutionOperatorBase",
+    "GradientOperator",
+    "ConvolutionOperatorBase",  # Backwards compatibility alias
     "LaplaceOperator",
     "FEMGradientOperator",
     "IsotropicStiffnessOperator2D",

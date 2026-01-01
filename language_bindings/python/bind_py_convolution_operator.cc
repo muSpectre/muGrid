@@ -47,8 +47,8 @@
 
 #include <sstream>
 
-using muGrid::ConvolutionOperatorBase;
-using muGrid::ConvolutionOperator;
+using muGrid::GradientOperator;
+using muGrid::StencilGradientOperator;
 using muGrid::LaplaceOperator;
 using muGrid::FEMGradientOperator;
 using muGrid::IsotropicStiffnessOperator2D;
@@ -61,6 +61,10 @@ using muGrid::Shape_t;
 using muGrid::HostSpace;
 using pybind11::literals::operator""_a;
 
+// Backwards compatibility aliases
+using ConvolutionOperatorBase = GradientOperator;
+using ConvolutionOperator = StencilGradientOperator;
+
 namespace py = pybind11;
 
 // Type aliases for host fields
@@ -72,11 +76,11 @@ using RealFieldDevice = TypedFieldBase<Real, DeviceSpace>;
 #endif
 
 
-// A helper class that bounces calls to virtual methods back to Python 
-class PyConvolutionOperator : public ConvolutionOperatorBase {
+// A helper class that bounces calls to virtual methods back to Python
+class PyGradientOperator : public GradientOperator {
 public:
     // Inherit the constructors
-    using ConvolutionOperatorBase::ConvolutionOperatorBase;
+    using GradientOperator::GradientOperator;
 
     // Trampoline (one for each virtual function)
 
@@ -84,7 +88,7 @@ public:
                TypedFieldBase<Real> &quadrature_point_field) const override {
         PYBIND11_OVERRIDE_PURE(
             void,
-            ConvolutionOperatorBase,
+            GradientOperator,
             apply,
             nodal_field, quadrature_point_field
         );
@@ -95,7 +99,7 @@ public:
         TypedFieldBase<Real> &quadrature_point_field) const override {
         PYBIND11_OVERRIDE_PURE(
             void,
-            ConvolutionOperatorBase,
+            GradientOperator,
             apply_increment,
             nodal_field, alpha, quadrature_point_field
         );
@@ -107,7 +111,7 @@ public:
               const std::vector<Real> &weights = {}) const override {
         PYBIND11_OVERRIDE_PURE(
             void,
-            ConvolutionOperatorBase,
+            GradientOperator,
             transpose,
             quadrature_point_field, nodal_field, weights
         );
@@ -119,67 +123,67 @@ public:
         const std::vector<Real> &weights = {}) const override {
         PYBIND11_OVERRIDE_PURE(
             void,
-            ConvolutionOperatorBase,
+            GradientOperator,
             transpose,
             quadrature_point_field, alpha, nodal_field, weights
         );
     }
 
-    Index_t get_nb_operators() const override {
+    Index_t get_nb_output_components() const override {
         PYBIND11_OVERRIDE_PURE(
             Index_t,
-            ConvolutionOperatorBase,
-            get_nb_operators,
+            GradientOperator,
+            get_nb_output_components,
         );
     }
 
     Index_t get_nb_quad_pts() const override {
         PYBIND11_OVERRIDE_PURE(
             Index_t,
-            ConvolutionOperatorBase,
+            GradientOperator,
             get_nb_quad_pts,
         );
     }
 
-    Index_t get_nb_nodal_pts() const override {
+    Index_t get_nb_input_components() const override {
         PYBIND11_OVERRIDE_PURE(
             Index_t,
-            ConvolutionOperatorBase,
-            get_nb_nodal_pts,
+            GradientOperator,
+            get_nb_input_components,
         );
     }
 
     Dim_t get_spatial_dim() const override {
         PYBIND11_OVERRIDE_PURE(
             Index_t,
-            ConvolutionOperatorBase,
+            GradientOperator,
             get_spatial_dim,
         );
     }
 };
 
 
-// Bind class GraidentOperatorBase
+// Bind class GradientOperator
 void add_convolution_operator_base(py::module &mod) {
-    py::class_<ConvolutionOperatorBase, PyConvolutionOperator>(mod, "ConvolutionOperatorBase")
+    py::class_<GradientOperator, PyGradientOperator>(mod, "GradientOperator")
             .def(py::init<>())
-            .def("apply", &ConvolutionOperatorBase::apply, "nodal_field"_a, "quadrature_point_field"_a)
-            .def_property_readonly("nb_quad_pts", &ConvolutionOperatorBase::get_nb_quad_pts)
-            .def_property_readonly("nb_nodal_pts", &ConvolutionOperatorBase::get_nb_nodal_pts)
-            .def_property_readonly("nb_operators", &ConvolutionOperatorBase::get_nb_operators)
-            .def_property_readonly("spatial_dim", &ConvolutionOperatorBase::get_spatial_dim);
+            .def("apply", &GradientOperator::apply, "nodal_field"_a, "quadrature_point_field"_a)
+            .def_property_readonly("nb_quad_pts", &GradientOperator::get_nb_quad_pts)
+            .def_property_readonly("nb_input_components", &GradientOperator::get_nb_input_components)
+            .def_property_readonly("nb_output_components", &GradientOperator::get_nb_output_components)
+            .def_property_readonly("spatial_dim", &GradientOperator::get_spatial_dim);
 }
 
 
-// Bind class ConvolutionOperator
+// Bind class StencilGradientOperator
 void add_convolution_operator_default(py::module &mod) {
     // Function pointer types for explicit overload selection
-    using ApplyHostFn = void (ConvolutionOperator::*)(
+    using ApplyHostFn = void (StencilGradientOperator::*)(
         const RealFieldHost&, RealFieldHost&) const;
-    using TransposeHostFn = void (ConvolutionOperator::*)(
+    using TransposeHostFn = void (StencilGradientOperator::*)(
         const RealFieldHost&, RealFieldHost&, const std::vector<Real>&) const;
 
-    auto conv_op = py::class_<ConvolutionOperator, ConvolutionOperatorBase>(mod, "ConvolutionOperator")
+    auto conv_op = py::class_<StencilGradientOperator, GradientOperator>(mod, "StencilGradientOperator")
             .def(py::init(
                      [](const Shape_t &offset, py::array_t<Real, py::array::f_style | py::array::forcecast> array) {
                          // Array should have shape (directions, quadrature-points, nodal-points, pixels)
@@ -188,17 +192,17 @@ void add_convolution_operator_default(py::module &mod) {
                          if (nb_dims != 1 && nb_dims != 2 && nb_dims != 3) {
                              throw std::runtime_error("Stencil must be 1D, 2D or 3D");
                          }
-                         py::ssize_t nb_operators{1};
+                         py::ssize_t nb_output_components{1};
                          if (static_cast<size_t>(array.ndim()) > nb_dims) {
-                             nb_operators = array.shape(0);
+                             nb_output_components = array.shape(0);
                          }
                          py::ssize_t nb_quad_pts{1};
                          if (static_cast<size_t>(array.ndim()) > nb_dims + 1) {
                              nb_quad_pts = array.shape(1);
                          }
-                         py::ssize_t nb_nodal_pts{1};
+                         py::ssize_t nb_input_components{1};
                          if (static_cast<size_t>(array.ndim()) > nb_dims + 2) {
-                             nb_nodal_pts = array.shape(2);
+                             nb_input_components = array.shape(2);
                          }
                          Shape_t nb_stencil_pts(nb_dims);
                          // .shape() returns a pointer to dimension array
@@ -207,26 +211,26 @@ void add_convolution_operator_default(py::module &mod) {
 
                         // Number of entries in the operator
                          const auto nb_entries{
-                            nb_operators * nb_quad_pts * nb_nodal_pts *
+                            nb_output_components * nb_quad_pts * nb_input_components *
                             std::accumulate(nb_stencil_pts.begin(),
                                             nb_stencil_pts.end(), 1,
                                             std::multiplies<Index_t>())};
-                         return ConvolutionOperator(offset, std::span<const Real>(array.data(), nb_entries),
-                                                    nb_stencil_pts, nb_nodal_pts, nb_quad_pts, nb_operators);
+                         return StencilGradientOperator(offset, std::span<const Real>(array.data(), nb_entries),
+                                                        nb_stencil_pts, nb_input_components, nb_quad_pts, nb_output_components);
                     }),
-                 "nb_spatial_dims"_a, "pixel_operator"_a)
+                 "offset"_a, "coefficients"_a)
             // Host field overloads (always available)
             .def("apply",
-                 static_cast<ApplyHostFn>(&ConvolutionOperator::apply),
+                 static_cast<ApplyHostFn>(&StencilGradientOperator::apply),
                  "nodal_field"_a, "quadrature_point_field"_a,
-                 "Apply convolution to host (CPU) fields")
+                 "Apply gradient operator to host (CPU) fields")
             .def("transpose",
-                 static_cast<TransposeHostFn>(&ConvolutionOperator::transpose),
+                 static_cast<TransposeHostFn>(&StencilGradientOperator::transpose),
                  "quadrature_point_field"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
-                 "Apply transpose convolution to host (CPU) fields")
+                 "Apply transpose (divergence) to host (CPU) fields")
             .def("fourier",
-                 [](const ConvolutionOperator & op,
+                 [](const StencilGradientOperator & op,
                     py::array_t<Real, py::array::f_style> phases) {
                      // Extract buffer info from input phases array
                      py::buffer_info phases_info = phases.request();
@@ -312,32 +316,31 @@ void add_convolution_operator_default(py::module &mod) {
                  >>> phases = np.stack([qx, qy], axis=0)  # shape (2, 10, 10)
                  >>> coeffs = op.fourier(phases)  # Returns array of shape (10, 10)
                  )pbdoc")
-            .def_property_readonly("pixel_operator", &ConvolutionOperator::get_pixel_operator)
             .def_property_readonly("offset",
-                [](const ConvolutionOperator & op) {
-                    const auto& offset = op.get_pixel_offset();
+                [](const StencilGradientOperator & op) {
+                    const auto& offset = op.get_offset();
                     return py::array_t<Index_t>(offset.size(), offset.data());
                 },
                 "Stencil offset in number of pixels")
-            .def_property_readonly("shape",
-                [](const ConvolutionOperator & op) {
-                    const auto& shape = op.get_conv_pts_shape();
+            .def_property_readonly("stencil_shape",
+                [](const StencilGradientOperator & op) {
+                    const auto& shape = op.get_stencil_shape();
                     return py::array_t<Index_t>(shape.size(), shape.data());
                 },
                 "Shape of the convolution stencil")
             .def_property_readonly("coefficients",
-                [](const ConvolutionOperator & op) {
-                    const auto& flat_op = op.get_pixel_operator();
-                    const auto& stencil_shape = op.get_conv_pts_shape();
-                    const auto nb_operators = op.get_nb_operators();
+                [](const StencilGradientOperator & op) {
+                    const auto& flat_op = op.get_coefficients();
+                    const auto& stencil_shape = op.get_stencil_shape();
+                    const auto nb_output_components = op.get_nb_output_components();
                     const auto nb_quad_pts = op.get_nb_quad_pts();
-                    const auto nb_nodal_pts = op.get_nb_nodal_pts();
+                    const auto nb_input_components = op.get_nb_input_components();
 
-                    // Build the full shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape)
+                    // Build the full shape: (nb_output_components, nb_quad_pts, nb_input_components, *stencil_shape)
                     std::vector<py::ssize_t> full_shape;
-                    full_shape.push_back(nb_operators);
+                    full_shape.push_back(nb_output_components);
                     full_shape.push_back(nb_quad_pts);
-                    full_shape.push_back(nb_nodal_pts);
+                    full_shape.push_back(nb_input_components);
                     for (const auto& dim : stencil_shape) {
                         full_shape.push_back(dim);
                     }
@@ -367,29 +370,29 @@ void add_convolution_operator_default(py::module &mod) {
                 --------
                 >>> # 2D Laplacian stencil
                 >>> stencil_2d = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-                >>> op = muGrid.ConvolutionOperator([-1, -1], stencil_2d)
+                >>> op = muGrid.StencilGradientOperator([-1, -1], stencil_2d)
                 >>> reshaped = op.coefficients
-                >>> reshaped.shape  # (1, 1, 1, 3, 3) for 1 operator, 1 quad pt, 1 nodal pt
+                >>> reshaped.shape  # (1, 1, 1, 3, 3) for 1 output component, 1 quad pt, 1 input component
                 )pbdoc")
-            .def_property_readonly("spatial_dim", &ConvolutionOperator::get_spatial_dim)
-            .def_property_readonly("nb_quad_pts", &ConvolutionOperator::get_nb_quad_pts)
-            .def_property_readonly("nb_nodal_pts", &ConvolutionOperator::get_nb_nodal_pts)
-            .def_property_readonly("nb_operators", &ConvolutionOperator::get_nb_operators);
+            .def_property_readonly("spatial_dim", &StencilGradientOperator::get_spatial_dim)
+            .def_property_readonly("nb_quad_pts", &StencilGradientOperator::get_nb_quad_pts)
+            .def_property_readonly("nb_input_components", &StencilGradientOperator::get_nb_input_components)
+            .def_property_readonly("nb_output_components", &StencilGradientOperator::get_nb_output_components);
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device field overloads (only when GPU backend is enabled)
-    using ApplyDeviceFn = void (ConvolutionOperator::*)(
+    using ApplyDeviceFn = void (StencilGradientOperator::*)(
         const RealFieldDevice&, RealFieldDevice&) const;
-    using TransposeDeviceFn = void (ConvolutionOperator::*)(
+    using TransposeDeviceFn = void (StencilGradientOperator::*)(
         const RealFieldDevice&, RealFieldDevice&, const std::vector<Real>&) const;
 
     conv_op
         .def("apply",
-             static_cast<ApplyDeviceFn>(&ConvolutionOperator::apply),
+             static_cast<ApplyDeviceFn>(&StencilGradientOperator::apply),
              "nodal_field"_a, "quadrature_point_field"_a,
              "Apply convolution to device (GPU) fields")
         .def("transpose",
-             static_cast<TransposeDeviceFn>(&ConvolutionOperator::transpose),
+             static_cast<TransposeDeviceFn>(&StencilGradientOperator::transpose),
              "quadrature_point_field"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
              "Apply transpose convolution to device (GPU) fields");
@@ -417,8 +420,8 @@ void add_laplace_operator(py::module &mod) {
         incorporate grid spacing and sign conventions (e.g., for making
         the operator positive-definite for use with CG solvers).
 
-        This operator inherits from ConvolutionOperatorBase and can be used
-        interchangeably with the generic ConvolutionOperator. The hard-coded
+        This operator inherits from GradientOperator and can be used
+        interchangeably with the generic StencilGradientOperator. The hard-coded
         implementation provides significantly better performance (~3-10x) due
         to compile-time known memory access patterns that enable SIMD
         vectorization.
@@ -440,29 +443,29 @@ void add_laplace_operator(py::module &mod) {
              "Scale factor applied to output")
         .def_property_readonly("offset",
             [](const LaplaceOperator & op) {
-                const auto& offset = op.get_pixel_offset();
+                const auto& offset = op.get_offset();
                 return py::array_t<Index_t>(offset.size(), offset.data());
             },
             "Stencil offset in number of pixels")
-        .def_property_readonly("shape",
+        .def_property_readonly("stencil_shape",
             [](const LaplaceOperator & op) {
-                const auto& shape = op.get_conv_pts_shape();
+                const auto& shape = op.get_stencil_shape();
                 return py::array_t<Index_t>(shape.size(), shape.data());
             },
             "Shape of the convolution stencil")
         .def_property_readonly("coefficients",
             [](const LaplaceOperator & op) {
-                const auto& flat_op = op.get_pixel_operator();
-                const auto& stencil_shape = op.get_conv_pts_shape();
-                const auto nb_operators = op.get_nb_operators();
+                const auto& flat_op = op.get_coefficients();
+                const auto& stencil_shape = op.get_stencil_shape();
+                const auto nb_output_components = op.get_nb_output_components();
                 const auto nb_quad_pts = op.get_nb_quad_pts();
-                const auto nb_nodal_pts = op.get_nb_nodal_pts();
+                const auto nb_input_components = op.get_nb_input_components();
 
-                // Build the full shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape)
+                // Build the full shape: (nb_output_components, nb_quad_pts, nb_input_components, *stencil_shape)
                 std::vector<py::ssize_t> full_shape;
-                full_shape.push_back(nb_operators);
+                full_shape.push_back(nb_output_components);
                 full_shape.push_back(nb_quad_pts);
-                full_shape.push_back(nb_nodal_pts);
+                full_shape.push_back(nb_input_components);
                 for (const auto& dim : stencil_shape) {
                     full_shape.push_back(dim);
                 }
@@ -528,8 +531,8 @@ void add_fem_gradient_operator(py::module &mod) {
         Shape function gradients are compile-time constants for linear elements,
         enabling SIMD vectorization and optimal performance.
 
-        This operator inherits from ConvolutionOperatorBase and can be used
-        interchangeably with the generic ConvolutionOperator.
+        This operator inherits from GradientOperator and can be used
+        interchangeably with the generic StencilGradientOperator.
         )pbdoc")
         .def(py::init<Index_t, std::vector<Real>>(),
              "spatial_dim"_a, "grid_spacing"_a = std::vector<Real>{},
@@ -550,29 +553,29 @@ void add_fem_gradient_operator(py::module &mod) {
              "Get the quadrature weights (one per quadrature point)")
         .def_property_readonly("offset",
             [](const FEMGradientOperator & op) {
-                const auto& offset = op.get_pixel_offset();
+                const auto& offset = op.get_offset();
                 return py::array_t<Index_t>(offset.size(), offset.data());
             },
             "Stencil offset in number of pixels")
-        .def_property_readonly("shape",
+        .def_property_readonly("stencil_shape",
             [](const FEMGradientOperator & op) {
-                const auto& shape = op.get_conv_pts_shape();
+                const auto& shape = op.get_stencil_shape();
                 return py::array_t<Index_t>(shape.size(), shape.data());
             },
             "Shape of the convolution stencil")
         .def_property_readonly("coefficients",
             [](const FEMGradientOperator & op) {
-                const auto& flat_op = op.get_pixel_operator();
-                const auto& stencil_shape = op.get_conv_pts_shape();
-                const auto nb_operators = op.get_nb_operators();
+                const auto& flat_op = op.get_coefficients();
+                const auto& stencil_shape = op.get_stencil_shape();
+                const auto nb_output_components = op.get_nb_output_components();
                 const auto nb_quad_pts = op.get_nb_quad_pts();
-                const auto nb_nodal_pts = op.get_nb_nodal_pts();
+                const auto nb_input_components = op.get_nb_input_components();
 
-                // Build the full shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *stencil_shape)
+                // Build the full shape: (nb_output_components, nb_quad_pts, nb_input_components, *stencil_shape)
                 std::vector<py::ssize_t> full_shape;
-                full_shape.push_back(nb_operators);
+                full_shape.push_back(nb_output_components);
                 full_shape.push_back(nb_quad_pts);
-                full_shape.push_back(nb_nodal_pts);
+                full_shape.push_back(nb_input_components);
                 for (const auto& dim : stencil_shape) {
                     full_shape.push_back(dim);
                 }
@@ -776,4 +779,8 @@ void add_convolution_operator_classes(py::module &mod) {
     add_fem_gradient_operator(mod);
     add_isotropic_stiffness_operator_2d(mod);
     add_isotropic_stiffness_operator_3d(mod);
+
+    // Backwards compatibility aliases
+    mod.attr("ConvolutionOperatorBase") = mod.attr("GradientOperator");
+    mod.attr("ConvolutionOperator") = mod.attr("StencilGradientOperator");
 }

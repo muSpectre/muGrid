@@ -1,5 +1,5 @@
 /**
- * @file   gradient_operator_default.hh
+ * @file   convolution_operator.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  * @author Martin Ladecký <m.ladecky@gmail.com>
@@ -69,11 +69,10 @@ namespace muGrid {
     };
 
     /**
-     * @class ConvolutionOperator
-     * @brief Implements convolution operations that can be applied pixel-wise to
-     * the field.
+     * @class StencilGradientOperator
+     * @brief Implements gradient operations using a stencil-based approach.
      *
-     * This class extends ConvolutionOperatorBase to provide specific implementations
+     * This class extends GradientOperator to provide specific implementations
      * for gradient and divergence operations based on the shape function
      * gradients for each quadrature point. It is designed to work with fields
      * defined on nodal points and quadrature points, facilitating the evaluation
@@ -87,49 +86,49 @@ namespace muGrid {
      * @note This class cannot be instantiated directly and does not support copy
      *       construction or copy assignment.
      */
-    class ConvolutionOperator : public ConvolutionOperatorBase {
+    class StencilGradientOperator : public GradientOperator {
     public:
-        using Parent = ConvolutionOperatorBase;
+        using Parent = GradientOperator;
 
         //! Default constructor is deleted to prevent instantiation.
-        ConvolutionOperator() = delete;
+        StencilGradientOperator() = delete;
 
         /**
-         * @brief Constructs a ConvolutionOperator object. It initializes
-         * the convolution operator with the provided pixel-wise operator,
+         * @brief Constructs a StencilGradientOperator object. It initializes
+         * the gradient operator with the provided stencil coefficients,
          * and necessary information to indicate its shape.
          *
-         * @param pixel_offset Stencil offset in number of pixels
-         * @param pixel_operator The pixel-wise operator raveled as an array.
-         * @param conv_pts_shape Shape of the stencil.
-         * @param nb_pixelnodal_pts Number of nodal points per pixel.
+         * @param offset Stencil offset in number of pixels
+         * @param coefficients The stencil coefficients raveled as an array.
+         * @param stencil_shape Shape of the stencil.
+         * @param nb_pixel_input_components Number of input components per pixel.
          * @param nb_quad_pts Number of quadrature points per pixel.
-         * @param nb_operators Number of operators in the stencil.
+         * @param nb_output_components Number of output components.
          */
-        ConvolutionOperator(
-            const Shape_t &pixel_offset,
-            std::span<const Real> pixel_operator,
-            const Shape_t &conv_pts_shape,
-            const Index_t &nb_pixelnodal_pts,
+        StencilGradientOperator(
+            const Shape_t &offset,
+            std::span<const Real> coefficients,
+            const Shape_t &stencil_shape,
+            const Index_t &nb_pixel_input_components,
             const Index_t &nb_quad_pts,
-            const Index_t &nb_operators);
+            const Index_t &nb_output_components);
 
         //! Copy constructor
-        ConvolutionOperator(const ConvolutionOperator &other) = delete;
+        StencilGradientOperator(const StencilGradientOperator &other) = delete;
 
         //! Move constructor
-        ConvolutionOperator(ConvolutionOperator &&other) = default;
+        StencilGradientOperator(StencilGradientOperator &&other) = default;
 
         //! Destructor
-        ~ConvolutionOperator() override = default;
+        ~StencilGradientOperator() override = default;
 
         //! Copy assignment operator
-        ConvolutionOperator &
-        operator=(const ConvolutionOperator &other) = delete;
+        StencilGradientOperator &
+        operator=(const StencilGradientOperator &other) = delete;
 
         //! Move assignment operator
-        ConvolutionOperator &
-        operator=(ConvolutionOperator &&other) = default;
+        StencilGradientOperator &
+        operator=(StencilGradientOperator &&other) = default;
 
         /**
          * Evaluates the gradient of nodal_field into quadrature_point_field
@@ -242,20 +241,19 @@ namespace muGrid {
 #endif
 
         /**
-         * Return the operator array linking the nodal degrees of freedom to their
-         * quadrature-point values.
+         * Return the stencil coefficients.
          */
-        const std::vector<Real> &get_pixel_operator() const;
+        const std::vector<Real> &get_coefficients() const;
 
         /**
          * Return the stencil offset in number of pixels.
          */
-        const Shape_t &get_pixel_offset() const;
+        const Shape_t &get_offset() const;
 
         /**
-         * Return the shape of the convolution stencil.
+         * Return the shape of the stencil.
          */
-        const Shape_t &get_conv_pts_shape() const;
+        const Shape_t &get_stencil_shape() const;
 
         /**
          * returns the number of quadrature points are associated with any
@@ -265,16 +263,16 @@ namespace muGrid {
         Index_t get_nb_quad_pts() const final;
 
         /**
-         * returns the number of operators
+         * returns the number of output components
          */
-        Index_t get_nb_operators() const final;
+        Index_t get_nb_output_components() const final;
 
         /**
-         * returns the number of nodal points associated with any pixel/voxel.
+         * returns the number of input components associated with any pixel/voxel.
          * (Every node belonging to at least one of the elements belonging to any
          * pixel/voxel, without recounting nodes that appear multiple times)
          */
-        Index_t get_nb_nodal_pts() const final;
+        Index_t get_nb_input_components() const final;
 
         /**
          * return the spatial dimension of this gradient operator
@@ -287,7 +285,7 @@ namespace muGrid {
         void clear_cache() const;
 
         /**
-         * Compute the Fourier representation of this convolution operator
+         * Compute the Fourier representation of this stencil operator
          *
          * Converts a translationally invariant linear combination of grid values
          * into a multiplication with a complex number in Fourier space.
@@ -301,52 +299,50 @@ namespace muGrid {
         /**
          * stencil offset in number of pixels
          */
-        Shape_t pixel_offset{};
+        Shape_t offset_{};
         /**
-         * array linking the nodal degrees of freedom to their quadrature-point
-         * values.
+         * Stencil coefficients linking the nodal degrees of freedom to their
+         * quadrature-point values.
          */
-        std::vector<Real> pixel_operator{};
+        std::vector<Real> coefficients_{};
         /**
-         * number of convolution points, i.e., number of nodal points that is
-         * involved in the convolution of one pixel.
+         * Shape of the stencil (number of pixels in each dimension).
          */
-        Shape_t conv_pts_shape;
+        Shape_t stencil_shape_;
         /**
-         * number of pixel nodal points. When the grid gets complicated,
+         * number of input components per pixel. When the grid gets complicated,
          * it shall be divided into sub-grids, where each of them is a
-         * regular grid. Hence the name "pixel nodal".
+         * regular grid.
          */
-        Index_t nb_pixelnodal_pts;
+        Index_t nb_pixel_input_components_;
         /**
          * number of quadrature points per pixel (e.g.. 4 for linear
          * quadrilateral)
          */
-        Index_t nb_quad_pts;
+        Index_t nb_quad_pts_;
         /**
-         * number of nodal points that is involved in the convolution of this pixel.
+         * number of output components (e.g., spatial dimension for gradients)
          */
-        Index_t nb_operators;
+        Index_t nb_output_components_;
         /**
-         * the spatial dimension & number of the nodal points involved in the
-         * convolution of one pixel.
+         * the spatial dimension & number of stencil points
          */
-        Dim_t spatial_dim;
-        Index_t nb_conv_pts;
+        Dim_t spatial_dim_;
+        Index_t nb_stencil_pts_;
 
         //! Tolerance for considering operator values as zero
         static constexpr Real zero_tolerance = 1e-14;
 
         //! Cached sparse operators for reuse (two orderings for optimal access)
         //! Row-major: groups by quad index (optimal for apply - write locality)
-        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_apply_op{};
+        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_apply_op_{};
         //! Column-major: groups by nodal index (optimal for transpose - write locality)
-        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_transpose_op{};
-        mutable std::optional<SparseOperatorCacheKey> cached_key{};
+        mutable std::optional<SparseOperatorSoA<HostSpace>> cached_transpose_op_{};
+        mutable std::optional<SparseOperatorCacheKey> cached_key_{};
 
         //! Device-space cached operators (lazily copied from host)
-        mutable std::optional<SparseOperatorSoA<DefaultDeviceSpace>> cached_device_apply_op{};
-        mutable std::optional<SparseOperatorSoA<DefaultDeviceSpace>> cached_device_transpose_op{};
+        mutable std::optional<SparseOperatorSoA<DefaultDeviceSpace>> cached_device_apply_op_{};
+        mutable std::optional<SparseOperatorSoA<DefaultDeviceSpace>> cached_device_transpose_op_{};
 
         /**
          * @brief Validate that fields are compatible with this operator
@@ -524,6 +520,9 @@ namespace muGrid {
                                       Index_t nb_nodal_components) const;
     };
 
+    // Backwards compatibility alias
+    using ConvolutionOperator = StencilGradientOperator;
+
     // Kernel functions and deep_copy_sparse_operator are now in operators/convolution_kernels.hh
 
     /**
@@ -557,17 +556,17 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Template method implementations for ConvolutionOperator                */
+    /* Template method implementations for StencilGradientOperator            */
     /* ---------------------------------------------------------------------- */
 
     template<typename DeviceSpace>
-    void ConvolutionOperator::apply_on_device(
+    void StencilGradientOperator::apply_on_device(
         const Real* nodal_data,
         Real* quad_data,
         const Real alpha,
         const GridTraversalParams& params) const {
         // Get device sparse operator (lazily copies from host if needed)
-        const auto& sparse_op = this->cached_device_apply_op.value();
+        const auto& sparse_op = this->cached_device_apply_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
         KernelDispatcher<DeviceSpace>::apply_convolution(
@@ -575,13 +574,13 @@ namespace muGrid {
     }
 
     template<typename DeviceSpace>
-    void ConvolutionOperator::transpose_on_device(
+    void StencilGradientOperator::transpose_on_device(
         const Real* quad_data,
         Real* nodal_data,
         const Real alpha,
         const GridTraversalParams& params) const {
         // Get device sparse operator (lazily copies from host if needed)
-        const auto& sparse_op = this->cached_device_transpose_op.value();
+        const auto& sparse_op = this->cached_device_transpose_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
         KernelDispatcher<DeviceSpace>::transpose_convolution(
@@ -590,38 +589,38 @@ namespace muGrid {
 
     template<typename DeviceSpace>
     const SparseOperatorSoA<DeviceSpace>&
-    ConvolutionOperator::get_device_apply_operator(
+    StencilGradientOperator::get_device_apply_operator(
         const DynGridIndex& nb_grid_pts,
         Index_t nb_nodal_components) const {
         // Check if device cache needs update
-        if (!this->cached_device_apply_op.has_value()) {
+        if (!this->cached_device_apply_op_.has_value()) {
             // Create operator with SoA indices (device storage order) and copy to device
             // Device spaces use StructureOfArrays for optimal memory coalescence
             auto host_soa_op = this->create_apply_operator<DeviceSpace::storage_order>(
                 nb_grid_pts, nb_nodal_components);
-            this->cached_device_apply_op = muGrid::deep_copy_sparse_operator<
+            this->cached_device_apply_op_ = muGrid::deep_copy_sparse_operator<
                 DeviceSpace, HostSpace>(host_soa_op);
         }
 
-        return this->cached_device_apply_op.value();
+        return this->cached_device_apply_op_.value();
     }
 
     template<typename DeviceSpace>
     const SparseOperatorSoA<DeviceSpace>&
-    ConvolutionOperator::get_device_transpose_operator(
+    StencilGradientOperator::get_device_transpose_operator(
         const DynGridIndex& nb_grid_pts,
         Index_t nb_nodal_components) const {
         // Check if device cache needs update
-        if (!this->cached_device_transpose_op.has_value()) {
+        if (!this->cached_device_transpose_op_.has_value()) {
             // Create operator with SoA indices (device storage order) and copy to device
             // Device spaces use StructureOfArrays for optimal memory coalescence
             auto host_soa_op = this->create_transpose_operator<DeviceSpace::storage_order>(
                 nb_grid_pts, nb_nodal_components);
-            this->cached_device_transpose_op = muGrid::deep_copy_sparse_operator<
+            this->cached_device_transpose_op_ = muGrid::deep_copy_sparse_operator<
                 DeviceSpace, HostSpace>(host_soa_op);
         }
 
-        return this->cached_device_transpose_op.value();
+        return this->cached_device_transpose_op_.value();
     }
 
 } // namespace muGrid

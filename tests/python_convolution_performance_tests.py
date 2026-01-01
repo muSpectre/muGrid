@@ -213,16 +213,15 @@ def count_theoretical_flops(conv_op, nodal_field, quad_field, grid_size):
     """
     nb_pixels = np.prod(grid_size)
     nb_components = nodal_field.nb_components
-    nb_operators = conv_op.nb_operators
+    nb_operators = conv_op.nb_output_components
     nb_quad_pts = conv_op.nb_quad_pts
-    nb_nodal_pts = conv_op.nb_nodal_pts
+    nb_nodal_pts = conv_op.nb_input_components
 
     # Get stencil shape from the operator
-    # This is a bit tricky - we need to compute nb_conv_pts from the stencil
-    # For now, estimate from the operator matrix dimensions
-    # pixel_operator returns a flat list, so we compute nb_conv_pts from total size
-    operator_list = conv_op.pixel_operator
-    total_elements = len(operator_list)
+    # coefficients returns a shaped array:
+    # (nb_output_components, nb_quad_pts, nb_input_components, *stencil_shape)
+    coefficients = conv_op.coefficients
+    total_elements = coefficients.size
     # Total elements = nb_operators * nb_quad_pts * nb_nodal_pts * nb_conv_pts
     nb_conv_pts = total_elements // (nb_operators * nb_quad_pts * nb_nodal_pts)
 
@@ -358,7 +357,7 @@ def measure_convolution_performance(
         grid_size=grid_size,
         stencil_size=stencil_size,
         nb_components=nodal_field.nb_components,
-        nb_operators=conv_op.nb_operators,
+        nb_operators=conv_op.nb_output_components,
         nb_quad_pts=conv_op.nb_quad_pts,
         device=device,
         papi_cycles=papi_values.get("cycles"),

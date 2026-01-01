@@ -59,8 +59,8 @@ namespace muGrid {
      * incorporate grid spacing and sign conventions (e.g., for making
      * the operator positive-definite for use with CG solvers).
      *
-     * This operator inherits from ConvolutionOperatorBase and can be used
-     * interchangeably with the generic ConvolutionOperator. The hard-coded
+     * This operator inherits from GradientOperator and can be used
+     * interchangeably with the generic StencilGradientOperator. The hard-coded
      * implementation provides significantly better performance (~3-10x) due
      * to compile-time known memory access patterns that enable SIMD
      * vectorization.
@@ -68,9 +68,9 @@ namespace muGrid {
      * Since the Laplacian is self-adjoint (symmetric), the transpose operation
      * is identical to the forward apply operation.
      */
-    class LaplaceOperator : public ConvolutionOperatorBase {
+    class LaplaceOperator : public GradientOperator {
     public:
-        using Parent = ConvolutionOperatorBase;
+        using Parent = GradientOperator;
 
         /**
          * @brief Construct a Laplace operator for the given dimension.
@@ -171,10 +171,10 @@ namespace muGrid {
 #endif
 
         /**
-         * @brief Get the number of operators (always 1 for Laplacian).
+         * @brief Get the number of output components (always 1 for Laplacian).
          * @return 1
          */
-        Index_t get_nb_operators() const override { return 1; }
+        Index_t get_nb_output_components() const override { return 1; }
 
         /**
          * @brief Get the number of quadrature points (always 1 for Laplacian).
@@ -183,10 +183,10 @@ namespace muGrid {
         Index_t get_nb_quad_pts() const override { return 1; }
 
         /**
-         * @brief Get the number of nodal points (always 1 for Laplacian).
+         * @brief Get the number of input components (always 1 for Laplacian).
          * @return 1
          */
-        Index_t get_nb_nodal_pts() const override { return 1; }
+        Index_t get_nb_input_components() const override { return 1; }
 
         /**
          * @brief Get the spatial dimension.
@@ -212,7 +212,7 @@ namespace muGrid {
          * @brief Get the stencil offset.
          * @return Stencil offset in pixels (centered: [-1,-1] for 2D, [-1,-1,-1] for 3D)
          */
-        Shape_t get_pixel_offset() const {
+        Shape_t get_offset() const {
             return Shape_t(spatial_dim, -1);
         }
 
@@ -220,7 +220,7 @@ namespace muGrid {
          * @brief Get the stencil shape.
          * @return Shape of the stencil ([3,3] for 2D, [3,3,3] for 3D)
          */
-        Shape_t get_conv_pts_shape() const {
+        Shape_t get_stencil_shape() const {
             return Shape_t(spatial_dim, 3);
         }
 
@@ -231,7 +231,7 @@ namespace muGrid {
          * For 2D: [0, 1, 0, 1, -4, 1, 0, 1, 0] * scale
          * For 3D: 7-point stencil with center=-6*scale, neighbors=1*scale
          */
-        std::vector<Real> get_pixel_operator() const {
+        std::vector<Real> get_coefficients() const {
             if (spatial_dim == 2) {
                 return {0.0, scale, 0.0,
                         scale, -4.0*scale, scale,

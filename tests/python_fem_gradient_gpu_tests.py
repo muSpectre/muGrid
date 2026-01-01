@@ -75,7 +75,7 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
 
         # Create nodal and gradient fields
         nodal = fc.real_field("nodal", (1,))
-        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
 
         # Initialize and apply (should not raise)
         nodal.set_zero()
@@ -94,7 +94,7 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
         )
 
         nodal = fc.real_field("nodal", (1,))
-        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
 
         gradient.set_zero()
         nodal.set_zero()
@@ -122,7 +122,7 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
         )
 
         nodal = fc.real_field("nodal", (1,))
-        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
 
         nodal.set_zero()
         gradient.set_zero()
@@ -140,7 +140,7 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
         )
 
         nodal = fc.real_field("nodal", (1,))
-        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
 
         gradient.set_zero()
         nodal.set_zero()
@@ -171,7 +171,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         )
 
         nodal = fc.real_field("nodal", (1,))
-        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
 
         # Arrays should be CuPy
         self.assertIsInstance(nodal.s, cp.ndarray)
@@ -196,7 +196,9 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
-        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient_host = fc_host.real_field(
+            "gradient", (fem_grad.nb_output_components,), "quad"
+        )
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -207,7 +209,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
-            "gradient", (fem_grad.nb_operators,), "quad"
+            "gradient", (fem_grad.nb_output_components,), "quad"
         )
 
         # Initialize with same random data
@@ -236,7 +238,9 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
-        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient_host = fc_host.real_field(
+            "gradient", (fem_grad.nb_output_components,), "quad"
+        )
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -247,7 +251,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
-            "gradient", (fem_grad.nb_operators,), "quad"
+            "gradient", (fem_grad.nb_output_components,), "quad"
         )
 
         # Initialize gradient with random data
@@ -277,7 +281,9 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
-        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient_host = fc_host.real_field(
+            "gradient", (fem_grad.nb_output_components,), "quad"
+        )
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -288,7 +294,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
-            "gradient", (fem_grad.nb_operators,), "quad"
+            "gradient", (fem_grad.nb_output_components,), "quad"
         )
 
         # Initialize with same random data
@@ -318,7 +324,9 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             nb_ghosts_right=(1, 1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
-        gradient_host = fc_host.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient_host = fc_host.real_field(
+            "gradient", (fem_grad.nb_output_components,), "quad"
+        )
 
         # Create device fields
         fc_device = muGrid.GlobalFieldCollection(
@@ -329,7 +337,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
-            "gradient", (fem_grad.nb_operators,), "quad"
+            "gradient", (fem_grad.nb_output_components,), "quad"
         )
 
         # Initialize gradient with random data
@@ -360,7 +368,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
         )
 
         nodal_in = fc.real_field("nodal_in", (1,))
-        gradient = fc.real_field("gradient", (fem_grad.nb_operators,), "quad")
+        gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
         nodal_out = fc.real_field("nodal_out", (1,))
 
         # Initialize with random data

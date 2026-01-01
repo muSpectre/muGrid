@@ -797,9 +797,9 @@ class FFTEngine:
         )
 
 
-class ConvolutionOperator:
+class StencilGradientOperator:
     """
-    Python wrapper for muGrid ConvolutionOperator.
+    Python wrapper for muGrid StencilGradientOperator.
 
     Applies convolution (stencil) operations to fields. Useful for computing
     gradients, Laplacians, and other discrete differential operators.
@@ -816,7 +816,7 @@ class ConvolutionOperator:
     >>> # Create a 2D Laplacian stencil
     >>> import numpy as np
     >>> stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    >>> laplace = ConvolutionOperator([-1, -1], stencil)
+    >>> laplace = StencilGradientOperator([-1, -1], stencil)
     >>> laplace.apply(input_field, output_field)
     """
 
@@ -826,7 +826,7 @@ class ConvolutionOperator:
         stencil: ArrayLike,
     ) -> None:
         stencil_arr = np.asarray(stencil, dtype=np.float64, order="F")
-        self._cpp = _muGrid.ConvolutionOperator(list(offset), stencil_arr)
+        self._cpp = _muGrid.StencilGradientOperator(list(offset), stencil_arr)
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """
@@ -871,9 +871,9 @@ class ConvolutionOperator:
 
     def __repr__(self) -> str:
         return (
-            f"ConvolutionOperator("
+            f"StencilGradientOperator("
             f"spatial_dim={self._cpp.spatial_dim}, "
-            f"nb_operators={self._cpp.nb_operators})"
+            f"nb_output_components={self._cpp.nb_output_components})"
         )
 
 

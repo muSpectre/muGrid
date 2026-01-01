@@ -81,9 +81,9 @@ namespace muGrid {
      * Shape function gradients are compile-time constants for linear elements,
      * enabling SIMD vectorization and optimal performance.
      */
-    class FEMGradientOperator : public ConvolutionOperatorBase {
+    class FEMGradientOperator : public GradientOperator {
        public:
-        using Parent = ConvolutionOperatorBase;
+        using Parent = GradientOperator;
 
         /**
          * @brief Construct a FEM gradient operator for the given dimension.
@@ -208,10 +208,10 @@ namespace muGrid {
 #endif
 
         /**
-         * @brief Get the number of gradient components (same as spatial_dim).
-         * @return Number of operators (2 for 2D, 3 for 3D)
+         * @brief Get the number of output components (same as spatial_dim).
+         * @return Number of gradient components (2 for 2D, 3 for 3D)
          */
-        Index_t get_nb_operators() const override { return spatial_dim; }
+        Index_t get_nb_output_components() const override { return spatial_dim; }
 
         /**
          * @brief Get the number of quadrature points per pixel/voxel.
@@ -222,7 +222,7 @@ namespace muGrid {
         }
 
         /**
-         * @brief Get the number of nodal points per pixel/voxel.
+         * @brief Get the number of input components per pixel/voxel.
          *
          * For continuous FEM, nodes are shared between pixels via ghost
          * communication. Each pixel uses values from 4 (2D) or 8 (3D) grid
@@ -232,7 +232,7 @@ namespace muGrid {
          * @return 1 (one scalar value per grid point, neighbors accessed via
          * ghosts)
          */
-        Index_t get_nb_nodal_pts() const override { return 1; }
+        Index_t get_nb_input_components() const override { return 1; }
 
         /**
          * @brief Get the spatial dimension.
@@ -261,24 +261,24 @@ namespace muGrid {
          * @brief Get the stencil offset.
          * @return Stencil offset in pixels ([0,0] for 2D, [0,0,0] for 3D)
          */
-        Shape_t get_pixel_offset() const { return Shape_t(spatial_dim, 0); }
+        Shape_t get_offset() const { return Shape_t(spatial_dim, 0); }
 
         /**
          * @brief Get the stencil shape.
          * @return Shape of the stencil ([2,2] for 2D, [2,2,2] for 3D)
          */
-        Shape_t get_conv_pts_shape() const { return Shape_t(spatial_dim, 2); }
+        Shape_t get_stencil_shape() const { return Shape_t(spatial_dim, 2); }
 
         /**
-         * @brief Get the shape function gradients as pixel operator.
-         * @return Vector of shape function gradients [nb_ops * nb_quad *
-         * nb_nodal * conv_pts_size]
+         * @brief Get the stencil coefficients.
+         * @return Vector of shape function gradients as flat array
          *
          * Returns the shape function gradients scaled by grid spacing.
-         * Shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *conv_pts_shape)
-         * where conv_pts_shape is [2,2] for 2D or [2,2,2] for 3D.
+         * Shape: (nb_output_components, nb_quad_pts, nb_input_components,
+         *         *stencil_shape)
+         * where stencil_shape is [2,2] for 2D or [2,2,2] for 3D.
          */
-        std::vector<Real> get_pixel_operator() const;
+        std::vector<Real> get_coefficients() const;
 
        private:
         Dim_t spatial_dim;

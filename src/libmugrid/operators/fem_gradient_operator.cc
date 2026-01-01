@@ -162,17 +162,17 @@ namespace muGrid {
         }
 
         // Get and validate component counts
-        // Output should have nb_operators * nb_nodal_components components
+        // Output should have nb_output_components * nb_nodal_components components
         Index_t nb_nodal_components = nodal_field.get_nb_components();
         Index_t nb_grad_components = gradient_field.get_nb_components();
         Index_t expected_grad_components =
-            this->get_nb_operators() * nb_nodal_components;
+            this->get_nb_output_components() * nb_nodal_components;
 
         if (nb_grad_components != expected_grad_components) {
             std::stringstream err_msg;
             err_msg << "Component mismatch: Expected gradient field with "
                     << expected_grad_components << " components ("
-                    << this->get_nb_operators() << " operators × "
+                    << this->get_nb_output_components() << " output components × "
                     << nb_nodal_components << " nodal components) but got "
                     << nb_grad_components << " components.";
             throw RuntimeError(err_msg.str());
@@ -204,7 +204,7 @@ namespace muGrid {
         }
     }
 
-    std::vector<Real> FEMGradientOperator::get_pixel_operator() const {
+    std::vector<Real> FEMGradientOperator::get_coefficients() const {
         using namespace fem_gradient_kernels;
 
         if (this->spatial_dim == 2) {
@@ -298,7 +298,7 @@ namespace muGrid {
             // sub_pts, nx, ny] Field layout (column-major/AoS): components vary
             // FASTEST, then sub_pts, then spatial dimensions.
             Index_t nb_sub =
-                this->get_nb_nodal_pts();  // 1 (one scalar per grid point)
+                this->get_nb_input_components();  // 1 (one scalar per grid point)
             Index_t nodal_stride_c = 1;    // components are innermost
             Index_t nodal_stride_n = nb_components;
             Index_t nodal_stride_x = nb_components * nb_sub;
@@ -339,7 +339,7 @@ namespace muGrid {
 
             // Nodal field strides [components, sub_pts, x, y, z]
             // Column-major (AoS): components vary fastest
-            Index_t nb_sub = this->get_nb_nodal_pts();  // 1
+            Index_t nb_sub = this->get_nb_input_components();  // 1
             Index_t nodal_stride_c = 1;
             Index_t nodal_stride_n = nb_components;
             Index_t nodal_stride_x = nb_components * nb_sub;
@@ -401,7 +401,7 @@ namespace muGrid {
 
             // Nodal field strides [components, sub_pts, x, y]
             // Column-major (AoS): components vary fastest
-            Index_t nb_nodes = this->get_nb_nodal_pts();
+            Index_t nb_nodes = this->get_nb_input_components();
             Index_t nodal_stride_c = 1;
             Index_t nodal_stride_n = nb_components;
             Index_t nodal_stride_x = nb_components * nb_nodes;
@@ -436,7 +436,7 @@ namespace muGrid {
 
             // Nodal field strides [components, sub_pts, x, y, z]
             // Column-major (AoS): components vary fastest
-            Index_t nb_nodes = this->get_nb_nodal_pts();
+            Index_t nb_nodes = this->get_nb_input_components();
             Index_t nodal_stride_c = 1;
             Index_t nodal_stride_n = nb_components;
             Index_t nodal_stride_x = nb_components * nb_nodes;
@@ -527,7 +527,7 @@ namespace muGrid {
             Index_t nodal_stride_x = 1;
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_n = nx * ny;
-            Index_t nodal_stride_c = nx * ny * this->get_nb_nodal_pts();
+            Index_t nodal_stride_c = nx * ny * this->get_nb_input_components();
 
             // For SoA: gradient field [components, operators, nb_quad, x, y]
             // Memory: x fastest, then y, then q, then operators, then
@@ -566,7 +566,7 @@ namespace muGrid {
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_z = nx * ny;
             Index_t nodal_stride_n = nx * ny * nz;
-            Index_t nodal_stride_c = nx * ny * nz * this->get_nb_nodal_pts();
+            Index_t nodal_stride_c = nx * ny * nz * this->get_nb_input_components();
 
             // For SoA: gradient field [components, operators, nb_quad, x, y, z]
             Index_t dim = this->spatial_dim;
@@ -630,7 +630,7 @@ namespace muGrid {
             Index_t nodal_stride_x = 1;
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_n = nx * ny;
-            Index_t nodal_stride_c = nx * ny * this->get_nb_nodal_pts();
+            Index_t nodal_stride_c = nx * ny * this->get_nb_input_components();
 
             // For SoA: gradient field [components, operators, nb_quad, x, y]
             Index_t dim = this->spatial_dim;
@@ -667,7 +667,7 @@ namespace muGrid {
             Index_t nodal_stride_y = nx;
             Index_t nodal_stride_z = nx * ny;
             Index_t nodal_stride_n = nx * ny * nz;
-            Index_t nodal_stride_c = nx * ny * nz * this->get_nb_nodal_pts();
+            Index_t nodal_stride_c = nx * ny * nz * this->get_nb_input_components();
 
             // For SoA: gradient field [components, operators, nb_quad, x, y, z]
             Index_t dim = this->spatial_dim;

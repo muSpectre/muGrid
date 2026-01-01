@@ -5,7 +5,7 @@
  *
  * @date   09 Dec 2025
  *
- * @brief  Tests for the ConvolutionOperator with GPU support
+ * @brief  Tests for the StencilGradientOperator with GPU support
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -60,26 +60,26 @@ namespace muGrid {
     static constexpr Real del_z = 1.0;
 
     // Simple bilinear (2D) or trilinear (3D) operator
-    // 1 nodal point per pixel, 1 quad point per pixel, 1 operator
-    static constexpr Index_t NbNodalPts = 1;
+    // 1 input component per pixel, 1 quad point per pixel, Dim output components
+    static constexpr Index_t NbInputComponents = 1;
     static constexpr Index_t NbQuadPts = 1;
-    static constexpr Index_t NbOperators = Dim;  // gradient has Dim components
+    static constexpr Index_t NbOutputComponents = Dim;  // gradient has Dim components
 
-    static Shape_t get_pixel_offset() {
+    static Shape_t get_offset() {
       Shape_t offset(Dim, 0);
       return offset;
     }
 
-    static Shape_t get_conv_pts_shape() {
+    static Shape_t get_stencil_shape() {
       Shape_t shape(Dim, 2);  // 2^Dim stencil points
       return shape;
     }
 
-    static std::vector<Real> get_pixel_operator() {
+    static std::vector<Real> get_coefficients() {
       // Simple finite difference gradient operator
       // Layout: column-major (Fortran order) to match original Eigen matrix
-      // rows = NbOperators * NbQuadPts = Dim
-      // cols = NbNodalPts * 2^Dim
+      // rows = NbOutputComponents * NbQuadPts = Dim
+      // cols = NbInputComponents * 2^Dim
       const Index_t nb_stencil_pts = static_cast<Index_t>(std::pow(2, Dim));
       const Index_t nb_rows = Dim;
       std::vector<Real> op(nb_rows * nb_stencil_pts, 0.0);
@@ -120,19 +120,19 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
-    ConvolutionOperator op{
-        get_pixel_offset(),
-        get_pixel_operator(),
-        get_conv_pts_shape(),
-        NbNodalPts,
+    StencilGradientOperator op{
+        get_offset(),
+        get_coefficients(),
+        get_stencil_shape(),
+        NbInputComponents,
         NbQuadPts,
-        NbOperators};
+        NbOutputComponents};
 
     GlobalFieldCollection collection;
 
     Fixture2D()
         : collection(nb_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
-                     {{PixelTag, NbNodalPts}, {"quad", NbQuadPts}},
+                     {{PixelTag, NbInputComponents}, {"quad", NbQuadPts}},
                      StorageOrder::ArrayOfStructures,
                      nb_ghosts_left, nb_ghosts_right) {
     }
@@ -147,19 +147,19 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
-    ConvolutionOperator op{
-        get_pixel_offset(),
-        get_pixel_operator(),
-        get_conv_pts_shape(),
-        NbNodalPts,
+    StencilGradientOperator op{
+        get_offset(),
+        get_coefficients(),
+        get_stencil_shape(),
+        NbInputComponents,
         NbQuadPts,
-        NbOperators};
+        NbOutputComponents};
 
     GlobalFieldCollection collection;
 
     Fixture3D()
         : collection(nb_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
-                     {{PixelTag, NbNodalPts}, {"quad", NbQuadPts}},
+                     {{PixelTag, NbInputComponents}, {"quad", NbQuadPts}},
                      StorageOrder::ArrayOfStructures,
                      nb_ghosts_left, nb_ghosts_right) {
     }
@@ -176,19 +176,19 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1};  // needed for apply (reads at positive offsets)
 
-    ConvolutionOperator op{
-        get_pixel_offset(),
-        get_pixel_operator(),
-        get_conv_pts_shape(),
-        NbNodalPts,
+    StencilGradientOperator op{
+        get_offset(),
+        get_coefficients(),
+        get_stencil_shape(),
+        NbInputComponents,
         NbQuadPts,
-        NbOperators};
+        NbOutputComponents};
 
     GlobalFieldCollection collection;
 
     FixtureLarge2D()
         : collection(nb_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
-                     {{PixelTag, NbNodalPts}, {"quad", NbQuadPts}},
+                     {{PixelTag, NbInputComponents}, {"quad", NbQuadPts}},
                      StorageOrder::ArrayOfStructures,
                      nb_ghosts_left, nb_ghosts_right) {
     }
@@ -202,19 +202,19 @@ namespace muGrid {
     DynGridIndex nb_ghosts_left{1, 1, 1};   // needed for transpose (reads at negative offsets)
     DynGridIndex nb_ghosts_right{1, 1, 1};  // needed for apply (reads at positive offsets)
 
-    ConvolutionOperator op{
-        get_pixel_offset(),
-        get_pixel_operator(),
-        get_conv_pts_shape(),
-        NbNodalPts,
+    StencilGradientOperator op{
+        get_offset(),
+        get_coefficients(),
+        get_stencil_shape(),
+        NbInputComponents,
         NbQuadPts,
-        NbOperators};
+        NbOutputComponents};
 
     GlobalFieldCollection collection;
 
     FixtureLarge3D()
         : collection(nb_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
-                     {{PixelTag, NbNodalPts}, {"quad", NbQuadPts}},
+                     {{PixelTag, NbInputComponents}, {"quad", NbQuadPts}},
                      StorageOrder::ArrayOfStructures,
                      nb_ghosts_left, nb_ghosts_right) {
     }
@@ -234,14 +234,14 @@ namespace muGrid {
                                    Fix) {
     BOOST_CHECK_EQUAL(Fix::op.get_spatial_dim(), Fix::Dim);
     BOOST_CHECK_EQUAL(Fix::op.get_nb_quad_pts(), Fix::NbQuadPts);
-    BOOST_CHECK_EQUAL(Fix::op.get_nb_nodal_pts(), Fix::NbNodalPts);
-    BOOST_CHECK_EQUAL(Fix::op.get_nb_operators(), Fix::NbOperators);
+    BOOST_CHECK_EQUAL(Fix::op.get_nb_input_components(), Fix::NbInputComponents);
+    BOOST_CHECK_EQUAL(Fix::op.get_nb_output_components(), Fix::NbOutputComponents);
 
-    auto & pixel_op = Fix::op.get_pixel_operator();
-    const Index_t expected_size = Fix::NbOperators * Fix::NbQuadPts *
-                                  Fix::NbNodalPts *
+    auto & coefficients = Fix::op.get_coefficients();
+    const Index_t expected_size = Fix::NbOutputComponents * Fix::NbQuadPts *
+                                  Fix::NbInputComponents *
                                   static_cast<Index_t>(std::pow(2, Fix::Dim));
-    BOOST_CHECK_EQUAL(pixel_op.size(), expected_size);
+    BOOST_CHECK_EQUAL(coefficients.size(), expected_size);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -910,12 +910,12 @@ namespace muGrid {
     // Stencil at positions -1, 0, 1 (centered)
     // This should give Fourier representation: i*sin(2π*q)
 
-    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
-    Shape_t conv_pts_shape{3};  // 3 points in stencil
-    std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};  // central difference
+    Shape_t offset{-1};  // offset [-1] for centered stencil
+    Shape_t stencil_shape{3};  // 3 points in stencil
+    std::vector<Real> coefficients{-0.5, 0.0, 0.5};  // central difference
 
-    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
-                          1, 1, 1};  // 1 nodal pt, 1 quad pt, 1 operator
+    StencilGradientOperator op{offset, coefficients, stencil_shape,
+                               1, 1, 1};  // 1 input comp, 1 quad pt, 1 output comp
 
     // Test at several phase values
     const Real pi_val = 3.1415926535897932384626433;
@@ -938,12 +938,12 @@ namespace muGrid {
     // Stencil at positions -1, 0, 1
     // This should give Fourier representation: 1 - exp(-2πiq)
 
-    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
-    Shape_t conv_pts_shape{3};
-    std::vector<Real> pixel_operator{-1.0, 1.0, 0.0};  // backward difference
+    Shape_t offset{-1};  // offset [-1] for centered stencil
+    Shape_t stencil_shape{3};
+    std::vector<Real> coefficients{-1.0, 1.0, 0.0};  // backward difference
 
-    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
-                          1, 1, 1};
+    StencilGradientOperator op{offset, coefficients, stencil_shape,
+                               1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
     std::vector<Real> test_phases{0.0, 0.1, 0.25, 0.5};
@@ -966,12 +966,12 @@ namespace muGrid {
     // Stencil at positions -1, 0, 1 (centered)
     // This should give Fourier representation: -4*sin²(π*q)
 
-    Shape_t pixel_offset{-1};  // offset [-1] for centered stencil
-    Shape_t conv_pts_shape{3};
-    std::vector<Real> pixel_operator{1.0, -2.0, 1.0};  // second derivative
+    Shape_t offset{-1};  // offset [-1] for centered stencil
+    Shape_t stencil_shape{3};
+    std::vector<Real> coefficients{1.0, -2.0, 1.0};  // second derivative
 
-    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
-                          1, 1, 1};
+    StencilGradientOperator op{offset, coefficients, stencil_shape,
+                               1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
     std::vector<Real> test_phases{0.0, 0.1, 0.25, 0.5};
@@ -994,13 +994,13 @@ namespace muGrid {
     // Stencil at x positions -1, 0, 1; y position 0
     // This should give Fourier representation: i*sin(2π*qx)
 
-    Shape_t pixel_offset{-1, 0};  // offset [-1, 0] for x-centered stencil
-    Shape_t conv_pts_shape{3, 1};  // 3 points in x, 1 in y
+    Shape_t offset{-1, 0};  // offset [-1, 0] for x-centered stencil
+    Shape_t stencil_shape{3, 1};  // 3 points in x, 1 in y
     // Operator coefficients for x-derivative: [-1/2, 0, 1/2] at y=0
-    std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};
+    std::vector<Real> coefficients{-0.5, 0.0, 0.5};
 
-    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
-                          1, 1, 1};
+    StencilGradientOperator op{offset, coefficients, stencil_shape,
+                               1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
     std::vector<std::pair<Real, Real>> test_phases{
@@ -1023,12 +1023,12 @@ namespace muGrid {
     // Create a 2D y-derivative operator using central differences
     // Stencil at x position 0; y positions -1, 0, 1
 
-    Shape_t pixel_offset{0, -1};  // offset [0, -1] for y-centered stencil
-    Shape_t conv_pts_shape{1, 3};  // 1 point in x, 3 in y
-    std::vector<Real> pixel_operator{-0.5, 0.0, 0.5};
+    Shape_t offset{0, -1};  // offset [0, -1] for y-centered stencil
+    Shape_t stencil_shape{1, 3};  // 1 point in x, 3 in y
+    std::vector<Real> coefficients{-0.5, 0.0, 0.5};
 
-    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
-                          1, 1, 1};
+    StencilGradientOperator op{offset, coefficients, stencil_shape,
+                               1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
     std::vector<std::pair<Real, Real>> test_phases{
@@ -1055,17 +1055,17 @@ namespace muGrid {
     // This should give Fourier representation:
     // -4*(sin²(π*qx) + sin²(π*qy))
 
-    Shape_t pixel_offset{-1, -1};  // center at (0,0), so offset is (-1,-1)
-    Shape_t conv_pts_shape{3, 3};  // 3x3 stencil
+    Shape_t offset{-1, -1};  // center at (0,0), so offset is (-1,-1)
+    Shape_t stencil_shape{3, 3};  // 3x3 stencil
     // Layout is column-major through stencil points
-    std::vector<Real> pixel_operator{
+    std::vector<Real> coefficients{
       0.0, 1.0, 0.0,    // x=-1: (y=-1,y=0,y=1)
       1.0, -4.0, 1.0,   // x=0:  (y=-1,y=0,y=1)
       0.0, 1.0, 0.0     // x=1:  (y=-1,y=0,y=1)
     };
 
-    ConvolutionOperator op{pixel_offset, pixel_operator, conv_pts_shape,
-                          1, 1, 1};
+    StencilGradientOperator op{offset, coefficients, stencil_shape,
+                               1, 1, 1};
 
     const Real pi_val = 3.1415926535897932384626433;
     std::vector<std::pair<Real, Real>> test_phases{
