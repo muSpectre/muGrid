@@ -5,7 +5,12 @@
  *
  * @date   24 Dec 2024
  *
- * @brief  Hard-coded Laplace operator with optimized stencil implementation
+ * @brief  Factory interface for dimension-specific Laplace operators
+ *
+ * This header provides:
+ * - LaplaceOperator2D: Optimized 2D Laplace operator with 5-point stencil
+ * - LaplaceOperator3D: Optimized 3D Laplace operator with 7-point stencil
+ * - LaplaceOperator: Factory class for backwards compatibility
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -36,37 +41,28 @@
 #ifndef SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_HH_
 #define SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_HH_
 
-#include "core/types.hh"
-#include "field/field_typed.hh"
-#include "memory/memory_space.hh"
-#include "operators/convolution_operator_base.hh"
+// Include dimension-specific implementations
+#include "laplace_operator_2d.hh"
+#include "laplace_operator_3d.hh"
+
+#include "core/exception.hh"
+
+#include <memory>
+#include <variant>
 
 namespace muGrid {
 
-    // Forward declaration
-    class GlobalFieldCollection;
-
     /**
      * @class LaplaceOperator
-     * @brief Hard-coded Laplace operator with optimized stencil implementation.
+     * @brief Wrapper class providing a unified interface to dimension-specific
+     *        Laplace operators for backwards compatibility.
      *
-     * This class provides optimized implementations of the discrete Laplace
-     * operator using:
-     * - 5-point stencil for 2D grids: [0,1,0; 1,-4,1; 0,1,0]
-     * - 7-point stencil for 3D grids: center=-6, neighbors=+1
+     * This class wraps either LaplaceOperator2D or LaplaceOperator3D internally,
+     * dispatching calls to the appropriate implementation based on the spatial
+     * dimension specified at construction time.
      *
-     * The output is multiplied by a scale factor, which can be used to
-     * incorporate grid spacing and sign conventions (e.g., for making
-     * the operator positive-definite for use with CG solvers).
-     *
-     * This operator inherits from GradientOperator and can be used
-     * interchangeably with the generic StencilGradientOperator. The hard-coded
-     * implementation provides significantly better performance (~3-10x) due
-     * to compile-time known memory access patterns that enable SIMD
-     * vectorization.
-     *
-     * Since the Laplacian is self-adjoint (symmetric), the transpose operation
-     * is identical to the forward apply operation.
+     * For new code, consider using LaplaceOperator2D or LaplaceOperator3D
+     * directly for slightly better performance (avoids virtual dispatch).
      */
     class LaplaceOperator : public GradientOperator {
     public:
@@ -77,7 +73,16 @@ namespace muGrid {
          * @param spatial_dim Spatial dimension (2 or 3)
          * @param scale Scale factor applied to the output (default: 1.0)
          */
-        explicit LaplaceOperator(Index_t spatial_dim, Real scale = 1.0);
+        explicit LaplaceOperator(Index_t spatial_dim, Real scale = 1.0)
+            : Parent{}, spatial_dim{spatial_dim}, scale{scale} {
+            if (spatial_dim == 2) {
+                impl_2d = std::make_unique<LaplaceOperator2D>(scale);
+            } else if (spatial_dim == 3) {
+                impl_3d = std::make_unique<LaplaceOperator3D>(scale);
+            } else {
+                throw RuntimeError("LaplaceOperator only supports 2D and 3D grids");
+            }
+        }
 
         //! Default constructor is deleted
         LaplaceOperator() = delete;
@@ -97,298 +102,100 @@ namespace muGrid {
         //! Move assignment operator
         LaplaceOperator &operator=(LaplaceOperator &&other) = default;
 
-        /**
-         * @brief Apply the Laplace operator on host memory fields.
-         *
-         * Computes output = scale * Laplace(input) using the appropriate stencil
-         * (5-point for 2D, 7-point for 3D).
-         *
-         * @param input_field Input field (with ghost layers populated)
-         * @param output_field Output field
-         */
         void apply(const TypedFieldBase<Real> &input_field,
-                   TypedFieldBase<Real> &output_field) const override;
+                   TypedFieldBase<Real> &output_field) const override {
+            if (impl_2d) {
+                impl_2d->apply(input_field, output_field);
+            } else {
+                impl_3d->apply(input_field, output_field);
+            }
+        }
 
-        /**
-         * @brief Apply the Laplace operator with increment.
-         *
-         * Computes output += alpha * scale * Laplace(input)
-         *
-         * @param input_field Input field (with ghost layers populated)
-         * @param alpha Scaling factor for the increment
-         * @param output_field Output field to increment
-         */
         void apply_increment(const TypedFieldBase<Real> &input_field,
                              const Real &alpha,
-                             TypedFieldBase<Real> &output_field) const override;
+                             TypedFieldBase<Real> &output_field) const override {
+            if (impl_2d) {
+                impl_2d->apply_increment(input_field, alpha, output_field);
+            } else {
+                impl_3d->apply_increment(input_field, alpha, output_field);
+            }
+        }
 
-        /**
-         * @brief Apply the transpose (same as apply for symmetric Laplacian).
-         *
-         * Since the Laplacian is self-adjoint, transpose equals apply.
-         *
-         * @param input_field Input field (quadrature point field in base class terms)
-         * @param output_field Output field (nodal field in base class terms)
-         * @param weights Ignored for Laplacian (no quadrature weighting)
-         */
         void transpose(const TypedFieldBase<Real> &input_field,
                        TypedFieldBase<Real> &output_field,
-                       const std::vector<Real> &weights = {}) const override;
+                       const std::vector<Real> &weights = {}) const override {
+            if (impl_2d) {
+                impl_2d->transpose(input_field, output_field, weights);
+            } else {
+                impl_3d->transpose(input_field, output_field, weights);
+            }
+        }
 
-        /**
-         * @brief Apply the transpose with increment (same as apply_increment).
-         *
-         * @param input_field Input field
-         * @param alpha Scaling factor for the increment
-         * @param output_field Output field to increment
-         * @param weights Ignored for Laplacian
-         */
         void transpose_increment(const TypedFieldBase<Real> &input_field,
                                  const Real &alpha,
                                  TypedFieldBase<Real> &output_field,
-                                 const std::vector<Real> &weights = {}) const override;
+                                 const std::vector<Real> &weights = {}) const override {
+            if (impl_2d) {
+                impl_2d->transpose_increment(input_field, alpha, output_field, weights);
+            } else {
+                impl_3d->transpose_increment(input_field, alpha, output_field, weights);
+            }
+        }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        /**
-         * @brief Apply the Laplace operator on device memory fields.
-         *
-         * @param input_field Input field in device memory
-         * @param output_field Output field in device memory
-         */
         void apply(const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
-                   TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const;
+                   TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
+            if (impl_2d) {
+                impl_2d->apply(input_field, output_field);
+            } else {
+                impl_3d->apply(input_field, output_field);
+            }
+        }
 
-        /**
-         * @brief Apply the Laplace operator with increment on device memory.
-         *
-         * @param input_field Input field in device memory
-         * @param alpha Scaling factor for the increment
-         * @param output_field Output field in device memory
-         */
         void apply_increment(const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
                              const Real &alpha,
-                             TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const;
+                             TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
+            if (impl_2d) {
+                impl_2d->apply_increment(input_field, alpha, output_field);
+            } else {
+                impl_3d->apply_increment(input_field, alpha, output_field);
+            }
+        }
 #endif
 
-        /**
-         * @brief Get the number of output components (always 1 for Laplacian).
-         * @return 1
-         */
         Index_t get_nb_output_components() const override { return 1; }
-
-        /**
-         * @brief Get the number of quadrature points (always 1 for Laplacian).
-         * @return 1
-         */
         Index_t get_nb_quad_pts() const override { return 1; }
-
-        /**
-         * @brief Get the number of input components (always 1 for Laplacian).
-         * @return 1
-         */
         Index_t get_nb_input_components() const override { return 1; }
-
-        /**
-         * @brief Get the spatial dimension.
-         * @return Spatial dimension (2 or 3)
-         */
         Dim_t get_spatial_dim() const override { return spatial_dim; }
 
-        /**
-         * @brief Get the number of stencil points.
-         * @return Number of stencil points (5 for 2D, 7 for 3D)
-         */
         Index_t get_nb_stencil_pts() const {
             return spatial_dim == 2 ? 5 : 7;
         }
 
-        /**
-         * @brief Get the scale factor.
-         * @return Scale factor applied to output
-         */
         Real get_scale() const { return scale; }
 
-        /**
-         * @brief Get the stencil offset.
-         * @return Stencil offset in pixels (centered: [-1,-1] for 2D, [-1,-1,-1] for 3D)
-         */
         Shape_t get_offset() const {
             return Shape_t(spatial_dim, -1);
         }
 
-        /**
-         * @brief Get the stencil shape.
-         * @return Shape of the stencil ([3,3] for 2D, [3,3,3] for 3D)
-         */
         Shape_t get_stencil_shape() const {
             return Shape_t(spatial_dim, 3);
         }
 
-        /**
-         * @brief Get the stencil coefficients in reshaped form.
-         * @return Vector of stencil coefficients
-         *
-         * For 2D: [0, 1, 0, 1, -4, 1, 0, 1, 0] * scale
-         * For 3D: 7-point stencil with center=-6*scale, neighbors=1*scale
-         */
         std::vector<Real> get_coefficients() const {
-            if (spatial_dim == 2) {
-                return {0.0, scale, 0.0,
-                        scale, -4.0*scale, scale,
-                        0.0, scale, 0.0};
-            } else {  // 3D
-                std::vector<Real> stencil(27, 0.0);
-                // Center point at [1,1,1] = index 13
-                stencil[13] = -6.0 * scale;
-                // 6 neighbors
-                stencil[13-1] = scale;   // [1,1,0]
-                stencil[13+1] = scale;   // [1,1,2]
-                stencil[13-3] = scale;   // [1,0,1]
-                stencil[13+3] = scale;   // [1,2,1]
-                stencil[13-9] = scale;   // [0,1,1]
-                stencil[13+9] = scale;   // [2,1,1]
-                return stencil;
+            if (impl_2d) {
+                return impl_2d->get_coefficients();
+            } else {
+                return impl_3d->get_coefficients();
             }
         }
 
     private:
         Index_t spatial_dim;
         Real scale;
-
-        /**
-         * @brief Validate that fields are compatible with this operator.
-         * @param input_field The input field
-         * @param output_field The output field
-         * @return Reference to the GlobalFieldCollection
-         * @throws RuntimeError if validation fails
-         */
-        const GlobalFieldCollection& validate_fields(
-            const Field &input_field,
-            const Field &output_field) const;
-
-        /**
-         * @brief Internal implementation of apply with optional increment.
-         * @param input_field Input field
-         * @param output_field Output field
-         * @param alpha Scaling factor (0 means overwrite, non-zero means increment)
-         * @param increment If true, add to output; if false, overwrite output
-         */
-        void apply_impl(const TypedFieldBase<Real> &input_field,
-                        TypedFieldBase<Real> &output_field,
-                        Real alpha,
-                        bool increment) const;
-
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        /**
-         * @brief Internal device implementation of apply with optional increment.
-         */
-        void apply_impl(const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
-                        TypedFieldBase<Real, DefaultDeviceSpace> &output_field,
-                        Real alpha,
-                        bool increment) const;
-#endif
+        std::unique_ptr<LaplaceOperator2D> impl_2d;
+        std::unique_ptr<LaplaceOperator3D> impl_3d;
     };
-
-    // Kernel implementations
-    namespace laplace_kernels {
-
-        /**
-         * @brief Apply 5-point 2D Laplace stencil on host.
-         *
-         * Stencil: scale * [0, 1, 0]
-         *                  [1,-4, 1]
-         *                  [0, 1, 0]
-         *
-         * @param input Input array
-         * @param output Output array
-         * @param nx Grid size in x (including ghosts)
-         * @param ny Grid size in y (including ghosts)
-         * @param stride_x Stride in x direction
-         * @param stride_y Stride in y direction
-         * @param scale Scale factor
-         * @param increment If true, add to output; if false, overwrite
-         */
-        void laplace_2d_host(
-            const Real* MUGRID_RESTRICT input,
-            Real* MUGRID_RESTRICT output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale,
-            bool increment = false);
-
-        /**
-         * @brief Apply 7-point 3D Laplace stencil on host.
-         *
-         * Stencil: scale * (center = -6, each of 6 neighbors = +1)
-         *
-         * @param input Input array
-         * @param output Output array
-         * @param nx Grid size in x (including ghosts)
-         * @param ny Grid size in y (including ghosts)
-         * @param nz Grid size in z (including ghosts)
-         * @param stride_x Stride in x direction
-         * @param stride_y Stride in y direction
-         * @param stride_z Stride in z direction
-         * @param scale Scale factor
-         * @param increment If true, add to output; if false, overwrite
-         */
-        void laplace_3d_host(
-            const Real* MUGRID_RESTRICT input,
-            Real* MUGRID_RESTRICT output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale,
-            bool increment = false);
-
-#if defined(MUGRID_ENABLE_CUDA)
-        /**
-         * @brief Apply 2D Laplace stencil on CUDA device.
-         */
-        void laplace_2d_cuda(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale,
-            bool increment = false);
-
-        /**
-         * @brief Apply 3D Laplace stencil on CUDA device.
-         */
-        void laplace_3d_cuda(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale,
-            bool increment = false);
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-        /**
-         * @brief Apply 2D Laplace stencil on HIP device.
-         */
-        void laplace_2d_hip(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale,
-            bool increment = false);
-
-        /**
-         * @brief Apply 3D Laplace stencil on HIP device.
-         */
-        void laplace_3d_hip(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale,
-            bool increment = false);
-#endif
-
-    }  // namespace laplace_kernels
 
 }  // namespace muGrid
 

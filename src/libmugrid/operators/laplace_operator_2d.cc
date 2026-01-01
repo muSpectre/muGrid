@@ -1,11 +1,11 @@
 /**
- * @file   laplace_operator.cc
+ * @file   laplace_operator_2d.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   24 Dec 2025
+ * @date   01 Jan 2026
  *
- * @brief  Host implementation of hard-coded Laplace operator
+ * @brief  Host implementation of hard-coded 2D Laplace operator
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -33,20 +33,16 @@
  *
  */
 
-#include "laplace_operator.hh"
+#include "laplace_operator_2d.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
 namespace muGrid {
 
-    LaplaceOperator::LaplaceOperator(Index_t spatial_dim, Real scale)
-        : Parent{}, spatial_dim{spatial_dim}, scale{scale} {
-        if (spatial_dim != 2 && spatial_dim != 3) {
-            throw RuntimeError("LaplaceOperator only supports 2D and 3D grids");
-        }
-    }
+    LaplaceOperator2D::LaplaceOperator2D(Real scale)
+        : Parent{}, scale{scale} {}
 
-    const GlobalFieldCollection& LaplaceOperator::validate_fields(
+    const GlobalFieldCollection& LaplaceOperator2D::validate_fields(
         const Field &input_field,
         const Field &output_field) const {
 
@@ -64,24 +60,23 @@ namespace muGrid {
         auto* global_fc = dynamic_cast<const GlobalFieldCollection*>(
             &input_collection);
         if (!global_fc) {
-            throw RuntimeError("LaplaceOperator requires GlobalFieldCollection");
+            throw RuntimeError("LaplaceOperator2D requires GlobalFieldCollection");
         }
 
         // Check dimension matches
-        if (global_fc->get_spatial_dim() != this->spatial_dim) {
+        if (global_fc->get_spatial_dim() != 2) {
             throw RuntimeError("Field collection dimension (" +
                 std::to_string(global_fc->get_spatial_dim()) +
-                ") does not match operator dimension (" +
-                std::to_string(this->spatial_dim) + ")");
+                ") does not match operator dimension (2)");
         }
 
         // Check ghost layers (need at least 1 in each direction)
         auto left_ghosts = global_fc->get_nb_ghosts_left();
         auto right_ghosts = global_fc->get_nb_ghosts_right();
 
-        for (Index_t d = 0; d < this->spatial_dim; ++d) {
+        for (Index_t d = 0; d < 2; ++d) {
             if (left_ghosts[d] < 1 || right_ghosts[d] < 1) {
-                throw RuntimeError("LaplaceOperator requires at least 1 ghost "
+                throw RuntimeError("LaplaceOperator2D requires at least 1 ghost "
                                    "layer in each direction");
             }
         }
@@ -89,10 +84,10 @@ namespace muGrid {
         return *global_fc;
     }
 
-    void LaplaceOperator::apply_impl(const TypedFieldBase<Real> &input_field,
-                                      TypedFieldBase<Real> &output_field,
-                                      Real alpha,
-                                      bool increment) const {
+    void LaplaceOperator2D::apply_impl(const TypedFieldBase<Real> &input_field,
+                                        TypedFieldBase<Real> &output_field,
+                                        Real alpha,
+                                        bool increment) const {
         const auto& collection = this->validate_fields(input_field, output_field);
 
         // Get grid dimensions (with ghosts for input, without for output range)
@@ -105,53 +100,44 @@ namespace muGrid {
         // Combine alpha with scale
         Real effective_scale = alpha * this->scale;
 
-        if (this->spatial_dim == 2) {
-            // For 2D with ArrayOfStructures layout, stride_x = 1, stride_y = nx
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            laplace_kernels::laplace_2d_host(
-                input, output, nx, ny, 1, nx, effective_scale, increment);
-        } else {
-            // For 3D with ArrayOfStructures layout
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            Index_t nz = nb_grid_pts[2];
-            laplace_kernels::laplace_3d_host(
-                input, output, nx, ny, nz, 1, nx, nx * ny, effective_scale, increment);
-        }
+        // For 2D with ArrayOfStructures layout, stride_x = 1, stride_y = nx
+        Index_t nx = nb_grid_pts[0];
+        Index_t ny = nb_grid_pts[1];
+        laplace_kernels::laplace_2d_host(
+            input, output, nx, ny, 1, nx, effective_scale, increment);
     }
 
-    void LaplaceOperator::apply(const TypedFieldBase<Real> &input_field,
-                                 TypedFieldBase<Real> &output_field) const {
+    void LaplaceOperator2D::apply(const TypedFieldBase<Real> &input_field,
+                                   TypedFieldBase<Real> &output_field) const {
         this->apply_impl(input_field, output_field, 1.0, false);
     }
 
-    void LaplaceOperator::apply_increment(const TypedFieldBase<Real> &input_field,
-                                           const Real &alpha,
-                                           TypedFieldBase<Real> &output_field) const {
+    void LaplaceOperator2D::apply_increment(const TypedFieldBase<Real> &input_field,
+                                             const Real &alpha,
+                                             TypedFieldBase<Real> &output_field) const {
         this->apply_impl(input_field, output_field, alpha, true);
     }
 
-    void LaplaceOperator::transpose(const TypedFieldBase<Real> &input_field,
-                                     TypedFieldBase<Real> &output_field,
-                                     const std::vector<Real> &weights) const {
+    void LaplaceOperator2D::transpose(const TypedFieldBase<Real> &input_field,
+                                       TypedFieldBase<Real> &output_field,
+                                       const std::vector<Real> &weights) const {
         // Laplacian is self-adjoint, so transpose = apply
         // weights are ignored (no quadrature weighting for Laplacian)
         (void)weights;
         this->apply(input_field, output_field);
     }
 
-    void LaplaceOperator::transpose_increment(const TypedFieldBase<Real> &input_field,
-                                               const Real &alpha,
-                                               TypedFieldBase<Real> &output_field,
-                                               const std::vector<Real> &weights) const {
+    void LaplaceOperator2D::transpose_increment(const TypedFieldBase<Real> &input_field,
+                                                 const Real &alpha,
+                                                 TypedFieldBase<Real> &output_field,
+                                                 const std::vector<Real> &weights) const {
         // Laplacian is self-adjoint, so transpose = apply
         (void)weights;
         this->apply_increment(input_field, alpha, output_field);
     }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-    void LaplaceOperator::apply_impl(
+    void LaplaceOperator2D::apply_impl(
         const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
         TypedFieldBase<Real, DefaultDeviceSpace> &output_field,
         Real alpha,
@@ -169,38 +155,24 @@ namespace muGrid {
         // Combine alpha with scale
         Real effective_scale = alpha * this->scale;
 
-        if (this->spatial_dim == 2) {
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            // Device uses StructureOfArrays, but for scalar fields it's the same
+        Index_t nx = nb_grid_pts[0];
+        Index_t ny = nb_grid_pts[1];
 #if defined(MUGRID_ENABLE_CUDA)
-            laplace_kernels::laplace_2d_cuda(
-                input, output, nx, ny, 1, nx, effective_scale, increment);
+        laplace_kernels::laplace_2d_cuda(
+            input, output, nx, ny, 1, nx, effective_scale, increment);
 #elif defined(MUGRID_ENABLE_HIP)
-            laplace_kernels::laplace_2d_hip(
-                input, output, nx, ny, 1, nx, effective_scale, increment);
+        laplace_kernels::laplace_2d_hip(
+            input, output, nx, ny, 1, nx, effective_scale, increment);
 #endif
-        } else {
-            Index_t nx = nb_grid_pts[0];
-            Index_t ny = nb_grid_pts[1];
-            Index_t nz = nb_grid_pts[2];
-#if defined(MUGRID_ENABLE_CUDA)
-            laplace_kernels::laplace_3d_cuda(
-                input, output, nx, ny, nz, 1, nx, nx * ny, effective_scale, increment);
-#elif defined(MUGRID_ENABLE_HIP)
-            laplace_kernels::laplace_3d_hip(
-                input, output, nx, ny, nz, 1, nx, nx * ny, effective_scale, increment);
-#endif
-        }
     }
 
-    void LaplaceOperator::apply(
+    void LaplaceOperator2D::apply(
         const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
         TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
         this->apply_impl(input_field, output_field, 1.0, false);
     }
 
-    void LaplaceOperator::apply_increment(
+    void LaplaceOperator2D::apply_increment(
         const TypedFieldBase<Real, DefaultDeviceSpace> &input_field,
         const Real &alpha,
         TypedFieldBase<Real, DefaultDeviceSpace> &output_field) const {
@@ -243,47 +215,6 @@ namespace muGrid {
                         output[idx] += result;
                     } else {
                         output[idx] = result;
-                    }
-                }
-            }
-        }
-
-        void laplace_3d_host(
-            const Real* MUGRID_RESTRICT input,
-            Real* MUGRID_RESTRICT output,
-            Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale,
-            bool increment) {
-
-            // Process interior points (excluding ghost layers)
-            for (Index_t iz = 1; iz < nz - 1; ++iz) {
-                for (Index_t iy = 1; iy < ny - 1; ++iy) {
-                    #if defined(_MSC_VER)
-                    #pragma loop(ivdep)
-                    #elif defined(__clang__)
-                    #pragma clang loop vectorize(enable) interleave(enable)
-                    #elif defined(__GNUC__)
-                    #pragma GCC ivdep
-                    #endif
-                    for (Index_t ix = 1; ix < nx - 1; ++ix) {
-                        Index_t idx = ix * stride_x + iy * stride_y + iz * stride_z;
-
-                        // 7-point stencil: center=-6, neighbors=+1
-                        Real center = input[idx];
-                        Real xm = input[idx - stride_x];
-                        Real xp = input[idx + stride_x];
-                        Real ym = input[idx - stride_y];
-                        Real yp = input[idx + stride_y];
-                        Real zm = input[idx - stride_z];
-                        Real zp = input[idx + stride_z];
-
-                        Real result = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
-                        if (increment) {
-                            output[idx] += result;
-                        } else {
-                            output[idx] = result;
-                        }
                     }
                 }
             }
