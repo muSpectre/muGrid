@@ -37,7 +37,8 @@
  *
  */
 
-#include "fem_gradient_operator.hh"
+#include "fem_gradient_2d.hh"
+#include "fem_gradient_3d.hh"
 
 // Unified GPU abstraction macros
 #if defined(MUGRID_ENABLE_CUDA)
