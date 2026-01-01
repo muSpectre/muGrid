@@ -2,14 +2,14 @@
 #
 # Benchmark script for Poisson solver
 #
-# This script runs the Poisson solver with different grid sizes and stencil
-# implementations, comparing performance between generic and hard-coded stencils.
+# This script runs the Poisson solver with different grid sizes and kernel
+# implementations, comparing performance between generic and hard-coded kernels.
 #
 # Usage:
-#   ./benchmark_poisson.sh [host|device] [2d|3d] [maxiter]
+#   ./benchmark_poisson.sh [cpu|gpu] [2d|3d] [maxiter]
 #
 # Arguments:
-#   host|device  - Memory location (default: host)
+#   cpu|gpu      - Device for computation (default: cpu)
 #   2d|3d        - Grid dimensionality (default: 3d)
 #   maxiter      - Maximum CG iterations (default: 50)
 #
@@ -25,7 +25,7 @@
 set -e
 
 # Default parameters
-MEMORY="${1:-host}"
+DEVICE="${1:-cpu}"
 DIM="${2:-3d}"
 MAXITER="${3:-50}"  # Limit iterations for consistent benchmarking
 
@@ -33,15 +33,15 @@ MAXITER="${3:-50}"  # Limit iterations for consistent benchmarking
 PYTHON="${PYTHON:-python3}"
 
 # Validate arguments
-if [[ "$MEMORY" != "host" && "$MEMORY" != "device" ]]; then
-    echo "Error: First argument must be 'host' or 'device'"
-    echo "Usage: $0 [host|device] [2d|3d]"
+if [[ "$DEVICE" != "cpu" && "$DEVICE" != "gpu" ]]; then
+    echo "Error: First argument must be 'cpu' or 'gpu'"
+    echo "Usage: $0 [cpu|gpu] [2d|3d]"
     exit 1
 fi
 
 if [[ "$DIM" != "2d" && "$DIM" != "3d" ]]; then
     echo "Error: Second argument must be '2d' or '3d'"
-    echo "Usage: $0 [host|device] [2d|3d]"
+    echo "Usage: $0 [cpu|gpu] [2d|3d]"
     exit 1
 fi
 
@@ -68,8 +68,8 @@ else
     GRID_SIZES=("16,16,16" "32,32,32" "48,48,48" "64,64,64" "96,96,96" "128,128,128")
 fi
 
-# Stencil implementations to compare
-STENCILS=("generic" "hardcoded")
+# Kernel implementations to compare
+KERNELS=("generic" "hardcoded")
 
 # Output file for results
 RESULTS_FILE="/tmp/poisson_benchmark_results.json"
@@ -79,7 +79,7 @@ echo "============================================================"
 echo "Poisson Solver Benchmark"
 echo "============================================================"
 echo "Python:      $PYTHON"
-echo "Memory:      $MEMORY"
+echo "Device:      $DEVICE"
 echo "Dimensions:  $DIM"
 echo "Max iter:    $MAXITER"
 echo "Grid sizes:  ${GRID_SIZES[*]}"
@@ -88,14 +88,14 @@ echo ""
 
 # Run benchmarks
 for grid in "${GRID_SIZES[@]}"; do
-    for stencil in "${STENCILS[@]}"; do
-        echo -n "Running: grid=$grid, stencil=$stencil ... "
+    for kernel in "${KERNELS[@]}"; do
+        echo -n "Running: grid=$grid, kernel=$kernel ... "
 
         # Run the solver and capture JSON output
         result=$("$PYTHON" "$POISSON_PY" \
             -n "$grid" \
-            -m "$MEMORY" \
-            -s "$stencil" \
+            -d "$DEVICE" \
+            -k "$kernel" \
             -i "$MAXITER" \
             --json 2>&1)
 
@@ -132,25 +132,25 @@ printf "%-15s %12s %12s %10s %10s %10s\n" \
 
 # Process results and compute speedup
 for grid in "${GRID_SIZES[@]}"; do
-    # Get apply times for both stencils
+    # Get apply times for both kernels
     generic_time=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.stencil == "generic")] | .[0].results.apply_time_seconds // "N/A"' \
+              | select(.config.kernel == "generic")] | .[0].results.apply_time_seconds // "N/A"' \
         "$RESULTS_FILE")
 
     hardcoded_time=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.stencil == "hardcoded")] | .[0].results.apply_time_seconds // "N/A"' \
+              | select(.config.kernel == "hardcoded")] | .[0].results.apply_time_seconds // "N/A"' \
         "$RESULTS_FILE")
 
     hardcoded_throughput=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.stencil == "hardcoded")] | .[0].results.apply_throughput_GBps // "N/A"' \
+              | select(.config.kernel == "hardcoded")] | .[0].results.apply_throughput_GBps // "N/A"' \
         "$RESULTS_FILE")
 
     hardcoded_flops=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.stencil == "hardcoded")] | .[0].results.apply_flops_rate_GFLOPs // "N/A"' \
+              | select(.config.kernel == "hardcoded")] | .[0].results.apply_flops_rate_GFLOPs // "N/A"' \
         "$RESULTS_FILE")
 
     # Compute speedup
@@ -191,7 +191,7 @@ done
 
 echo ""
 echo "============================================================"
-echo "Scaling Analysis (Hardcoded Stencil)"
+echo "Scaling Analysis (Hardcoded Kernel)"
 echo "============================================================"
 echo ""
 
@@ -201,10 +201,10 @@ printf "%-15s %12s %12s %10s %10s\n" \
     "---------------" "------------" "------------" "----------" "----------"
 
 for grid in "${GRID_SIZES[@]}"; do
-    # Get metrics for hardcoded stencil
+    # Get metrics for hardcoded kernel
     result=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.stencil == "hardcoded")] | .[0] // empty' \
+              | select(.config.kernel == "hardcoded")] | .[0] // empty' \
         "$RESULTS_FILE")
 
     if [[ -n "$result" ]]; then
