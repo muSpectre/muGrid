@@ -899,7 +899,14 @@ class LaplaceOperator:
     """
 
     def __init__(self, spatial_dim: int, scale: float = 1.0) -> None:
-        self._cpp = _muGrid.LaplaceOperator(spatial_dim, scale)
+        if spatial_dim == 2:
+            self._cpp = _muGrid.LaplaceOperator2D(scale)
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.LaplaceOperator3D(scale)
+        else:
+            raise ValueError(
+                f"spatial_dim must be 2 or 3, got {spatial_dim}"
+            )
 
     def apply(self, input_field: Field, output_field: Field) -> None:
         """
@@ -987,7 +994,14 @@ class FEMGradientOperator:
     ) -> None:
         if grid_spacing is None:
             grid_spacing = []
-        self._cpp = _muGrid.FEMGradientOperator(spatial_dim, list(grid_spacing))
+        if spatial_dim == 2:
+            self._cpp = _muGrid.FEMGradientOperator2D(list(grid_spacing))
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.FEMGradientOperator3D(list(grid_spacing))
+        else:
+            raise ValueError(
+                f"spatial_dim must be 2 or 3, got {spatial_dim}"
+            )
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """

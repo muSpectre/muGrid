@@ -39,8 +39,8 @@
 #define SRC_LIBMUGRID_CONVOLUTION_OPERATOR_HH_
 
 #include "core/coordinates.hh"
-#include "operators/convolution_operator_base.hh"
-#include "operators/convolution_kernels.hh"
+#include "operators/gradient.hh"
+#include "operators/kernel_dispatcher.hh"
 
 #include "Eigen/Dense"
 
@@ -519,9 +519,6 @@ namespace muGrid {
         get_device_transpose_operator(const DynGridIndex& nb_grid_pts,
                                       Index_t nb_nodal_components) const;
     };
-
-    // Backwards compatibility alias
-    using ConvolutionOperator = StencilGradientOperator;
 
     // Kernel functions and deep_copy_sparse_operator are now in operators/convolution_kernels.hh
 

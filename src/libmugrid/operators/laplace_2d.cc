@@ -33,7 +33,7 @@
  *
  */
 
-#include "laplace_operator_2d.hh"
+#include "laplace_2d.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 

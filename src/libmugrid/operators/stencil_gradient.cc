@@ -34,7 +34,7 @@
  *
  */
 
-#include "operators/convolution_operator.hh"
+#include "operators/stencil_gradient.hh"
 #include "core/types.hh"
 #include "collection/field_collection_global.hh"
 #include "grid/index_ops.hh"

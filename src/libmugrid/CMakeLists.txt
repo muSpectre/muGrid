@@ -43,11 +43,11 @@ set(MUGRID_SOURCES
     mpi/cartesian_communicator.cc
     mpi/cartesian_decomposition.cc
     # operators/
-    operators/convolution_operator.cc
-    operators/laplace_operator_2d.cc
-    operators/laplace_operator_3d.cc
-    operators/fem_gradient_operator_2d.cc
-    operators/fem_gradient_operator_3d.cc
+        operators/stencil_gradient.cc
+        operators/laplace_2d.cc
+        operators/laplace_3d.cc
+        operators/fem_gradient_2d.cc
+        operators/fem_gradient_3d.cc
     operators/solids/isotropic_stiffness_operator.cc
     # io/
     io/file_io_base.cc
@@ -80,34 +80,34 @@ endif()
 # Add GPU backend sources if CUDA or HIP is available
 if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cc)
-    list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
-    list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cc)
-    list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/stencil_gradient_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/cufft_backend.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/stencil_gradient_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE CUDA
     )
 elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/hipfft_backend.cc)
-    list(APPEND MUGRID_SOURCES operators/convolution_operator_device.cc)
-    list(APPEND MUGRID_SOURCES operators/laplace_operator_gpu.cc)
-    list(APPEND MUGRID_SOURCES operators/fem_gradient_operator_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/stencil_gradient_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_operator_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/hipfft_backend.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/convolution_operator_device.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_operator_gpu.cc
-        ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_operator_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/stencil_gradient_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_operator_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         PROPERTIES LANGUAGE HIP

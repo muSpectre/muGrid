@@ -33,7 +33,7 @@
  *
  */
 
-#include "fem_gradient_operator_2d.hh"
+#include "fem_gradient_2d.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 

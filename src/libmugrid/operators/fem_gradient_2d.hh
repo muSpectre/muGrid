@@ -46,7 +46,7 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
-#include "operators/convolution_operator_base.hh"
+#include "operators/gradient.hh"
 
 #include <array>
 #include <vector>

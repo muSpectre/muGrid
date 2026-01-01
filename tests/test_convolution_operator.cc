@@ -36,7 +36,7 @@
 #include "tests.hh"
 #include "test_goodies.hh"
 
-#include "operators/convolution_operator.hh"
+#include "operators/stencil_gradient.hh"
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "field/field_map.hh"

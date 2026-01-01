@@ -223,9 +223,6 @@ namespace muGrid {
    protected:
   };
 
-  // Backwards compatibility alias
-  using ConvolutionOperatorBase = GradientOperator;
-
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_CONVOLUTION_OPERATOR_BASE_HH_
