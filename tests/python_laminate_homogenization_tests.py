@@ -43,6 +43,7 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 import pytest
+from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
 from muGrid import Timer
@@ -386,11 +387,14 @@ class LaminateHomogenization:
         self.nb_quad = self.gradient_op.nb_quad_pts
         self.quad_weights = self.gradient_op.quadrature_weights
 
+        # Compute MPI subdivisions
+        nb_subdivisions = suggest_subdivisions(self.dim, self.comm.size)
+
         # Create decomposition with ghost cells
         self.decomposition = muGrid.CartesianDecomposition(
             self.comm,
             nb_grid_pts,
-            nb_subdivisions=(1,) * self.dim,
+            nb_subdivisions=nb_subdivisions,
             nb_ghosts_left=(1,) * self.dim,
             nb_ghosts_right=(1,) * self.dim,
             nb_sub_pts={"quad": self.nb_quad},
@@ -400,10 +404,13 @@ class LaminateHomogenization:
         self.element_decomposition = muGrid.CartesianDecomposition(
             self.comm,
             nb_grid_pts,
-            nb_subdivisions=(1,) * self.dim,
+            nb_subdivisions=nb_subdivisions,
             nb_ghosts_left=(1,) * self.dim,
             nb_ghosts_right=(1,) * self.dim,
         )
+
+        # Store local grid shape for array allocations
+        self.local_grid_shape = self.decomposition.nb_subdomain_grid_pts
 
         # Create stiffness operator
         if self.dim == 2:
@@ -438,24 +445,20 @@ class LaminateHomogenization:
             "stress", (self.dim, self.dim), "quad"
         )
 
-        # Stiffness tensor field for generic operator
+        # Stiffness tensor field for generic operator (use local shape!)
         self.nb_voigt = 3 if self.dim == 2 else 6
         self.C_field = np.zeros(
-            (self.nb_voigt, self.nb_voigt, self.nb_quad) + tuple(self.nb_grid_pts)
+            (self.nb_voigt, self.nb_voigt, self.nb_quad) + self.local_grid_shape
         )
 
     def _setup_material(self):
         """Set up laminate material distribution."""
-        # Create coordinate grid for nodes
-        coords = [
-            np.linspace(0, L, n, endpoint=False)
-            for L, n in zip(self.domain_size, self.nb_grid_pts)
-        ]
-        grid = np.meshgrid(*coords, indexing="ij")
+        # Use local coordinates from decomposition (handles MPI domain decomposition)
+        local_coords = self.decomposition.coords
 
         # Determine phase based on layer direction
         # Phase 1 where coordinate < volume_fraction_1
-        layer_coord = grid[self.layer_direction]
+        layer_coord = local_coords[self.layer_direction]
         phase = (layer_coord < self.volume_fraction_1).astype(float)
 
         # Set material properties
@@ -493,12 +496,12 @@ class LaminateHomogenization:
     def _strain_to_voigt(self, strain):
         """Convert strain tensor to Voigt notation."""
         if self.dim == 2:
-            eps_voigt = np.zeros((3, self.nb_quad) + tuple(self.nb_grid_pts))
+            eps_voigt = np.zeros((3, self.nb_quad) + self.local_grid_shape)
             eps_voigt[0, ...] = strain[0, 0, ...]
             eps_voigt[1, ...] = strain[1, 1, ...]
             eps_voigt[2, ...] = 2 * strain[0, 1, ...]
         else:
-            eps_voigt = np.zeros((6, self.nb_quad) + tuple(self.nb_grid_pts))
+            eps_voigt = np.zeros((6, self.nb_quad) + self.local_grid_shape)
             eps_voigt[0, ...] = strain[0, 0, ...]
             eps_voigt[1, ...] = strain[1, 1, ...]
             eps_voigt[2, ...] = strain[2, 2, ...]
@@ -540,7 +543,7 @@ class LaminateHomogenization:
 
     def _compute_rhs(self, E_macro, rhs_out):
         """Compute RHS: f = -B^T C E_macro."""
-        strain_shape = (self.dim, self.dim, self.nb_quad) + tuple(self.nb_grid_pts)
+        strain_shape = (self.dim, self.dim, self.nb_quad) + self.local_grid_shape
         eps_macro = np.zeros(strain_shape)
         for i in range(self.dim):
             for j in range(self.dim):
@@ -605,8 +608,8 @@ class LaminateHomogenization:
             self.gradient_op.apply(self.u_field, self.gradient_field)
             grad = self.gradient_field.s
 
-            # Symmetric strain
-            strain_shape = (self.dim, self.dim, self.nb_quad) + tuple(self.nb_grid_pts)
+            # Symmetric strain (use local shape!)
+            strain_shape = (self.dim, self.dim, self.nb_quad) + self.local_grid_shape
             strain = np.zeros(strain_shape)
             for ii in range(self.dim):
                 for jj in range(self.dim):
