@@ -188,9 +188,12 @@ namespace muGrid {
         /**
          * @brief 3D host kernel for isotropic stiffness operator.
          *
+         * Uses gather pattern: iterates over interior nodes, gathers from
+         * neighboring elements via ghost cells. Ghost communication handles
+         * periodicity and MPI boundaries.
+         *
          * @param nnx, nny, nnz Number of interior nodes
          * @param nelx, nely, nelz Number of elements
-         * @param periodic Whether to use periodic element indexing
          */
         void isotropic_stiffness_3d_host(
             const Real* MUGRID_RESTRICT displacement,
@@ -205,7 +208,7 @@ namespace muGrid {
             Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
             Index_t force_stride_d,
             const Real* G, const Real* V,
-            Real alpha, bool increment, bool periodic);
+            Real alpha, bool increment);
 
 #if defined(MUGRID_ENABLE_CUDA)
         void isotropic_stiffness_3d_cuda(
@@ -219,7 +222,7 @@ namespace muGrid {
             Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
             Index_t force_stride_d,
             const Real* G, const Real* V,
-            Real alpha, bool increment, bool periodic);
+            Real alpha, bool increment);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
@@ -234,7 +237,7 @@ namespace muGrid {
             Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
             Index_t force_stride_d,
             const Real* G, const Real* V,
-            Real alpha, bool increment, bool periodic);
+            Real alpha, bool increment);
 #endif
 
     }  // namespace isotropic_stiffness_kernels

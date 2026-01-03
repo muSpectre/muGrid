@@ -791,10 +791,12 @@ class UnitImpulseTest2D(unittest.TestCase):
                         quad_weights,
                     )
 
-                # Compare fused vs generic FEMGradientOperator
+                # Compare fused vs generic FEMGradientOperator (interior only)
+                # For non-periodic BC, boundary node forces are not computed by
+                # the fused operator (they have Dirichlet BC)
                 np.testing.assert_allclose(
-                    force_fused.p,
-                    force_generic.p,
+                    force_fused.p[:, 1 : nx - 1, 1 : ny - 1],
+                    force_generic.p[:, 1 : nx - 1, 1 : ny - 1],
                     rtol=1e-10,
                     atol=1e-14,
                     err_msg=f"Fused vs generic mismatch at node ({ix}, {iy}), "
@@ -802,9 +804,10 @@ class UnitImpulseTest2D(unittest.TestCase):
                 )
 
                 # Compare generic FEMGradientOperator vs ConvolutionOperator
+                # (interior only)
                 np.testing.assert_allclose(
-                    force_generic.p,
-                    force_convolution.p,
+                    force_generic.p[:, 1 : nx - 1, 1 : ny - 1],
+                    force_convolution.p[:, 1 : nx - 1, 1 : ny - 1],
                     rtol=1e-10,
                     atol=1e-14,
                     err_msg=f"Generic vs convolution mismatch at node ({ix}, {iy}), "
@@ -1086,10 +1089,12 @@ class UnitImpulseTest3D(unittest.TestCase):
                         quad_weights,
                     )
 
-                # Compare fused vs generic FEMGradientOperator
+                # Compare fused vs generic FEMGradientOperator (interior only)
+                # For non-periodic BC, boundary node forces are not computed by
+                # the fused operator (they have Dirichlet BC)
                 np.testing.assert_allclose(
-                    force_fused.p,
-                    force_generic.p,
+                    force_fused.p[:, 1 : nx - 1, 1 : ny - 1, 1 : nz - 1],
+                    force_generic.p[:, 1 : nx - 1, 1 : ny - 1, 1 : nz - 1],
                     rtol=1e-10,
                     atol=1e-14,
                     err_msg=f"Fused vs generic mismatch at node ({ix}, {iy}, {iz}), "
@@ -1097,9 +1102,10 @@ class UnitImpulseTest3D(unittest.TestCase):
                 )
 
                 # Compare generic FEMGradientOperator vs ConvolutionOperator
+                # (interior only)
                 np.testing.assert_allclose(
-                    force_generic.p,
-                    force_convolution.p,
+                    force_generic.p[:, 1 : nx - 1, 1 : ny - 1, 1 : nz - 1],
+                    force_convolution.p[:, 1 : nx - 1, 1 : ny - 1, 1 : nz - 1],
                     rtol=1e-10,
                     atol=1e-14,
                     err_msg="Generic vs convolution mismatch at node "

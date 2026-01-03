@@ -97,21 +97,28 @@ __global__ void isotropic_stiffness_2d_kernel(
     Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
     Index_t mat_stride_x, Index_t mat_stride_y,
     Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_d,
-    Real alpha, bool increment, bool periodic) {
+    Real alpha, bool increment) {
 
     constexpr int NB_NODES = 4;
     constexpr int NB_DOFS = 2;
     constexpr int NB_ELEM_DOFS = NB_NODES * NB_DOFS;
 
-    // Thread indexing for NODES
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    // Compute iteration bounds
+    // For periodic BC (nelx == nnx): iterate over all nodes
+    // For non-periodic BC (nelx == nnx-1): skip boundary nodes
+    Index_t ix_start = (nelx == nnx) ? 0 : 1;
+    Index_t iy_start = (nely == nny) ? 0 : 1;
+    Index_t ix_end = (nelx == nnx) ? nnx : nnx - 1;
+    Index_t iy_end = (nely == nny) ? nny : nny - 1;
 
-    // Check bounds (loop over interior nodes)
-    if (ix >= nnx || iy >= nny) return;
+    // Thread indexing for NODES (offset by start)
+    Index_t ix = ix_start + blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t iy = iy_start + blockIdx.y * blockDim.y + threadIdx.y;
+
+    // Check bounds
+    if (ix >= ix_end || iy >= iy_end) return;
 
     // Neighboring element offsets and corresponding local node index
-    // Element at (ix + eox, iy + eoy) has this node as local node `local_node`
     const int ELEM_OFFSETS[4][3] = {
         {-1, -1, 3},  // Element (ix-1, iy-1): this node is local node 3
         { 0, -1, 2},  // Element (ix,   iy-1): this node is local node 2
@@ -122,20 +129,12 @@ __global__ void isotropic_stiffness_2d_kernel(
     // Accumulate force for this node
     Real f[NB_DOFS] = {0.0, 0.0};
 
-    // Loop over neighboring elements
+    // Loop over neighboring elements (all guaranteed to exist for this node)
     #pragma unroll
     for (int elem = 0; elem < 4; ++elem) {
-        int ex = ix + ELEM_OFFSETS[elem][0];
-        int ey = iy + ELEM_OFFSETS[elem][1];
+        int ex = static_cast<int>(ix) + ELEM_OFFSETS[elem][0];
+        int ey = static_cast<int>(iy) + ELEM_OFFSETS[elem][1];
         int local_node = ELEM_OFFSETS[elem][2];
-
-        // Handle periodic wrapping or skip out-of-bounds
-        if (periodic) {
-            ex = (ex + nelx) % nelx;
-            ey = (ey + nely) % nely;
-        } else {
-            if (ex < 0 || ex >= nelx || ey < 0 || ey >= nely) continue;
-        }
 
         // Get material parameters for this element
         Real lam = lambda[ex * mat_stride_x + ey * mat_stride_y];
@@ -212,24 +211,31 @@ __global__ void isotropic_stiffness_3d_kernel(
     Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
     Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
     Index_t force_stride_d,
-    Real alpha, bool increment, bool periodic) {
+    Real alpha, bool increment) {
 
     constexpr int NB_NODES = 8;
     constexpr int NB_DOFS = 3;
     constexpr int NB_ELEM_DOFS = NB_NODES * NB_DOFS;
 
-    // Thread indexing for NODES
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
-    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
+    // Compute iteration bounds
+    // For periodic BC (nelx == nnx): iterate over all nodes
+    // For non-periodic BC (nelx == nnx-1): skip boundary nodes
+    Index_t ix_start = (nelx == nnx) ? 0 : 1;
+    Index_t iy_start = (nely == nny) ? 0 : 1;
+    Index_t iz_start = (nelz == nnz) ? 0 : 1;
+    Index_t ix_end = (nelx == nnx) ? nnx : nnx - 1;
+    Index_t iy_end = (nely == nny) ? nny : nny - 1;
+    Index_t iz_end = (nelz == nnz) ? nnz : nnz - 1;
 
-    // Check bounds (loop over interior nodes)
-    if (ix >= nnx || iy >= nny || iz >= nnz) return;
+    // Thread indexing for NODES (offset by start)
+    Index_t ix = ix_start + blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t iy = iy_start + blockIdx.y * blockDim.y + threadIdx.y;
+    Index_t iz = iz_start + blockIdx.z * blockDim.z + threadIdx.z;
+
+    // Check bounds
+    if (ix >= ix_end || iy >= iy_end || iz >= iz_end) return;
 
     // Neighboring element offsets and corresponding local node index
-    // Element at (ix + eox, iy + eoy, iz + eoz) has this node as local node `local_node`
-    // Local node index = (1-eox-1) + 2*(1-eoy-1) + 4*(1-eoz-1) = -eox + 2*(-eoy) + 4*(-eoz)
-    // When eox=-1: contributes 1, eox=0: contributes 0
     const int ELEM_OFFSETS[8][4] = {
         {-1, -1, -1, 7},  // Element (ix-1, iy-1, iz-1): local node 7 (corner 1,1,1)
         { 0, -1, -1, 6},  // Element (ix,   iy-1, iz-1): local node 6 (corner 0,1,1)
@@ -244,24 +250,13 @@ __global__ void isotropic_stiffness_3d_kernel(
     // Accumulate force for this node
     Real f[NB_DOFS] = {0.0, 0.0, 0.0};
 
-    // Loop over neighboring elements
+    // Loop over neighboring elements (all guaranteed to exist for this node)
     #pragma unroll
     for (int elem = 0; elem < 8; ++elem) {
-        int ex = ix + ELEM_OFFSETS[elem][0];
-        int ey = iy + ELEM_OFFSETS[elem][1];
-        int ez = iz + ELEM_OFFSETS[elem][2];
+        int ex = static_cast<int>(ix) + ELEM_OFFSETS[elem][0];
+        int ey = static_cast<int>(iy) + ELEM_OFFSETS[elem][1];
+        int ez = static_cast<int>(iz) + ELEM_OFFSETS[elem][2];
         int local_node = ELEM_OFFSETS[elem][3];
-
-        // Handle periodic wrapping or skip out-of-bounds
-        if (periodic) {
-            ex = (ex + nelx) % nelx;
-            ey = (ey + nely) % nely;
-            ez = (ez + nelz) % nelz;
-        } else {
-            if (ex < 0 || ex >= nelx ||
-                ey < 0 || ey >= nely ||
-                ez < 0 || ez >= nelz) continue;
-        }
 
         // Get material parameters for this element
         Index_t mat_idx = ex * mat_stride_x + ey * mat_stride_y + ez * mat_stride_z;
@@ -333,7 +328,7 @@ void isotropic_stiffness_2d_cuda(
     Index_t mat_stride_x, Index_t mat_stride_y,
     Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_d,
     const Real* G, const Real* V,
-    Real alpha, bool increment, bool periodic) {
+    Real alpha, bool increment) {
 
     // Copy G and V to constant memory if not already done
     if (!g_2d_constants_initialized) {
@@ -342,9 +337,13 @@ void isotropic_stiffness_2d_cuda(
         g_2d_constants_initialized = true;
     }
 
-    // Launch stiffness kernel - one thread per NODE (gather pattern writes directly)
+    // Compute effective grid size (interior nodes only for non-periodic)
+    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
+    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
+
+    // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
-    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
+    dim3 grid((nx_eff + block.x - 1) / block.x, (ny_eff + block.y - 1) / block.y);
 
     isotropic_stiffness_2d_kernel<<<grid, block>>>(
         displacement, lambda, mu, force,
@@ -352,7 +351,7 @@ void isotropic_stiffness_2d_cuda(
         disp_stride_x, disp_stride_y, disp_stride_d,
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
-        alpha, increment, periodic);
+        alpha, increment);
 
     // Check for errors
     cudaError_t err = cudaGetLastError();
@@ -373,7 +372,7 @@ void isotropic_stiffness_3d_cuda(
     Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
     Index_t force_stride_d,
     const Real* G, const Real* V,
-    Real alpha, bool increment, bool periodic) {
+    Real alpha, bool increment) {
 
     // Copy G and V to constant memory if not already done
     if (!g_3d_constants_initialized) {
@@ -382,11 +381,16 @@ void isotropic_stiffness_3d_cuda(
         g_3d_constants_initialized = true;
     }
 
-    // Launch stiffness kernel - one thread per NODE (gather pattern writes directly)
+    // Compute effective grid size (interior nodes only for non-periodic)
+    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
+    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
+    Index_t nz_eff = (nelz == nnz) ? nnz : nnz - 2;
+
+    // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
-    dim3 grid((nnx + block.x - 1) / block.x,
-              (nny + block.y - 1) / block.y,
-              (nnz + block.z - 1) / block.z);
+    dim3 grid((nx_eff + block.x - 1) / block.x,
+              (ny_eff + block.y - 1) / block.y,
+              (nz_eff + block.z - 1) / block.z);
 
     isotropic_stiffness_3d_kernel<<<grid, block>>>(
         displacement, lambda, mu, force,
@@ -394,7 +398,7 @@ void isotropic_stiffness_3d_cuda(
         disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
-        alpha, increment, periodic);
+        alpha, increment);
 
     // Check for errors
     cudaError_t err = cudaGetLastError();
@@ -420,7 +424,7 @@ void isotropic_stiffness_2d_hip(
     Index_t mat_stride_x, Index_t mat_stride_y,
     Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_d,
     const Real* G, const Real* V,
-    Real alpha, bool increment, bool periodic) {
+    Real alpha, bool increment) {
 
     // Copy G and V to constant memory if not already done
     if (!g_2d_constants_initialized) {
@@ -429,9 +433,13 @@ void isotropic_stiffness_2d_hip(
         g_2d_constants_initialized = true;
     }
 
-    // Launch stiffness kernel - one thread per NODE (gather pattern writes directly)
+    // Compute effective grid size (interior nodes only for non-periodic)
+    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
+    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
+
+    // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
-    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
+    dim3 grid((nx_eff + block.x - 1) / block.x, (ny_eff + block.y - 1) / block.y);
 
     hipLaunchKernelGGL(isotropic_stiffness_2d_kernel, grid, block, 0, 0,
         displacement, lambda, mu, force,
@@ -439,7 +447,7 @@ void isotropic_stiffness_2d_hip(
         disp_stride_x, disp_stride_y, disp_stride_d,
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
-        alpha, increment, periodic);
+        alpha, increment);
 
     // Check for errors
     hipError_t err = hipGetLastError();
@@ -460,7 +468,7 @@ void isotropic_stiffness_3d_hip(
     Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
     Index_t force_stride_d,
     const Real* G, const Real* V,
-    Real alpha, bool increment, bool periodic) {
+    Real alpha, bool increment) {
 
     // Copy G and V to constant memory if not already done
     if (!g_3d_constants_initialized) {
@@ -469,11 +477,16 @@ void isotropic_stiffness_3d_hip(
         g_3d_constants_initialized = true;
     }
 
-    // Launch stiffness kernel - one thread per NODE (gather pattern writes directly)
+    // Compute effective grid size (interior nodes only for non-periodic)
+    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
+    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
+    Index_t nz_eff = (nelz == nnz) ? nnz : nnz - 2;
+
+    // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
-    dim3 grid((nnx + block.x - 1) / block.x,
-              (nny + block.y - 1) / block.y,
-              (nnz + block.z - 1) / block.z);
+    dim3 grid((nx_eff + block.x - 1) / block.x,
+              (ny_eff + block.y - 1) / block.y,
+              (nz_eff + block.z - 1) / block.z);
 
     hipLaunchKernelGGL(isotropic_stiffness_3d_kernel, grid, block, 0, 0,
         displacement, lambda, mu, force,
@@ -481,7 +494,7 @@ void isotropic_stiffness_3d_hip(
         disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
-        alpha, increment, periodic);
+        alpha, increment);
 
     // Check for errors
     hipError_t err = hipGetLastError();
@@ -539,16 +552,22 @@ void IsotropicStiffnessOperator2D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator2D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration for displacement/force fields
+    // Validate ghost configuration - require ghosts on both sides
+    // Ghost communication handles periodicity and MPI boundaries
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
+    if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
+            "left side of displacement/force fields (nb_ghosts_left >= (1, 1))");
+    }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
             "right side of displacement/force fields (nb_ghosts_right >= (1, 1))");
     }
 
-    // Material field dimensions = number of elements (no ghosts on material field)
+    // Material field dimensions = number of elements
     auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nelx = nb_elements[0];
     Index_t nely = nb_elements[1];
@@ -557,24 +576,6 @@ void IsotropicStiffnessOperator2D::apply_impl(
     auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nnx = nb_interior[0];
     Index_t nny = nb_interior[1];
-
-    // Determine if periodic BC based on material field size
-    bool periodic = (nelx == nnx) && (nely == nny);
-    bool non_periodic = (nelx == nnx - 1) && (nely == nny - 1);
-
-    if (!periodic && !non_periodic) {
-        throw RuntimeError(
-            "Material field dimensions (" + std::to_string(nelx) + ", " +
-            std::to_string(nely) + ") must equal interior nodes (" +
-            std::to_string(nnx) + ", " + std::to_string(nny) +
-            ") for periodic BC, or interior nodes - 1 for non-periodic BC");
-    }
-
-    if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1)) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator2D with periodic BC requires at least 1 "
-            "ghost cell on the left side of displacement/force fields");
-    }
 
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
@@ -612,7 +613,7 @@ void IsotropicStiffnessOperator2D::apply_impl(
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
         G_matrix.data(), V_matrix.data(),
-        alpha, increment, periodic);
+        alpha, increment);
 }
 
 void IsotropicStiffnessOperator3D::apply(
@@ -653,9 +654,15 @@ void IsotropicStiffnessOperator3D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator3D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration for displacement/force fields
+    // Validate ghost configuration - require ghosts on both sides
+    // Ghost communication handles periodicity and MPI boundaries
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
+    if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
+            "left side of displacement/force fields (nb_ghosts_left >= (1, 1, 1))");
+    }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 || nb_ghosts_right[2] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
@@ -673,25 +680,6 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t nnx = nb_interior[0];
     Index_t nny = nb_interior[1];
     Index_t nnz = nb_interior[2];
-
-    // Determine if periodic BC based on material field size
-    bool periodic = (nelx == nnx) && (nely == nny) && (nelz == nnz);
-    bool non_periodic = (nelx == nnx - 1) && (nely == nny - 1) && (nelz == nnz - 1);
-
-    if (!periodic && !non_periodic) {
-        throw RuntimeError(
-            "Material field dimensions (" + std::to_string(nelx) + ", " +
-            std::to_string(nely) + ", " + std::to_string(nelz) +
-            ") must equal interior nodes (" + std::to_string(nnx) + ", " +
-            std::to_string(nny) + ", " + std::to_string(nnz) +
-            ") for periodic BC, or interior nodes - 1 for non-periodic BC");
-    }
-
-    if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1)) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator3D with periodic BC requires at least 1 "
-            "ghost cell on the left side of displacement/force fields");
-    }
 
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
@@ -736,7 +724,7 @@ void IsotropicStiffnessOperator3D::apply_impl(
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
         G_matrix.data(), V_matrix.data(),
-        alpha, increment, periodic);
+        alpha, increment);
 }
 
 #elif defined(MUGRID_ENABLE_HIP)
@@ -779,9 +767,15 @@ void IsotropicStiffnessOperator2D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator2D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration for displacement/force fields
+    // Validate ghost configuration - require ghosts on both sides
+    // Ghost communication handles periodicity and MPI boundaries
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
+    if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
+            "left side of displacement/force fields (nb_ghosts_left >= (1, 1))");
+    }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
@@ -797,24 +791,6 @@ void IsotropicStiffnessOperator2D::apply_impl(
     auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nnx = nb_interior[0];
     Index_t nny = nb_interior[1];
-
-    // Determine if periodic BC based on material field size
-    bool periodic = (nelx == nnx) && (nely == nny);
-    bool non_periodic = (nelx == nnx - 1) && (nely == nny - 1);
-
-    if (!periodic && !non_periodic) {
-        throw RuntimeError(
-            "Material field dimensions (" + std::to_string(nelx) + ", " +
-            std::to_string(nely) + ") must equal interior nodes (" +
-            std::to_string(nnx) + ", " + std::to_string(nny) +
-            ") for periodic BC, or interior nodes - 1 for non-periodic BC");
-    }
-
-    if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1)) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator2D with periodic BC requires at least 1 "
-            "ghost cell on the left side of displacement/force fields");
-    }
 
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
@@ -852,7 +828,7 @@ void IsotropicStiffnessOperator2D::apply_impl(
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
         G_matrix.data(), V_matrix.data(),
-        alpha, increment, periodic);
+        alpha, increment);
 }
 
 void IsotropicStiffnessOperator3D::apply(
@@ -893,9 +869,15 @@ void IsotropicStiffnessOperator3D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator3D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration for displacement/force fields
+    // Validate ghost configuration - require ghosts on both sides
+    // Ghost communication handles periodicity and MPI boundaries
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
+    if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
+            "left side of displacement/force fields (nb_ghosts_left >= (1, 1, 1))");
+    }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 || nb_ghosts_right[2] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
@@ -913,25 +895,6 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t nnx = nb_interior[0];
     Index_t nny = nb_interior[1];
     Index_t nnz = nb_interior[2];
-
-    // Determine if periodic BC based on material field size
-    bool periodic = (nelx == nnx) && (nely == nny) && (nelz == nnz);
-    bool non_periodic = (nelx == nnx - 1) && (nely == nny - 1) && (nelz == nnz - 1);
-
-    if (!periodic && !non_periodic) {
-        throw RuntimeError(
-            "Material field dimensions (" + std::to_string(nelx) + ", " +
-            std::to_string(nely) + ", " + std::to_string(nelz) +
-            ") must equal interior nodes (" + std::to_string(nnx) + ", " +
-            std::to_string(nny) + ", " + std::to_string(nnz) +
-            ") for periodic BC, or interior nodes - 1 for non-periodic BC");
-    }
-
-    if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1)) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator3D with periodic BC requires at least 1 "
-            "ghost cell on the left side of displacement/force fields");
-    }
 
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
@@ -976,7 +939,7 @@ void IsotropicStiffnessOperator3D::apply_impl(
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
         G_matrix.data(), V_matrix.data(),
-        alpha, increment, periodic);
+        alpha, increment);
 }
 
 #endif  // HIP

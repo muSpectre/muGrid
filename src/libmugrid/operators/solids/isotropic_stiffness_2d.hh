@@ -189,10 +189,12 @@ namespace muGrid {
         /**
          * @brief 2D host kernel for isotropic stiffness operator.
          *
+         * Uses gather pattern: iterates over interior nodes, gathers from
+         * neighboring elements via ghost cells. Ghost communication handles
+         * periodicity and MPI boundaries.
+         *
          * @param nnx, nny Number of interior nodes
-         * @param nelx, nely Number of elements (= nnx for periodic, nnx-1 for
-         * non-periodic)
-         * @param periodic Whether to use periodic element indexing
+         * @param nelx, nely Number of elements
          */
         void isotropic_stiffness_2d_host(
             const Real * MUGRID_RESTRICT displacement,
@@ -202,7 +204,7 @@ namespace muGrid {
             Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
             Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
             Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment, bool periodic);
+            const Real * V, Real alpha, bool increment);
 
 #if defined(MUGRID_ENABLE_CUDA)
         void isotropic_stiffness_2d_cuda(
@@ -211,7 +213,7 @@ namespace muGrid {
             Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
             Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
             Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment, bool periodic);
+            const Real * V, Real alpha, bool increment);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
@@ -221,7 +223,7 @@ namespace muGrid {
             Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
             Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
             Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment, bool periodic);
+            const Real * V, Real alpha, bool increment);
 #endif
 
     }  // namespace isotropic_stiffness_kernels

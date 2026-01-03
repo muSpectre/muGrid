@@ -44,30 +44,31 @@ namespace muGrid {
     // ============================================================================
 
     // 3D shape function gradients for 5 tetrahedra per voxel
-    // B_3D[quad][dim][node]
+    // B_3D[quad][dim][node] where dim: 0=d/dx, 1=d/dy, 2=d/dz
     // Nodes: 0=(0,0,0), 1=(1,0,0), 2=(0,1,0), 3=(1,1,0),
     //        4=(0,0,1), 5=(1,0,1), 6=(0,1,1), 7=(1,1,1)
+    // These values match FEMGradientOperator's 5-tetrahedra decomposition
     static const Real B_3D[5][3][8] = {
         // Tet 0: Central tetrahedron (nodes 1,2,4,7)
         {{0.0, 0.5, -0.5, 0.0, -0.5, 0.0, 0.0, 0.5},   // d/dx
          {0.0, -0.5, 0.5, 0.0, -0.5, 0.0, 0.0, 0.5},   // d/dy
          {0.0, -0.5, -0.5, 0.0, 0.5, 0.0, 0.0, 0.5}},  // d/dz
         // Tet 1: Corner at (0,0,0) - nodes 0,1,2,4
-        {{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-         {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-         {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},
-        // Tet 2: Corner at (1,1,0) - nodes 1,2,3,7
-        {{0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},
-         {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},
-         {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}},
+        {{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},    // d/dx
+         {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},    // d/dy
+         {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},   // d/dz
+        // Tet 2: Corner at (0,1,1) - nodes 2,4,6,7
+        {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0},    // d/dx
+         {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0},    // d/dy
+         {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}},   // d/dz
         // Tet 3: Corner at (1,0,1) - nodes 1,4,5,7
-        {{0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},
-         {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
-         {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0}},
-        // Tet 4: Corner at (0,1,1) - nodes 2,4,6,7
-        {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0},
-         {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0},
-         {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}}};
+        {{0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},    // d/dx
+         {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},    // d/dy
+         {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0}},   // d/dz
+        // Tet 4: Corner at (1,1,0) - nodes 1,2,3,7
+        {{0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},    // d/dx
+         {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},    // d/dy
+         {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}}};
 
     // Quadrature weights for 3D (volume of each tet / voxel volume)
     static const Real W_3D[5] = {1.0 / 3.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0,
@@ -130,48 +131,50 @@ namespace muGrid {
                             //   K[u_b,I; u_b,J] += μ * dN_I/dx_a * dN_J/dx_a
                             //   K[u_a,I; u_b,J] += μ * dN_I/dx_b * dN_J/dx_a
                             //   K[u_b,I; u_a,J] += μ * dN_I/dx_a * dN_J/dx_b
+                            // Shear strain contributions
+                            // Using single-line expressions to avoid parsing issues
+                            Real dNI_dx = B_3D[q][0][I] * scale[0];
+                            Real dNI_dy = B_3D[q][1][I] * scale[1];
+                            Real dNI_dz = B_3D[q][2][I] * scale[2];
+                            Real dNJ_dx = B_3D[q][0][J] * scale[0];
+                            Real dNJ_dy = B_3D[q][1][J] * scale[1];
+                            Real dNJ_dz = B_3D[q][2][J] * scale[2];
+
+                            // Shear strain contributions with explicit intermediate
+                            // variables to avoid potential compiler optimization issues
                             if (a == 0 && b == 0) {
                                 // u_x - u_x: shear εxy (dN/dy) and εxz (dN/dz)
-                                g_contrib += 0.5 * B_3D[q][1][I] * scale[1] *
-                                             B_3D[q][1][J] * scale[1];  // εxy
-                                g_contrib += 0.5 * B_3D[q][2][I] * scale[2] *
-                                             B_3D[q][2][J] * scale[2];  // εxz
+                                Real shear_xy = 0.5 * dNI_dy * dNJ_dy;
+                                Real shear_xz = 0.5 * dNI_dz * dNJ_dz;
+                                g_contrib += shear_xy + shear_xz;
                             } else if (a == 1 && b == 1) {
                                 // u_y - u_y: shear εxy (dN/dx) and εyz (dN/dz)
-                                g_contrib += 0.5 * B_3D[q][0][I] * scale[0] *
-                                             B_3D[q][0][J] * scale[0];  // εxy
-                                g_contrib += 0.5 * B_3D[q][2][I] * scale[2] *
-                                             B_3D[q][2][J] * scale[2];  // εyz
+                                Real shear_xy = 0.5 * dNI_dx * dNJ_dx;
+                                Real shear_yz = 0.5 * dNI_dz * dNJ_dz;
+                                g_contrib += shear_xy + shear_yz;
                             } else if (a == 2 && b == 2) {
                                 // u_z - u_z: shear εxz (dN/dx) and εyz (dN/dy)
-                                g_contrib += 0.5 * B_3D[q][0][I] * scale[0] *
-                                             B_3D[q][0][J] * scale[0];  // εxz
-                                g_contrib += 0.5 * B_3D[q][1][I] * scale[1] *
-                                             B_3D[q][1][J] * scale[1];  // εyz
+                                Real shear_xz = 0.5 * dNI_dx * dNJ_dx;
+                                Real shear_yz = 0.5 * dNI_dy * dNJ_dy;
+                                g_contrib += shear_xz + shear_yz;
                             } else if (a == 0 && b == 1) {
                                 // u_x,I - u_y,J cross coupling via εxy
-                                g_contrib += 0.5 * B_3D[q][1][I] * scale[1] *
-                                             B_3D[q][0][J] * scale[0];
+                                g_contrib += 0.5 * dNI_dy * dNJ_dx;
                             } else if (a == 1 && b == 0) {
                                 // u_y,I - u_x,J cross coupling via εxy
-                                g_contrib += 0.5 * B_3D[q][0][I] * scale[0] *
-                                             B_3D[q][1][J] * scale[1];
+                                g_contrib += 0.5 * dNI_dx * dNJ_dy;
                             } else if (a == 0 && b == 2) {
                                 // u_x,I - u_z,J cross coupling via εxz
-                                g_contrib += 0.5 * B_3D[q][2][I] * scale[2] *
-                                             B_3D[q][0][J] * scale[0];
+                                g_contrib += 0.5 * dNI_dz * dNJ_dx;
                             } else if (a == 2 && b == 0) {
                                 // u_z,I - u_x,J cross coupling via εxz
-                                g_contrib += 0.5 * B_3D[q][0][I] * scale[0] *
-                                             B_3D[q][2][J] * scale[2];
+                                g_contrib += 0.5 * dNI_dx * dNJ_dz;
                             } else if (a == 1 && b == 2) {
                                 // u_y,I - u_z,J cross coupling via εyz
-                                g_contrib += 0.5 * B_3D[q][2][I] * scale[2] *
-                                             B_3D[q][1][J] * scale[1];
+                                g_contrib += 0.5 * dNI_dz * dNJ_dy;
                             } else if (a == 2 && b == 1) {
                                 // u_z,I - u_y,J cross coupling via εyz
-                                g_contrib += 0.5 * B_3D[q][1][I] * scale[1] *
-                                             B_3D[q][2][J] * scale[2];
+                                g_contrib += 0.5 * dNI_dy * dNJ_dz;
                             }
 
                             // V contribution: (B^T m)(m^T B)
@@ -243,14 +246,9 @@ namespace muGrid {
         if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 ||
             nb_ghosts_right[2] < 1) {
             throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                               "1 ghost cell on the "
-                               "right side of displacement/force fields "
-                               "(nb_ghosts_right >= (1, 1, 1))");
+                               "1 ghost cell on the right side of "
+                               "displacement/force fields");
         }
-
-        // Get material field ghost configuration
-        auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
-        auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
 
         // Material field dimensions = number of elements (interior, without
         // ghosts)
@@ -267,54 +265,65 @@ namespace muGrid {
         Index_t nny = nb_interior[1];
         Index_t nnz = nb_interior[2];
 
-        // Determine if periodic BC based on material field size
-        // Periodic: nel == nn (N elements for N nodes, wraps around)
-        // Non-periodic: nel == nn - 1 (N-1 elements for N nodes)
+        // Determine periodic/non-periodic based on material vs node dimensions
+        // Periodic: nelx == nnx (one element wraps around)
+        // Non-periodic: nelx == nnx - 1 (boundary nodes lack some neighbors)
         bool periodic_x = (nelx == nnx);
         bool periodic_y = (nely == nny);
         bool periodic_z = (nelz == nnz);
-        bool periodic = periodic_x && periodic_y && periodic_z;
-        bool non_periodic =
-            (nelx == nnx - 1) && (nely == nny - 1) && (nelz == nnz - 1);
+        bool non_periodic_x = (nelx == nnx - 1);
+        bool non_periodic_y = (nely == nny - 1);
+        bool non_periodic_z = (nelz == nnz - 1);
 
         // Validate material field dimensions
-        if (!periodic && !non_periodic) {
+        if (!periodic_x && !non_periodic_x) {
             throw RuntimeError(
-                "Material field dimensions (" + std::to_string(nelx) + ", " +
-                std::to_string(nely) + ", " + std::to_string(nelz) +
-                ") must equal interior nodes (" + std::to_string(nnx) + ", " +
-                std::to_string(nny) + ", " + std::to_string(nnz) +
-                ") for periodic BC, or interior nodes - 1 (" +
-                std::to_string(nnx - 1) + ", " + std::to_string(nny - 1) +
-                ", " + std::to_string(nnz - 1) + ") for non-periodic BC");
+                "IsotropicStiffnessOperator3D: material field x-dimension (" +
+                std::to_string(nelx) + ") must be either nnx (" +
+                std::to_string(nnx) + ") for periodic or nnx-1 (" +
+                std::to_string(nnx - 1) + ") for non-periodic");
+        }
+        if (!periodic_y && !non_periodic_y) {
+            throw RuntimeError(
+                "IsotropicStiffnessOperator3D: material field y-dimension (" +
+                std::to_string(nely) + ") must be either nny (" +
+                std::to_string(nny) + ") for periodic or nny-1 (" +
+                std::to_string(nny - 1) + ") for non-periodic");
+        }
+        if (!periodic_z && !non_periodic_z) {
+            throw RuntimeError(
+                "IsotropicStiffnessOperator3D: material field z-dimension (" +
+                std::to_string(nelz) + ") must be either nnz (" +
+                std::to_string(nnz) + ") for periodic or nnz-1 (" +
+                std::to_string(nnz - 1) + ") for non-periodic");
         }
 
-        // For periodic BC, need left ghosts on displacement/force fields
+        bool periodic = periodic_x && periodic_y && periodic_z;
+
+        // Validate ghost configuration based on periodic/non-periodic mode
         if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 ||
                          nb_ghosts_left[2] < 1)) {
             throw RuntimeError(
                 "IsotropicStiffnessOperator3D with periodic BC requires at "
-                "least 1 "
-                "ghost cell on the left side of displacement/force fields");
+                "least 1 ghost cell on the left side of displacement/force "
+                "fields");
         }
 
-        // For periodic BC, material field should also have left ghosts
-        if (periodic &&
-            (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 ||
-             mat_nb_ghosts_left[2] < 1)) {
-            throw RuntimeError(
-                "IsotropicStiffnessOperator3D with periodic BC requires at "
-                "least 1 "
-                "ghost cell on the left side of material fields (lambda, mu). "
-                "Call communicate_ghosts on material fields once before "
-                "apply.");
+        // Get material field ghost configuration
+        auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+
+        // For periodic case, material field needs ghost cells too
+        if (periodic && (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 ||
+                         mat_nb_ghosts_left[2] < 1)) {
+            throw RuntimeError("IsotropicStiffnessOperator3D with periodic BC "
+                               "requires at least 1 ghost cell on the left "
+                               "side of material fields (lambda, mu)");
         }
 
         // Node dimensions (for displacement/force fields with ghosts)
         auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
         Index_t nx = nb_nodes[0];
         Index_t ny = nb_nodes[1];
-        Index_t nz = nb_nodes[2];
 
         // Ghost offsets (interior starts at this offset in the ghosted array)
         Index_t disp_ghost_offset_x = nb_ghosts_left[0];
@@ -367,7 +376,7 @@ namespace muGrid {
             disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
             mat_stride_x, mat_stride_y, mat_stride_z, force_stride_x,
             force_stride_y, force_stride_z, force_stride_d, G_matrix.data(),
-            V_matrix.data(), alpha, increment, periodic);
+            V_matrix.data(), alpha, increment);
     }
 
     // ============================================================================
@@ -391,92 +400,104 @@ namespace muGrid {
             Index_t mat_stride_y, Index_t mat_stride_z, Index_t force_stride_x,
             Index_t force_stride_y, Index_t force_stride_z,
             Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
-            bool increment, bool periodic) {
+            bool increment) {
 
             constexpr Index_t NB_NODES = 8;
             constexpr Index_t NB_DOFS = 3;
             constexpr Index_t NB_ELEM_DOFS = NB_NODES * NB_DOFS;
 
+            // Use signed versions of strides to avoid unsigned overflow
+            // when accessing ghost cells at negative indices
+            using SIndex_t = std::ptrdiff_t;
+            SIndex_t s_disp_stride_x = static_cast<SIndex_t>(disp_stride_x);
+            SIndex_t s_disp_stride_y = static_cast<SIndex_t>(disp_stride_y);
+            SIndex_t s_disp_stride_z = static_cast<SIndex_t>(disp_stride_z);
+            SIndex_t s_disp_stride_d = static_cast<SIndex_t>(disp_stride_d);
+            SIndex_t s_mat_stride_x = static_cast<SIndex_t>(mat_stride_x);
+            SIndex_t s_mat_stride_y = static_cast<SIndex_t>(mat_stride_y);
+            SIndex_t s_mat_stride_z = static_cast<SIndex_t>(mat_stride_z);
+            SIndex_t s_force_stride_x = static_cast<SIndex_t>(force_stride_x);
+            SIndex_t s_force_stride_y = static_cast<SIndex_t>(force_stride_y);
+            SIndex_t s_force_stride_z = static_cast<SIndex_t>(force_stride_z);
+            SIndex_t s_force_stride_d = static_cast<SIndex_t>(force_stride_d);
+
             // Neighboring element offsets and corresponding local node index
-            // Element at (ix + eox, iy + eoy, iz + eoz) has this node as local
-            // node
-            static const Index_t ELEM_OFFSETS[8][4] = {
-                {-1, -1, -1,
-                 7},  // Element (ix-1, iy-1, iz-1): local node 7 (corner 1,1,1)
-                {0, -1, -1,
-                 6},  // Element (ix,   iy-1, iz-1): local node 6 (corner 0,1,1)
-                {-1, 0, -1,
-                 5},  // Element (ix-1, iy,   iz-1): local node 5 (corner 1,0,1)
-                {0, 0, -1,
-                 4},  // Element (ix,   iy,   iz-1): local node 4 (corner 0,0,1)
-                {-1, -1, 0,
-                 3},  // Element (ix-1, iy-1, iz  ): local node 3 (corner 1,1,0)
-                {0, -1, 0,
-                 2},  // Element (ix,   iy-1, iz  ): local node 2 (corner 0,1,0)
-                {-1, 0, 0,
-                 1},  // Element (ix-1, iy,   iz  ): local node 1 (corner 1,0,0)
-                {0, 0, 0, 0}
-                // Element (ix,   iy,   iz  ): local node 0 (corner 0,0,0)
+            // Element at (ix + eox, iy + eoy, iz + eoz) has this node as local node
+            static const SIndex_t ELEM_OFFSETS[8][4] = {
+                {-1, -1, -1, 7},  // Element (ix-1, iy-1, iz-1): local node 7 (corner 1,1,1)
+                { 0, -1, -1, 6},  // Element (ix,   iy-1, iz-1): local node 6 (corner 0,1,1)
+                {-1,  0, -1, 5},  // Element (ix-1, iy,   iz-1): local node 5 (corner 1,0,1)
+                { 0,  0, -1, 4},  // Element (ix,   iy,   iz-1): local node 4 (corner 0,0,1)
+                {-1, -1,  0, 3},  // Element (ix-1, iy-1, iz  ): local node 3 (corner 1,1,0)
+                { 0, -1,  0, 2},  // Element (ix,   iy-1, iz  ): local node 2 (corner 0,1,0)
+                {-1,  0,  0, 1},  // Element (ix-1, iy,   iz  ): local node 1 (corner 1,0,0)
+                { 0,  0,  0, 0}   // Element (ix,   iy,   iz  ): local node 0 (corner 0,0,0)
             };
 
-            // Gather pattern: loop over interior NODES
-            for (Index_t iz = 0; iz < nnz; ++iz) {
-                for (Index_t iy = 0; iy < nny; ++iy) {
-                    for (Index_t ix = 0; ix < nnx; ++ix) {
+            // Node offsets within element [node][dim]
+            static const SIndex_t NODE_OFFSET[8][3] = {
+                {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+                {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
+
+            // Compute iteration bounds
+            // For periodic BC (nelx == nnx): iterate over all nodes, all elements valid
+            // For non-periodic BC (nelx == nnx-1): boundary node forces are irrelevant
+            //   (overwritten by ghost communication), so skip bounds checking
+            SIndex_t ix_start = (nelx == nnx) ? 0 : 1;
+            SIndex_t iy_start = (nely == nny) ? 0 : 1;
+            SIndex_t iz_start = (nelz == nnz) ? 0 : 1;
+            SIndex_t ix_end = (nelx == nnx) ? static_cast<SIndex_t>(nnx) : static_cast<SIndex_t>(nnx) - 1;
+            SIndex_t iy_end = (nely == nny) ? static_cast<SIndex_t>(nny) : static_cast<SIndex_t>(nny) - 1;
+            SIndex_t iz_end = (nelz == nnz) ? static_cast<SIndex_t>(nnz) : static_cast<SIndex_t>(nnz) - 1;
+
+            // Gather pattern: loop over interior NODES, gather from neighboring
+            // elements. Ghost cells handle periodicity and MPI boundaries.
+            // For non-periodic BC, boundary nodes are skipped (their forces are
+            // overwritten by ghost communication anyway).
+            for (SIndex_t iz = iz_start; iz < iz_end; ++iz) {
+                for (SIndex_t iy = iy_start; iy < iy_end; ++iy) {
+                    for (SIndex_t ix = ix_start; ix < ix_end; ++ix) {
                         // Accumulate force for this node
                         Real f[NB_DOFS] = {0.0, 0.0, 0.0};
 
-                        // Loop over neighboring elements
+                        // Loop over neighboring elements (all 8 elements guaranteed
+                        // to exist for nodes in this iteration range)
                         for (Index_t elem = 0; elem < 8; ++elem) {
-                            Index_t ex = ix + ELEM_OFFSETS[elem][0];
-                            Index_t ey = iy + ELEM_OFFSETS[elem][1];
-                            Index_t ez = iz + ELEM_OFFSETS[elem][2];
+                            // Element indices (can be -1 for periodic BC accessing ghost cells)
+                            SIndex_t ex = ix + ELEM_OFFSETS[elem][0];
+                            SIndex_t ey = iy + ELEM_OFFSETS[elem][1];
+                            SIndex_t ez = iz + ELEM_OFFSETS[elem][2];
                             Index_t local_node = ELEM_OFFSETS[elem][3];
 
-                            // Handle boundary: skip out-of-bounds elements for
-                            // non-periodic BC For periodic BC, ghost cells
-                            // contain wrap-around data, so no skip needed
-                            if (!periodic &&
-                                (ex < 0 || ex >= nelx || ey < 0 || ey >= nely ||
-                                 ez < 0 || ez >= nelz)) {
-                                continue;
-                            }
-
                             // Get material parameters
-                            // For periodic BC with ghost cells: ex=-1 accesses
-                            // left ghost (contains last element)
-                            Index_t mat_idx = ex * mat_stride_x +
-                                              ey * mat_stride_y +
-                                              ez * mat_stride_z;
+                            SIndex_t mat_idx = ex * s_mat_stride_x +
+                                               ey * s_mat_stride_y +
+                                               ez * s_mat_stride_z;
                             Real lam = lambda[mat_idx];
                             Real mu_val = mu[mat_idx];
 
-                            // Gather displacements from all 8 nodes of this
-                            // element
+                            // Gather displacements from all 8 nodes of this element
                             Real u[NB_ELEM_DOFS];
                             for (Index_t node = 0; node < NB_NODES; ++node) {
-                                Index_t nx_pos = ex + NODE_OFFSET_3D[node][0];
-                                Index_t ny_pos = ey + NODE_OFFSET_3D[node][1];
-                                Index_t nz_pos = ez + NODE_OFFSET_3D[node][2];
-                                Index_t disp_idx = nx_pos * disp_stride_x +
-                                                   ny_pos * disp_stride_y +
-                                                   nz_pos * disp_stride_z;
+                                SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
+                                SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
+                                SIndex_t nz_pos = ez + NODE_OFFSET[node][2];
+                                SIndex_t disp_idx = nx_pos * s_disp_stride_x +
+                                                    ny_pos * s_disp_stride_y +
+                                                    nz_pos * s_disp_stride_z;
                                 for (Index_t d = 0; d < NB_DOFS; ++d) {
                                     u[node * NB_DOFS + d] =
-                                        displacement[disp_idx +
-                                                     d * disp_stride_d];
+                                        displacement[disp_idx + d * s_disp_stride_d];
                                 }
                             }
 
-                            // Compute only the rows that correspond to this
-                            // node
+                            // Compute only the rows that correspond to this node
                             for (Index_t d = 0; d < NB_DOFS; ++d) {
                                 Index_t row = local_node * NB_DOFS + d;
                                 Real contrib = 0.0;
                                 for (Index_t j = 0; j < NB_ELEM_DOFS; ++j) {
                                     contrib +=
-                                        (2.0 * mu_val *
-                                             G[row * NB_ELEM_DOFS + j] +
+                                        (2.0 * mu_val * G[row * NB_ELEM_DOFS + j] +
                                          lam * V[row * NB_ELEM_DOFS + j]) *
                                         u[j];
                                 }
@@ -485,17 +506,16 @@ namespace muGrid {
                         }
 
                         // Write force for this node
-                        Index_t base = ix * force_stride_x +
-                                       iy * force_stride_y +
-                                       iz * force_stride_z;
+                        SIndex_t base = ix * s_force_stride_x +
+                                        iy * s_force_stride_y +
+                                        iz * s_force_stride_z;
                         if (increment) {
                             for (Index_t d = 0; d < NB_DOFS; ++d) {
-                                force[base + d * force_stride_d] +=
-                                    alpha * f[d];
+                                force[base + d * s_force_stride_d] += alpha * f[d];
                             }
                         } else {
                             for (Index_t d = 0; d < NB_DOFS; ++d) {
-                                force[base + d * force_stride_d] = alpha * f[d];
+                                force[base + d * s_force_stride_d] = alpha * f[d];
                             }
                         }
                     }
