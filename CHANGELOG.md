@@ -1,6 +1,26 @@
 Change log for µGrid
 ====================
 
+0.103.0 (03Jan26)
+-----------------
+
+- ENH: Added `IsotropicStiffnessOperator2D` and `IsotropicStiffnessOperator3D` for solid mechanics
+  - Fused elliptic operators computing K @ u = B^T C B @ u for isotropic linear elastic materials
+  - Memory efficient: stores only Lamé parameters (λ, μ) per voxel instead of full stiffness matrix
+  - Reduces memory from O(N × 24²) for full K storage to O(N × 2) for spatially-varying materials
+  - GPU support with optimized CUDA and HIP kernels
+  - Uses linear tetrahedral FEM with 5-tetrahedra decomposition (3D) or 2-triangle decomposition (2D)
+- API: Renamed `StencilGradientOperator` to `GenericLinearOperator`
+  - Clearer naming that reflects the operator's purpose as a general linear convolution operator
+  - Python bindings updated accordingly
+- BUG: Fixed 3D stiffness kernel on GPUs
+- BUG: Gracefully handle non-initialized MPI
+- TST: Added laminate homogenization tests for validating effective material properties
+- TST: MPI-parallel laminate homogenization tests
+- TST: Refactored and unified test infrastructure
+- MAINT: Restructured operators to separate 2D and 3D implementations into distinct source files
+- MAINT: Updated benchmark scripts for performance testing
+
 0.102.0 (30Dec25)
 -----------------
 

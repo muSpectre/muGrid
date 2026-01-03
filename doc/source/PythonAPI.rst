@@ -442,6 +442,88 @@ FEMGradientOperator
       :param weights: Weights for the transpose operation.
       :type weights: sequence of float, optional
 
+IsotropicStiffnessOperator
+--------------------------
+
+.. py:class:: muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+              muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+
+   Fused stiffness operators for isotropic linear elastic materials.
+
+   These operators compute ``K @ u = B^T C B @ u`` for linear finite elements
+   without storing the full stiffness matrix. Instead, they exploit the
+   isotropic material structure:
+
+   .. math::
+
+      K = 2\mu G + \lambda V
+
+   where G and V are geometry-only matrices (same for all voxels) and
+   λ, μ are the Lamé parameters which can vary spatially.
+
+   This reduces memory from O(N × 24²) for full K storage to O(N × 2)
+   for spatially-varying isotropic materials, plus O(1) for the shared
+   geometry matrices.
+
+   :param grid_spacing: Grid spacing in each direction ``[hx, hy]`` (2D) or ``[hx, hy, hz]`` (3D).
+   :type grid_spacing: sequence of float
+
+   **Example**::
+
+       >>> import numpy as np
+       >>> import muGrid
+       >>>
+       >>> # Create 3D operator
+       >>> stiffness = muGrid.IsotropicStiffnessOperator3D([0.1, 0.1, 0.1])
+       >>>
+       >>> # Setup fields (displacement at nodes, materials at elements)
+       >>> fc = muGrid.CartesianDecomposition(
+       ...     muGrid.Communicator(),
+       ...     nb_domain_grid_pts=[32, 32, 32],
+       ...     nb_ghosts_left=[1, 1, 1],
+       ...     nb_ghosts_right=[1, 1, 1],
+       ... )
+       >>> u = fc.real_field("displacement", (3,))
+       >>> f = fc.real_field("force", (3,))
+       >>>
+       >>> # Material parameters (one fewer element in each direction)
+       >>> lam = fc.real_field("lambda")  # Lamé first parameter
+       >>> mu = fc.real_field("mu")       # Shear modulus
+       >>> lam.p[...] = 1.0  # Uniform material
+       >>> mu.p[...] = 1.0
+       >>>
+       >>> # Apply stiffness: f = K @ u
+       >>> fc.communicate_ghosts(u)
+       >>> stiffness.apply(u, lam, mu, f)
+
+   .. py:method:: apply(displacement, lam, mu, force)
+
+      Apply the stiffness operator: ``force = K @ displacement``.
+
+      :param displacement: Input displacement field at nodal points.
+      :type displacement: Field
+      :param lam: Lamé first parameter field at element centers.
+      :type lam: Field
+      :param mu: Shear modulus field at element centers.
+      :type mu: Field
+      :param force: Output force field at nodal points.
+      :type force: Field
+
+   .. py:method:: apply_increment(displacement, lam, mu, alpha, force)
+
+      Apply stiffness and add scaled result: ``force += alpha * K @ displacement``.
+
+      :param displacement: Input displacement field at nodal points.
+      :type displacement: Field
+      :param lam: Lamé first parameter field at element centers.
+      :type lam: Field
+      :param mu: Shear modulus field at element centers.
+      :type mu: Field
+      :param alpha: Scaling factor.
+      :type alpha: float
+      :param force: Output force field at nodal points (updated in-place).
+      :type force: Field
+
 FFT Engine
 **********
 
