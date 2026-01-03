@@ -241,22 +241,21 @@ namespace muGrid {
         }
 
         // Validate ghost configuration for displacement/force fields
+        // Node-based indexing: requires ghosts on both left and right
         auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
         auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
+        if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 ||
+            nb_ghosts_left[2] < 1) {
+            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                               "1 ghost cell on the left side of "
+                               "displacement/force fields");
+        }
         if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 ||
             nb_ghosts_right[2] < 1) {
             throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
                                "1 ghost cell on the right side of "
                                "displacement/force fields");
         }
-
-        // Material field dimensions = number of elements (interior, without
-        // ghosts)
-        auto nb_elements =
-            mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-        Index_t nelx = nb_elements[0];
-        Index_t nely = nb_elements[1];
-        Index_t nelz = nb_elements[2];
 
         // Get number of interior nodes
         auto nb_interior =
@@ -265,59 +264,38 @@ namespace muGrid {
         Index_t nny = nb_interior[1];
         Index_t nnz = nb_interior[2];
 
-        // Determine periodic/non-periodic based on material vs node dimensions
-        // Periodic: nelx == nnx (one element wraps around)
-        // Non-periodic: nelx == nnx - 1 (boundary nodes lack some neighbors)
-        bool periodic_x = (nelx == nnx);
-        bool periodic_y = (nely == nny);
-        bool periodic_z = (nelz == nnz);
-        bool non_periodic_x = (nelx == nnx - 1);
-        bool non_periodic_y = (nely == nny - 1);
-        bool non_periodic_z = (nelz == nnz - 1);
+        // Material field dimensions (interior, without ghosts)
+        // Node-based indexing: material field must have same size as node field
+        auto nb_elements =
+            mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
+        Index_t nelx = nb_elements[0];
+        Index_t nely = nb_elements[1];
+        Index_t nelz = nb_elements[2];
 
-        // Validate material field dimensions
-        if (!periodic_x && !non_periodic_x) {
+        // Validate material field dimensions match node field
+        if (nelx != nnx || nely != nny || nelz != nnz) {
             throw RuntimeError(
-                "IsotropicStiffnessOperator3D: material field x-dimension (" +
-                std::to_string(nelx) + ") must be either nnx (" +
-                std::to_string(nnx) + ") for periodic or nnx-1 (" +
-                std::to_string(nnx - 1) + ") for non-periodic");
-        }
-        if (!periodic_y && !non_periodic_y) {
-            throw RuntimeError(
-                "IsotropicStiffnessOperator3D: material field y-dimension (" +
-                std::to_string(nely) + ") must be either nny (" +
-                std::to_string(nny) + ") for periodic or nny-1 (" +
-                std::to_string(nny - 1) + ") for non-periodic");
-        }
-        if (!periodic_z && !non_periodic_z) {
-            throw RuntimeError(
-                "IsotropicStiffnessOperator3D: material field z-dimension (" +
-                std::to_string(nelz) + ") must be either nnz (" +
-                std::to_string(nnz) + ") for periodic or nnz-1 (" +
-                std::to_string(nnz - 1) + ") for non-periodic");
+                "IsotropicStiffnessOperator3D: material field dimensions (" +
+                std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
+                std::to_string(nelz) + ") must match node field dimensions (" +
+                std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
+                std::to_string(nnz) + ")");
         }
 
-        bool periodic = periodic_x && periodic_y && periodic_z;
-
-        // Validate ghost configuration based on periodic/non-periodic mode
-        if (periodic && (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 ||
-                         nb_ghosts_left[2] < 1)) {
-            throw RuntimeError(
-                "IsotropicStiffnessOperator3D with periodic BC requires at "
-                "least 1 ghost cell on the left side of displacement/force "
-                "fields");
-        }
-
-        // Get material field ghost configuration
+        // Validate material field ghost configuration matches node field
         auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
-
-        // For periodic case, material field needs ghost cells too
-        if (periodic && (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 ||
-                         mat_nb_ghosts_left[2] < 1)) {
-            throw RuntimeError("IsotropicStiffnessOperator3D with periodic BC "
-                               "requires at least 1 ghost cell on the left "
-                               "side of material fields (lambda, mu)");
+        auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+        if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 ||
+            mat_nb_ghosts_left[2] < 1) {
+            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                               "1 ghost cell on the left side of material "
+                               "fields (lambda, mu)");
+        }
+        if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1 ||
+            mat_nb_ghosts_right[2] < 1) {
+            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                               "1 ghost cell on the right side of material "
+                               "fields (lambda, mu)");
         }
 
         // Node dimensions (for displacement/force fields with ghosts)
@@ -439,21 +417,17 @@ namespace muGrid {
                 {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
                 {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
 
-            // Compute iteration bounds
-            // For periodic BC (nelx == nnx): iterate over all nodes, all elements valid
-            // For non-periodic BC (nelx == nnx-1): boundary node forces are irrelevant
-            //   (overwritten by ghost communication), so skip bounds checking
-            SIndex_t ix_start = (nelx == nnx) ? 0 : 1;
-            SIndex_t iy_start = (nely == nny) ? 0 : 1;
-            SIndex_t iz_start = (nelz == nnz) ? 0 : 1;
-            SIndex_t ix_end = (nelx == nnx) ? static_cast<SIndex_t>(nnx) : static_cast<SIndex_t>(nnx) - 1;
-            SIndex_t iy_end = (nely == nny) ? static_cast<SIndex_t>(nny) : static_cast<SIndex_t>(nny) - 1;
-            SIndex_t iz_end = (nelz == nnz) ? static_cast<SIndex_t>(nnz) : static_cast<SIndex_t>(nnz) - 1;
+            // Iteration bounds: iterate over all interior nodes (0 to nn-1)
+            // Ghost cells handle periodicity and MPI boundaries
+            SIndex_t ix_start = 0;
+            SIndex_t iy_start = 0;
+            SIndex_t iz_start = 0;
+            SIndex_t ix_end = static_cast<SIndex_t>(nnx);
+            SIndex_t iy_end = static_cast<SIndex_t>(nny);
+            SIndex_t iz_end = static_cast<SIndex_t>(nnz);
 
-            // Gather pattern: loop over interior NODES, gather from neighboring
+            // Gather pattern: loop over all interior NODES, gather from neighboring
             // elements. Ghost cells handle periodicity and MPI boundaries.
-            // For non-periodic BC, boundary nodes are skipped (their forces are
-            // overwritten by ghost communication anyway).
             for (SIndex_t iz = iz_start; iz < iz_end; ++iz) {
                 for (SIndex_t iy = iy_start; iy < iy_end; ++iy) {
                     for (SIndex_t ix = ix_start; ix < ix_end; ++ix) {

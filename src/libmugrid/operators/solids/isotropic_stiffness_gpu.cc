@@ -103,20 +103,13 @@ __global__ void isotropic_stiffness_2d_kernel(
     constexpr int NB_DOFS = 2;
     constexpr int NB_ELEM_DOFS = NB_NODES * NB_DOFS;
 
-    // Compute iteration bounds
-    // For periodic BC (nelx == nnx): iterate over all nodes
-    // For non-periodic BC (nelx == nnx-1): skip boundary nodes
-    Index_t ix_start = (nelx == nnx) ? 0 : 1;
-    Index_t iy_start = (nely == nny) ? 0 : 1;
-    Index_t ix_end = (nelx == nnx) ? nnx : nnx - 1;
-    Index_t iy_end = (nely == nny) ? nny : nny - 1;
-
-    // Thread indexing for NODES (offset by start)
-    Index_t ix = ix_start + blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = iy_start + blockIdx.y * blockDim.y + threadIdx.y;
+    // Thread indexing for NODES - iterate over all interior nodes
+    // Ghost cells handle periodicity and MPI boundaries
+    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
 
     // Check bounds
-    if (ix >= ix_end || iy >= iy_end) return;
+    if (ix >= nnx || iy >= nny) return;
 
     // Neighboring element offsets and corresponding local node index
     const int ELEM_OFFSETS[4][3] = {
@@ -217,23 +210,14 @@ __global__ void isotropic_stiffness_3d_kernel(
     constexpr int NB_DOFS = 3;
     constexpr int NB_ELEM_DOFS = NB_NODES * NB_DOFS;
 
-    // Compute iteration bounds
-    // For periodic BC (nelx == nnx): iterate over all nodes
-    // For non-periodic BC (nelx == nnx-1): skip boundary nodes
-    Index_t ix_start = (nelx == nnx) ? 0 : 1;
-    Index_t iy_start = (nely == nny) ? 0 : 1;
-    Index_t iz_start = (nelz == nnz) ? 0 : 1;
-    Index_t ix_end = (nelx == nnx) ? nnx : nnx - 1;
-    Index_t iy_end = (nely == nny) ? nny : nny - 1;
-    Index_t iz_end = (nelz == nnz) ? nnz : nnz - 1;
-
-    // Thread indexing for NODES (offset by start)
-    Index_t ix = ix_start + blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = iy_start + blockIdx.y * blockDim.y + threadIdx.y;
-    Index_t iz = iz_start + blockIdx.z * blockDim.z + threadIdx.z;
+    // Thread indexing for NODES - iterate over all interior nodes
+    // Ghost cells handle periodicity and MPI boundaries
+    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
 
     // Check bounds
-    if (ix >= ix_end || iy >= iy_end || iz >= iz_end) return;
+    if (ix >= nnx || iy >= nny || iz >= nnz) return;
 
     // Neighboring element offsets and corresponding local node index
     const int ELEM_OFFSETS[8][4] = {
@@ -337,13 +321,9 @@ void isotropic_stiffness_2d_cuda(
         g_2d_constants_initialized = true;
     }
 
-    // Compute effective grid size (interior nodes only for non-periodic)
-    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
-    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
-
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
-    dim3 grid((nx_eff + block.x - 1) / block.x, (ny_eff + block.y - 1) / block.y);
+    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
 
     isotropic_stiffness_2d_kernel<<<grid, block>>>(
         displacement, lambda, mu, force,
@@ -381,16 +361,11 @@ void isotropic_stiffness_3d_cuda(
         g_3d_constants_initialized = true;
     }
 
-    // Compute effective grid size (interior nodes only for non-periodic)
-    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
-    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
-    Index_t nz_eff = (nelz == nnz) ? nnz : nnz - 2;
-
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
-    dim3 grid((nx_eff + block.x - 1) / block.x,
-              (ny_eff + block.y - 1) / block.y,
-              (nz_eff + block.z - 1) / block.z);
+    dim3 grid((nnx + block.x - 1) / block.x,
+              (nny + block.y - 1) / block.y,
+              (nnz + block.z - 1) / block.z);
 
     isotropic_stiffness_3d_kernel<<<grid, block>>>(
         displacement, lambda, mu, force,
@@ -433,13 +408,9 @@ void isotropic_stiffness_2d_hip(
         g_2d_constants_initialized = true;
     }
 
-    // Compute effective grid size (interior nodes only for non-periodic)
-    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
-    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
-
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
-    dim3 grid((nx_eff + block.x - 1) / block.x, (ny_eff + block.y - 1) / block.y);
+    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
 
     hipLaunchKernelGGL(isotropic_stiffness_2d_kernel, grid, block, 0, 0,
         displacement, lambda, mu, force,
@@ -477,16 +448,11 @@ void isotropic_stiffness_3d_hip(
         g_3d_constants_initialized = true;
     }
 
-    // Compute effective grid size (interior nodes only for non-periodic)
-    Index_t nx_eff = (nelx == nnx) ? nnx : nnx - 2;
-    Index_t ny_eff = (nely == nny) ? nny : nny - 2;
-    Index_t nz_eff = (nelz == nnz) ? nnz : nnz - 2;
-
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
-    dim3 grid((nx_eff + block.x - 1) / block.x,
-              (ny_eff + block.y - 1) / block.y,
-              (nz_eff + block.z - 1) / block.z);
+    dim3 grid((nnx + block.x - 1) / block.x,
+              (nny + block.y - 1) / block.y,
+              (nnz + block.z - 1) / block.z);
 
     hipLaunchKernelGGL(isotropic_stiffness_3d_kernel, grid, block, 0, 0,
         displacement, lambda, mu, force,
@@ -545,46 +511,74 @@ void IsotropicStiffnessOperator2D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator2D requires GlobalFieldCollection");
     }
 
-    // Get dimensions from material field collection (defines number of elements)
+    // Get dimensions from material field collection
     auto& mat_coll = lambda.get_collection();
     auto* mat_global_fc = dynamic_cast<const GlobalFieldCollection*>(&mat_coll);
     if (!mat_global_fc) {
         throw RuntimeError("IsotropicStiffnessOperator2D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration - require ghosts on both sides
-    // Ghost communication handles periodicity and MPI boundaries
+    // Validate ghost configuration for displacement/force fields
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
     if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
-            "left side of displacement/force fields (nb_ghosts_left >= (1, 1))");
+            "left side of displacement/force fields");
     }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
-            "right side of displacement/force fields (nb_ghosts_right >= (1, 1))");
+            "right side of displacement/force fields");
     }
-
-    // Material field dimensions = number of elements
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
 
     // Get number of interior nodes
     auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nnx = nb_interior[0];
     Index_t nny = nb_interior[1];
 
+    // Material field dimensions (interior, without ghosts)
+    // Node-based indexing: material field must have same size as node field
+    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
+    Index_t nelx = nb_elements[0];
+    Index_t nely = nb_elements[1];
+
+    // Validate material field dimensions match node field
+    if (nelx != nnx || nely != nny) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator2D: material field dimensions (" +
+            std::to_string(nelx) + ", " + std::to_string(nely) +
+            ") must match node field dimensions (" +
+            std::to_string(nnx) + ", " + std::to_string(nny) + ")");
+    }
+
+    // Validate material field ghost configuration
+    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+    if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
+                           "1 ghost cell on the left side of material fields");
+    }
+    if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
+                           "1 ghost cell on the right side of material fields");
+    }
+
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
     Index_t nx = nb_nodes[0];
     Index_t ny = nb_nodes[1];
 
-    // Ghost offsets (interior starts at this offset in the ghosted array)
+    // Material field dimensions with ghosts
+    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
+    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
+
+    // Ghost offsets
     Index_t ghost_offset_x = nb_ghosts_left[0];
     Index_t ghost_offset_y = nb_ghosts_left[1];
+    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
+    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
 
     // GPU uses SoA layout: [d, x, y]
     Index_t disp_stride_d = nx * ny;
@@ -592,7 +586,7 @@ void IsotropicStiffnessOperator2D::apply_impl(
     Index_t disp_stride_y = nx;
 
     Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = nelx;
+    Index_t mat_stride_y = mat_nx;
 
     Index_t force_stride_d = nx * ny;
     Index_t force_stride_x = 1;
@@ -603,12 +597,16 @@ void IsotropicStiffnessOperator2D::apply_impl(
                           ghost_offset_y * disp_stride_y;
     Index_t force_offset = ghost_offset_x * force_stride_x +
                            ghost_offset_y * force_stride_y;
+    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
+                         mat_ghost_offset_y * mat_stride_y;
 
     isotropic_stiffness_kernels::isotropic_stiffness_2d_cuda(
-        displacement.view().data() + disp_offset, lambda.view().data(), mu.view().data(),
+        displacement.view().data() + disp_offset,
+        lambda.view().data() + mat_offset,
+        mu.view().data() + mat_offset,
         force.view().data() + force_offset,
         nnx, nny,  // Number of interior nodes
-        nelx, nely,  // Number of elements
+        nelx, nely,  // Number of elements (same as nodes with node-based indexing)
         disp_stride_x, disp_stride_y, disp_stride_d,
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
@@ -647,33 +645,26 @@ void IsotropicStiffnessOperator3D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator3D requires GlobalFieldCollection");
     }
 
-    // Get dimensions from material field collection (defines number of elements)
+    // Get dimensions from material field collection
     auto& mat_coll = lambda.get_collection();
     auto* mat_global_fc = dynamic_cast<const GlobalFieldCollection*>(&mat_coll);
     if (!mat_global_fc) {
         throw RuntimeError("IsotropicStiffnessOperator3D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration - require ghosts on both sides
-    // Ghost communication handles periodicity and MPI boundaries
+    // Validate ghost configuration for displacement/force fields
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
     if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
-            "left side of displacement/force fields (nb_ghosts_left >= (1, 1, 1))");
+            "left side of displacement/force fields");
     }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 || nb_ghosts_right[2] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
-            "right side of displacement/force fields (nb_ghosts_right >= (1, 1, 1))");
+            "right side of displacement/force fields");
     }
-
-    // Material field dimensions = number of elements
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
-    Index_t nelz = nb_elements[2];
 
     // Get number of interior nodes
     auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
@@ -681,16 +672,54 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t nny = nb_interior[1];
     Index_t nnz = nb_interior[2];
 
+    // Material field dimensions (interior, without ghosts)
+    // Node-based indexing: material field must have same size as node field
+    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
+    Index_t nelx = nb_elements[0];
+    Index_t nely = nb_elements[1];
+    Index_t nelz = nb_elements[2];
+
+    // Validate material field dimensions match node field
+    if (nelx != nnx || nely != nny || nelz != nnz) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator3D: material field dimensions (" +
+            std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
+            std::to_string(nelz) + ") must match node field dimensions (" +
+            std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
+            std::to_string(nnz) + ")");
+    }
+
+    // Validate material field ghost configuration
+    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+    if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 || mat_nb_ghosts_left[2] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                           "1 ghost cell on the left side of material fields");
+    }
+    if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1 || mat_nb_ghosts_right[2] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                           "1 ghost cell on the right side of material fields");
+    }
+
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
     Index_t nx = nb_nodes[0];
     Index_t ny = nb_nodes[1];
     Index_t nz = nb_nodes[2];
 
-    // Ghost offsets (interior starts at this offset in the ghosted array)
+    // Material field dimensions with ghosts
+    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
+    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
+    Index_t mat_nz = mat_nb_pts_with_ghosts[2];
+
+    // Ghost offsets
     Index_t ghost_offset_x = nb_ghosts_left[0];
     Index_t ghost_offset_y = nb_ghosts_left[1];
     Index_t ghost_offset_z = nb_ghosts_left[2];
+    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
+    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
+    Index_t mat_ghost_offset_z = mat_nb_ghosts_left[2];
 
     // GPU uses SoA layout: [d, x, y, z]
     Index_t disp_stride_d = nx * ny * nz;
@@ -699,8 +728,8 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t disp_stride_z = nx * ny;
 
     Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = nelx;
-    Index_t mat_stride_z = nelx * nely;
+    Index_t mat_stride_y = mat_nx;
+    Index_t mat_stride_z = mat_nx * mat_ny;
 
     Index_t force_stride_d = nx * ny * nz;
     Index_t force_stride_x = 1;
@@ -714,12 +743,17 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t force_offset = ghost_offset_x * force_stride_x +
                            ghost_offset_y * force_stride_y +
                            ghost_offset_z * force_stride_z;
+    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
+                         mat_ghost_offset_y * mat_stride_y +
+                         mat_ghost_offset_z * mat_stride_z;
 
     isotropic_stiffness_kernels::isotropic_stiffness_3d_cuda(
-        displacement.view().data() + disp_offset, lambda.view().data(), mu.view().data(),
+        displacement.view().data() + disp_offset,
+        lambda.view().data() + mat_offset,
+        mu.view().data() + mat_offset,
         force.view().data() + force_offset,
         nnx, nny, nnz,  // Number of interior nodes
-        nelx, nely, nelz,  // Number of elements
+        nelx, nely, nelz,  // Number of elements (same as nodes)
         disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
@@ -760,46 +794,74 @@ void IsotropicStiffnessOperator2D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator2D requires GlobalFieldCollection");
     }
 
-    // Get dimensions from material field collection (defines number of elements)
+    // Get dimensions from material field collection
     auto& mat_coll = lambda.get_collection();
     auto* mat_global_fc = dynamic_cast<const GlobalFieldCollection*>(&mat_coll);
     if (!mat_global_fc) {
         throw RuntimeError("IsotropicStiffnessOperator2D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration - require ghosts on both sides
-    // Ghost communication handles periodicity and MPI boundaries
+    // Validate ghost configuration for displacement/force fields
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
     if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
-            "left side of displacement/force fields (nb_ghosts_left >= (1, 1))");
+            "left side of displacement/force fields");
     }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
-            "right side of displacement/force fields (nb_ghosts_right >= (1, 1))");
+            "right side of displacement/force fields");
     }
-
-    // Material field dimensions = number of elements
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
 
     // Get number of interior nodes
     auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
     Index_t nnx = nb_interior[0];
     Index_t nny = nb_interior[1];
 
+    // Material field dimensions (interior, without ghosts)
+    // Node-based indexing: material field must have same size as node field
+    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
+    Index_t nelx = nb_elements[0];
+    Index_t nely = nb_elements[1];
+
+    // Validate material field dimensions match node field
+    if (nelx != nnx || nely != nny) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator2D: material field dimensions (" +
+            std::to_string(nelx) + ", " + std::to_string(nely) +
+            ") must match node field dimensions (" +
+            std::to_string(nnx) + ", " + std::to_string(nny) + ")");
+    }
+
+    // Validate material field ghost configuration
+    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+    if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
+                           "1 ghost cell on the left side of material fields");
+    }
+    if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
+                           "1 ghost cell on the right side of material fields");
+    }
+
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
     Index_t nx = nb_nodes[0];
     Index_t ny = nb_nodes[1];
 
-    // Ghost offsets (interior starts at this offset in the ghosted array)
+    // Material field dimensions with ghosts
+    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
+    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
+
+    // Ghost offsets
     Index_t ghost_offset_x = nb_ghosts_left[0];
     Index_t ghost_offset_y = nb_ghosts_left[1];
+    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
+    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
 
     // GPU uses SoA layout: [d, x, y]
     Index_t disp_stride_d = nx * ny;
@@ -807,7 +869,7 @@ void IsotropicStiffnessOperator2D::apply_impl(
     Index_t disp_stride_y = nx;
 
     Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = nelx;
+    Index_t mat_stride_y = mat_nx;
 
     Index_t force_stride_d = nx * ny;
     Index_t force_stride_x = 1;
@@ -818,12 +880,16 @@ void IsotropicStiffnessOperator2D::apply_impl(
                           ghost_offset_y * disp_stride_y;
     Index_t force_offset = ghost_offset_x * force_stride_x +
                            ghost_offset_y * force_stride_y;
+    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
+                         mat_ghost_offset_y * mat_stride_y;
 
     isotropic_stiffness_kernels::isotropic_stiffness_2d_hip(
-        displacement.view().data() + disp_offset, lambda.view().data(), mu.view().data(),
+        displacement.view().data() + disp_offset,
+        lambda.view().data() + mat_offset,
+        mu.view().data() + mat_offset,
         force.view().data() + force_offset,
         nnx, nny,  // Number of interior nodes
-        nelx, nely,  // Number of elements
+        nelx, nely,  // Number of elements (same as nodes)
         disp_stride_x, disp_stride_y, disp_stride_d,
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
@@ -862,33 +928,26 @@ void IsotropicStiffnessOperator3D::apply_impl(
         throw RuntimeError("IsotropicStiffnessOperator3D requires GlobalFieldCollection");
     }
 
-    // Get dimensions from material field collection (defines number of elements)
+    // Get dimensions from material field collection
     auto& mat_coll = lambda.get_collection();
     auto* mat_global_fc = dynamic_cast<const GlobalFieldCollection*>(&mat_coll);
     if (!mat_global_fc) {
         throw RuntimeError("IsotropicStiffnessOperator3D material fields require GlobalFieldCollection");
     }
 
-    // Validate ghost configuration - require ghosts on both sides
-    // Ghost communication handles periodicity and MPI boundaries
+    // Validate ghost configuration for displacement/force fields
     auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
     auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
     if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
-            "left side of displacement/force fields (nb_ghosts_left >= (1, 1, 1))");
+            "left side of displacement/force fields");
     }
     if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 || nb_ghosts_right[2] < 1) {
         throw RuntimeError(
             "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
-            "right side of displacement/force fields (nb_ghosts_right >= (1, 1, 1))");
+            "right side of displacement/force fields");
     }
-
-    // Material field dimensions = number of elements
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
-    Index_t nelz = nb_elements[2];
 
     // Get number of interior nodes
     auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
@@ -896,16 +955,54 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t nny = nb_interior[1];
     Index_t nnz = nb_interior[2];
 
+    // Material field dimensions (interior, without ghosts)
+    // Node-based indexing: material field must have same size as node field
+    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
+    Index_t nelx = nb_elements[0];
+    Index_t nely = nb_elements[1];
+    Index_t nelz = nb_elements[2];
+
+    // Validate material field dimensions match node field
+    if (nelx != nnx || nely != nny || nelz != nnz) {
+        throw RuntimeError(
+            "IsotropicStiffnessOperator3D: material field dimensions (" +
+            std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
+            std::to_string(nelz) + ") must match node field dimensions (" +
+            std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
+            std::to_string(nnz) + ")");
+    }
+
+    // Validate material field ghost configuration
+    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
+    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
+    if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 || mat_nb_ghosts_left[2] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                           "1 ghost cell on the left side of material fields");
+    }
+    if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1 || mat_nb_ghosts_right[2] < 1) {
+        throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
+                           "1 ghost cell on the right side of material fields");
+    }
+
     // Node dimensions (for displacement/force fields with ghosts)
     auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
     Index_t nx = nb_nodes[0];
     Index_t ny = nb_nodes[1];
     Index_t nz = nb_nodes[2];
 
-    // Ghost offsets (interior starts at this offset in the ghosted array)
+    // Material field dimensions with ghosts
+    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
+    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
+    Index_t mat_nz = mat_nb_pts_with_ghosts[2];
+
+    // Ghost offsets
     Index_t ghost_offset_x = nb_ghosts_left[0];
     Index_t ghost_offset_y = nb_ghosts_left[1];
     Index_t ghost_offset_z = nb_ghosts_left[2];
+    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
+    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
+    Index_t mat_ghost_offset_z = mat_nb_ghosts_left[2];
 
     // GPU uses SoA layout: [d, x, y, z]
     Index_t disp_stride_d = nx * ny * nz;
@@ -914,8 +1011,8 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t disp_stride_z = nx * ny;
 
     Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = nelx;
-    Index_t mat_stride_z = nelx * nely;
+    Index_t mat_stride_y = mat_nx;
+    Index_t mat_stride_z = mat_nx * mat_ny;
 
     Index_t force_stride_d = nx * ny * nz;
     Index_t force_stride_x = 1;
@@ -929,12 +1026,17 @@ void IsotropicStiffnessOperator3D::apply_impl(
     Index_t force_offset = ghost_offset_x * force_stride_x +
                            ghost_offset_y * force_stride_y +
                            ghost_offset_z * force_stride_z;
+    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
+                         mat_ghost_offset_y * mat_stride_y +
+                         mat_ghost_offset_z * mat_stride_z;
 
     isotropic_stiffness_kernels::isotropic_stiffness_3d_hip(
-        displacement.view().data() + disp_offset, lambda.view().data(), mu.view().data(),
+        displacement.view().data() + disp_offset,
+        lambda.view().data() + mat_offset,
+        mu.view().data() + mat_offset,
         force.view().data() + force_offset,
         nnx, nny, nnz,  // Number of interior nodes
-        nelx, nely, nelz,  // Number of elements
+        nelx, nely, nelz,  // Number of elements (same as nodes)
         disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
