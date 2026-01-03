@@ -34,15 +34,34 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import unittest
-
 import numpy as np
+import pytest
+
+# Import GPU testing utilities from conftest
+from conftest import (
+    HAS_CUPY,
+    cp,
+    create_device,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 
 import muGrid
 from muGrid import Timer
 
+# =============================================================================
+# Test Configuration
+# =============================================================================
 
-class IsotropicStiffnessOperator2DTest(unittest.TestCase):
+GPU_AVAILABLE = muGrid.has_gpu
+
+
+# =============================================================================
+# 2D Operator Tests
+# =============================================================================
+
+
+class TestIsotropicStiffnessOperator2D:
     """Test suite for IsotropicStiffnessOperator2D."""
 
     def test_construction(self):
@@ -53,8 +72,8 @@ class IsotropicStiffnessOperator2DTest(unittest.TestCase):
         # Check that G and V matrices have correct shape
         G = op.G
         V = op.V
-        self.assertEqual(G.shape, (8, 8))
-        self.assertEqual(V.shape, (8, 8))
+        assert G.shape == (8, 8)
+        assert V.shape == (8, 8)
 
     def test_symmetry(self):
         """Test that G and V matrices are symmetric."""
@@ -129,7 +148,7 @@ class IsotropicStiffnessOperator2DTest(unittest.TestCase):
         # Force should be non-zero only at boundaries for uniform strain
         # (internal forces cancel out for constant strain)
         # Just check that it runs without error and force is finite
-        self.assertTrue(np.all(np.isfinite(force.p)))
+        assert np.all(np.isfinite(force.p))
 
     def test_compare_with_generic_operator(self):
         """Compare fused kernel with generic B^T C B computation."""
@@ -222,7 +241,12 @@ class IsotropicStiffnessOperator2DTest(unittest.TestCase):
         )
 
 
-class IsotropicStiffnessOperator3DTest(unittest.TestCase):
+# =============================================================================
+# 3D Operator Tests
+# =============================================================================
+
+
+class TestIsotropicStiffnessOperator3D:
     """Test suite for IsotropicStiffnessOperator3D."""
 
     def test_construction(self):
@@ -233,8 +257,8 @@ class IsotropicStiffnessOperator3DTest(unittest.TestCase):
         # Check that G and V matrices have correct shape
         G = op.G
         V = op.V
-        self.assertEqual(G.shape, (24, 24))
-        self.assertEqual(V.shape, (24, 24))
+        assert G.shape == (24, 24)
+        assert V.shape == (24, 24)
 
     def test_symmetry(self):
         """Test that G and V matrices are symmetric."""
@@ -300,7 +324,7 @@ class IsotropicStiffnessOperator3DTest(unittest.TestCase):
         op.apply(displacement, lambda_field, mu_field, force)
 
         # Just check that it runs without error and force is finite
-        self.assertTrue(np.all(np.isfinite(force.p)))
+        assert np.all(np.isfinite(force.p))
 
     def test_compare_with_generic_operator(self):
         """Compare fused kernel with generic B^T C B computation."""
@@ -396,7 +420,12 @@ class IsotropicStiffnessOperator3DTest(unittest.TestCase):
         )
 
 
-class IsotropicStiffnessApplyIncrementTest(unittest.TestCase):
+# =============================================================================
+# Apply Increment Tests
+# =============================================================================
+
+
+class TestIsotropicStiffnessApplyIncrement:
     """Test apply_increment functionality."""
 
     def test_apply_increment_2d(self):
@@ -491,45 +520,38 @@ class IsotropicStiffnessApplyIncrementTest(unittest.TestCase):
 
 
 # =============================================================================
-# GPU Tests
+# Smoke Tests (Parametrized on Device)
 # =============================================================================
 
-GPU_AVAILABLE = muGrid.has_gpu
 
-try:
-    import cupy as cp
+@pytest.mark.parametrize("device", get_test_devices())
+class TestIsotropicStiffnessOperatorApply_smoke:
+    """Smoke tests for IsotropicStiffnessOperator apply on different devices."""
 
-    HAS_CUPY = True
-except ImportError:
-    HAS_CUPY = False
-    cp = None
+    def test_2d_apply_smoke(self, device):
+        """Test 2D operator apply smoke test."""
+        skip_if_gpu_unavailable(device)
 
-
-@unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
-class IsotropicStiffnessOperatorGPUTest(unittest.TestCase):
-    """Test suite for IsotropicStiffnessOperator on GPU."""
-
-    def test_gpu_2d_apply(self):
-        """Test 2D operator on GPU."""
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
         op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
 
         # Create device field collections
-        # GPU kernels require ghosts on both sides
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
+
         fc = muGrid.GlobalFieldCollection(
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
-        # Material field same size as node field, with ghost cells
         fc_mat = muGrid.GlobalFieldCollection(
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
 
         displacement = fc.real_field("displacement", (2,))
@@ -545,30 +567,38 @@ class IsotropicStiffnessOperatorGPUTest(unittest.TestCase):
         # Apply should not raise
         op.apply(displacement, lambda_field, mu_field, force)
 
-        # Check that force is on GPU and finite
-        self.assertTrue(force.is_on_gpu)
+        # Check that force is finite
+        if device == "gpu":
+            assert force.is_on_gpu
+            force_data = cp.asnumpy(force.p)
+        else:
+            force_data = force.p
+        assert np.all(np.isfinite(force_data))
 
-    def test_gpu_3d_apply(self):
-        """Test 3D operator on GPU."""
+    def test_3d_apply_smoke(self, device):
+        """Test 3D operator apply smoke test."""
+        skip_if_gpu_unavailable(device)
+
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
         op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
 
         # Create device field collections
-        # GPU kernels require ghosts on both sides
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
+
         fc = muGrid.GlobalFieldCollection(
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
-        # Material field same size as node field, with ghost cells
         fc_mat = muGrid.GlobalFieldCollection(
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
 
         displacement = fc.real_field("displacement", (3,))
@@ -584,13 +614,30 @@ class IsotropicStiffnessOperatorGPUTest(unittest.TestCase):
         # Apply should not raise
         op.apply(displacement, lambda_field, mu_field, force)
 
-        # Check that force is on GPU
-        self.assertTrue(force.is_on_gpu)
+        # Check that force is finite
+        if device == "gpu":
+            assert force.is_on_gpu
+            force_data = cp.asnumpy(force.p)
+        else:
+            force_data = force.p
+        assert np.all(np.isfinite(force_data))
 
 
-@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU backend or CuPy not available")
-class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
+# =============================================================================
+# GPU vs CPU Consistency Tests (Dual-device comparison)
+# =============================================================================
+
+
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not available")
+class TestIsotropicStiffnessOperatorGPUCorrectness:
     """Test GPU correctness by comparing with CPU."""
+
+    def setup_method(self, method):
+        """Skip tests if no GPU is available at runtime."""
+        if not muGrid.is_gpu_available():
+            pytest.skip("No GPU device available at runtime")
+        if not HAS_CUPY:
+            pytest.skip("CuPy not available for GPU tests")
 
     def test_gpu_cpu_consistency_2d(self):
         """Test that GPU and CPU give same results in 2D."""
@@ -600,11 +647,9 @@ class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
 
         # Both CPU and GPU use same ghost configuration for comparison
-        # GPU kernels require ghosts on both sides; CPU accepts this too
         fc_cpu = muGrid.GlobalFieldCollection(
             (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
         )
-        # Material field same size as node field, with ghost cells
         fc_mat_cpu = muGrid.GlobalFieldCollection(
             (nx, ny), nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
         )
@@ -618,13 +663,13 @@ class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         fc_mat_gpu = muGrid.GlobalFieldCollection(
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         disp_gpu = fc_gpu.real_field("displacement", (2,))
@@ -668,11 +713,9 @@ class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
         op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
 
         # Both CPU and GPU use same ghost configuration for comparison
-        # GPU kernels require ghosts on both sides; CPU accepts this too
         fc_cpu = muGrid.GlobalFieldCollection(
             (nx, ny, nz), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
         )
-        # Material field same size as node field, with ghost cells
         fc_mat_cpu = muGrid.GlobalFieldCollection(
             (nx, ny, nz), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
         )
@@ -686,13 +729,13 @@ class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         fc_mat_gpu = muGrid.GlobalFieldCollection(
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         disp_gpu = fc_gpu.real_field("displacement", (3,))
@@ -742,7 +785,7 @@ class IsotropicStiffnessOperatorGPUCorrectnessTest(unittest.TestCase):
 # =============================================================================
 
 
-class UnitImpulseTest2D(unittest.TestCase):
+class TestUnitImpulse2D:
     """Test fused operator matches generic operator for unit impulses in 2D."""
 
     def _generic_apply(self, decomposition, displacement, force, lam, mu, grad_op):
@@ -1045,7 +1088,7 @@ class UnitImpulseTest2D(unittest.TestCase):
         timer.print_summary(title=f"2D Periodic ({nx}x{ny} grid)")
 
 
-class UnitImpulseTest3D(unittest.TestCase):
+class TestUnitImpulse3D:
     """Test fused operator matches generic operator for unit impulses in 3D."""
 
     def _generic_apply(self, decomposition, displacement, force, lam, mu, grad_op):
@@ -1360,7 +1403,7 @@ class UnitImpulseTest3D(unittest.TestCase):
 # =============================================================================
 
 
-class ValidationGuardTest2D(unittest.TestCase):
+class TestValidationGuard2D:
     """Test that validation guards raise appropriate exceptions in 2D."""
 
     def test_wrong_material_field_size(self):
@@ -1386,13 +1429,10 @@ class ValidationGuardTest2D(unittest.TestCase):
         lambda_field.pg[...] = 1.0
         mu_field.pg[...] = 1.0
 
-        with self.assertRaises(RuntimeError) as context:
+        with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
-        err_msg = str(context.exception).lower()
-        self.assertTrue(
-            "material field" in err_msg or "dimensions" in err_msg,
-            f"Expected error about material field dimensions, got: {context.exception}",
-        )
+        err_msg = str(exc_info.value).lower()
+        assert "material field" in err_msg or "dimensions" in err_msg
 
     def test_missing_left_ghosts_node(self):
         """Test error when left ghost cells are missing for node field."""
@@ -1417,13 +1457,10 @@ class ValidationGuardTest2D(unittest.TestCase):
         lambda_field.pg[...] = 1.0
         mu_field.pg[...] = 1.0
 
-        with self.assertRaises(RuntimeError) as context:
+        with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
-        err_msg = str(context.exception).lower()
-        self.assertTrue(
-            "ghost" in err_msg or "ghosts" in err_msg,
-            f"Expected error about ghost cells, got: {context.exception}",
-        )
+        err_msg = str(exc_info.value).lower()
+        assert "ghost" in err_msg or "ghosts" in err_msg
 
     def test_missing_right_ghosts(self):
         """Test error when right ghost cells are missing."""
@@ -1448,9 +1485,9 @@ class ValidationGuardTest2D(unittest.TestCase):
         lambda_field.pg[...] = 1.0
         mu_field.pg[...] = 1.0
 
-        with self.assertRaises(RuntimeError) as context:
+        with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
-        self.assertIn("ghost", str(context.exception).lower())
+        assert "ghost" in str(exc_info.value).lower()
 
     def test_missing_material_ghosts(self):
         """Test error when ghost cells are missing for material field."""
@@ -1473,13 +1510,10 @@ class ValidationGuardTest2D(unittest.TestCase):
         lambda_field.s[...] = 1.0
         mu_field.s[...] = 1.0
 
-        with self.assertRaises(RuntimeError) as context:
+        with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
-        err_msg = str(context.exception).lower()
-        self.assertTrue(
-            "ghost" in err_msg or "ghosts" in err_msg,
-            f"Expected error about ghost cells, got: {context.exception}",
-        )
+        err_msg = str(exc_info.value).lower()
+        assert "ghost" in err_msg or "ghosts" in err_msg
 
     def test_valid_config(self):
         """Test that valid configuration does not raise."""
@@ -1514,7 +1548,7 @@ class ValidationGuardTest2D(unittest.TestCase):
         op.apply(displacement, lambda_field, mu_field, force)
 
 
-class ValidationGuardTest3D(unittest.TestCase):
+class TestValidationGuard3D:
     """Test that validation guards raise appropriate exceptions in 3D."""
 
     def test_wrong_material_field_size(self):
@@ -1541,13 +1575,10 @@ class ValidationGuardTest3D(unittest.TestCase):
         lambda_field.pg[...] = 1.0
         mu_field.pg[...] = 1.0
 
-        with self.assertRaises(RuntimeError) as context:
+        with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
-        err_msg = str(context.exception).lower()
-        self.assertTrue(
-            "material field" in err_msg or "dimensions" in err_msg,
-            f"Expected error about material field dimensions, got: {context.exception}",
-        )
+        err_msg = str(exc_info.value).lower()
+        assert "material field" in err_msg or "dimensions" in err_msg
 
     def test_missing_ghosts(self):
         """Test error when ghost cells are missing in 3D."""
@@ -1570,19 +1601,26 @@ class ValidationGuardTest3D(unittest.TestCase):
         lambda_field.pg[...] = 1.0
         mu_field.pg[...] = 1.0
 
-        with self.assertRaises(RuntimeError) as context:
+        with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
-        self.assertIn("ghost", str(context.exception).lower())
+        assert "ghost" in str(exc_info.value).lower()
 
 
 # =============================================================================
-# GPU Unit Impulse Tests
+# GPU Unit Impulse Tests (Dual-device comparison)
 # =============================================================================
 
 
-@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU backend or CuPy not available")
-class GPUUnitImpulseTest(unittest.TestCase):
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not available")
+class TestGPUUnitImpulse:
     """Test GPU unit impulse response matches CPU."""
+
+    def setup_method(self, method):
+        """Skip tests if no GPU is available at runtime."""
+        if not muGrid.is_gpu_available():
+            pytest.skip("No GPU device available at runtime")
+        if not HAS_CUPY:
+            pytest.skip("CuPy not available for GPU tests")
 
     def test_gpu_unit_impulse_2d(self):
         """Test GPU unit impulse response in 2D."""
@@ -1616,13 +1654,13 @@ class GPUUnitImpulseTest(unittest.TestCase):
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         fc_mat_gpu = muGrid.GlobalFieldCollection(
             (nx, ny),
             nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         disp_gpu = fc_gpu.real_field("displacement", (2,))
@@ -1698,13 +1736,13 @@ class GPUUnitImpulseTest(unittest.TestCase):
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         fc_mat_gpu = muGrid.GlobalFieldCollection(
             (nx, ny, nz),
             nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         disp_gpu = fc_gpu.real_field("displacement", (3,))
@@ -1750,4 +1788,4 @@ class GPUUnitImpulseTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__, "-v"])

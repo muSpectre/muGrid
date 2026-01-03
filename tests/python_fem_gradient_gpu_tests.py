@@ -34,43 +34,55 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import unittest
-
 import numpy as np
+import pytest
+
+# Import GPU testing utilities from conftest
+from conftest import (
+    HAS_CUPY,
+    cp,
+    create_device,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 
 import muGrid
 
-# Try to import CuPy for GPU tests
-try:
-    import cupy as cp
+# =============================================================================
+# Test Configuration
+# =============================================================================
 
-    HAS_CUPY = True
-except ImportError:
-    HAS_CUPY = False
-    cp = None
-
-# Use compile-time feature flag for GPU availability
 GPU_AVAILABLE = muGrid.has_gpu
 
 
-@unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
-class FEMGradientOperatorDeviceCheck(unittest.TestCase):
-    """Test suite for FEMGradientOperator on device (GPU) memory."""
+# =============================================================================
+# 2D FEM Gradient Smoke Tests (Parametrized on Device)
+# =============================================================================
 
-    def setUp(self):
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestFEMGradientOperator2D_smoke:
+    """Smoke tests for FEMGradientOperator 2D on different devices."""
+
+    def setup_method(self):
         self.nb_x_pts = 8
         self.nb_y_pts = 6
 
-    def test_device_fem_gradient_2d_apply(self):
+    def test_fem_gradient_2d_apply_smoke(self, device):
         """Test that FEM gradient 2D can be applied on device fields."""
+        skip_if_gpu_unavailable(device)
+
         fem_grad = muGrid.FEMGradientOperator(2)  # 2D
 
-        # Create device collection with ghosts
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
+
+        # Create collection with ghosts
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
 
         # Create nodal and gradient fields
@@ -82,15 +94,24 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
         gradient.set_zero()
         fem_grad.apply(nodal, gradient)
 
-    def test_device_fem_gradient_2d_transpose(self):
+        # Verify device location
+        if device == "gpu":
+            assert gradient.is_on_gpu
+
+    def test_fem_gradient_2d_transpose_smoke(self, device):
         """Test that FEM gradient 2D transpose can be applied on device fields."""
+        skip_if_gpu_unavailable(device)
+
         fem_grad = muGrid.FEMGradientOperator(2)
+
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
 
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -100,25 +121,39 @@ class FEMGradientOperatorDeviceCheck(unittest.TestCase):
         nodal.set_zero()
         fem_grad.transpose(gradient, nodal)
 
+        # Verify device location
+        if device == "gpu":
+            assert nodal.is_on_gpu
 
-@unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
-class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
-    """Test suite for 3D FEMGradientOperator on device memory."""
 
-    def setUp(self):
+# =============================================================================
+# 3D FEM Gradient Smoke Tests (Parametrized on Device)
+# =============================================================================
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestFEMGradientOperator3D_smoke:
+    """Smoke tests for 3D FEMGradientOperator on different devices."""
+
+    def setup_method(self):
         self.nb_x_pts = 6
         self.nb_y_pts = 6
         self.nb_z_pts = 6
 
-    def test_device_fem_gradient_3d_apply(self):
+    def test_fem_gradient_3d_apply_smoke(self, device):
         """Test that FEM gradient 3D can be applied on device fields."""
+        skip_if_gpu_unavailable(device)
+
         fem_grad = muGrid.FEMGradientOperator(3)  # 3D
+
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
 
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts, self.nb_z_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -128,15 +163,24 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
         gradient.set_zero()
         fem_grad.apply(nodal, gradient)
 
-    def test_device_fem_gradient_3d_transpose(self):
+        # Verify device location
+        if device == "gpu":
+            assert gradient.is_on_gpu
+
+    def test_fem_gradient_3d_transpose_smoke(self, device):
         """Test that FEM gradient 3D transpose can be applied on device fields."""
+        skip_if_gpu_unavailable(device)
+
         fem_grad = muGrid.FEMGradientOperator(3)
+
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
 
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts, self.nb_z_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            **fc_kwargs,
         )
 
         nodal = fc.real_field("nodal", (1,))
@@ -146,16 +190,30 @@ class FEMGradientOperator3DDeviceCheck(unittest.TestCase):
         nodal.set_zero()
         fem_grad.transpose(gradient, nodal)
 
+        # Verify device location
+        if device == "gpu":
+            assert nodal.is_on_gpu
 
-@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU backend or CuPy not available")
-class FEMGradientOperatorCuPyCheck(unittest.TestCase):
-    """Test suite for FEMGradientOperator with CuPy arrays.
+
+# =============================================================================
+# GPU vs CPU Correctness Tests (Dual-device comparison)
+# =============================================================================
+
+
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not available")
+class TestFEMGradientOperatorGPUCorrectness:
+    """Test suite for FEMGradientOperator GPU correctness.
 
     These tests verify that GPU FEM gradient operations return CuPy arrays
     and produce correct results that match the CPU reference.
     """
 
-    def setUp(self):
+    def setup_method(self, method):
+        """Skip tests if no GPU is available at runtime."""
+        if not muGrid.is_gpu_available():
+            pytest.skip("No GPU device available at runtime")
+        if not HAS_CUPY:
+            pytest.skip("CuPy not available for GPU tests")
         self.nb_x_pts = 8
         self.nb_y_pts = 6
 
@@ -167,20 +225,20 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         nodal = fc.real_field("nodal", (1,))
         gradient = fc.real_field("gradient", (fem_grad.nb_output_components,), "quad")
 
         # Arrays should be CuPy
-        self.assertIsInstance(nodal.s, cp.ndarray)
-        self.assertIsInstance(gradient.s, cp.ndarray)
+        assert isinstance(nodal.s, cp.ndarray)
+        assert isinstance(gradient.s, cp.ndarray)
 
         fem_grad.apply(nodal, gradient)
 
         # Result should still be CuPy
-        self.assertIsInstance(gradient.s, cp.ndarray)
+        assert isinstance(gradient.s, cp.ndarray)
 
     def test_device_fem_gradient_2d_correctness(self):
         """Test that 2D device FEM gradient produces correct results.
@@ -205,7 +263,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -247,7 +305,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -290,7 +348,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -333,7 +391,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         gradient_device = fc_device.real_field(
@@ -364,7 +422,7 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         nodal_in = fc.real_field("nodal_in", (1,))
@@ -381,9 +439,9 @@ class FEMGradientOperatorCuPyCheck(unittest.TestCase):
 
         # Result should be a valid array (no NaN or Inf)
         result = cp.asnumpy(nodal_out.s)
-        self.assertFalse(np.any(np.isnan(result)))
-        self.assertFalse(np.any(np.isinf(result)))
+        assert not np.any(np.isnan(result))
+        assert not np.any(np.isinf(result))
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__, "-v"])

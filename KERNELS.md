@@ -231,12 +231,21 @@ This reduces memory from O(N × DOF²) for full K to O(N × 2) for spatially-var
 **3D:** 5 tetrahedra per voxel (Kuhn triangulation)
 - Quadrature weights: `[1/3, 1/6, 1/6, 1/6, 1/6]`
 
-### Ghost Requirements
+### Field Requirements
 
-| Field | Left Ghosts | Right Ghosts |
-|-------|-------------|--------------|
-| Displacement/Force | 1 (periodic) or 0 (non-periodic) | 1 |
-| Material (λ, μ) | 1 (periodic) or 0 (non-periodic) | 0 |
+All fields use **node-based indexing** with the same grid dimensions:
+
+| Field | Dimensions | Left Ghosts | Right Ghosts |
+|-------|------------|-------------|--------------|
+| Displacement | (nx, ny, nz) | 1 | 1 |
+| Force | (nx, ny, nz) | 1 | 1 |
+| Material (λ, μ) | (nx, ny, nz) | 1 | 1 |
+
+**Key design principle**: The kernel does not distinguish between periodic and non-periodic boundary conditions. Ghost cell communication (via `CartesianDecomposition::communicate_ghosts()`) handles periodicity:
+- For **periodic BC**: ghost cells contain copies from the opposite boundary
+- For **non-periodic BC**: ghost cells are filled with appropriate boundary values
+
+This unified approach simplifies the kernel implementation and enables consistent behavior across CPU and GPU.
 
 ### Gather Pattern
 
@@ -258,32 +267,36 @@ Element offsets and local node indices:
   (-1, 0, 0) → local node 1    (0, 0, 0) → local node 0
 ```
 
-### Iteration Bounds for Non-Periodic BC
+### Iteration Bounds
 
-For non-periodic boundary conditions, the kernel only computes forces for interior nodes:
+The kernel iterates over all interior nodes (indices 0 to n-1):
 ```cpp
-// Non-periodic: skip boundary nodes (indices 0 and n-1)
-ix_start = (periodic_x) ? 0 : 1;
-ix_end = (periodic_x) ? nnx : nnx - 1;
+// Iterate over all nodes - ghost communication handles periodicity
+for (ix = 0; ix < nnx; ix++):
+    for (iy = 0; iy < nny; iy++):
+        // Compute force at node (ix, iy)
 ```
 
-Boundary nodes have Dirichlet boundary conditions and their forces are irrelevant.
+The kernel reads from ghost cells at positions -1 (left) and n (right), which must be populated before calling the operator. For periodic BC, these contain copies from the opposite boundary. For non-periodic BC, these contain boundary values (typically zero for homogeneous Dirichlet conditions).
 
 ### Kernel Pseudocode
 
 ```cpp
-for each interior node (ix, iy, iz):
+for each node (ix, iy, iz) in [0, nnx) × [0, nny) × [0, nnz):
     f = [0, 0, 0]  // force accumulator
 
     for each neighboring element (8 in 3D):
-        ex, ey, ez = element indices (can be -1 for ghost access)
+        // Element indices can be -1 (left ghost) or nx (right ghost)
+        ex, ey, ez = element indices relative to node
         local_node = which corner of element is this node
 
+        // Material fields are node-indexed, read from element position
+        // (element at ex,ey,ez has material stored at node ex,ey,ez)
         λ = material_lambda[ex, ey, ez]
         μ = material_mu[ex, ey, ez]
 
-        // Gather displacement from all element nodes
-        u = [displacement at each element node]
+        // Gather displacement from all element nodes (may read ghosts)
+        u = [displacement at each element corner node]
 
         // Compute stiffness contribution
         for each DOF d:
@@ -370,5 +383,6 @@ Tests are in `tests/python_isotropic_stiffness_operator_tests.py`:
 - `test_unit_impulse_*`: Verifies response to unit displacement at specific nodes
 - `test_symmetry`: Verifies K is symmetric
 - `ValidationGuardTest*`: Verifies proper error handling for invalid configurations
+- `GPUUnitImpulseTest`: Verifies GPU kernel matches CPU kernel output
 
-For non-periodic tests, comparisons are restricted to interior nodes since boundary forces are not computed by the fused operator.
+With node-based indexing, all tests compare the full output (all nodes), not just interior nodes.
