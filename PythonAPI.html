@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ API Reference" href="CplusplusAPI.html"><link rel="prev" title="C++ Bindings" href="Cplusplus.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Python API Reference - µGrid 0.101.1-18-ga136d8c3 documentation</title>
+        <title>Python API Reference - µGrid 0.101.1-85-g21f46807 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.101.1-18-ga136d8c3
+      <a href="index.html"><div class="brand">µGrid 0.101.1-85-g21f46807
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.101.1-18-ga136d8c3
+  <span class="sidebar-brand-text">µGrid 0.101.1-85-g21f46807
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -273,27 +273,34 @@ with a Pythonic interface.</p>
 <li><p><a class="reference internal" href="#convolutionoperator" id="id11">ConvolutionOperator</a></p></li>
 <li><p><a class="reference internal" href="#laplaceoperator" id="id12">LaplaceOperator</a></p></li>
 <li><p><a class="reference internal" href="#femgradientoperator" id="id13">FEMGradientOperator</a></p></li>
+<li><p><a class="reference internal" href="#isotropicstiffnessoperator" id="id14">IsotropicStiffnessOperator</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#fft-engine" id="id14">FFT Engine</a></p>
+<li><p><a class="reference internal" href="#fft-engine" id="id15">FFT Engine</a></p>
 <ul>
-<li><p><a class="reference internal" href="#fftengine" id="id15">FFTEngine</a></p></li>
-<li><p><a class="reference internal" href="#fft-utilities" id="id16">FFT Utilities</a></p></li>
+<li><p><a class="reference internal" href="#fftengine" id="id16">FFTEngine</a></p></li>
+<li><p><a class="reference internal" href="#fft-utilities" id="id17">FFT Utilities</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#file-i-o" id="id17">File I/O</a></p>
+<li><p><a class="reference internal" href="#file-i-o" id="id18">File I/O</a></p>
 <ul>
-<li><p><a class="reference internal" href="#fileionetcdf" id="id18">FileIONetCDF</a></p></li>
+<li><p><a class="reference internal" href="#fileionetcdf" id="id19">FileIONetCDF</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#utilities" id="id19">Utilities</a></p>
+<li><p><a class="reference internal" href="#utilities" id="id20">Utilities</a></p>
 <ul>
-<li><p><a class="reference internal" href="#timer" id="id20">Timer</a></p></li>
-<li><p><a class="reference internal" href="#module-muGrid.Solvers" id="id21">Solvers</a></p></li>
+<li><p><a class="reference internal" href="#timer" id="id21">Timer</a></p></li>
+<li><p><a class="reference internal" href="#module-muGrid.Solvers" id="id22">Solvers</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#enumerations" id="id22">Enumerations</a></p></li>
-<li><p><a class="reference internal" href="#module-constants" id="id23">Module Constants</a></p></li>
+<li><p><a class="reference internal" href="#device-selection" id="id23">Device Selection</a></p>
+<ul>
+<li><p><a class="reference internal" href="#device" id="id24">Device</a></p></li>
+<li><p><a class="reference internal" href="#devicetype" id="id25">DeviceType</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#enumerations" id="id26">Enumerations</a></p></li>
+<li><p><a class="reference internal" href="#module-constants" id="id27">Module Constants</a></p></li>
 </ul>
 </nav>
 <section id="field-collections">
@@ -303,7 +310,7 @@ with a Pythonic interface.</p>
 <h3><a class="toc-backref" href="#id2" role="doc-backlink">GlobalFieldCollection</a><a class="headerlink" href="#globalfieldcollection" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.GlobalFieldCollection">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">GlobalFieldCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_left</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_right</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_location</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.GlobalFieldCollection" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">GlobalFieldCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_left</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_right</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.GlobalFieldCollection" title="Link to this definition">¶</a></dt>
 <dd><p>A GlobalFieldCollection manages a set of fields that share the same
 global grid structure. It can allocate fields in either host (CPU)
 or device (GPU) memory.</p>
@@ -314,7 +321,8 @@ or device (GPU) memory.</p>
 <li><p><strong>nb_sub_pts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>, </em><em>optional</em>) – Number of sub-points per pixel for each sub-point type. Default is <code class="docutils literal notranslate"><span class="pre">{}</span></code>.</p></li>
 <li><p><strong>nb_ghosts_left</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Ghost cells on low-index side. Default is no ghosts.</p></li>
 <li><p><strong>nb_ghosts_right</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Ghost cells on high-index side. Default is no ghosts.</p></li>
-<li><p><strong>memory_location</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Memory location for field data: <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code> (CPU) or <code class="docutils literal notranslate"><span class="pre">&quot;device&quot;</span></code> (GPU). Default is <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code>.</p></li>
+<li><p><strong>device</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device"><em>Device</em></a><em>, </em><em>optional</em>) – Device for field allocation. Can be a string (<code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cuda&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cuda:N&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;rocm&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;rocm:N&quot;</span></code>) or a <code class="docutils literal notranslate"><span class="pre">Device</span></code> instance. Default is <code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code>.</p></li>
 </ul>
 </dd>
 </dl>
@@ -324,7 +332,7 @@ or device (GPU) memory.</p>
 <span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">field</span><span class="p">.</span><span class="n">p</span><span class="p">[</span><span class="o">:</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">300.0</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">Set</span><span class="w"> </span><span class="n">temperature</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="mi">300</span><span class="n">K</span>
 
 <span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">GPU</span><span class="w"> </span><span class="n">field</span><span class="w"> </span><span class="n">collection</span>
-<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">fc_gpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">],</span><span class="w"> </span><span class="n">memory_location</span><span class="o">=</span><span class="s">&quot;device&quot;</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">fc_gpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">],</span><span class="w"> </span><span class="n">device</span><span class="o">=</span><span class="s">&quot;cuda&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="py method">
@@ -418,7 +426,7 @@ or device (GPU) memory.</p>
 <h3><a class="toc-backref" href="#id3" role="doc-backlink">LocalFieldCollection</a><a class="headerlink" href="#localfieldcollection" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.LocalFieldCollection">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">LocalFieldCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_location</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.LocalFieldCollection" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">LocalFieldCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.LocalFieldCollection" title="Link to this definition">¶</a></dt>
 <dd><p>A LocalFieldCollection manages fields on a subset of pixels, typically
 used for material-specific data in heterogeneous simulations.</p>
 <dl class="field-list simple">
@@ -427,7 +435,8 @@ used for material-specific data in heterogeneous simulations.</p>
 <li><p><strong>spatial_dim</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Spatial dimension (2 or 3).</p></li>
 <li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name for the collection. Default is <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code>.</p></li>
 <li><p><strong>nb_sub_pts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>, </em><em>optional</em>) – Number of sub-points per pixel for each sub-point type.</p></li>
-<li><p><strong>memory_location</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Memory location: <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;device&quot;</span></code>. Default is <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code>.</p></li>
+<li><p><strong>device</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device"><em>Device</em></a><em>, </em><em>optional</em>) – Device for field allocation. Can be a string (<code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cuda&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cuda:N&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;rocm&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;rocm:N&quot;</span></code>) or a <code class="docutils literal notranslate"><span class="pre">Device</span></code> instance. Default is <code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code>.</p></li>
 </ul>
 </dd>
 </dl>
@@ -543,7 +552,7 @@ so modifications to the arrays will modify the field data directly (zero-copy).<
 <h3><a class="toc-backref" href="#id8" role="doc-backlink">CartesianDecomposition</a><a class="headerlink" href="#cartesiandecomposition" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.CartesianDecomposition">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">CartesianDecomposition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">communicator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_domain_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_subdivisions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_left</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_right</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_location</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.CartesianDecomposition" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">CartesianDecomposition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">communicator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_domain_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_subdivisions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_left</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_right</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.CartesianDecomposition" title="Link to this definition">¶</a></dt>
 <dd><p>CartesianDecomposition manages domain decomposition for MPI-parallel
 computations on structured grids, including ghost buffer regions for
 stencil operations.</p>
@@ -556,7 +565,8 @@ stencil operations.</p>
 <li><p><strong>nb_ghosts_left</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Ghost cells on low-index side. Default is no ghosts.</p></li>
 <li><p><strong>nb_ghosts_right</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Ghost cells on high-index side. Default is no ghosts.</p></li>
 <li><p><strong>nb_sub_pts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>, </em><em>optional</em>) – Number of sub-points per pixel for each sub-point type.</p></li>
-<li><p><strong>memory_location</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Memory location: <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;device&quot;</span></code>. Default is <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code>.</p></li>
+<li><p><strong>device</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device"><em>Device</em></a><em>, </em><em>optional</em>) – Device for field allocation. Can be a string (<code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cuda&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cuda:N&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;rocm&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;rocm:N&quot;</span></code>) or a <code class="docutils literal notranslate"><span class="pre">Device</span></code> instance. Default is <code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code>.</p></li>
 </ul>
 </dd>
 </dl>
@@ -566,6 +576,7 @@ stencil operations.</p>
 <span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">decomp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CartesianDecomposition</span><span class="p">(</span>
 <span class="p">...</span><span class="w">     </span><span class="n">comm</span><span class="p">,</span>
 <span class="p">...</span><span class="w">     </span><span class="n">nb_domain_grid_pts</span><span class="o">=</span><span class="p">[</span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">],</span>
+<span class="p">...</span><span class="w">     </span><span class="n">nb_subdivisions</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">],</span>
 <span class="p">...</span><span class="w">     </span><span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">],</span>
 <span class="p">...</span><span class="w">     </span><span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span>
 <span class="p">...</span><span class="w"> </span><span class="p">)</span>
@@ -658,8 +669,8 @@ Default is a serial communicator containing just the present process.</p>
 <section id="convolutionoperator">
 <h3><a class="toc-backref" href="#id11" role="doc-backlink">ConvolutionOperator</a><a class="headerlink" href="#convolutionoperator" title="Link to this heading">¶</a></h3>
 <dl class="py class">
-<dt class="sig sig-object py" id="muGrid.ConvolutionOperator">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">ConvolutionOperator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">offset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stencil</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.ConvolutionOperator" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="muGrid.GenericLinearOperator">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">GenericLinearOperator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">offset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stencil</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.GenericLinearOperator" title="Link to this definition">¶</a></dt>
 <dd><p>Applies convolution (stencil) operations to fields. Useful for computing
 gradients, Laplacians, and other discrete differential operators.</p>
 <dl class="field-list simple">
@@ -674,13 +685,13 @@ gradients, Laplacians, and other discrete differential operators.</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Create</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="mi">2</span><span class="n">D</span><span class="w"> </span><span class="n">Laplacian</span><span class="w"> </span><span class="n">stencil</span>
 <span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">numpy</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">np</span>
 <span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">stencil</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">np</span><span class="p">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">-4</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">]])</span>
-<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">laplace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">ConvolutionOperator</span><span class="p">([</span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="mi">-1</span><span class="p">],</span><span class="w"> </span><span class="n">stencil</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">laplace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="mi">-1</span><span class="p">],</span><span class="w"> </span><span class="n">stencil</span><span class="p">)</span>
 <span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">laplace</span><span class="p">.</span><span class="n">apply</span><span class="p">(</span><span class="n">input_field</span><span class="p">,</span><span class="w"> </span><span class="n">output_field</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="py method">
-<dt class="sig sig-object py" id="muGrid.ConvolutionOperator.apply">
-<span class="sig-name descname"><span class="pre">apply</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodal_field</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quadrature_point_field</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.ConvolutionOperator.apply" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="muGrid.GenericLinearOperator.apply">
+<span class="sig-name descname"><span class="pre">apply</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodal_field</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quadrature_point_field</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.GenericLinearOperator.apply" title="Link to this definition">¶</a></dt>
 <dd><p>Apply convolution to fields.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -693,8 +704,8 @@ gradients, Laplacians, and other discrete differential operators.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="muGrid.ConvolutionOperator.transpose">
-<span class="sig-name descname"><span class="pre">transpose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">quadrature_point_field</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodal_field</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.ConvolutionOperator.transpose" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="muGrid.GenericLinearOperator.transpose">
+<span class="sig-name descname"><span class="pre">transpose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">quadrature_point_field</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodal_field</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.GenericLinearOperator.transpose" title="Link to this definition">¶</a></dt>
 <dd><p>Apply transpose convolution to fields.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -860,12 +871,101 @@ shape functions on triangles (2D) or tetrahedra (3D).</p>
 </dd></dl>
 
 </section>
+<section id="isotropicstiffnessoperator">
+<h3><a class="toc-backref" href="#id14" role="doc-backlink">IsotropicStiffnessOperator</a><a class="headerlink" href="#isotropicstiffnessoperator" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="muGrid.IsotropicStiffnessOperator2D">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">IsotropicStiffnessOperator2D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid_spacing</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.IsotropicStiffnessOperator2D" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="muGrid.IsotropicStiffnessOperator3D">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">IsotropicStiffnessOperator3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid_spacing</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.IsotropicStiffnessOperator3D" title="Link to this definition">¶</a></dt>
+<dd><p>Fused stiffness operators for isotropic linear elastic materials.</p>
+<p>These operators compute <code class="docutils literal notranslate"><span class="pre">K</span> <span class="pre">&#64;</span> <span class="pre">u</span> <span class="pre">=</span> <span class="pre">B^T</span> <span class="pre">C</span> <span class="pre">B</span> <span class="pre">&#64;</span> <span class="pre">u</span></code> for linear finite elements
+without storing the full stiffness matrix. Instead, they exploit the
+isotropic material structure:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[K = 2\mu G + \lambda V\]</div>
+</div>
+<p>where G and V are geometry-only matrices (same for all voxels) and
+λ, μ are the Lamé parameters which can vary spatially.</p>
+<p>This reduces memory from O(N × 24²) for full K storage to O(N × 2)
+for spatially-varying isotropic materials, plus O(1) for the shared
+geometry matrices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>grid_spacing</strong> (<em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Grid spacing in each direction <code class="docutils literal notranslate"><span class="pre">[hx,</span> <span class="pre">hy]</span></code> (2D) or <code class="docutils literal notranslate"><span class="pre">[hx,</span> <span class="pre">hy,</span> <span class="pre">hz]</span></code> (3D).</p>
+</dd>
+</dl>
+<p><strong>Example</strong>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">numpy</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">np</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">muGrid</span>
+<span class="o">&gt;&gt;&gt;</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Create</span><span class="w"> </span><span class="mi">3</span><span class="n">D</span><span class="w"> </span><span class="k">operator</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">stiffness</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">IsotropicStiffnessOperator3D</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">])</span>
+<span class="o">&gt;&gt;&gt;</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Setup</span><span class="w"> </span><span class="n">fields</span><span class="w"> </span><span class="p">(</span><span class="n">displacement</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">nodes</span><span class="p">,</span><span class="w"> </span><span class="n">materials</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">elements</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">fc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
+<span class="p">...</span><span class="w">     </span><span class="n">muGrid</span><span class="p">.</span><span class="n">Communicator</span><span class="p">(),</span>
+<span class="p">...</span><span class="w">     </span><span class="n">nb_domain_grid_pts</span><span class="o">=</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">],</span>
+<span class="p">...</span><span class="w">     </span><span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">],</span>
+<span class="p">...</span><span class="w">     </span><span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">],</span>
+<span class="p">...</span><span class="w"> </span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fc</span><span class="p">.</span><span class="n">real_field</span><span class="p">(</span><span class="s">&quot;displacement&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fc</span><span class="p">.</span><span class="n">real_field</span><span class="p">(</span><span class="s">&quot;force&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+<span class="o">&gt;&gt;&gt;</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Material</span><span class="w"> </span><span class="n">parameters</span><span class="w"> </span><span class="p">(</span><span class="n">one</span><span class="w"> </span><span class="n">fewer</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">direction</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">lam</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fc</span><span class="p">.</span><span class="n">real_field</span><span class="p">(</span><span class="s">&quot;lambda&quot;</span><span class="p">)</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">Lamé</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="n">parameter</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">mu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fc</span><span class="p">.</span><span class="n">real_field</span><span class="p">(</span><span class="s">&quot;mu&quot;</span><span class="p">)</span><span class="w">       </span><span class="err">#</span><span class="w"> </span><span class="n">Shear</span><span class="w"> </span><span class="n">modulus</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">lam</span><span class="p">.</span><span class="n">p</span><span class="p">[...]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">Uniform</span><span class="w"> </span><span class="n">material</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">mu</span><span class="p">.</span><span class="n">p</span><span class="p">[...]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span>
+<span class="o">&gt;&gt;&gt;</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Apply</span><span class="w"> </span><span class="n">stiffness</span><span class="o">:</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">K</span><span class="w"> </span><span class="err">@</span><span class="w"> </span><span class="n">u</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">fc</span><span class="p">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">stiffness</span><span class="p">.</span><span class="n">apply</span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="n">lam</span><span class="p">,</span><span class="w"> </span><span class="n">mu</span><span class="p">,</span><span class="w"> </span><span class="n">f</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.IsotropicStiffnessOperator3D.apply">
+<span class="sig-name descname"><span class="pre">apply</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">displacement</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.IsotropicStiffnessOperator3D.apply" title="Link to this definition">¶</a></dt>
+<dd><p>Apply the stiffness operator: <code class="docutils literal notranslate"><span class="pre">force</span> <span class="pre">=</span> <span class="pre">K</span> <span class="pre">&#64;</span> <span class="pre">displacement</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>displacement</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Input displacement field at nodal points.</p></li>
+<li><p><strong>lam</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Lamé first parameter field at element centers.</p></li>
+<li><p><strong>mu</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Shear modulus field at element centers.</p></li>
+<li><p><strong>force</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Output force field at nodal points.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.IsotropicStiffnessOperator3D.apply_increment">
+<span class="sig-name descname"><span class="pre">apply_increment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">displacement</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.IsotropicStiffnessOperator3D.apply_increment" title="Link to this definition">¶</a></dt>
+<dd><p>Apply stiffness and add scaled result: <code class="docutils literal notranslate"><span class="pre">force</span> <span class="pre">+=</span> <span class="pre">alpha</span> <span class="pre">*</span> <span class="pre">K</span> <span class="pre">&#64;</span> <span class="pre">displacement</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>displacement</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Input displacement field at nodal points.</p></li>
+<li><p><strong>lam</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Lamé first parameter field at element centers.</p></li>
+<li><p><strong>mu</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Shear modulus field at element centers.</p></li>
+<li><p><strong>alpha</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Scaling factor.</p></li>
+<li><p><strong>force</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>Field</em></a>) – Output force field at nodal points (updated in-place).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
 </section>
 <section id="fft-engine">
-<h2><a class="toc-backref" href="#id14" role="doc-backlink">FFT Engine</a><a class="headerlink" href="#fft-engine" title="Link to this heading">¶</a></h2>
+<h2><a class="toc-backref" href="#id15" role="doc-backlink">FFT Engine</a><a class="headerlink" href="#fft-engine" title="Link to this heading">¶</a></h2>
 <p>Distributed FFT operations using pencil decomposition.</p>
 <section id="fftengine">
-<h3><a class="toc-backref" href="#id15" role="doc-backlink">FFTEngine</a><a class="headerlink" href="#fftengine" title="Link to this heading">¶</a></h3>
+<h3><a class="toc-backref" href="#id16" role="doc-backlink">FFTEngine</a><a class="headerlink" href="#fftengine" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.FFTEngine">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">FFTEngine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_domain_grid_pts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">communicator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_left</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_ghosts_right</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nb_sub_pts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.FFTEngine" title="Link to this definition">¶</a></dt>
@@ -1120,7 +1220,7 @@ element is the integer coordinate index.</p>
 
 </section>
 <section id="fft-utilities">
-<h3><a class="toc-backref" href="#id16" role="doc-backlink">FFT Utilities</a><a class="headerlink" href="#fft-utilities" title="Link to this heading">¶</a></h3>
+<h3><a class="toc-backref" href="#id17" role="doc-backlink">FFT Utilities</a><a class="headerlink" href="#fft-utilities" title="Link to this heading">¶</a></h3>
 <dl class="py function">
 <dt class="sig sig-object py" id="muGrid.fft_normalization">
 <span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">fft_normalization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nb_grid_pts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.fft_normalization" title="Link to this definition">¶</a></dt>
@@ -1158,10 +1258,10 @@ element is the integer coordinate index.</p>
 </section>
 </section>
 <section id="file-i-o">
-<h2><a class="toc-backref" href="#id17" role="doc-backlink">File I/O</a><a class="headerlink" href="#file-i-o" title="Link to this heading">¶</a></h2>
+<h2><a class="toc-backref" href="#id18" role="doc-backlink">File I/O</a><a class="headerlink" href="#file-i-o" title="Link to this heading">¶</a></h2>
 <p>Classes for reading and writing fields to NetCDF files.</p>
 <section id="fileionetcdf">
-<h3><a class="toc-backref" href="#id18" role="doc-backlink">FileIONetCDF</a><a class="headerlink" href="#fileionetcdf" title="Link to this heading">¶</a></h3>
+<h3><a class="toc-backref" href="#id19" role="doc-backlink">FileIONetCDF</a><a class="headerlink" href="#fileionetcdf" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.FileIONetCDF">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">FileIONetCDF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">open_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'read'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">communicator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.FileIONetCDF" title="Link to this definition">¶</a></dt>
@@ -1215,37 +1315,92 @@ passed, its underlying field collection is used.</p>
 </section>
 </section>
 <section id="utilities">
-<h2><a class="toc-backref" href="#id19" role="doc-backlink">Utilities</a><a class="headerlink" href="#utilities" title="Link to this heading">¶</a></h2>
+<h2><a class="toc-backref" href="#id20" role="doc-backlink">Utilities</a><a class="headerlink" href="#utilities" title="Link to this heading">¶</a></h2>
 <section id="timer">
-<h3><a class="toc-backref" href="#id20" role="doc-backlink">Timer</a><a class="headerlink" href="#timer" title="Link to this heading">¶</a></h3>
+<h3><a class="toc-backref" href="#id21" role="doc-backlink">Timer</a><a class="headerlink" href="#timer" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.Timer">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">Timer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer" title="Link to this definition">¶</a></dt>
-<dd><p>Timer utility for performance measurement.</p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">Timer</span></span><a class="headerlink" href="#muGrid.Timer" title="Link to this definition">¶</a></dt>
+<dd><p>Hierarchical timer utility for performance measurement with context manager support.</p>
+<p>The Timer supports nested timing regions and can be used as a context manager
+for convenient timing of code blocks.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">timer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">Timer</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">timer</span><span class="p">(</span><span class="s">&quot;outer&quot;</span><span class="p">)</span><span class="o">:</span>
+<span class="p">...</span><span class="w">     </span><span class="n">with</span><span class="w"> </span><span class="n">timer</span><span class="p">(</span><span class="s">&quot;inner&quot;</span><span class="p">)</span><span class="o">:</span>
+<span class="p">...</span><span class="w">         </span><span class="err">#</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="n">some</span><span class="w"> </span><span class="n">computation</span><span class="w"> </span><span class="p">...</span>
+<span class="p">...</span><span class="w">         </span><span class="n">pass</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">timer</span><span class="p">.</span><span class="n">print_summary</span><span class="p">()</span>
+<span class="n">Timer</span><span class="w"> </span><span class="n">Summary</span><span class="o">:</span>
+<span class="w">  </span><span class="nl">outer</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1234</span><span class="n">s</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="n">calls</span><span class="p">)</span>
+<span class="w">    </span><span class="nl">inner</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0567</span><span class="n">s</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="n">calls</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Timer.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.__call__" title="Link to this definition">¶</a></dt>
+<dd><p>Context manager for timing a named code block.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name for the timer. Default is <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code>.</p>
+<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Name of the timing region.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Context manager that times the enclosed block.</p>
 </dd>
 </dl>
-<dl class="py method">
-<dt class="sig sig-object py" id="muGrid.Timer.start">
-<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.start" title="Link to this definition">¶</a></dt>
-<dd><p>Start the timer.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="muGrid.Timer.stop">
-<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.stop" title="Link to this definition">¶</a></dt>
-<dd><p>Stop the timer.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="muGrid.Timer.elapsed">
-<span class="sig-name descname"><span class="pre">elapsed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.elapsed" title="Link to this definition">¶</a></dt>
-<dd><p>Return elapsed time in seconds.</p>
+<dt class="sig sig-object py" id="muGrid.Timer.get_time">
+<span class="sig-name descname"><span class="pre">get_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.get_time" title="Link to this definition">¶</a></dt>
+<dd><p>Get total elapsed time for a timing region.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Name of the timing region (use <code class="docutils literal notranslate"><span class="pre">&quot;/&quot;</span></code> for nested regions,
+e.g., <code class="docutils literal notranslate"><span class="pre">&quot;outer/inner&quot;</span></code>).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Total elapsed time in seconds.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Timer.get_calls">
+<span class="sig-name descname"><span class="pre">get_calls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.get_calls" title="Link to this definition">¶</a></dt>
+<dd><p>Get the number of times a timing region was entered.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Name of the timing region.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Number of calls.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Timer.print_summary">
+<span class="sig-name descname"><span class="pre">print_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.print_summary" title="Link to this definition">¶</a></dt>
+<dd><p>Print a formatted summary of all timing regions.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Timer.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Timer.to_dict" title="Link to this definition">¶</a></dt>
+<dd><p>Export timer data as a dictionary (useful for JSON serialization).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary with timing data.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1254,11 +1409,11 @@ passed, its underlying field collection is used.</p>
 
 </section>
 <section id="module-muGrid.Solvers">
-<span id="solvers"></span><h3><a class="toc-backref" href="#id21" role="doc-backlink">Solvers</a><a class="headerlink" href="#module-muGrid.Solvers" title="Link to this heading">¶</a></h3>
+<span id="solvers"></span><h3><a class="toc-backref" href="#id22" role="doc-backlink">Solvers</a><a class="headerlink" href="#module-muGrid.Solvers" title="Link to this heading">¶</a></h3>
 <p>The Solvers module provides simple parallel iterative solvers.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Solvers.conjugate_gradients">
-<span class="sig-prename descclassname"><span class="pre">muGrid.Solvers.</span></span><span class="sig-name descname"><span class="pre">conjugate_gradients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">comm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hessp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxiter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Solvers.conjugate_gradients" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">muGrid.Solvers.</span></span><span class="sig-name descname"><span class="pre">conjugate_gradients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">comm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hessp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxiter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Solvers.conjugate_gradients" title="Link to this definition">¶</a></dt>
 <dd><p>Conjugate gradient method for matrix-free solution of the linear problem
 <code class="docutils literal notranslate"><span class="pre">Ax</span> <span class="pre">=</span> <span class="pre">b</span></code>, where <code class="docutils literal notranslate"><span class="pre">A</span></code> is represented by the function <code class="docutils literal notranslate"><span class="pre">hessp</span></code> (which computes the
 product of <code class="docutils literal notranslate"><span class="pre">A</span></code> with a vector). The method iteratively refines the solution <code class="docutils literal notranslate"><span class="pre">x</span></code>
@@ -1269,14 +1424,17 @@ are reached.</p>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>comm</strong> (<em>muGrid.Communicator</em>) – Communicator for parallel processing.</p></li>
 <li><p><strong>fc</strong> (<a class="reference internal" href="#muGrid.GlobalFieldCollection" title="muGrid.GlobalFieldCollection"><em>muGrid.GlobalFieldCollection</em></a><em>, </em><a class="reference internal" href="#muGrid.LocalFieldCollection" title="muGrid.LocalFieldCollection"><em>muGrid.LocalFieldCollection</em></a><em>, or </em><a class="reference internal" href="#muGrid.CartesianDecomposition" title="muGrid.CartesianDecomposition"><em>muGrid.CartesianDecomposition</em></a>) – Collection for creating temporary fields used by the CG algorithm.</p></li>
-<li><p><strong>hessp</strong> (<em>callable</em>) – Function that computes the product of the Hessian matrix <code class="docutils literal notranslate"><span class="pre">A</span></code> with a vector.
-Signature: <code class="docutils literal notranslate"><span class="pre">hessp(input_field,</span> <span class="pre">output_field)</span></code> where both are <code class="docutils literal notranslate"><span class="pre">muGrid.Field</span></code>.</p></li>
 <li><p><strong>b</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>muGrid.Field</em></a>) – Right-hand side vector.</p></li>
 <li><p><strong>x</strong> (<a class="reference internal" href="#muGrid.Field" title="muGrid.Field"><em>muGrid.Field</em></a>) – Initial guess for the solution (modified in place).</p></li>
+<li><p><strong>hessp</strong> (<em>callable</em>) – Function that computes the product of the Hessian matrix <code class="docutils literal notranslate"><span class="pre">A</span></code> with a vector.
+Signature: <code class="docutils literal notranslate"><span class="pre">hessp(input_field,</span> <span class="pre">output_field)</span></code> where both are <code class="docutils literal notranslate"><span class="pre">muGrid.Field</span></code>.</p></li>
 <li><p><strong>tol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Tolerance for convergence. Default is <code class="docutils literal notranslate"><span class="pre">1e-6</span></code>.</p></li>
 <li><p><strong>maxiter</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Maximum number of iterations. Default is <code class="docutils literal notranslate"><span class="pre">1000</span></code>.</p></li>
 <li><p><strong>callback</strong> (<em>callable</em><em>, </em><em>optional</em>) – Function to call after each iteration with signature:
-<code class="docutils literal notranslate"><span class="pre">callback(iteration,</span> <span class="pre">x_array,</span> <span class="pre">residual_array,</span> <span class="pre">search_direction_array)</span></code>.</p></li>
+<code class="docutils literal notranslate"><span class="pre">callback(iteration,</span> <span class="pre">state_dict)</span></code> where <code class="docutils literal notranslate"><span class="pre">state_dict</span></code> contains keys
+<code class="docutils literal notranslate"><span class="pre">&quot;x&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;r&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;p&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">&quot;rr&quot;</span></code> (squared residual norm).</p></li>
+<li><p><strong>timer</strong> (<a class="reference internal" href="#muGrid.Timer" title="muGrid.Timer"><em>muGrid.Timer</em></a><em>, </em><em>optional</em>) – Timer object for performance profiling. If provided, the solver
+will record timing for various operations (hessp, dot products, updates).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1294,8 +1452,206 @@ or if the Hessian is not positive definite.</p>
 
 </section>
 </section>
+<section id="device-selection">
+<h2><a class="toc-backref" href="#id23" role="doc-backlink">Device Selection</a><a class="headerlink" href="#device-selection" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Device</span></code> class and <code class="docutils literal notranslate"><span class="pre">DeviceType</span></code> enum provide a Pythonic way to specify
+where field data should be allocated.</p>
+<section id="device">
+<h3><a class="toc-backref" href="#id24" role="doc-backlink">Device</a><a class="headerlink" href="#device" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">Device</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device" title="Link to this definition">¶</a></dt>
+<dd><p>Represents a compute device (CPU or GPU) for field allocation.</p>
+<p>Factory methods provide convenient construction:</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.cpu">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">cpu</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.cpu" title="Link to this definition">¶</a></dt>
+<dd><p>Create a CPU device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A Device representing the CPU.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device">Device</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.cuda">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">cuda</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.cuda" title="Link to this definition">¶</a></dt>
+<dd><p>Create a CUDA GPU device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device_id</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – GPU device ID. Default is 0.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A Device representing a CUDA GPU.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device">Device</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.rocm">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">rocm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.rocm" title="Link to this definition">¶</a></dt>
+<dd><p>Create a ROCm GPU device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device_id</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – GPU device ID. Default is 0.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A Device representing a ROCm GPU.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device">Device</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.gpu">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">gpu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.gpu" title="Link to this definition">¶</a></dt>
+<dd><p>Create a GPU device using the default backend.</p>
+<p>Automatically selects the available GPU backend:</p>
+<ul class="simple">
+<li><p>Returns CUDA device if CUDA is available</p></li>
+<li><p>Returns ROCm device if ROCm is available (and CUDA is not)</p></li>
+<li><p>Returns CPU device if no GPU backend is available</p></li>
+</ul>
+<p>This is the recommended way to request GPU execution without
+hard-coding a specific backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device_id</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – GPU device ID. Default is 0.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A Device for the default GPU backend.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#muGrid.Solvers.muGrid.Device" title="muGrid.Solvers.muGrid.Device">Device</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.is_host">
+<span class="sig-name descname"><span class="pre">is_host</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.is_host" title="Link to this definition">¶</a></dt>
+<dd><p>Check if this is a host (CPU) device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if CPU device, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.is_device">
+<span class="sig-name descname"><span class="pre">is_device</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.is_device" title="Link to this definition">¶</a></dt>
+<dd><p>Check if this is a device (GPU) memory location.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if GPU device, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.get_type">
+<span class="sig-name descname"><span class="pre">get_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.get_type" title="Link to this definition">¶</a></dt>
+<dd><p>Get the device type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The device type enum value.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType" title="muGrid.Solvers.muGrid.DeviceType">DeviceType</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.Device.get_device_id">
+<span class="sig-name descname"><span class="pre">get_device_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#muGrid.Solvers.muGrid.Device.get_device_id" title="Link to this definition">¶</a></dt>
+<dd><p>Get the device ID for multi-GPU systems.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Device ID (0 for single-GPU or CPU).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<p><strong>Example</strong>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">muGrid</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Create</span><span class="w"> </span><span class="n">devices</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">Device</span><span class="p">.</span><span class="n">cpu</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">gpu0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">Device</span><span class="p">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">gpu1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">Device</span><span class="p">.</span><span class="n">cuda</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="n">type</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">cpu</span><span class="p">.</span><span class="n">is_host</span><span class="p">()</span>
+<span class="n">True</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">gpu0</span><span class="p">.</span><span class="n">is_device</span><span class="p">()</span>
+<span class="n">True</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Use</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">field</span><span class="w"> </span><span class="n">collections</span>
+<span class="o">&gt;&gt;&gt;</span><span class="w"> </span><span class="n">fc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">muGrid</span><span class="p">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">],</span><span class="w"> </span><span class="n">device</span><span class="o">=</span><span class="n">muGrid</span><span class="p">.</span><span class="n">Device</span><span class="p">.</span><span class="n">cuda</span><span class="p">())</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="devicetype">
+<h3><a class="toc-backref" href="#id25" role="doc-backlink">DeviceType</a><a class="headerlink" href="#devicetype" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.DeviceType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">DeviceType</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.DeviceType" title="Link to this definition">¶</a></dt>
+<dd><p>Enumeration for device types. Values follow DLPack conventions.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.DeviceType.CPU">
+<span class="sig-name descname"><span class="pre">CPU</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.DeviceType.CPU" title="Link to this definition">¶</a></dt>
+<dd><p>CPU device (value 1).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.DeviceType.CUDA">
+<span class="sig-name descname"><span class="pre">CUDA</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.DeviceType.CUDA" title="Link to this definition">¶</a></dt>
+<dd><p>NVIDIA CUDA GPU device (value 2).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.DeviceType.CUDAHost">
+<span class="sig-name descname"><span class="pre">CUDAHost</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.DeviceType.CUDAHost" title="Link to this definition">¶</a></dt>
+<dd><p>CUDA pinned host memory (value 3).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.DeviceType.ROCm">
+<span class="sig-name descname"><span class="pre">ROCm</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.DeviceType.ROCm" title="Link to this definition">¶</a></dt>
+<dd><p>AMD ROCm GPU device (value 10).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="muGrid.Solvers.muGrid.DeviceType.ROCmHost">
+<span class="sig-name descname"><span class="pre">ROCmHost</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.DeviceType.ROCmHost" title="Link to this definition">¶</a></dt>
+<dd><p>ROCm pinned host memory (value 11).</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
 <section id="enumerations">
-<h2><a class="toc-backref" href="#id22" role="doc-backlink">Enumerations</a><a class="headerlink" href="#enumerations" title="Link to this heading">¶</a></h2>
+<h2><a class="toc-backref" href="#id26" role="doc-backlink">Enumerations</a><a class="headerlink" href="#enumerations" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="muGrid.Solvers.muGrid.IterUnit">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">muGrid.</span></span><span class="sig-name descname"><span class="pre">IterUnit</span></span><a class="headerlink" href="#muGrid.Solvers.muGrid.IterUnit" title="Link to this definition">¶</a></dt>
@@ -1334,7 +1690,7 @@ or if the Hessian is not positive definite.</p>
 
 </section>
 <section id="module-constants">
-<h2><a class="toc-backref" href="#id23" role="doc-backlink">Module Constants</a><a class="headerlink" href="#module-constants" title="Link to this heading">¶</a></h2>
+<h2><a class="toc-backref" href="#id27" role="doc-backlink">Module Constants</a><a class="headerlink" href="#module-constants" title="Link to this heading">¶</a></h2>
 <p>The following constants indicate compile-time configuration:</p>
 <dl class="py data">
 <dt class="sig sig-object py" id="muGrid.Solvers.muGrid.has_mpi">
@@ -1480,9 +1836,9 @@ or if the Hessian is not positive definite.</p>
 </li>
 <li><a class="reference internal" href="#operators">Operators</a><ul>
 <li><a class="reference internal" href="#convolutionoperator">ConvolutionOperator</a><ul>
-<li><a class="reference internal" href="#muGrid.ConvolutionOperator"><code class="docutils literal notranslate"><span class="pre">muGrid.ConvolutionOperator</span></code></a><ul>
-<li><a class="reference internal" href="#muGrid.ConvolutionOperator.apply"><code class="docutils literal notranslate"><span class="pre">muGrid.ConvolutionOperator.apply()</span></code></a></li>
-<li><a class="reference internal" href="#muGrid.ConvolutionOperator.transpose"><code class="docutils literal notranslate"><span class="pre">muGrid.ConvolutionOperator.transpose()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.GenericLinearOperator"><code class="docutils literal notranslate"><span class="pre">muGrid.GenericLinearOperator</span></code></a><ul>
+<li><a class="reference internal" href="#muGrid.GenericLinearOperator.apply"><code class="docutils literal notranslate"><span class="pre">muGrid.GenericLinearOperator.apply()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.GenericLinearOperator.transpose"><code class="docutils literal notranslate"><span class="pre">muGrid.GenericLinearOperator.transpose()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -1502,6 +1858,15 @@ or if the Hessian is not positive definite.</p>
 <li><a class="reference internal" href="#muGrid.FEMGradientOperator.apply_increment"><code class="docutils literal notranslate"><span class="pre">muGrid.FEMGradientOperator.apply_increment()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FEMGradientOperator.transpose"><code class="docutils literal notranslate"><span class="pre">muGrid.FEMGradientOperator.transpose()</span></code></a></li>
 <li><a class="reference internal" href="#muGrid.FEMGradientOperator.transpose_increment"><code class="docutils literal notranslate"><span class="pre">muGrid.FEMGradientOperator.transpose_increment()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#isotropicstiffnessoperator">IsotropicStiffnessOperator</a><ul>
+<li><a class="reference internal" href="#muGrid.IsotropicStiffnessOperator2D"><code class="docutils literal notranslate"><span class="pre">muGrid.IsotropicStiffnessOperator2D</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.IsotropicStiffnessOperator3D"><code class="docutils literal notranslate"><span class="pre">muGrid.IsotropicStiffnessOperator3D</span></code></a><ul>
+<li><a class="reference internal" href="#muGrid.IsotropicStiffnessOperator3D.apply"><code class="docutils literal notranslate"><span class="pre">muGrid.IsotropicStiffnessOperator3D.apply()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.IsotropicStiffnessOperator3D.apply_increment"><code class="docutils literal notranslate"><span class="pre">muGrid.IsotropicStiffnessOperator3D.apply_increment()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -1551,15 +1916,45 @@ or if the Hessian is not positive definite.</p>
 <li><a class="reference internal" href="#utilities">Utilities</a><ul>
 <li><a class="reference internal" href="#timer">Timer</a><ul>
 <li><a class="reference internal" href="#muGrid.Timer"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer</span></code></a><ul>
-<li><a class="reference internal" href="#muGrid.Timer.start"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.start()</span></code></a></li>
-<li><a class="reference internal" href="#muGrid.Timer.stop"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.stop()</span></code></a></li>
-<li><a class="reference internal" href="#muGrid.Timer.elapsed"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.elapsed()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Timer.__call__"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.__call__()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Timer.get_time"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.get_time()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Timer.get_calls"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.get_calls()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Timer.print_summary"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.print_summary()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Timer.to_dict"><code class="docutils literal notranslate"><span class="pre">muGrid.Timer.to_dict()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-muGrid.Solvers">Solvers</a><ul>
 <li><a class="reference internal" href="#muGrid.Solvers.muGrid.Solvers.conjugate_gradients"><code class="docutils literal notranslate"><span class="pre">muGrid.Solvers.conjugate_gradients()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#device-selection">Device Selection</a><ul>
+<li><a class="reference internal" href="#device">Device</a><ul>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device"><code class="docutils literal notranslate"><span class="pre">muGrid.Device</span></code></a><ul>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.cpu"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.cpu()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.cuda"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.cuda()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.rocm"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.rocm()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.gpu"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.gpu()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.is_host"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.is_host()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.is_device"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.is_device()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.get_type"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.get_type()</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.Device.get_device_id"><code class="docutils literal notranslate"><span class="pre">muGrid.Device.get_device_id()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#devicetype">DeviceType</a><ul>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType"><code class="docutils literal notranslate"><span class="pre">muGrid.DeviceType</span></code></a><ul>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType.CPU"><code class="docutils literal notranslate"><span class="pre">muGrid.DeviceType.CPU</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType.CUDA"><code class="docutils literal notranslate"><span class="pre">muGrid.DeviceType.CUDA</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType.CUDAHost"><code class="docutils literal notranslate"><span class="pre">muGrid.DeviceType.CUDAHost</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType.ROCm"><code class="docutils literal notranslate"><span class="pre">muGrid.DeviceType.ROCm</span></code></a></li>
+<li><a class="reference internal" href="#muGrid.Solvers.muGrid.DeviceType.ROCmHost"><code class="docutils literal notranslate"><span class="pre">muGrid.DeviceType.ROCmHost</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -1596,9 +1991,10 @@ or if the Hessian is not positive definite.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=965b7f22"></script>
+</div><script src="_static/documentation_options.js?v=c6fabfb7"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>
 </html>

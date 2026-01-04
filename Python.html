@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Fast Fourier Transform" href="FFT.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Python Bindings - µGrid 0.101.1-18-ga136d8c3 documentation</title>
+        <title>Python Bindings - µGrid 0.101.1-85-g21f46807 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.101.1-18-ga136d8c3
+      <a href="index.html"><div class="brand">µGrid 0.101.1-85-g21f46807
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.101.1-18-ga136d8c3
+  <span class="sidebar-brand-text">µGrid 0.101.1-85-g21f46807
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -468,6 +468,7 @@ missing. This means we can represent a simple forward-differences gradient opera
 
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
+
     <span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">(</span><span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="p">)</span>
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
     <span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">()</span>
@@ -495,7 +496,9 @@ missing. This means we can represent a simple forward-differences gradient opera
 <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nx</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ny</span><span class="p">),</span> <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span><span class="p">)</span>
 <span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span>
 <span class="c1"># Padding to mimic periodic boundary (sine wave is also periodic)</span>
-<span class="n">nodal_field</span><span class="o">.</span><span class="n">pg</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wrap&quot;</span><span class="p">)</span>
+<span class="n">nodal_field</span><span class="o">.</span><span class="n">pg</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
+    <span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wrap&quot;</span>
+<span class="p">)</span>
 
 <span class="c1"># Derivative stencil of shape (2, quad, 2, 2)</span>
 <span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
@@ -510,21 +513,21 @@ missing. This means we can represent a simple forward-differences gradient opera
         <span class="p">],</span>
     <span class="p">],</span>
 <span class="p">)</span>
-<span class="n">op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">ConvolutionOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
 
 <span class="c1"># Apply the gradient operator to the nodal field and write result to the quad field</span>
 <span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="p">,</span> <span class="n">quad_field</span><span class="p">)</span>
 
 <span class="c1"># Check that the quadrature field has the correct derivative</span>
 <span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
-    <span class="c1"># Even though the quadrature point can have different locations, because the gradient</span>
-    <span class="c1"># stencil is linearly interpolating, it should compare against the analytic value</span>
-    <span class="c1"># evaluated at the middle of two grid points, hence (x + 0.5)</span>
-    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span>
+    <span class="c1"># Even though the quadrature point can have different locations, because the</span>
+    <span class="c1"># gradient stencil is linearly interpolating, it should compare against the</span>
+    <span class="c1"># analytic value evaluated at the middle of two grid points, hence (x + 0.5)</span>
+    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">)</span> <span class="o">/</span> <span class="n">nx</span><span class="p">,</span>
+    <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
-    <span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">0</span>
-<span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">quad_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -733,7 +736,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=965b7f22"></script>
+</div><script src="_static/documentation_options.js?v=c6fabfb7"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

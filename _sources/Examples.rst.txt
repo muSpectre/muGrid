@@ -87,7 +87,7 @@ We create this with a ``ConvolutionOperator``:
     ])
     stencil_offset = [-1, -1]  # Stencil origin relative to center
 
-    laplace_generic = muGrid.ConvolutionOperator(stencil_offset, stencil)
+    laplace_generic = muGrid.GenericLinearOperator(stencil_offset, stencil)
 
 **Hard-coded Laplacian operator:**
 
@@ -142,9 +142,9 @@ The conjugate gradient solver requires a function that applies the linear operat
     conjugate_gradients(
         comm,
         decomposition,
-        apply_laplacian,
         rhs,
         solution,
+        hessp=apply_laplacian,
         tol=1e-6,
         maxiter=1000,
     )
@@ -194,8 +194,8 @@ Here is the complete, minimal Poisson solver:
         laplace.apply(x, Ax)
 
     # Solve
-    conjugate_gradients(comm, decomposition, apply_laplacian, rhs, solution,
-                        tol=1e-6, maxiter=1000)
+    conjugate_gradients(comm, decomposition, rhs, solution,
+                        hessp=apply_laplacian, tol=1e-6, maxiter=1000)
 
     print(f"Solved! Solution range: [{solution.p.min():.4f}, {solution.p.max():.4f}]")
 
@@ -454,9 +454,9 @@ measure the resulting average stress:
     conjugate_gradients(
         comm,
         decomposition,
-        apply_stiffness,
         f_field,
         u_field,
+        hessp=apply_stiffness,
         tol=1e-6,
         maxiter=500,
     )
@@ -492,7 +492,7 @@ The ``ConvolutionOperator`` class accepts arbitrary stencils:
 
     # Any stencil shape and values
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    op = muGrid.ConvolutionOperator([-1, -1], stencil)
+    op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
 **Advantages:**
 
@@ -592,7 +592,7 @@ Example: comparing both approaches
 
     # Generic operator
     stencil = scale * np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    generic_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+    generic_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
     # Hard-coded operator
     hardcoded_op = muGrid.LaplaceOperator(2, scale)

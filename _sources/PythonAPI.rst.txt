@@ -17,7 +17,7 @@ Field collections manage groups of fields on structured grids.
 GlobalFieldCollection
 ---------------------
 
-.. py:class:: muGrid.GlobalFieldCollection(nb_grid_pts, nb_sub_pts=None, nb_ghosts_left=None, nb_ghosts_right=None, memory_location=None)
+.. py:class:: muGrid.GlobalFieldCollection(nb_grid_pts, nb_sub_pts=None, nb_ghosts_left=None, nb_ghosts_right=None, device=None)
 
    A GlobalFieldCollection manages a set of fields that share the same
    global grid structure. It can allocate fields in either host (CPU)
@@ -31,8 +31,9 @@ GlobalFieldCollection
    :type nb_ghosts_left: sequence of int, optional
    :param nb_ghosts_right: Ghost cells on high-index side. Default is no ghosts.
    :type nb_ghosts_right: sequence of int, optional
-   :param memory_location: Memory location for field data: ``"host"`` (CPU) or ``"device"`` (GPU). Default is ``"host"``.
-   :type memory_location: str, optional
+   :param device: Device for field allocation. Can be a string (``"cpu"``, ``"cuda"``, ``"cuda:N"``,
+      ``"rocm"``, ``"rocm:N"``) or a ``Device`` instance. Default is ``"cpu"``.
+   :type device: str or Device, optional
 
    **Example**::
 
@@ -41,7 +42,7 @@ GlobalFieldCollection
        >>> field.p[:] = 300.0  # Set temperature to 300K
 
        >>> # GPU field collection
-       >>> fc_gpu = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
+       >>> fc_gpu = muGrid.GlobalFieldCollection([64, 64], device="cuda")
 
    .. py:method:: real_field(name, components=(), sub_pt="pixel")
 
@@ -98,7 +99,7 @@ GlobalFieldCollection
 LocalFieldCollection
 --------------------
 
-.. py:class:: muGrid.LocalFieldCollection(spatial_dim, name="", nb_sub_pts=None, memory_location=None)
+.. py:class:: muGrid.LocalFieldCollection(spatial_dim, name="", nb_sub_pts=None, device=None)
 
    A LocalFieldCollection manages fields on a subset of pixels, typically
    used for material-specific data in heterogeneous simulations.
@@ -109,8 +110,9 @@ LocalFieldCollection
    :type name: str, optional
    :param nb_sub_pts: Number of sub-points per pixel for each sub-point type.
    :type nb_sub_pts: dict, optional
-   :param memory_location: Memory location: ``"host"`` or ``"device"``. Default is ``"host"``.
-   :type memory_location: str, optional
+   :param device: Device for field allocation. Can be a string (``"cpu"``, ``"cuda"``, ``"cuda:N"``,
+      ``"rocm"``, ``"rocm:N"``) or a ``Device`` instance. Default is ``"cpu"``.
+   :type device: str or Device, optional
 
    The field creation methods (``real_field``, ``complex_field``, ``int_field``, ``uint_field``)
    are the same as for ``GlobalFieldCollection``.
@@ -196,7 +198,7 @@ Classes for parallel domain decomposition with MPI.
 CartesianDecomposition
 ----------------------
 
-.. py:class:: muGrid.CartesianDecomposition(communicator, nb_domain_grid_pts, nb_subdivisions=None, nb_ghosts_left=None, nb_ghosts_right=None, nb_sub_pts=None, memory_location=None)
+.. py:class:: muGrid.CartesianDecomposition(communicator, nb_domain_grid_pts, nb_subdivisions=None, nb_ghosts_left=None, nb_ghosts_right=None, nb_sub_pts=None, device=None)
 
    CartesianDecomposition manages domain decomposition for MPI-parallel
    computations on structured grids, including ghost buffer regions for
@@ -214,8 +216,9 @@ CartesianDecomposition
    :type nb_ghosts_right: sequence of int, optional
    :param nb_sub_pts: Number of sub-points per pixel for each sub-point type.
    :type nb_sub_pts: dict, optional
-   :param memory_location: Memory location: ``"host"`` or ``"device"``. Default is ``"host"``.
-   :type memory_location: str, optional
+   :param device: Device for field allocation. Can be a string (``"cpu"``, ``"cuda"``, ``"cuda:N"``,
+      ``"rocm"``, ``"rocm:N"``) or a ``Device`` instance. Default is ``"cpu"``.
+   :type device: str or Device, optional
 
    **Example**::
 
@@ -224,6 +227,7 @@ CartesianDecomposition
        >>> decomp = CartesianDecomposition(
        ...     comm,
        ...     nb_domain_grid_pts=[128, 128],
+       ...     nb_subdivisions=[1, 1],
        ...     nb_ghosts_left=[1, 1],
        ...     nb_ghosts_right=[1, 1]
        ... )
@@ -289,7 +293,7 @@ Discrete operators for stencil-based computations.
 ConvolutionOperator
 -------------------
 
-.. py:class:: muGrid.ConvolutionOperator(offset, stencil)
+.. py:class:: muGrid.GenericLinearOperator(offset, stencil)
 
    Applies convolution (stencil) operations to fields. Useful for computing
    gradients, Laplacians, and other discrete differential operators.
@@ -304,7 +308,7 @@ ConvolutionOperator
        >>> # Create a 2D Laplacian stencil
        >>> import numpy as np
        >>> stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-       >>> laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+       >>> laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
        >>> laplace.apply(input_field, output_field)
 
    .. py:method:: apply(nodal_field, quadrature_point_field)
@@ -437,6 +441,88 @@ FEMGradientOperator
       :type nodal_field: Field
       :param weights: Weights for the transpose operation.
       :type weights: sequence of float, optional
+
+IsotropicStiffnessOperator
+--------------------------
+
+.. py:class:: muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+              muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+
+   Fused stiffness operators for isotropic linear elastic materials.
+
+   These operators compute ``K @ u = B^T C B @ u`` for linear finite elements
+   without storing the full stiffness matrix. Instead, they exploit the
+   isotropic material structure:
+
+   .. math::
+
+      K = 2\mu G + \lambda V
+
+   where G and V are geometry-only matrices (same for all voxels) and
+   λ, μ are the Lamé parameters which can vary spatially.
+
+   This reduces memory from O(N × 24²) for full K storage to O(N × 2)
+   for spatially-varying isotropic materials, plus O(1) for the shared
+   geometry matrices.
+
+   :param grid_spacing: Grid spacing in each direction ``[hx, hy]`` (2D) or ``[hx, hy, hz]`` (3D).
+   :type grid_spacing: sequence of float
+
+   **Example**::
+
+       >>> import numpy as np
+       >>> import muGrid
+       >>>
+       >>> # Create 3D operator
+       >>> stiffness = muGrid.IsotropicStiffnessOperator3D([0.1, 0.1, 0.1])
+       >>>
+       >>> # Setup fields (displacement at nodes, materials at elements)
+       >>> fc = muGrid.CartesianDecomposition(
+       ...     muGrid.Communicator(),
+       ...     nb_domain_grid_pts=[32, 32, 32],
+       ...     nb_ghosts_left=[1, 1, 1],
+       ...     nb_ghosts_right=[1, 1, 1],
+       ... )
+       >>> u = fc.real_field("displacement", (3,))
+       >>> f = fc.real_field("force", (3,))
+       >>>
+       >>> # Material parameters (one fewer element in each direction)
+       >>> lam = fc.real_field("lambda")  # Lamé first parameter
+       >>> mu = fc.real_field("mu")       # Shear modulus
+       >>> lam.p[...] = 1.0  # Uniform material
+       >>> mu.p[...] = 1.0
+       >>>
+       >>> # Apply stiffness: f = K @ u
+       >>> fc.communicate_ghosts(u)
+       >>> stiffness.apply(u, lam, mu, f)
+
+   .. py:method:: apply(displacement, lam, mu, force)
+
+      Apply the stiffness operator: ``force = K @ displacement``.
+
+      :param displacement: Input displacement field at nodal points.
+      :type displacement: Field
+      :param lam: Lamé first parameter field at element centers.
+      :type lam: Field
+      :param mu: Shear modulus field at element centers.
+      :type mu: Field
+      :param force: Output force field at nodal points.
+      :type force: Field
+
+   .. py:method:: apply_increment(displacement, lam, mu, alpha, force)
+
+      Apply stiffness and add scaled result: ``force += alpha * K @ displacement``.
+
+      :param displacement: Input displacement field at nodal points.
+      :type displacement: Field
+      :param lam: Lamé first parameter field at element centers.
+      :type lam: Field
+      :param mu: Shear modulus field at element centers.
+      :type mu: Field
+      :param alpha: Scaling factor.
+      :type alpha: float
+      :param force: Output force field at nodal points (updated in-place).
+      :type force: Field
 
 FFT Engine
 **********
@@ -689,26 +775,62 @@ Utilities
 Timer
 -----
 
-.. py:class:: muGrid.Timer(name="")
+.. py:class:: muGrid.Timer()
 
-   Timer utility for performance measurement.
+   Hierarchical timer utility for performance measurement with context manager support.
 
-   :param name: Name for the timer. Default is ``""``.
-   :type name: str, optional
+   The Timer supports nested timing regions and can be used as a context manager
+   for convenient timing of code blocks.
 
-   .. py:method:: start()
+   **Example**::
 
-      Start the timer.
+       >>> timer = muGrid.Timer()
+       >>> with timer("outer"):
+       ...     with timer("inner"):
+       ...         # ... some computation ...
+       ...         pass
+       >>> timer.print_summary()
+       Timer Summary:
+         outer: 0.1234s (1 calls)
+           inner: 0.0567s (1 calls)
 
-   .. py:method:: stop()
+   .. py:method:: __call__(name)
 
-      Stop the timer.
+      Context manager for timing a named code block.
 
-   .. py:method:: elapsed()
+      :param name: Name of the timing region.
+      :type name: str
+      :returns: Context manager that times the enclosed block.
 
-      Return elapsed time in seconds.
+   .. py:method:: get_time(name)
 
+      Get total elapsed time for a timing region.
+
+      :param name: Name of the timing region (use ``"/"`` for nested regions,
+         e.g., ``"outer/inner"``).
+      :type name: str
+      :returns: Total elapsed time in seconds.
       :rtype: float
+
+   .. py:method:: get_calls(name)
+
+      Get the number of times a timing region was entered.
+
+      :param name: Name of the timing region.
+      :type name: str
+      :returns: Number of calls.
+      :rtype: int
+
+   .. py:method:: print_summary()
+
+      Print a formatted summary of all timing regions.
+
+   .. py:method:: to_dict()
+
+      Export timer data as a dictionary (useful for JSON serialization).
+
+      :returns: Dictionary with timing data.
+      :rtype: dict
 
 Solvers
 -------
@@ -717,7 +839,7 @@ Solvers
 
 The Solvers module provides simple parallel iterative solvers.
 
-.. py:function:: muGrid.Solvers.conjugate_gradients(comm, fc, hessp, b, x, tol=1e-6, maxiter=1000, callback=None)
+.. py:function:: muGrid.Solvers.conjugate_gradients(comm, fc, b, x, hessp, tol=1e-6, maxiter=1000, callback=None, timer=None)
 
    Conjugate gradient method for matrix-free solution of the linear problem
    ``Ax = b``, where ``A`` is represented by the function ``hessp`` (which computes the
@@ -729,24 +851,156 @@ The Solvers module provides simple parallel iterative solvers.
    :type comm: muGrid.Communicator
    :param fc: Collection for creating temporary fields used by the CG algorithm.
    :type fc: muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or muGrid.CartesianDecomposition
-   :param hessp: Function that computes the product of the Hessian matrix ``A`` with a vector.
-      Signature: ``hessp(input_field, output_field)`` where both are ``muGrid.Field``.
-   :type hessp: callable
    :param b: Right-hand side vector.
    :type b: muGrid.Field
    :param x: Initial guess for the solution (modified in place).
    :type x: muGrid.Field
+   :param hessp: Function that computes the product of the Hessian matrix ``A`` with a vector.
+      Signature: ``hessp(input_field, output_field)`` where both are ``muGrid.Field``.
+   :type hessp: callable
    :param tol: Tolerance for convergence. Default is ``1e-6``.
    :type tol: float, optional
    :param maxiter: Maximum number of iterations. Default is ``1000``.
    :type maxiter: int, optional
    :param callback: Function to call after each iteration with signature:
-      ``callback(iteration, x_array, residual_array, search_direction_array)``.
+      ``callback(iteration, state_dict)`` where ``state_dict`` contains keys
+      ``"x"``, ``"r"``, ``"p"``, and ``"rr"`` (squared residual norm).
    :type callback: callable, optional
+   :param timer: Timer object for performance profiling. If provided, the solver
+      will record timing for various operations (hessp, dot products, updates).
+   :type timer: muGrid.Timer, optional
    :returns: Solution to the system ``Ax = b`` (same as input field ``x``).
    :rtype: muGrid.Field
    :raises RuntimeError: If the algorithm does not converge within ``maxiter`` iterations,
       or if the Hessian is not positive definite.
+
+Device Selection
+****************
+
+The ``Device`` class and ``DeviceType`` enum provide a Pythonic way to specify
+where field data should be allocated.
+
+Device
+------
+
+.. py:class:: muGrid.Device
+
+   Represents a compute device (CPU or GPU) for field allocation.
+
+   Factory methods provide convenient construction:
+
+   .. py:staticmethod:: cpu()
+
+      Create a CPU device.
+
+      :returns: A Device representing the CPU.
+      :rtype: Device
+
+   .. py:staticmethod:: cuda(device_id=0)
+
+      Create a CUDA GPU device.
+
+      :param device_id: GPU device ID. Default is 0.
+      :type device_id: int, optional
+      :returns: A Device representing a CUDA GPU.
+      :rtype: Device
+
+   .. py:staticmethod:: rocm(device_id=0)
+
+      Create a ROCm GPU device.
+
+      :param device_id: GPU device ID. Default is 0.
+      :type device_id: int, optional
+      :returns: A Device representing a ROCm GPU.
+      :rtype: Device
+
+   .. py:staticmethod:: gpu(device_id=0)
+
+      Create a GPU device using the default backend.
+
+      Automatically selects the available GPU backend:
+
+      - Returns CUDA device if CUDA is available
+      - Returns ROCm device if ROCm is available (and CUDA is not)
+      - Returns CPU device if no GPU backend is available
+
+      This is the recommended way to request GPU execution without
+      hard-coding a specific backend.
+
+      :param device_id: GPU device ID. Default is 0.
+      :type device_id: int, optional
+      :returns: A Device for the default GPU backend.
+      :rtype: Device
+
+   .. py:method:: is_host()
+
+      Check if this is a host (CPU) device.
+
+      :returns: ``True`` if CPU device, ``False`` otherwise.
+      :rtype: bool
+
+   .. py:method:: is_device()
+
+      Check if this is a device (GPU) memory location.
+
+      :returns: ``True`` if GPU device, ``False`` otherwise.
+      :rtype: bool
+
+   .. py:method:: get_type()
+
+      Get the device type.
+
+      :returns: The device type enum value.
+      :rtype: DeviceType
+
+   .. py:method:: get_device_id()
+
+      Get the device ID for multi-GPU systems.
+
+      :returns: Device ID (0 for single-GPU or CPU).
+      :rtype: int
+
+   **Example**::
+
+       >>> import muGrid
+       >>> # Create devices
+       >>> cpu = muGrid.Device.cpu()
+       >>> gpu0 = muGrid.Device.cuda()
+       >>> gpu1 = muGrid.Device.cuda(1)
+       >>> # Check device type
+       >>> cpu.is_host()
+       True
+       >>> gpu0.is_device()
+       True
+       >>> # Use with field collections
+       >>> fc = muGrid.GlobalFieldCollection([64, 64], device=muGrid.Device.cuda())
+
+DeviceType
+----------
+
+.. py:class:: muGrid.DeviceType
+
+   Enumeration for device types. Values follow DLPack conventions.
+
+   .. py:attribute:: CPU
+
+      CPU device (value 1).
+
+   .. py:attribute:: CUDA
+
+      NVIDIA CUDA GPU device (value 2).
+
+   .. py:attribute:: CUDAHost
+
+      CUDA pinned host memory (value 3).
+
+   .. py:attribute:: ROCm
+
+      AMD ROCm GPU device (value 10).
+
+   .. py:attribute:: ROCmHost
+
+      ROCm pinned host memory (value 11).
 
 Enumerations
 ************

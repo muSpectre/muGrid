@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Examples" href="Examples.html"><link rel="prev" title="Fast Fourier Transform" href="FFT.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>GPU Computing - µGrid 0.101.1-18-ga136d8c3 documentation</title>
+        <title>GPU Computing - µGrid 0.101.1-85-g21f46807 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.101.1-18-ga136d8c3
+      <a href="index.html"><div class="brand">µGrid 0.101.1-85-g21f46807
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.101.1-18-ga136d8c3
+  <span class="sidebar-brand-text">µGrid 0.101.1-85-g21f46807
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -294,18 +294,31 @@ pip<span class="w"> </span>install<span class="w"> </span>cupy-rocm-5-0<span cla
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">has_gpu</span></code> flag is <code class="docutils literal notranslate"><span class="pre">True</span></code> if either CUDA or ROCm support is available.</p>
 </section>
-<section id="memory-locations">
-<h2>Memory locations<a class="headerlink" href="#memory-locations" title="Link to this heading">¶</a></h2>
-<p>Field collections can be created with a specific memory location using a string:</p>
+<section id="device-selection">
+<h2>Device selection<a class="headerlink" href="#device-selection" title="Link to this heading">¶</a></h2>
+<p>Field collections can be created on a specific device using the <code class="docutils literal notranslate"><span class="pre">device</span></code> parameter.
+The device can be specified as a simple string or as a <code class="docutils literal notranslate"><span class="pre">Device</span></code> object:</p>
+<p>String values:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code>: Allocate fields in CPU memory (default)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;device&quot;</span></code>: Allocate fields in GPU memory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;cpu&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;host&quot;</span></code>: Allocate fields in CPU memory (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;gpu&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;device&quot;</span></code>: Allocate on default GPU (auto-detects CUDA or ROCm)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;gpu:N&quot;</span></code>: Allocate on default GPU with device ID N</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;cuda&quot;</span></code>: Allocate fields on CUDA GPU (device 0)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;cuda:N&quot;</span></code>: Allocate on CUDA GPU with device ID N</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;rocm&quot;</span></code>: Allocate on ROCm GPU (device 0)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;rocm:N&quot;</span></code>: Allocate on ROCm GPU with device ID N</p></li>
 </ul>
 <p>Here is an example of creating a field collection on the GPU:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
-<span class="c1"># Create a GPU field collection</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
+<span class="c1"># Create a GPU field collection using auto-detection (recommended)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;gpu&quot;</span><span class="p">)</span>
+
+<span class="c1"># Or explicitly specify CUDA</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+
+<span class="c1"># Or using Device object for auto-detection</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">muGrid</span><span class="o">.</span><span class="n">Device</span><span class="o">.</span><span class="n">gpu</span><span class="p">())</span>
 
 <span class="c1"># Create a field on the GPU</span>
 <span class="n">field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;my_field&quot;</span><span class="p">)</span>
@@ -328,7 +341,7 @@ API for GPU arrays:</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
 
 <span class="c1"># Create GPU field collection</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create fields</span>
 <span class="n">field_a</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">)</span>
@@ -349,8 +362,8 @@ In the above example, execute the sum with:</p>
 </pre></div>
 </div>
 <p>This may not always be possible. In this case, it may be useful to either import
-<cite>numpy</cite> or <cite>scipy</cite> under the same module alias:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">memory</span> <span class="o">==</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span>
+<cite>numpy</cite> or <cite>cupy</cite> under the same module alias:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="s2">&quot;cpu&quot;</span><span class="p">:</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xp</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xp</span>
@@ -371,7 +384,7 @@ data exchange between the C++ library and Python. This means:</p>
 <section id="cartesiandecomposition-with-gpu">
 <h2>CartesianDecomposition with GPU<a class="headerlink" href="#cartesiandecomposition-with-gpu" title="Link to this heading">¶</a></h2>
 <p>When using domain decomposition with <code class="docutils literal notranslate"><span class="pre">CartesianDecomposition</span></code>, you can also
-specify the memory location:</p>
+specify the device:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
 <span class="c1"># Create communicator (serial or MPI)</span>
@@ -381,13 +394,14 @@ specify the memory location:</p>
 <span class="n">decomp</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
     <span class="n">comm</span><span class="p">,</span>
     <span class="n">nb_domain_grid_pts</span><span class="o">=</span><span class="p">[</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">],</span>
+    <span class="n">nb_subdivisions</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
     <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
     <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
-    <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span>
 <span class="p">)</span>
 
-<span class="c1"># Create GPU field using real_field helper</span>
-<span class="n">field</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="n">decomp</span><span class="p">,</span> <span class="s2">&quot;gpu_field&quot;</span><span class="p">)</span>
+<span class="c1"># Create GPU field</span>
+<span class="n">field</span> <span class="o">=</span> <span class="n">decomp</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;gpu_field&quot;</span><span class="p">)</span>
 
 <span class="c1"># Access coordinates (returned as CuPy arrays on GPU)</span>
 <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">decomp</span><span class="o">.</span><span class="n">coords</span>
@@ -407,11 +421,11 @@ on the GPU when both input and output fields are on the GPU:</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
 
 <span class="c1"># Create GPU field collection</span>
-<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">memory_location</span><span class="o">=</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create Laplacian stencil (defined on CPU as numpy array)</span>
 <span class="n">stencil</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
-<span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">ConvolutionOperator</span><span class="p">([</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">stencil</span><span class="p">)</span>
+<span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">stencil</span><span class="p">)</span>
 
 <span class="c1"># Create fields</span>
 <span class="n">input_field</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
@@ -497,7 +511,7 @@ outweigh the benefits of GPU computation.</p>
 <li><a class="reference internal" href="#building-with-gpu-support">Building with GPU support</a></li>
 <li><a class="reference internal" href="#installing-cupy">Installing CuPy</a></li>
 <li><a class="reference internal" href="#checking-gpu-availability">Checking GPU availability</a></li>
-<li><a class="reference internal" href="#memory-locations">Memory locations</a></li>
+<li><a class="reference internal" href="#device-selection">Device selection</a></li>
 <li><a class="reference internal" href="#working-with-gpu-arrays">Working with GPU arrays</a></li>
 <li><a class="reference internal" href="#zero-copy-data-exchange">Zero-copy data exchange</a></li>
 <li><a class="reference internal" href="#cartesiandecomposition-with-gpu">CartesianDecomposition with GPU</a></li>
@@ -514,7 +528,7 @@ outweigh the benefits of GPU computation.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=965b7f22"></script>
+</div><script src="_static/documentation_options.js?v=c6fabfb7"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
