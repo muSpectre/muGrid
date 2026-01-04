@@ -101,37 +101,37 @@ jobs:
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Poisson 2D on HOST ==="
-          python3 examples/poisson.py -n 32,32 -m host -s hardcoded -q
+          python3 examples/poisson.py -n 32,32 -d cpu -k hardcoded -q
           echo ""
           echo "=== Poisson 3D on HOST ==="
-          python3 examples/poisson.py -n 16,16,16 -m host -s hardcoded -q
+          python3 examples/poisson.py -n 16,16,16 -d cpu -k hardcoded -q
 
       - name: Run Poisson example (device)
         run: |
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Poisson 2D on DEVICE (GPU) ==="
-          python3 examples/poisson.py -n 32,32 -m device -s hardcoded -q
+          python3 examples/poisson.py -n 32,32 -d gpu -k hardcoded -q
           echo ""
           echo "=== Poisson 3D on DEVICE (GPU) ==="
-          python3 examples/poisson.py -n 16,16,16 -m device -s hardcoded -q
+          python3 examples/poisson.py -n 16,16,16 -d gpu -k hardcoded -q
 
       - name: Run Homogenization example (host)
         run: |
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Homogenization 2D on HOST ==="
-          python3 examples/homogenization.py -n 16,16 -m host -q
+          python3 examples/homogenization.py -n 16,16 -d cpu -q
           echo ""
           echo "=== Homogenization 3D on HOST ==="
-          python3 examples/homogenization.py -n 8,8,8 -m host -q
+          python3 examples/homogenization.py -n 8,8,8 -d cpu -q
 
       - name: Run Homogenization example (device)
         run: |
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           echo "=== Homogenization 2D on DEVICE (GPU) ==="
-          python3 examples/homogenization.py -n 16,16 -m device -q
+          python3 examples/homogenization.py -n 16,16 -d gpu -q
           echo ""
           echo "=== Homogenization 3D on DEVICE (GPU) ==="
-          python3 examples/homogenization.py -n 8,8,8 -m device -q
+          python3 examples/homogenization.py -n 8,8,8 -d gpu -q
