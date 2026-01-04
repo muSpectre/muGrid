@@ -1,11 +1,11 @@
 /**
- * @file   laplace_operator.hh
+ * @file   laplace_operator_3d.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   24 Dec 2024
+ * @date   01 Jan 2026
  *
- * @brief  Hard-coded Laplace operator with optimized stencil implementation
+ * @brief  Hard-coded 3D Laplace operator with optimized stencil implementation
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -33,13 +33,13 @@
  *
  */
 
-#ifndef SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_HH_
-#define SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_HH_
+#ifndef SRC_LIBMUGRID_OPERATORS_LAPLACE_3D_HH_
+#define SRC_LIBMUGRID_OPERATORS_LAPLACE_3D_HH_
 
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
-#include "operators/convolution_operator_base.hh"
+#include "operators/linear.hh"
 
 namespace muGrid {
 
@@ -47,20 +47,18 @@ namespace muGrid {
     class GlobalFieldCollection;
 
     /**
-     * @class LaplaceOperator
-     * @brief Hard-coded Laplace operator with optimized stencil implementation.
+     * @class LaplaceOperator3D
+     * @brief Hard-coded 3D Laplace operator with optimized 7-point stencil.
      *
-     * This class provides optimized implementations of the discrete Laplace
-     * operator using:
-     * - 5-point stencil for 2D grids: [0,1,0; 1,-4,1; 0,1,0]
-     * - 7-point stencil for 3D grids: center=-6, neighbors=+1
+     * This class provides an optimized implementation of the discrete Laplace
+     * operator using a 7-point stencil for 3D grids: center=-6, neighbors=+1
      *
      * The output is multiplied by a scale factor, which can be used to
      * incorporate grid spacing and sign conventions (e.g., for making
      * the operator positive-definite for use with CG solvers).
      *
-     * This operator inherits from ConvolutionOperatorBase and can be used
-     * interchangeably with the generic ConvolutionOperator. The hard-coded
+     * This operator inherits from GradientOperator and can be used
+     * interchangeably with other gradient operators. The hard-coded
      * implementation provides significantly better performance (~3-10x) due
      * to compile-time known memory access patterns that enable SIMD
      * vectorization.
@@ -68,40 +66,41 @@ namespace muGrid {
      * Since the Laplacian is self-adjoint (symmetric), the transpose operation
      * is identical to the forward apply operation.
      */
-    class LaplaceOperator : public ConvolutionOperatorBase {
+    class LaplaceOperator3D : public LinearOperator {
     public:
-        using Parent = ConvolutionOperatorBase;
+        using Parent = LinearOperator;
+
+        //! Number of stencil points (compile-time constant for 3D)
+        static constexpr Index_t NB_STENCIL_PTS = 7;
 
         /**
-         * @brief Construct a Laplace operator for the given dimension.
-         * @param spatial_dim Spatial dimension (2 or 3)
+         * @brief Construct a 3D Laplace operator.
          * @param scale Scale factor applied to the output (default: 1.0)
          */
-        explicit LaplaceOperator(Index_t spatial_dim, Real scale = 1.0);
+        explicit LaplaceOperator3D(Real scale = 1.0);
 
         //! Default constructor is deleted
-        LaplaceOperator() = delete;
+        LaplaceOperator3D() = delete;
 
         //! Copy constructor is deleted
-        LaplaceOperator(const LaplaceOperator &other) = delete;
+        LaplaceOperator3D(const LaplaceOperator3D &other) = delete;
 
         //! Move constructor
-        LaplaceOperator(LaplaceOperator &&other) = default;
+        LaplaceOperator3D(LaplaceOperator3D &&other) = default;
 
         //! Destructor
-        ~LaplaceOperator() override = default;
+        ~LaplaceOperator3D() override = default;
 
         //! Copy assignment operator is deleted
-        LaplaceOperator &operator=(const LaplaceOperator &other) = delete;
+        LaplaceOperator3D &operator=(const LaplaceOperator3D &other) = delete;
 
         //! Move assignment operator
-        LaplaceOperator &operator=(LaplaceOperator &&other) = default;
+        LaplaceOperator3D &operator=(LaplaceOperator3D &&other) = default;
 
         /**
          * @brief Apply the Laplace operator on host memory fields.
          *
-         * Computes output = scale * Laplace(input) using the appropriate stencil
-         * (5-point for 2D, 7-point for 3D).
+         * Computes output = scale * Laplace(input) using the 7-point stencil.
          *
          * @param input_field Input field (with ghost layers populated)
          * @param output_field Output field
@@ -171,10 +170,10 @@ namespace muGrid {
 #endif
 
         /**
-         * @brief Get the number of operators (always 1 for Laplacian).
+         * @brief Get the number of output components (always 1 for Laplacian).
          * @return 1
          */
-        Index_t get_nb_operators() const override { return 1; }
+        Index_t get_nb_output_components() const override { return 1; }
 
         /**
          * @brief Get the number of quadrature points (always 1 for Laplacian).
@@ -183,24 +182,22 @@ namespace muGrid {
         Index_t get_nb_quad_pts() const override { return 1; }
 
         /**
-         * @brief Get the number of nodal points (always 1 for Laplacian).
+         * @brief Get the number of input components (always 1 for Laplacian).
          * @return 1
          */
-        Index_t get_nb_nodal_pts() const override { return 1; }
+        Index_t get_nb_input_components() const override { return 1; }
 
         /**
          * @brief Get the spatial dimension.
-         * @return Spatial dimension (2 or 3)
+         * @return 3
          */
-        Dim_t get_spatial_dim() const override { return spatial_dim; }
+        Dim_t get_spatial_dim() const override { return 3; }
 
         /**
          * @brief Get the number of stencil points.
-         * @return Number of stencil points (5 for 2D, 7 for 3D)
+         * @return 7
          */
-        Index_t get_nb_stencil_pts() const {
-            return spatial_dim == 2 ? 5 : 7;
-        }
+        Index_t get_nb_stencil_pts() const { return NB_STENCIL_PTS; }
 
         /**
          * @brief Get the scale factor.
@@ -210,49 +207,37 @@ namespace muGrid {
 
         /**
          * @brief Get the stencil offset.
-         * @return Stencil offset in pixels (centered: [-1,-1] for 2D, [-1,-1,-1] for 3D)
+         * @return Stencil offset in pixels (centered: [-1,-1,-1])
          */
-        Shape_t get_pixel_offset() const {
-            return Shape_t(spatial_dim, -1);
-        }
+        Shape_t get_offset() const { return Shape_t{-1, -1, -1}; }
 
         /**
          * @brief Get the stencil shape.
-         * @return Shape of the stencil ([3,3] for 2D, [3,3,3] for 3D)
+         * @return Shape of the stencil ([3,3,3])
          */
-        Shape_t get_conv_pts_shape() const {
-            return Shape_t(spatial_dim, 3);
-        }
+        Shape_t get_stencil_shape() const { return Shape_t{3, 3, 3}; }
 
         /**
          * @brief Get the stencil coefficients in reshaped form.
          * @return Vector of stencil coefficients
          *
-         * For 2D: [0, 1, 0, 1, -4, 1, 0, 1, 0] * scale
-         * For 3D: 7-point stencil with center=-6*scale, neighbors=1*scale
+         * Returns 7-point stencil with center=-6*scale, neighbors=1*scale
          */
-        std::vector<Real> get_pixel_operator() const {
-            if (spatial_dim == 2) {
-                return {0.0, scale, 0.0,
-                        scale, -4.0*scale, scale,
-                        0.0, scale, 0.0};
-            } else {  // 3D
-                std::vector<Real> stencil(27, 0.0);
-                // Center point at [1,1,1] = index 13
-                stencil[13] = -6.0 * scale;
-                // 6 neighbors
-                stencil[13-1] = scale;   // [1,1,0]
-                stencil[13+1] = scale;   // [1,1,2]
-                stencil[13-3] = scale;   // [1,0,1]
-                stencil[13+3] = scale;   // [1,2,1]
-                stencil[13-9] = scale;   // [0,1,1]
-                stencil[13+9] = scale;   // [2,1,1]
-                return stencil;
-            }
+        std::vector<Real> get_coefficients() const {
+            std::vector<Real> stencil(27, 0.0);
+            // Center point at [1,1,1] = index 13
+            stencil[13] = -6.0 * scale;
+            // 6 neighbors
+            stencil[13-1] = scale;   // [1,1,0]
+            stencil[13+1] = scale;   // [1,1,2]
+            stencil[13-3] = scale;   // [1,0,1]
+            stencil[13+3] = scale;   // [1,2,1]
+            stencil[13-9] = scale;   // [0,1,1]
+            stencil[13+9] = scale;   // [2,1,1]
+            return stencil;
         }
 
     private:
-        Index_t spatial_dim;
         Real scale;
 
         /**
@@ -293,30 +278,6 @@ namespace muGrid {
     namespace laplace_kernels {
 
         /**
-         * @brief Apply 5-point 2D Laplace stencil on host.
-         *
-         * Stencil: scale * [0, 1, 0]
-         *                  [1,-4, 1]
-         *                  [0, 1, 0]
-         *
-         * @param input Input array
-         * @param output Output array
-         * @param nx Grid size in x (including ghosts)
-         * @param ny Grid size in y (including ghosts)
-         * @param stride_x Stride in x direction
-         * @param stride_y Stride in y direction
-         * @param scale Scale factor
-         * @param increment If true, add to output; if false, overwrite
-         */
-        void laplace_2d_host(
-            const Real* MUGRID_RESTRICT input,
-            Real* MUGRID_RESTRICT output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale,
-            bool increment = false);
-
-        /**
          * @brief Apply 7-point 3D Laplace stencil on host.
          *
          * Stencil: scale * (center = -6, each of 6 neighbors = +1)
@@ -342,17 +303,6 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA)
         /**
-         * @brief Apply 2D Laplace stencil on CUDA device.
-         */
-        void laplace_2d_cuda(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale,
-            bool increment = false);
-
-        /**
          * @brief Apply 3D Laplace stencil on CUDA device.
          */
         void laplace_3d_cuda(
@@ -365,17 +315,6 @@ namespace muGrid {
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-        /**
-         * @brief Apply 2D Laplace stencil on HIP device.
-         */
-        void laplace_2d_hip(
-            const Real* input,
-            Real* output,
-            Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y,
-            Real scale,
-            bool increment = false);
-
         /**
          * @brief Apply 3D Laplace stencil on HIP device.
          */
@@ -392,4 +331,4 @@ namespace muGrid {
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_OPERATORS_LAPLACE_OPERATOR_HH_
+#endif  // SRC_LIBMUGRID_OPERATORS_LAPLACE_3D_HH_

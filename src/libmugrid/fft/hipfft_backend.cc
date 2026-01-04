@@ -1,9 +1,9 @@
 /**
- * @file   fft/hipfft_backend.cpp
+ * @file   fft/hipfft_backend.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   19 Dec 2024
+ * @date   19 Dec 2025
  *
  * @brief  hipFFT implementation of FFT1DBackend for AMD GPUs
  *

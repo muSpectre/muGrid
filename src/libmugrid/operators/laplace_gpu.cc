@@ -1,9 +1,9 @@
 /**
- * @file   laplace_operator_gpu.cpp
+ * @file   laplace_operator_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   25 Dec 2024
+ * @date   25 Dec 2025
  *
  * @brief  Unified CUDA/HIP implementation of hard-coded Laplace operator
  *
@@ -37,19 +37,25 @@
  *
  */
 
-#include "laplace_operator.hh"
+#include "core/types.hh"
+
+#include <vector>
 
 // Unified GPU abstraction macros
 #if defined(MUGRID_ENABLE_CUDA)
     #include <cuda_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
         kernel<<<grid, block>>>(__VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() cudaDeviceSynchronize()
+    #define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...) \
+        kernel<<<grid, block, shmem>>>(__VA_ARGS__)
+    #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
 #elif defined(MUGRID_ENABLE_HIP)
     #include <hip/hip_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
         hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() hipDeviceSynchronize()
+    #define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...) \
+        hipLaunchKernelGGL(kernel, grid, block, shmem, 0, __VA_ARGS__)
+    #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
 #endif
 
 namespace muGrid {

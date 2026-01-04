@@ -86,15 +86,6 @@ def test_bcast_1():
     assert res == comm.size
 
 
-# TODO(RLeute): I think we need such a test
-# def test_get_comm():
-#     # test if the function get comm works and returns the mpi communicator
-#     from mpi4py import MPI
-#     mpi_communicator = MPI.COMM_WORLD
-#     comm = muGrid.Communicator(mpi_communicator)
-#     self.assertEqual(comm.mpi_comm, mpi_communicator)
-
-
 @pytest.mark.skipif(not muGrid.has_mpi, reason="muFFT was compiled without MPI support")
 def test_bcast_2():
     try:

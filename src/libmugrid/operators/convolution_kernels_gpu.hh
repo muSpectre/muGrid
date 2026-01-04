@@ -1,5 +1,5 @@
 /**
- * @file   convolution_kernels_gpu.hpp
+ * @file   convolution_kernels_gpu.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *

@@ -17,7 +17,8 @@ After solving, the homogenized stress is computed as:
     Σ = (1/|Ω|) ∫ C : (E_macro + ε(u)) dΩ
 
 For a 2D problem, we compute all 3 independent stiffness components (xx, yy, xy).
-For a 3D problem, we compute all 6 independent stiffness components (xx, yy, zz, yz, xz, xy).
+For a 3D problem, we compute all 6 independent stiffness components
+  (xx, yy, zz, yz, xz, xy).
 """
 
 import argparse
@@ -44,6 +45,7 @@ except ImportError:
 # Voigt notation mappings
 # 2D: [xx, yy, xy] -> indices 0, 1, 2
 # 3D: [xx, yy, zz, yz, xz, xy] -> indices 0, 1, 2, 3, 4, 5
+
 
 def voigt_index_2d(i, j):
     """Convert 2D tensor indices to Voigt notation index."""
@@ -168,17 +170,18 @@ parser.add_argument(
     help="Grid points as nx,ny or nx,ny,nz (default: 16,16)",
 )
 
-_memory_locations = {
-    "host": muGrid.GlobalFieldCollection.MemoryLocation.Host,
-    "device": muGrid.GlobalFieldCollection.MemoryLocation.Device,
+_devices = {
+    "cpu": muGrid.Device.cpu(),
+    "gpu": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
 }
 
 parser.add_argument(
-    "-m",
-    "--memory",
-    choices=_memory_locations,
-    default="host",
-    help="Memory space for allocation (default: host)",
+    "-d",
+    "--device",
+    choices=_devices,
+    default="cpu",
+    help="Device for computation: 'cpu' or 'gpu' (auto-detect CUDA/ROCm) "
+    "(default: cpu)",
 )
 
 parser.add_argument(
@@ -253,9 +256,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--papi",
-    action="store_true",
-    help="Use PAPI hardware counters for performance measurement (requires pypapi)",
+    "-k",
+    "--kernel",
+    choices=["fused", "generic"],
+    default="fused",
+    help="Kernel implementation: 'fused' (IsotropicStiffnessOperator) or "
+    "'generic' (gradient/stress/divergence) (default: fused)",
 )
 
 args = parser.parse_args()
@@ -265,12 +271,12 @@ if args.json:
     args.quiet = True
 
 # Select array library based on memory location
-if args.memory == "host":
+if args.device == "cpu":
     import numpy as arr
 else:
     import cupy as arr
 
-memory_location = _memory_locations[args.memory]
+device = _devices[args.device]
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
@@ -293,21 +299,26 @@ else:
 # Create the FEM gradient operator first to get accurate quadrature info
 gradient_op = muGrid.FEMGradientOperator(dim, list(grid_spacing))
 
-# Number of quadrature points and nodal points from the operator
+# Number of quadrature points from the operator
+# Number of nodes per element: 4 for 2D (corners of pixel), 8 for 3D (corners of voxel)
 nb_quad = gradient_op.nb_quad_pts
-nb_nodes = gradient_op.nb_nodal_pts
+nb_nodes = 2**dim
 
 # Quadrature weights (area/volume of each element)
-quad_weights = np.array(gradient_op.get_quadrature_weights())
+quad_weights = np.array(gradient_op.quadrature_weights)
 
 # Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
-# CartesianDecomposition handles ghost communication for both serial and MPI parallel execution.
+# CartesianDecomposition handles ghost communication for both serial and
+# MPI parallel execution.
 #
 # We use ghosts on BOTH sides (left and right). This approach means:
-# - Ghost elements on the left boundary provide contributions to interior nodes directly
-# - Ghost elements on the right boundary provide contributions to interior nodes directly
-# - No ghost reduction is needed since interior nodes receive all contributions directly
+# - Ghost elements on the left boundary provide contributions to interior nodes
+#   directly
+# - Ghost elements on the right boundary provide contributions to interior nodes
+#   directly
+# - No ghost reduction is needed since interior nodes receive all contributions
+#   directly
 # - The trade-off is slightly more memory and computation in ghost regions
 decomposition = muGrid.CartesianDecomposition(
     comm,
@@ -316,7 +327,7 @@ decomposition = muGrid.CartesianDecomposition(
     nb_ghosts_left=(1,) * dim,
     nb_ghosts_right=(1,) * dim,
     nb_sub_pts={"quad": nb_quad},  # Use actual quad count from operator
-    memory_location=memory_location,
+    device=device,
 )
 
 # Get local grid dimensions
@@ -342,7 +353,7 @@ if comm.rank == 0 and not args.quiet:
     print(f"Grid size: {args.nb_grid_pts}")
     print(f"Dimensions: {dim}D")
     print(f"Grid spacing: {grid_spacing}")
-    print(f"Memory location: {args.memory}")
+    print(f"Device: {device.device_string}")
     print(f"Number of quadrature points per pixel: {nb_quad}")
     print(f"Number of nodal points per pixel: {nb_nodes}")
     print(f"Quadrature weights: {quad_weights}")
@@ -356,8 +367,12 @@ if comm.rank == 0 and not args.quiet:
 #   (dim input components × dim operators)
 #
 # Tensor fields for gradient/stress at quadrature points:
-grad_u = decomposition.real_field("grad_u", (dim, dim), "quad")  # displacement gradient tensor
-stress_field = decomposition.real_field("stress_field", (dim, dim), "quad")  # stress tensor
+grad_u = decomposition.real_field(
+    "grad_u", (dim, dim), "quad"
+)  # displacement gradient tensor
+stress_field = decomposition.real_field(
+    "stress_field", (dim, dim), "quad"
+)  # stress tensor
 
 # Vector fields for CG solver (displacement and force vectors)
 u_field = decomposition.real_field("u_field", (dim,))
@@ -371,18 +386,60 @@ C_field_np = np.zeros(C_field_shape)
 for q in range(nb_quad):
     for i in range(nb_voigt):
         for j in range(nb_voigt):
-            C_field_np[i, j, q] = C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
+            C_field_np[i, j, q] = (
+                C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
+            )
 
 # Convert to device array if using GPU
 C_field = arr.asarray(C_field_np)
 
-# Create global timer for hierarchical timing
-# PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and args.memory == "host"
-if args.papi and args.memory != "host":
+# For fused kernel: create Lamé parameter fields
+if args.kernel == "fused":
+    # Compute Lamé parameters from Young's modulus and Poisson's ratio
+    lam_matrix = args.E_matrix * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
+    mu_matrix = args.E_matrix / (2 * (1 + args.nu))
+    lam_inclusion = args.E_inclusion * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
+    mu_inclusion = args.E_inclusion / (2 * (1 + args.nu))
+
+    # Create element-based CartesianDecomposition with ghost cells
+    element_decomposition = muGrid.CartesianDecomposition(
+        comm,
+        args.nb_grid_pts,
+        nb_subdivisions=(1,) * dim,
+        nb_ghosts_left=(1,) * dim,
+        nb_ghosts_right=(1,) * dim,
+        device=device,
+    )
+
+    # Create lambda and mu fields
+    lambda_field = element_decomposition.real_field("lambda")
+    mu_field = element_decomposition.real_field("mu")
+
+    # Set spatially varying material properties based on phase
+    # Phase is defined at grid points, element properties taken at grid points
+    # (for element (i,j), use material at grid point (i,j))
+    lambda_field.p[...] = arr.asarray(lam_matrix * (1 - phase) + lam_inclusion * phase)
+    mu_field.p[...] = arr.asarray(mu_matrix * (1 - phase) + mu_inclusion * phase)
+
+    # Fill ghost cells for material fields (only needs to be done once)
+    element_decomposition.communicate_ghosts(lambda_field)
+    element_decomposition.communicate_ghosts(mu_field)
+
+    # Create the fused isotropic stiffness operator
+    if dim == 2:
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(list(grid_spacing))
+    else:
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
+
     if comm.rank == 0 and not args.quiet:
-        print("Warning: PAPI not available for device memory (GPU). Using estimates only.")
-timer = muGrid.Timer(use_papi=use_papi)
+        print(f"Using fused IsotropicStiffnessOperator{dim}D")
+        print(f"  Lambda (matrix): {lam_matrix:.4f}, Mu (matrix): {mu_matrix:.4f}")
+        print(
+            f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}"
+        )
+
+# Create global timer for hierarchical timing
+timer = muGrid.Timer()
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
@@ -495,7 +552,7 @@ def compute_stress(strain, stress, C):
         eps_voigt = strain_to_voigt(strain)
 
         # Compute stress in Voigt: sig = C @ eps
-        if args.memory == "host":
+        if device.is_host:
             sig_voigt = np.einsum("ijq...,jq...->iq...", C, eps_voigt)
         else:
             # CuPy einsum
@@ -545,9 +602,9 @@ strain_arr = arr.zeros(strain_shape)
 stress_arr = arr.zeros(strain_shape)
 
 
-def apply_stiffness(u_in, f_out):
+def apply_stiffness_generic(u_in, f_out):
     """
-    Apply K = B^T C B to displacement vector.
+    Apply K = B^T C B to displacement vector using generic gradient/stress/divergence.
 
     Parameters
     ----------
@@ -557,14 +614,48 @@ def apply_stiffness(u_in, f_out):
         Output force field with (dim, nb_nodes) components (modified in place)
     """
     with timer("apply_stiffness"):
-        # Compute strain eps = B * u
-        compute_strain(u_in, strain_arr)
+        with timer("strain"):
+            # Compute strain eps = B * u
+            compute_strain(u_in, strain_arr)
 
-        # Compute stress sig = C : eps
-        compute_stress(strain_arr, stress_arr, C_field)
+        with timer("stress"):
+            # Compute stress sig = C : eps
+            compute_stress(strain_arr, stress_arr, C_field)
 
-        # Compute force f = B^T * sig
-        compute_divergence(stress_arr, f_out)
+        with timer("divergence"):
+            # Compute force f = B^T * sig
+            compute_divergence(stress_arr, f_out)
+
+
+def apply_stiffness_fused(u_in, f_out):
+    """
+    Apply K = B^T C B to displacement vector using fused isotropic stiffness operator.
+
+    This is more memory-efficient for isotropic materials as it only stores
+    two Lamé parameters (λ, μ) per element instead of the full stiffness tensor.
+
+    Parameters
+    ----------
+    u_in : Field
+        Input displacement field with (dim, nb_nodes) components
+    f_out : Field
+        Output force field with (dim, nb_nodes) components (modified in place)
+    """
+    with timer("apply_stiffness"):
+        with timer("communicate_ghosts"):
+            # Fill ghost values for periodic BC
+            decomposition.communicate_ghosts(u_in)
+
+        with timer("fused_kernel"):
+            # Apply fused stiffness operator: f = K @ u
+            fused_stiffness_op.apply(u_in, lambda_field, mu_field, f_out)
+
+
+# Select the stiffness application method
+if args.kernel == "fused":
+    apply_stiffness = apply_stiffness_fused
+else:
+    apply_stiffness = apply_stiffness_generic
 
 
 def compute_rhs(E_macro, rhs_out):
@@ -642,33 +733,32 @@ with timer("total_solve"):
         # CG callback
         iteration_count = [0]  # Use list to allow modification in nested function
 
-        def callback(it, x, r, p):
-            iteration_count[0] = it
+        def callback(iteration, state):
+            iteration_count[0] = iteration
             if not args.quiet:
-                r_flat = r.ravel()
-                res_norm = float(arr.sqrt(comm.sum(arr.dot(r_flat, r_flat))))
-                if comm.rank == 0 and it % 10 == 0:
-                    print(f"  CG iteration {it}: |r| = {res_norm:.6e}")
+                res_norm = float(arr.sqrt(state["rr"]))
+                if comm.rank == 0 and iteration % 10 == 0:
+                    print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
 
         # Solve K u = f using conjugate_gradients from Solvers.py
-        with timer(f"cg_case_{case_idx}"):
-            try:
-                conjugate_gradients(
-                    comm,
-                    decomposition,
-                    apply_stiffness,
-                    rhs_field,
-                    u_field,
-                    tol=args.tol,
-                    callback=callback,
-                    maxiter=args.maxiter,
-                )
-                converged = True
-            except RuntimeError as e:
-                if "did not converge" in str(e):
-                    converged = False
-                else:
-                    raise
+        try:
+            conjugate_gradients(
+                comm,
+                decomposition,
+                rhs_field,
+                u_field,
+                hessp=apply_stiffness,
+                tol=args.tol,
+                callback=callback,
+                maxiter=args.maxiter,
+                timer=timer,
+            )
+            converged = True
+        except RuntimeError as e:
+            if "did not converge" in str(e):
+                converged = False
+            else:
+                raise
 
         total_iterations += iteration_count[0]
 
@@ -696,10 +786,12 @@ with timer("total_solve"):
             for L in range(dim):
                 local_sum = 0.0
                 for q in range(nb_quad):
-                    if args.memory == "host":
+                    if device.is_host:
                         local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
                     else:
-                        local_sum += quad_weights[q] * float(arr.sum(stress_arr[k, L, q, ...]))
+                        local_sum += quad_weights[q] * float(
+                            arr.sum(stress_arr[k, L, q, ...])
+                        )
                 sig_avg[k, L] = comm.sum(local_sum)
 
         # Normalize by total volume
@@ -722,18 +814,33 @@ with timer("total_solve"):
                 )
             else:
                 print(
-                    f"  Average stress: xx={sig_avg[0, 0]:.6f}, yy={sig_avg[1, 1]:.6f}, "
-                    f"zz={sig_avg[2, 2]:.6f}"
+                    f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
+                    f"yy={sig_avg[1, 1]:.6f}, zz={sig_avg[2, 2]:.6f}"
                 )
                 print(
-                    f"                  yz={sig_avg[1, 2]:.6f}, xz={sig_avg[0, 2]:.6f}, "
-                    f"xy={sig_avg[0, 1]:.6f}"
+                    f"                  yz={sig_avg[1, 2]:.6f}, "
+                    f"xz={sig_avg[0, 2]:.6f}, xy={sig_avg[0, 1]:.6f}"
                 )
 
 # Get timing information
 elapsed_time = timer.get_time("total_solve")
-nb_stiffness_calls = timer.get_calls("apply_stiffness")
-apply_stiffness_time = timer.get_time("total_solve/apply_stiffness") if nb_stiffness_calls > 0 else 0
+# Stiffness is called in both startup and iteration phases
+nb_stiffness_calls_startup = timer.get_calls("total_solve/startup/apply_stiffness")
+nb_stiffness_calls_iter = timer.get_calls("total_solve/iteration/hessp/apply_stiffness")
+nb_stiffness_calls = nb_stiffness_calls_startup + nb_stiffness_calls_iter
+apply_stiffness_time_startup = timer.get_time("total_solve/startup/apply_stiffness")
+apply_stiffness_time_iter = timer.get_time(
+    "total_solve/iteration/hessp/apply_stiffness"
+)
+apply_stiffness_time = apply_stiffness_time_startup + apply_stiffness_time_iter
+
+# Lattice updates per second (LUPS)
+# One "lattice update" = one grid point processed in one stiffness call
+total_lattice_updates = nb_grid_pts_total * nb_stiffness_calls
+lups = total_lattice_updates / elapsed_time if elapsed_time > 0 else 0
+apply_lups = (
+    total_lattice_updates / apply_stiffness_time if apply_stiffness_time > 0 else 0
+)
 
 # Performance metrics
 # Memory throughput estimate:
@@ -749,7 +856,9 @@ memory_throughput = total_bytes / elapsed_time if elapsed_time > 0 else 0
 # - Gradient: ~dim * dim * nb_stencil_pts * 2 FLOPs per grid point
 # - Stress: ~nb_voigt * nb_voigt * nb_quad FLOPs per grid point
 # - Divergence: similar to gradient
-flops_per_call = nb_grid_pts_total * (dim * dim * 10 + nb_voigt * nb_voigt * nb_quad * 2)
+flops_per_call = nb_grid_pts_total * (
+    dim * dim * 10 + nb_voigt * nb_voigt * nb_quad * 2
+)
 total_flops = nb_stiffness_calls * flops_per_call
 flops_rate = total_flops / elapsed_time if elapsed_time > 0 else 0
 
@@ -769,7 +878,7 @@ if args.json and comm.rank == 0:
             "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
             "nb_grid_pts_total": int(nb_grid_pts_total),
             "dimensions": int(dim),
-            "memory": args.memory,
+            "device": device.device_string,
             "maxiter": int(args.maxiter),
             "tolerance": float(args.tol),
             "E_matrix": float(args.E_matrix),
@@ -778,19 +887,27 @@ if args.json and comm.rank == 0:
             "inclusion_type": args.inclusion_type,
             "inclusion_radius": float(args.inclusion_radius),
             "volume_fraction": float(v_f),
+            "kernel": args.kernel,
         },
         "results": {
             "total_cg_iterations": int(total_iterations),
             "stiffness_calls": int(nb_stiffness_calls),
             "total_time_seconds": float(elapsed_time),
             "apply_stiffness_time_seconds": float(apply_stiffness_time),
+            "total_lattice_updates": int(total_lattice_updates),
+            "MLUPS": float(lups / 1e6),
+            "GLUPS": float(lups / 1e9),
+            "apply_MLUPS": float(apply_lups / 1e6),
+            "apply_GLUPS": float(apply_lups / 1e9),
             "bytes_per_call": int(bytes_per_call),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
             "flops_per_call_estimated": int(flops_per_call),
             "total_flops_estimated": int(total_flops),
             "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
-            "C_eff": [[float(C_eff[i, j]) for j in range(nb_voigt)] for i in range(nb_voigt)],
+            "C_eff": [
+                [float(C_eff[i, j]) for j in range(nb_voigt)] for i in range(nb_voigt)
+            ],
             "E_effective_approx": float(E_eff_approx),
             "E_voigt_bound": float(E_voigt),
             "E_reuss_bound": float(E_reuss),
@@ -810,7 +927,9 @@ elif comm.rank == 0:
 
     # Print matrix
     for i, row_label in enumerate(voigt_labels):
-        row = f"{row_label:>4}  " + "".join(f"{C_eff[i, j]:10.6f}" for j in range(nb_voigt))
+        row = f"{row_label:>4}  " + "".join(
+            f"{C_eff[i, j]:10.6f}" for j in range(nb_voigt)
+        )
         print(row)
 
     print("\n" + "=" * 60)
@@ -824,12 +943,19 @@ elif comm.rank == 0:
     print("\n" + "=" * 60)
     print("Performance Summary")
     print("=" * 60)
-    print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = {nb_grid_pts_total:,} points")
+    print(
+        f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
+        f"{nb_grid_pts_total:,} points"
+    )
     print(f"Dimensions: {dim}D")
-    print(f"Memory location: {args.memory}")
+    print(f"Device: {device.device_string}")
     print(f"Total CG iterations: {total_iterations}")
     print(f"Stiffness operator calls: {nb_stiffness_calls}")
     print(f"Total time: {elapsed_time:.4f} seconds")
+
+    print("\nLattice updates per second:")
+    print(f"  Total lattice updates: {total_lattice_updates:,}")
+    print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
 
     print("\nMemory throughput (estimated):")
     print(f"  Bytes per stiffness call: {bytes_per_call / 1e6:.2f} MB")
@@ -862,7 +988,7 @@ if args.plot and comm.rank == 0:
 
         # Stress xx from last load case (convert to numpy if on device)
         ax = axes[1]
-        if args.memory == "host":
+        if device.is_host:
             sig_xx_avg = np.mean(stress_arr[0, 0, ...], axis=0)
         else:
             sig_xx_avg = np.mean(arr.asnumpy(stress_arr[0, 0, ...]), axis=0)
@@ -872,7 +998,7 @@ if args.plot and comm.rank == 0:
 
         # Displacement magnitude from last load case
         ax = axes[2]
-        if args.memory == "host":
+        if device.is_host:
             u_mag = np.sqrt(u_field.s[0, 0, ...] ** 2 + u_field.s[1, 0, ...] ** 2)
         else:
             u_s = arr.asnumpy(u_field.s)

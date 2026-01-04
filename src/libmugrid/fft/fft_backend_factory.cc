@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   20 Dec 2024
+ * @date   20 Dec 2025
  *
  * @brief  Factory functions for FFT backends
  *

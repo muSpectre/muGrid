@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   18 Dec 2024
+ * @date   18 Dec 2025
  *
  * @brief  Python bindings for FFT classes
  *
@@ -171,7 +171,6 @@ void add_fft_utils(py::module & mod) {
 }
 
 void add_fft_engine(py::module & mod) {
-  using MemoryLocation = muGrid::FieldCollection::MemoryLocation;
   using SubPtMap_t = muGrid::FieldCollection::SubPtMap_t;
 
   py::class_<PyFFTEngine, muGrid::CartesianDecomposition>(mod, "FFTEngine",

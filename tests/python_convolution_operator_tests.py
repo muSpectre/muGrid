@@ -115,12 +115,12 @@ class ConvolutionOperatorCheck(unittest.TestCase):
             nb_stencil_x,
             nb_stencil_y,
         )
-        d_op = muGrid.ConvolutionOperator([0, 0], stencil_oqij)
+        d_op = muGrid.GenericLinearOperator([0, 0], stencil_oqij)
 
         # Check that convolution operator has correct shape
-        assert d_op.nb_operators == nb_operators
+        assert d_op.nb_output_components == nb_operators
         assert d_op.nb_quad_pts == nb_quad_pts
-        assert d_op.nb_nodal_pts == nb_nodal_pts
+        assert d_op.nb_input_components == nb_nodal_pts
 
         # Create the grid
         nb_ghosts_right = (nb_stencil_x - 1, nb_stencil_y - 1)
@@ -264,7 +264,7 @@ def test_malformed_convolution_input(comm):
     # Stencil shape: (nb_operators=1, nb_quad_pts=2, stencil_y=3,
     # stencil_x=3) But we're using it on a local field collection
     # (after decomposition)
-    shift_op = muGrid.ConvolutionOperator([-1, -1], shift)
+    shift_op = muGrid.GenericLinearOperator([-1, -1], shift)
     # This should raise an error because fields are local, not global
     with pytest.raises(RuntimeError):
         shift_op.apply(nodal_field1, nodal_field2)
@@ -306,7 +306,7 @@ def test_convolution_component_mismatch_global():
         ]
     )
 
-    conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+    conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
     # Create field collection
     fc = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={"quad": 1})
@@ -352,7 +352,7 @@ def test_convolution_component_mismatch_multiple_operators_global():
     stencil[1, 0, 0, 1] = 1.0
     stencil[2, 0, 1, 0] = 1.0
 
-    conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+    conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
     # Create field collection
     fc = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts), sub_pts={"quad": 1})
@@ -393,7 +393,7 @@ def test_convolution_wrong_input_subpt_type_global():
 
     # Create a simple stencil
     stencil = np.array([[[1, 0], [0, 1]]])
-    conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+    conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
     # Create field collection with different sub-point counts
     fc_nodal = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts))
@@ -435,7 +435,7 @@ def test_convolution_wrong_output_subpt_type_global():
 
     # Create a simple stencil
     stencil = np.array([[[1, 0], [0, 1]]])
-    conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+    conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
     # Create field collections with different sub-point counts
     fc_nodal = muGrid.GlobalFieldCollection((nb_x_pts, nb_y_pts))
@@ -469,7 +469,7 @@ class FourierMethodCheck(unittest.TestCase):
         # Create 1D central difference operator: [-1/2, 0, 1/2]
         # Stencil at positions -1, 0, 1 (centered)
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         # Single phase vector
         phase = np.array([0.25])
@@ -485,7 +485,7 @@ class FourierMethodCheck(unittest.TestCase):
         # Create 1D central difference operator
         # Stencil at positions -1, 0, 1 (centered)
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         # Multiple phase vectors - shape (1, N)
         phases = np.array([[0.0, 0.1, 0.25, 0.5]])
@@ -503,7 +503,7 @@ class FourierMethodCheck(unittest.TestCase):
         # Stencil at x positions -1, 0, 1; y position 0
         # Shape (3, 1) means 3 points in x, 1 point in y
         stencil = np.array([[-0.5], [0.0], [0.5]])
-        op = muGrid.ConvolutionOperator([-1, 0], stencil)
+        op = muGrid.GenericLinearOperator([-1, 0], stencil)
 
         # Single phase vector
         phase = np.array([0.25, 0.5])
@@ -520,7 +520,7 @@ class FourierMethodCheck(unittest.TestCase):
         # Stencil at x position 0; y positions -1, 0, 1
         # Shape (1, 3) means 1 point in x, 3 points in y
         stencil = np.array([[-0.5, 0.0, 0.5]])
-        op = muGrid.ConvolutionOperator([0, -1], stencil)
+        op = muGrid.GenericLinearOperator([0, -1], stencil)
 
         # 1D batch: shape (2, N)
         qx = np.array([0.0, 0.1, 0.2])
@@ -547,7 +547,7 @@ class FourierMethodCheck(unittest.TestCase):
                 [0.0, 1.0, 0.0],  # x=1
             ]
         )
-        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create 2D grid of phases
         qx = np.linspace(0, 0.5, 5)
@@ -570,7 +570,7 @@ class FourierMethodCheck(unittest.TestCase):
         # 1D backward difference: [-1, 1, 0]
         # Stencil at positions -1, 0, 1
         stencil = np.array([-1.0, 1.0, 0.0])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         # Test at several phases
         phases = np.array([[0.0, 0.1, 0.25, 0.5]])
@@ -586,7 +586,7 @@ class FourierMethodCheck(unittest.TestCase):
         # 1D second derivative: [1, -2, 1]
         # Stencil at positions -1, 0, 1 (centered)
         stencil = np.array([1.0, -2.0, 1.0])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         # Test at several phases
         phases = np.array([[0.0, 0.1, 0.25, 0.5]])
@@ -602,7 +602,7 @@ class FourierMethodCheck(unittest.TestCase):
         """Test that fourier() validates phase dimension."""
         # 2D operator
         stencil = np.array([[-0.5, 0.0, 0.5]])
-        op = muGrid.ConvolutionOperator([-1, 0], stencil)
+        op = muGrid.GenericLinearOperator([-1, 0], stencil)
 
         # Wrong dimension (3D phase for 2D operator)
         phases_wrong = np.array([[0.1], [0.2], [0.3]])
@@ -614,7 +614,7 @@ class FourierMethodCheck(unittest.TestCase):
         """Test fourier() at zero phase returns sum of coefficients."""
         # For gradient operators, sum should be zero (translational invariance)
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         phase = np.array([0.0])
         result = op.fourier(phase)
@@ -625,7 +625,7 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_output_dtype(self):
         """Test that fourier() returns complex128."""
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         phases = np.array([[0.1, 0.2, 0.3]])
         results = op.fourier(phases)
@@ -635,7 +635,7 @@ class FourierMethodCheck(unittest.TestCase):
     def test_fourier_fortran_order(self):
         """Test that fourier() preserves Fortran (column-major) order."""
         stencil = np.array([[-0.5], [0.0], [0.5]])
-        op = muGrid.ConvolutionOperator([0, -1], stencil)
+        op = muGrid.GenericLinearOperator([0, -1], stencil)
 
         # Create Fortran-ordered input
         phases = np.asfortranarray(np.random.rand(2, 10, 10))
@@ -660,7 +660,7 @@ class StencilAccessCheck(unittest.TestCase):
     def test_offset_1d(self):
         """Test that offset property works in 1D."""
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         offset = op.offset
         np.testing.assert_array_equal(offset, [-1])
@@ -668,7 +668,7 @@ class StencilAccessCheck(unittest.TestCase):
     def test_offset_2d(self):
         """Test that offset property works in 2D."""
         stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         offset = op.offset
         np.testing.assert_array_equal(offset, [-1, -1])
@@ -676,7 +676,7 @@ class StencilAccessCheck(unittest.TestCase):
     def test_offset_2d_noncentered(self):
         """Test offset with non-centered stencil."""
         stencil = np.array([[1, 0], [0, 0]])
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         offset = op.offset
         np.testing.assert_array_equal(offset, [0, 0])
@@ -691,7 +691,7 @@ class StencilAccessCheck(unittest.TestCase):
         stencil[1, 2, 1] = 1
         stencil[1, 1, 0] = 1
         stencil[1, 1, 2] = 1
-        op = muGrid.ConvolutionOperator([-1, -1, -1], stencil)
+        op = muGrid.GenericLinearOperator([-1, -1, -1], stencil)
 
         offset = op.offset
         np.testing.assert_array_equal(offset, [-1, -1, -1])
@@ -699,39 +699,39 @@ class StencilAccessCheck(unittest.TestCase):
     def test_shape_1d(self):
         """Test that shape property works in 1D."""
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
-        shape = op.shape
+        shape = op.stencil_shape
         np.testing.assert_array_equal(shape, [3])
 
     def test_shape_2d(self):
         """Test that shape property works in 2D."""
         stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
-        shape = op.shape
+        shape = op.stencil_shape
         np.testing.assert_array_equal(shape, [3, 3])
 
     def test_shape_2d_nonsquare(self):
         """Test shape with non-square 2D stencil."""
         stencil = np.array([[1, 0, 0], [0, 0, 0]])  # 2x3
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.GenericLinearOperator([0, 0], stencil)
 
-        shape = op.shape
+        shape = op.stencil_shape
         np.testing.assert_array_equal(shape, [2, 3])
 
     def test_shape_3d(self):
         """Test that shape property works in 3D."""
         stencil = np.zeros((3, 3, 3))
-        op = muGrid.ConvolutionOperator([-1, -1, -1], stencil)
+        op = muGrid.GenericLinearOperator([-1, -1, -1], stencil)
 
-        shape = op.shape
+        shape = op.stencil_shape
         np.testing.assert_array_equal(shape, [3, 3, 3])
 
     def test_coefficients_1d(self):
         """Test coefficients property in 1D."""
         stencil = np.array([-0.5, 0.0, 0.5])
-        op = muGrid.ConvolutionOperator([-1], stencil)
+        op = muGrid.GenericLinearOperator([-1], stencil)
 
         reshaped = op.coefficients
 
@@ -742,7 +742,7 @@ class StencilAccessCheck(unittest.TestCase):
     def test_coefficients_2d_simple(self):
         """Test coefficients property with simple 2D stencil."""
         stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-        op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         reshaped = op.coefficients
 
@@ -757,7 +757,7 @@ class StencilAccessCheck(unittest.TestCase):
         stencil_1 = np.array([[0, 1], [0, 0]])
         stencil = np.array([stencil_0, stencil_1])  # Shape (2, 2, 2)
 
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         reshaped = op.coefficients
 
@@ -778,7 +778,7 @@ class StencilAccessCheck(unittest.TestCase):
             ]
         )  # Shape (1, 2, 2, 2)
 
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         reshaped = op.coefficients
 
@@ -788,21 +788,20 @@ class StencilAccessCheck(unittest.TestCase):
         np.testing.assert_array_equal(reshaped[0, 1, 0, :, :], [[0, 1], [0, 0]])
 
     def test_coefficients_roundtrip(self):
-        """Test that coefficients returns data consistent with pixel_operator."""
+        """Test that coefficients property returns correct data."""
         # Create a complex stencil with multiple dimensions
         stencil = np.random.rand(2, 3, 3, 4)  # 2 ops, 3 quad pts, 3x4 stencil
 
-        op = muGrid.ConvolutionOperator([0, 0], stencil)
+        op = muGrid.GenericLinearOperator([0, 0], stencil)
 
-        # Get both flattened and reshaped versions
-        flat = np.array(op.pixel_operator)
+        # Get reshaped coefficients
         reshaped = op.coefficients
 
         # Should have shape (2, 3, 1, 3, 4)
         self.assertEqual(reshaped.shape, (2, 3, 1, 3, 4))
 
-        # Flattened version of reshaped should match pixel_operator
-        np.testing.assert_array_equal(reshaped.ravel(order='F'), flat)
+        # Coefficients should contain the original stencil data
+        np.testing.assert_allclose(reshaped[:, :, 0, :, :], stencil)
 
     def test_coefficients_3d(self):
         """Test coefficients property in 3D."""
@@ -810,7 +809,7 @@ class StencilAccessCheck(unittest.TestCase):
         stencil[0, 0, 0] = 1.0
         stencil[1, 1, 1] = -1.0
 
-        op = muGrid.ConvolutionOperator([0, 0, 0], stencil)
+        op = muGrid.GenericLinearOperator([0, 0, 0], stencil)
 
         reshaped = op.coefficients
 
@@ -833,15 +832,15 @@ class StencilAccessCheck(unittest.TestCase):
             ]
         )  # Shape (2, 2, 2, 3)
 
-        op = muGrid.ConvolutionOperator([-1, 0], stencil)
+        op = muGrid.GenericLinearOperator([-1, 0], stencil)
 
         # Check all properties
-        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_output_components, 2)
         self.assertEqual(op.nb_quad_pts, 2)
-        self.assertEqual(op.nb_nodal_pts, 1)
+        self.assertEqual(op.nb_input_components, 1)
         self.assertEqual(op.spatial_dim, 2)
         np.testing.assert_array_equal(op.offset, [-1, 0])
-        np.testing.assert_array_equal(op.shape, [2, 3])
+        np.testing.assert_array_equal(op.stencil_shape, [2, 3])
 
         # Check that coefficients returns correct shape
         reshaped = op.coefficients
@@ -849,7 +848,6 @@ class StencilAccessCheck(unittest.TestCase):
 
         # Check that the total number of elements is consistent
         expected_size = 2 * 2 * 1 * 2 * 3  # ops * quad * nodal * stencil
-        self.assertEqual(len(op.pixel_operator), expected_size)
         self.assertEqual(reshaped.size, expected_size)
 
 
@@ -867,7 +865,7 @@ class LaplaceOperatorStencilAccess(unittest.TestCase):
 
         # Check offset and shape
         np.testing.assert_array_equal(op.offset, [-1, -1])
-        np.testing.assert_array_equal(op.shape, [3, 3])
+        np.testing.assert_array_equal(op.stencil_shape, [3, 3])
 
         # Check coefficients
         coeffs = op.coefficients
@@ -883,7 +881,7 @@ class LaplaceOperatorStencilAccess(unittest.TestCase):
 
         # Check offset and shape
         np.testing.assert_array_equal(op.offset, [-1, -1, -1])
-        np.testing.assert_array_equal(op.shape, [3, 3, 3])
+        np.testing.assert_array_equal(op.stencil_shape, [3, 3, 3])
 
         # Check coefficients
         coeffs = op.coefficients
@@ -905,9 +903,9 @@ class LaplaceOperatorStencilAccess(unittest.TestCase):
 
         # Check dimensions
         self.assertEqual(op.spatial_dim, 2)
-        self.assertEqual(op.nb_operators, 1)
+        self.assertEqual(op.nb_output_components, 1)
         self.assertEqual(op.nb_quad_pts, 1)
-        self.assertEqual(op.nb_nodal_pts, 1)
+        self.assertEqual(op.nb_input_components, 1)
 
         # Check total size
         coeffs = op.coefficients
@@ -924,7 +922,7 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
         # Check offset and shape
         np.testing.assert_array_equal(op.offset, [0, 0])
-        np.testing.assert_array_equal(op.shape, [2, 2])
+        np.testing.assert_array_equal(op.stencil_shape, [2, 2])
 
         # Check coefficients
         coeffs = op.coefficients
@@ -932,7 +930,7 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
         self.assertEqual(coeffs.shape, (2, 2, 1, 2, 2))
 
         # Check that we have x and y derivatives
-        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_output_components, 2)
         self.assertEqual(op.nb_quad_pts, 2)
 
     def test_fem_3d_properties(self):
@@ -941,7 +939,7 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
         # Check offset and shape
         np.testing.assert_array_equal(op.offset, [0, 0, 0])
-        np.testing.assert_array_equal(op.shape, [2, 2, 2])
+        np.testing.assert_array_equal(op.stencil_shape, [2, 2, 2])
 
         # Check coefficients
         coeffs = op.coefficients
@@ -949,7 +947,7 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
         self.assertEqual(coeffs.shape, (3, 5, 1, 2, 2, 2))
 
         # Check that we have x, y, z derivatives
-        self.assertEqual(op.nb_operators, 3)
+        self.assertEqual(op.nb_output_components, 3)
         self.assertEqual(op.nb_quad_pts, 5)
 
     def test_fem_consistency(self):
@@ -958,9 +956,9 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
         # Check dimensions
         self.assertEqual(op.spatial_dim, 2)
-        self.assertEqual(op.nb_operators, 2)
+        self.assertEqual(op.nb_output_components, 2)
         self.assertEqual(op.nb_quad_pts, 2)
-        self.assertEqual(op.nb_nodal_pts, 1)
+        self.assertEqual(op.nb_input_components, 1)
 
         # Check total size
         coeffs = op.coefficients
@@ -1020,7 +1018,7 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
                 ]
             ]
         )
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         # Create host field collection
         fc = muGrid.GlobalFieldCollection(
@@ -1029,9 +1027,7 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
 
         # Verify host collection
         self.assertFalse(fc.is_on_device)
-        self.assertEqual(
-            fc.memory_location, muGrid.GlobalFieldCollection.MemoryLocation.Host
-        )
+        self.assertTrue(fc.device.is_host)
 
         # Create fields
         nodal = fc.real_field("nodal", (2,))
@@ -1061,7 +1057,7 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
 
         # Simple identity stencil
         stencil = np.array([[[[1, 0], [0, 0]]]])
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         fc = muGrid.GlobalFieldCollection(
             (nb_x_pts, nb_y_pts), sub_pts={"quad": 1}, nb_ghosts_right=(1, 1)
@@ -1101,19 +1097,17 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
         """Test that device collection has correct properties."""
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         self.assertTrue(fc.is_on_device)
-        self.assertEqual(
-            fc.memory_location, muGrid.GlobalFieldCollection.MemoryLocation.Device
-        )
+        self.assertTrue(fc.device.is_device)
 
     def test_device_field_properties(self):
         """Test that device fields have correct properties."""
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         field = fc.real_field("test", (3,))
@@ -1130,7 +1124,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (2,))
@@ -1150,7 +1144,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
                 ]
             ]
         )
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         # Use the constructor that accepts nb_domain_grid_pts (tuple) as first arg
         # to enable nb_ghosts_right parameter
@@ -1158,7 +1152,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (2,))
@@ -1195,7 +1189,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
                 ]
             ]
         )
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         # Use the constructor that accepts nb_domain_grid_pts (tuple) as first arg
         # to enable nb_ghosts_right parameter
@@ -1203,7 +1197,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         nodal = fc.real_field("nodal", (2,))
@@ -1237,7 +1231,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
                 ],
             ]
         )
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -1255,7 +1249,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", (2,))
         quad_device = fc_device.real_field("quad", (2, nb_operators), "quad")
@@ -1278,7 +1272,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
     def test_host_device_mixed_workflow(self):
         """Test workflow transferring data between host and device."""
         stencil = np.array([[[[1, 0], [0, 0]]]])
-        conv_op = muGrid.ConvolutionOperator([0, 0], stencil)
+        conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
 
         # Create host collection for initial data
         fc_host = muGrid.GlobalFieldCollection(
@@ -1293,7 +1287,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": 1},
             nb_ghosts_right=(1, 1),
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         quad_device = fc_device.real_field("quad", (1,), "quad")

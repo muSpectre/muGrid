@@ -46,11 +46,6 @@
 #include <type_traits>
 #include <memory>
 
-#ifdef WITH_MPI
-#include "mpi.h"
-#include "mpi/communicator.hh"
-#endif
-
 namespace muGrid {
 
   //! forward declaration
@@ -173,13 +168,10 @@ namespace muGrid {
     //! subtraction assignment
     TypedFieldBase & operator-=(const TypedFieldBase & other);
 
-    //! return type of the stored data
-    const std::type_info & get_typeid() const final { return typeid(T); }
-
-#ifdef WITH_MPI
-    //! return the MPI representation of the stored type
-    MPI_Datatype get_mpi_type() const final { return mpi_type<T>(); }
-#endif
+    //! return the unified type descriptor for this field's element type
+    TypeDescriptor get_type_descriptor() const final {
+      return type_to_descriptor<T>();
+    }
 
     //! return the size of the elementary field entry in bytes
     std::size_t get_element_size_in_bytes() const final {
@@ -571,6 +563,13 @@ namespace muGrid {
 
   /**
    * Free function for deep copying between fields in different memory spaces.
+   *
+   * This function handles layout conversion between AoS (Array of Structures,
+   * used by host/CPU) and SoA (Structure of Arrays, used by device/GPU).
+   *
+   * For same-space copies (host-host or device-device), a fast byte copy is
+   * used. For cross-space copies (host-device or device-host), layout
+   * conversion is performed so that the logical field values are preserved.
    */
   template <typename T, typename DstSpace, typename SrcSpace>
   void deep_copy(TypedFieldBase<T, DstSpace> & dst,
@@ -578,8 +577,66 @@ namespace muGrid {
     if (dst.view().size() != src.view().size()) {
       throw FieldError("Size mismatch in deep_copy");
     }
-    // Use muGrid::deep_copy from array.hh
-    muGrid::deep_copy(dst.view(), src.view());
+
+    const auto src_order = src.get_storage_order();
+    const auto dst_order = dst.get_storage_order();
+
+    // Same storage order: use fast byte copy
+    if (src_order == dst_order) {
+      muGrid::deep_copy(dst.view(), src.view());
+      return;
+    }
+
+    // Different storage orders: need layout conversion
+    // This happens when copying between host (AoS) and device (SoA)
+
+    const Index_t nb_buffer_pixels =
+        src.get_collection().get_nb_buffer_pixels();
+    const Index_t nb_components = src.get_nb_components();
+    const Index_t nb_sub_pts = src.get_nb_sub_pts();
+    const Index_t nb_dof_per_pixel = nb_components * nb_sub_pts;
+    const Index_t total_size = nb_buffer_pixels * nb_dof_per_pixel;
+
+    if (total_size == 0) {
+      return;
+    }
+
+    // Allocate temporary host buffer for conversion
+    Array<T, HostSpace> tmp(total_size);
+
+    if constexpr (is_host_space_v<SrcSpace> && is_device_space_v<DstSpace>) {
+      // Host (AoS) -> Device (SoA): Convert on host, then copy to device
+      // AoS: data[pixel * nb_dof_per_pixel + dof]
+      // SoA: data[dof * nb_buffer_pixels + pixel]
+      const T * src_data = src.view().data();
+      T * tmp_data = tmp.data();
+      for (Index_t pixel = 0; pixel < nb_buffer_pixels; ++pixel) {
+        for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
+          tmp_data[dof * nb_buffer_pixels + pixel] =
+              src_data[pixel * nb_dof_per_pixel + dof];
+        }
+      }
+      // Copy converted SoA data to device
+      muGrid::deep_copy(dst.view(), tmp);
+    } else if constexpr (is_device_space_v<SrcSpace> &&
+                         is_host_space_v<DstSpace>) {
+      // Device (SoA) -> Host (AoS): Copy to host, then convert
+      // Copy SoA data from device to temp buffer
+      muGrid::deep_copy(tmp, src.view());
+      // Convert SoA -> AoS
+      const T * tmp_data = tmp.data();
+      T * dst_data = dst.view().data();
+      for (Index_t pixel = 0; pixel < nb_buffer_pixels; ++pixel) {
+        for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
+          dst_data[pixel * nb_dof_per_pixel + dof] =
+              tmp_data[dof * nb_buffer_pixels + pixel];
+        }
+      }
+    } else {
+      // Should not reach here - both host or both device with different orders
+      throw FieldError(
+          "Unexpected storage order mismatch in same-space deep_copy");
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -594,7 +651,7 @@ namespace muGrid {
     if (this->field_exists(unique_name)) {
       if (allow_existing) {
         auto & field{*this->fields[unique_name]};
-        field.assert_typeid(typeid(T));
+        field.assert_type_descriptor(type_to_descriptor<T>());
         if (field.get_nb_components() != nb_components) {
           std::stringstream error{};
           error << "You can't change the number of components of a field "
@@ -633,7 +690,7 @@ namespace muGrid {
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
     Field * raw_ptr{nullptr};
-    if (this->memory_location == MemoryLocation::Device) {
+    if (this->device.is_device()) {
       raw_ptr = new TypedField<T, DefaultDeviceSpace>{
           unique_name, *this, nb_components, sub_division_tag, unit};
     } else {
@@ -661,7 +718,7 @@ namespace muGrid {
     if (this->field_exists(unique_name)) {
       if (allow_existing) {
         auto & field{*this->fields[unique_name]};
-        field.assert_typeid(typeid(T));
+        field.assert_type_descriptor(type_to_descriptor<T>());
         if (field.get_components_shape() != components_shape) {
           throw FieldCollectionError(
               "You can't change the shape of a field by re-registering it.");
@@ -695,7 +752,7 @@ namespace muGrid {
     //! following line, please check whether you are creating a TypedField with
     //! the number of components specified in 'int' rather than 'size_t'.
     Field * raw_ptr{nullptr};
-    if (this->memory_location == MemoryLocation::Device) {
+    if (this->device.is_device()) {
       raw_ptr = new TypedField<T, DefaultDeviceSpace>{
           unique_name, *this, components_shape, sub_division_tag, unit};
     } else {

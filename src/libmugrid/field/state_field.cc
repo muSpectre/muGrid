@@ -40,11 +40,6 @@
 
 #include <sstream>
 
-#ifdef WITH_MPI
-#include "mpi.h"
-#include "mpi/communicator.hh"
-#endif
-
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
@@ -85,11 +80,12 @@ namespace muGrid {
   const Unit & StateField::get_physical_unit() const { return this->unit; }
 
   /* ---------------------------------------------------------------------- */
-  void StateField::assert_typeid(const std::type_info & type) const {
-    if (this->get_typeid() != type) {
+  void StateField::assert_type_descriptor(TypeDescriptor type_desc) const {
+    if (this->get_type_descriptor() != type_desc) {
       std::stringstream s;
-      s << "Field stores data of type `" << this->get_typeid().name()
-        << "`, which differs from `" << typeid(Int).name() << "`.";
+      s << "StateField stores data of type `"
+        << type_descriptor_name(this->get_type_descriptor())
+        << "`, which differs from `" << type_descriptor_name(type_desc) << "`.";
       throw std::runtime_error(s.str());
     }
   }
@@ -150,17 +146,9 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   template <typename T>
-  const std::type_info & TypedStateField<T>::get_typeid() const {
-    return typeid(T);
+  TypeDescriptor TypedStateField<T>::get_type_descriptor() const {
+    return type_to_descriptor<T>();
   }
-
-#ifdef WITH_MPI
-  /* ---------------------------------------------------------------------- */
-  template <typename T>
-  MPI_Datatype TypedStateField<T>::get_mpi_type() const {
-    return mpi_type<T>();
-  }
-#endif
 
   /* ---------------------------------------------------------------------- */
   template <typename T>

@@ -1,16 +1,18 @@
 /**
- * @file   fem_gradient_operator.hh
+ * @file   fem_gradient_operator_2d.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   25 Dec 2024
+ * @date   01 Jan 2026
  *
- * @brief  Hard-coded linear FEM gradient operator
+ * @brief  Hard-coded 2D linear FEM gradient operator
  *
  * This class provides optimized implementations of the gradient operator
- * for linear finite elements on structured grids:
- * - 2D: 2 triangles per pixel, 4 nodal points, 2 quadrature points
- * - 3D: 5 tetrahedra per voxel, 8 nodal points, 5 quadrature points
+ * for linear finite elements on 2D structured grids:
+ * - 4 nodal points per pixel (corners at [0,0], [1,0], [0,1], [1,1])
+ * - 2 triangles per pixel (lower-left and upper-right)
+ * - 2 quadrature points (one per triangle, at centroid)
+ * - 2 gradient components (d/dx, d/dy)
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -38,13 +40,13 @@
  *
  */
 
-#ifndef SRC_LIBMUGRID_OPERATORS_FEM_GRADIENT_OPERATOR_HH_
-#define SRC_LIBMUGRID_OPERATORS_FEM_GRADIENT_OPERATOR_HH_
+#ifndef SRC_LIBMUGRID_OPERATORS_FEM_GRADIENT_2D_HH_
+#define SRC_LIBMUGRID_OPERATORS_FEM_GRADIENT_2D_HH_
 
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
-#include "operators/convolution_operator_base.hh"
+#include "operators/linear.hh"
 
 #include <array>
 #include <vector>
@@ -55,24 +57,18 @@ namespace muGrid {
     class GlobalFieldCollection;
 
     /**
-     * @class FEMGradientOperator
-     * @brief Hard-coded linear FEM gradient operator with optimized
+     * @class FEMGradientOperator2D
+     * @brief Hard-coded 2D linear FEM gradient operator with optimized
      * implementation.
      *
      * This class provides optimized implementations of the gradient operator
-     * for linear finite elements on structured grids:
+     * for linear finite elements on 2D structured grids:
      *
      * **2D (Linear Triangles):**
      * - 4 nodal points per pixel (corners at [0,0], [1,0], [0,1], [1,1])
      * - 2 triangles per pixel (lower-left and upper-right)
      * - 2 quadrature points (one per triangle, at centroid)
      * - 2 gradient components (d/dx, d/dy)
-     *
-     * **3D (Linear Tetrahedra):**
-     * - 8 nodal points per voxel (corners of unit cube)
-     * - 5 tetrahedra per voxel (Kuhn triangulation)
-     * - 5 quadrature points (one per tetrahedron, at centroid)
-     * - 3 gradient components (d/dx, d/dy, d/dz)
      *
      * The apply() method computes the gradient (nodal → quadrature points).
      * The transpose() method computes the divergence (quadrature → nodal
@@ -81,40 +77,45 @@ namespace muGrid {
      * Shape function gradients are compile-time constants for linear elements,
      * enabling SIMD vectorization and optimal performance.
      */
-    class FEMGradientOperator : public ConvolutionOperatorBase {
+    class FEMGradientOperator2D : public LinearOperator {
        public:
-        using Parent = ConvolutionOperatorBase;
+        using Parent = LinearOperator;
+
+        //! Number of nodes per pixel (compile-time constant for 2D)
+        static constexpr Index_t NB_NODES = 4;
+
+        //! Number of quadrature points per pixel (compile-time constant for 2D)
+        static constexpr Index_t NB_QUAD = 2;
+
+        //! Spatial dimension
+        static constexpr Dim_t DIM = 2;
 
         /**
-         * @brief Construct a FEM gradient operator for the given dimension.
-         * @param spatial_dim Spatial dimension (2 or 3)
-         * @param scale Scale factor applied to the output (default: 1.0)
+         * @brief Construct a 2D FEM gradient operator.
+         * @param grid_spacing Grid spacing in each direction (default: [1.0, 1.0])
          *
-         * The scale factor can be used to incorporate grid spacing.
-         * For a grid with spacing (hx, hy), use scale = 1.0 and the
-         * shape function gradients will be scaled by 1/h internally.
+         * The grid spacing is used to scale the shape function gradients.
          */
-        explicit FEMGradientOperator(Dim_t spatial_dim,
-                                     std::vector<Real> grid_spacing = {});
+        explicit FEMGradientOperator2D(std::vector<Real> grid_spacing = {});
 
         //! Default constructor is deleted
-        FEMGradientOperator() = delete;
+        FEMGradientOperator2D() = delete;
 
         //! Copy constructor is deleted
-        FEMGradientOperator(const FEMGradientOperator & other) = delete;
+        FEMGradientOperator2D(const FEMGradientOperator2D & other) = delete;
 
         //! Move constructor
-        FEMGradientOperator(FEMGradientOperator && other) = default;
+        FEMGradientOperator2D(FEMGradientOperator2D && other) = default;
 
         //! Destructor
-        ~FEMGradientOperator() override = default;
+        ~FEMGradientOperator2D() override = default;
 
         //! Copy assignment operator is deleted
-        FEMGradientOperator &
-        operator=(const FEMGradientOperator & other) = delete;
+        FEMGradientOperator2D &
+        operator=(const FEMGradientOperator2D & other) = delete;
 
         //! Move assignment operator
-        FEMGradientOperator & operator=(FEMGradientOperator && other) = default;
+        FEMGradientOperator2D & operator=(FEMGradientOperator2D && other) = default;
 
         /**
          * @brief Apply the gradient operator (nodal → quadrature).
@@ -208,37 +209,33 @@ namespace muGrid {
 #endif
 
         /**
-         * @brief Get the number of gradient components (same as spatial_dim).
-         * @return Number of operators (2 for 2D, 3 for 3D)
+         * @brief Get the number of output components (2 for 2D gradient).
+         * @return 2 (d/dx, d/dy)
          */
-        Index_t get_nb_operators() const override { return spatial_dim; }
+        Index_t get_nb_output_components() const override { return DIM; }
 
         /**
-         * @brief Get the number of quadrature points per pixel/voxel.
-         * @return 2 for 2D (triangles), 5 for 3D (tetrahedra)
+         * @brief Get the number of quadrature points per pixel.
+         * @return 2 (one per triangle)
          */
-        Index_t get_nb_quad_pts() const override {
-            return spatial_dim == 2 ? 2 : 5;
-        }
+        Index_t get_nb_quad_pts() const override { return NB_QUAD; }
 
         /**
-         * @brief Get the number of nodal points per pixel/voxel.
+         * @brief Get the number of input components per pixel.
          *
          * For continuous FEM, nodes are shared between pixels via ghost
-         * communication. Each pixel uses values from 4 (2D) or 8 (3D) grid
-         * points, but the field itself has only 1 value per grid point.
-         * Ghost communication handles the periodic boundary conditions.
+         * communication. Each pixel uses values from 4 grid points, but the
+         * field itself has only 1 value per grid point.
          *
-         * @return 1 (one scalar value per grid point, neighbors accessed via
-         * ghosts)
+         * @return 1 (one scalar value per grid point)
          */
-        Index_t get_nb_nodal_pts() const override { return 1; }
+        Index_t get_nb_input_components() const override { return 1; }
 
         /**
          * @brief Get the spatial dimension.
-         * @return Spatial dimension (2 or 3)
+         * @return 2
          */
-        Dim_t get_spatial_dim() const override { return spatial_dim; }
+        Dim_t get_spatial_dim() const override { return DIM; }
 
         /**
          * @brief Get the grid spacing.
@@ -252,36 +249,32 @@ namespace muGrid {
          * @brief Get the quadrature weights.
          * @return Vector of quadrature weights (one per quadrature point)
          *
-         * For 2D: Each triangle has weight = 0.5 (half the pixel area)
-         * For 3D: Tetrahedra have weights summing to 1.0 (voxel volume)
+         * For 2D: Each triangle has weight = 0.5 * hx * hy (half the pixel area)
          */
         std::vector<Real> get_quadrature_weights() const;
 
         /**
          * @brief Get the stencil offset.
-         * @return Stencil offset in pixels ([0,0] for 2D, [0,0,0] for 3D)
+         * @return Stencil offset in pixels ([0,0])
          */
-        Shape_t get_pixel_offset() const { return Shape_t(spatial_dim, 0); }
+        Shape_t get_offset() const { return Shape_t{0, 0}; }
 
         /**
          * @brief Get the stencil shape.
-         * @return Shape of the stencil ([2,2] for 2D, [2,2,2] for 3D)
+         * @return Shape of the stencil ([2,2])
          */
-        Shape_t get_conv_pts_shape() const { return Shape_t(spatial_dim, 2); }
+        Shape_t get_stencil_shape() const { return Shape_t{2, 2}; }
 
         /**
-         * @brief Get the shape function gradients as pixel operator.
-         * @return Vector of shape function gradients [nb_ops * nb_quad *
-         * nb_nodal * conv_pts_size]
+         * @brief Get the stencil coefficients.
+         * @return Vector of shape function gradients as flat array
          *
          * Returns the shape function gradients scaled by grid spacing.
-         * Shape: (nb_operators, nb_quad_pts, nb_nodal_pts, *conv_pts_shape)
-         * where conv_pts_shape is [2,2] for 2D or [2,2,2] for 3D.
+         * Shape: (nb_output_components, nb_quad_pts, nb_input_components, 2, 2)
          */
-        std::vector<Real> get_pixel_operator() const;
+        std::vector<Real> get_coefficients() const;
 
        private:
-        Dim_t spatial_dim;
         std::vector<Real> grid_spacing;
 
         /**
@@ -323,7 +316,7 @@ namespace muGrid {
 #endif
     };
 
-    // Kernel implementations
+    // 2D Kernel implementations
     namespace fem_gradient_kernels {
 
         // =====================================================================
@@ -386,86 +379,11 @@ namespace muGrid {
         constexpr Real QUAD_WEIGHT_2D[NB_QUAD_2D] = {0.5, 0.5};
 
         // =====================================================================
-        // 3D Linear Tetrahedra Shape Function Gradients (Kuhn Triangulation)
-        // =====================================================================
-        //
-        // Voxel corners (nodal points) - binary indexing:
-        //   Node 0: (0,0,0), Node 1: (1,0,0), Node 2: (0,1,0), Node 3: (1,1,0)
-        //   Node 4: (0,0,1), Node 5: (1,0,1), Node 6: (0,1,1), Node 7: (1,1,1)
-        //
-        // 5 tetrahedra per voxel (Kuhn triangulation):
-        //   Tet 0: Nodes 0, 1, 2, 4
-        //   Tet 1: Nodes 1, 2, 4, 5
-        //   Tet 2: Nodes 2, 4, 5, 6
-        //   Tet 3: Nodes 1, 2, 3, 5
-        //   Tet 4: Nodes 2, 3, 5, 7
-        //   (Note: Center tetrahedron connects nodes 2, 5 which is the main
-        //   diagonal)
-        //
-        // =====================================================================
-
-        // Number of nodes and quadrature points for 3D
-        constexpr Index_t NB_NODES_3D = 8;
-        constexpr Index_t NB_QUAD_3D = 5;
-        constexpr Index_t DIM_3D = 3;
-
-        // Node offsets within voxel for 3D [node][dim]
-        constexpr Index_t NODE_OFFSET_3D[NB_NODES_3D][DIM_3D] = {
-            {0, 0, 0},  // Node 0
-            {1, 0, 0},  // Node 1
-            {0, 1, 0},  // Node 2
-            {1, 1, 0},  // Node 3
-            {0, 0, 1},  // Node 4
-            {1, 0, 1},  // Node 5
-            {0, 1, 1},  // Node 6
-            {1, 1, 1}   // Node 7
-        };
-
-        // Tetrahedra node indices [tet][4 nodes]
-        constexpr Index_t TET_NODES[NB_QUAD_3D][4] = {
-            {0, 1, 2, 4},  // Tet 0
-            {1, 2, 4, 5},  // Tet 1
-            {2, 4, 5, 6},  // Tet 2
-            {1, 2, 3, 5},  // Tet 3
-            {2, 3, 5, 7}   // Tet 4 (using node 7 instead of 6 for proper Kuhn)
-        };
-
-        // Shape function gradients for 3D [dim][quad][node]
-        // For a tetrahedron with vertices v0, v1, v2, v3:
-        // grad(N_i) = (1/6V) * (face_normal_opposite_to_i)
-        // These are pre-computed for the Kuhn triangulation
-        extern const Real B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D];
-
-        // Quadrature weights for 3D (volume of each tet / total voxel volume)
-        // For Kuhn triangulation: 4 corner tets have volume 1/6, center tet has
-        // volume 1/3 But with 5 tets: each corner tet = 1/6, total = 5/6...
-        // need to verify Actually for 5-tet Kuhn: volumes are 1/6, 1/6, 1/6,
-        // 1/6, 1/6 (all equal)
-        constexpr Real QUAD_WEIGHT_3D[NB_QUAD_3D] = {0.2, 0.2, 0.2, 0.2, 0.2};
-
-        // =====================================================================
-        // Host Kernel Declarations
+        // 2D Host Kernel Declarations
         // =====================================================================
 
         /**
          * @brief Apply 2D FEM gradient operator on host.
-         *
-         * @param nodal_input Input nodal field [nb_nodes * nx * ny]
-         * @param gradient_output Output gradient field [dim * nb_quad * nx *
-         * ny]
-         * @param nx Grid size in x (including ghosts)
-         * @param ny Grid size in y (including ghosts)
-         * @param nodal_stride_x Stride for nodal field in x
-         * @param nodal_stride_y Stride for nodal field in y
-         * @param nodal_stride_n Stride between nodal points
-         * @param grad_stride_x Stride for gradient field in x
-         * @param grad_stride_y Stride for gradient field in y
-         * @param grad_stride_q Stride between quadrature points
-         * @param grad_stride_d Stride between gradient components
-         * @param hx Grid spacing in x
-         * @param hy Grid spacing in y
-         * @param alpha Scale factor
-         * @param increment If true, add to output; if false, overwrite
          */
         void fem_gradient_2d_host(const Real * MUGRID_RESTRICT nodal_input,
                                   Real * MUGRID_RESTRICT gradient_output,
@@ -488,30 +406,6 @@ namespace muGrid {
             Index_t nodal_stride_y, Index_t nodal_stride_n, Real hx, Real hy,
             const Real * quad_weights, Real alpha, bool increment);
 
-        /**
-         * @brief Apply 3D FEM gradient operator on host.
-         */
-        void fem_gradient_3d_host(
-            const Real * MUGRID_RESTRICT nodal_input,
-            Real * MUGRID_RESTRICT gradient_output, Index_t nx, Index_t ny,
-            Index_t nz, Index_t nodal_stride_x, Index_t nodal_stride_y,
-            Index_t nodal_stride_z, Index_t nodal_stride_n,
-            Index_t grad_stride_x, Index_t grad_stride_y, Index_t grad_stride_z,
-            Index_t grad_stride_q, Index_t grad_stride_d, Real hx, Real hy,
-            Real hz, Real alpha, bool increment);
-
-        /**
-         * @brief Apply 3D FEM transpose (divergence) operator on host.
-         */
-        void fem_divergence_3d_host(
-            const Real * MUGRID_RESTRICT gradient_input,
-            Real * MUGRID_RESTRICT nodal_output, Index_t nx, Index_t ny,
-            Index_t nz, Index_t grad_stride_x, Index_t grad_stride_y,
-            Index_t grad_stride_z, Index_t grad_stride_q, Index_t grad_stride_d,
-            Index_t nodal_stride_x, Index_t nodal_stride_y,
-            Index_t nodal_stride_z, Index_t nodal_stride_n, Real hx, Real hy,
-            Real hz, const Real * quad_weights, Real alpha, bool increment);
-
 #if defined(MUGRID_ENABLE_CUDA)
         void fem_gradient_2d_cuda(const Real * nodal_input,
                                   Real * gradient_output, Index_t nx,
@@ -530,25 +424,6 @@ namespace muGrid {
                                Index_t nodal_stride_y, Index_t nodal_stride_n,
                                Real hx, Real hy, const Real * quad_weights,
                                Real alpha, bool increment);
-
-        void
-        fem_gradient_3d_cuda(const Real * nodal_input, Real * gradient_output,
-                             Index_t nx, Index_t ny, Index_t nz,
-                             Index_t nodal_stride_x, Index_t nodal_stride_y,
-                             Index_t nodal_stride_z, Index_t nodal_stride_n,
-                             Index_t grad_stride_x, Index_t grad_stride_y,
-                             Index_t grad_stride_z, Index_t grad_stride_q,
-                             Index_t grad_stride_d, Real hx, Real hy, Real hz,
-                             Real alpha, bool increment);
-
-        void fem_divergence_3d_cuda(
-            const Real * gradient_input, Real * nodal_output, Index_t nx,
-            Index_t ny, Index_t nz, Index_t grad_stride_x,
-            Index_t grad_stride_y, Index_t grad_stride_z, Index_t grad_stride_q,
-            Index_t grad_stride_d, Index_t nodal_stride_x,
-            Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n, Real hx, Real hy, Real hz,
-            const Real * quad_weights, Real alpha, bool increment);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
@@ -569,29 +444,10 @@ namespace muGrid {
                                    Index_t nodal_stride_n, Real hx, Real hy,
                                    const Real * quad_weights, Real alpha,
                                    bool increment);
-
-        void fem_gradient_3d_hip(const Real * nodal_input,
-                                 Real * gradient_output, Index_t nx, Index_t ny,
-                                 Index_t nz, Index_t nodal_stride_x,
-                                 Index_t nodal_stride_y, Index_t nodal_stride_z,
-                                 Index_t nodal_stride_n, Index_t grad_stride_x,
-                                 Index_t grad_stride_y, Index_t grad_stride_z,
-                                 Index_t grad_stride_q, Index_t grad_stride_d,
-                                 Real hx, Real hy, Real hz, Real alpha,
-                                 bool increment);
-
-        void fem_divergence_3d_hip(
-            const Real * gradient_input, Real * nodal_output, Index_t nx,
-            Index_t ny, Index_t nz, Index_t grad_stride_x,
-            Index_t grad_stride_y, Index_t grad_stride_z, Index_t grad_stride_q,
-            Index_t grad_stride_d, Index_t nodal_stride_x,
-            Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n, Real hx, Real hy, Real hz,
-            const Real * quad_weights, Real alpha, bool increment);
 #endif
 
     }  // namespace fem_gradient_kernels
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_OPERATORS_FEM_GRADIENT_OPERATOR_HH_
+#endif  // SRC_LIBMUGRID_OPERATORS_FEM_GRADIENT_2D_HH_

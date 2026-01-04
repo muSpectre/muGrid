@@ -16,6 +16,7 @@
 
 #include "core/coordinates.hh"
 #include "core/enums.hh"
+#include "core/type_descriptor.hh"
 #include "field/field.hh"
 #include "collection/field_collection_global.hh"
 #include "mpi/cartesian_communicator.hh"
@@ -24,19 +25,19 @@
 namespace muGrid {
     CartesianDecomposition::CartesianDecomposition(
         const Communicator & comm, Dim_t spatial_dimension,
-        const SubPtMap_t & nb_sub_pts, MemoryLocation memory_location)
+        const SubPtMap_t & nb_sub_pts, Device device)
         : Parent_t{}, comm{comm},
           collection(spatial_dimension, nb_sub_pts,
-                     StorageOrder::ArrayOfStructures, memory_location) {}
+                     StorageOrder::ArrayOfStructures, device) {}
 
     CartesianDecomposition::CartesianDecomposition(
         const Communicator & comm, const DynGridIndex & nb_domain_grid_pts,
         const DynGridIndex & nb_subdivisions, const DynGridIndex & nb_ghosts_left,
         const DynGridIndex & nb_ghosts_right, const SubPtMap_t & nb_sub_pts,
-        MemoryLocation memory_location)
+        Device device)
         : Parent_t{}, comm{comm},
           collection(nb_domain_grid_pts.size(), nb_sub_pts,
-                     StorageOrder::ArrayOfStructures, memory_location) {
+                     StorageOrder::ArrayOfStructures, device) {
         this->initialise(nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left,
                          nb_ghosts_right);
     }
@@ -200,11 +201,11 @@ namespace muGrid {
         // Get strides (in unit: elements)
         auto strides{field.get_strides(IterUnit::SubPt)};
 
-        // Total number of elements in the field
-        // FIXME: This appears to be assuming a column-major field
-        auto nb_total_elements{
-            strides[strides.size() - 1] *
-            this->get_nb_subdomain_grid_pts_with_ghosts()[spatial_dims - 1]};
+        // Total number of elements in the field.
+        // For SoA (Structure of Arrays) layout on GPU, components are stored
+        // separately, so we need to use get_buffer_size() to get the true
+        // total, not just spatial elements × last_stride.
+        auto nb_total_elements{static_cast<Index_t>(field.get_buffer_size())};
 
         // Get the begin address of the field data (cast into char * for pointer
         // arithmetics). Pass false to allow device pointers for CUDA-aware MPI.
@@ -218,12 +219,8 @@ namespace muGrid {
         auto element_size{
             static_cast<Index_t>(field.get_element_size_in_bytes())};
 
-#ifdef WITH_MPI
-        MPI_Datatype mpi_type{field.get_mpi_type()};
-        void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
-#else
-        void * mpi_type_ptr{nullptr};
-#endif
+        // Get type descriptor for communication
+        TypeDescriptor type_desc{field.get_type_descriptor()};
 
         // FIXME! The code below assumes a specific form of data layout,
         // essentially column-major but with potentially varying slides
@@ -248,16 +245,28 @@ namespace muGrid {
             // between slices which means to send multiple consecutive slices
             // we just send more blocks.
             auto block_len{strides[strides.size() - spatial_dims + direction]};
-            // Block stride
+
+            // Detect SoA (Structure of Arrays) layout vs AoS (Array of
+            // Structures). In SoA, spatial indices are fastest (stride = 1),
+            // components are slowest. In AoS, components are fastest
+            // (stride = 1), spatial indices are slower.
+            auto first_spatial_stride{strides[strides.size() - spatial_dims]};
+            bool is_soa{strides[0] > first_spatial_stride};
+
+            // Block stride: for non-last directions, use the next spatial
+            // stride. For the last direction:
+            // - AoS: use nb_total_elements (one big block)
+            // - SoA: use the stride of the last non-spatial dimension (just
+            //   before the spatial dimensions). This ensures we get the right
+            //   number of blocks to cover all component/sub_pt combinations.
+            Index_t last_non_spatial_stride{
+                strides.size() > static_cast<size_t>(spatial_dims)
+                    ? strides[strides.size() - spatial_dims - 1]
+                    : nb_total_elements};
             auto block_stride{
                 direction < spatial_dims - 1
                     ? strides[strides.size() - spatial_dims + direction + 1]
-                    : nb_total_elements};
-            /*
-             auto block_stride{
-                 block_len *
-                 this->get_nb_subdomain_grid_pts_with_ghosts()[direction]};
-            */
+                    : (is_soa ? last_non_spatial_stride : nb_total_elements)};
 
             // Number of blocks for single slice
             auto nb_blocks{nb_total_elements / block_stride};
@@ -323,7 +332,7 @@ namespace muGrid {
                     // stride in send direction
                     block_len,
                     // type information
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     // device memory flag for serial GPU memory copy
                     is_device_memory);
 
@@ -351,7 +360,7 @@ namespace muGrid {
                     // stride in send direction
                     block_len,
                     // type information
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     // device memory flag for serial GPU memory copy
                     is_device_memory);
 
@@ -382,10 +391,11 @@ namespace muGrid {
         // Get strides (in unit: elements)
         auto strides{field.get_strides(IterUnit::SubPt)};
 
-        // Total number of elements in the field
-        auto nb_total_elements{
-            strides[strides.size() - 1] *
-            this->get_nb_subdomain_grid_pts_with_ghosts()[spatial_dims - 1]};
+        // Total number of elements in the field.
+        // For SoA (Structure of Arrays) layout on GPU, components are stored
+        // separately, so we need to use get_buffer_size() to get the true
+        // total, not just spatial elements × last_stride.
+        auto nb_total_elements{static_cast<Index_t>(field.get_buffer_size())};
 
         // Get the begin address of the field data
         auto * data{static_cast<char *>(field.get_void_data_ptr(false))};
@@ -397,12 +407,8 @@ namespace muGrid {
         auto element_size{
             static_cast<Index_t>(field.get_element_size_in_bytes())};
 
-#ifdef WITH_MPI
-        MPI_Datatype mpi_type{field.get_mpi_type()};
-        void * mpi_type_ptr{static_cast<void *>(&mpi_type)};
-#else
-        void * mpi_type_ptr{nullptr};
-#endif
+        // Get type descriptor for communication
+        TypeDescriptor type_desc{field.get_type_descriptor()};
 
         // For each direction (in reverse order to handle corners correctly)
         for (Dim_t direction{static_cast<int>(spatial_dims) - 1}; direction >= 0;
@@ -413,10 +419,28 @@ namespace muGrid {
 
             // Calculate memory layout
             auto block_len{strides[strides.size() - spatial_dims + direction]};
+
+            // Detect SoA (Structure of Arrays) layout vs AoS (Array of
+            // Structures). In SoA, spatial indices are fastest (stride = 1),
+            // components are slowest. In AoS, components are fastest
+            // (stride = 1), spatial indices are slower.
+            auto first_spatial_stride{strides[strides.size() - spatial_dims]};
+            bool is_soa{strides[0] > first_spatial_stride};
+
+            // Block stride: for non-last directions, use the next spatial
+            // stride. For the last direction:
+            // - AoS: use nb_total_elements (one big block)
+            // - SoA: use the stride of the last non-spatial dimension (just
+            //   before the spatial dimensions). This ensures we get the right
+            //   number of blocks to cover all component/sub_pt combinations.
+            Index_t last_non_spatial_stride{
+                strides.size() > static_cast<size_t>(spatial_dims)
+                    ? strides[strides.size() - spatial_dims - 1]
+                    : nb_total_elements};
             auto block_stride{
                 direction < spatial_dims - 1
                     ? strides[strides.size() - spatial_dims + direction + 1]
-                    : nb_total_elements};
+                    : (is_soa ? last_non_spatial_stride : nb_total_elements)};
 
             // Number of blocks for single slice
             auto nb_blocks{nb_total_elements / block_stride};
@@ -455,7 +479,7 @@ namespace muGrid {
                         nb_ghosts_left,
                     data,
                     block_len,
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     is_device_memory);
             }
 
@@ -475,7 +499,7 @@ namespace muGrid {
                     nb_ghosts_left,
                     data,
                     block_len,
-                    element_size, mpi_type_ptr,
+                    element_size, type_desc,
                     is_device_memory);
             }
 
@@ -489,8 +513,8 @@ namespace muGrid {
                         cudaMemset(data + offset * element_size, 0,
                                    block_len * element_size);
 #elif defined(MUGRID_ENABLE_HIP)
-                        hipMemset(data + offset * element_size, 0,
-                                  block_len * element_size);
+                        (void)hipMemset(data + offset * element_size, 0,
+                                        block_len * element_size);
 #endif
                     } else {
                         std::memset(data + offset * element_size, 0,
@@ -510,8 +534,8 @@ namespace muGrid {
                         cudaMemset(data + offset * element_size, 0,
                                    block_len * element_size);
 #elif defined(MUGRID_ENABLE_HIP)
-                        hipMemset(data + offset * element_size, 0,
-                                  block_len * element_size);
+                        (void)hipMemset(data + offset * element_size, 0,
+                                        block_len * element_size);
 #endif
                     } else {
                         std::memset(data + offset * element_size, 0,

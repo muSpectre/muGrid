@@ -186,25 +186,25 @@ class FileIOTest(unittest.TestCase):
         loc_prefix = "local-state-field"
         sf_glob = self.fc_glob.register_real_state_field(glob_prefix, 3, 1, "pixel")
         # iterate over state field where only the current field has write access
-        for i in range(sf_glob.get_nb_memory() + 1):
+        for i in range(sf_glob.nb_memory + 1):
             f_glob = sf_glob.current()
             a_glob = np.from_dlpack(f_glob)
             a_glob[:] = i + 1
             sf_glob.cycle()
         # bring field in the correct order
-        for i in range(sf_glob.get_nb_memory()):
+        for i in range(sf_glob.nb_memory):
             sf_glob.cycle()
         file_io_object.register_field_collection(self.fc_glob)
 
         sf_loc = self.fc_loc.register_int_state_field(loc_prefix, 3, 1, "pixel")
         # iterate over state field where only the current field has write access
-        for i in range(sf_loc.get_nb_memory() + 1):
+        for i in range(sf_loc.nb_memory + 1):
             f_loc = sf_loc.current()
             a_loc = np.from_dlpack(f_loc)
             a_loc[:] = 2 * i + 1
             sf_loc.cycle()
         # bring field in the correct order
-        for i in range(sf_loc.get_nb_memory()):
+        for i in range(sf_loc.nb_memory):
             sf_loc.cycle()
         file_io_object.register_field_collection(self.fc_loc)
 
@@ -217,12 +217,12 @@ class FileIOTest(unittest.TestCase):
 
         # read fields by name in frame 0
         file_io_object.read(0, [glob_prefix, loc_prefix])
-        for i in range(sf_glob.get_nb_memory() + 1):
+        for i in range(sf_glob.nb_memory + 1):
             f_glob = sf_glob.old(i)
             a_glob = np.from_dlpack(f_glob)
-            ref = sf_glob.get_nb_memory() + 1 - i
+            ref = sf_glob.nb_memory + 1 - i
             self.assertTrue((a_glob == ref).all(), str(a_glob) + " != " + str(ref))
-        for i in range(sf_loc.get_nb_memory() + 1):
+        for i in range(sf_loc.nb_memory + 1):
             f_loc = sf_loc.old(i)
             a_loc = np.from_dlpack(f_loc)
             ref = 0
@@ -230,15 +230,15 @@ class FileIOTest(unittest.TestCase):
 
         # read fields in frame 1
         file_io_object.read(1)
-        for i in range(sf_glob.get_nb_memory() + 1):
+        for i in range(sf_glob.nb_memory + 1):
             f_glob = sf_glob.old(i)
             a_glob = np.from_dlpack(f_glob)
             ref = 0
             self.assertTrue((a_glob == ref).all(), str(a_glob) + " != " + str(ref))
-        for i in range(sf_loc.get_nb_memory() + 1):
+        for i in range(sf_loc.nb_memory + 1):
             f_loc = sf_loc.old(i)
             a_loc = np.from_dlpack(f_loc)
-            ref = 2 * (sf_loc.get_nb_memory() - i) + 1
+            ref = 2 * (sf_loc.nb_memory - i) + 1
             self.assertTrue((a_loc == ref).all(), str(a_loc) + " != " + str(ref))
 
         file_io_object.close()
@@ -366,6 +366,9 @@ class FileIOTest(unittest.TestCase):
         global_att_dic = file_io_object_r.read_global_attributes()
         for k in global_att_dic.keys():
             self.assertTrue(global_att_dic[k] == global_att_ref_dic[k])
+
+        # close the read handle before opening in append mode
+        file_io_object_r.close()
 
         # --- change global attribute in append mode --- #
         file_io_object_a = muGrid.FileIONetCDF(

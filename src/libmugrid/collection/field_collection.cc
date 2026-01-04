@@ -55,28 +55,23 @@ namespace muGrid {
     FieldCollection::FieldCollection(ValidityDomain domain,
                                      Dim_t spatial_dimension,
                                      const SubPtMap_t & nb_sub_pts,
-                                     StorageOrder storage_order,
-                                     MemoryLocation memory_location)
+                                     StorageOrder storage_order, Device device)
         : domain{domain}, spatial_dim{spatial_dimension},
           nb_sub_pts{nb_sub_pts},
           // Use StructureOfArrays storage order for device memory
           // to ensure optimal memory coalescing on GPU
-          storage_order{memory_location == MemoryLocation::Device
-                            ? StorageOrder::StructureOfArrays
-                            : storage_order},
-          memory_location{memory_location} {
+          storage_order{device.is_device() ? StorageOrder::StructureOfArrays
+                                           : storage_order},
+          device{device} {
         this->set_nb_sub_pts(PixelTag, 1);
     }
 
     /* ---------------------------------------------------------------------- */
-    FieldCollection::MemoryLocation
-    FieldCollection::get_memory_location() const {
-        return this->memory_location;
-    }
+    Device FieldCollection::get_device() const { return this->device; }
 
     /* ---------------------------------------------------------------------- */
     bool FieldCollection::is_on_device() const {
-        return this->memory_location == MemoryLocation::Device;
+        return this->device.is_device();
     }
 
     /* ---------------------------------------------------------------------- */

@@ -139,7 +139,7 @@ void add_file_io_base(py::module & mod) {
            })
       .def("append_frame", &FileIOBase::append_frame,
            py::return_value_policy::reference_internal)
-      .def("get_communicator", &FileIOBase::get_communicator);
+      .def_property_readonly("communicator", &FileIOBase::get_communicator);
 }
 
 void add_file_frame(py::module & mod) {

@@ -3,14 +3,16 @@
 # Benchmark script for Homogenization solver
 #
 # This script runs the homogenization solver with different grid sizes,
-# comparing performance between host (CPU) and device (GPU) execution.
+# comparing performance between fused and generic kernels.
 #
 # Usage:
-#   ./benchmark_homogenization.sh [host|device] [maxiter]
+#   ./benchmark_homogenization.sh [cpu|gpu] [2d|3d] [maxiter] [maxgrid] [maxgrid]
 #
 # Arguments:
-#   host|device  - Memory location (default: host)
+#   cpu|gpu      - Device for computation (default: cpu)
+#   2d|3d        - Grid dimensionality (default: 2d)
 #   maxiter      - Maximum CG iterations per load case (default: 100)
+#   maxgrid      - Maximum grid points in one direction (default: 128)
 #
 # Environment variables:
 #   PYTHON       - Python interpreter to use (default: python3)
@@ -19,22 +21,30 @@
 # Requirements:
 #   - jq (for JSON processing)
 #   - Python with muGrid installed
-#   - CuPy (for device execution)
+#   - CuPy (for GPU execution)
 #
 
 set -e
 
 # Default parameters
-MEMORY="${1:-host}"
-MAXITER="${2:-100}"
+DEVICE="${1:-cpu}"
+DIM="${2:-2d}"
+MAXITER="${3:-100}"
+MAXGRID="${4:-128}"  # Maximum grid points in one direction
 
 # Use PYTHON environment variable or default to python3
 PYTHON="${PYTHON:-python3}"
 
 # Validate arguments
-if [[ "$MEMORY" != "host" && "$MEMORY" != "device" ]]; then
-    echo "Error: First argument must be 'host' or 'device'"
-    echo "Usage: $0 [host|device] [maxiter]"
+if [[ "$DEVICE" != "cpu" && "$DEVICE" != "gpu" ]]; then
+    echo "Error: First argument must be 'cpu' or 'gpu'"
+    echo "Usage: $0 [cpu|gpu] [2d|3d] [maxiter] [maxgrid]"
+    exit 1
+fi
+
+if [[ "$DIM" != "2d" && "$DIM" != "3d" ]]; then
+    echo "Error: Second argument must be '2d' or '3d'"
+    echo "Usage: $0 [cpu|gpu] [2d|3d] [maxiter] [maxgrid]"
     exit 1
 fi
 
@@ -54,8 +64,24 @@ if [[ ! -f "$HOMOG_PY" ]]; then
     exit 1
 fi
 
-# Define grid sizes (2D only for homogenization)
-GRID_SIZES=("16,16" "32,32" "64,64" "128,128" "256,256")
+# Define grid sizes based on dimensionality and MAXGRID
+GRID_SIZES=()
+if [[ "$DIM" == "2d" ]]; then
+    for n in 16 32 64 128 256 512 1024 2048 4096 8192; do
+        if [[ $n -le $MAXGRID ]]; then
+            GRID_SIZES+=("$n,$n")
+        fi
+    done
+else
+    for n in 8 16 24 32 48 64 96 128 256 512 1024 2048; do
+        if [[ $n -le $MAXGRID ]]; then
+            GRID_SIZES+=("$n,$n,$n")
+        fi
+    done
+fi
+
+# Kernel implementations to compare
+KERNELS=("fused" "generic")
 
 # Inclusion types to test
 INCLUSION_TYPES=("single" "checkerboard")
@@ -68,48 +94,54 @@ echo "============================================================"
 echo "Homogenization Benchmark"
 echo "============================================================"
 echo "Python:      $PYTHON"
-echo "Memory:      $MEMORY"
+echo "Device:      $DEVICE"
+echo "Dimensions:  $DIM"
 echo "Max iter:    $MAXITER"
+echo "Max grid:    $MAXGRID"
 echo "Grid sizes:  ${GRID_SIZES[*]}"
+echo "Kernels:     ${KERNELS[*]}"
 echo "============================================================"
 echo ""
 
 # Run benchmarks
 for grid in "${GRID_SIZES[@]}"; do
-    for incl_type in "${INCLUSION_TYPES[@]}"; do
-        echo -n "Running: grid=$grid, inclusion=$incl_type ... "
+    for kernel in "${KERNELS[@]}"; do
+        for incl_type in "${INCLUSION_TYPES[@]}"; do
+            echo -n "Running: grid=$grid, kernel=$kernel, inclusion=$incl_type ... "
 
-        # Run the solver and capture JSON output
-        result=$("$PYTHON" "$HOMOG_PY" \
-            -n "$grid" \
-            -m "$MEMORY" \
-            -i "$MAXITER" \
-            --inclusion-type "$incl_type" \
-            --json 2>&1)
+            # Run the solver and capture JSON output
+            result=$("$PYTHON" "$HOMOG_PY" \
+                -n "$grid" \
+                -d "$DEVICE" \
+                -k "$kernel" \
+                -i "$MAXITER" \
+                --inclusion-type "$incl_type" \
+                --json 2>&1)
 
-        if [[ $? -ne 0 ]]; then
-            echo "FAILED"
-            echo "$result"
-            continue
-        fi
+            if [[ $? -ne 0 ]]; then
+                echo "FAILED"
+                echo "$result"
+                continue
+            fi
 
-        # Extract key metrics
-        total_time=$(echo "$result" | jq -r '.results.total_time_seconds')
-        throughput=$(echo "$result" | jq -r '.results.memory_throughput_GBps')
-        flops=$(echo "$result" | jq -r '.results.flops_rate_GFLOPs')
-        iterations=$(echo "$result" | jq -r '.results.total_cg_iterations')
+            # Extract key metrics
+            total_time=$(echo "$result" | jq -r '.results.total_time_seconds')
+            throughput=$(echo "$result" | jq -r '.results.memory_throughput_GBps')
+            flops=$(echo "$result" | jq -r '.results.flops_rate_GFLOPs_estimated')
+            iterations=$(echo "$result" | jq -r '.results.total_cg_iterations')
 
-        echo "done (time: ${total_time}s, ${iterations} iters, ${throughput} GB/s, ${flops} GFLOP/s)"
+            echo "done (time: ${total_time}s, ${iterations} iters, ${throughput} GB/s, ${flops} GFLOP/s)"
 
-        # Append to results file
-        jq --argjson new "$result" '. += [$new]' "$RESULTS_FILE" > "${RESULTS_FILE}.tmp"
-        mv "${RESULTS_FILE}.tmp" "$RESULTS_FILE"
+            # Append to results file
+            jq --argjson new "$result" '. += [$new]' "$RESULTS_FILE" > "${RESULTS_FILE}.tmp"
+            mv "${RESULTS_FILE}.tmp" "$RESULTS_FILE"
+        done
     done
 done
 
 echo ""
 echo "============================================================"
-echo "Summary: Performance by Grid Size (single inclusion)"
+echo "Summary: Performance by Grid Size (single inclusion, fused kernel)"
 echo "============================================================"
 echo ""
 
@@ -123,7 +155,8 @@ printf "%-12s %12s %10s %12s %10s %10s\n" \
 for grid in "${GRID_SIZES[@]}"; do
     result=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.inclusion_type == "single")] | .[0] // empty' \
+              | select(.config.inclusion_type == "single")
+              | select(.config.kernel == "fused")] | .[0] // empty' \
         "$RESULTS_FILE")
 
     if [[ -n "$result" ]]; then
@@ -131,7 +164,7 @@ for grid in "${GRID_SIZES[@]}"; do
         total_time=$(echo "$result" | jq -r '.results.total_time_seconds')
         iterations=$(echo "$result" | jq -r '.results.total_cg_iterations')
         throughput=$(echo "$result" | jq -r '.results.memory_throughput_GBps')
-        flops=$(echo "$result" | jq -r '.results.flops_rate_GFLOPs')
+        flops=$(echo "$result" | jq -r '.results.flops_rate_GFLOPs_estimated')
 
         printf "%-12s %12s %10s %12.4f %10.2f %10.2f\n" \
             "$grid" "$nb_pts" "$iterations" "$total_time" "$throughput" "$flops"
@@ -140,7 +173,41 @@ done
 
 echo ""
 echo "============================================================"
-echo "Summary: Homogenized Properties (single inclusion)"
+echo "Summary: Fused vs Generic Kernel (single inclusion)"
+echo "============================================================"
+echo ""
+
+printf "%-12s %12s %12s %10s\n" \
+    "Grid Size" "Fused (s)" "Generic (s)" "Speedup"
+printf "%-12s %12s %12s %10s\n" \
+    "------------" "------------" "------------" "----------"
+
+for grid in "${GRID_SIZES[@]}"; do
+    fused_time=$(jq -r --arg g "$grid" \
+        '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
+              | select(.config.inclusion_type == "single")
+              | select(.config.kernel == "fused")] | .[0].results.total_time_seconds // "N/A"' \
+        "$RESULTS_FILE")
+
+    generic_time=$(jq -r --arg g "$grid" \
+        '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
+              | select(.config.inclusion_type == "single")
+              | select(.config.kernel == "generic")] | .[0].results.total_time_seconds // "N/A"' \
+        "$RESULTS_FILE")
+
+    if [[ "$fused_time" != "N/A" && "$generic_time" != "N/A" && "$fused_time" != "0" ]]; then
+        speedup=$(echo "scale=2; $generic_time / $fused_time" | bc)
+        printf "%-12s %12.4f %12.4f %9sx\n" \
+            "$grid" "$fused_time" "$generic_time" "$speedup"
+    else
+        printf "%-12s %12s %12s %10s\n" \
+            "$grid" "$fused_time" "$generic_time" "N/A"
+    fi
+done
+
+echo ""
+echo "============================================================"
+echo "Summary: Homogenized Properties (single inclusion, fused)"
 echo "============================================================"
 echo ""
 
@@ -152,7 +219,8 @@ printf "%-12s %12s %12s %12s %12s\n" \
 for grid in "${GRID_SIZES[@]}"; do
     result=$(jq -r --arg g "$grid" \
         '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-              | select(.config.inclusion_type == "single")] | .[0] // empty' \
+              | select(.config.inclusion_type == "single")
+              | select(.config.kernel == "fused")] | .[0] // empty' \
         "$RESULTS_FILE")
 
     if [[ -n "$result" ]]; then
@@ -166,45 +234,8 @@ for grid in "${GRID_SIZES[@]}"; do
     fi
 done
 
-echo ""
-echo "============================================================"
-echo "Host vs Device Comparison (if both available)"
-echo "============================================================"
-echo ""
-
-# If we have both host and device results, compare them
-if [[ -f "/tmp/homogenization_benchmark_host.json" && -f "/tmp/homogenization_benchmark_device.json" ]]; then
-    printf "%-12s %12s %12s %10s\n" \
-        "Grid Size" "Host (s)" "Device (s)" "Speedup"
-    printf "%-12s %12s %12s %10s\n" \
-        "------------" "------------" "------------" "----------"
-
-    for grid in "${GRID_SIZES[@]}"; do
-        host_time=$(jq -r --arg g "$grid" \
-            '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-                  | select(.config.inclusion_type == "single")] | .[0].results.total_time_seconds // "N/A"' \
-            "/tmp/homogenization_benchmark_host.json")
-
-        device_time=$(jq -r --arg g "$grid" \
-            '[.[] | select(.config.nb_grid_pts == ($g | split(",") | map(tonumber)))
-                  | select(.config.inclusion_type == "single")] | .[0].results.total_time_seconds // "N/A"' \
-            "/tmp/homogenization_benchmark_device.json")
-
-        if [[ "$host_time" != "N/A" && "$device_time" != "N/A" ]]; then
-            speedup=$(echo "scale=2; $host_time / $device_time" | bc)
-            printf "%-12s %12.4f %12.4f %9sx\n" \
-                "$grid" "$host_time" "$device_time" "$speedup"
-        fi
-    done
-else
-    echo "Run benchmark with both 'host' and 'device' to see comparison."
-    echo "Results are saved to:"
-    echo "  Host:   /tmp/homogenization_benchmark_host.json"
-    echo "  Device: /tmp/homogenization_benchmark_device.json"
-fi
-
-# Save results with memory type suffix for later comparison
-cp "$RESULTS_FILE" "/tmp/homogenization_benchmark_${MEMORY}.json"
+# Save results with device suffix for later comparison
+cp "$RESULTS_FILE" "/tmp/homogenization_benchmark_${DEVICE}.json"
 
 echo ""
 echo "============================================================"
@@ -216,9 +247,13 @@ echo "  - FEM gradient/divergence operations"
 echo "  - Stress tensor computations"
 echo "  - Ghost communication overhead"
 echo ""
-echo "The homogenization solves 3 load cases (xx, yy, xy strain)."
+if [[ "$DIM" == "2d" ]]; then
+    echo "The homogenization solves 3 load cases (xx, yy, xy strain)."
+else
+    echo "The homogenization solves 6 load cases (xx, yy, zz, yz, xz, xy strain)."
+fi
 echo "Total CG iterations is the sum across all cases."
 echo ""
 echo "Results saved to: $RESULTS_FILE"
-echo "Comparison file:  /tmp/homogenization_benchmark_${MEMORY}.json"
+echo "Comparison file:  /tmp/homogenization_benchmark_${DEVICE}.json"
 echo ""

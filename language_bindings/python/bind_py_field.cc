@@ -306,6 +306,25 @@ void add_typed_field(py::module &mod, std::string name) {
                 },
                 "nb_rows"_a = muGrid::Unknown,
                 py::return_value_policy::reference_internal)
+            // Deep copy from another host field (same-space copy)
+            .def(
+                "deep_copy_from",
+                [](TypedFieldBase<T> &dst, const TypedFieldBase<T> &src) {
+                    dst.deep_copy_from(src);
+                },
+                "src"_a,
+                "Deep copy from another host field")
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            // Deep copy from device field (cross-space copy with layout conversion)
+            .def(
+                "deep_copy_from",
+                [](TypedFieldBase<T> &dst,
+                   const TypedFieldBase<T, muGrid::DefaultDeviceSpace> &src) {
+                    dst.deep_copy_from(src);
+                },
+                "src"_a,
+                "Deep copy from device field with automatic layout conversion")
+#endif
             // DLPack support: versioned protocol for numpy >= 2.1
             .def(
                 "__dlpack__",
@@ -344,6 +363,24 @@ void add_typed_field_device(py::module &mod, std::string name) {
     // Device-space TypedFieldBase - inherits from Field
     // Note: get_pixel_map and get_sub_pt_map are host-only, so not exposed here
     py::class_<TypedFieldBase<T, DeviceSpace>, Field>(mod, (name + "DeviceBase").c_str())
+            // Deep copy from host field (cross-space copy with layout conversion)
+            .def(
+                "deep_copy_from",
+                [](TypedFieldBase<T, DeviceSpace> &dst,
+                   const TypedFieldBase<T, muGrid::HostSpace> &src) {
+                    dst.deep_copy_from(src);
+                },
+                "src"_a,
+                "Deep copy from host field with automatic layout conversion")
+            // Deep copy from another device field (same-space copy)
+            .def(
+                "deep_copy_from",
+                [](TypedFieldBase<T, DeviceSpace> &dst,
+                   const TypedFieldBase<T, DeviceSpace> &src) {
+                    dst.deep_copy_from(src);
+                },
+                "src"_a,
+                "Deep copy from another device field")
             // DLPack support: versioned protocol for numpy >= 2.1
             .def(
                 "__dlpack__",

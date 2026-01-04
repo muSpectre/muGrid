@@ -85,7 +85,7 @@ class FFTEngine : public FFTEngineBase {
             const DynGridIndex & nb_ghosts_right = DynGridIndex{},
             const SubPtMap_t & nb_sub_pts = {})
       : Parent_t{nb_domain_grid_pts, comm, nb_ghosts_left, nb_ghosts_right,
-                 nb_sub_pts, memory_location<MemorySpace>()},
+                 nb_sub_pts, memory_space_to_device<MemorySpace>()},
         backend{create_fft_backend<MemorySpace>()} {}
 
   FFTEngine() = delete;

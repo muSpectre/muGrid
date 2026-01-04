@@ -5,6 +5,7 @@ set(MUGRID_EXAMPLES
     field_collection.py
     fourier_derivative.py
     gradient.py
+    homogenization.py
     io.py
     poisson.py
     sub_points.py
@@ -43,6 +44,26 @@ if(NUMPY_CHECK_RESULT EQUAL 0)
             ENVIRONMENT "${PYTHON_EXAMPLE_ENV}"
         )
     endforeach()
+
+    # Additional 3D tests for poisson and homogenization examples
+    # These ensure both 2D and 3D code paths are tested
+    add_test(
+        NAME example_poisson_3d
+        COMMAND ${MUGRID_PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/poisson.py -n 8,8,8 -q
+    )
+    set_tests_properties(example_poisson_3d PROPERTIES
+        TIMEOUT 300
+        ENVIRONMENT "${PYTHON_EXAMPLE_ENV}"
+    )
+
+    add_test(
+        NAME example_homogenization_3d
+        COMMAND ${MUGRID_PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/homogenization.py -n 6,6,6 -q
+    )
+    set_tests_properties(example_homogenization_3d PROPERTIES
+        TIMEOUT 300
+        ENVIRONMENT "${PYTHON_EXAMPLE_ENV}"
+    )
 else()
     message(STATUS "numpy not available in ${MUGRID_PYTHON_EXECUTABLE}, skipping Python examples")
 endif()

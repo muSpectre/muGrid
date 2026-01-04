@@ -87,10 +87,9 @@ class HostFieldDeviceInfoTests(unittest.TestCase):
         """Test that host collection reports is_on_device = False."""
         self.assertFalse(self.fc.is_on_device)
 
-    def test_host_collection_memory_location(self):
-        """Test that host collection reports Host memory location."""
-        self.assertEqual(self.fc.memory_location,
-                         muGrid.GlobalFieldCollection.MemoryLocation.Host)
+    def test_host_collection_device(self):
+        """Test that host collection reports CPU device."""
+        self.assertTrue(self.fc.device.is_host)
 
 
 class HostFieldAccessTests(unittest.TestCase):
@@ -127,17 +126,16 @@ class DeviceCollectionTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            device=muGrid.Device.cuda()
         )
 
     def test_device_collection_is_on_device(self):
         """Test that device collection reports is_on_device = True."""
         self.assertTrue(self.fc.is_on_device)
 
-    def test_device_collection_memory_location(self):
-        """Test that device collection reports Device memory location."""
-        self.assertEqual(self.fc.memory_location,
-                         muGrid.GlobalFieldCollection.MemoryLocation.Device)
+    def test_device_collection_device(self):
+        """Test that device collection reports CUDA/ROCm device."""
+        self.assertTrue(self.fc.device.is_device)
 
     def test_device_field_is_on_gpu(self):
         """Test that fields in device collection report is_on_gpu = True."""
@@ -185,7 +183,7 @@ class DeviceFieldFactoryTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            device=muGrid.Device.cuda()
         )
 
     def test_real_field_on_device_collection(self):
@@ -213,7 +211,7 @@ class CuPyIntegrationTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            device=muGrid.Device.cuda()
         )
 
     def test_device_field_returns_cupy_array(self):
@@ -289,7 +287,7 @@ class MixedHostDeviceTests(unittest.TestCase):
         # Create device collection
         self.fc_device = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device
+            device=muGrid.Device.cuda()
         )
 
     def test_host_and_device_collections(self):

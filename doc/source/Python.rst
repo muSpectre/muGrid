@@ -198,7 +198,7 @@ missing. This means we can represent a simple forward-differences gradient opera
         [[-1, 1], [0, 0]],
         [[-1, 0], [1, 0]]
     ])
-    op = muGrid.ConvolutionOperator(2, stencil)
+    op = muGrid.GenericLinearOperator(2, stencil)
 
 .. literalinclude:: ../../examples/gradient.py
     :language: python

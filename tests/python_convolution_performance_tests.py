@@ -213,16 +213,15 @@ def count_theoretical_flops(conv_op, nodal_field, quad_field, grid_size):
     """
     nb_pixels = np.prod(grid_size)
     nb_components = nodal_field.nb_components
-    nb_operators = conv_op.nb_operators
+    nb_operators = conv_op.nb_output_components
     nb_quad_pts = conv_op.nb_quad_pts
-    nb_nodal_pts = conv_op.nb_nodal_pts
+    nb_nodal_pts = conv_op.nb_input_components
 
     # Get stencil shape from the operator
-    # This is a bit tricky - we need to compute nb_conv_pts from the stencil
-    # For now, estimate from the operator matrix dimensions
-    # pixel_operator returns a flat list, so we compute nb_conv_pts from total size
-    operator_list = conv_op.pixel_operator
-    total_elements = len(operator_list)
+    # coefficients returns a shaped array:
+    # (nb_output_components, nb_quad_pts, nb_input_components, *stencil_shape)
+    coefficients = conv_op.coefficients
+    total_elements = coefficients.size
     # Total elements = nb_operators * nb_quad_pts * nb_nodal_pts * nb_conv_pts
     nb_conv_pts = total_elements // (nb_operators * nb_quad_pts * nb_nodal_pts)
 
@@ -254,7 +253,7 @@ def measure_convolution_performance(
 
     Parameters
     ----------
-    conv_op : muGrid.ConvolutionOperator
+    conv_op : muGrid.GenericLinearOperator
         The convolution operator to benchmark
     nodal_field : muGrid.Field
         Input nodal field
@@ -358,7 +357,7 @@ def measure_convolution_performance(
         grid_size=grid_size,
         stencil_size=stencil_size,
         nb_components=nodal_field.nb_components,
-        nb_operators=conv_op.nb_operators,
+        nb_operators=conv_op.nb_output_components,
         nb_quad_pts=conv_op.nb_quad_pts,
         device=device,
         papi_cycles=papi_values.get("cycles"),
@@ -391,7 +390,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create field collection
         nb_ghosts = (1, 1)
@@ -444,7 +443,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
             nb_operators, nb_quad_pts, 1, nb_stencil_x, nb_stencil_y
         )
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create field collection
         comm = muGrid.Communicator()
@@ -499,7 +498,7 @@ class ConvolutionPerformanceTests(unittest.TestCase):
             # Create stencil
             stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
 
-            conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+            conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
             # Create field collection
             nb_ghosts = (1, 1)
@@ -575,13 +574,13 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
 
     # Determine memory location
     if use_device:
-        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Device
+        device = muGrid.Device.cuda()
     else:
-        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Host
+        device = muGrid.Device.cpu()
 
     # Setup problem
     decomposition = muGrid.CartesianDecomposition(
-        comm, nb_grid_pts, subdivisions, (1, 1), (1, 1), memory_location=memory_location
+        comm, nb_grid_pts, subdivisions, (1, 1), (1, 1), device=device
     )
     fc = decomposition
     grid_spacing = 1 / np.array(nb_grid_pts)
@@ -607,7 +606,7 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
 
     # Create Laplace operator
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
 
     # Get device string for reporting
     device_str = rhs.device
@@ -620,7 +619,6 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
         laplace.apply(x_field, Ax_field)
         Ax = wrap_field(Ax_field)
         Ax.s[...] /= scale_factor
-        return Ax_field
 
     # Time the solver
     if use_device and HAS_CUPY:
@@ -633,9 +631,9 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
     conjugate_gradients(
         comm,
         fc,
-        hessp_mugrid,
         rhs,
         solution,
+        hessp=hessp_mugrid,
         tol=1e-6,
         maxiter=1000,
     )
@@ -711,15 +709,14 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
         Ax = wrap_field(Ax_field)
         Ax.p[...] = (laplace_sparse @ x_arr.p.reshape(-1)).reshape(nb_grid_pts)
         Ax.s[...] /= -np.mean(grid_spacing) ** 2
-        return Ax_field
 
     t_scipy = -time.perf_counter()
     conjugate_gradients(
         comm,
         fc,
-        hessp_scipy,
         rhs,
         solution,
+        hessp=hessp_scipy,
         tol=1e-6,
         maxiter=1000,
     )
@@ -859,16 +856,16 @@ def run_quad_triangle_mugrid(nb_grid_pts, use_device=False):
 
     # Determine memory location
     if use_device:
-        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Device
+        device = muGrid.Device.cuda()
     else:
-        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Host
+        device = muGrid.Device.cpu()
 
     # Create field collection
     fc = muGrid.GlobalFieldCollection(
         nb_grid_pts,
         sub_pts={"quad": 6},
         nb_ghosts_right=(1, 1),
-        memory_location=memory_location,
+        device=device,
     )
     nodal_field_cpp = fc.real_field("nodal")
     quad_field_cpp = fc.real_field("quad", 1, "quad")
@@ -886,7 +883,7 @@ def run_quad_triangle_mugrid(nb_grid_pts, use_device=False):
 
     # Create operator
     kernel = get_quad_triangle_kernel()
-    op_mugrid = muGrid.ConvolutionOperator([0, 0], kernel)
+    op_mugrid = muGrid.GenericLinearOperator([0, 0], kernel)
 
     device_str = nodal_field_cpp.device
 
@@ -987,15 +984,15 @@ def test_quad_triangle_device_vs_host():
     # Run on device with same input
     # Recreate the field collection and use same init_field
     if HAS_CUPY:
-        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Device
+        device = muGrid.Device.cuda()
     else:
-        memory_location = muGrid.GlobalFieldCollection.MemoryLocation.Host
+        device = muGrid.Device.cpu()
 
     fc = muGrid.GlobalFieldCollection(
         nb_grid_pts,
         sub_pts={"quad": 6},
         nb_ghosts_right=(1, 1),
-        memory_location=memory_location,
+        device=device,
     )
     nodal_field_cpp = fc.real_field("nodal")
     quad_field_cpp = fc.real_field("quad", 1, "quad")
@@ -1005,7 +1002,7 @@ def test_quad_triangle_device_vs_host():
     nodal_field.pg[...] = cp.asarray(padded_field)
 
     kernel = get_quad_triangle_kernel()
-    op_mugrid = muGrid.ConvolutionOperator([0, 0], kernel)
+    op_mugrid = muGrid.GenericLinearOperator([0, 0], kernel)
     device_str = nodal_field_cpp.device
 
     # Time device operation
@@ -1085,7 +1082,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil_x, nb_stencil_y)
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create device field collection
         nb_ghosts = (1, 1)
@@ -1094,7 +1091,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
             sub_pts={"quad": nb_quad_pts},
             nb_ghosts_left=nb_ghosts,
             nb_ghosts_right=nb_ghosts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         # Create fields
@@ -1146,7 +1143,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
             nb_operators, nb_quad_pts, 1, nb_stencil_x, nb_stencil_y
         )
 
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create device field collection
         nb_ghosts = (1, 1)
@@ -1155,7 +1152,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
             sub_pts={"quad": nb_quad_pts},
             nb_ghosts_left=nb_ghosts,
             nb_ghosts_right=nb_ghosts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
 
         # Create fields
@@ -1208,7 +1205,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
 
             # Create stencil
             stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
-            conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+            conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
             # Host field collection
             fc_host = muGrid.GlobalFieldCollection(
@@ -1245,7 +1242,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
                 sub_pts={"quad": nb_quad_pts},
                 nb_ghosts_left=nb_ghosts,
                 nb_ghosts_right=nb_ghosts,
-                memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+                device=muGrid.Device.cuda(),
             )
             nodal_device = fc_device.real_field("nodal", nb_components)
             quad_device = fc_device.real_field(
@@ -1303,7 +1300,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
 
         # Create stencil
         stencil = np.random.rand(nb_operators, nb_quad_pts, nb_stencil, nb_stencil)
-        conv_op = muGrid.ConvolutionOperator([-1, -1], stencil)
+        conv_op = muGrid.GenericLinearOperator([-1, -1], stencil)
 
         # Create host fields
         fc_host = muGrid.GlobalFieldCollection(
@@ -1330,7 +1327,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
             sub_pts={"quad": nb_quad_pts},
             nb_ghosts_left=nb_ghosts,
             nb_ghosts_right=nb_ghosts,
-            memory_location=muGrid.GlobalFieldCollection.MemoryLocation.Device,
+            device=muGrid.Device.cuda(),
         )
         nodal_device = fc_device.real_field("nodal", nb_components)
         quad_device = fc_device.real_field(

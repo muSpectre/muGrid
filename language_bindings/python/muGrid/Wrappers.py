@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from .Parallel import Communicator
 
 # Type aliases
-MemoryLocationStr = Literal["host", "device"]
+DeviceStr = Literal["cpu", "cuda", "rocm", "gpu", "host", "device"]
 SubPtMap = Dict[str, int]
 Shape = Union[Tuple[int, ...], List[int], Sequence[int]]
 
@@ -209,46 +209,73 @@ def _unwrap(obj: Any) -> Any:
     return getattr(obj, "_cpp", obj)
 
 
-def _parse_memory_location(
-    location: Optional[
-        Union[MemoryLocationStr, "_muGrid.GlobalFieldCollection.MemoryLocation"]
-    ],
-) -> "_muGrid.GlobalFieldCollection.MemoryLocation":
+def _parse_device(
+    device: Optional[Union[str, "_muGrid.Device"]],
+) -> "_muGrid.Device":
     """
-    Parse a memory location string to the C++ enum.
+    Parse a device specification to a Device instance.
 
     Parameters
     ----------
-    location : str, MemoryLocation enum, or None
-        Memory location: "host", "device", a MemoryLocation enum value,
-        or None (defaults to "host").
+    device : str, Device, or None
+        Device specification. Can be:
+        - None: defaults to CPU
+        - "cpu" or "host": CPU device
+        - "gpu" or "device": Default GPU (auto-detects CUDA or ROCm)
+        - "gpu:N": Default GPU with device ID N
+        - "cuda": CUDA GPU (device 0)
+        - "cuda:N": CUDA GPU with device ID N
+        - "rocm": ROCm GPU (device 0)
+        - "rocm:N": ROCm GPU with device ID N
+        - Device instance: used directly
 
     Returns
     -------
-    MemoryLocation
-        The C++ MemoryLocation enum value.
+    Device
+        The C++ Device instance.
 
     Raises
     ------
     ValueError
-        If an invalid memory location string is provided.
+        If an invalid device string is provided.
+    RuntimeError
+        If GPU is requested but not available.
     """
-    MemoryLocation = _muGrid.GlobalFieldCollection.MemoryLocation
-    # If it's already a MemoryLocation enum, return it directly
-    if isinstance(location, MemoryLocation):
-        return location
-    if location is None or location == "host":
-        return MemoryLocation.Host
-    elif location == "device":
+    Device = _muGrid.Device
+    # If it's already a Device instance, return it directly
+    if isinstance(device, Device):
+        return device
+    if device is None or device == "host" or device == "cpu":
+        return Device.cpu()
+    elif (
+        device == "gpu"
+        or device.startswith("gpu:")
+        or device == "device"
+        or device.startswith("cuda")
+        or device.startswith("rocm")
+    ):
         if not _muGrid.has_gpu:
             raise RuntimeError(
                 "GPU support is not available. "
                 "Rebuild muGrid with MUGRID_ENABLE_CUDA=ON or MUGRID_ENABLE_HIP=ON."
             )
-        return MemoryLocation.Device
+        # Parse device:id format
+        if ":" in device:
+            parts = device.split(":")
+            device_id = int(parts[1]) if len(parts) > 1 else 0
+        else:
+            device_id = 0
+        # Auto-detect GPU backend for "gpu" or "device"
+        if device == "gpu" or device.startswith("gpu:") or device == "device":
+            return Device.gpu(device_id)
+        elif device.startswith("cuda"):
+            return Device.cuda(device_id)
+        else:
+            return Device.rocm(device_id)
     else:
         raise ValueError(
-            f"Invalid memory_location: {location!r}. " f"Must be 'host' or 'device'."
+            f"Invalid device: {device!r}. "
+            f"Must be 'cpu', 'gpu', 'cuda', 'cuda:N', 'rocm', or 'rocm:N'."
         )
 
 
@@ -271,9 +298,9 @@ class GlobalFieldCollection(FieldCollectionMixin):
         Ghost cells on low-index side. Default is no ghosts.
     nb_ghosts_right : Sequence[int], optional
         Ghost cells on high-index side. Default is no ghosts.
-    memory_location : str, optional
-        Memory location for field data: "host" (CPU) or "device" (GPU).
-        Default is "host".
+    device : str or Device, optional
+        Device for field allocation: "cpu", "cuda", "cuda:N", "rocm:N",
+        or a Device instance. Default is "cpu".
 
     Examples
     --------
@@ -282,11 +309,11 @@ class GlobalFieldCollection(FieldCollectionMixin):
     >>> field.p[:] = 300.0  # Set temperature to 300K
 
     >>> # GPU field collection
-    >>> fc_gpu = GlobalFieldCollection([64, 64], memory_location="device")
+    >>> fc_gpu = GlobalFieldCollection([64, 64], device="cuda")
     """
 
-    # Expose MemoryLocation enum for backwards compatibility
-    MemoryLocation = _muGrid.GlobalFieldCollection.MemoryLocation
+    # Expose Device class for setting device
+    Device = _muGrid.Device
 
     def __init__(self, *args, **kwargs) -> None:
         # If called with positional args matching C++ signature, pass through directly
@@ -305,7 +332,7 @@ class GlobalFieldCollection(FieldCollectionMixin):
         sub_pts = kwargs.get("sub_pts")
         nb_ghosts_left = kwargs.get("nb_ghosts_left")
         nb_ghosts_right = kwargs.get("nb_ghosts_right")
-        memory_location = kwargs.get("memory_location")
+        device = kwargs.get("device")
         nb_subdomain_grid_pts = kwargs.get("nb_subdomain_grid_pts")
 
         # Handle sub_pts alias
@@ -333,12 +360,9 @@ class GlobalFieldCollection(FieldCollectionMixin):
             "nb_ghosts_right": list(nb_ghosts_right),
         }
 
-        # Handle memory_location
-        if memory_location is not None:
-            if isinstance(memory_location, str):
-                cpp_kwargs["memory_location"] = _parse_memory_location(memory_location)
-            else:
-                cpp_kwargs["memory_location"] = memory_location
+        # Handle device parameter
+        if device is not None:
+            cpp_kwargs["device"] = _parse_device(device)
 
         # Handle nb_subdomain_grid_pts if provided
         if nb_subdomain_grid_pts is not None:
@@ -375,12 +399,13 @@ class LocalFieldCollection(FieldCollectionMixin):
         Name for the collection.
     nb_sub_pts : dict, optional
         Number of sub-points per pixel for each sub-point type.
-    memory_location : str, optional
-        Memory location: "host" or "device". Default is "host".
+    device : str or Device, optional
+        Device for field allocation: "cpu", "cuda", "cuda:N", "rocm:N",
+        or a Device instance. Default is "cpu".
     """
 
-    # Expose MemoryLocation enum for backwards compatibility
-    MemoryLocation = _muGrid.LocalFieldCollection.MemoryLocation
+    # Expose Device class for setting device
+    Device = _muGrid.Device
 
     def __init__(self, *args, **kwargs) -> None:
         # If called with positional args matching C++ signature, pass through directly
@@ -398,7 +423,7 @@ class LocalFieldCollection(FieldCollectionMixin):
 
         name = kwargs.get("name", "")
         nb_sub_pts = kwargs.get("nb_sub_pts", {})
-        memory_location = kwargs.get("memory_location")
+        device = kwargs.get("device")
 
         cpp_kwargs = {
             "spatial_dimension": spatial_dim,
@@ -406,11 +431,8 @@ class LocalFieldCollection(FieldCollectionMixin):
             "nb_sub_pts": nb_sub_pts,
         }
 
-        if memory_location is not None:
-            if isinstance(memory_location, str):
-                cpp_kwargs["memory_location"] = _parse_memory_location(memory_location)
-            else:
-                cpp_kwargs["memory_location"] = memory_location
+        if device is not None:
+            cpp_kwargs["device"] = _parse_device(device)
 
         self._cpp = _muGrid.LocalFieldCollection(**cpp_kwargs)
         self._spatial_dim = spatial_dim
@@ -445,8 +467,9 @@ class CartesianDecomposition(FieldCollectionMixin):
         Ghost cells on high-index side. Default is no ghosts.
     nb_sub_pts : dict, optional
         Number of sub-points per pixel for each sub-point type.
-    memory_location : str, optional
-        Memory location: "host" or "device". Default is "host".
+    device : Device or str, optional
+        Device for field allocation: Device instance, "host", "device",
+        "cpu", "cuda:N", or "rocm:N". Default is CPU.
 
     Examples
     --------
@@ -461,6 +484,9 @@ class CartesianDecomposition(FieldCollectionMixin):
     >>> field = decomp.real_field("displacement", components=(3,))
     """
 
+    # Expose Device class for setting device
+    Device = _muGrid.Device
+
     def __init__(
         self,
         communicator: "Communicator",
@@ -469,7 +495,7 @@ class CartesianDecomposition(FieldCollectionMixin):
         nb_ghosts_left: Optional[Shape] = None,
         nb_ghosts_right: Optional[Shape] = None,
         nb_sub_pts: Optional[SubPtMap] = None,
-        memory_location: Optional[MemoryLocationStr] = None,
+        device: Optional[Union[DeviceStr, "_muGrid.Device"]] = None,
     ) -> None:
         from .Parallel import Communicator as CommFactory
 
@@ -488,11 +514,11 @@ class CartesianDecomposition(FieldCollectionMixin):
         if nb_sub_pts is None:
             nb_sub_pts = {}
 
-        mem_loc = _parse_memory_location(memory_location)
+        mem_loc = _parse_device(device)
         # C++ constructor signature:
         # CartesianDecomposition(comm, nb_domain_grid_pts, nb_subdivisions,
         #                        nb_ghosts_left, nb_ghosts_right, sub_pts={},
-        #                        memory_location=Host)
+        #                        device=Device::cpu())
         self._cpp = _muGrid.CartesianDecomposition(
             _unwrap(communicator),
             list(nb_domain_grid_pts),
@@ -771,9 +797,9 @@ class FFTEngine:
         )
 
 
-class ConvolutionOperator:
+class GenericLinearOperator:
     """
-    Python wrapper for muGrid ConvolutionOperator.
+    Python wrapper for muGrid GenericLinearOperator.
 
     Applies convolution (stencil) operations to fields. Useful for computing
     gradients, Laplacians, and other discrete differential operators.
@@ -790,7 +816,7 @@ class ConvolutionOperator:
     >>> # Create a 2D Laplacian stencil
     >>> import numpy as np
     >>> stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    >>> laplace = ConvolutionOperator([-1, -1], stencil)
+    >>> laplace = GenericLinearOperator([-1, -1], stencil)
     >>> laplace.apply(input_field, output_field)
     """
 
@@ -800,7 +826,7 @@ class ConvolutionOperator:
         stencil: ArrayLike,
     ) -> None:
         stencil_arr = np.asarray(stencil, dtype=np.float64, order="F")
-        self._cpp = _muGrid.ConvolutionOperator(list(offset), stencil_arr)
+        self._cpp = _muGrid.GenericLinearOperator(list(offset), stencil_arr)
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """
@@ -845,9 +871,9 @@ class ConvolutionOperator:
 
     def __repr__(self) -> str:
         return (
-            f"ConvolutionOperator("
+            f"GenericLinearOperator("
             f"spatial_dim={self._cpp.spatial_dim}, "
-            f"nb_operators={self._cpp.nb_operators})"
+            f"nb_output_components={self._cpp.nb_output_components})"
         )
 
 
@@ -873,7 +899,14 @@ class LaplaceOperator:
     """
 
     def __init__(self, spatial_dim: int, scale: float = 1.0) -> None:
-        self._cpp = _muGrid.LaplaceOperator(spatial_dim, scale)
+        if spatial_dim == 2:
+            self._cpp = _muGrid.LaplaceOperator2D(scale)
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.LaplaceOperator3D(scale)
+        else:
+            raise ValueError(
+                f"spatial_dim must be 2 or 3, got {spatial_dim}"
+            )
 
     def apply(self, input_field: Field, output_field: Field) -> None:
         """
@@ -961,7 +994,14 @@ class FEMGradientOperator:
     ) -> None:
         if grid_spacing is None:
             grid_spacing = []
-        self._cpp = _muGrid.FEMGradientOperator(spatial_dim, list(grid_spacing))
+        if spatial_dim == 2:
+            self._cpp = _muGrid.FEMGradientOperator2D(list(grid_spacing))
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.FEMGradientOperator3D(list(grid_spacing))
+        else:
+            raise ValueError(
+                f"spatial_dim must be 2 or 3, got {spatial_dim}"
+            )
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """

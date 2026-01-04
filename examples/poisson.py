@@ -22,66 +22,66 @@ except ImportError:
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 parser = argparse.ArgumentParser(
-    prog="Poisson",
-    description="Solve the Poisson equation"
+    prog="Poisson", description="Solve the Poisson equation"
 )
 
 parser.add_argument(
-    "-n", "--nb-grid-pts",
+    "-n",
+    "--nb-grid-pts",
     default=[32, 32],
     type=lambda s: [int(x) for x in s.split(",")],
-    help="Grid points as nx,ny or nx,ny,nz (default: 32,32)"
+    help="Grid points as nx,ny or nx,ny,nz (default: 32,32)",
 )
 
-_memory_locations = {
-    "host": muGrid.GlobalFieldCollection.MemoryLocation.Host,
-    "device": muGrid.GlobalFieldCollection.MemoryLocation.Device,
+_devices = {
+    "cpu": muGrid.Device.cpu(),
+    "gpu": muGrid.Device.gpu(),  # Auto-detect CUDA or ROCm
 }
 
 parser.add_argument(
-    "-m", "--memory",
-    choices=_memory_locations,
-    default="host",
-    help="Memory space for allocation (default: host)"
+    "-d",
+    "--device",
+    choices=_devices,
+    default="cpu",
+    help="Device for computation: 'cpu' or 'gpu' (auto-detect CUDA/ROCm) "
+    "(default: cpu)",
 )
 
 parser.add_argument(
-    "-i", "--maxiter",
+    "-i",
+    "--maxiter",
     type=int,
     default=1000,
-    help="Maximum number of CG iterations (default: 1000)"
+    help="Maximum number of CG iterations (default: 1000)",
 )
 
 parser.add_argument(
-    "-p", "--plot",
+    "-p",
+    "--plot",
     action="store_true",
-    help="Show plot of RHS and solution (default: off)"
+    help="Show plot of RHS and solution (default: off)",
 )
 
 parser.add_argument(
-    "-s", "--stencil",
+    "-k",
+    "--kernel",
     choices=["generic", "hardcoded"],
-    default="generic",
-    help="Stencil implementation: 'generic' (sparse convolution) or "
-         "'hardcoded' (optimized Laplace operator) (default: generic)"
+    default="hardcoded",
+    help="Kernel implementation: 'generic' (sparse convolution) or "
+    "'hardcoded' (optimized Laplace operator) (default: hardcoded)",
 )
 
 parser.add_argument(
-    "-q", "--quiet",
+    "-q",
+    "--quiet",
     action="store_true",
-    help="Suppress per-iteration output (default: off)"
+    help="Suppress per-iteration output (default: off)",
 )
 
 parser.add_argument(
     "--json",
     action="store_true",
-    help="Output results in JSON format (implies --quiet)"
-)
-
-parser.add_argument(
-    "--papi",
-    action="store_true",
-    help="Use PAPI hardware counters for performance measurement (requires pypapi)"
+    help="Output results in JSON format (implies --quiet)",
 )
 
 args = parser.parse_args()
@@ -90,12 +90,12 @@ args = parser.parse_args()
 if args.json:
     args.quiet = True
 
-if args.memory == "host":
+if args.device == "cpu":
     import numpy as arr
 else:
     import cupy as arr
 
-args.memory = _memory_locations[args.memory]
+device = _devices[args.device]
 
 dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
@@ -107,9 +107,9 @@ s = suggest_subdivisions(dim, comm.size)
 left_ghosts = (1,) * dim
 right_ghosts = (1,) * dim
 
-decomposition = muGrid.CartesianDecomposition(comm, args.nb_grid_pts, s,
-                                              left_ghosts, right_ghosts,
-                                              memory_location=args.memory)
+decomposition = muGrid.CartesianDecomposition(
+    comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=device
+)
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 # FD-stencil for the Laplacian
@@ -124,7 +124,7 @@ else:
 laplace_scale = -1.0 / np.mean(grid_spacing) ** 2
 
 # Create the Laplace operator based on the selected implementation
-if args.stencil == "generic":
+if args.kernel == "generic":
     # Generic sparse convolution operator
     if dim == 2:
         # 5-point stencil for 2D
@@ -142,7 +142,7 @@ if args.stencil == "generic":
         stencil[1, 1, 2] = 1  # z+1
         stencil *= laplace_scale
         stencil_offset = [-1, -1, -1]
-    laplace = muGrid.ConvolutionOperator(stencil_offset, stencil)
+    laplace = muGrid.GenericLinearOperator(stencil_offset, stencil)
     stencil_name = "Generic sparse convolution"
 else:
     # Hard-coded optimized Laplace operator (for benchmarking)
@@ -162,42 +162,37 @@ if dim == 2:
     rhs.p[...] = arr.asarray((1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y)) ** 10)
 else:
     x, y, z = coords
-    rhs.p[...] = arr.asarray((1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y) *
-                              np.cos(2 * np.pi * z)) ** 10)
+    rhs.p[...] = arr.asarray(
+        (1 + np.cos(2 * np.pi * x) * np.cos(2 * np.pi * y) * np.cos(2 * np.pi * z))
+        ** 10
+    )
 rhs.p[...] -= arr.mean(rhs.p)
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
 # Create global timer for hierarchical timing
-# PAPI is only available on host (CPU), not on device (GPU)
-use_papi = args.papi and args.memory == _memory_locations["host"]
-if args.papi and args.memory != _memory_locations["host"]:
-    if not args.quiet:
-        print("Warning: PAPI not available for device memory (GPU). Using estimates only.")
-timer = muGrid.Timer(use_papi=use_papi)
+timer = muGrid.Timer()
 
 
-def callback(it, x, r, p):
+def callback(iteration, state):
     """
-    Callback function to print the current solution, residual, and search direction.
+    Callback function to print the iteration and squared residual norm.
     """
     if not args.quiet:
-        print(f"{it:5} {arr.dot(r.ravel(), r.ravel()):.5}")
+        print(f"{iteration:5} {state['rr']:.5}")
 
 
 def hessp(x, Ax):
     """
-    Function to compute the product of the Hessian matrix with a vector.
-    The Hessian is represented by the convolution operator.
-    The scale factor (grid spacing and sign) is already folded into the operator.
+    Hessian-vector product function for CG solver.
+
+    This function computes the product of the Hessian matrix with a vector.
     """
-    with timer("hessp"):
-        with timer("communicate_ghosts"):
-            decomposition.communicate_ghosts(x)
-        with timer("apply"):
-            laplace.apply(x, Ax)
-    return Ax
+    with timer("communicate_ghosts"):
+        decomposition.communicate_ghosts(x)
+    with timer("apply"):
+        laplace.apply(x, Ax)
 
 
 converged = False
@@ -206,12 +201,13 @@ with timer("conjugate_gradients"):
         conjugate_gradients(
             comm,
             decomposition,
-            hessp,  # linear operator
             rhs,
             solution,
+            hessp=hessp,
             tol=1e-6,
             callback=callback,
             maxiter=args.maxiter,
+            timer=timer,
         )
         converged = True
         if not args.quiet:
@@ -223,32 +219,61 @@ with timer("conjugate_gradients"):
 elapsed_time = timer.get_time("conjugate_gradients")
 
 # Performance metrics calculations
-# Get number of hessp calls from timer
-nb_hessp_calls = timer.get_calls("hessp")
+# Get number of hessp calls from timer (= number of CG iterations)
+nb_iterations = timer.get_calls("conjugate_gradients/iteration/hessp")
 
-# Memory throughput estimate for the convolution operation:
-# - Read: nb_stencil_pts values per grid point (stencil neighborhood)
-# - Write: 1 value per grid point
+# Lattice updates per second (LUPS)
+# One "lattice update" = one grid point processed in one CG iteration
+total_lattice_updates = nb_grid_pts_total * nb_iterations
+lups = total_lattice_updates / elapsed_time if elapsed_time > 0 else 0
+
+# Memory and FLOPS estimates per CG iteration:
 # Each value is 8 bytes (double precision)
-bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8  # bytes
-total_bytes = nb_hessp_calls * bytes_per_hessp
+#
+# Per CG iteration (excluding ghost communication):
+#   hessp (apply):         read nb_stencil_pts, write 1, FLOPs 2*nb_stencil_pts
+#   dot_pAp:               read 2 (p, Ap),       FLOPs 2 (mul + add)
+#   update_x (axpy):       read 2, write 1,      FLOPs 2
+#   update_r (axpy_norm_sq): read 2, write 1,    FLOPs 4 (fused axpy + norm)
+#   update_p (axpby):      read 2, write 1,      FLOPs 2 (mul + mul + add)
+#
+# The fused axpy_norm_sq saves 1 read compared to separate axpy + norm_sq,
+# because the norm is computed during the write pass without re-reading y.
+#
+# Total reads:  nb_stencil_pts + 2 + 2 + 2 + 2 = nb_stencil_pts + 8
+# Total writes: 1 + 0 + 1 + 1 + 1 = 4
+# Total FLOPs:  2*nb_stencil_pts + 2 + 2 + 4 + 2 = 2*nb_stencil_pts + 10
+
+reads_per_iteration = nb_stencil_pts + 8  # values read per grid point
+writes_per_iteration = 4  # values written per grid point
+flops_per_iteration = 2 * nb_stencil_pts + 10  # FLOPs per grid point
+
+bytes_per_iteration = (
+    nb_grid_pts_total * (reads_per_iteration + writes_per_iteration) * 8
+)
+total_bytes = nb_iterations * bytes_per_iteration
 memory_throughput = total_bytes / elapsed_time if elapsed_time > 0 else 0
 
-# FLOPS estimate for the convolution operation:
-# - nb_stencil_pts multiplications and nb_stencil_pts-1 additions per grid point
-# - Plus 1 division for scaling (counted as 1 FLOP)
-# Total: 2 * nb_stencil_pts FLOPs per grid point (approx)
-flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
-total_flops = nb_hessp_calls * flops_per_hessp
+flops_per_cg_iteration = nb_grid_pts_total * flops_per_iteration
+total_flops = nb_iterations * flops_per_cg_iteration
 flops_rate = total_flops / elapsed_time if elapsed_time > 0 else 0
 
 # Arithmetic intensity (FLOPs per byte)
-arithmetic_intensity = total_flops / total_bytes if total_bytes > 0 else 0
+arithmetic_intensity = flops_per_iteration / (
+    (reads_per_iteration + writes_per_iteration) * 8
+)
 
-# Get apply time from timer
-apply_time = timer.get_time("conjugate_gradients/hessp/apply")
-apply_throughput = total_bytes / apply_time if apply_time > 0 else 0
-apply_flops_rate = total_flops / apply_time if apply_time > 0 else 0
+# Breakdown: hessp (apply) only
+bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8
+flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
+apply_time = timer.get_time("conjugate_gradients/iteration/hessp/apply")
+apply_lups = total_lattice_updates / apply_time if apply_time > 0 else 0
+apply_throughput = (
+    (nb_iterations * bytes_per_hessp) / apply_time if apply_time > 0 else 0
+)
+apply_flops_rate = (
+    (nb_iterations * flops_per_hessp) / apply_time if apply_time > 0 else 0
+)
 
 if args.json:
     # JSON output (convert numpy types to Python types for JSON serialization)
@@ -258,26 +283,33 @@ if args.json:
             "nb_grid_pts": [int(x) for x in args.nb_grid_pts],
             "nb_grid_pts_total": int(nb_grid_pts_total),
             "dimensions": int(dim),
-            "stencil": args.stencil,
+            "kernel": args.kernel,
             "stencil_name": stencil_name,
             "nb_stencil_pts": int(nb_stencil_pts),
-            "memory": "host" if args.memory == _memory_locations["host"] else "device",
+            "device": device.device_string,
             "maxiter": int(args.maxiter),
         },
         "results": {
             "converged": converged,
-            "iterations": int(nb_hessp_calls),
+            "iterations": int(nb_iterations),
             "total_time_seconds": float(elapsed_time),
-            "bytes_per_iteration": int(bytes_per_hessp),
+            "total_lattice_updates": int(total_lattice_updates),
+            "MLUPS": float(lups / 1e6),
+            "GLUPS": float(lups / 1e9),
+            "reads_per_grid_point": int(reads_per_iteration),
+            "writes_per_grid_point": int(writes_per_iteration),
+            "bytes_per_iteration": int(bytes_per_iteration),
             "total_bytes": int(total_bytes),
             "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_iteration_estimated": int(flops_per_hessp),
-            "total_flops_estimated": int(total_flops),
-            "flops_rate_GFLOPs_estimated": float(flops_rate / 1e9),
+            "flops_per_grid_point": int(flops_per_iteration),
+            "flops_per_iteration": int(flops_per_cg_iteration),
+            "total_flops": int(total_flops),
+            "flops_rate_GFLOPs": float(flops_rate / 1e9),
             "arithmetic_intensity": float(arithmetic_intensity),
             "apply_time_seconds": float(apply_time),
+            "apply_MLUPS": float(apply_lups / 1e6),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
-            "apply_flops_rate_GFLOPs_estimated": float(apply_flops_rate / 1e9),
+            "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
         },
         "timing": timer.to_dict(),
     }
@@ -287,22 +319,45 @@ else:
     print(f"\n{'='*60}")
     print("Performance Summary")
     print(f"{'='*60}")
-    print(f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
-          f"{nb_grid_pts_total:,} points")
+    print(
+        f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
+        f"{nb_grid_pts_total:,} points"
+    )
     print(f"Dimensions: {dim}D")
+    print(f"Device: {device.device_string}")
     print(f"Stencil implementation: {stencil_name}")
     print(f"Stencil points: {nb_stencil_pts}")
-    print(f"CG iterations (hessp calls): {nb_hessp_calls}")
+    print(f"CG iterations: {nb_iterations}")
     print(f"Total time: {elapsed_time:.4f} seconds")
 
-    print("\nMemory throughput (estimated):")
-    print(f"  Bytes per hessp call: {bytes_per_hessp / 1e6:.2f} MB")
-    print(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB")
+    print("\nLattice updates per second:")
+    print(f"  Total lattice updates: {total_lattice_updates:,}")
+    print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
+
+    print("\nMemory traffic per CG iteration (estimated):")
+    print(
+        f"  Per grid point: {reads_per_iteration} reads + "
+        f"{writes_per_iteration} writes "
+        f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes"
+    )
+    print(f"    hessp:    {nb_stencil_pts} reads, 1 write")
+    print("    dot_pAp:  2 reads")
+    print("    update_x: 2 reads, 1 write")
+    print("    update_r: 2 reads, 1 write (fused axpy_norm_sq)")
+    print("    update_p: 2 reads, 1 write")
+    print(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB")
+    print(f"  Total: {total_bytes / 1e9:.2f} GB")
     print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
 
-    print("\nFLOPS (estimated for convolution only):")
-    print(f"  FLOPs per hessp call: {flops_per_hessp / 1e6:.2f} MFLOP")
-    print(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP")
+    print("\nFLOPs per CG iteration (estimated):")
+    print(f"  Per grid point: {flops_per_iteration} FLOPs")
+    print(f"    hessp:    {2 * nb_stencil_pts} FLOPs")
+    print("    dot_pAp:  2 FLOPs")
+    print("    update_x: 2 FLOPs")
+    print("    update_r: 4 FLOPs (fused axpy_norm_sq)")
+    print("    update_p: 2 FLOPs")
+    print(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP")
+    print(f"  Total: {total_flops / 1e9:.2f} GFLOP")
     print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
 
     print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")

@@ -60,13 +60,73 @@ has_netcdf = _muGrid.has_netcdf
 host_arch = _muGrid.host_arch
 device_arch = _muGrid.device_arch
 
+# Device abstraction
+Device = _muGrid.Device
+DeviceType = _muGrid.DeviceType
+
+
+# Cache for runtime GPU availability check
+_gpu_available_cache = None
+
+
+def is_gpu_available():
+    """Check if a GPU device is available at runtime.
+
+    This function checks whether GPU hardware is actually accessible,
+    not just whether muGrid was compiled with GPU support. It attempts
+    to create a GPU device and allocate memory to verify the GPU works.
+
+    The result is cached after the first call for performance.
+
+    Returns
+    -------
+    bool
+        True if a GPU device is available and functional, False otherwise.
+
+    Examples
+    --------
+    >>> import muGrid
+    >>> if muGrid.is_gpu_available():
+    ...     fc = muGrid.GlobalFieldCollection((10, 10), device=muGrid.Device.gpu())
+    ... else:
+    ...     fc = muGrid.GlobalFieldCollection((10, 10))
+
+    See Also
+    --------
+    has_gpu : Compile-time flag indicating GPU support was built.
+    """
+    global _gpu_available_cache
+    if _gpu_available_cache is not None:
+        return _gpu_available_cache
+
+    # If not compiled with GPU support, definitely not available
+    if not has_gpu:
+        _gpu_available_cache = False
+        return False
+
+    try:
+        # Try to create a GPU device and allocate memory
+        # Device.gpu() may succeed even without hardware, so we test allocation
+        device = Device.gpu()
+        # Use keyword argument for device since positional args differ
+        fc = _muGrid.GlobalFieldCollection(
+            nb_domain_grid_pts=[2, 2],
+            device=device,
+        )
+        _ = fc.real_field("test", [1])
+        _gpu_available_cache = True
+        return True
+    except Exception:
+        _gpu_available_cache = False
+        return False
+
 # Import Python wrappers for main classes (these accept wrapped Field objects)
-from .Wrappers import (  # noqa: E402
+from .Wrappers import (  # noqa: E402, E305
     CartesianDecomposition,
-    ConvolutionOperator,
     FEMGradientOperator,
     FFTEngine,
     FileIONetCDF,
+    GenericLinearOperator,
     GlobalFieldCollection,
     LaplaceOperator,
     LocalFieldCollection,
@@ -79,7 +139,7 @@ if hasattr(_muGrid, "FileIONetCDF"):
 # Low-level C++ classes (for advanced use cases)
 # These are prefixed with underscore to indicate they're internal
 _CartesianDecomposition = _muGrid.CartesianDecomposition
-_ConvolutionOperator = _muGrid.ConvolutionOperator
+_GenericLinearOperator = _muGrid.GenericLinearOperator
 _FFTEngine = _muGrid.FFTEngine
 _GlobalFieldCollection = _muGrid.GlobalFieldCollection
 _LocalFieldCollection = _muGrid.LocalFieldCollection
@@ -87,8 +147,14 @@ if hasattr(_muGrid, "FileIONetCDF"):
     _FileIONetCDF = _muGrid.FileIONetCDF
 
 # Base classes and utilities (always C++ objects)
-ConvolutionOperatorBase = _muGrid.ConvolutionOperatorBase
+GradientOperator = _muGrid.GradientOperator
+# Backwards compatibility alias
+ConvolutionOperatorBase = GradientOperator
 Decomposition = _muGrid.Decomposition
+
+# Isotropic stiffness operators (fused elliptic kernels)
+IsotropicStiffnessOperator2D = _muGrid.IsotropicStiffnessOperator2D
+IsotropicStiffnessOperator3D = _muGrid.IsotropicStiffnessOperator3D
 DynCoord = _muGrid.DynCoord
 DynRcoord = _muGrid.DynRcoord
 IterUnit = _muGrid.IterUnit
@@ -96,6 +162,9 @@ Pixel = _muGrid.Pixel
 StorageOrder = _muGrid.StorageOrder
 SubPt = _muGrid.SubPt
 Unit = _muGrid.Unit
+
+# Linear algebra operations on fields (Python wrapper with automatic _cpp extraction)
+from . import linalg  # noqa: E402
 
 # FFT utility functions
 # Note: fft_freq, fft_freqind, rfft_freq, rfft_freqind are now properties
@@ -130,10 +199,12 @@ __all__ = [
     "has_netcdf",
     "host_arch",
     "device_arch",
+    # Runtime checks
+    "is_gpu_available",
     # Main classes (Python wrappers)
     "CartesianDecomposition",
     "Communicator",
-    "ConvolutionOperator",
+    "GenericLinearOperator",
     "FFTEngine",
     "Field",
     "FileIONetCDF",
@@ -148,9 +219,12 @@ __all__ = [
     "get_domain_ccoord",
     "get_domain_index",
     # Enums and types
-    "ConvolutionOperatorBase",
+    "GradientOperator",
+    "ConvolutionOperatorBase",  # Backwards compatibility alias
     "LaplaceOperator",
     "FEMGradientOperator",
+    "IsotropicStiffnessOperator2D",
+    "IsotropicStiffnessOperator3D",
     "Decomposition",
     "DynCoord",
     "DynRcoord",
@@ -163,4 +237,6 @@ __all__ = [
     "Verbosity",
     # Utilities
     "Timer",
+    # Linear algebra
+    "linalg",
 ]

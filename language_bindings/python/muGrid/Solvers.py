@@ -2,16 +2,19 @@
 Collection of simple parallel solvers
 """
 
+from . import linalg
+
 
 def conjugate_gradients(
     comm,
     fc,
-    hessp: callable,
     b,
     x,
+    hessp: callable,
     tol: float = 1e-6,
     maxiter: int = 1000,
     callback: callable = None,
+    timer=None,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -27,20 +30,27 @@ def conjugate_gradients(
     fc : muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or
          muGrid.CartesianDecomposition
         Collection for creating temporary fields used by the CG algorithm.
-    hessp : callable
-        Function that computes the product of the Hessian matrix A with a vector.
-        Signature: hessp(input_field, output_field) where both are muGrid.Field.
     b : muGrid.Field
         Right-hand side vector.
     x : muGrid.Field
         Initial guess for the solution (modified in place).
+    hessp : callable
+        Function that computes the product of the Hessian matrix A with a vector.
+        Signature: hessp(input_field, output_field) where both are muGrid.Field.
     tol : float, optional
         Tolerance for convergence. The default is 1e-6.
     maxiter : int, optional
         Maximum number of iterations. The default is 1000.
     callback : callable, optional
         Function to call after each iteration with signature:
-        callback(iteration, x_array, residual_array, search_direction_array)
+        callback(iteration, state_dict) where state_dict contains:
+        - "x": solution field
+        - "r": residual field
+        - "p": search direction field
+        - "rr": squared residual norm (float)
+    timer : muGrid.Timer, optional
+        Timer object for performance profiling. If provided, the solver will
+        record timing for the hessp (Hessian-vector product) operations.
 
     Returns
     -------
@@ -51,60 +61,89 @@ def conjugate_gradients(
     ------
     RuntimeError
         If the algorithm does not converge within maxiter iterations,
-        or if the Hessian is not positive definite.
+        or if the residual becomes NaN (indicating numerical issues).
     """
     tol_sq = tol * tol
 
-    # Get spatial dimension from the field collection
-    spatial_dim = len(fc.nb_grid_pts)
+    # Timer context manager (no-op if timer is None)
+    from contextlib import nullcontext
 
-    # Extract component shape from b: b.s.shape = (*components, nb_sub_pts, *spatial)
-    # The +1 accounts for the nb_sub_pts dimension
-    components_shape = b.s.shape[: -(spatial_dim + 1)]
+    def timed(name):
+        return timer(name) if timer is not None else nullcontext()
 
-    # Create temporary fields with matching component shape
-    p = fc.real_field("cg-search-direction", components_shape)
-    Ap = fc.real_field("cg-hessian-product", components_shape)
+    with timed("startup"):
+        # Create temporary fields with matching component shape
+        # r: residual field
+        # p: search direction field
+        # Ap: Hessian product field
+        r = fc.real_field("cg-residual", b.components_shape)
+        p = fc.real_field("cg-search-direction", b.components_shape)
+        Ap = fc.real_field("cg-hessian-product", b.components_shape)
 
-    # Initial residual: r = b - A*x
-    hessp(x, Ap)
-    p.s[...] = b.s - Ap.s
-    r = p.s.copy()
+        # Initial residual: r = b - A*x
+        hessp(x, Ap)
+        # r = b (copy)
+        linalg.copy(b, r)
+        # r = r - Ap = b - A*x (axpy with alpha=-1)
+        linalg.axpy(-1.0, Ap, r)
 
-    if callback:
-        callback(0, x.s, r, p.s)
-
-    rr = comm.sum(r.ravel().dot(r.ravel()))
-    if rr < tol_sq:
-        return x
-
-    for iteration in range(maxiter):
-        # Compute Hessian product: Ap = A * p
-        hessp(p, Ap)
-
-        # Compute step size
-        pAp = comm.sum(p.s.ravel().dot(Ap.s.ravel()))
-        if pAp <= 0:
-            raise RuntimeError("Hessian is not positive definite")
-
-        alpha = rr / pAp
-
-        # Update solution and residual
-        x.s[...] += alpha * p.s
-        r -= alpha * Ap.s
+        # Initial search direction: p = r
+        linalg.copy(r, p)
 
         if callback:
-            callback(iteration + 1, x.s, r, p.s)
+            rr = comm.sum(linalg.norm_sq(r))
+            callback(0, {"x": x, "r": r, "p": p, "rr": rr})
 
-        # Check convergence
-        next_rr = comm.sum(r.ravel().dot(r.ravel()))
-        if next_rr < tol_sq:
+        with timed("dot_rr"):
+            rr = comm.sum(linalg.norm_sq(r))
+        rr_val = float(rr)
+
+        if rr_val < tol_sq:
             return x
 
-        # Update search direction
-        beta = next_rr / rr
-        rr = next_rr
-        p.s[...] *= beta
-        p.s[...] += r
+    with timed("iteration"):
+        for iteration in range(maxiter):
+            # Compute Hessian product: Ap = A * p
+            with timed("hessp"):
+                hessp(p, Ap)
+
+            # Compute pAp for step size
+            with timed("dot_pAp"):
+                pAp = comm.sum(linalg.vecdot(p, Ap))
+
+            # Compute alpha
+            alpha = rr / pAp
+
+            # Update solution: x += alpha * p
+            with timed("update_x"):
+                linalg.axpy(alpha, p, x)
+
+            # Update residual and compute norm in one pass: r -= alpha * Ap
+            with timed("update_r"):
+                next_rr = comm.sum(linalg.axpy_norm_sq(-alpha, Ap, r))
+            next_rr_val = float(next_rr)
+
+            if callback:
+                with timed("callback"):
+                    callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": next_rr})
+
+            # Check for numerical issues (NaN indicates non-positive-definite H)
+            if next_rr_val != next_rr_val:  # NaN check
+                raise RuntimeError(
+                    "Residual became NaN - Hessian may not be positive definite"
+                )
+
+            if next_rr_val < tol_sq:
+                return x
+
+            # Compute beta
+            beta = next_rr / rr
+
+            # Update rr for next iteration
+            rr = next_rr
+
+            # Update search direction: p = r + beta * p
+            with timed("update_p"):
+                linalg.axpby(1.0, r, beta, p)
 
     raise RuntimeError("Conjugate gradient algorithm did not converge")

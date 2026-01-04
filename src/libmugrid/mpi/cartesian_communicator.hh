@@ -39,6 +39,7 @@
 #endif
 
 #include "core/coordinates.hh"
+#include "core/type_descriptor.hh"
 #include "mpi/communicator.hh"
 
 namespace muGrid {
@@ -184,8 +185,8 @@ namespace muGrid {
          * @param stride_in_direction Stride in the communication direction
          *                            (in elements).
          * @param elem_size_in_bytes Size of each element in bytes.
-         * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
-         *                   with MPI; ignored for serial mode.
+         * @param type_desc TypeDescriptor identifying the element type. Used
+         *                  for MPI type conversion; ignored in serial mode.
          * @param is_device_memory If true, data resides on GPU device memory.
          *                         Used in serial mode to select appropriate
          *                         memory copy method (CUDA/HIP for GPU).
@@ -195,7 +196,8 @@ namespace muGrid {
                             int nb_recv_blocks, int recv_block_len,
                             Index_t recv_offset, char * data,
                             int stride_in_direction, int elem_size_in_bytes,
-                            void * elem_mpi_t, bool is_device_memory = false) const;
+                            TypeDescriptor type_desc,
+                            bool is_device_memory = false) const;
 
         /**
          * @brief Send data to the left neighbor; receive from the right.
@@ -226,8 +228,8 @@ namespace muGrid {
          * @param stride_in_direction Stride in the communication direction
          *                            (in elements).
          * @param elem_size_in_bytes Size of each element in bytes.
-         * @param elem_mpi_t Pointer to MPI_Datatype for elements. Only used
-         *                   with MPI; ignored for serial mode.
+         * @param type_desc TypeDescriptor identifying the element type. Used
+         *                  for MPI type conversion; ignored in serial mode.
          * @param is_device_memory If true, data resides on GPU device memory.
          *                         Used in serial mode to select appropriate
          *                         memory copy method (CUDA/HIP for GPU).
@@ -237,7 +239,8 @@ namespace muGrid {
                            int nb_recv_blocks, int recv_block_len,
                            Index_t recv_offset, char * data,
                            int stride_in_direction, int elem_size_in_bytes,
-                           void * elem_mpi_t, bool is_device_memory = false) const;
+                           TypeDescriptor type_desc,
+                           bool is_device_memory = false) const;
 
         /**
          * @brief Template method for sending a scalar to the right neighbor and
@@ -258,6 +261,11 @@ namespace muGrid {
         template <typename T>
         T sendrecv_right(int direction, T data) const {
 #ifdef WITH_MPI
+            // Check if MPI is available (comm may be NULL if MPI was not
+            // initialized)
+            if (this->comm == MPI_COMM_NULL) {
+                return data;
+            }
             MPI_Status status;
             T value;
             MPI_Sendrecv(&data, 1, mpi_type<T>(), this->right_ranks[direction],
@@ -288,6 +296,11 @@ namespace muGrid {
         template <typename T>
         T sendrecv_left(int direction, T data) const {
 #ifdef WITH_MPI
+            // Check if MPI is available (comm may be NULL if MPI was not
+            // initialized)
+            if (this->comm == MPI_COMM_NULL) {
+                return data;
+            }
             MPI_Status status;
             T value;
             MPI_Sendrecv(&data, 1, mpi_type<T>(), this->left_ranks[direction],
@@ -317,7 +330,7 @@ namespace muGrid {
          * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in communication direction.
          * @param elem_size_in_bytes Size of each element in bytes.
-         * @param elem_mpi_t Pointer to MPI_Datatype for elements.
+         * @param type_desc TypeDescriptor identifying the element type.
          * @param is_device_memory If true, data is on GPU device memory.
          */
         void sendrecv_right_accumulate(int direction, int block_stride,
@@ -325,7 +338,8 @@ namespace muGrid {
                                        Index_t send_offset, int nb_recv_blocks,
                                        int recv_block_len, Index_t recv_offset,
                                        char * data, int stride_in_direction,
-                                       int elem_size_in_bytes, void * elem_mpi_t,
+                                       int elem_size_in_bytes,
+                                       TypeDescriptor type_desc,
                                        bool is_device_memory = false) const;
 
         /**
@@ -346,7 +360,7 @@ namespace muGrid {
          * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in communication direction.
          * @param elem_size_in_bytes Size of each element in bytes.
-         * @param elem_mpi_t Pointer to MPI_Datatype for elements.
+         * @param type_desc TypeDescriptor identifying the element type.
          * @param is_device_memory If true, data is on GPU device memory.
          */
         void sendrecv_left_accumulate(int direction, int block_stride,
@@ -354,7 +368,8 @@ namespace muGrid {
                                       Index_t send_offset, int nb_recv_blocks,
                                       int recv_block_len, Index_t recv_offset,
                                       char * data, int stride_in_direction,
-                                      int elem_size_in_bytes, void * elem_mpi_t,
+                                      int elem_size_in_bytes,
+                                      TypeDescriptor type_desc,
                                       bool is_device_memory = false) const;
 
        protected:

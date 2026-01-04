@@ -61,13 +61,21 @@ Before using GPU features, you can check if *µ*\Grid was compiled with GPU supp
 
 The ``has_gpu`` flag is ``True`` if either CUDA or ROCm support is available.
 
-Memory locations
+Device selection
 ****************
 
-Field collections can be created with a specific memory location using a string:
+Field collections can be created on a specific device using the ``device`` parameter.
+The device can be specified as a simple string or as a ``Device`` object:
 
-* ``"host"``: Allocate fields in CPU memory (default)
-* ``"device"``: Allocate fields in GPU memory
+String values:
+
+* ``"cpu"`` or ``"host"``: Allocate fields in CPU memory (default)
+* ``"gpu"`` or ``"device"``: Allocate on default GPU (auto-detects CUDA or ROCm)
+* ``"gpu:N"``: Allocate on default GPU with device ID N
+* ``"cuda"``: Allocate fields on CUDA GPU (device 0)
+* ``"cuda:N"``: Allocate on CUDA GPU with device ID N
+* ``"rocm"``: Allocate on ROCm GPU (device 0)
+* ``"rocm:N"``: Allocate on ROCm GPU with device ID N
 
 Here is an example of creating a field collection on the GPU:
 
@@ -75,8 +83,14 @@ Here is an example of creating a field collection on the GPU:
 
     import muGrid
 
-    # Create a GPU field collection
-    fc = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
+    # Create a GPU field collection using auto-detection (recommended)
+    fc = muGrid.GlobalFieldCollection([64, 64], device="gpu")
+
+    # Or explicitly specify CUDA
+    fc = muGrid.GlobalFieldCollection([64, 64], device="cuda")
+
+    # Or using Device object for auto-detection
+    fc = muGrid.GlobalFieldCollection([64, 64], device=muGrid.Device.gpu())
 
     # Create a field on the GPU
     field = fc.real_field("my_field")
@@ -101,7 +115,7 @@ API for GPU arrays:
     import cupy as cp
 
     # Create GPU field collection
-    fc = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
+    fc = muGrid.GlobalFieldCollection([64, 64], device="cuda")
 
     # Create fields
     field_a = fc.real_field("a")
@@ -123,11 +137,11 @@ In the above example, execute the sum with:
     result = (field_b.p ** 2).sum()
 
 This may not always be possible. In this case, it may be useful to either import
-`numpy` or `scipy` under the same module alias:
+`numpy` or `cupy` under the same module alias:
 
 .. code-block:: python
 
-    if memory == "host":
+    if device == "cpu":
         import numpy as xp
     else:
         import cupy as xp
@@ -148,7 +162,7 @@ CartesianDecomposition with GPU
 *******************************
 
 When using domain decomposition with ``CartesianDecomposition``, you can also
-specify the memory location:
+specify the device:
 
 .. code-block:: python
 
@@ -161,13 +175,14 @@ specify the memory location:
     decomp = muGrid.CartesianDecomposition(
         comm,
         nb_domain_grid_pts=[128, 128],
+        nb_subdivisions=[1, 1],
         nb_ghosts_left=[1, 1],
         nb_ghosts_right=[1, 1],
-        memory_location="device"
+        device="cuda"
     )
 
-    # Create GPU field using real_field helper
-    field = muGrid.real_field(decomp, "gpu_field")
+    # Create GPU field
+    field = decomp.real_field("gpu_field")
 
     # Access coordinates (returned as CuPy arrays on GPU)
     x, y = decomp.coords
@@ -189,11 +204,11 @@ on the GPU when both input and output fields are on the GPU:
     import cupy as cp
 
     # Create GPU field collection
-    fc = muGrid.GlobalFieldCollection([64, 64], memory_location="device")
+    fc = muGrid.GlobalFieldCollection([64, 64], device="cuda")
 
     # Create Laplacian stencil (defined on CPU as numpy array)
     stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
 
     # Create fields
     input_field = fc.real_field("input")

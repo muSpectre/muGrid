@@ -42,6 +42,7 @@ namespace py = pybind11;
 
 void add_common_mugrid(py::module & mod);
 void add_communicator(py::module & mod);
+void add_device_classes(py::module & mod);
 void add_decomposition_classes(py::module & mod);
 void add_field_classes(py::module & mod);
 void add_state_field_classes(py::module & mod);
@@ -49,5 +50,6 @@ void add_field_collection_classes(py::module & mod);
 void add_convolution_operator_classes(py::module & mod);
 void add_file_io_classes(py::module & mod);
 void add_fft_classes(py::module & mod);
+void add_linalg_functions(py::module & mod);
 
 #endif  // LANGUAGE_BINDINGS_LIBMUGRID_PYTHON_BIND_PY_DECLARATIONS_HH_

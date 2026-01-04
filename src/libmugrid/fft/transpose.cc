@@ -3,7 +3,7 @@
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   21 Dec 2024
+ * @date   21 Dec 2025
  *
  * @brief  MPI transpose using derived datatypes (no explicit pack/unpack)
  *

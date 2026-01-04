@@ -1,0 +1,854 @@
+/**
+ * @file   bind_py_convolution_operator.cc
+ *
+ * @author Yizhen Wang <yizhen.wang@imtek.uni-freiburg.de>
+ *
+ * @date   28 Nov 2024
+ *
+ * @brief  Python bindings for the convolution operator
+ *
+ * Copyright © 2018 Till Junge
+ *
+ * µGrid is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3, or (at
+ * your option) any later version.
+ *
+ * µGrid is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with µGrid; see the file COPYING. If not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * * Boston, MA 02111-1307, USA.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or combining it
+ * with proprietary FFT implementations or numerical libraries, containing parts
+ * covered by the terms of those libraries' licenses, the licensors of this
+ * Program grant you additional permission to convey the resulting work.
+ *
+ */
+
+#include "core/types.hh"
+#include "field/field_typed.hh"
+#include "operators/linear.hh"
+#include "operators/generic.hh"
+#include "operators/laplace_2d.hh"
+#include "operators/laplace_3d.hh"
+#include "operators/fem_gradient_2d.hh"
+#include "operators/fem_gradient_3d.hh"
+#include "operators/solids/isotropic_stiffness_2d.hh"
+#include "operators/solids/isotropic_stiffness_3d.hh"
+
+#include <pybind11/pybind11.h>
+#include <pybind11/eigen.h>
+#include <pybind11/stl.h>
+
+#include <sstream>
+
+using muGrid::LinearOperator;
+using muGrid::GenericLinearOperator;
+using muGrid::LaplaceOperator2D;
+using muGrid::LaplaceOperator3D;
+using muGrid::FEMGradientOperator2D;
+using muGrid::FEMGradientOperator3D;
+using muGrid::IsotropicStiffnessOperator2D;
+using muGrid::IsotropicStiffnessOperator3D;
+using muGrid::TypedFieldBase;
+using muGrid::Real;
+using muGrid::Dim_t;
+using muGrid::Index_t;
+using muGrid::Shape_t;
+using muGrid::HostSpace;
+using pybind11::literals::operator""_a;
+
+// Backwards compatibility aliases
+using ConvolutionOperatorBase = LinearOperator;
+using ConvolutionOperator = GenericLinearOperator;
+
+namespace py = pybind11;
+
+// Type aliases for host fields
+using RealFieldHost = TypedFieldBase<Real, HostSpace>;
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+using DeviceSpace = muGrid::DefaultDeviceSpace;
+using RealFieldDevice = TypedFieldBase<Real, DeviceSpace>;
+#endif
+
+// A helper class that bounces calls to virtual methods back to Python
+class PyGradientOperator : public LinearOperator {
+   public:
+    // Inherit the constructors
+    using LinearOperator::LinearOperator;
+
+    // Trampoline (one for each virtual function)
+
+    void apply(const TypedFieldBase<Real> & nodal_field,
+               TypedFieldBase<Real> & quadrature_point_field) const override {
+        PYBIND11_OVERRIDE_PURE(void, LinearOperator, apply, nodal_field,
+                               quadrature_point_field);
+    }
+
+    void apply_increment(
+        const TypedFieldBase<Real> & nodal_field, const Real & alpha,
+        TypedFieldBase<Real> & quadrature_point_field) const override {
+        PYBIND11_OVERRIDE_PURE(void, LinearOperator, apply_increment,
+                               nodal_field, alpha, quadrature_point_field);
+    }
+
+    void transpose(const TypedFieldBase<Real> & quadrature_point_field,
+                   TypedFieldBase<Real> & nodal_field,
+                   const std::vector<Real> & weights = {}) const override {
+        PYBIND11_OVERRIDE_PURE(void, LinearOperator, transpose,
+                               quadrature_point_field, nodal_field, weights);
+    }
+
+    void
+    transpose_increment(const TypedFieldBase<Real> & quadrature_point_field,
+                        const Real & alpha, TypedFieldBase<Real> & nodal_field,
+                        const std::vector<Real> & weights = {}) const override {
+        PYBIND11_OVERRIDE_PURE(void, LinearOperator, transpose,
+                               quadrature_point_field, alpha, nodal_field,
+                               weights);
+    }
+
+    Index_t get_nb_output_components() const override {
+        PYBIND11_OVERRIDE_PURE(Index_t, LinearOperator,
+                               get_nb_output_components, );
+    }
+
+    Index_t get_nb_quad_pts() const override {
+        PYBIND11_OVERRIDE_PURE(Index_t, LinearOperator, get_nb_quad_pts, );
+    }
+
+    Index_t get_nb_input_components() const override {
+        PYBIND11_OVERRIDE_PURE(Index_t, LinearOperator,
+                               get_nb_input_components, );
+    }
+
+    Dim_t get_spatial_dim() const override {
+        PYBIND11_OVERRIDE_PURE(Index_t, LinearOperator, get_spatial_dim, );
+    }
+};
+
+// Bind class GradientOperator
+void add_gradient_operator(py::module & mod) {
+    py::class_<LinearOperator, PyGradientOperator>(mod, "GradientOperator")
+        .def(py::init<>())
+        .def("apply", &LinearOperator::apply, "nodal_field"_a,
+             "quadrature_point_field"_a)
+        .def_property_readonly("nb_quad_pts",
+                               &LinearOperator::get_nb_quad_pts)
+        .def_property_readonly("nb_input_components",
+                               &LinearOperator::get_nb_input_components)
+        .def_property_readonly("nb_output_components",
+                               &LinearOperator::get_nb_output_components)
+        .def_property_readonly("spatial_dim",
+                               &LinearOperator::get_spatial_dim);
+}
+
+// Bind class GenericLinearOperator
+void add_stencil_gradient_operator(py::module & mod) {
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (GenericLinearOperator::*)(
+        const RealFieldHost &, RealFieldHost &) const;
+    using TransposeHostFn = void (GenericLinearOperator::*)(
+        const RealFieldHost &, RealFieldHost &, const std::vector<Real> &)
+        const;
+
+    auto conv_op = py::class_<GenericLinearOperator, LinearOperator>(mod, "GenericLinearOperator")
+            .def(py::init(
+                     [](const Shape_t &offset, py::array_t<Real, py::array::f_style | py::array::forcecast> array) {
+                         // Array should have shape (directions, quadrature-points, nodal-points, pixels)
+                         // pixels portion has nb_dims. Everything in front is omitted.
+                         const auto nb_dims{offset.size()};
+                         if (nb_dims != 1 && nb_dims != 2 && nb_dims != 3) {
+                             throw std::runtime_error("Stencil must be 1D, 2D or 3D");
+                         }
+                         py::ssize_t nb_output_components{1};
+                         if (static_cast<size_t>(array.ndim()) > nb_dims) {
+                             nb_output_components = array.shape(0);
+                         }
+                         py::ssize_t nb_quad_pts{1};
+                         if (static_cast<size_t>(array.ndim()) > nb_dims + 1) {
+                             nb_quad_pts = array.shape(1);
+                         }
+                         py::ssize_t nb_input_components{1};
+                         if (static_cast<size_t>(array.ndim()) > nb_dims + 2) {
+                             nb_input_components = array.shape(2);
+                         }
+                         Shape_t nb_stencil_pts(nb_dims);
+                         // .shape() returns a pointer to dimension array
+                         std::copy(array.shape() + array.ndim() - nb_dims, array.shape() + array.ndim(),
+                                   nb_stencil_pts.begin());
+
+                        // Number of entries in the operator
+                         const auto nb_entries{
+                            nb_output_components * nb_quad_pts * nb_input_components *
+                            std::accumulate(nb_stencil_pts.begin(),
+                                            nb_stencil_pts.end(), 1,
+                                            std::multiplies<Index_t>())};
+                         return GenericLinearOperator(offset, std::span<const Real>(array.data(), nb_entries),
+                                                        nb_stencil_pts, nb_input_components, nb_quad_pts, nb_output_components);
+                    }),
+                 "offset"_a, "coefficients"_a)
+            // Host field overloads (always available)
+            .def("apply",
+                 static_cast<ApplyHostFn>(&GenericLinearOperator::apply),
+                 "nodal_field"_a, "quadrature_point_field"_a,
+                 "Apply gradient operator to host (CPU) fields")
+            .def("transpose",
+                 static_cast<TransposeHostFn>(&GenericLinearOperator::transpose),
+                 "quadrature_point_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose (divergence) to host (CPU) fields")
+            .def("fourier",
+                 [](const GenericLinearOperator & op,
+                    py::array_t<Real, py::array::f_style> phases) {
+                     // Extract buffer info from input phases array
+                     py::buffer_info phases_info = phases.request();
+
+                     // Validate input shape
+                     if (phases_info.ndim < 1) {
+                         throw std::runtime_error("phases array must have at least 1 dimension");
+                     }
+
+                     // First dimension = spatial dimensions; remaining = entries
+                     py::ssize_t nb_components = phases_info.shape[0];
+                     if (nb_components != op.get_spatial_dim()) {
+                         std::ostringstream err_msg;
+                         err_msg << "Phase dimension mismatch: expected "
+                                 << op.get_spatial_dim() << " but got "
+                                 << nb_components;
+                         throw std::runtime_error(err_msg.str());
+                     }
+
+                     // Calculate number of phase vectors and output shape
+                     py::ssize_t nb_entries = 1;
+                     std::vector<py::ssize_t> output_shape;
+                     for (py::ssize_t i = 1; i < phases_info.ndim; ++i) {
+                         output_shape.push_back(phases_info.shape[i]);
+                         nb_entries *= phases_info.shape[i];
+                     }
+
+                     // Create output array for Complex coefficients
+                     py::array_t<muGrid::Complex, py::array::f_style> coeffs(output_shape);
+                     py::buffer_info coeffs_info = coeffs.request();
+
+                     // Loop over all entries, calling fourier() for each phase vector
+                     auto phase_ptr = static_cast<const Real *>(phases_info.ptr);
+                     auto coeffs_ptr = static_cast<muGrid::Complex *>(coeffs_info.ptr);
+
+                     for (py::ssize_t i = 0; i < nb_entries; ++i) {
+                         // Map phase data to Eigen vector
+                         Eigen::Map<const Eigen::VectorXd> phase_vec(phase_ptr, nb_components);
+                         coeffs_ptr[i] = op.fourier(phase_vec);
+                         phase_ptr += nb_components;
+                     }
+
+                     return coeffs;
+                 },
+                 "phases"_a,
+                 R"pbdoc(
+                 Compute the Fourier representation of this convolution operator.
+
+                 This method converts a translationally invariant linear combination of
+                 grid values into a multiplication with a complex number in Fourier space.
+
+                 Parameters
+                 ----------
+                 phases : numpy.ndarray
+                     Array of phase vectors. First dimension must match spatial_dim.
+                     Remaining dimensions represent the batch of phase vectors.
+                     Each phase is the wavevector times cell dimension (lacking factor of 2π).
+
+                     Examples:
+                     - 1D: shape (1,) for single phase, (1, N) for N phases
+                     - 2D: shape (2,) for single phase, (2, N) or (2, M, N) for batches
+                     - 3D: shape (3,) for single phase, (3, N, M, K) for batches
+
+                 Returns
+                 -------
+                 numpy.ndarray of complex128
+                     Complex Fourier coefficients with shape matching the batch dimensions
+                     (i.e., input shape with first dimension removed).
+
+                 Examples
+                 --------
+                 >>> # Single phase vector in 2D
+                 >>> phase = np.array([0.25, 0.5])
+                 >>> coeff = op.fourier(phase)  # Returns scalar complex number
+                 >>>
+                 >>> # Multiple phase vectors in 2D
+                 >>> phases = np.array([[0.1, 0.2, 0.3],
+                 ...                    [0.4, 0.5, 0.6]])  # shape (2, 3)
+                 >>> coeffs = op.fourier(phases)  # Returns array of shape (3,)
+                 >>>
+                 >>> # Grid of phase vectors in 2D
+                 >>> qx, qy = np.meshgrid(np.linspace(0, 1, 10), np.linspace(0, 1, 10))
+                 >>> phases = np.stack([qx, qy], axis=0)  # shape (2, 10, 10)
+                 >>> coeffs = op.fourier(phases)  # Returns array of shape (10, 10)
+                 )pbdoc")
+            .def_property_readonly("offset",
+                [](const GenericLinearOperator & op) {
+                    const auto& offset = op.get_offset();
+                    return py::array_t<Index_t>(offset.size(), offset.data());
+                },
+                "Stencil offset in number of pixels")
+            .def_property_readonly("stencil_shape",
+                [](const GenericLinearOperator & op) {
+                    const auto& shape = op.get_stencil_shape();
+                    return py::array_t<Index_t>(shape.size(), shape.data());
+                },
+                "Shape of the convolution stencil")
+            .def_property_readonly("coefficients",
+                [](const GenericLinearOperator & op) {
+                    const auto& flat_op = op.get_coefficients();
+                    const auto& stencil_shape = op.get_stencil_shape();
+                    const auto nb_output_components = op.get_nb_output_components();
+                    const auto nb_quad_pts = op.get_nb_quad_pts();
+                    const auto nb_input_components = op.get_nb_input_components();
+
+                    // Build the full shape: (nb_output_components, nb_quad_pts, nb_input_components, *stencil_shape)
+                    std::vector<py::ssize_t> full_shape;
+                    full_shape.push_back(nb_output_components);
+                    full_shape.push_back(nb_quad_pts);
+                    full_shape.push_back(nb_input_components);
+                    for (const auto& dim : stencil_shape) {
+                        full_shape.push_back(dim);
+                    }
+
+                    // Create a Fortran-ordered (column-major) array
+                    py::array_t<Real, py::array::f_style> result(full_shape);
+                    auto result_ptr = result.mutable_data();
+
+                    // Copy data
+                    std::copy(flat_op.begin(), flat_op.end(), result_ptr);
+
+                    return result;
+                },
+                R"pbdoc(
+                Stencil coefficients in reshaped form.
+
+                Returns the stencil coefficients with shape
+                (nb_operators, nb_quad_pts, nb_nodal_pts, *shape),
+                where shape contains the spatial dimensions of the stencil.
+
+                Returns
+                -------
+                numpy.ndarray
+                    Stencil coefficients with shape matching the original stencil structure.
+
+                Examples
+                --------
+                >>> # 2D Laplacian stencil
+                >>> stencil_2d = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+                >>> op = muGrid.GenericLinearOperator([-1, -1], stencil_2d)
+                >>> reshaped = op.coefficients
+                >>> reshaped.shape  # (1, 1, 1, 3, 3) for 1 output component, 1 quad pt, 1 input component
+                )pbdoc")
+            .def_property_readonly("spatial_dim", &GenericLinearOperator::get_spatial_dim)
+            .def_property_readonly("nb_quad_pts", &GenericLinearOperator::get_nb_quad_pts)
+            .def_property_readonly("nb_input_components", &GenericLinearOperator::get_nb_input_components)
+            .def_property_readonly("nb_output_components", &GenericLinearOperator::get_nb_output_components);
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    // Device field overloads (only when GPU backend is enabled)
+    using ApplyDeviceFn = void (GenericLinearOperator::*)(
+        const RealFieldDevice &, RealFieldDevice &) const;
+    using TransposeDeviceFn = void (GenericLinearOperator::*)(
+        const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
+        const;
+
+    conv_op
+        .def("apply",
+             static_cast<ApplyDeviceFn>(&GenericLinearOperator::apply),
+             "nodal_field"_a, "quadrature_point_field"_a,
+             "Apply convolution to device (GPU) fields")
+        .def(
+            "transpose",
+            static_cast<TransposeDeviceFn>(&GenericLinearOperator::transpose),
+            "quadrature_point_field"_a, "nodal_field"_a,
+            "weights"_a = std::vector<Real>{},
+            "Apply transpose convolution to device (GPU) fields");
+#endif
+}
+
+// Bind class LaplaceOperator2D (dimension-specific)
+void add_laplace_operator_2d(py::module & mod) {
+    using ApplyHostFn = void (LaplaceOperator2D::*)(const RealFieldHost &,
+                                                    RealFieldHost &) const;
+
+    auto laplace_op =
+        py::class_<LaplaceOperator2D, LinearOperator>(mod,
+                                                        "LaplaceOperator2D",
+                                                        R"pbdoc(
+        Optimized 2D Laplace operator with hard-coded 5-point stencil.
+
+        This operator provides an optimized implementation of the discrete Laplace
+        operator using a 5-point stencil: [0,1,0; 1,-4,1; 0,1,0].
+
+        For new code, prefer using this class directly instead of LaplaceOperator(2)
+        for slightly better performance (avoids virtual dispatch).
+        )pbdoc")
+            .def(py::init<Real>(), "scale"_a = 1.0,
+                 "Construct a 2D Laplace operator with optional scale factor")
+            .def("apply", static_cast<ApplyHostFn>(&LaplaceOperator2D::apply),
+                 "input_field"_a, "output_field"_a,
+                 "Apply the Laplace operator to host (CPU) fields")
+            .def_property_readonly("nb_stencil_pts",
+                                   &LaplaceOperator2D::get_nb_stencil_pts)
+            .def_property_readonly("scale", &LaplaceOperator2D::get_scale)
+            .def_property_readonly("offset",
+                                   [](const LaplaceOperator2D & op) {
+                                       const auto & offset = op.get_offset();
+                                       return py::array_t<Index_t>(
+                                           offset.size(), offset.data());
+                                   })
+            .def_property_readonly(
+                "stencil_shape",
+                [](const LaplaceOperator2D & op) {
+                    const auto & shape = op.get_stencil_shape();
+                    return py::array_t<Index_t>(shape.size(), shape.data());
+                })
+            .def_property_readonly(
+                "coefficients", [](const LaplaceOperator2D & op) {
+                    const auto & flat_op = op.get_coefficients();
+                    const auto & stencil_shape = op.get_stencil_shape();
+                    std::vector<py::ssize_t> full_shape{1, 1, 1};
+                    for (const auto & dim : stencil_shape) {
+                        full_shape.push_back(dim);
+                    }
+                    py::array_t<Real, py::array::f_style> result(full_shape);
+                    std::copy(flat_op.begin(), flat_op.end(),
+                              result.mutable_data());
+                    return result;
+                });
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (LaplaceOperator2D::*)(const RealFieldDevice &,
+                                                      RealFieldDevice &) const;
+    laplace_op.def("apply",
+                   static_cast<ApplyDeviceFn>(&LaplaceOperator2D::apply),
+                   "input_field"_a, "output_field"_a,
+                   "Apply the Laplace operator to device (GPU) fields");
+#endif
+}
+
+// Bind class LaplaceOperator3D (dimension-specific)
+void add_laplace_operator_3d(py::module & mod) {
+    using ApplyHostFn = void (LaplaceOperator3D::*)(const RealFieldHost &,
+                                                    RealFieldHost &) const;
+
+    auto laplace_op =
+        py::class_<LaplaceOperator3D, LinearOperator>(mod,
+                                                        "LaplaceOperator3D",
+                                                        R"pbdoc(
+        Optimized 3D Laplace operator with hard-coded 7-point stencil.
+
+        This operator provides an optimized implementation of the discrete Laplace
+        operator using a 7-point stencil: center=-6, neighbors=+1.
+
+        For new code, prefer using this class directly instead of LaplaceOperator(3)
+        for slightly better performance (avoids virtual dispatch).
+        )pbdoc")
+            .def(py::init<Real>(), "scale"_a = 1.0,
+                 "Construct a 3D Laplace operator with optional scale factor")
+            .def("apply", static_cast<ApplyHostFn>(&LaplaceOperator3D::apply),
+                 "input_field"_a, "output_field"_a,
+                 "Apply the Laplace operator to host (CPU) fields")
+            .def_property_readonly("nb_stencil_pts",
+                                   &LaplaceOperator3D::get_nb_stencil_pts)
+            .def_property_readonly("scale", &LaplaceOperator3D::get_scale)
+            .def_property_readonly("offset",
+                                   [](const LaplaceOperator3D & op) {
+                                       const auto & offset = op.get_offset();
+                                       return py::array_t<Index_t>(
+                                           offset.size(), offset.data());
+                                   })
+            .def_property_readonly(
+                "stencil_shape",
+                [](const LaplaceOperator3D & op) {
+                    const auto & shape = op.get_stencil_shape();
+                    return py::array_t<Index_t>(shape.size(), shape.data());
+                })
+            .def_property_readonly(
+                "coefficients", [](const LaplaceOperator3D & op) {
+                    const auto & flat_op = op.get_coefficients();
+                    const auto & stencil_shape = op.get_stencil_shape();
+                    std::vector<py::ssize_t> full_shape{1, 1, 1};
+                    for (const auto & dim : stencil_shape) {
+                        full_shape.push_back(dim);
+                    }
+                    py::array_t<Real, py::array::f_style> result(full_shape);
+                    std::copy(flat_op.begin(), flat_op.end(),
+                              result.mutable_data());
+                    return result;
+                });
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (LaplaceOperator3D::*)(const RealFieldDevice &,
+                                                      RealFieldDevice &) const;
+    laplace_op.def("apply",
+                   static_cast<ApplyDeviceFn>(&LaplaceOperator3D::apply),
+                   "input_field"_a, "output_field"_a,
+                   "Apply the Laplace operator to device (GPU) fields");
+#endif
+}
+
+// Bind class FEMGradientOperator2D (dimension-specific)
+void add_fem_gradient_operator_2d(py::module & mod) {
+    using ApplyHostFn = void (FEMGradientOperator2D::*)(const RealFieldHost &,
+                                                        RealFieldHost &) const;
+    using TransposeHostFn =
+        void (FEMGradientOperator2D::*)(const RealFieldHost &, RealFieldHost &,
+                                        const std::vector<Real> &) const;
+
+    auto fem_grad_op =
+        py::class_<FEMGradientOperator2D, LinearOperator>(
+            mod, "FEMGradientOperator2D",
+            R"pbdoc(
+        Optimized 2D linear FEM gradient operator with triangular elements.
+
+        2 triangles per pixel, 2 quadrature points, 2 gradient components (d/dx, d/dy).
+
+        For new code, prefer using this class directly instead of FEMGradientOperator(2)
+        for slightly better performance (avoids virtual dispatch).
+        )pbdoc")
+            .def(py::init<std::vector<Real>>(),
+                 "grid_spacing"_a = std::vector<Real>{},
+                 "Construct with optional grid spacing [hx, hy]")
+            .def("apply",
+                 static_cast<ApplyHostFn>(&FEMGradientOperator2D::apply),
+                 "nodal_field"_a, "gradient_field"_a,
+                 "Apply gradient operator to host fields")
+            .def(
+                "transpose",
+                static_cast<TransposeHostFn>(&FEMGradientOperator2D::transpose),
+                "gradient_field"_a, "nodal_field"_a,
+                "weights"_a = std::vector<Real>{},
+                "Apply transpose (divergence) to host fields")
+            .def_property_readonly("grid_spacing",
+                                   &FEMGradientOperator2D::get_grid_spacing)
+            .def_property_readonly(
+                "quadrature_weights",
+                &FEMGradientOperator2D::get_quadrature_weights)
+            .def_property_readonly("offset",
+                                   [](const FEMGradientOperator2D & op) {
+                                       const auto & offset = op.get_offset();
+                                       return py::array_t<Index_t>(
+                                           offset.size(), offset.data());
+                                   })
+            .def_property_readonly(
+                "stencil_shape",
+                [](const FEMGradientOperator2D & op) {
+                    const auto & shape = op.get_stencil_shape();
+                    return py::array_t<Index_t>(shape.size(), shape.data());
+                })
+            .def_property_readonly(
+                "coefficients", [](const FEMGradientOperator2D & op) {
+                    const auto & flat_op = op.get_coefficients();
+                    const auto & stencil_shape = op.get_stencil_shape();
+                    const auto nb_output = op.get_nb_output_components();
+                    const auto nb_quad = op.get_nb_quad_pts();
+                    const auto nb_input = op.get_nb_input_components();
+                    std::vector<py::ssize_t> full_shape{nb_output, nb_quad,
+                                                        nb_input};
+                    for (const auto & dim : stencil_shape) {
+                        full_shape.push_back(dim);
+                    }
+                    py::array_t<Real, py::array::f_style> result(full_shape);
+                    std::copy(flat_op.begin(), flat_op.end(),
+                              result.mutable_data());
+                    return result;
+                });
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (FEMGradientOperator2D::*)(
+        const RealFieldDevice &, RealFieldDevice &) const;
+    using TransposeDeviceFn = void (FEMGradientOperator2D::*)(
+        const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
+        const;
+    fem_grad_op
+        .def("apply", static_cast<ApplyDeviceFn>(&FEMGradientOperator2D::apply),
+             "nodal_field"_a, "gradient_field"_a,
+             "Apply gradient operator to device fields")
+        .def("transpose",
+             static_cast<TransposeDeviceFn>(&FEMGradientOperator2D::transpose),
+             "gradient_field"_a, "nodal_field"_a,
+             "weights"_a = std::vector<Real>{},
+             "Apply transpose to device fields");
+#endif
+}
+
+// Bind class FEMGradientOperator3D (dimension-specific)
+void add_fem_gradient_operator_3d(py::module & mod) {
+    using ApplyHostFn = void (FEMGradientOperator3D::*)(const RealFieldHost &,
+                                                        RealFieldHost &) const;
+    using TransposeHostFn =
+        void (FEMGradientOperator3D::*)(const RealFieldHost &, RealFieldHost &,
+                                        const std::vector<Real> &) const;
+
+    auto fem_grad_op =
+        py::class_<FEMGradientOperator3D, LinearOperator>(
+            mod, "FEMGradientOperator3D",
+            R"pbdoc(
+        Optimized 3D linear FEM gradient operator with tetrahedral elements.
+
+        5 tetrahedra per voxel (Kuhn triangulation), 5 quadrature points,
+        3 gradient components (d/dx, d/dy, d/dz).
+
+        For new code, prefer using this class directly instead of FEMGradientOperator(3)
+        for slightly better performance (avoids virtual dispatch).
+        )pbdoc")
+            .def(py::init<std::vector<Real>>(),
+                 "grid_spacing"_a = std::vector<Real>{},
+                 "Construct with optional grid spacing [hx, hy, hz]")
+            .def("apply",
+                 static_cast<ApplyHostFn>(&FEMGradientOperator3D::apply),
+                 "nodal_field"_a, "gradient_field"_a,
+                 "Apply gradient operator to host fields")
+            .def(
+                "transpose",
+                static_cast<TransposeHostFn>(&FEMGradientOperator3D::transpose),
+                "gradient_field"_a, "nodal_field"_a,
+                "weights"_a = std::vector<Real>{},
+                "Apply transpose (divergence) to host fields")
+            .def_property_readonly("grid_spacing",
+                                   &FEMGradientOperator3D::get_grid_spacing)
+            .def_property_readonly(
+                "quadrature_weights",
+                &FEMGradientOperator3D::get_quadrature_weights)
+            .def_property_readonly("offset",
+                                   [](const FEMGradientOperator3D & op) {
+                                       const auto & offset = op.get_offset();
+                                       return py::array_t<Index_t>(
+                                           offset.size(), offset.data());
+                                   })
+            .def_property_readonly(
+                "stencil_shape",
+                [](const FEMGradientOperator3D & op) {
+                    const auto & shape = op.get_stencil_shape();
+                    return py::array_t<Index_t>(shape.size(), shape.data());
+                })
+            .def_property_readonly(
+                "coefficients", [](const FEMGradientOperator3D & op) {
+                    const auto & flat_op = op.get_coefficients();
+                    const auto & stencil_shape = op.get_stencil_shape();
+                    const auto nb_output = op.get_nb_output_components();
+                    const auto nb_quad = op.get_nb_quad_pts();
+                    const auto nb_input = op.get_nb_input_components();
+                    std::vector<py::ssize_t> full_shape{nb_output, nb_quad,
+                                                        nb_input};
+                    for (const auto & dim : stencil_shape) {
+                        full_shape.push_back(dim);
+                    }
+                    py::array_t<Real, py::array::f_style> result(full_shape);
+                    std::copy(flat_op.begin(), flat_op.end(),
+                              result.mutable_data());
+                    return result;
+                });
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (FEMGradientOperator3D::*)(
+        const RealFieldDevice &, RealFieldDevice &) const;
+    using TransposeDeviceFn = void (FEMGradientOperator3D::*)(
+        const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
+        const;
+    fem_grad_op
+        .def("apply", static_cast<ApplyDeviceFn>(&FEMGradientOperator3D::apply),
+             "nodal_field"_a, "gradient_field"_a,
+             "Apply gradient operator to device fields")
+        .def("transpose",
+             static_cast<TransposeDeviceFn>(&FEMGradientOperator3D::transpose),
+             "gradient_field"_a, "nodal_field"_a,
+             "weights"_a = std::vector<Real>{},
+             "Apply transpose to device fields");
+#endif
+}
+
+// Bind class IsotropicStiffnessOperator2D
+void add_isotropic_stiffness_operator_2d(py::module & mod) {
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldHost &, const RealFieldHost &, const RealFieldHost &,
+        RealFieldHost &) const;
+    using ApplyIncrementHostFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldHost &, const RealFieldHost &, const RealFieldHost &,
+        Real, RealFieldHost &) const;
+
+    auto op =
+        py::class_<IsotropicStiffnessOperator2D>(mod,
+                                                 "IsotropicStiffnessOperator2D",
+                                                 R"pbdoc(
+        Fused stiffness operator for 2D isotropic linear elastic materials.
+
+        This operator computes K @ u = B^T C B @ u for 2D linear triangular
+        elements, where C is the isotropic elasticity tensor parameterized by
+        Lamé constants λ (lambda) and μ (mu).
+
+        Instead of storing the full stiffness matrix K, it exploits the
+        isotropic structure: K = 2μ G + λ V, where G and V are geometry-only
+        matrices precomputed at construction time.
+
+        This reduces memory from O(N × 64) for full K storage to O(N × 2) for
+        spatially-varying isotropic materials, plus O(1) for the shared G and V.
+
+        Parameters
+        ----------
+        grid_spacing : list of float
+            Grid spacing [hx, hy] in each direction.
+
+        Notes
+        -----
+        - Displacement field shape: [2, nx, ny] (2 DOFs per node)
+        - Material fields (lambda, mu) shape: [nx-1, ny-1] (one value per pixel)
+        - Force field shape: [2, nx, ny] (same as displacement)
+        )pbdoc")
+            .def(py::init<const std::vector<Real> &>(), "grid_spacing"_a,
+                 "Construct with grid spacing [hx, hy]")
+            .def("apply",
+                 static_cast<ApplyHostFn>(&IsotropicStiffnessOperator2D::apply),
+                 "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+                 "Apply stiffness operator: force = K @ displacement")
+            .def("apply_increment",
+                 static_cast<ApplyIncrementHostFn>(
+                     &IsotropicStiffnessOperator2D::apply_increment),
+                 "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
+                 "force"_a,
+                 "Apply with increment: force += alpha * K @ displacement")
+            .def_property_readonly(
+                "G",
+                [](const IsotropicStiffnessOperator2D & op) {
+                    const auto & G = op.get_G();
+                    return py::array_t<Real>({8, 8}, G.data());
+                },
+                "Precomputed G matrix (shear stiffness geometry)")
+            .def_property_readonly(
+                "V",
+                [](const IsotropicStiffnessOperator2D & op) {
+                    const auto & V = op.get_V();
+                    return py::array_t<Real>({8, 8}, V.data());
+                },
+                "Precomputed V matrix (volumetric stiffness geometry)");
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldDevice &, const RealFieldDevice &,
+        const RealFieldDevice &, RealFieldDevice &) const;
+    using ApplyIncrementDeviceFn = void (IsotropicStiffnessOperator2D::*)(
+        const RealFieldDevice &, const RealFieldDevice &,
+        const RealFieldDevice &, Real, RealFieldDevice &) const;
+
+    op.def("apply",
+           static_cast<ApplyDeviceFn>(&IsotropicStiffnessOperator2D::apply),
+           "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+           "Apply stiffness operator to device (GPU) fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(
+                 &IsotropicStiffnessOperator2D::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
+             "force"_a, "Apply with increment to device (GPU) fields");
+#endif
+}
+
+// Bind class IsotropicStiffnessOperator3D
+void add_isotropic_stiffness_operator_3d(py::module & mod) {
+    // Function pointer types for explicit overload selection
+    using ApplyHostFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldHost &, const RealFieldHost &, const RealFieldHost &,
+        RealFieldHost &) const;
+    using ApplyIncrementHostFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldHost &, const RealFieldHost &, const RealFieldHost &,
+        Real, RealFieldHost &) const;
+
+    auto op =
+        py::class_<IsotropicStiffnessOperator3D>(mod,
+                                                 "IsotropicStiffnessOperator3D",
+                                                 R"pbdoc(
+        Fused stiffness operator for 3D isotropic linear elastic materials.
+
+        This operator computes K @ u = B^T C B @ u for 3D linear tetrahedral
+        elements using a 5-tetrahedra decomposition per voxel (Kuhn triangulation).
+
+        The isotropic structure K = 2μ G + λ V is exploited to reduce memory
+        requirements from O(N × 576) for full K storage to O(N × 2) for
+        spatially-varying isotropic materials.
+
+        Parameters
+        ----------
+        grid_spacing : list of float
+            Grid spacing [hx, hy, hz] in each direction.
+
+        Notes
+        -----
+        - Displacement field shape: [3, nx, ny, nz] (3 DOFs per node)
+        - Material fields (lambda, mu) shape: [nx-1, ny-1, nz-1] (one value per voxel)
+        - Force field shape: [3, nx, ny, nz] (same as displacement)
+        )pbdoc")
+            .def(py::init<const std::vector<Real> &>(), "grid_spacing"_a,
+                 "Construct with grid spacing [hx, hy, hz]")
+            .def("apply",
+                 static_cast<ApplyHostFn>(&IsotropicStiffnessOperator3D::apply),
+                 "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+                 "Apply stiffness operator: force = K @ displacement")
+            .def("apply_increment",
+                 static_cast<ApplyIncrementHostFn>(
+                     &IsotropicStiffnessOperator3D::apply_increment),
+                 "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
+                 "force"_a,
+                 "Apply with increment: force += alpha * K @ displacement")
+            .def_property_readonly(
+                "G",
+                [](const IsotropicStiffnessOperator3D & op) {
+                    const auto & G = op.get_G();
+                    return py::array_t<Real>({24, 24}, G.data());
+                },
+                "Precomputed G matrix (shear stiffness geometry)")
+            .def_property_readonly(
+                "V",
+                [](const IsotropicStiffnessOperator3D & op) {
+                    const auto & V = op.get_V();
+                    return py::array_t<Real>({24, 24}, V.data());
+                },
+                "Precomputed V matrix (volumetric stiffness geometry)");
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using ApplyDeviceFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldDevice &, const RealFieldDevice &,
+        const RealFieldDevice &, RealFieldDevice &) const;
+    using ApplyIncrementDeviceFn = void (IsotropicStiffnessOperator3D::*)(
+        const RealFieldDevice &, const RealFieldDevice &,
+        const RealFieldDevice &, Real, RealFieldDevice &) const;
+
+    op.def("apply",
+           static_cast<ApplyDeviceFn>(&IsotropicStiffnessOperator3D::apply),
+           "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+           "Apply stiffness operator to device (GPU) fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(
+                 &IsotropicStiffnessOperator3D::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
+             "force"_a, "Apply with increment to device (GPU) fields");
+#endif
+}
+
+void add_convolution_operator_classes(py::module & mod) {
+    add_gradient_operator(mod);
+    add_stencil_gradient_operator(mod);
+    add_laplace_operator_2d(mod);
+    add_laplace_operator_3d(mod);
+    add_fem_gradient_operator_2d(mod);
+    add_fem_gradient_operator_3d(mod);
+    add_isotropic_stiffness_operator_2d(mod);
+    add_isotropic_stiffness_operator_3d(mod);
+
+    // Backwards compatibility aliases
+    mod.attr("ConvolutionOperatorBase") = mod.attr("GradientOperator");
+    mod.attr("ConvolutionOperator") = mod.attr("GenericLinearOperator");
+}

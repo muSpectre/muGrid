@@ -62,7 +62,6 @@ class FFTEngineBase : public CartesianDecomposition {
  public:
   using Parent_t = CartesianDecomposition;
   using SubPtMap_t = FieldCollection::SubPtMap_t;
-  using MemoryLocation = FieldCollection::MemoryLocation;
 
   /**
    * Construct an FFT engine base with pencil decomposition.
@@ -72,14 +71,14 @@ class FFTEngineBase : public CartesianDecomposition {
    * @param nb_ghosts_left      Ghost cells on low-index side of each dimension
    * @param nb_ghosts_right     Ghost cells on high-index side of each dimension
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
-   * @param memory_location     Where to allocate field memory (Host or Device)
+   * @param device              Where to allocate field memory
    */
   FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                 const Communicator & comm = Communicator(),
                 const DynGridIndex & nb_ghosts_left = DynGridIndex{},
                 const DynGridIndex & nb_ghosts_right = DynGridIndex{},
                 const SubPtMap_t & nb_sub_pts = {},
-                MemoryLocation memory_location = MemoryLocation::Host);
+                Device device = Device::cpu());
 
   FFTEngineBase() = delete;
   FFTEngineBase(const FFTEngineBase &) = delete;

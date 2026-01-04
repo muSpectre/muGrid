@@ -1,9 +1,9 @@
 /**
- * @file   fem_gradient_operator_gpu.cpp
+ * @file   fem_gradient_operator_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   25 Dec 2024
+ * @date   25 Dec 2025
  *
  * @brief  Unified CUDA/HIP implementation of hard-coded FEM gradient operator
  *
@@ -37,7 +37,8 @@
  *
  */
 
-#include "fem_gradient_operator.hh"
+#include "fem_gradient_2d.hh"
+#include "fem_gradient_3d.hh"
 
 // Unified GPU abstraction macros
 #if defined(MUGRID_ENABLE_CUDA)
@@ -58,6 +59,19 @@ namespace fem_gradient_kernels {
 // Block sizes for GPU kernels
 constexpr int BLOCK_SIZE_2D = 16;
 constexpr int BLOCK_SIZE_3D = 8;
+
+// Custom atomicAdd for double precision (needed for shared memory on some architectures)
+// Uses compare-and-swap loop
+__device__ inline double atomicAddDouble(double* address, double val) {
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
 
 // =========================================================================
 // 2D GPU Kernels
@@ -212,30 +226,31 @@ __global__ void fem_divergence_2d_kernel(
 
 // Device-side copies of shape function gradients for 3D
 // These are the same as in the header, made accessible to GPU kernels
+// 5-tet decomposition: 1 central tetrahedron + 4 corner tetrahedra
 __constant__ Real d_B_3D_REF[DIM_3D][NB_QUAD_3D][NB_NODES_3D] = {
     // d/dx gradients
     {
-        {-1.0,  1.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0},
-        { 0.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0},
-        { 0.0,  0.0,  0.0,  0.0,  0.0,  1.0, -1.0,  0.0},
-        { 0.0, -1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0},
-        { 0.0,  0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  1.0}
+        { 0.0,  0.5, -0.5,  0.0, -0.5,  0.0,  0.0,  0.5},  // Tet 0: Central
+        {-1.0,  1.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0},  // Tet 1: Corner (0,0,0)
+        { 0.0,  0.0, -1.0,  1.0,  0.0,  0.0,  0.0,  0.0},  // Tet 2: Corner (1,1,0)
+        { 0.0,  0.0,  0.0,  0.0, -1.0,  1.0,  0.0,  0.0},  // Tet 3: Corner (1,0,1)
+        { 0.0,  0.0,  0.0,  0.0,  0.0,  0.0, -1.0,  1.0}   // Tet 4: Corner (0,1,1)
     },
     // d/dy gradients
     {
-        {-1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0,  0.0},
-        { 0.0,  0.0,  1.0,  0.0, -1.0,  0.0,  0.0,  0.0},
-        { 0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0},
-        { 0.0,  0.0, -1.0,  1.0,  0.0,  0.0,  0.0,  0.0},
-        { 0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  0.0,  1.0}
+        { 0.0, -0.5,  0.5,  0.0, -0.5,  0.0,  0.0,  0.5},  // Tet 0: Central
+        {-1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0,  0.0},  // Tet 1: Corner (0,0,0)
+        { 0.0, -1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0},  // Tet 2: Corner (1,1,0)
+        { 0.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0},  // Tet 3: Corner (1,0,1)
+        { 0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0,  0.0}   // Tet 4: Corner (0,1,1)
     },
     // d/dz gradients
     {
-        {-1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0},
-        { 0.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0},
-        { 0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0,  0.0},
-        { 0.0,  0.0,  0.0,  0.0,  0.0,  1.0, -1.0,  0.0},
-        { 0.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0}
+        { 0.0, -0.5, -0.5,  0.0,  0.5,  0.0,  0.0,  0.5},  // Tet 0: Central
+        {-1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0},  // Tet 1: Corner (0,0,0)
+        { 0.0,  0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  1.0},  // Tet 2: Corner (1,1,0)
+        { 0.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0},  // Tet 3: Corner (1,0,1)
+        { 0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0}   // Tet 4: Corner (0,1,1)
     }
 };
 
@@ -378,39 +393,41 @@ __global__ void fem_gradient_3d_kernel(
                             iy * grad_stride_y +
                             iz * grad_stride_z;
 
-        // Hand-unrolled gradient computation exploiting B matrix sparsity
-        // Each quadrature point corresponds to a tetrahedron in the voxel
-        // B matrix has only 2 non-zero entries per gradient component per quad
+        // Hand-unrolled gradient computation for 5-tet decomposition
+        // Tet 0: Central tetrahedron (nodes 1,2,4,7) - uses all 4 vertices
+        // Tet 1-4: Corner tetrahedra - use simple forward differences
 
-        // Quad 0: tetrahedron with nodes 0,1,2,4
+        // Quad 0: Central tetrahedron (nodes 1,2,4,7)
+        // grad_x = 0.5*(n1 - n2 - n4 + n7) / hx
+        // grad_y = 0.5*(-n1 + n2 - n4 + n7) / hy
+        // grad_z = 0.5*(-n1 - n2 + n4 + n7) / hz
+        Real gx0 = inv_hx * 0.5 * (n1 - n2 - n4 + n7);
+        Real gy0 = inv_hy * 0.5 * (-n1 + n2 - n4 + n7);
+        Real gz0 = inv_hz * 0.5 * (-n1 - n2 + n4 + n7);
+
+        // Quad 1: Corner at (0,0,0) - nodes 0,1,2,4
         // grad_x = (-n0 + n1) / hx, grad_y = (-n0 + n2) / hy, grad_z = (-n0 + n4) / hz
-        Real gx0 = inv_hx * (-n0 + n1);
-        Real gy0 = inv_hy * (-n0 + n2);
-        Real gz0 = inv_hz * (-n0 + n4);
+        Real gx1 = inv_hx * (-n0 + n1);
+        Real gy1 = inv_hy * (-n0 + n2);
+        Real gz1 = inv_hz * (-n0 + n4);
 
-        // Quad 1: tetrahedron with nodes 1,2,4,5
-        // grad_x = (-n1 + n5) / hx, grad_y = (n2 - n4) / hy, grad_z = (-n1 + n5) / hz
-        Real gx1 = inv_hx * (-n1 + n5);
-        Real gy1 = inv_hy * (n2 - n4);
-        Real gz1 = inv_hz * (-n1 + n5);
+        // Quad 2: Corner at (1,1,0) - nodes 1,2,3,7
+        // grad_x = (-n2 + n3) / hx, grad_y = (-n1 + n3) / hy, grad_z = (-n3 + n7) / hz
+        Real gx2 = inv_hx * (-n2 + n3);
+        Real gy2 = inv_hy * (-n1 + n3);
+        Real gz2 = inv_hz * (-n3 + n7);
 
-        // Quad 2: tetrahedron with nodes 2,4,5,6
-        // grad_x = (n5 - n6) / hx, grad_y = (-n2 + n6) / hy, grad_z = (-n4 + n6) / hz
-        Real gx2 = inv_hx * (n5 - n6);
-        Real gy2 = inv_hy * (-n2 + n6);
-        Real gz2 = inv_hz * (-n4 + n6);
+        // Quad 3: Corner at (1,0,1) - nodes 1,4,5,7
+        // grad_x = (-n4 + n5) / hx, grad_y = (-n5 + n7) / hy, grad_z = (-n1 + n5) / hz
+        Real gx3 = inv_hx * (-n4 + n5);
+        Real gy3 = inv_hy * (-n5 + n7);
+        Real gz3 = inv_hz * (-n1 + n5);
 
-        // Quad 3: tetrahedron with nodes 1,2,3,5
-        // grad_x = (-n1 + n3) / hx, grad_y = (-n2 + n3) / hy, grad_z = (n5 - n6) / hz
-        Real gx3 = inv_hx * (-n1 + n3);
-        Real gy3 = inv_hy * (-n2 + n3);
-        Real gz3 = inv_hz * (n5 - n6);
-
-        // Quad 4: tetrahedron with nodes 2,3,5,7
-        // grad_x = (-n3 + n7) / hx, grad_y = (-n2 + n7) / hy, grad_z = (-n5 + n7) / hz
-        Real gx4 = inv_hx * (-n3 + n7);
-        Real gy4 = inv_hy * (-n2 + n7);
-        Real gz4 = inv_hz * (-n5 + n7);
+        // Quad 4: Corner at (0,1,1) - nodes 2,4,6,7
+        // grad_x = (-n6 + n7) / hx, grad_y = (-n4 + n6) / hy, grad_z = (-n2 + n6) / hz
+        Real gx4 = inv_hx * (-n6 + n7);
+        Real gy4 = inv_hy * (-n4 + n6);
+        Real gz4 = inv_hz * (-n2 + n6);
 
         // Store gradients
         if (increment) {
@@ -458,21 +475,16 @@ __global__ void fem_gradient_3d_kernel(
 }
 
 /**
- * GPU kernel for 3D FEM divergence (transpose) operator.
+ * GPU kernel for 3D FEM divergence (transpose) operator - GATHER version.
  *
- * Uses gather pattern: each thread handles one NODE and gathers contributions
- * from up to 8 adjacent voxels. This eliminates the need for atomic operations.
+ * Uses gather pattern - NO ATOMICS, NO SHARED MEMORY:
+ * - Each thread handles one NODE
+ * - Gathers contributions from up to 8 neighboring voxels
+ * - Single write per node
  *
- * For node at (ix, iy, iz), gather from adjacent voxels where this node
- * is at corner position node_idx:
- * - Voxel (ix, iy, iz): corner 0
- * - Voxel (ix-1, iy, iz): corner 1
- * - Voxel (ix, iy-1, iz): corner 2
- * - Voxel (ix-1, iy-1, iz): corner 3
- * - Voxel (ix, iy, iz-1): corner 4
- * - Voxel (ix-1, iy, iz-1): corner 5
- * - Voxel (ix, iy-1, iz-1): corner 6
- * - Voxel (ix-1, iy-1, iz-1): corner 7
+ * This kernel relies on L2 cache for data reuse between adjacent threads.
+ * Adjacent threads in x access adjacent voxels, which have adjacent memory
+ * addresses (x stride = 1).
  */
 __global__ void fem_divergence_3d_kernel(
     const Real* MUGRID_RESTRICT gradient_input,
@@ -487,57 +499,154 @@ __global__ void fem_divergence_3d_kernel(
     bool increment) {
 
     // Thread indices - each thread processes one NODE
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
-    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
+    const Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    const Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
 
     // Check bounds (all nodes)
-    if (ix < nx && iy < ny && iz < nz) {
-        Real contrib = 0.0;
+    if (ix >= nx || iy >= ny || iz >= nz) return;
 
-        // Iterate over all 8 potential adjacent voxels
-        // Each voxel contributes if this node is one of its corners
-        for (Index_t corner = 0; corner < NB_NODES_3D; ++corner) {
-            // Compute voxel position based on which corner this node would be
-            // Corner offsets: 0=(0,0,0), 1=(1,0,0), 2=(0,1,0), 3=(1,1,0),
-            //                 4=(0,0,1), 5=(1,0,1), 6=(0,1,1), 7=(1,1,1)
-            Index_t vx = ix - d_NODE_OFFSET_3D[corner][0];
-            Index_t vy = iy - d_NODE_OFFSET_3D[corner][1];
-            Index_t vz = iz - d_NODE_OFFSET_3D[corner][2];
+    // Load weights into registers
+    const Real w0 = quad_weights[0];
+    const Real w1 = quad_weights[1];
+    const Real w2 = quad_weights[2];
+    const Real w3 = quad_weights[3];
+    const Real w4 = quad_weights[4];
 
-            // Check if this voxel exists (valid interior voxel)
-            if (vx >= 0 && vx < nx - 1 &&
-                vy >= 0 && vy < ny - 1 &&
-                vz >= 0 && vz < nz - 1) {
+    // Pre-compute weighted inverse spacings
+    const Real w0_ihx = w0 * inv_hx, w0_ihy = w0 * inv_hy, w0_ihz = w0 * inv_hz;
+    const Real w1_ihx = w1 * inv_hx, w1_ihy = w1 * inv_hy, w1_ihz = w1 * inv_hz;
+    const Real w2_ihx = w2 * inv_hx, w2_ihy = w2 * inv_hy, w2_ihz = w2 * inv_hz;
+    const Real w3_ihx = w3 * inv_hx, w3_ihy = w3 * inv_hy, w3_ihz = w3 * inv_hz;
+    const Real w4_ihx = w4 * inv_hx, w4_ihy = w4 * inv_hy, w4_ihz = w4 * inv_hz;
 
-                Index_t grad_base = vx * grad_stride_x +
-                                    vy * grad_stride_y +
-                                    vz * grad_stride_z;
+    Real contrib = 0.0;
 
-                // Gather B^T contributions from all quadrature points
-                for (Index_t q = 0; q < NB_QUAD_3D; ++q) {
-                    Index_t grad_idx = grad_base + q * grad_stride_q;
-                    Real gx = gradient_input[grad_idx + 0 * grad_stride_d];
-                    Real gy = gradient_input[grad_idx + 1 * grad_stride_d];
-                    Real gz = gradient_input[grad_idx + 2 * grad_stride_d];
+    // 5-tet decomposition: Tet 0 = central, Tet 1-4 = corners
+    // For each voxel, we check which tetrahedra this node belongs to
+    // and accumulate the B^T contributions.
+    //
+    // Tetrahedra membership:
+    //   Tet 0 (central): nodes 1, 2, 4, 7
+    //   Tet 1 (corner 0,0,0): nodes 0, 1, 2, 4
+    //   Tet 2 (corner 1,1,0): nodes 1, 2, 3, 7
+    //   Tet 3 (corner 1,0,1): nodes 1, 4, 5, 7
+    //   Tet 4 (corner 0,1,1): nodes 2, 4, 6, 7
 
-                    contrib += quad_weights[q] * (
-                        d_B_3D_REF[0][q][corner] * inv_hx * gx +
-                        d_B_3D_REF[1][q][corner] * inv_hy * gy +
-                        d_B_3D_REF[2][q][corner] * inv_hz * gz);
-                }
-            }
-        }
+    // Voxel (ix, iy, iz): this node is corner 0
+    // Only in Tet 1: B^T = w1*(-gx/hx - gy/hy - gz/hz)
+    if (ix < nx - 1 && iy < ny - 1 && iz < nz - 1) {
+        Index_t grad_base = ix * grad_stride_x + iy * grad_stride_y + iz * grad_stride_z;
+        Real gx_q1 = gradient_input[grad_base + 1 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q1 = gradient_input[grad_base + 1 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q1 = gradient_input[grad_base + 1 * grad_stride_q + 2 * grad_stride_d];
+        contrib += -w1_ihx * gx_q1 - w1_ihy * gy_q1 - w1_ihz * gz_q1;
+    }
 
-        // Single write to this node - no atomics needed!
-        Index_t nodal_idx = ix * nodal_stride_x +
-                            iy * nodal_stride_y +
-                            iz * nodal_stride_z;
-        if (increment) {
-            nodal_output[nodal_idx] += contrib;
-        } else {
-            nodal_output[nodal_idx] = contrib;
-        }
+    // Voxel (ix-1, iy, iz): this node is corner 1
+    // In Tet 0: +0.5*gx - 0.5*gy - 0.5*gz
+    // In Tet 1: +gx
+    // In Tet 2: -gy
+    // In Tet 3: -gz
+    if (ix > 0 && iy < ny - 1 && iz < nz - 1) {
+        Index_t grad_base = (ix - 1) * grad_stride_x + iy * grad_stride_y + iz * grad_stride_z;
+        Real gx_q0 = gradient_input[grad_base + 0 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q0 = gradient_input[grad_base + 0 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q0 = gradient_input[grad_base + 0 * grad_stride_q + 2 * grad_stride_d];
+        Real gx_q1 = gradient_input[grad_base + 1 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q2 = gradient_input[grad_base + 2 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q3 = gradient_input[grad_base + 3 * grad_stride_q + 2 * grad_stride_d];
+        contrib += w0_ihx * 0.5 * gx_q0 - w0_ihy * 0.5 * gy_q0 - w0_ihz * 0.5 * gz_q0
+                 + w1_ihx * gx_q1 - w2_ihy * gy_q2 - w3_ihz * gz_q3;
+    }
+
+    // Voxel (ix, iy-1, iz): this node is corner 2
+    // In Tet 0: -0.5*gx + 0.5*gy - 0.5*gz
+    // In Tet 1: +gy
+    // In Tet 2: -gx
+    // In Tet 4: -gz
+    if (ix < nx - 1 && iy > 0 && iz < nz - 1) {
+        Index_t grad_base = ix * grad_stride_x + (iy - 1) * grad_stride_y + iz * grad_stride_z;
+        Real gx_q0 = gradient_input[grad_base + 0 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q0 = gradient_input[grad_base + 0 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q0 = gradient_input[grad_base + 0 * grad_stride_q + 2 * grad_stride_d];
+        Real gy_q1 = gradient_input[grad_base + 1 * grad_stride_q + 1 * grad_stride_d];
+        Real gx_q2 = gradient_input[grad_base + 2 * grad_stride_q + 0 * grad_stride_d];
+        Real gz_q4 = gradient_input[grad_base + 4 * grad_stride_q + 2 * grad_stride_d];
+        contrib += -w0_ihx * 0.5 * gx_q0 + w0_ihy * 0.5 * gy_q0 - w0_ihz * 0.5 * gz_q0
+                 + w1_ihy * gy_q1 - w2_ihx * gx_q2 - w4_ihz * gz_q4;
+    }
+
+    // Voxel (ix-1, iy-1, iz): this node is corner 3
+    // Only in Tet 2: +gx + gy - gz
+    if (ix > 0 && iy > 0 && iz < nz - 1) {
+        Index_t grad_base = (ix - 1) * grad_stride_x + (iy - 1) * grad_stride_y + iz * grad_stride_z;
+        Real gx_q2 = gradient_input[grad_base + 2 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q2 = gradient_input[grad_base + 2 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q2 = gradient_input[grad_base + 2 * grad_stride_q + 2 * grad_stride_d];
+        contrib += w2_ihx * gx_q2 + w2_ihy * gy_q2 - w2_ihz * gz_q2;
+    }
+
+    // Voxel (ix, iy, iz-1): this node is corner 4
+    // In Tet 0: -0.5*gx - 0.5*gy + 0.5*gz
+    // In Tet 1: +gz
+    // In Tet 3: -gx
+    // In Tet 4: -gy
+    if (ix < nx - 1 && iy < ny - 1 && iz > 0) {
+        Index_t grad_base = ix * grad_stride_x + iy * grad_stride_y + (iz - 1) * grad_stride_z;
+        Real gx_q0 = gradient_input[grad_base + 0 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q0 = gradient_input[grad_base + 0 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q0 = gradient_input[grad_base + 0 * grad_stride_q + 2 * grad_stride_d];
+        Real gz_q1 = gradient_input[grad_base + 1 * grad_stride_q + 2 * grad_stride_d];
+        Real gx_q3 = gradient_input[grad_base + 3 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q4 = gradient_input[grad_base + 4 * grad_stride_q + 1 * grad_stride_d];
+        contrib += -w0_ihx * 0.5 * gx_q0 - w0_ihy * 0.5 * gy_q0 + w0_ihz * 0.5 * gz_q0
+                 + w1_ihz * gz_q1 - w3_ihx * gx_q3 - w4_ihy * gy_q4;
+    }
+
+    // Voxel (ix-1, iy, iz-1): this node is corner 5
+    // Only in Tet 3: +gx - gy + gz
+    if (ix > 0 && iy < ny - 1 && iz > 0) {
+        Index_t grad_base = (ix - 1) * grad_stride_x + iy * grad_stride_y + (iz - 1) * grad_stride_z;
+        Real gx_q3 = gradient_input[grad_base + 3 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q3 = gradient_input[grad_base + 3 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q3 = gradient_input[grad_base + 3 * grad_stride_q + 2 * grad_stride_d];
+        contrib += w3_ihx * gx_q3 - w3_ihy * gy_q3 + w3_ihz * gz_q3;
+    }
+
+    // Voxel (ix, iy-1, iz-1): this node is corner 6
+    // Only in Tet 4: -gx + gy + gz
+    if (ix < nx - 1 && iy > 0 && iz > 0) {
+        Index_t grad_base = ix * grad_stride_x + (iy - 1) * grad_stride_y + (iz - 1) * grad_stride_z;
+        Real gx_q4 = gradient_input[grad_base + 4 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q4 = gradient_input[grad_base + 4 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q4 = gradient_input[grad_base + 4 * grad_stride_q + 2 * grad_stride_d];
+        contrib += -w4_ihx * gx_q4 + w4_ihy * gy_q4 + w4_ihz * gz_q4;
+    }
+
+    // Voxel (ix-1, iy-1, iz-1): this node is corner 7
+    // In Tet 0: +0.5*gx + 0.5*gy + 0.5*gz
+    // In Tet 2: +gz
+    // In Tet 3: +gy
+    // In Tet 4: +gx
+    if (ix > 0 && iy > 0 && iz > 0) {
+        Index_t grad_base = (ix - 1) * grad_stride_x + (iy - 1) * grad_stride_y + (iz - 1) * grad_stride_z;
+        Real gx_q0 = gradient_input[grad_base + 0 * grad_stride_q + 0 * grad_stride_d];
+        Real gy_q0 = gradient_input[grad_base + 0 * grad_stride_q + 1 * grad_stride_d];
+        Real gz_q0 = gradient_input[grad_base + 0 * grad_stride_q + 2 * grad_stride_d];
+        Real gz_q2 = gradient_input[grad_base + 2 * grad_stride_q + 2 * grad_stride_d];
+        Real gy_q3 = gradient_input[grad_base + 3 * grad_stride_q + 1 * grad_stride_d];
+        Real gx_q4 = gradient_input[grad_base + 4 * grad_stride_q + 0 * grad_stride_d];
+        contrib += w0_ihx * 0.5 * gx_q0 + w0_ihy * 0.5 * gy_q0 + w0_ihz * 0.5 * gz_q0
+                 + w2_ihz * gz_q2 + w3_ihy * gy_q3 + w4_ihx * gx_q4;
+    }
+
+    // Single write to this node - NO ATOMICS NEEDED!
+    Index_t nodal_idx = ix * nodal_stride_x + iy * nodal_stride_y + iz * nodal_stride_z;
+    if (increment) {
+        nodal_output[nodal_idx] += contrib;
+    } else {
+        nodal_output[nodal_idx] = contrib;
     }
 }
 

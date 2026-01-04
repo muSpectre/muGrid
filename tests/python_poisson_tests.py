@@ -45,8 +45,8 @@ def test_fd_stencil():
     stencil = np.array(
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
-    assert laplace.nb_operators == 1
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
+    assert laplace.nb_output_components == 1
     assert laplace.nb_quad_pts == 1
 
     nb_ghosts = (1, 1)
@@ -74,8 +74,8 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
     stencil = np.array(
         [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     )  # FD-stencil for the Laplacian
-    laplace = muGrid.ConvolutionOperator([-1, -1], stencil)
-    assert laplace.nb_operators == 1
+    laplace = muGrid.GenericLinearOperator([-1, -1], stencil)
+    assert laplace.nb_output_components == 1
     assert laplace.nb_quad_pts == 1
 
     # np.testing.assert_array_equal(decomposition.nb_subdivisions, s)
@@ -87,11 +87,11 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
 
     rhs.p[...] = np.sin(2 * np.pi * x)
 
-    def callback(it, x, r, p):
+    def callback(iteration, state):
         """
-        Callback function to print the current solution, residual, and search direction.
+        Callback function to print the iteration and squared residual norm.
         """
-        print(it, np.dot(r.ravel(), r.ravel()))
+        print(iteration, state["rr"])
 
     def hessp(x_field, Ax_field):
         """
@@ -104,14 +104,13 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         # definite, but the conjugate-gradients solver assumes a
         # positive-definite operator.
         Ax_field.s[...] /= -np.mean(grid_spacing) ** 2  # Scale by grid spacing
-        return Ax_field
 
     conjugate_gradients(
         comm,
         decomposition,
-        hessp,  # linear operator
         rhs,
         solution,
+        hessp=hessp,
         tol=1e-6,
         callback=callback,
         maxiter=10,
@@ -146,7 +145,7 @@ def test_unit_impulse(
             ],
         ],
     )
-    gradient_op = muGrid.ConvolutionOperator([0, 0], gradient)
+    gradient_op = muGrid.GenericLinearOperator([0, 0], gradient)
 
     # Get nodal field
     nodal_field_cpp = fc.real_field("nodal-field", (1,), "nodal_points")
