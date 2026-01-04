@@ -429,3 +429,33 @@ def Communicator(communicator=None):
             "method. muGrid only supports communicators that "
             "conform to the mpi4py interface."
         )
+
+
+def parprint(*args, comm=None, **kwargs):
+    """
+    MPI-safe print function that only prints on rank 0.
+
+    This function behaves like the built-in print() function but only executes
+    on the master process (rank 0) in an MPI environment. This prevents
+    duplicate output when running in parallel.
+
+    Parameters
+    ----------
+    *args
+        Positional arguments passed to print()
+    comm : Communicator, optional
+        The communicator to use. If None, prints unconditionally (useful for
+        serial execution or when used outside of an MPI context).
+    **kwargs
+        Keyword arguments passed to print()
+
+    Examples
+    --------
+    >>> from muGrid import Communicator
+    >>> from muGrid.Parallel import parprint
+    >>> comm = Communicator()
+    >>> parprint("This only prints on rank 0", comm=comm)
+    >>> parprint("This prints unconditionally")  # No comm specified
+    """
+    if comm is None or comm.rank == 0:
+        print(*args, **kwargs)
