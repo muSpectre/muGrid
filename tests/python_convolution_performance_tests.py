@@ -37,7 +37,6 @@ Program grant you additional permission to convey the resulting work.
 import time
 import unittest
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 from scipy.sparse import coo_array
@@ -45,17 +44,6 @@ from scipy.sparse import coo_array
 import muGrid
 from muGrid import wrap_field
 from muGrid.Solvers import conjugate_gradients
-
-# Try to import pypapi for hardware counter access
-try:
-    import pypapi
-    from pypapi import events as papi_events
-
-    PAPI_AVAILABLE = True
-except ImportError:
-    PAPI_AVAILABLE = False
-    print("Warning: pypapi not available. Install with: pip install pypapi")
-    print("Performance tests will run without hardware counters.")
 
 # Try to import CuPy for GPU tests
 try:
@@ -104,53 +92,10 @@ class PerformanceMetrics:
     # Device info
     device: str = "cpu"
 
-    # Hardware counters (optional)
-    papi_cycles: Optional[int] = None
-    papi_instructions: Optional[int] = None
-    papi_fp_ops: Optional[int] = None
-    papi_l1_dcm: Optional[int] = None
-    papi_l2_dcm: Optional[int] = None
-    papi_l3_tcm: Optional[int] = None
-
     @property
     def gflops(self) -> float:
         """Calculate GFLOPS from theoretical FLOPs"""
         return (self.total_flops / 1e9) / (self.wall_time_ms / 1000.0)
-
-    @property
-    def actual_gflops(self) -> float:
-        """Calculate GFLOPS from PAPI measured FP operations"""
-        if self.papi_fp_ops is not None:
-            return (self.papi_fp_ops / 1e9) / (self.wall_time_ms / 1000.0)
-        return self.gflops
-
-    @property
-    def ipc(self) -> Optional[float]:
-        """Calculate instructions per cycle"""
-        if self.papi_cycles is not None and self.papi_instructions is not None:
-            return self.papi_instructions / self.papi_cycles
-        return None
-
-    @property
-    def l1_miss_rate(self) -> Optional[float]:
-        """Calculate L1 cache miss rate as percentage"""
-        if self.papi_l1_dcm is not None and self.papi_instructions is not None:
-            return (self.papi_l1_dcm / self.papi_instructions) * 100.0
-        return None
-
-    @property
-    def l2_miss_rate(self) -> Optional[float]:
-        """Calculate L2 cache miss rate as percentage"""
-        if self.papi_l2_dcm is not None and self.papi_instructions is not None:
-            return (self.papi_l2_dcm / self.papi_instructions) * 100.0
-        return None
-
-    @property
-    def l3_miss_rate(self) -> Optional[float]:
-        """Calculate L3 cache miss rate as percentage"""
-        if self.papi_l3_tcm is not None and self.papi_instructions is not None:
-            return (self.papi_l3_tcm / self.papi_instructions) * 100.0
-        return None
 
     def print_report(self):
         """Print a formatted performance report"""
@@ -170,28 +115,6 @@ class PerformanceMetrics:
         print(f"Wall time:          {self.wall_time_ms:.3f} ms")
         print(f"Theoretical FLOPs:  {self.total_flops:,}")
         print(f"Theoretical GFLOPS: {self.gflops:.3f}")
-
-        if self.papi_fp_ops is not None:
-            print("-" * 70)
-            print("PAPI Hardware Counters:")
-            print(f"  Actual FP Ops:    {self.papi_fp_ops:,}")
-            print(f"  Actual GFLOPS:    {self.actual_gflops:.3f}")
-            print(f"  Total cycles:     {self.papi_cycles:,}")
-            print(f"  Total instr:      {self.papi_instructions:,}")
-            print(f"  IPC:              {self.ipc:.2f}")
-            print(
-                f"  L1 cache misses:  {self.papi_l1_dcm:,} "
-                f"({self.l1_miss_rate:.2f}% of instructions)"
-            )
-            print(
-                f"  L2 cache misses:  {self.papi_l2_dcm:,} "
-                f"({self.l2_miss_rate:.2f}% of instructions)"
-            )
-            print(
-                f"  L3 cache misses:  {self.papi_l3_tcm:,} "
-                f"({self.l3_miss_rate:.2f}% of instructions)"
-            )
-        print("=" * 70 + "\n")
 
 
 def count_theoretical_flops(conv_op, nodal_field, quad_field, grid_size):
@@ -245,7 +168,6 @@ def measure_convolution_performance(
     grid_size,
     stencil_size,
     num_iterations=10,
-    use_papi=True,
     device="cpu",
 ):
     """
@@ -265,8 +187,6 @@ def measure_convolution_performance(
         Size of the stencil (sx, sy)
     num_iterations : int
         Number of iterations for averaging
-    use_papi : bool
-        Whether to use PAPI hardware counters
     device : str
         Device string (e.g., "cpu", "cuda:0", "rocm:0")
 
@@ -286,28 +206,6 @@ def measure_convolution_performance(
     # Synchronize if on device to ensure warm-up is complete
     if is_on_device and HAS_CUPY:
         cp.cuda.Device().synchronize()
-
-    # Initialize PAPI if available, requested, and on host (PAPI doesn't work for GPU)
-    papi_values = {}
-    if PAPI_AVAILABLE and use_papi and not is_on_device:
-        try:
-            # Define events to monitor
-            papi_events_list = [
-                papi_events.PAPI_TOT_CYC,  # Total cycles
-                papi_events.PAPI_TOT_INS,  # Total instructions
-                papi_events.PAPI_FP_OPS,  # Floating point operations
-                papi_events.PAPI_L1_DCM,  # L1 data cache misses
-                papi_events.PAPI_L2_DCM,  # L2 data cache misses
-                papi_events.PAPI_L3_TCM,  # L3 total cache misses
-            ]
-
-            pypapi.papi_high.start_counters(papi_events_list)
-            papi_enabled = True
-        except Exception as e:
-            print(f"Warning: Could not initialize PAPI: {e}")
-            papi_enabled = False
-    else:
-        papi_enabled = False
 
     # Time the operation
     if is_on_device and HAS_CUPY:
@@ -334,22 +232,6 @@ def measure_convolution_performance(
         end_time = time.perf_counter()
         wall_time_ms = ((end_time - start_time) / num_iterations) * 1000.0
 
-    # Read PAPI counters
-    if papi_enabled:
-        try:
-            counters = pypapi.papi_high.stop_counters()
-            papi_values = {
-                "cycles": counters[0] // num_iterations,
-                "instructions": counters[1] // num_iterations,
-                "fp_ops": counters[2] // num_iterations,
-                "l1_dcm": counters[3] // num_iterations,
-                "l2_dcm": counters[4] // num_iterations,
-                "l3_tcm": counters[5] // num_iterations,
-            }
-        except Exception as e:
-            print(f"Warning: Could not read PAPI counters: {e}")
-            papi_values = {}
-
     # Create metrics object
     metrics = PerformanceMetrics(
         wall_time_ms=wall_time_ms,
@@ -360,12 +242,6 @@ def measure_convolution_performance(
         nb_operators=conv_op.nb_output_components,
         nb_quad_pts=conv_op.nb_quad_pts,
         device=device,
-        papi_cycles=papi_values.get("cycles"),
-        papi_instructions=papi_values.get("instructions"),
-        papi_fp_ops=papi_values.get("fp_ops"),
-        papi_l1_dcm=papi_values.get("l1_dcm"),
-        papi_l2_dcm=papi_values.get("l2_dcm"),
-        papi_l3_tcm=papi_values.get("l3_tcm"),
     )
 
     return metrics
