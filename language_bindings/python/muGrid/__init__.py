@@ -180,8 +180,8 @@ get_domain_index = _muGrid.get_domain_index
 from .Field import Field  # noqa: E402
 from .Field import wrap_field  # noqa: E402
 
-# MPI communicator
-from .Parallel import Communicator  # noqa: E402
+# MPI communicator and parallel utilities
+from .Parallel import Communicator, parprint  # noqa: E402
 
 # Timing utility
 from .Timer import Timer  # noqa: E402
@@ -237,6 +237,7 @@ __all__ = [
     "Verbosity",
     # Utilities
     "Timer",
+    "parprint",
     # Linear algebra
     "linalg",
 ]

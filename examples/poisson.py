@@ -10,6 +10,7 @@ except ModuleNotFoundError:
 import numpy as np
 
 import muGrid
+from muGrid import parprint
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -180,7 +181,7 @@ def callback(iteration, state):
     Callback function to print the iteration and squared residual norm.
     """
     if not args.quiet:
-        print(f"{iteration:5} {state['rr']:.5}")
+        parprint(f"{iteration:5} {state['rr']:.5}", comm=comm)
 
 
 def hessp(x, Ax):
@@ -211,10 +212,10 @@ with timer("conjugate_gradients"):
         )
         converged = True
         if not args.quiet:
-            print("CG converged.")
+            parprint("CG converged.", comm=comm)
     except RuntimeError:
         if not args.quiet:
-            print("CG did not converge.")
+            parprint("CG did not converge.", comm=comm)
 
 elapsed_time = timer.get_time("conjugate_gradients")
 
@@ -313,64 +314,66 @@ if args.json:
         },
         "timing": timer.to_dict(),
     }
-    print(json.dumps(results, indent=2))
+    parprint(json.dumps(results, indent=2), comm=comm)
 else:
     # Text output
-    print(f"\n{'='*60}")
-    print("Performance Summary")
-    print(f"{'='*60}")
-    print(
+    parprint(f"\n{'='*60}", comm=comm)
+    parprint("Performance Summary", comm=comm)
+    parprint(f"{'='*60}", comm=comm)
+    parprint(
         f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
-        f"{nb_grid_pts_total:,} points"
+        f"{nb_grid_pts_total:,} points",
+        comm=comm,
     )
-    print(f"Dimensions: {dim}D")
-    print(f"Device: {device.device_string}")
-    print(f"Stencil implementation: {stencil_name}")
-    print(f"Stencil points: {nb_stencil_pts}")
-    print(f"CG iterations: {nb_iterations}")
-    print(f"Total time: {elapsed_time:.4f} seconds")
+    parprint(f"Dimensions: {dim}D", comm=comm)
+    parprint(f"Device: {device.device_string}", comm=comm)
+    parprint(f"Stencil implementation: {stencil_name}", comm=comm)
+    parprint(f"Stencil points: {nb_stencil_pts}", comm=comm)
+    parprint(f"CG iterations: {nb_iterations}", comm=comm)
+    parprint(f"Total time: {elapsed_time:.4f} seconds", comm=comm)
 
-    print("\nLattice updates per second:")
-    print(f"  Total lattice updates: {total_lattice_updates:,}")
-    print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
+    parprint("\nLattice updates per second:", comm=comm)
+    parprint(f"  Total lattice updates: {total_lattice_updates:,}", comm=comm)
+    parprint(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)", comm=comm)
 
-    print("\nMemory traffic per CG iteration (estimated):")
-    print(
+    parprint("\nMemory traffic per CG iteration (estimated):", comm=comm)
+    parprint(
         f"  Per grid point: {reads_per_iteration} reads + "
         f"{writes_per_iteration} writes "
-        f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes"
+        f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes",
+        comm=comm,
     )
-    print(f"    hessp:    {nb_stencil_pts} reads, 1 write")
-    print("    dot_pAp:  2 reads")
-    print("    update_x: 2 reads, 1 write")
-    print("    update_r: 2 reads, 1 write (fused axpy_norm_sq)")
-    print("    update_p: 2 reads, 1 write")
-    print(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB")
-    print(f"  Total: {total_bytes / 1e9:.2f} GB")
-    print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
+    parprint(f"    hessp:    {nb_stencil_pts} reads, 1 write", comm=comm)
+    parprint("    dot_pAp:  2 reads", comm=comm)
+    parprint("    update_x: 2 reads, 1 write", comm=comm)
+    parprint("    update_r: 2 reads, 1 write (fused axpy_norm_sq)", comm=comm)
+    parprint("    update_p: 2 reads, 1 write", comm=comm)
+    parprint(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB", comm=comm)
+    parprint(f"  Total: {total_bytes / 1e9:.2f} GB", comm=comm)
+    parprint(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s", comm=comm)
 
-    print("\nFLOPs per CG iteration (estimated):")
-    print(f"  Per grid point: {flops_per_iteration} FLOPs")
-    print(f"    hessp:    {2 * nb_stencil_pts} FLOPs")
-    print("    dot_pAp:  2 FLOPs")
-    print("    update_x: 2 FLOPs")
-    print("    update_r: 4 FLOPs (fused axpy_norm_sq)")
-    print("    update_p: 2 FLOPs")
-    print(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP")
-    print(f"  Total: {total_flops / 1e9:.2f} GFLOP")
-    print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
+    parprint("\nFLOPs per CG iteration (estimated):", comm=comm)
+    parprint(f"  Per grid point: {flops_per_iteration} FLOPs", comm=comm)
+    parprint(f"    hessp:    {2 * nb_stencil_pts} FLOPs", comm=comm)
+    parprint("    dot_pAp:  2 FLOPs", comm=comm)
+    parprint("    update_x: 2 FLOPs", comm=comm)
+    parprint("    update_r: 4 FLOPs (fused axpy_norm_sq)", comm=comm)
+    parprint("    update_p: 2 FLOPs", comm=comm)
+    parprint(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP", comm=comm)
+    parprint(f"  Total: {total_flops / 1e9:.2f} GFLOP", comm=comm)
+    parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
 
-    print(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte")
-    print(f"{'='*60}")
+    parprint(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte", comm=comm)
+    parprint(f"{'='*60}", comm=comm)
 
     # Print hierarchical timing breakdown (includes PAPI data when enabled)
     timer.print_summary()
 
 if args.plot:
     if dim == 3:
-        print("Warning: Plotting not supported for 3D grids")
+        parprint("Warning: Plotting not supported for 3D grids", comm=comm)
     elif plt is None:
-        print("Warning: matplotlib not available, cannot show plot")
+        parprint("Warning: matplotlib not available, cannot show plot", comm=comm)
     else:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
         ax1.imshow(rhs.p)

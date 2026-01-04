@@ -10,6 +10,16 @@ Change log for µGrid
   - Reduces memory from O(N × 24²) for full K storage to O(N × 2) for spatially-varying materials
   - GPU support with optimized CUDA and HIP kernels
   - Uses linear tetrahedral FEM with 5-tetrahedra decomposition (3D) or 2-triangle decomposition (2D)
+- ENH: Added `parprint` utility function for MPI-safe printing
+  - MPI-aware print function that only outputs on rank 0
+  - Similar to ASE's parprint implementation
+  - Works with NuMPI's MPI stub for compatibility with and without MPI
+  - Available as `muGrid.parprint()` in Python API
+- ENH: Enabled MPI parallel execution of Poisson and homogenization examples
+  - Use `suggest_subdivisions` from NuMPI for automatic domain decomposition
+  - Changed from hardcoded serial execution to dynamic MPI-aware subdivision
+  - Both examples now scale efficiently across multiple MPI ranks
+  - Updated all output to use `parprint` for clean parallel execution
 - API: Renamed `StencilGradientOperator` to `GenericLinearOperator`
   - Clearer naming that reflects the operator's purpose as a general linear convolution operator
   - Python bindings updated accordingly
@@ -17,6 +27,10 @@ Change log for µGrid
 - BUG: Gracefully handle non-initialized MPI
 - TST: Added laminate homogenization tests for validating effective material properties
 - TST: MPI-parallel laminate homogenization tests
+- TST: Added MPI parallel tests for Poisson and homogenization examples in CI
+  - Tests run with 2 and 4 MPI ranks for both 2D and 3D cases
+  - Validates domain decomposition, ghost communication, and result consistency
+  - Automatically runs in GitHub Actions CI when MPI is enabled
 - TST: Refactored and unified test infrastructure
 - MAINT: Restructured operators to separate 2D and 3D implementations into distinct source files
 - MAINT: Updated benchmark scripts for performance testing

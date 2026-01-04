@@ -32,6 +32,7 @@ except ModuleNotFoundError:
 import numpy as np
 
 import muGrid
+from muGrid import parprint
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -40,6 +41,8 @@ try:
     comm = muGrid.Communicator(MPI.COMM_WORLD)
 except ImportError:
     comm = muGrid.Communicator()
+
+from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 
 # Voigt notation mappings
@@ -307,6 +310,9 @@ nb_nodes = 2**dim
 # Quadrature weights (area/volume of each element)
 quad_weights = np.array(gradient_op.quadrature_weights)
 
+# Determine MPI decomposition using NuMPI's suggest_subdivisions
+s = suggest_subdivisions(dim, comm.size)
+
 # Create Cartesian decomposition for ghost handling.
 # The FEM gradient kernel requires ghosts for accessing neighbor nodes.
 # CartesianDecomposition handles ghost communication for both serial and
@@ -323,7 +329,7 @@ quad_weights = np.array(gradient_op.quadrature_weights)
 decomposition = muGrid.CartesianDecomposition(
     comm,
     args.nb_grid_pts,
-    nb_subdivisions=(1,) * dim,  # Serial execution: single subdivision
+    nb_subdivisions=s,  # MPI-aware domain decomposition
     nb_ghosts_left=(1,) * dim,
     nb_ghosts_right=(1,) * dim,
     nb_sub_pts={"quad": nb_quad},  # Use actual quad count from operator
@@ -349,16 +355,16 @@ phase = create_microstructure(coords, args.inclusion_type, args.inclusion_radius
 C_matrix = isotropic_stiffness(dim, args.E_matrix, args.nu)
 C_inclusion = isotropic_stiffness(dim, args.E_inclusion, args.nu)
 
-if comm.rank == 0 and not args.quiet:
-    print(f"Grid size: {args.nb_grid_pts}")
-    print(f"Dimensions: {dim}D")
-    print(f"Grid spacing: {grid_spacing}")
-    print(f"Device: {device.device_string}")
-    print(f"Number of quadrature points per pixel: {nb_quad}")
-    print(f"Number of nodal points per pixel: {nb_nodes}")
-    print(f"Quadrature weights: {quad_weights}")
-    print(f"Inclusion volume fraction: {np.mean(phase):.4f}")
-    print()
+if not args.quiet:
+    parprint(f"Grid size: {args.nb_grid_pts}", comm=comm)
+    parprint(f"Dimensions: {dim}D", comm=comm)
+    parprint(f"Grid spacing: {grid_spacing}", comm=comm)
+    parprint(f"Device: {device.device_string}", comm=comm)
+    parprint(f"Number of quadrature points per pixel: {nb_quad}", comm=comm)
+    parprint(f"Number of nodal points per pixel: {nb_nodes}", comm=comm)
+    parprint(f"Quadrature weights: {quad_weights}", comm=comm)
+    parprint(f"Inclusion volume fraction: {np.mean(phase):.4f}", comm=comm)
+    parprint(comm=comm)
 
 # Create muGrid fields for gradient operations.
 # The FEM gradient operator now supports multi-component fields:
@@ -405,7 +411,7 @@ if args.kernel == "fused":
     element_decomposition = muGrid.CartesianDecomposition(
         comm,
         args.nb_grid_pts,
-        nb_subdivisions=(1,) * dim,
+        nb_subdivisions=s,  # Use same MPI decomposition
         nb_ghosts_left=(1,) * dim,
         nb_ghosts_right=(1,) * dim,
         device=device,
@@ -431,11 +437,12 @@ if args.kernel == "fused":
     else:
         fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
 
-    if comm.rank == 0 and not args.quiet:
-        print(f"Using fused IsotropicStiffnessOperator{dim}D")
-        print(f"  Lambda (matrix): {lam_matrix:.4f}, Mu (matrix): {mu_matrix:.4f}")
-        print(
-            f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}"
+    if not args.quiet:
+        parprint(f"Using fused IsotropicStiffnessOperator{dim}D", comm=comm)
+        parprint(f"  Lambda (matrix): {lam_matrix:.4f}, Mu (matrix): {mu_matrix:.4f}", comm=comm)
+        parprint(
+            f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}",
+            comm=comm,
         )
 
 # Create global timer for hierarchical timing
@@ -704,10 +711,10 @@ else:  # dim == 3
         (0, 1),  # xy
     ]
 
-if comm.rank == 0 and not args.quiet:
-    print("=" * 60)
-    print("Computing homogenized stiffness tensor")
-    print("=" * 60)
+if not args.quiet:
+    parprint("=" * 60, comm=comm)
+    parprint("Computing homogenized stiffness tensor", comm=comm)
+    parprint("=" * 60, comm=comm)
 
 total_iterations = 0
 
@@ -721,8 +728,8 @@ with timer("total_solve"):
 
         voigt_col = voigt_index(dim, i, j)
 
-        if comm.rank == 0 and not args.quiet:
-            print(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1")
+        if not args.quiet:
+            parprint(f"\nCase {case_idx + 1}: E_macro[{i},{j}] = 1", comm=comm)
 
         # Compute RHS into rhs_field
         compute_rhs(E_macro, rhs_field)
@@ -735,10 +742,9 @@ with timer("total_solve"):
 
         def callback(iteration, state):
             iteration_count[0] = iteration
-            if not args.quiet:
+            if not args.quiet and iteration % 10 == 0:
                 res_norm = float(arr.sqrt(state["rr"]))
-                if comm.rank == 0 and iteration % 10 == 0:
-                    print(f"  CG iteration {iteration}: |r| = {res_norm:.6e}")
+                parprint(f"  CG iteration {iteration}: |r| = {res_norm:.6e}", comm=comm)
 
         # Solve K u = f using conjugate_gradients from Solvers.py
         try:
@@ -762,11 +768,11 @@ with timer("total_solve"):
 
         total_iterations += iteration_count[0]
 
-        if comm.rank == 0 and not args.quiet:
+        if not args.quiet:
             if converged:
-                print(f"  CG converged in {iteration_count[0]} iterations")
+                parprint(f"  CG converged in {iteration_count[0]} iterations", comm=comm)
             else:
-                print(f"  CG did not converge after {args.maxiter} iterations")
+                parprint(f"  CG did not converge after {args.maxiter} iterations", comm=comm)
 
         # Compute strain from solution
         compute_strain(u_field, strain_arr)
@@ -806,20 +812,23 @@ with timer("total_solve"):
                 if k <= L:
                     C_eff[voigt_row, voigt_col] = sig_avg[k, L]
 
-        if comm.rank == 0 and not args.quiet:
+        if not args.quiet:
             if dim == 2:
-                print(
+                parprint(
                     f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
-                    f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}"
+                    f"yy={sig_avg[1, 1]:.6f}, xy={sig_avg[0, 1]:.6f}",
+                    comm=comm,
                 )
             else:
-                print(
+                parprint(
                     f"  Average stress: xx={sig_avg[0, 0]:.6f}, "
-                    f"yy={sig_avg[1, 1]:.6f}, zz={sig_avg[2, 2]:.6f}"
+                    f"yy={sig_avg[1, 1]:.6f}, zz={sig_avg[2, 2]:.6f}",
+                    comm=comm,
                 )
-                print(
+                parprint(
                     f"                  yz={sig_avg[1, 2]:.6f}, "
-                    f"xz={sig_avg[0, 2]:.6f}, xy={sig_avg[0, 1]:.6f}"
+                    f"xz={sig_avg[0, 2]:.6f}, xy={sig_avg[0, 1]:.6f}",
+                    comm=comm,
                 )
 
 # Get timing information
@@ -870,7 +879,7 @@ E_voigt = v_f * E_i + (1 - v_f) * E_m
 E_reuss = 1.0 / (v_f / E_i + (1 - v_f) / E_m)
 E_eff_approx = C_eff[0, 0] * (1 - nu**2)
 
-if args.json and comm.rank == 0:
+if args.json:
     # JSON output
     # Timer's to_dict() includes PAPI data when available
     results = {
@@ -914,70 +923,71 @@ if args.json and comm.rank == 0:
         },
         "timing": timer.to_dict(),
     }
-    print(json.dumps(results, indent=2))
-elif comm.rank == 0:
+    parprint(json.dumps(results, indent=2), comm=comm)
+else:
     # Text output
-    print("\n" + "=" * 60)
-    print("Homogenized stiffness tensor (Voigt notation)")
-    print("=" * 60)
+    parprint("\n" + "=" * 60, comm=comm)
+    parprint("Homogenized stiffness tensor (Voigt notation)", comm=comm)
+    parprint("=" * 60, comm=comm)
 
     # Print header
     header = "      " + "".join(f"{lbl:>10}" for lbl in voigt_labels)
-    print(header)
+    parprint(header, comm=comm)
 
     # Print matrix
     for i, row_label in enumerate(voigt_labels):
         row = f"{row_label:>4}  " + "".join(
             f"{C_eff[i, j]:10.6f}" for j in range(nb_voigt)
         )
-        print(row)
+        parprint(row, comm=comm)
 
-    print("\n" + "=" * 60)
-    print("Comparison with analytical bounds")
-    print("=" * 60)
-    print(f"Volume fraction of inclusion: {v_f:.4f}")
-    print(f"Voigt bound (upper): E = {E_voigt:.4f}")
-    print(f"Reuss bound (lower): E = {E_reuss:.4f}")
-    print(f"Effective E (approx from C_xxxx): E ≈ {E_eff_approx:.4f}")
+    parprint("\n" + "=" * 60, comm=comm)
+    parprint("Comparison with analytical bounds", comm=comm)
+    parprint("=" * 60, comm=comm)
+    parprint(f"Volume fraction of inclusion: {v_f:.4f}", comm=comm)
+    parprint(f"Voigt bound (upper): E = {E_voigt:.4f}", comm=comm)
+    parprint(f"Reuss bound (lower): E = {E_reuss:.4f}", comm=comm)
+    parprint(f"Effective E (approx from C_xxxx): E ≈ {E_eff_approx:.4f}", comm=comm)
 
-    print("\n" + "=" * 60)
-    print("Performance Summary")
-    print("=" * 60)
-    print(
+    parprint("\n" + "=" * 60, comm=comm)
+    parprint("Performance Summary", comm=comm)
+    parprint("=" * 60, comm=comm)
+    parprint(
         f"Grid size: {' x '.join(map(str, args.nb_grid_pts))} = "
-        f"{nb_grid_pts_total:,} points"
+        f"{nb_grid_pts_total:,} points",
+        comm=comm,
     )
-    print(f"Dimensions: {dim}D")
-    print(f"Device: {device.device_string}")
-    print(f"Total CG iterations: {total_iterations}")
-    print(f"Stiffness operator calls: {nb_stiffness_calls}")
-    print(f"Total time: {elapsed_time:.4f} seconds")
+    parprint(f"Dimensions: {dim}D", comm=comm)
+    parprint(f"Device: {device.device_string}", comm=comm)
+    parprint(f"Total CG iterations: {total_iterations}", comm=comm)
+    parprint(f"Stiffness operator calls: {nb_stiffness_calls}", comm=comm)
+    parprint(f"Total time: {elapsed_time:.4f} seconds", comm=comm)
 
-    print("\nLattice updates per second:")
-    print(f"  Total lattice updates: {total_lattice_updates:,}")
-    print(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)")
+    parprint("\nLattice updates per second:", comm=comm)
+    parprint(f"  Total lattice updates: {total_lattice_updates:,}", comm=comm)
+    parprint(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)", comm=comm)
 
-    print("\nMemory throughput (estimated):")
-    print(f"  Bytes per stiffness call: {bytes_per_call / 1e6:.2f} MB")
-    print(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB")
-    print(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s")
+    parprint("\nMemory throughput (estimated):", comm=comm)
+    parprint(f"  Bytes per stiffness call: {bytes_per_call / 1e6:.2f} MB", comm=comm)
+    parprint(f"  Total bytes transferred: {total_bytes / 1e9:.2f} GB", comm=comm)
+    parprint(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s", comm=comm)
 
-    print("\nFLOPS (estimated):")
-    print(f"  FLOPs per stiffness call: {flops_per_call / 1e6:.2f} MFLOP")
-    print(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP")
-    print(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s")
-    print("=" * 60)
+    parprint("\nFLOPS (estimated):", comm=comm)
+    parprint(f"  FLOPs per stiffness call: {flops_per_call / 1e6:.2f} MFLOP", comm=comm)
+    parprint(f"  Total FLOPs: {total_flops / 1e9:.2f} GFLOP", comm=comm)
+    parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
+    parprint("=" * 60, comm=comm)
 
     # Print hierarchical timing breakdown (includes PAPI data when enabled)
     timer.print_summary()
 
 # Optional plotting (2D only)
-if args.plot and comm.rank == 0:
+if args.plot:
     if dim == 3:
-        print("Warning: Plotting not supported for 3D grids")
+        parprint("Warning: Plotting not supported for 3D grids", comm=comm)
     elif plt is None:
-        print("Warning: matplotlib not available, cannot show plot")
-    else:
+        parprint("Warning: matplotlib not available, cannot show plot", comm=comm)
+    elif comm.rank == 0:
         fig, axes = plt.subplots(1, 3, figsize=(12, 4))
 
         # Microstructure
