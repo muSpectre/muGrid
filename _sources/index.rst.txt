@@ -22,6 +22,7 @@ domain decomposition with ghost cell communication, and NetCDF I/O.
    Python
    FFT
    GPU
+   Operators
    Examples
    Cplusplus
    PythonAPI

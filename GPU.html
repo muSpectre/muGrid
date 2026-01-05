@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Examples" href="Examples.html"><link rel="prev" title="Fast Fourier Transform" href="FFT.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Linear Operators" href="Operators.html"><link rel="prev" title="Fast Fourier Transform" href="FFT.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>GPU Computing - µGrid 0.101.1-91-g0cd9f180 documentation</title>
+        <title>GPU Computing - µGrid 0.101.1-104-g5ac0cfee documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.101.1-91-g0cd9f180
+      <a href="index.html"><div class="brand">µGrid 0.101.1-104-g5ac0cfee
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.101.1-91-g0cd9f180
+  <span class="sidebar-brand-text">µGrid 0.101.1-104-g5ac0cfee
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -199,6 +199,7 @@
 <li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">GPU Computing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Operators.html">Linear Operators</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="PythonAPI.html">Python API Reference</a></li>
@@ -439,6 +440,67 @@ on the GPU when both input and output fields are on the GPU:</p>
 </pre></div>
 </div>
 </section>
+<section id="fft-on-gpu">
+<h2>FFT on GPU<a class="headerlink" href="#fft-on-gpu" title="Link to this heading">¶</a></h2>
+<p><em>µ</em>Grid provides GPU-accelerated FFT operations, but there are important differences
+between the NVIDIA (CUDA/cuFFT) and AMD (ROCm/rocFFT) backends.</p>
+<section id="nvidia-gpus-cufft">
+<h3>NVIDIA GPUs (cuFFT)<a class="headerlink" href="#nvidia-gpus-cufft" title="Link to this heading">¶</a></h3>
+<p>On NVIDIA GPUs, <em>µ</em>Grid uses the cuFFT library. cuFFT has a <strong>documented limitation</strong>:</p>
+<blockquote>
+<div><p><em>“Strides on the real part of real-to-complex and complex-to-real transforms
+are not supported.”</em></p>
+</div></blockquote>
+<p>This limitation affects <strong>3D MPI-parallel FFTs</strong> on NVIDIA GPUs. In the pencil
+decomposition used for distributed FFTs, the data layout after transpose
+operations results in non-unit strides for the R2C/C2R transforms along the
+X-direction.</p>
+<p><strong>Consequence</strong>: 3D MPI-parallel FFTs on NVIDIA GPUs will raise a <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code>
+with a clear explanation of the limitation.</p>
+<p><strong>Workarounds</strong>:</p>
+<ol class="arabic simple">
+<li><p>Use the CPU FFT backend (PocketFFT) for 3D MPI-parallel transforms</p></li>
+<li><p>Use 2D grids, which support batched transforms with unit stride</p></li>
+<li><p>Use single-GPU (non-MPI) execution where the data layout is contiguous</p></li>
+</ol>
+</section>
+<section id="amd-gpus-rocfft">
+<h3>AMD GPUs (rocFFT)<a class="headerlink" href="#amd-gpus-rocfft" title="Link to this heading">¶</a></h3>
+<p>On AMD GPUs, <em>µ</em>Grid uses the native rocFFT library directly (not hipFFT).
+rocFFT’s API provides more flexible stride support through its
+<code class="docutils literal notranslate"><span class="pre">rocfft_plan_description_set_data_layout()</span></code> function, which allows specifying
+arbitrary strides for all transform types including R2C and C2R.</p>
+<p><strong>Consequence</strong>: 3D MPI-parallel FFTs should work correctly on AMD GPUs with rocFFT.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The rocFFT backend is a new implementation and may require testing on your
+specific ROCm installation. Please report any issues.</p>
+</div>
+</section>
+<section id="example-gpu-fft-with-fallback">
+<h3>Example: GPU FFT with fallback<a class="headerlink" href="#example-gpu-fft-with-fallback" title="Link to this heading">¶</a></h3>
+<p>For code that needs to handle both 2D and 3D cases on GPU:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">]</span>  <span class="c1"># 3D grid</span>
+<span class="n">dim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Determine device based on dimension and GPU availability</span>
+<span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_cuda</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_rocm</span><span class="p">:</span>
+    <span class="c1"># 3D on CUDA: must use CPU for FFT due to cuFFT limitation</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Using CPU for 3D FFT (cuFFT stride limitation)&quot;</span><span class="p">)</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span>
+<span class="k">elif</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">has_gpu</span><span class="p">:</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;gpu&quot;</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span>
+
+<span class="c1"># Create FFT engine</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
 <section id="performance-considerations">
 <h2>Performance considerations<a class="headerlink" href="#performance-considerations" title="Link to this heading">¶</a></h2>
 <p>GPU acceleration is most beneficial when:</p>
@@ -457,12 +519,12 @@ outweigh the benefits of GPU computation.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="Examples.html">
+          <a class="next-page" href="Operators.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Examples</div>
+                <div class="title">Linear Operators</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -516,6 +578,12 @@ outweigh the benefits of GPU computation.</p>
 <li><a class="reference internal" href="#zero-copy-data-exchange">Zero-copy data exchange</a></li>
 <li><a class="reference internal" href="#cartesiandecomposition-with-gpu">CartesianDecomposition with GPU</a></li>
 <li><a class="reference internal" href="#convolution-operators-on-gpu">Convolution operators on GPU</a></li>
+<li><a class="reference internal" href="#fft-on-gpu">FFT on GPU</a><ul>
+<li><a class="reference internal" href="#nvidia-gpus-cufft">NVIDIA GPUs (cuFFT)</a></li>
+<li><a class="reference internal" href="#amd-gpus-rocfft">AMD GPUs (rocFFT)</a></li>
+<li><a class="reference internal" href="#example-gpu-fft-with-fallback">Example: GPU FFT with fallback</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#performance-considerations">Performance considerations</a></li>
 </ul>
 </li>
@@ -528,7 +596,7 @@ outweigh the benefits of GPU computation.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=b61428fe"></script>
+</div><script src="_static/documentation_options.js?v=c156c2f9"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

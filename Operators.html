@@ -1,0 +1,846 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Examples" href="Examples.html"><link rel="prev" title="GPU Computing" href="GPU.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>Linear Operators - µGrid 0.101.1-104-g5ac0cfee documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">µGrid 0.101.1-104-g5ac0cfee
+ documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">µGrid 0.101.1-104-g5ac0cfee
+ documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GPU.html">GPU Computing</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Linear Operators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="PythonAPI.html">Python API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/Operators.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="linear-operators">
+<h1>Linear Operators<a class="headerlink" href="#linear-operators" title="Link to this heading">¶</a></h1>
+<p><em>µ</em>Grid provides a hierarchy of linear operators for discretizing partial
+differential equations on structured grids. This chapter explains the different
+operator types and when to use each one.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>Linear operators in <em>µ</em>Grid fall into three categories:</p>
+<ol class="arabic simple">
+<li><p><strong>Generic operators</strong>: Flexible, user-defined stencils for arbitrary convolutions</p></li>
+<li><p><strong>Gradient/divergence operators</strong>: FEM-based operators for computing derivatives</p></li>
+<li><p><strong>Fused operators</strong>: Highly optimized operators for specific PDEs (Laplace, elasticity)</p></li>
+</ol>
+<p>The general recommendation is to use fused operators when available, as they
+provide the best performance. Generic operators are useful for prototyping or
+implementing custom stencils.</p>
+<div class="table-wrapper colwidths-given docutils container" id="id2">
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Operator Summary</span><a class="headerlink" href="#id2" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 35.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Operator</p></th>
+<th class="head"><p>Use Case</p></th>
+<th class="head"><p>Performance</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GenericLinearOperator</span></code></p></td>
+<td><p>Custom stencils, prototyping</p></td>
+<td><p>Baseline</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">FEMGradientOperator</span></code></p></td>
+<td><p>Gradient/divergence with FEM</p></td>
+<td><p>2-3× faster than generic</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LaplaceOperator</span></code></p></td>
+<td><p>Scalar Poisson problems</p></td>
+<td><p>2-4× faster than generic</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">IsotropicStiffnessOperator</span></code></p></td>
+<td><p>Linear elasticity (isotropic)</p></td>
+<td><p>5-10× faster than unfused</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="generic-linear-operators">
+<h2>Generic Linear Operators<a class="headerlink" href="#generic-linear-operators" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">GenericLinearOperator</span></code> class (formerly <code class="docutils literal notranslate"><span class="pre">StencilGradientOperator</span></code>)
+implements arbitrary convolution stencils. It is the most flexible operator
+type but also the slowest due to indirect memory access patterns.</p>
+<section id="creating-a-generic-operator">
+<h3>Creating a generic operator<a class="headerlink" href="#creating-a-generic-operator" title="Link to this heading">¶</a></h3>
+<p>A generic operator requires:</p>
+<ol class="arabic simple">
+<li><p><strong>Stencil coefficients</strong>: A numpy array of any shape containing the weights</p></li>
+<li><p><strong>Offset</strong>: The position of the stencil origin relative to array indices</p></li>
+</ol>
+<p>Example: 5-point Laplacian in 2D:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
+<span class="c1"># 5-point Laplacian stencil</span>
+<span class="n">h</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># Grid spacing</span>
+<span class="n">stencil</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="p">[</span><span class="mi">0</span><span class="p">,</span>  <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="p">[</span><span class="mi">0</span><span class="p">,</span>  <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="p">])</span> <span class="o">/</span> <span class="n">h</span><span class="o">**</span><span class="mi">2</span>
+
+<span class="c1"># Offset: stencil[0,0] corresponds to neighbor at (-1, -1)</span>
+<span class="n">offset</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+<span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">stencil</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="multi-component-stencils">
+<h3>Multi-component stencils<a class="headerlink" href="#multi-component-stencils" title="Link to this heading">¶</a></h3>
+<p>For operators with multiple input/output components (like gradients), use
+higher-dimensional coefficient arrays:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># 2D gradient stencil: 2 output components, 1 input, 2×2 stencil</span>
+<span class="c1"># Shape: [nb_output, nb_quad, nb_input, stencil_x, stencil_y]</span>
+<span class="n">gradient_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="c1"># ∂/∂x: forward difference</span>
+<span class="n">gradient_coeffs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="o">/</span><span class="n">h</span>
+<span class="n">gradient_coeffs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">+</span><span class="mi">1</span><span class="o">/</span><span class="n">h</span>
+
+<span class="c1"># ∂/∂y: forward difference</span>
+<span class="n">gradient_coeffs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="o">/</span><span class="n">h</span>
+<span class="n">gradient_coeffs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="o">+</span><span class="mi">1</span><span class="o">/</span><span class="n">h</span>
+
+<span class="n">gradient_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient_coeffs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="using-generic-operators">
+<h3>Using generic operators<a class="headerlink" href="#using-generic-operators" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create field collection with ghost regions</span>
+<span class="n">decomposition</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
+    <span class="n">comm</span><span class="p">,</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">),</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">input_field</span> <span class="o">=</span> <span class="n">decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;input&quot;</span><span class="p">)</span>
+<span class="n">output_field</span> <span class="o">=</span> <span class="n">decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;output&quot;</span><span class="p">)</span>
+
+<span class="c1"># Fill ghost regions before applying operator</span>
+<span class="n">decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">input_field</span><span class="p">)</span>
+
+<span class="c1"># Apply the operator</span>
+<span class="n">laplace</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">input_field</span><span class="p">,</span> <span class="n">output_field</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="fem-gradient-operator">
+<h2>FEM Gradient Operator<a class="headerlink" href="#fem-gradient-operator" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">FEMGradientOperator</span></code> computes gradients using linear finite element
+shape functions. Each pixel/voxel is subdivided into simplicial elements
+(triangles in 2D, tetrahedra in 3D) with multiple quadrature points.</p>
+<section id="properties">
+<h3>Properties<a class="headerlink" href="#properties" title="Link to this heading">¶</a></h3>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Dimension</p></th>
+<th class="head"><p>Elements</p></th>
+<th class="head"><p>Quadrature Points</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2D</p></td>
+<td><p>2 triangles per pixel</p></td>
+<td><p>2 (one per triangle)</p></td>
+</tr>
+<tr class="row-odd"><td><p>3D</p></td>
+<td><p>5 tetrahedra per voxel</p></td>
+<td><p>5 (one per tetrahedron)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="creating-the-operator">
+<h3>Creating the operator<a class="headerlink" href="#creating-the-operator" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Grid spacing (can be non-uniform)</span>
+<span class="n">grid_spacing</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>  <span class="c1"># 2D</span>
+<span class="c1"># grid_spacing = (0.1, 0.1, 0.1)  # 3D</span>
+
+<span class="n">gradient_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FEMGradientOperator</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">grid_spacing</span><span class="o">=</span><span class="n">grid_spacing</span><span class="p">)</span>
+
+<span class="c1"># Query operator properties</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Quadrature points: </span><span class="si">{</span><span class="n">gradient_op</span><span class="o">.</span><span class="n">nb_quad_pts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Quadrature weights: </span><span class="si">{</span><span class="n">gradient_op</span><span class="o">.</span><span class="n">quadrature_weights</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="gradient-operation">
+<h3>Gradient operation<a class="headerlink" href="#gradient-operation" title="Link to this heading">¶</a></h3>
+<p>The forward operation computes gradients at quadrature points:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Input: scalar or vector field at nodes</span>
+<span class="c1"># Output: gradient tensor at quadrature points</span>
+
+<span class="c1"># For a displacement field u with shape [dim, nx, ny]:</span>
+<span class="c1"># gradient_op.apply(u, grad_u) produces grad_u with shape [dim, dim, quad, nx, ny]</span>
+
+<span class="n">decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">u_field</span><span class="p">)</span>
+<span class="n">gradient_op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">u_field</span><span class="p">,</span> <span class="n">gradient_field</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="divergence-transpose-operation">
+<h3>Divergence (transpose) operation<a class="headerlink" href="#divergence-transpose-operation" title="Link to this heading">¶</a></h3>
+<p>The transpose operation computes the (negative) divergence, weighted by
+quadrature weights:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Input: tensor field at quadrature points</span>
+<span class="c1"># Output: vector field at nodes</span>
+
+<span class="n">gradient_op</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">stress_field</span><span class="p">,</span> <span class="n">force_field</span><span class="p">,</span> <span class="n">quad_weights</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The quadrature weights are typically the element volumes divided by the number
+of quadrature points per element.</p>
+</section>
+</section>
+<section id="laplace-operator">
+<h2>Laplace Operator<a class="headerlink" href="#laplace-operator" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">LaplaceOperator</span></code> provides an optimized implementation of the discrete
+Laplacian using the standard 5-point (2D) or 7-point (3D) stencil.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create Laplacian with scaling factor</span>
+<span class="c1"># Negative scale makes the operator positive-definite (for CG solver)</span>
+<span class="n">scale</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">h</span><span class="o">**</span><span class="mi">2</span>
+<span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">LaplaceOperator</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">)</span>
+
+<span class="c1"># Apply to fields</span>
+<span class="n">decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">u_field</span><span class="p">)</span>
+<span class="n">laplace</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">u_field</span><span class="p">,</span> <span class="n">result_field</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The hard-coded implementation is significantly faster than an equivalent
+<code class="docutils literal notranslate"><span class="pre">GenericLinearOperator</span></code> because:</p>
+<ul class="simple">
+<li><p>Memory access patterns are predictable</p></li>
+<li><p>The compiler can vectorize the inner loops (SIMD)</p></li>
+<li><p>GPU kernels are highly optimized</p></li>
+</ul>
+</section>
+<section id="isotropic-stiffness-operator">
+<h2>Isotropic Stiffness Operator<a class="headerlink" href="#isotropic-stiffness-operator" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">IsotropicStiffnessOperator2D</span></code> and <code class="docutils literal notranslate"><span class="pre">IsotropicStiffnessOperator3D</span></code>
+classes implement fused stiffness operators for isotropic linear elastic
+materials. They compute:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\mathbf{f} = \mathbf{K} \mathbf{u} = \mathbf{B}^T \mathbf{C} \mathbf{B} \mathbf{u}\]</div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\mathbf{u}\)</span> is the displacement field</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mathbf{B}\)</span> is the strain-displacement matrix (gradient operator)</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mathbf{C}\)</span> is the material stiffness tensor</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mathbf{f}\)</span> is the internal force vector</p></li>
+</ul>
+<section id="mathematical-formulation">
+<h3>Mathematical formulation<a class="headerlink" href="#mathematical-formulation" title="Link to this heading">¶</a></h3>
+<p>For isotropic materials, the stiffness tensor <span class="math notranslate nohighlight">\(\mathbf{C}\)</span> depends only
+on two Lamé parameters:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\lambda\)</span> (first Lamé parameter, related to bulk modulus)</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mu\)</span> (shear modulus)</p></li>
+</ul>
+<p>The element stiffness matrix decomposes as:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\mathbf{K}_e = 2\mu \mathbf{G} + \lambda \mathbf{V}\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\mathbf{G}\)</span> and <span class="math notranslate nohighlight">\(\mathbf{V}\)</span> are geometry-only matrices
+computed once at construction time. This decomposition enables:</p>
+<ol class="arabic simple">
+<li><p><strong>Memory efficiency</strong>: Store only 2 scalars per element instead of a full stiffness matrix</p></li>
+<li><p><strong>Computational efficiency</strong>: Avoid explicit matrix assembly and storage</p></li>
+</ol>
+</section>
+<section id="id1">
+<h3>Creating the operator<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># 2D operator</span>
+<span class="n">grid_spacing</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+<span class="n">stiffness_op_2d</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">IsotropicStiffnessOperator2D</span><span class="p">(</span><span class="n">grid_spacing</span><span class="p">)</span>
+
+<span class="c1"># 3D operator</span>
+<span class="n">grid_spacing</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+<span class="n">stiffness_op_3d</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">IsotropicStiffnessOperator3D</span><span class="p">(</span><span class="n">grid_spacing</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="material-fields">
+<h3>Material fields<a class="headerlink" href="#material-fields" title="Link to this heading">¶</a></h3>
+<p>The operator requires two material fields containing the Lamé parameters at
+each element (pixel/voxel):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create decomposition for element-based fields (one fewer grid point in each direction)</span>
+<span class="c1"># because elements are defined between nodes</span>
+<span class="n">element_grid_pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="n">element_decomposition</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
+    <span class="n">comm</span><span class="p">,</span> <span class="n">element_grid_pts</span><span class="p">,</span>
+    <span class="n">nb_subdivisions</span><span class="o">=</span><span class="n">subdivisions</span><span class="p">,</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="n">dim</span><span class="p">,</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="n">dim</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Create material fields with shape [nx-1, ny-1] (2D) or [nx-1, ny-1, nz-1] (3D)</span>
+<span class="n">lambda_field</span> <span class="o">=</span> <span class="n">element_decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;lambda&quot;</span><span class="p">)</span>
+<span class="n">mu_field</span> <span class="o">=</span> <span class="n">element_decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;mu&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="computing-lame-parameters-from-engineering-constants">
+<h3>Computing Lamé parameters from engineering constants<a class="headerlink" href="#computing-lame-parameters-from-engineering-constants" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">lame_parameters</span><span class="p">(</span><span class="n">E</span><span class="p">,</span> <span class="n">nu</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute Lamé parameters from Young&#39;s modulus E and Poisson&#39;s ratio nu.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    E : float</span>
+<span class="sd">        Young&#39;s modulus</span>
+<span class="sd">    nu : float</span>
+<span class="sd">        Poisson&#39;s ratio</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    lam : float</span>
+<span class="sd">        First Lamé parameter (λ)</span>
+<span class="sd">    mu : float</span>
+<span class="sd">        Shear modulus (μ)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lam</span> <span class="o">=</span> <span class="n">E</span> <span class="o">*</span> <span class="n">nu</span> <span class="o">/</span> <span class="p">((</span><span class="mi">1</span> <span class="o">+</span> <span class="n">nu</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">nu</span><span class="p">))</span>
+    <span class="n">mu</span> <span class="o">=</span> <span class="n">E</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">nu</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">lam</span><span class="p">,</span> <span class="n">mu</span>
+
+<span class="c1"># Example: heterogeneous material with matrix and inclusions</span>
+<span class="n">E_matrix</span><span class="p">,</span> <span class="n">E_inclusion</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span>
+<span class="n">nu</span> <span class="o">=</span> <span class="mf">0.3</span>
+
+<span class="n">lam_matrix</span><span class="p">,</span> <span class="n">mu_matrix</span> <span class="o">=</span> <span class="n">lame_parameters</span><span class="p">(</span><span class="n">E_matrix</span><span class="p">,</span> <span class="n">nu</span><span class="p">)</span>
+<span class="n">lam_inclusion</span><span class="p">,</span> <span class="n">mu_inclusion</span> <span class="o">=</span> <span class="n">lame_parameters</span><span class="p">(</span><span class="n">E_inclusion</span><span class="p">,</span> <span class="n">nu</span><span class="p">)</span>
+
+<span class="c1"># Set material properties based on phase field (0 = matrix, 1 = inclusion)</span>
+<span class="n">lambda_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">lam_matrix</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">phase</span><span class="p">)</span> <span class="o">+</span> <span class="n">lam_inclusion</span> <span class="o">*</span> <span class="n">phase</span>
+<span class="n">mu_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_matrix</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">phase</span><span class="p">)</span> <span class="o">+</span> <span class="n">mu_inclusion</span> <span class="o">*</span> <span class="n">phase</span>
+
+<span class="c1"># Fill ghost regions (only needs to be done once)</span>
+<span class="n">element_decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">lambda_field</span><span class="p">)</span>
+<span class="n">element_decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">mu_field</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="applying-the-operator">
+<h3>Applying the operator<a class="headerlink" href="#applying-the-operator" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Displacement and force fields on node-based grid</span>
+<span class="c1"># Shape: [dim, nx, ny] for 2D, [dim, nx, ny, nz] for 3D</span>
+<span class="n">u_field</span> <span class="o">=</span> <span class="n">decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;displacement&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
+<span class="n">f_field</span> <span class="o">=</span> <span class="n">decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;force&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
+
+<span class="c1"># Apply stiffness operator: f = K @ u</span>
+<span class="n">decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">u_field</span><span class="p">)</span>
+<span class="n">stiffness_op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">u_field</span><span class="p">,</span> <span class="n">lambda_field</span><span class="p">,</span> <span class="n">mu_field</span><span class="p">,</span> <span class="n">f_field</span><span class="p">)</span>
+
+<span class="c1"># Increment form: f += alpha * K @ u</span>
+<span class="n">stiffness_op</span><span class="o">.</span><span class="n">apply_increment</span><span class="p">(</span><span class="n">u_field</span><span class="p">,</span> <span class="n">lambda_field</span><span class="p">,</span> <span class="n">mu_field</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">f_field</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="complete-linear-elasticity-example">
+<h3>Complete linear elasticity example<a class="headerlink" href="#complete-linear-elasticity-example" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid.Solvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">conjugate_gradients</span>
+
+<span class="c1"># Parameters</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
+<span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">E_matrix</span><span class="p">,</span> <span class="n">E_inclusion</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span>
+<span class="n">nu</span> <span class="o">=</span> <span class="mf">0.3</span>
+
+<span class="c1"># Compute Lamé parameters</span>
+<span class="n">lam_matrix</span> <span class="o">=</span> <span class="n">E_matrix</span> <span class="o">*</span> <span class="n">nu</span> <span class="o">/</span> <span class="p">((</span><span class="mi">1</span> <span class="o">+</span> <span class="n">nu</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">nu</span><span class="p">))</span>
+<span class="n">mu_matrix</span> <span class="o">=</span> <span class="n">E_matrix</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">nu</span><span class="p">))</span>
+<span class="n">lam_inclusion</span> <span class="o">=</span> <span class="n">E_inclusion</span> <span class="o">*</span> <span class="n">nu</span> <span class="o">/</span> <span class="p">((</span><span class="mi">1</span> <span class="o">+</span> <span class="n">nu</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">nu</span><span class="p">))</span>
+<span class="n">mu_inclusion</span> <span class="o">=</span> <span class="n">E_inclusion</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">nu</span><span class="p">))</span>
+
+<span class="c1"># Grid spacing</span>
+<span class="n">grid_spacing</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">nb_grid_pts</span><span class="p">)</span>
+
+<span class="c1"># Create operator</span>
+<span class="n">stiffness_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">IsotropicStiffnessOperator2D</span><span class="p">(</span><span class="n">grid_spacing</span><span class="p">)</span>
+
+<span class="c1"># Domain decomposition for nodal fields</span>
+<span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">()</span>
+<span class="n">decomposition</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
+    <span class="n">comm</span><span class="p">,</span> <span class="n">nb_grid_pts</span><span class="p">,</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Domain decomposition for element fields</span>
+<span class="n">element_decomposition</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">CartesianDecomposition</span><span class="p">(</span>
+    <span class="n">comm</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">nb_grid_pts</span><span class="p">),</span>
+    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Create fields</span>
+<span class="n">u_field</span> <span class="o">=</span> <span class="n">decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;displacement&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
+<span class="n">f_field</span> <span class="o">=</span> <span class="n">decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;force&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
+<span class="n">lambda_field</span> <span class="o">=</span> <span class="n">element_decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;lambda&quot;</span><span class="p">)</span>
+<span class="n">mu_field</span> <span class="o">=</span> <span class="n">element_decomposition</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;mu&quot;</span><span class="p">)</span>
+
+<span class="c1"># Set up material (circular inclusion)</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">element_decomposition</span><span class="o">.</span><span class="n">coords</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">phase</span> <span class="o">=</span> <span class="p">((</span><span class="n">X</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">Y</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">&lt;</span> <span class="mf">0.25</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="n">lambda_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">lam_matrix</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">phase</span><span class="p">)</span> <span class="o">+</span> <span class="n">lam_inclusion</span> <span class="o">*</span> <span class="n">phase</span>
+<span class="n">mu_field</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_matrix</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">phase</span><span class="p">)</span> <span class="o">+</span> <span class="n">mu_inclusion</span> <span class="o">*</span> <span class="n">phase</span>
+<span class="n">element_decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">lambda_field</span><span class="p">)</span>
+<span class="n">element_decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">mu_field</span><span class="p">)</span>
+
+<span class="c1"># Stiffness operator wrapper for CG solver</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_stiffness</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
+    <span class="n">decomposition</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+    <span class="n">stiffness_op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">lambda_field</span><span class="p">,</span> <span class="n">mu_field</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+
+<span class="c1"># Solve (with appropriate RHS setup for homogenization...)</span>
+<span class="c1"># conjugate_gradients(comm, decomposition, rhs, u_field, hessp=apply_stiffness, ...)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="performance-comparison">
+<h2>Performance Comparison<a class="headerlink" href="#performance-comparison" title="Link to this heading">¶</a></h2>
+<p>The fused <code class="docutils literal notranslate"><span class="pre">IsotropicStiffnessOperator</span></code> provides significant performance
+advantages over manually computing <span class="math notranslate nohighlight">\(\mathbf{B}^T \mathbf{C} \mathbf{B}\)</span>:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 20.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Approach</p></th>
+<th class="head"><p>Relative Speed</p></th>
+<th class="head"><p>Memory per Element</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Full stiffness matrix</p></td>
+<td><p>1× (baseline)</p></td>
+<td><p>576 floats (3D)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Separate B, C, B^T ops</p></td>
+<td><p>2-3×</p></td>
+<td><p>Full C tensor + intermediates</p></td>
+</tr>
+<tr class="row-even"><td><p>Fused isotropic operator</p></td>
+<td><p>5-10×</p></td>
+<td><p>2 floats (λ, μ)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The speedup comes from:</p>
+<ol class="arabic simple">
+<li><p><strong>Reduced memory traffic</strong>: Only read 2 material values per element instead of full tensors</p></li>
+<li><p><strong>No intermediate storage</strong>: Strain and stress computed on-the-fly</p></li>
+<li><p><strong>Optimized kernels</strong>: Hand-tuned CPU loops and GPU kernels</p></li>
+<li><p><strong>Better cache utilization</strong>: Predictable access patterns</p></li>
+</ol>
+<section id="gpu-performance">
+<h3>GPU Performance<a class="headerlink" href="#gpu-performance" title="Link to this heading">¶</a></h3>
+<p>On GPUs, the fused operators show even greater advantages:</p>
+<ul class="simple">
+<li><p>Atomic-free implementation using gather patterns</p></li>
+<li><p>Shared memory optimization for cooperative node loading</p></li>
+<li><p>High occupancy due to low register pressure</p></li>
+</ul>
+<p>Typical GPU speedups are 5-10× over unfused approaches on modern NVIDIA and AMD GPUs.</p>
+</section>
+</section>
+<section id="when-to-use-each-operator">
+<h2>When to Use Each Operator<a class="headerlink" href="#when-to-use-each-operator" title="Link to this heading">¶</a></h2>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Operator</p></th>
+<th class="head"><p>Recommended Use</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GenericLinearOperator</span></code></p></td>
+<td><p>Prototyping, custom stencils, uncommon PDEs</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">FEMGradientOperator</span></code></p></td>
+<td><p>Computing gradients/divergence, anisotropic materials</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LaplaceOperator</span></code></p></td>
+<td><p>Scalar Poisson problems, diffusion equations</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">IsotropicStiffnessOperator</span></code></p></td>
+<td><p>Linear elasticity with isotropic materials</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>For production code solving standard PDEs, always prefer the fused operators
+when available. They provide the best performance while maintaining numerical
+accuracy identical to the unfused approach.</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="Examples.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Examples</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="GPU.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">GPU Computing</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2017-2022 Till Junge, 2018-2024 Lars Pastewka
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Linear Operators</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#generic-linear-operators">Generic Linear Operators</a><ul>
+<li><a class="reference internal" href="#creating-a-generic-operator">Creating a generic operator</a></li>
+<li><a class="reference internal" href="#multi-component-stencils">Multi-component stencils</a></li>
+<li><a class="reference internal" href="#using-generic-operators">Using generic operators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#fem-gradient-operator">FEM Gradient Operator</a><ul>
+<li><a class="reference internal" href="#properties">Properties</a></li>
+<li><a class="reference internal" href="#creating-the-operator">Creating the operator</a></li>
+<li><a class="reference internal" href="#gradient-operation">Gradient operation</a></li>
+<li><a class="reference internal" href="#divergence-transpose-operation">Divergence (transpose) operation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#laplace-operator">Laplace Operator</a></li>
+<li><a class="reference internal" href="#isotropic-stiffness-operator">Isotropic Stiffness Operator</a><ul>
+<li><a class="reference internal" href="#mathematical-formulation">Mathematical formulation</a></li>
+<li><a class="reference internal" href="#id1">Creating the operator</a></li>
+<li><a class="reference internal" href="#material-fields">Material fields</a></li>
+<li><a class="reference internal" href="#computing-lame-parameters-from-engineering-constants">Computing Lamé parameters from engineering constants</a></li>
+<li><a class="reference internal" href="#applying-the-operator">Applying the operator</a></li>
+<li><a class="reference internal" href="#complete-linear-elasticity-example">Complete linear elasticity example</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#performance-comparison">Performance Comparison</a><ul>
+<li><a class="reference internal" href="#gpu-performance">GPU Performance</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#when-to-use-each-operator">When to Use Each Operator</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=c156c2f9"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    </body>
+</html>
