@@ -78,14 +78,17 @@ class FFTEngine : public FFTEngineBase {
    * @param nb_ghosts_left      Ghost cells on low-index side of each dimension
    * @param nb_ghosts_right     Ghost cells on high-index side of each dimension
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
+   * @param device              Device for field memory allocation (optional,
+   *                            default uses memory space's default device)
    */
   FFTEngine(const DynGridIndex & nb_domain_grid_pts,
             const Communicator & comm = Communicator(),
             const DynGridIndex & nb_ghosts_left = DynGridIndex{},
             const DynGridIndex & nb_ghosts_right = DynGridIndex{},
-            const SubPtMap_t & nb_sub_pts = {})
+            const SubPtMap_t & nb_sub_pts = {},
+            Device device = memory_space_to_device<MemorySpace>())
       : Parent_t{nb_domain_grid_pts, comm, nb_ghosts_left, nb_ghosts_right,
-                 nb_sub_pts, memory_space_to_device<MemorySpace>()},
+                 nb_sub_pts, device},
         backend{create_fft_backend<MemorySpace>()} {}
 
   FFTEngine() = delete;

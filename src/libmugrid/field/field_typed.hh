@@ -333,10 +333,10 @@ namespace muGrid {
 
     /**
      * Get device ID for multi-GPU systems.
-     * Currently returns 0 as multi-GPU is not yet supported.
+     * Returns the device ID from the field collection's Device.
      */
     int get_device_id() const final {
-      return 0;  // TODO: Support multi-GPU
+      return this->get_collection().get_device().get_device_id();
     }
 
     /**

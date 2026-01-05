@@ -41,6 +41,13 @@
 #include "field/field_map.hh"
 #include "util/tensor_algebra.hh"
 
+#if defined(MUGRID_ENABLE_CUDA)
+#include <cuda_runtime.h>
+#endif
+#if defined(MUGRID_ENABLE_HIP)
+#include <hip/hip_runtime.h>
+#endif
+
 namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
@@ -196,6 +203,22 @@ namespace muGrid {
     if (this->values.size() != static_cast<size_t>(expected_size) or
         static_cast<Index_t>(this->current_nb_entries) != size) {
       this->current_nb_entries = size;
+
+      // Set the correct GPU device before allocation for multi-GPU support
+      if constexpr (is_device_space_v<MemorySpace>) {
+        const int device_id = this->get_device_id();
+#if defined(MUGRID_ENABLE_CUDA)
+        if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
+          cudaSetDevice(device_id);
+        }
+#endif
+#if defined(MUGRID_ENABLE_HIP)
+        if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
+          hipSetDevice(device_id);
+        }
+#endif
+      }
+
       // Use our resize function
       muGrid::resize(this->values, expected_size);
       // Zero-initialize the new memory

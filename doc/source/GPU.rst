@@ -220,6 +220,74 @@ on the GPU when both input and output fields are on the GPU:
     # Apply convolution (executed on GPU) - fields are passed directly
     laplace.apply(input_field, output_field)
 
+FFT on GPU
+**********
+
+*µ*\Grid provides GPU-accelerated FFT operations, but there are important differences
+between the NVIDIA (CUDA/cuFFT) and AMD (ROCm/rocFFT) backends.
+
+NVIDIA GPUs (cuFFT)
+-------------------
+
+On NVIDIA GPUs, *µ*\Grid uses the cuFFT library. cuFFT has a **documented limitation**:
+
+    *"Strides on the real part of real-to-complex and complex-to-real transforms
+    are not supported."*
+
+This limitation affects **3D MPI-parallel FFTs** on NVIDIA GPUs. In the pencil
+decomposition used for distributed FFTs, the data layout after transpose
+operations results in non-unit strides for the R2C/C2R transforms along the
+X-direction.
+
+**Consequence**: 3D MPI-parallel FFTs on NVIDIA GPUs will raise a ``RuntimeError``
+with a clear explanation of the limitation.
+
+**Workarounds**:
+
+1. Use the CPU FFT backend (PocketFFT) for 3D MPI-parallel transforms
+2. Use 2D grids, which support batched transforms with unit stride
+3. Use single-GPU (non-MPI) execution where the data layout is contiguous
+
+AMD GPUs (rocFFT)
+-----------------
+
+On AMD GPUs, *µ*\Grid uses the native rocFFT library directly (not hipFFT).
+rocFFT's API provides more flexible stride support through its
+``rocfft_plan_description_set_data_layout()`` function, which allows specifying
+arbitrary strides for all transform types including R2C and C2R.
+
+**Consequence**: 3D MPI-parallel FFTs should work correctly on AMD GPUs with rocFFT.
+
+.. note::
+
+    The rocFFT backend is a new implementation and may require testing on your
+    specific ROCm installation. Please report any issues.
+
+Example: GPU FFT with fallback
+------------------------------
+
+For code that needs to handle both 2D and 3D cases on GPU:
+
+.. code-block:: python
+
+    import muGrid
+
+    nb_grid_pts = [64, 64, 64]  # 3D grid
+    dim = len(nb_grid_pts)
+
+    # Determine device based on dimension and GPU availability
+    if dim == 3 and muGrid.has_cuda and not muGrid.has_rocm:
+        # 3D on CUDA: must use CPU for FFT due to cuFFT limitation
+        print("Warning: Using CPU for 3D FFT (cuFFT stride limitation)")
+        device = "cpu"
+    elif muGrid.has_gpu:
+        device = "gpu"
+    else:
+        device = "cpu"
+
+    # Create FFT engine
+    engine = muGrid.FFTEngine(nb_grid_pts, device=device)
+
 Performance considerations
 **************************
 

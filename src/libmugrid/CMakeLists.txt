@@ -97,7 +97,7 @@ if(MUGRID_ENABLE_CUDA)
         PROPERTIES LANGUAGE CUDA
     )
 elseif(MUGRID_ENABLE_HIP)
-    list(APPEND MUGRID_SOURCES fft/hipfft_backend.cc)
+    list(APPEND MUGRID_SOURCES fft/rocfft_backend.cc)
     list(APPEND MUGRID_SOURCES operators/generic_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
@@ -105,7 +105,7 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
-        ${CMAKE_CURRENT_SOURCE_DIR}/fft/hipfft_backend.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/fft/rocfft_backend.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/generic_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
@@ -176,14 +176,15 @@ if(MUGRID_ENABLE_CUDA)
     )
 endif()
 
-# HIP support
+# HIP/ROCm support
 if(MUGRID_ENABLE_HIP)
     find_package(hip REQUIRED)
-    find_package(hipfft REQUIRED)
+    find_package(rocfft REQUIRED)
     target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_HIP)
     # HIP headers require the platform to be defined when not using hipcc
     target_compile_definitions(muGrid PUBLIC __HIP_PLATFORM_AMD__)
-    target_link_libraries(muGrid PRIVATE hip::host hip::hipfft)
+    # Link native rocFFT (not hipFFT) for better stride support in 3D MPI FFTs
+    target_link_libraries(muGrid PRIVATE hip::host roc::rocfft)
     # Some ROCm installations don't properly set include dirs on the hip::host target
     # Derive ROCm root from hip_DIR and add include path explicitly
     get_filename_component(ROCM_PATH "${hip_DIR}/../../.." ABSOLUTE)

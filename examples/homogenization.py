@@ -44,7 +44,6 @@ except ImportError:
 
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
-
 # Voigt notation mappings
 # 2D: [xx, yy, xy] -> indices 0, 1, 2
 # 3D: [xx, yy, zz, yz, xz, xy] -> indices 0, 1, 2, 3, 4, 5
@@ -300,7 +299,7 @@ else:
     voigt_labels = ["xx", "yy", "zz", "yz", "xz", "xy"]
 
 # Create the FEM gradient operator first to get accurate quadrature info
-gradient_op = muGrid.FEMGradientOperator(dim, list(grid_spacing))
+gradient_op = muGrid.FEMGradientOperator(dim, tuple(grid_spacing))
 
 # Number of quadrature points from the operator
 # Number of nodes per element: 4 for 2D (corners of pixel), 8 for 3D (corners of voxel)
@@ -336,19 +335,17 @@ decomposition = muGrid.CartesianDecomposition(
     device=device,
 )
 
-# Get local grid dimensions
-grid_shape = tuple(args.nb_grid_pts)
+# Get local grid dimensions from the decomposition
+# For MPI runs, this is the local subdomain shape, not the global grid
+local_grid_shape = decomposition.nb_subdomain_grid_pts
 
-# Get coordinates for microstructure generation
-coord_arrays = []
-for d in range(dim):
-    coord_arrays.append(
-        np.linspace(0, 1, args.nb_grid_pts[d], endpoint=False)
-        + 0.5 / args.nb_grid_pts[d]
-    )
-coords = np.meshgrid(*coord_arrays, indexing="ij")
+# Get coordinates for microstructure generation from the decomposition
+# This returns only the local portion of coordinates for this MPI rank
+# Shape: [dim, *local_grid_shape] with values in [0, 1)
+local_coords = decomposition.coords
+coords = [local_coords[d] for d in range(dim)]
 
-# Create the microstructure (phase field)
+# Create the microstructure (phase field) - only for local portion
 phase = create_microstructure(coords, args.inclusion_type, args.inclusion_radius)
 
 # Create the material stiffness tensor at each pixel
@@ -363,7 +360,13 @@ if not args.quiet:
     parprint(f"Number of quadrature points per pixel: {nb_quad}", comm=comm)
     parprint(f"Number of nodal points per pixel: {nb_nodes}", comm=comm)
     parprint(f"Quadrature weights: {quad_weights}", comm=comm)
-    parprint(f"Inclusion volume fraction: {np.mean(phase):.4f}", comm=comm)
+    # Compute global volume fraction via MPI reduction
+    local_sum = np.sum(phase)
+    local_count = phase.size
+    global_sum = comm.sum(local_sum)
+    global_count = comm.sum(local_count)
+    v_f_print = global_sum / global_count
+    parprint(f"Inclusion volume fraction: {v_f_print:.4f}", comm=comm)
     parprint(comm=comm)
 
 # Create muGrid fields for gradient operations.
@@ -385,9 +388,10 @@ u_field = decomposition.real_field("u_field", (dim,))
 f_field = decomposition.real_field("f_field", (dim,))
 rhs_field = decomposition.real_field("rhs_field", (dim,))
 
-# Material stiffness at each quadrature point [voigt, voigt, quad, *grid_shape]
+# Material stiffness at each quadrature point [voigt, voigt, quad, *local_grid_shape]
 # Create on host first, then convert to device array if needed
-C_field_shape = (nb_voigt, nb_voigt, nb_quad) + grid_shape
+# phase is already local (from decomposition.coords), so no slicing needed
+C_field_shape = (nb_voigt, nb_voigt, nb_quad) + local_grid_shape
 C_field_np = np.zeros(C_field_shape)
 for q in range(nb_quad):
     for i in range(nb_voigt):
@@ -424,6 +428,7 @@ if args.kernel == "fused":
     # Set spatially varying material properties based on phase
     # Phase is defined at grid points, element properties taken at grid points
     # (for element (i,j), use material at grid point (i,j))
+    # phase is already local (from decomposition.coords), so no slicing needed
     lambda_field.p[...] = arr.asarray(lam_matrix * (1 - phase) + lam_inclusion * phase)
     mu_field.p[...] = arr.asarray(mu_matrix * (1 - phase) + mu_inclusion * phase)
 
@@ -433,13 +438,14 @@ if args.kernel == "fused":
 
     # Create the fused isotropic stiffness operator
     if dim == 2:
-        fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(list(grid_spacing))
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(tuple(grid_spacing))
     else:
-        fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(tuple(grid_spacing))
 
     if not args.quiet:
         parprint(f"Using fused IsotropicStiffnessOperator{dim}D", comm=comm)
-        parprint(f"  Lambda (matrix): {lam_matrix:.4f}, Mu (matrix): {mu_matrix:.4f}", comm=comm)
+        parprint(f"  Lambda (matrix): {lam_matrix:.4f}, "
+                 f"Mu (matrix): {mu_matrix:.4f}", comm=comm)
         parprint(
             f"  Lambda (incl.):  {lam_inclusion:.4f}, Mu (incl.):  {mu_inclusion:.4f}",
             comm=comm,
@@ -495,7 +501,7 @@ def strain_to_voigt(strain):
     eps_voigt : ndarray
         Strain in Voigt notation with shape (nb_voigt, quad, *grid_shape)
     """
-    voigt_shape = (nb_voigt, nb_quad) + grid_shape
+    voigt_shape = (nb_voigt, nb_quad) + local_grid_shape
     eps_voigt = arr.zeros(voigt_shape)
 
     if dim == 2:
@@ -603,8 +609,8 @@ def compute_divergence(stress, f_vec):
         gradient_op.transpose(stress_field, f_vec, list(quad_weights))
 
 
-# Temporary arrays for strain and stress [dim, dim, quad, *grid_shape]
-strain_shape = (dim, dim, nb_quad) + grid_shape
+# Temporary arrays for strain and stress [dim, dim, quad, *local_grid_shape]
+strain_shape = (dim, dim, nb_quad) + local_grid_shape
 strain_arr = arr.zeros(strain_shape)
 stress_arr = arr.zeros(strain_shape)
 
@@ -770,9 +776,11 @@ with timer("total_solve"):
 
         if not args.quiet:
             if converged:
-                parprint(f"  CG converged in {iteration_count[0]} iterations", comm=comm)
+                parprint(f"  CG converged in {iteration_count[0]} "
+                         "iterations", comm=comm)
             else:
-                parprint(f"  CG did not converge after {args.maxiter} iterations", comm=comm)
+                parprint(f"  CG did not converge after {args.maxiter} "
+                         "iterations", comm=comm)
 
         # Compute strain from solution
         compute_strain(u_field, strain_arr)
@@ -872,7 +880,12 @@ total_flops = nb_stiffness_calls * flops_per_call
 flops_rate = total_flops / elapsed_time if elapsed_time > 0 else 0
 
 # Analytical bounds
-v_f = float(np.mean(phase))  # Volume fraction of inclusion
+# Compute global volume fraction via MPI reduction
+local_phase_sum = np.sum(phase)
+local_phase_count = phase.size
+global_phase_sum = comm.sum(local_phase_sum)
+global_phase_count = comm.sum(local_phase_count)
+v_f = float(global_phase_sum / global_phase_count)  # Volume fraction of inclusion
 E_m, E_i = args.E_matrix, args.E_inclusion
 nu = args.nu
 E_voigt = v_f * E_i + (1 - v_f) * E_m

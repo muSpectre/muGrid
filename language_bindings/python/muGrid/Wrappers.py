@@ -534,6 +534,23 @@ class CartesianDecomposition(FieldCollectionMixin):
         return self._cpp.collection
 
     @property
+    def collection(self) -> GlobalFieldCollection:
+        """
+        Get the underlying GlobalFieldCollection.
+
+        Returns
+        -------
+        GlobalFieldCollection
+            Wrapped field collection with Pythonic interfaces.
+        """
+        # Create a wrapper around the C++ collection
+        wrapper = GlobalFieldCollection.__new__(GlobalFieldCollection)
+        wrapper._cpp = self._cpp.collection
+        # Get grid pts from decomposition, not from collection
+        wrapper._nb_grid_pts = list(self._cpp.nb_domain_grid_pts)
+        return wrapper
+
+    @property
     def nb_grid_pts(self) -> List[int]:
         """Local subdomain grid dimensions (alias for nb_subdomain_grid_pts)."""
         return list(self._cpp.nb_subdomain_grid_pts)
@@ -608,6 +625,10 @@ class FFTEngine:
         Ghost cells on high-index side of each dimension.
     nb_sub_pts : dict, optional
         Number of sub-points per pixel.
+    device : str or Device, optional
+        Device for FFT execution: "cpu" (default), "cuda", "cuda:N", "gpu",
+        or a Device instance. When a GPU device is specified, the FFT uses
+        cuFFT and fields are allocated on GPU memory.
 
     Examples
     --------
@@ -617,6 +638,12 @@ class FFTEngine:
     >>> engine.fft(real_field, fourier_field)
     >>> engine.ifft(fourier_field, real_field)
     >>> real_field.s[:] *= engine.normalisation
+
+    GPU example with multi-GPU MPI:
+
+    >>> from mpi4py import MPI
+    >>> comm = Communicator(MPI.COMM_WORLD)
+    >>> engine = FFTEngine([64, 64], comm, device=f"cuda:{comm.rank}")
     """
 
     def __init__(
@@ -626,6 +653,7 @@ class FFTEngine:
         nb_ghosts_left: Optional[Shape] = None,
         nb_ghosts_right: Optional[Shape] = None,
         nb_sub_pts: Optional[SubPtMap] = None,
+        device: Optional[Union[DeviceStr, "_muGrid.Device"]] = None,
     ) -> None:
         from .Parallel import Communicator as CommFactory
 
@@ -645,13 +673,32 @@ class FFTEngine:
         if nb_sub_pts is None:
             nb_sub_pts = {}
 
-        self._cpp = _muGrid.FFTEngine(
-            list(nb_domain_grid_pts),
-            _unwrap(comm),
-            list(nb_ghosts_left),
-            list(nb_ghosts_right),
-            nb_sub_pts,
-        )
+        # Parse device and select appropriate engine
+        parsed_device = _parse_device(device)
+        if parsed_device.is_device:
+            # GPU FFT engine (cuFFT)
+            if not hasattr(_muGrid, "FFTEngineCuda"):
+                raise RuntimeError(
+                    "GPU FFT requested but muGrid was compiled without CUDA support"
+                )
+            device_id = parsed_device.device_id
+            self._cpp = _muGrid.FFTEngineCuda(
+                list(nb_domain_grid_pts),
+                _unwrap(comm),
+                list(nb_ghosts_left),
+                list(nb_ghosts_right),
+                nb_sub_pts,
+                device_id,
+            )
+        else:
+            # CPU FFT engine (PocketFFT)
+            self._cpp = _muGrid.FFTEngine(
+                list(nb_domain_grid_pts),
+                _unwrap(comm),
+                list(nb_ghosts_left),
+                list(nb_ghosts_right),
+                nb_sub_pts,
+            )
 
     def fft(self, input_field: Field, output_field: Field) -> None:
         """
@@ -784,6 +831,36 @@ class FFTEngine:
         """
         cpp_field = self._cpp.fourier_space_field(name, nb_components)
         return Field(cpp_field)
+
+    @property
+    def real_space_collection(self) -> GlobalFieldCollection:
+        """
+        Get the real-space field collection.
+
+        Returns
+        -------
+        GlobalFieldCollection
+            Wrapped field collection for real-space fields.
+        """
+        wrapper = GlobalFieldCollection.__new__(GlobalFieldCollection)
+        wrapper._cpp = self._cpp.real_space_collection
+        wrapper._nb_grid_pts = list(self._cpp.nb_domain_grid_pts)
+        return wrapper
+
+    @property
+    def fourier_space_collection(self) -> GlobalFieldCollection:
+        """
+        Get the Fourier-space field collection.
+
+        Returns
+        -------
+        GlobalFieldCollection
+            Wrapped field collection for Fourier-space fields.
+        """
+        wrapper = GlobalFieldCollection.__new__(GlobalFieldCollection)
+        wrapper._cpp = self._cpp.fourier_space_collection
+        wrapper._nb_grid_pts = list(self._cpp.nb_fourier_grid_pts)
+        return wrapper
 
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the underlying C++ object."""

@@ -1,13 +1,13 @@
 /**
- * @file   fft/hipfft_backend.hh
+ * @file   fft/rocfft_backend.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
- * @date   19 Dec 2024
+ * @date   05 Jan 2026
  *
- * @brief  hipFFT implementation of FFT1DBackend for AMD GPUs
+ * @brief  Native rocFFT implementation of FFT1DBackend for AMD GPUs
  *
- * Copyright © 2024 Lars Pastewka
+ * Copyright © 2024-2026 Lars Pastewka
  *
  * µGrid is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License as
@@ -33,12 +33,12 @@
  *
  */
 
-#ifndef SRC_LIBMUGRID_FFT_HIPFFT_BACKEND_HH_
-#define SRC_LIBMUGRID_FFT_HIPFFT_BACKEND_HH_
+#ifndef SRC_LIBMUGRID_FFT_ROCFFT_BACKEND_HH_
+#define SRC_LIBMUGRID_FFT_ROCFFT_BACKEND_HH_
 
 #include "fft_1d_backend.hh"
 
-#include <hipfft/hipfft.h>
+#include <rocfft/rocfft.h>
 
 #include <unordered_map>
 #include <tuple>
@@ -46,19 +46,23 @@
 namespace muGrid {
 
 /**
- * hipFFT implementation of FFT1DBackend for AMD GPUs.
+ * Native rocFFT implementation of FFT1DBackend for AMD GPUs.
  *
- * This backend uses AMD's hipFFT library for GPU-accelerated FFT operations.
- * It operates on device memory and supports batched 1D transforms with
- * arbitrary strides.
+ * This backend uses AMD's rocFFT library directly (not via hipFFT) for
+ * GPU-accelerated FFT operations. Using the native rocFFT API provides
+ * better support for strided data layouts, which is essential for
+ * 3D MPI-parallel FFTs.
  *
- * hipFFT plans are cached by (n, batch, stride, dist) signature to avoid
- * repeated plan creation overhead.
+ * rocFFT plans are cached by (transform_type, n, batch, in_stride, in_dist,
+ * out_stride, out_dist) signature to avoid repeated plan creation overhead.
+ *
+ * Key advantage over hipFFT: rocFFT's native API supports arbitrary strides
+ * for all transform types including R2C and C2R, which cuFFT does not support.
  */
-class hipFFTBackend : public FFT1DBackend {
+class rocFFTBackend : public FFT1DBackend {
  public:
-  hipFFTBackend();
-  ~hipFFTBackend() override;
+  rocFFTBackend();
+  ~rocFFTBackend() override;
 
   void r2c(Index_t n, Index_t batch, const Real * input, Index_t in_stride,
            Index_t in_dist, Complex * output, Index_t out_stride,
@@ -78,15 +82,15 @@ class hipFFTBackend : public FFT1DBackend {
 
   bool supports_device_memory() const override { return true; }
 
-  const char * name() const override { return "hipfft"; }
+  const char * name() const override { return "rocfft"; }
 
  protected:
   /**
-   * Key type for plan cache: (transform_type, n, batch, in_stride, in_dist,
-   * out_stride, out_dist)
+   * Key type for plan cache: (transform_type, direction, n, batch, in_stride,
+   * in_dist, out_stride, out_dist)
    */
-  using PlanKey =
-      std::tuple<int, Index_t, Index_t, Index_t, Index_t, Index_t, Index_t>;
+  using PlanKey = std::tuple<int, int, Index_t, Index_t, Index_t, Index_t,
+                             Index_t, Index_t>;
 
   /**
    * Hash function for PlanKey.
@@ -94,12 +98,13 @@ class hipFFTBackend : public FFT1DBackend {
   struct PlanKeyHash {
     std::size_t operator()(const PlanKey & key) const {
       auto h1 = std::hash<int>{}(std::get<0>(key));
-      auto h2 = std::hash<Index_t>{}(std::get<1>(key));
+      auto h2 = std::hash<int>{}(std::get<1>(key));
       auto h3 = std::hash<Index_t>{}(std::get<2>(key));
       auto h4 = std::hash<Index_t>{}(std::get<3>(key));
       auto h5 = std::hash<Index_t>{}(std::get<4>(key));
       auto h6 = std::hash<Index_t>{}(std::get<5>(key));
       auto h7 = std::hash<Index_t>{}(std::get<6>(key));
+      auto h8 = std::hash<Index_t>{}(std::get<7>(key));
       // Combine hashes
       std::size_t result = h1;
       result ^= h2 + 0x9e3779b9 + (result << 6) + (result >> 2);
@@ -108,6 +113,7 @@ class hipFFTBackend : public FFT1DBackend {
       result ^= h5 + 0x9e3779b9 + (result << 6) + (result >> 2);
       result ^= h6 + 0x9e3779b9 + (result << 6) + (result >> 2);
       result ^= h7 + 0x9e3779b9 + (result << 6) + (result >> 2);
+      result ^= h8 + 0x9e3779b9 + (result << 6) + (result >> 2);
       return result;
     }
   };
@@ -118,30 +124,49 @@ class hipFFTBackend : public FFT1DBackend {
   enum TransformType { R2C = 0, C2R = 1, C2C = 2 };
 
   /**
-   * Get or create a hipFFT plan for the given parameters.
-   *
-   * @param type       Transform type (R2C, C2R, or C2C)
-   * @param n          Transform size
-   * @param batch      Number of batched transforms
-   * @param in_stride  Input stride
-   * @param in_dist    Input distance between batches
-   * @param out_stride Output stride
-   * @param out_dist   Output distance between batches
-   * @return hipfftHandle for the requested transform
+   * Direction identifiers for C2C transforms.
    */
-  hipfftHandle get_plan(TransformType type, Index_t n, Index_t batch,
-                        Index_t in_stride, Index_t in_dist, Index_t out_stride,
-                        Index_t out_dist);
+  enum Direction { FORWARD = 0, BACKWARD = 1 };
 
   /**
-   * Check hipFFT result and throw on error.
+   * Cached plan with associated execution info.
    */
-  static void check_hipfft_result(hipfftResult result, const char * operation);
+  struct CachedPlan {
+    rocfft_plan plan;
+    rocfft_execution_info info;
+    void * work_buffer;
+    size_t work_buffer_size;
+  };
+
+  /**
+   * Get or create a rocFFT plan for the given parameters.
+   *
+   * @param type       Transform type (R2C, C2R, or C2C)
+   * @param direction  Transform direction (FORWARD or BACKWARD, only for C2C)
+   * @param n          Transform size
+   * @param batch      Number of batched transforms
+   * @param in_stride  Input stride between elements
+   * @param in_dist    Input distance between batches
+   * @param out_stride Output stride between elements
+   * @param out_dist   Output distance between batches
+   * @return CachedPlan for the requested transform
+   */
+  CachedPlan & get_plan(TransformType type, Direction direction, Index_t n,
+                        Index_t batch, Index_t in_stride, Index_t in_dist,
+                        Index_t out_stride, Index_t out_dist);
+
+  /**
+   * Check rocFFT result and throw on error.
+   */
+  static void check_rocfft_result(rocfft_status result, const char * operation);
 
   //! Plan cache
-  std::unordered_map<PlanKey, hipfftHandle, PlanKeyHash> plan_cache;
+  std::unordered_map<PlanKey, CachedPlan, PlanKeyHash> plan_cache;
+
+  //! Flag to track if rocfft_setup has been called
+  static bool rocfft_initialized;
 };
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_FFT_HIPFFT_BACKEND_HH_
+#endif  // SRC_LIBMUGRID_FFT_ROCFFT_BACKEND_HH_

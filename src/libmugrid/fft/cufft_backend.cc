@@ -172,6 +172,22 @@ cufftHandle cuFFTBackend::get_plan(TransformType type, Index_t n, Index_t batch,
 void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
                        Index_t in_stride, Index_t in_dist, Complex * output,
                        Index_t out_stride, Index_t out_dist) {
+  // cuFFT does not support strided real-to-complex transforms.
+  // This is a documented limitation: "Strides on the real part of
+  // real-to-complex and complex-to-real transforms are not supported."
+  // This typically occurs in 3D MPI-parallel FFTs where the data layout
+  // after transpose operations results in non-unit strides.
+  if (in_stride != 1) {
+    throw RuntimeError(
+        "cuFFT does not support strided real-to-complex (R2C) transforms. "
+        "This limitation affects 3D MPI-parallel FFTs on NVIDIA GPUs. "
+        "The input stride is " +
+        std::to_string(in_stride) +
+        " but must be 1. "
+        "Workaround: Use CPU FFT backend for 3D MPI-parallel transforms, "
+        "or use 2D grids which support batched transforms with unit stride.");
+  }
+
   cufftHandle plan =
       get_plan(R2C, n, batch, in_stride, in_dist, out_stride, out_dist);
 
@@ -187,6 +203,22 @@ void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
 void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
                        Index_t in_stride, Index_t in_dist, Real * output,
                        Index_t out_stride, Index_t out_dist) {
+  // cuFFT does not support strided complex-to-real transforms.
+  // This is a documented limitation: "Strides on the real part of
+  // real-to-complex and complex-to-real transforms are not supported."
+  // This typically occurs in 3D MPI-parallel FFTs where the data layout
+  // after transpose operations results in non-unit strides.
+  if (out_stride != 1) {
+    throw RuntimeError(
+        "cuFFT does not support strided complex-to-real (C2R) transforms. "
+        "This limitation affects 3D MPI-parallel FFTs on NVIDIA GPUs. "
+        "The output stride is " +
+        std::to_string(out_stride) +
+        " but must be 1. "
+        "Workaround: Use CPU FFT backend for 3D MPI-parallel transforms, "
+        "or use 2D grids which support batched transforms with unit stride.");
+  }
+
   cufftHandle plan =
       get_plan(C2R, n, batch, in_stride, in_dist, out_stride, out_dist);
 

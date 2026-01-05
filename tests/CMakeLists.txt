@@ -60,7 +60,20 @@ if(Boost_FOUND)
     )
 
     # Register test
-    add_test(NAME mugrid_main_test_suite COMMAND mugrid_main_test_suite)
+    # When MPI and NetCDF are enabled, some tests (io_test_file_io_netcdf.cc) use
+    # MPIContext which requires proper MPI initialization. With HPC-X/OpenMPI,
+    # running without mpiexec causes collective operations to hang.
+    if(MUGRID_ENABLE_MPI AND MUGRID_ENABLE_NETCDF)
+        find_program(MPIEXEC_EXECUTABLE mpiexec)
+        if(MPIEXEC_EXECUTABLE)
+            add_test(NAME mugrid_main_test_suite
+                COMMAND ${MPIEXEC_EXECUTABLE} -n 1 --oversubscribe $<TARGET_FILE:mugrid_main_test_suite>)
+        else()
+            add_test(NAME mugrid_main_test_suite COMMAND mugrid_main_test_suite)
+        endif()
+    else()
+        add_test(NAME mugrid_main_test_suite COMMAND mugrid_main_test_suite)
+    endif()
     set_tests_properties(mugrid_main_test_suite PROPERTIES TIMEOUT 300)
 
     # MPI test sources
