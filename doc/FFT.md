@@ -1,4 +1,4 @@
-# FFT Engine Design Documentation
+# FFT Engine Design
 
 This document describes the design and implementation decisions for the muGrid FFT engine.
 
