@@ -46,7 +46,7 @@
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-#include "hipfft_backend.hh"
+#include "rocfft_backend.hh"
 #endif
 
 #include <memory>
@@ -89,16 +89,16 @@ struct FFTBackendSelector<CudaSpace> {
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-// HIP space uses hipFFT
+// HIP space uses native rocFFT (not hipFFT) for better stride support
 template <>
 struct FFTBackendSelector<HIPSpace> {
-  using type = hipFFTBackend;
+  using type = rocFFTBackend;
 
   static std::unique_ptr<FFT1DBackend> create() {
-    return std::make_unique<hipFFTBackend>();
+    return std::make_unique<rocFFTBackend>();
   }
 
-  static constexpr const char * name() { return "hipFFT"; }
+  static constexpr const char * name() { return "rocFFT"; }
 };
 #endif
 

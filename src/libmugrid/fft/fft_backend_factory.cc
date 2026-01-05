@@ -39,7 +39,7 @@
 #if defined(MUGRID_ENABLE_CUDA)
 #include "cufft_backend.hh"
 #elif defined(MUGRID_ENABLE_HIP)
-#include "hipfft_backend.hh"
+#include "rocfft_backend.hh"
 #endif
 
 namespace muGrid {
@@ -52,7 +52,7 @@ std::unique_ptr<FFT1DBackend> get_device_fft_backend() {
 #if defined(MUGRID_ENABLE_CUDA)
   return std::make_unique<cuFFTBackend>();
 #elif defined(MUGRID_ENABLE_HIP)
-  return std::make_unique<hipFFTBackend>();
+  return std::make_unique<rocFFTBackend>();
 #else
   return nullptr;
 #endif
