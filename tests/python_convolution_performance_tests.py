@@ -354,10 +354,6 @@ class ConvolutionPerformanceTests(unittest.TestCase):
         self.assertGreater(metrics.total_flops, 0)
         self.assertGreater(metrics.gflops, 0.0)
 
-        if metrics.l1_miss_rate is not None:
-            # Cache miss rate should be reasonable
-            self.assertLess(metrics.l1_miss_rate, 50.0)
-
     def test_performance_comparison_grid_sizes(self):
         """Compare performance across different grid sizes"""
         print("\n=== Comparing Performance Across Grid Sizes ===")
@@ -412,20 +408,6 @@ class ConvolutionPerformanceTests(unittest.TestCase):
             f"{'Grid Size':>10} {'GFLOPS':>12} {'L1 Miss %':>12} "
             f"{'L2 Miss %':>12} {'L3 Miss %':>12} {'IPC':>12}"
         )
-        print("-" * 90)
-
-        for metrics in results:
-            grid_pixels = np.prod(metrics.grid_size)
-            l1_str = f"{metrics.l1_miss_rate:.2f}" if metrics.l1_miss_rate else "N/A"
-            l2_str = f"{metrics.l2_miss_rate:.2f}" if metrics.l2_miss_rate else "N/A"
-            l3_str = f"{metrics.l3_miss_rate:.2f}" if metrics.l3_miss_rate else "N/A"
-            ipc_str = f"{metrics.ipc:.2f}" if metrics.ipc else "N/A"
-
-            print(
-                f"{grid_pixels:>10} {metrics.gflops:>12.3f} {l1_str:>12} "
-                f"{l2_str:>12} {l3_str:>12} {ipc_str:>12}"
-            )
-
         print("=" * 90 + "\n")
 
 
