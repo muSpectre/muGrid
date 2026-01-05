@@ -5,10 +5,6 @@ This chapter provides step-by-step examples for building numerical solvers with
 *µ*\Grid. We present two complete examples: a Poisson solver and a linear
 elasticity solver for micromechanical homogenization.
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 2
-
 Poisson Solver
 **************
 
