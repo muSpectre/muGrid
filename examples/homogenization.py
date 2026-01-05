@@ -299,7 +299,7 @@ else:
     voigt_labels = ["xx", "yy", "zz", "yz", "xz", "xy"]
 
 # Create the FEM gradient operator first to get accurate quadrature info
-gradient_op = muGrid.FEMGradientOperator(dim, list(grid_spacing))
+gradient_op = muGrid.FEMGradientOperator(dim, tuple(grid_spacing))
 
 # Number of quadrature points from the operator
 # Number of nodes per element: 4 for 2D (corners of pixel), 8 for 3D (corners of voxel)
@@ -337,7 +337,7 @@ decomposition = muGrid.CartesianDecomposition(
 
 # Get local grid dimensions from the decomposition
 # For MPI runs, this is the local subdomain shape, not the global grid
-local_grid_shape = tuple(decomposition.nb_subdomain_grid_pts)
+local_grid_shape = decomposition.nb_subdomain_grid_pts
 
 # Get coordinates for microstructure generation from the decomposition
 # This returns only the local portion of coordinates for this MPI rank
@@ -438,9 +438,9 @@ if args.kernel == "fused":
 
     # Create the fused isotropic stiffness operator
     if dim == 2:
-        fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(list(grid_spacing))
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(tuple(grid_spacing))
     else:
-        fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
+        fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(tuple(grid_spacing))
 
     if not args.quiet:
         parprint(f"Using fused IsotropicStiffnessOperator{dim}D", comm=comm)
