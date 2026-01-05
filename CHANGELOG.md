@@ -42,6 +42,14 @@ Change log for µGrid
   - Explains generic, gradient/divergence, and fused operators
   - Details `IsotropicStiffnessOperator` material field requirements
 - DOC: Simplified examples to use fused operators for better performance
+- DOC: Added GPU FFT documentation explaining backend limitations
+- ENH: Native rocFFT backend for AMD GPUs with full stride support
+  - Uses `rocfft_plan_description_set_data_layout()` for arbitrary strides
+  - Enables 3D MPI-parallel FFTs on AMD GPUs (not possible with cuFFT)
+- BUG: Added guard in cuFFT backend for unsupported strided R2C/C2R transforms
+  - cuFFT does not support strides on real data in R2C/C2R transforms
+  - 3D MPI-parallel FFTs on NVIDIA GPUs now raise clear `RuntimeError`
+  - Workaround: Use CPU FFT backend or 2D grids on NVIDIA hardware
 
 0.102.0 (30Dec25)
 -----------------
