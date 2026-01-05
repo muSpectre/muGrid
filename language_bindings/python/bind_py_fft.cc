@@ -147,19 +147,19 @@ void add_fft_utils(py::module & mod) {
       R"(
       Compute the Fourier grid dimensions for a half-complex r2c transform.
 
-      For a real-space grid of size [Nx, Ny, Nz], the half-complex Fourier grid
-      has size [Nx/2+1, Ny, Nz] (for r2c_axis=0).
+      For a real-space grid of size (Nx, Ny, Nz), the half-complex Fourier grid
+      has size (Nx/2+1, Ny, Nz) (for r2c_axis=0).
 
       Parameters
       ----------
-      nb_grid_pts : list of int
+      nb_grid_pts : tuple of int
           Real-space grid dimensions
       r2c_axis : int, optional
           Axis along which r2c transform is performed (default 0)
 
       Returns
       -------
-      list of int
+      tuple of int
           Fourier-space grid dimensions
       )");
 
@@ -177,7 +177,7 @@ void add_fft_utils(py::module & mod) {
 
       Parameters
       ----------
-      nb_grid_pts : list of int
+      nb_grid_pts : tuple of int
           Grid dimensions
 
       Returns
@@ -229,13 +229,13 @@ void add_fft_engine(py::module & mod) {
 
            Parameters
            ----------
-           nb_domain_grid_pts : list of int
-               Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
+           nb_domain_grid_pts : tuple of int
+               Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
            comm : Communicator, optional
                MPI communicator (default: serial)
-           nb_ghosts_left : list of int, optional
+           nb_ghosts_left : tuple of int, optional
                Ghost cells on low-index side of each dimension
-           nb_ghosts_right : list of int, optional
+           nb_ghosts_right : tuple of int, optional
                Ghost cells on high-index side of each dimension
            nb_sub_pts : dict, optional
                Number of sub-points per pixel
@@ -608,13 +608,13 @@ void add_fft_engine_cuda(py::module & mod) {
 
            Parameters
            ----------
-           nb_domain_grid_pts : list of int
-               Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
+           nb_domain_grid_pts : tuple of int
+               Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
            comm : Communicator, optional
                MPI communicator (default: serial)
-           nb_ghosts_left : list of int, optional
+           nb_ghosts_left : tuple of int, optional
                Ghost cells on low-index side
-           nb_ghosts_right : list of int, optional
+           nb_ghosts_right : tuple of int, optional
                Ghost cells on high-index side
            nb_sub_pts : dict, optional
                Number of sub-points per pixel

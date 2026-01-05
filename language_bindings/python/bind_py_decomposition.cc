@@ -139,13 +139,13 @@ void add_cartesian_decomposition(py::module & mod) {
         ----------
         comm : Communicator
             MPI communicator
-        nb_domain_grid_pts : list of int
-            Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
-        nb_subdivisions : list of int
+        nb_domain_grid_pts : tuple of int
+            Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
+        nb_subdivisions : tuple of int
             Number of subdivisions in each direction for domain decomposition
-        nb_ghosts_left : list of int
+        nb_ghosts_left : tuple of int
             Ghost layers on low-index side of each dimension
-        nb_ghosts_right : list of int
+        nb_ghosts_right : tuple of int
             Ghost layers on high-index side of each dimension
         sub_pts : dict, optional
             Mapping of sub-point names to counts (e.g., {"quad": 4})
@@ -164,11 +164,11 @@ void add_cartesian_decomposition(py::module & mod) {
             Integer indices at each pixel (excluding ghosts)
         icoordsg : tuple of ndarray
             Integer indices including ghost pixels
-        nb_domain_grid_pts : list of int
+        nb_domain_grid_pts : tuple of int
             Global grid dimensions
-        nb_subdomain_grid_pts : list of int
+        nb_subdomain_grid_pts : tuple of int
             Local subdomain dimensions (excluding ghosts)
-        subdomain_locations : list of int
+        subdomain_locations : tuple of int
             Starting indices of local subdomain in global grid
 
         Examples
@@ -176,7 +176,7 @@ void add_cartesian_decomposition(py::module & mod) {
         >>> from muGrid import Communicator, CartesianDecomposition
         >>> comm = Communicator()
         >>> decomp = CartesianDecomposition(
-        ...     comm, [64, 64, 64], [1, 1, 1], [1, 1, 1], [1, 1, 1]
+        ...     comm, (64, 64, 64), (1, 1, 1), (1, 1, 1), (1, 1, 1)
         ... )
         >>> field = decomp.collection.real_field("temperature")
         >>> decomp.communicate_ghosts(field)

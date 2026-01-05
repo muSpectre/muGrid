@@ -497,26 +497,26 @@ void add_global_field_collection(py::module & mod) {
 
         Parameters
         ----------
-        nb_domain_grid_pts : list of int
-            Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
-        nb_subdomain_grid_pts : list of int, optional
+        nb_domain_grid_pts : tuple of int
+            Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
+        nb_subdomain_grid_pts : tuple of int, optional
             Local subdomain dimensions (for MPI decomposition)
-        subdomain_locations : list of int, optional
+        subdomain_locations : tuple of int, optional
             Starting indices of the local subdomain in the global grid
         sub_pts : dict, optional
             Mapping of sub-point names to counts (e.g., {"quad": 4})
         storage_order : StorageOrder, optional
             Memory layout for field data (default: ArrayOfStructures)
-        nb_ghosts_left : list of int, optional
+        nb_ghosts_left : tuple of int, optional
             Ghost layers on low-index side of each dimension
-        nb_ghosts_right : list of int, optional
+        nb_ghosts_right : tuple of int, optional
             Ghost layers on high-index side of each dimension
         device : Device, optional
             Where to allocate field memory (default: Device.cpu())
 
         Examples
         --------
-        >>> fc = GlobalFieldCollection([64, 64, 64])
+        >>> fc = GlobalFieldCollection((64, 64, 64))
         >>> displacement = fc.real_field("displacement", (3,))
         >>> stress = fc.real_field("stress", (3, 3), "quad")
         )pbdoc")
