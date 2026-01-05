@@ -608,6 +608,10 @@ class FFTEngine:
         Ghost cells on high-index side of each dimension.
     nb_sub_pts : dict, optional
         Number of sub-points per pixel.
+    device : str or Device, optional
+        Device for FFT execution: "cpu" (default), "cuda", "cuda:N", "gpu",
+        or a Device instance. When a GPU device is specified, the FFT uses
+        cuFFT and fields are allocated on GPU memory.
 
     Examples
     --------
@@ -617,6 +621,12 @@ class FFTEngine:
     >>> engine.fft(real_field, fourier_field)
     >>> engine.ifft(fourier_field, real_field)
     >>> real_field.s[:] *= engine.normalisation
+
+    GPU example with multi-GPU MPI:
+
+    >>> from mpi4py import MPI
+    >>> comm = Communicator(MPI.COMM_WORLD)
+    >>> engine = FFTEngine([64, 64], comm, device=f"cuda:{comm.rank}")
     """
 
     def __init__(
@@ -626,6 +636,7 @@ class FFTEngine:
         nb_ghosts_left: Optional[Shape] = None,
         nb_ghosts_right: Optional[Shape] = None,
         nb_sub_pts: Optional[SubPtMap] = None,
+        device: Optional[Union[DeviceStr, "_muGrid.Device"]] = None,
     ) -> None:
         from .Parallel import Communicator as CommFactory
 
@@ -645,13 +656,32 @@ class FFTEngine:
         if nb_sub_pts is None:
             nb_sub_pts = {}
 
-        self._cpp = _muGrid.FFTEngine(
-            list(nb_domain_grid_pts),
-            _unwrap(comm),
-            list(nb_ghosts_left),
-            list(nb_ghosts_right),
-            nb_sub_pts,
-        )
+        # Parse device and select appropriate engine
+        parsed_device = _parse_device(device)
+        if parsed_device.is_device:
+            # GPU FFT engine (cuFFT)
+            if not hasattr(_muGrid, "FFTEngineCuda"):
+                raise RuntimeError(
+                    "GPU FFT requested but muGrid was compiled without CUDA support"
+                )
+            device_id = parsed_device.device_id
+            self._cpp = _muGrid.FFTEngineCuda(
+                list(nb_domain_grid_pts),
+                _unwrap(comm),
+                list(nb_ghosts_left),
+                list(nb_ghosts_right),
+                nb_sub_pts,
+                device_id,
+            )
+        else:
+            # CPU FFT engine (PocketFFT)
+            self._cpp = _muGrid.FFTEngine(
+                list(nb_domain_grid_pts),
+                _unwrap(comm),
+                list(nb_ghosts_left),
+                list(nb_ghosts_right),
+                nb_sub_pts,
+            )
 
     def fft(self, input_field: Field, output_field: Field) -> None:
         """
