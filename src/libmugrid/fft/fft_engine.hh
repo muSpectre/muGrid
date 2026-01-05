@@ -415,14 +415,15 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 2b: c2c FFT along Y for each component
+      // Batch Fx transforms per Z plane
       for (Index_t comp = 0; comp < nb_components; ++comp) {
         Index_t comp_offset = comp * work_y_comp_factor;
         for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
-          for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx = comp_offset + ix * work_y_x_stride + iz * work_y_z_dist;
-            backend->c2c_forward(Ny, 1, work_y_ptr + idx, work_y_y_dist, 0,
-                                 work_y_ptr + idx, work_y_y_dist, 0);
-          }
+          Index_t idx = comp_offset + iz * work_y_z_dist;
+          backend->c2c_forward(Ny, Fx, work_y_ptr + idx,
+                               work_y_y_dist, work_y_x_stride,
+                               work_y_ptr + idx,
+                               work_y_y_dist, work_y_x_stride);
         }
       }
 
@@ -454,13 +455,27 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 4: c2c FFT along Z for each component
-      for (Index_t comp = 0; comp < nb_components; ++comp) {
-        Index_t comp_offset = comp * out_comp_factor;
-        for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
-          for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
-            Index_t idx = comp_offset + ix * out_x_stride + iy * out_y_dist;
-            backend->c2c_forward(Nz, 1, output_ptr + idx, out_z_dist, 0,
-                                 output_ptr + idx, out_z_dist, 0);
+      // For SoA: Batch all local_fx * local_fy transforms together
+      // For AoS: Batch local_fx transforms per Y row
+      if (out_is_soa) {
+        Index_t batch_z = fourier_local[0] * fourier_local[1];
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * out_comp_factor;
+          backend->c2c_forward(Nz, batch_z, output_ptr + comp_offset,
+                               out_z_dist, Index_t{1},
+                               output_ptr + comp_offset,
+                               out_z_dist, Index_t{1});
+        }
+      } else {
+        // AoS: X elements are separated by out_x_stride
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * out_comp_factor;
+          for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
+            Index_t idx = comp_offset + iy * out_y_dist;
+            backend->c2c_forward(Nz, fourier_local[0], output_ptr + idx,
+                                 out_z_dist, out_x_stride,
+                                 output_ptr + idx,
+                                 out_z_dist, out_x_stride);
           }
         }
       }
@@ -747,14 +762,29 @@ class FFTEngine : public FFTEngineBase {
       deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Z for each component
-      // Batch all transforms in the XY plane together
-      Index_t batch_z = fourier_local[0] * fourier_local[1];
-      for (Index_t comp = 0; comp < nb_components; ++comp) {
-        Index_t comp_offset = comp * in_comp_factor;
-        backend->c2c_backward(Nz, batch_z, temp.data() + comp_offset,
-                              in_z_dist, Index_t{1},
-                              temp.data() + comp_offset,
-                              in_z_dist, Index_t{1});
+      // For SoA: Batch all local_fx * local_fy transforms together
+      // For AoS: Batch local_fx transforms per Y row
+      if (in_is_soa) {
+        Index_t batch_z = fourier_local[0] * fourier_local[1];
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * in_comp_factor;
+          backend->c2c_backward(Nz, batch_z, temp.data() + comp_offset,
+                                in_z_dist, Index_t{1},
+                                temp.data() + comp_offset,
+                                in_z_dist, Index_t{1});
+        }
+      } else {
+        // AoS: X elements are separated by in_x_stride
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * in_comp_factor;
+          for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
+            Index_t idx = comp_offset + iy * in_y_dist;
+            backend->c2c_backward(Nz, fourier_local[0], temp.data() + idx,
+                                  in_z_dist, in_x_stride,
+                                  temp.data() + idx,
+                                  in_z_dist, in_x_stride);
+          }
+        }
       }
 
       // Z-pencil work buffer
