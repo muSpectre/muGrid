@@ -678,8 +678,8 @@ class FFTEngine:
         if parsed_device.is_device:
             # GPU FFT engine (cuFFT or rocFFT)
             device_id = parsed_device.device_id
-            if hasattr(_muGrid, "FFTEngineCuda"):
-                self._cpp = _muGrid.FFTEngineCuda(
+            if hasattr(_muGrid, "FFTEngineCUDA"):
+                self._cpp = _muGrid.FFTEngineCUDA(
                     list(nb_domain_grid_pts),
                     _unwrap(comm),
                     list(nb_ghosts_left),
@@ -687,8 +687,8 @@ class FFTEngine:
                     nb_sub_pts,
                     device_id,
                 )
-            elif hasattr(_muGrid, "FFTEngineHIP"):
-                self._cpp = _muGrid.FFTEngineHIP(
+            elif hasattr(_muGrid, "FFTEngineROCm"):
+                self._cpp = _muGrid.FFTEngineROCm(
                     list(nb_domain_grid_pts),
                     _unwrap(comm),
                     list(nb_ghosts_left),
@@ -699,7 +699,7 @@ class FFTEngine:
             else:
                 raise RuntimeError(
                     "GPU FFT requested but muGrid was compiled without "
-                    "CUDA or HIP/ROCm support"
+                    "CUDA or ROCm support"
                 )
         else:
             # CPU FFT engine (PocketFFT)

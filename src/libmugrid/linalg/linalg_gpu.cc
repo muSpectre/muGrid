@@ -53,7 +53,7 @@
     #define GPU_MEMCPY_D2H(dst, src, size) \
         (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
     #define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
-    using DeviceSpace = muGrid::CudaSpace;
+    using DeviceSpace = muGrid::CUDASpace;
 #elif defined(MUGRID_ENABLE_HIP)
     #include <hip/hip_runtime.h>
     #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
@@ -64,7 +64,7 @@
     #define GPU_MEMCPY_D2H(dst, src, size) \
         (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
     #define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
-    using DeviceSpace = muGrid::HIPSpace;
+    using DeviceSpace = muGrid::ROCmSpace;
 #endif
 
 namespace muGrid {

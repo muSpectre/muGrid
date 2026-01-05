@@ -61,8 +61,8 @@ namespace muGrid {
  * The engine owns field collections for both real and Fourier space, and
  * work buffers for intermediate results during the distributed FFT.
  *
- * @tparam MemorySpace The memory space for work buffers (HostSpace, CudaSpace,
- * HIPSpace)
+ * @tparam MemorySpace The memory space for work buffers (HostSpace, CUDASpace,
+ * ROCmSpace)
  */
 template <typename MemorySpace>
 class FFTEngine : public FFTEngineBase {
@@ -936,10 +936,10 @@ class FFTEngine : public FFTEngineBase {
 // Explicit template instantiation declarations for common memory spaces
 extern template class FFTEngine<HostSpace>;
 #if defined(MUGRID_ENABLE_CUDA)
-extern template class FFTEngine<CudaSpace>;
+extern template class FFTEngine<CUDASpace>;
 #endif
 #if defined(MUGRID_ENABLE_HIP)
-extern template class FFTEngine<HIPSpace>;
+extern template class FFTEngine<ROCmSpace>;
 #endif
 
 }  // namespace muGrid

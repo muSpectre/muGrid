@@ -478,7 +478,7 @@ namespace muGrid {
          * Apply convolution on device memory fields.
          * Data must already be in device memory space.
          *
-         * @tparam DeviceSpace Target device memory space (CudaSpace, HIPSpace)
+         * @tparam DeviceSpace Target device memory space (CUDASpace, ROCmSpace)
          * @param nodal_data Pointer to nodal field data in device memory
          * @param quad_data Pointer to quadrature field data in device memory
          * @param alpha Scaling factor
@@ -493,7 +493,7 @@ namespace muGrid {
          * Transpose convolution on device memory fields.
          * Data must already be in device memory space.
          *
-         * @tparam DeviceSpace Target device memory space (CudaSpace, HIPSpace)
+         * @tparam DeviceSpace Target device memory space (CUDASpace, ROCmSpace)
          * @param quad_data Pointer to quadrature field data in device memory
          * @param nodal_data Pointer to nodal field data in device memory
          * @param alpha Scaling factor

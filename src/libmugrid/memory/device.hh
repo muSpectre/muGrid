@@ -169,8 +169,8 @@ class Device {
 
 // Forward declarations of memory space tags
 struct HostSpace;
-struct CudaSpace;
-struct HIPSpace;
+struct CUDASpace;
+struct ROCmSpace;
 
 /**
  * Compile-time conversion from memory space tag to Device.
@@ -187,23 +187,23 @@ constexpr Device memory_space_to_device<HostSpace>() {
 }
 
 #if defined(MUGRID_ENABLE_CUDA)
-// Specialization for CudaSpace
+// Specialization for CUDASpace
 // Note: Returns device 0 because this is a constexpr function evaluated at
 // compile time. The actual device ID for multi-GPU is a runtime concern
 // that must be handled when creating FieldCollections with specific devices.
 template <>
-constexpr Device memory_space_to_device<CudaSpace>() {
+constexpr Device memory_space_to_device<CUDASpace>() {
     return Device::cuda(0);
 }
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-// Specialization for HIPSpace
+// Specialization for ROCmSpace
 // Note: Returns device 0 because this is a constexpr function evaluated at
 // compile time. The actual device ID for multi-GPU is a runtime concern
 // that must be handled when creating FieldCollections with specific devices.
 template <>
-constexpr Device memory_space_to_device<HIPSpace>() {
+constexpr Device memory_space_to_device<ROCmSpace>() {
     return Device::rocm(0);
 }
 #endif

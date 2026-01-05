@@ -367,7 +367,7 @@ namespace muGrid {
    *
    * @tparam T type of scalar to hold. Must be one of `muGrid::Real`,
    * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`.
-   * @tparam MemorySpace Memory space (HostSpace by default, or CudaSpace/HIPSpace for GPU)
+   * @tparam MemorySpace Memory space (HostSpace by default, or CUDASpace/ROCmSpace for GPU)
    */
   template <typename T, typename MemorySpace>
   class TypedField : public TypedFieldBase<T, MemorySpace> {

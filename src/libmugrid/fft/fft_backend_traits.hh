@@ -77,7 +77,7 @@ struct FFTBackendSelector<HostSpace> {
 #if defined(MUGRID_ENABLE_CUDA)
 // CUDA space uses cuFFT
 template <>
-struct FFTBackendSelector<CudaSpace> {
+struct FFTBackendSelector<CUDASpace> {
   using type = cuFFTBackend;
 
   static std::unique_ptr<FFT1DBackend> create() {
@@ -89,9 +89,9 @@ struct FFTBackendSelector<CudaSpace> {
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-// HIP space uses native rocFFT (not hipFFT) for better stride support
+// ROCm space uses native rocFFT (not hipFFT) for better stride support
 template <>
-struct FFTBackendSelector<HIPSpace> {
+struct FFTBackendSelector<ROCmSpace> {
   using type = rocFFTBackend;
 
   static std::unique_ptr<FFT1DBackend> create() {

@@ -20,7 +20,7 @@ muGrid supports two storage orders for multi-component fields:
 
 - **SoA (Structure of Arrays)**: Components are stored in separate contiguous blocks
   - Memory layout: `[c0p0, c0p1, c0p2, ..., c1p0, c1p1, c1p2, ...]`
-  - Used on **GPU** (default for `CudaSpace` and `HIPSpace`)
+  - Used on **GPU** (default for `CUDASpace` and `ROCmSpace`)
   - Stride between consecutive X elements = 1
   - Component offset = `comp * nb_pixels`
 

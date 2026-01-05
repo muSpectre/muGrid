@@ -57,31 +57,31 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA)
     // Test is_device_space trait for CUDA
-    BOOST_CHECK(!is_host_space_v<CudaSpace>);
-    BOOST_CHECK(is_device_space_v<CudaSpace>);
+    BOOST_CHECK(!is_host_space_v<CUDASpace>);
+    BOOST_CHECK(is_device_space_v<CUDASpace>);
 
     // Test DLPack device type for CUDA
-    BOOST_CHECK_EQUAL(dlpack_device_type_v<CudaSpace>, DLPackDeviceType::CUDA);
+    BOOST_CHECK_EQUAL(dlpack_device_type_v<CUDASpace>, DLPackDeviceType::CUDA);
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-    // Test is_device_space trait for HIP/ROCm
-    BOOST_CHECK(!is_host_space_v<HIPSpace>);
-    BOOST_CHECK(is_device_space_v<HIPSpace>);
+    // Test is_device_space trait for ROCm
+    BOOST_CHECK(!is_host_space_v<ROCmSpace>);
+    BOOST_CHECK(is_device_space_v<ROCmSpace>);
 
-    // Test DLPack device type for HIP/ROCm
-    BOOST_CHECK_EQUAL(dlpack_device_type_v<HIPSpace>, DLPackDeviceType::ROCm);
+    // Test DLPack device type for ROCm
+    BOOST_CHECK_EQUAL(dlpack_device_type_v<ROCmSpace>, DLPackDeviceType::ROCm);
 #endif
 
     // Test device_name function
     BOOST_CHECK_EQUAL(std::string(device_name<HostSpace>()), "cpu");
 
 #if defined(MUGRID_ENABLE_CUDA)
-    BOOST_CHECK_EQUAL(std::string(device_name<CudaSpace>()), "cuda");
+    BOOST_CHECK_EQUAL(std::string(device_name<CUDASpace>()), "cuda");
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-    BOOST_CHECK_EQUAL(std::string(device_name<HIPSpace>()), "rocm");
+    BOOST_CHECK_EQUAL(std::string(device_name<ROCmSpace>()), "rocm");
 #endif
   }
 
@@ -280,13 +280,13 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_CASE(default_device_space_resolution) {
 #if defined(MUGRID_ENABLE_CUDA)
-    // When CUDA is enabled, DefaultDeviceSpace should be CudaSpace
-    bool is_cuda = std::is_same_v<DefaultDeviceSpace, CudaSpace>;
+    // When CUDA is enabled, DefaultDeviceSpace should be CUDASpace
+    bool is_cuda = std::is_same_v<DefaultDeviceSpace, CUDASpace>;
     BOOST_CHECK(is_cuda);
 #elif defined(MUGRID_ENABLE_HIP)
-    // When HIP is enabled, DefaultDeviceSpace should be HIPSpace
-    bool is_hip = std::is_same_v<DefaultDeviceSpace, HIPSpace>;
-    BOOST_CHECK(is_hip);
+    // When HIP is enabled, DefaultDeviceSpace should be ROCmSpace
+    bool is_rocm = std::is_same_v<DefaultDeviceSpace, ROCmSpace>;
+    BOOST_CHECK(is_rocm);
 #else
     // Without GPU backend, DefaultDeviceSpace is HostSpace
     bool is_host = std::is_same_v<DefaultDeviceSpace, HostSpace>;
