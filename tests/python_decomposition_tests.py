@@ -7,6 +7,7 @@ from NuMPI.Testing.Assertions import assert_all_allclose
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
+from muGrid import GlobalFieldCollection
 
 try:
     import netCDF4
@@ -275,9 +276,6 @@ def test_reduce_ghosts_multicomponent(comm, nb_subdivisions):
     for comp in range(nb_components):
         field.sg[comp, ...] = comp + 1.0
 
-    # Store interior before reduction
-    interior_before = field.s.copy()
-
     # Reduce ghosts
     cart_decomp.reduce_ghosts(field)
 
@@ -522,3 +520,65 @@ def test_fileio_netcdf_ghost_offset(comm, nb_subdivisions):
         comm.barrier()
         if comm.rank == 0 and os.path.exists(filename):
             os.unlink(filename)
+
+
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_collection_is_wrapped(comm, nb_subdivisions):
+    """
+    Test that CartesianDecomposition.collection returns a wrapped
+    GlobalFieldCollection.
+    """
+    spatial_dim = len(nb_subdivisions)
+    nb_pts_per_dim = 5
+    nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
+    nb_ghosts_left = np.full(spatial_dim, 1)
+    nb_ghosts_right = np.full(spatial_dim, 1)
+
+    cart_decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghosts_left.tolist(),
+        nb_ghosts_right.tolist(),
+    )
+
+    collection = cart_decomp.collection
+
+    # Check that it's the wrapped type, not the raw C++ type
+    assert isinstance(collection, GlobalFieldCollection)
+    # Check that the wrapper has the expected attributes
+    assert hasattr(collection, "_cpp")
+    assert hasattr(collection, "nb_grid_pts")
+
+
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_collection_field_creation(comm, nb_subdivisions):
+    """Test that fields created via collection property work correctly."""
+    spatial_dim = len(nb_subdivisions)
+    nb_pts_per_dim = 5
+    nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
+    nb_ghosts_left = np.full(spatial_dim, 1)
+    nb_ghosts_right = np.full(spatial_dim, 1)
+
+    cart_decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghosts_left.tolist(),
+        nb_ghosts_right.tolist(),
+    )
+
+    # Create field via collection property
+    collection = cart_decomp.collection
+    field = collection.real_field("test_via_collection")
+
+    # Check that field works correctly
+    assert field is not None
+    # Fill with data
+    field.sg[...] = 1.0
+
+    # Communicate ghosts should work with field from collection
+    cart_decomp.communicate_ghosts(field)
+
+    # Verify ghost values are properly filled (all ones for constant field)
+    np.testing.assert_array_almost_equal(field.sg, 1.0)

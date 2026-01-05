@@ -534,6 +534,23 @@ class CartesianDecomposition(FieldCollectionMixin):
         return self._cpp.collection
 
     @property
+    def collection(self) -> GlobalFieldCollection:
+        """
+        Get the underlying GlobalFieldCollection.
+
+        Returns
+        -------
+        GlobalFieldCollection
+            Wrapped field collection with Pythonic interfaces.
+        """
+        # Create a wrapper around the C++ collection
+        wrapper = GlobalFieldCollection.__new__(GlobalFieldCollection)
+        wrapper._cpp = self._cpp.collection
+        # Get grid pts from decomposition, not from collection
+        wrapper._nb_grid_pts = list(self._cpp.nb_domain_grid_pts)
+        return wrapper
+
+    @property
     def nb_grid_pts(self) -> List[int]:
         """Local subdomain grid dimensions (alias for nb_subdomain_grid_pts)."""
         return list(self._cpp.nb_subdomain_grid_pts)
@@ -814,6 +831,36 @@ class FFTEngine:
         """
         cpp_field = self._cpp.fourier_space_field(name, nb_components)
         return Field(cpp_field)
+
+    @property
+    def real_space_collection(self) -> GlobalFieldCollection:
+        """
+        Get the real-space field collection.
+
+        Returns
+        -------
+        GlobalFieldCollection
+            Wrapped field collection for real-space fields.
+        """
+        wrapper = GlobalFieldCollection.__new__(GlobalFieldCollection)
+        wrapper._cpp = self._cpp.real_space_collection
+        wrapper._nb_grid_pts = list(self._cpp.nb_domain_grid_pts)
+        return wrapper
+
+    @property
+    def fourier_space_collection(self) -> GlobalFieldCollection:
+        """
+        Get the Fourier-space field collection.
+
+        Returns
+        -------
+        GlobalFieldCollection
+            Wrapped field collection for Fourier-space fields.
+        """
+        wrapper = GlobalFieldCollection.__new__(GlobalFieldCollection)
+        wrapper._cpp = self._cpp.fourier_space_collection
+        wrapper._nb_grid_pts = list(self._cpp.nb_fourier_grid_pts)
+        return wrapper
 
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the underlying C++ object."""

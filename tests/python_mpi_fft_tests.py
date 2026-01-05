@@ -41,7 +41,7 @@ import pytest
 from conftest import get_array_module, get_test_devices, skip_if_gpu_unavailable
 from numpy.testing import assert_allclose
 
-from muGrid import FFTEngine
+from muGrid import FFTEngine, GlobalFieldCollection
 
 
 def get_device_for_rank(device, comm):
@@ -641,6 +641,84 @@ class TestMPIFFTEdgeCases:
         result = real_field.p.squeeze()
         if device == "gpu":
             result = result.get()  # CuPy to numpy
+        assert_allclose(result, original, atol=1e-14)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestMPIFFTCollectionWrappers:
+    """Test that FFT engine collection properties return wrapped collections."""
+
+    def test_real_space_collection_is_wrapped(self, comm, device):
+        """Test that real_space_collection returns a wrapped GlobalFieldCollection."""
+        skip_if_gpu_unavailable(device)
+
+        nb_grid_pts = [16, 20]
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        collection = engine.real_space_collection
+
+        # Check that it's the wrapped type, not the raw C++ type
+        assert isinstance(collection, GlobalFieldCollection)
+        # Check that the wrapper has the expected attributes
+        assert hasattr(collection, "_cpp")
+        assert hasattr(collection, "nb_grid_pts")
+        # Check that wrapper methods work
+        field = collection.real_field("test_field")
+        assert field is not None
+
+    def test_fourier_space_collection_is_wrapped(self, comm, device):
+        """
+        Test that fourier_space_collection returns a wrapped
+        GlobalFieldCollection.
+        """
+        skip_if_gpu_unavailable(device)
+
+        nb_grid_pts = [16, 20]
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        collection = engine.fourier_space_collection
+
+        # Check that it's the wrapped type, not the raw C++ type
+        assert isinstance(collection, GlobalFieldCollection)
+        # Check that the wrapper has the expected attributes
+        assert hasattr(collection, "_cpp")
+        assert hasattr(collection, "nb_grid_pts")
+        # Check that wrapper methods work
+        field = collection.complex_field("test_field")
+        assert field is not None
+
+    def test_collection_field_creation(self, comm, device):
+        """Test that fields created via collection work correctly."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        nb_grid_pts = [16, 20]
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        # Create fields via collection - use 1 component (nb_components=1)
+        real_coll = engine.real_space_collection
+        fourier_coll = engine.fourier_space_collection
+
+        real_field = real_coll.real_field("real_via_coll", components=(1,))
+        fourier_field = fourier_coll.complex_field("fourier_via_coll", components=(1,))
+
+        # Fill real field with data
+        np.random.seed(42 + comm.rank)
+        original = np.random.randn(*engine.nb_subdomain_grid_pts)
+        real_field.p[0, ...] = xp.asarray(original)
+
+        # Perform FFT roundtrip
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.p[0, ...] *= engine.normalisation
+
+        # Check result
+        result = real_field.p.squeeze()
+        if device == "gpu":
+            result = result.get()
         assert_allclose(result, original, atol=1e-14)
 
 
