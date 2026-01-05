@@ -50,7 +50,7 @@ jobs:
           python-version: '3.14'
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.3.0
+        uses: pypa/cibuildwheel@v3.3.1
         env:
           CIBW_BUILD_VERBOSITY: 3
           # Install NetCDF on all platforms
