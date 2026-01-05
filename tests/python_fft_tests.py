@@ -37,6 +37,8 @@ Program grant you additional permission to convey the resulting work.
 import unittest
 
 import numpy as np
+import pytest
+from conftest import get_array_module, get_test_devices, skip_if_gpu_unavailable
 from numpy.testing import assert_allclose, assert_array_equal
 
 import muGrid
@@ -290,6 +292,183 @@ class FFTRoundtripTest(unittest.TestCase):
         fourier_copy = fourier_field.s.copy()
         fourier_copy[0, 0, 0, 0] = 0
         assert_allclose(fourier_copy, 0, atol=1e-12)
+
+
+def _get_device_string(device):
+    """Convert device parameter to device string for FFTEngine."""
+    if device == "cpu":
+        return None
+    else:
+        return "cuda:0"
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestFFTMultiComponent:
+    """Test FFT with multi-component (vector/tensor) fields."""
+
+    def test_2d_vector_field_roundtrip(self, device):
+        """Test 2D FFT roundtrip with 2-component vector field."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        engine = muGrid.FFTEngine([16, 20], device=_get_device_string(device))
+        real_field = engine.real_space_field("vector", nb_components=2)
+        fourier_field = engine.fourier_space_field("vector_k", nb_components=2)
+
+        # Initialize with different patterns for each component
+        np.random.seed(42)
+        real_field.p[0, ...] = xp.asarray(np.random.randn(16, 20))
+        real_field.p[1, ...] = xp.asarray(np.random.randn(16, 20))
+        original = real_field.p.copy()
+
+        # Forward and inverse FFT
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+
+        # Normalize
+        real_field.p[:] *= engine.normalisation
+
+        # Check roundtrip for both components
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()
+            original = original.get()
+        assert_allclose(result, original, atol=1e-14)
+
+    def test_2d_tensor_field_roundtrip(self, device):
+        """Test 2D FFT roundtrip with 4-component (2x2 tensor) field."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        engine = muGrid.FFTEngine([16, 20], device=_get_device_string(device))
+        real_field = engine.real_space_field("tensor", nb_components=4)
+        fourier_field = engine.fourier_space_field("tensor_k", nb_components=4)
+
+        # Initialize with different patterns for each component
+        np.random.seed(123)
+        for c in range(4):
+            real_field.p[c, ...] = xp.asarray(np.random.randn(16, 20))
+        original = real_field.p.copy()
+
+        # Forward and inverse FFT
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+
+        # Normalize
+        real_field.p[:] *= engine.normalisation
+
+        # Check roundtrip for all components
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()
+            original = original.get()
+        assert_allclose(result, original, atol=1e-14)
+
+    def test_3d_vector_field_roundtrip(self, device):
+        """Test 3D FFT roundtrip with 3-component vector field."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        engine = muGrid.FFTEngine([8, 10, 12], device=_get_device_string(device))
+        real_field = engine.real_space_field("vector3d", nb_components=3)
+        fourier_field = engine.fourier_space_field("vector3d_k", nb_components=3)
+
+        # Initialize with different patterns for each component
+        np.random.seed(456)
+        for c in range(3):
+            real_field.p[c, ...] = xp.asarray(np.random.randn(8, 10, 12))
+        original = real_field.p.copy()
+
+        # Forward and inverse FFT
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+
+        # Normalize
+        real_field.p[:] *= engine.normalisation
+
+        # Check roundtrip for all components
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()
+            original = original.get()
+        assert_allclose(result, original, atol=1e-14)
+
+    def test_vector_field_dc_component(self, device):
+        """Test that constant vector field has only DC components."""
+        skip_if_gpu_unavailable(device)
+
+        engine = muGrid.FFTEngine([8, 10], device=_get_device_string(device))
+        real_field = engine.real_space_field("vec", nb_components=2)
+        fourier_field = engine.fourier_space_field("vec_k", nb_components=2)
+
+        # Constant field: component 0 = 3.0, component 1 = 5.0
+        real_field.p[0, ...] = 3.0
+        real_field.p[1, ...] = 5.0
+
+        engine.fft(real_field, fourier_field)
+
+        # Get result on CPU for comparison
+        fourier_p = fourier_field.p
+        if device == "gpu":
+            fourier_p = fourier_p.get()
+
+        # DC components should be sum = value * 80
+        # Component 0: 3 * 80 = 240
+        # Component 1: 5 * 80 = 400
+        assert abs(fourier_p[0, 0, 0].real - 240.0) < 1e-10
+        assert abs(fourier_p[0, 0, 0].imag) < 1e-10
+        assert abs(fourier_p[1, 0, 0].real - 400.0) < 1e-10
+        assert abs(fourier_p[1, 0, 0].imag) < 1e-10
+
+        # All other Fourier coefficients should be zero
+        fourier_copy = fourier_p.copy()
+        fourier_copy[:, 0, 0] = 0
+        assert_allclose(fourier_copy, 0, atol=1e-12)
+
+    def test_components_independent(self, device):
+        """Test that FFT of each component is independent."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        engine = muGrid.FFTEngine([16, 20], device=_get_device_string(device))
+
+        # Multi-component field
+        real_multi = engine.real_space_field("multi", nb_components=2)
+        fourier_multi = engine.fourier_space_field("multi_k", nb_components=2)
+
+        # Single component fields for reference
+        real_single0 = engine.real_space_field("single0", nb_components=1)
+        fourier_single0 = engine.fourier_space_field("single0_k", nb_components=1)
+        real_single1 = engine.real_space_field("single1", nb_components=1)
+        fourier_single1 = engine.fourier_space_field("single1_k", nb_components=1)
+
+        # Initialize with same data
+        np.random.seed(789)
+        data0 = np.random.randn(16, 20)
+        data1 = np.random.randn(16, 20)
+
+        real_multi.p[0, ...] = xp.asarray(data0)
+        real_multi.p[1, ...] = xp.asarray(data1)
+        real_single0.p[0, ...] = xp.asarray(data0)
+        real_single1.p[0, ...] = xp.asarray(data1)
+
+        # FFT all fields
+        engine.fft(real_multi, fourier_multi)
+        engine.fft(real_single0, fourier_single0)
+        engine.fft(real_single1, fourier_single1)
+
+        # Get results on CPU for comparison
+        fourier_multi_p = fourier_multi.p
+        fourier_single0_p = fourier_single0.p
+        fourier_single1_p = fourier_single1.p
+        if device == "gpu":
+            fourier_multi_p = fourier_multi_p.get()
+            fourier_single0_p = fourier_single0_p.get()
+            fourier_single1_p = fourier_single1_p.get()
+
+        # Multi-component FFT should match single-component FFTs
+        assert_allclose(fourier_multi_p[0, ...], fourier_single0_p[0, ...], atol=1e-14)
+        assert_allclose(fourier_multi_p[1, ...], fourier_single1_p[0, ...], atol=1e-14)
 
 
 class FFTFrequencyTest(unittest.TestCase):

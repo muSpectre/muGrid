@@ -201,50 +201,106 @@ class FFTEngine : public FFTEngineBase {
     Index_t Fx = Nx / 2 + 1;
     Index_t Ny = nb_grid_pts[1];
 
-    Index_t in_comp_stride = nb_components;
-    Index_t in_dist = local_with_ghosts[0] * nb_components;
-    Index_t in_base_offset =
-        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) *
-        nb_components;
+    // Storage order: SoA on GPU, AoS on CPU
+    // For SoA: components are in separate blocks, stride between X elements = 1
+    // For AoS: components are interleaved, stride between X elements = nb_components
+    StorageOrder storage_order = input.get_storage_order();
+    bool is_soa = (storage_order == StorageOrder::StructureOfArrays);
 
-    Index_t work_size = Fx * local_real[1] * nb_components;
+    Index_t nb_buffer_pixels = local_with_ghosts[0] * local_with_ghosts[1];
+    Index_t ghost_pixel_offset =
+        ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0];
+
+    Index_t nb_work_pixels = Fx * local_real[1];
+    Index_t nb_fourier_pixels = Fx * local_real[1];
+
+    // Compute strides based on storage order
+    // For SoA: consecutive X elements have stride 1, component offset = comp * nb_pixels
+    // For AoS: consecutive X elements have stride nb_components, component offset = comp
+    auto get_soa_strides = [&](Index_t nb_pixels, Index_t row_width) {
+      // Returns: {comp_offset_factor, x_stride, row_dist}
+      // comp_offset = comp * comp_offset_factor
+      // For SoA: x_stride=1, row_dist=row_width
+      return std::make_tuple(nb_pixels, Index_t{1}, row_width);
+    };
+    auto get_aos_strides = [&](Index_t /*nb_pixels*/, Index_t row_width) {
+      // For AoS: x_stride=nb_components, row_dist=row_width*nb_components
+      return std::make_tuple(Index_t{1}, nb_components, row_width * nb_components);
+    };
+
+    // Input field strides
+    auto [in_comp_factor, in_x_stride, in_row_dist] =
+        is_soa ? get_soa_strides(nb_buffer_pixels, local_with_ghosts[0])
+               : get_aos_strides(nb_buffer_pixels, local_with_ghosts[0]);
+    Index_t in_base_offset = is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components;
+
+    // Work buffer strides (same storage order as input/output)
+    auto [work_comp_factor, work_x_stride, work_row_dist] =
+        is_soa ? get_soa_strides(nb_work_pixels, Fx)
+               : get_aos_strides(nb_work_pixels, Fx);
+
+    Index_t work_size = nb_work_pixels * nb_components;
     WorkBuffer work_buffer(work_size);
     Complex * work_ptr = work_buffer.data();
 
     // Step 1: r2c FFT along X for each component
     for (Index_t comp = 0; comp < nb_components; ++comp) {
-      backend->r2c(Nx, local_real[1], input_ptr + in_base_offset + comp,
-                   in_comp_stride, in_dist, work_ptr + comp, nb_components,
-                   Fx * nb_components);
+      Index_t in_comp_offset = comp * in_comp_factor;
+      Index_t work_comp_offset = comp * work_comp_factor;
+      backend->r2c(Nx, local_real[1],
+                   input_ptr + in_base_offset + in_comp_offset,
+                   in_x_stride, in_row_dist,
+                   work_ptr + work_comp_offset,
+                   work_x_stride, work_row_dist);
     }
 
-    // Step 2: Transpose (or copy for serial)
+    // Check output storage order (should match work buffer storage order)
+    StorageOrder out_storage_order = output.get_storage_order();
+    bool out_is_soa = (out_storage_order == StorageOrder::StructureOfArrays);
+
+    // Output field strides
+    auto [out_comp_factor, out_x_stride, out_row_dist] =
+        out_is_soa ? get_soa_strides(nb_fourier_pixels, Fx)
+                   : get_aos_strides(nb_fourier_pixels, Fx);
+
+    // Step 2 & 3: Transpose/copy and c2c FFT along Y
     Transpose * transpose = this->get_transpose_xz(nb_components);
     if (transpose != nullptr) {
+      // MPI path: transpose to output, then c2c on output
+      // TODO: Transpose needs to handle storage order conversion
       transpose->forward(work_ptr, output_ptr);
-    } else {
-      deep_copy<Complex, MemorySpace>(output_ptr, work_ptr, work_size);
-    }
 
-    // Step 3: c2c FFT along Y for all components
-    if (transpose != nullptr) {
       Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
-      Index_t y_stride = local_fx * nb_components;
-      Index_t y_dist = nb_components;
+      Index_t local_fourier_pixels = local_fx * Ny;
 
+      // Recalculate output strides for MPI path (different shape)
+      auto [mpi_out_comp_factor, mpi_out_x_stride, mpi_out_row_dist] =
+          out_is_soa ? get_soa_strides(local_fourier_pixels, local_fx)
+                     : get_aos_strides(local_fourier_pixels, local_fx);
+
+      // For c2c along Y: stride is between Y elements (row distance)
+      // batch dimension is X
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        backend->c2c_forward(Ny, local_fx, output_ptr + comp, y_stride, y_dist,
-                             output_ptr + comp, y_stride, y_dist);
+        Index_t comp_offset = comp * mpi_out_comp_factor;
+        backend->c2c_forward(Ny, local_fx,
+                             output_ptr + comp_offset, mpi_out_row_dist, mpi_out_x_stride,
+                             output_ptr + comp_offset, mpi_out_row_dist, mpi_out_x_stride);
       }
     } else {
+      // Serial path: c2c on work buffer, then copy to output
       Index_t local_fy = local_real[1];
-      Index_t y_stride = Fx * nb_components;
-      Index_t y_dist = nb_components;
 
+      // Step 2: c2c FFT along Y on work buffer
+      // For c2c along Y: stride is between Y elements, batch is X
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        backend->c2c_forward(local_fy, Fx, output_ptr + comp, y_stride, y_dist,
-                             output_ptr + comp, y_stride, y_dist);
+        Index_t work_comp_offset = comp * work_comp_factor;
+        backend->c2c_forward(local_fy, Fx,
+                             work_ptr + work_comp_offset, work_row_dist, work_x_stride,
+                             work_ptr + work_comp_offset, work_row_dist, work_x_stride);
       }
+
+      // Step 3: Copy from work to output (same storage order, direct copy)
+      deep_copy<Complex, MemorySpace>(output_ptr, work_ptr, work_size);
     }
   }
 
@@ -281,123 +337,202 @@ class FFTEngine : public FFTEngineBase {
     Complex * output_ptr =
         static_cast<Complex *>(output.get_void_data_ptr(!is_device));
 
-    Index_t in_comp_stride = nb_components;
-    Index_t in_stride_y = local_with_ghosts[0] * nb_components;
-    Index_t in_stride_z = in_stride_y * local_with_ghosts[1];
-    Index_t in_base_offset =
-        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
-         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
-        nb_components;
+    // Storage order: SoA on GPU, AoS on CPU
+    StorageOrder storage_order = input.get_storage_order();
+    bool is_soa = (storage_order == StorageOrder::StructureOfArrays);
+
+    Index_t nb_buffer_pixels =
+        local_with_ghosts[0] * local_with_ghosts[1] * local_with_ghosts[2];
+    Index_t ghost_pixel_offset =
+        ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+        ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1];
+
+    // Stride helper functions for 3D
+    // Returns: {comp_offset_factor, x_stride, y_dist, z_dist}
+    auto get_soa_strides_3d = [&](Index_t nb_pixels, Index_t row_x, Index_t rows_y) {
+      // SoA: x_stride=1, y_dist=row_x, z_dist=row_x*rows_y
+      return std::make_tuple(nb_pixels, Index_t{1}, row_x, row_x * rows_y);
+    };
+    auto get_aos_strides_3d = [&](Index_t /*nb_pixels*/, Index_t row_x, Index_t rows_y) {
+      // AoS: x_stride=nb_comp, y_dist=row_x*nb_comp, z_dist=row_x*rows_y*nb_comp
+      return std::make_tuple(Index_t{1}, nb_components, row_x * nb_components,
+                             row_x * rows_y * nb_components);
+    };
+
+    // Input field strides
+    auto [in_comp_factor, in_x_stride, in_y_dist, in_z_dist] =
+        is_soa ? get_soa_strides_3d(nb_buffer_pixels, local_with_ghosts[0],
+                                    local_with_ghosts[1])
+               : get_aos_strides_3d(nb_buffer_pixels, local_with_ghosts[0],
+                                    local_with_ghosts[1]);
+    Index_t in_base_offset = is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components;
 
     if (need_mpi_path) {
       // MPI path with transposes
-      Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
+      Index_t nb_zpencil_pixels = Fx * local_real[1] * local_real[2];
+      Index_t zpencil_size = nb_zpencil_pixels * nb_components;
+
+      // Z-pencil work buffer strides
+      auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist, work_z_z_dist] =
+          is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
+                 : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
+
       WorkBuffer work_z(zpencil_size);
       Complex * work_z_ptr = work_z.data();
 
       // Step 1: r2c FFT along X for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t in_comp_offset = comp * in_comp_factor;
+        Index_t work_comp_offset = comp * work_z_comp_factor;
+
         for (Index_t iz = 0; iz < local_real[2]; ++iz) {
-          for (Index_t iy = 0; iy < local_real[1]; ++iy) {
-            Index_t in_idx =
-                in_base_offset + comp + iy * in_stride_y + iz * in_stride_z;
-            Index_t out_idx = comp + iy * Fx * nb_components +
-                              iz * Fx * local_real[1] * nb_components;
-            backend->r2c(Nx, 1, input_ptr + in_idx, in_comp_stride, 0,
-                         work_z_ptr + out_idx, nb_components, 0);
-          }
+          Index_t in_idx = in_base_offset + in_comp_offset + iz * in_z_dist;
+          Index_t out_idx = work_comp_offset + iz * work_z_z_dist;
+          backend->r2c(Nx, local_real[1], input_ptr + in_idx,
+                       in_x_stride, in_y_dist,
+                       work_z_ptr + out_idx,
+                       work_z_x_stride, work_z_y_dist);
         }
       }
 
       // Step 2a: Transpose Y<->Z
       const DynGridIndex & ypencil_shape =
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
-      Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
+      Index_t nb_ypencil_pixels = Fx * Ny * ypencil_shape[2];
+      Index_t ypencil_size = nb_ypencil_pixels * nb_components;
+
+      // Y-pencil work buffer strides
+      auto [work_y_comp_factor, work_y_x_stride, work_y_y_dist, work_y_z_dist] =
+          is_soa ? get_soa_strides_3d(nb_ypencil_pixels, Fx, Ny)
+                 : get_aos_strides_3d(nb_ypencil_pixels, Fx, Ny);
+
       WorkBuffer work_y(ypencil_size);
       Complex * work_y_ptr = work_y.data();
 
       if (transpose_yz_fwd != nullptr) {
+        // TODO: Transpose needs to handle storage order
         transpose_yz_fwd->forward(work_z_ptr, work_y_ptr);
       }
 
       // Step 2b: c2c FFT along Y for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t comp_offset = comp * work_y_comp_factor;
         for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
           for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx =
-                comp + ix * nb_components + iz * Fx * Ny * nb_components;
-            Index_t y_stride = Fx * nb_components;
-            backend->c2c_forward(Ny, 1, work_y_ptr + idx, y_stride, 0,
-                                 work_y_ptr + idx, y_stride, 0);
+            Index_t idx = comp_offset + ix * work_y_x_stride + iz * work_y_z_dist;
+            backend->c2c_forward(Ny, 1, work_y_ptr + idx, work_y_y_dist, 0,
+                                 work_y_ptr + idx, work_y_y_dist, 0);
           }
         }
       }
 
       // Step 2c: Transpose Z<->Y
       if (transpose_yz_bwd != nullptr) {
+        // TODO: Transpose needs to handle storage order
         transpose_yz_bwd->forward(work_y_ptr, work_z_ptr);
       }
 
       // Step 3: Transpose X<->Z (or copy if no transpose needed)
       const DynGridIndex & fourier_local = this->nb_fourier_subdomain_grid_pts;
+      Index_t nb_fourier_pixels = fourier_local[0] * fourier_local[1] * fourier_local[2];
+      Index_t fourier_size = nb_fourier_pixels * nb_components;
+
+      // Output field strides
+      StorageOrder out_storage_order = output.get_storage_order();
+      bool out_is_soa = (out_storage_order == StorageOrder::StructureOfArrays);
+      auto [out_comp_factor, out_x_stride, out_y_dist, out_z_dist] =
+          out_is_soa ? get_soa_strides_3d(nb_fourier_pixels, fourier_local[0],
+                                          fourier_local[1])
+                     : get_aos_strides_3d(nb_fourier_pixels, fourier_local[0],
+                                          fourier_local[1]);
+
       if (transpose_xz != nullptr) {
+        // TODO: Transpose needs to handle storage order
         transpose_xz->forward(work_z_ptr, output_ptr);
       } else {
-        Index_t fourier_size =
-            fourier_local[0] * fourier_local[1] * fourier_local[2] *
-            nb_components;
         deep_copy<Complex, MemorySpace>(output_ptr, work_z_ptr, fourier_size);
       }
 
       // Step 4: c2c FFT along Z for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t comp_offset = comp * out_comp_factor;
         for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
           for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
-            Index_t idx = comp + ix * nb_components +
-                          iy * fourier_local[0] * nb_components;
-            Index_t z_stride =
-                fourier_local[0] * fourier_local[1] * nb_components;
-            backend->c2c_forward(Nz, 1, output_ptr + idx, z_stride, 0,
-                                 output_ptr + idx, z_stride, 0);
+            Index_t idx = comp_offset + ix * out_x_stride + iy * out_y_dist;
+            backend->c2c_forward(Nz, 1, output_ptr + idx, out_z_dist, 0,
+                                 output_ptr + idx, out_z_dist, 0);
           }
         }
       }
     } else {
       // Serial path: all dimensions are local
-      Index_t out_comp_stride = nb_components;
-      Index_t out_stride_y = Fx * nb_components;
-      Index_t out_stride_z = out_stride_y * Ny;
+      Index_t nb_fourier_pixels = Fx * Ny * Nz;
+      Index_t work_size = nb_fourier_pixels * nb_components;
 
+      // Work/output buffer strides (same storage order as input)
+      auto [work_comp_factor, work_x_stride, work_y_dist, work_z_dist] =
+          is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
+                 : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
+
+      WorkBuffer work_buffer(work_size);
+      Complex * work_ptr = work_buffer.data();
+
+      // Step 1: r2c FFT along X for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        // Step 1: r2c FFT along X
+        Index_t in_comp_offset = comp * in_comp_factor;
+        Index_t work_comp_offset = comp * work_comp_factor;
+
         for (Index_t iz = 0; iz < Nz; ++iz) {
+          Index_t in_idx = in_base_offset + in_comp_offset + iz * in_z_dist;
+          Index_t work_idx = work_comp_offset + iz * work_z_dist;
+          backend->r2c(Nx, Ny, input_ptr + in_idx,
+                       in_x_stride, in_y_dist,
+                       work_ptr + work_idx,
+                       work_x_stride, work_y_dist);
+        }
+      }
+
+      // Step 2: c2c FFT along Y for each component
+      // Batch Fx transforms for each Z plane
+      // n=Ny, batch=Fx, stride=work_y_dist (between Y elements), dist=work_x_stride (between X batches)
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t comp_offset = comp * work_comp_factor;
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          Index_t idx = comp_offset + iz * work_z_dist;
+          backend->c2c_forward(Ny, Fx, work_ptr + idx, work_y_dist, work_x_stride,
+                               work_ptr + idx, work_y_dist, work_x_stride);
+        }
+      }
+
+      // Step 3: c2c FFT along Z for each component
+      // For SoA: Batch all Fx*Ny transforms together with dist=1
+      // For AoS: Batch Fx transforms per Y row with dist=work_x_stride
+      if (is_soa) {
+        // SoA: consecutive XY elements are separated by 1
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * work_comp_factor;
+          backend->c2c_forward(Nz, Fx * Ny, work_ptr + comp_offset,
+                               work_z_dist, Index_t{1},
+                               work_ptr + comp_offset,
+                               work_z_dist, Index_t{1});
+        }
+      } else {
+        // AoS: X elements are separated by work_x_stride (nb_components)
+        // Batch Fx transforms per Y row
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * work_comp_factor;
           for (Index_t iy = 0; iy < Ny; ++iy) {
-            Index_t in_idx =
-                in_base_offset + comp + iy * in_stride_y + iz * in_stride_z;
-            Index_t out_idx = comp + iy * out_stride_y + iz * out_stride_z;
-            backend->r2c(Nx, 1, input_ptr + in_idx, in_comp_stride, 0,
-                         output_ptr + out_idx, out_comp_stride, 0);
-          }
-        }
-
-        // Step 2: c2c FFT along Y
-        for (Index_t iz = 0; iz < Nz; ++iz) {
-          for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx = comp + ix * nb_components + iz * out_stride_z;
-            backend->c2c_forward(Ny, 1, output_ptr + idx, out_stride_y, 0,
-                                 output_ptr + idx, out_stride_y, 0);
-          }
-        }
-
-        // Step 3: c2c FFT along Z
-        for (Index_t iy = 0; iy < Ny; ++iy) {
-          for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx = comp + ix * nb_components + iy * out_stride_y;
-            backend->c2c_forward(Nz, 1, output_ptr + idx, out_stride_z, 0,
-                                 output_ptr + idx, out_stride_z, 0);
+            Index_t idx = comp_offset + iy * work_y_dist;
+            backend->c2c_forward(Nz, Fx, work_ptr + idx,
+                                 work_z_dist, work_x_stride,
+                                 work_ptr + idx,
+                                 work_z_dist, work_x_stride);
           }
         }
       }
+
+      // Copy from work to output (same storage order)
+      deep_copy<Complex, MemorySpace>(output_ptr, work_ptr, work_size);
     }
   }
 
@@ -424,63 +559,109 @@ class FFTEngine : public FFTEngineBase {
     Index_t Fx = Nx / 2 + 1;
     Index_t Ny = nb_grid_pts[1];
 
-    Index_t out_comp_stride = nb_components;
-    Index_t out_dist = local_with_ghosts[0] * nb_components;
-    Index_t out_base_offset =
-        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0]) *
-        nb_components;
+    // Storage order: SoA on GPU, AoS on CPU
+    StorageOrder storage_order = output.get_storage_order();
+    bool is_soa = (storage_order == StorageOrder::StructureOfArrays);
+
+    Index_t nb_buffer_pixels = local_with_ghosts[0] * local_with_ghosts[1];
+    Index_t ghost_pixel_offset =
+        ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0];
+
+    // Stride helper functions
+    auto get_soa_strides = [&](Index_t nb_pixels, Index_t row_width) {
+      return std::make_tuple(nb_pixels, Index_t{1}, row_width);
+    };
+    auto get_aos_strides = [&](Index_t /*nb_pixels*/, Index_t row_width) {
+      return std::make_tuple(Index_t{1}, nb_components, row_width * nb_components);
+    };
+
+    // Output field strides
+    auto [out_comp_factor, out_x_stride, out_row_dist] =
+        is_soa ? get_soa_strides(nb_buffer_pixels, local_with_ghosts[0])
+               : get_aos_strides(nb_buffer_pixels, local_with_ghosts[0]);
+    Index_t out_base_offset = is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components;
+
+    // Input (Fourier) field storage order should match
+    StorageOrder in_storage_order = input.get_storage_order();
+    bool in_is_soa = (in_storage_order == StorageOrder::StructureOfArrays);
 
     Transpose * transpose = this->get_transpose_xz(nb_components);
     if (transpose != nullptr) {
       Index_t local_fx = this->nb_fourier_subdomain_grid_pts[0];
-      Index_t local_fourier_size = local_fx * Ny * nb_components;
+      Index_t local_fourier_pixels = local_fx * Ny;
+      Index_t local_fourier_size = local_fourier_pixels * nb_components;
+
+      // Input strides for MPI path
+      auto [in_comp_factor, in_x_stride, in_row_dist] =
+          in_is_soa ? get_soa_strides(local_fourier_pixels, local_fx)
+                    : get_aos_strides(local_fourier_pixels, local_fx);
 
       WorkBuffer temp(local_fourier_size);
-      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr,
-                                      local_fourier_size);
+      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, local_fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
-      Index_t y_stride = local_fx * nb_components;
-      Index_t y_dist = nb_components;
-
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        backend->c2c_backward(Ny, local_fx, temp.data() + comp, y_stride,
-                              y_dist, temp.data() + comp, y_stride, y_dist);
+        Index_t comp_offset = comp * in_comp_factor;
+        backend->c2c_backward(Ny, local_fx,
+                              temp.data() + comp_offset, in_row_dist, in_x_stride,
+                              temp.data() + comp_offset, in_row_dist, in_x_stride);
       }
 
       // Step 2: Transpose X<->Y backward
-      Index_t work_size = Fx * local_real[1] * nb_components;
+      Index_t nb_work_pixels = Fx * local_real[1];
+      Index_t work_size = nb_work_pixels * nb_components;
       WorkBuffer work_buffer(work_size);
+
+      // TODO: Transpose needs to handle storage order
       transpose->backward(temp.data(), work_buffer.data());
+
+      // Work buffer strides (same storage order)
+      auto [work_comp_factor, work_x_stride, work_row_dist] =
+          is_soa ? get_soa_strides(nb_work_pixels, Fx)
+                 : get_aos_strides(nb_work_pixels, Fx);
 
       // Step 3: c2r IFFT along X for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        backend->c2r(Nx, local_real[1], work_buffer.data() + comp,
-                     nb_components, Fx * nb_components,
-                     output_ptr + out_base_offset + comp, out_comp_stride,
-                     out_dist);
+        Index_t work_comp_offset = comp * work_comp_factor;
+        Index_t out_comp_offset = comp * out_comp_factor;
+        backend->c2r(Nx, local_real[1],
+                     work_buffer.data() + work_comp_offset,
+                     work_x_stride, work_row_dist,
+                     output_ptr + out_base_offset + out_comp_offset,
+                     out_x_stride, out_row_dist);
       }
     } else {
+      // Serial path
       Index_t local_fy = local_real[1];
-      Index_t fourier_size = Fx * local_fy * nb_components;
+      Index_t nb_fourier_pixels = Fx * local_fy;
+      Index_t fourier_size = nb_fourier_pixels * nb_components;
 
+      // Input strides
+      auto [in_comp_factor, in_x_stride, in_row_dist] =
+          in_is_soa ? get_soa_strides(nb_fourier_pixels, Fx)
+                    : get_aos_strides(nb_fourier_pixels, Fx);
+
+      // Work buffer uses same storage order
       WorkBuffer temp(fourier_size);
       deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
-      Index_t y_stride = Fx * nb_components;
-      Index_t y_dist = nb_components;
-
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        backend->c2c_backward(local_fy, Fx, temp.data() + comp, y_stride,
-                              y_dist, temp.data() + comp, y_stride, y_dist);
+        Index_t comp_offset = comp * in_comp_factor;
+        backend->c2c_backward(local_fy, Fx,
+                              temp.data() + comp_offset, in_row_dist, in_x_stride,
+                              temp.data() + comp_offset, in_row_dist, in_x_stride);
       }
 
       // Step 2: c2r IFFT along X for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        backend->c2r(Nx, local_fy, temp.data() + comp, nb_components,
-                     Fx * nb_components, output_ptr + out_base_offset + comp,
-                     out_comp_stride, out_dist);
+        Index_t in_comp_offset = comp * in_comp_factor;
+        Index_t out_comp_offset = comp * out_comp_factor;
+        backend->c2r(Nx, local_fy,
+                     temp.data() + in_comp_offset,
+                     in_x_stride, in_row_dist,
+                     output_ptr + out_base_offset + out_comp_offset,
+                     out_x_stride, out_row_dist);
       }
     }
   }
@@ -518,44 +699,79 @@ class FFTEngine : public FFTEngineBase {
     Real * output_ptr =
         static_cast<Real *>(output.get_void_data_ptr(!is_device));
 
-    Index_t out_comp_stride = nb_components;
-    Index_t out_stride_y = local_with_ghosts[0] * nb_components;
-    Index_t out_stride_z = out_stride_y * local_with_ghosts[1];
-    Index_t out_base_offset =
-        (ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
-         ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1]) *
-        nb_components;
+    // Storage order: SoA on GPU, AoS on CPU
+    StorageOrder storage_order = output.get_storage_order();
+    bool is_soa = (storage_order == StorageOrder::StructureOfArrays);
+
+    Index_t nb_buffer_pixels =
+        local_with_ghosts[0] * local_with_ghosts[1] * local_with_ghosts[2];
+    Index_t ghost_pixel_offset =
+        ghosts_left[0] + ghosts_left[1] * local_with_ghosts[0] +
+        ghosts_left[2] * local_with_ghosts[0] * local_with_ghosts[1];
+
+    // Stride helper functions for 3D
+    auto get_soa_strides_3d = [&](Index_t nb_pixels, Index_t row_x, Index_t rows_y) {
+      return std::make_tuple(nb_pixels, Index_t{1}, row_x, row_x * rows_y);
+    };
+    auto get_aos_strides_3d = [&](Index_t /*nb_pixels*/, Index_t row_x, Index_t rows_y) {
+      return std::make_tuple(Index_t{1}, nb_components, row_x * nb_components,
+                             row_x * rows_y * nb_components);
+    };
+
+    // Output field strides
+    auto [out_comp_factor, out_x_stride, out_y_dist, out_z_dist] =
+        is_soa ? get_soa_strides_3d(nb_buffer_pixels, local_with_ghosts[0],
+                                    local_with_ghosts[1])
+               : get_aos_strides_3d(nb_buffer_pixels, local_with_ghosts[0],
+                                    local_with_ghosts[1]);
+    Index_t out_base_offset = is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components;
+
+    // Input (Fourier) field storage order should match
+    StorageOrder in_storage_order = input.get_storage_order();
+    bool in_is_soa = (in_storage_order == StorageOrder::StructureOfArrays);
 
     if (need_mpi_path) {
       // MPI path with transposes
       const DynGridIndex & fourier_local = this->nb_fourier_subdomain_grid_pts;
-      Index_t fourier_size =
-          fourier_local[0] * fourier_local[1] * fourier_local[2] *
-          nb_components;
+      Index_t nb_fourier_pixels = fourier_local[0] * fourier_local[1] * fourier_local[2];
+      Index_t fourier_size = nb_fourier_pixels * nb_components;
+
+      // Input field strides
+      auto [in_comp_factor, in_x_stride, in_y_dist, in_z_dist] =
+          in_is_soa ? get_soa_strides_3d(nb_fourier_pixels, fourier_local[0],
+                                         fourier_local[1])
+                    : get_aos_strides_3d(nb_fourier_pixels, fourier_local[0],
+                                         fourier_local[1]);
+
       WorkBuffer temp(fourier_size);
       deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Z for each component
+      // Batch all transforms in the XY plane together
+      Index_t batch_z = fourier_local[0] * fourier_local[1];
       for (Index_t comp = 0; comp < nb_components; ++comp) {
-        for (Index_t iy = 0; iy < fourier_local[1]; ++iy) {
-          for (Index_t ix = 0; ix < fourier_local[0]; ++ix) {
-            Index_t idx = comp + ix * nb_components +
-                          iy * fourier_local[0] * nb_components;
-            Index_t z_stride =
-                fourier_local[0] * fourier_local[1] * nb_components;
-            backend->c2c_backward(Nz, 1, temp.data() + idx, z_stride, 0,
-                                  temp.data() + idx, z_stride, 0);
-          }
-        }
+        Index_t comp_offset = comp * in_comp_factor;
+        backend->c2c_backward(Nz, batch_z, temp.data() + comp_offset,
+                              in_z_dist, Index_t{1},
+                              temp.data() + comp_offset,
+                              in_z_dist, Index_t{1});
       }
 
       // Z-pencil work buffer
-      Index_t zpencil_size = Fx * local_real[1] * local_real[2] * nb_components;
+      Index_t nb_zpencil_pixels = Fx * local_real[1] * local_real[2];
+      Index_t zpencil_size = nb_zpencil_pixels * nb_components;
+
+      // Z-pencil strides
+      auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist, work_z_z_dist] =
+          is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
+                 : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
+
       WorkBuffer work_z(zpencil_size);
       Complex * work_z_ptr = work_z.data();
 
       // Step 2: Transpose Z<->X backward (or copy)
       if (transpose_xz != nullptr) {
+        // TODO: Transpose needs to handle storage order
         transpose_xz->backward(temp.data(), work_z_ptr);
       } else {
         deep_copy<Complex, MemorySpace>(work_z_ptr, temp.data(), zpencil_size);
@@ -564,93 +780,120 @@ class FFTEngine : public FFTEngineBase {
       // Y-pencil work buffer
       const DynGridIndex & ypencil_shape =
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
-      Index_t ypencil_size = Fx * Ny * ypencil_shape[2] * nb_components;
+      Index_t nb_ypencil_pixels = Fx * Ny * ypencil_shape[2];
+      Index_t ypencil_size = nb_ypencil_pixels * nb_components;
+
+      // Y-pencil strides
+      auto [work_y_comp_factor, work_y_x_stride, work_y_y_dist, work_y_z_dist] =
+          is_soa ? get_soa_strides_3d(nb_ypencil_pixels, Fx, Ny)
+                 : get_aos_strides_3d(nb_ypencil_pixels, Fx, Ny);
+
       WorkBuffer work_y(ypencil_size);
       Complex * work_y_ptr = work_y.data();
 
       // Step 3a: Transpose Y<->Z backward
       if (transpose_yz_bwd != nullptr) {
+        // TODO: Transpose needs to handle storage order
         transpose_yz_bwd->backward(work_z_ptr, work_y_ptr);
       }
 
       // Step 3b: c2c IFFT along Y for each component
+      // Batch Fx transforms per Z plane
       for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t comp_offset = comp * work_y_comp_factor;
         for (Index_t iz = 0; iz < ypencil_shape[2]; ++iz) {
-          for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx =
-                comp + ix * nb_components + iz * Fx * Ny * nb_components;
-            Index_t y_stride = Fx * nb_components;
-            backend->c2c_backward(Ny, 1, work_y_ptr + idx, y_stride, 0,
-                                  work_y_ptr + idx, y_stride, 0);
-          }
+          Index_t idx = comp_offset + iz * work_y_z_dist;
+          backend->c2c_backward(Ny, Fx, work_y_ptr + idx,
+                                work_y_y_dist, work_y_x_stride,
+                                work_y_ptr + idx,
+                                work_y_y_dist, work_y_x_stride);
         }
       }
 
       // Step 3c: Transpose Z<->Y backward
       if (transpose_yz_fwd != nullptr) {
+        // TODO: Transpose needs to handle storage order
         transpose_yz_fwd->backward(work_y_ptr, work_z_ptr);
       }
 
       // Step 4: c2r IFFT along X for each component
       for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t work_comp_offset = comp * work_z_comp_factor;
+        Index_t out_comp_offset = comp * out_comp_factor;
+
         for (Index_t iz = 0; iz < local_real[2]; ++iz) {
-          for (Index_t iy = 0; iy < local_real[1]; ++iy) {
-            Index_t in_idx = comp + iy * Fx * nb_components +
-                             iz * Fx * local_real[1] * nb_components;
-            Index_t out_idx =
-                out_base_offset + comp + iy * out_stride_y + iz * out_stride_z;
-            backend->c2r(Nx, 1, work_z_ptr + in_idx, nb_components, 0,
-                         output_ptr + out_idx, out_comp_stride, 0);
-          }
+          Index_t in_idx = work_comp_offset + iz * work_z_z_dist;
+          Index_t out_idx = out_base_offset + out_comp_offset + iz * out_z_dist;
+          backend->c2r(Nx, local_real[1], work_z_ptr + in_idx,
+                       work_z_x_stride, work_z_y_dist,
+                       output_ptr + out_idx, out_x_stride, out_y_dist);
         }
       }
     } else {
       // Serial path: all dimensions are local
-      Index_t fourier_size = Fx * Ny * Nz;
+      Index_t nb_fourier_pixels = Fx * Ny * Nz;
+      Index_t work_size = nb_fourier_pixels * nb_components;
 
-      for (Index_t comp = 0; comp < nb_components; ++comp) {
-        // Copy this component's data to temp buffer
-        WorkBuffer temp(fourier_size);
-        if constexpr (is_host_space_v<MemorySpace>) {
-          for (Index_t i = 0; i < fourier_size; ++i) {
-            temp.data()[i] = input_ptr[i * nb_components + comp];
-          }
-        } else {
-          // For device memory, we need a different approach
-          // This is a limitation - strided copy on device requires a kernel
-          throw RuntimeError(
-              "Multi-component 3D serial IFFT on device memory not "
-              "yet supported");
+      // Input strides
+      auto [in_comp_factor, in_x_stride, in_y_dist, in_z_dist] =
+          in_is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
+                    : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
+
+      // Work buffer with same storage order
+      WorkBuffer work_buffer(work_size);
+      Complex * work_ptr = work_buffer.data();
+      deep_copy<Complex, MemorySpace>(work_ptr, input_ptr, work_size);
+
+      // Step 1: c2c IFFT along Z for each component
+      // For SoA: Batch all Fx*Ny transforms together with dist=1
+      // For AoS: Batch Fx transforms per Y row with dist=in_x_stride
+      if (in_is_soa) {
+        // SoA: consecutive XY elements are separated by 1
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * in_comp_factor;
+          backend->c2c_backward(Nz, Fx * Ny, work_ptr + comp_offset,
+                                in_z_dist, Index_t{1},
+                                work_ptr + comp_offset,
+                                in_z_dist, Index_t{1});
         }
-
-        // Step 1: c2c IFFT along Z
-        for (Index_t iy = 0; iy < Ny; ++iy) {
-          for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx = ix + iy * Fx;
-            Index_t stride = Fx * Ny;
-            backend->c2c_backward(Nz, 1, temp.data() + idx, stride, 0,
-                                  temp.data() + idx, stride, 0);
-          }
-        }
-
-        // Step 2: c2c IFFT along Y
-        for (Index_t iz = 0; iz < Nz; ++iz) {
-          for (Index_t ix = 0; ix < Fx; ++ix) {
-            Index_t idx = ix + iz * Fx * Ny;
-            backend->c2c_backward(Ny, 1, temp.data() + idx, Fx, 0,
-                                  temp.data() + idx, Fx, 0);
-          }
-        }
-
-        // Step 3: c2r IFFT along X
-        for (Index_t iz = 0; iz < Nz; ++iz) {
+      } else {
+        // AoS: X elements are separated by in_x_stride (nb_components)
+        // Batch Fx transforms per Y row
+        for (Index_t comp = 0; comp < nb_components; ++comp) {
+          Index_t comp_offset = comp * in_comp_factor;
           for (Index_t iy = 0; iy < Ny; ++iy) {
-            Index_t in_idx = iy * Fx + iz * Fx * Ny;
-            Index_t out_idx =
-                out_base_offset + comp + iy * out_stride_y + iz * out_stride_z;
-            backend->c2r(Nx, 1, temp.data() + in_idx, 1, 0,
-                         output_ptr + out_idx, out_comp_stride, 0);
+            Index_t idx = comp_offset + iy * in_y_dist;
+            backend->c2c_backward(Nz, Fx, work_ptr + idx,
+                                  in_z_dist, in_x_stride,
+                                  work_ptr + idx,
+                                  in_z_dist, in_x_stride);
           }
+        }
+      }
+
+      // Step 2: c2c IFFT along Y for each component
+      // Batch Fx transforms for each Z plane
+      // n=Ny, batch=Fx, stride=in_y_dist (between Y elements), dist=in_x_stride (between X batches)
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t comp_offset = comp * in_comp_factor;
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          Index_t idx = comp_offset + iz * in_z_dist;
+          backend->c2c_backward(Ny, Fx, work_ptr + idx, in_y_dist, in_x_stride,
+                                work_ptr + idx, in_y_dist, in_x_stride);
+        }
+      }
+
+      // Step 3: c2r IFFT along X for each component
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        Index_t in_comp_offset = comp * in_comp_factor;
+        Index_t out_comp_offset = comp * out_comp_factor;
+
+        for (Index_t iz = 0; iz < Nz; ++iz) {
+          Index_t in_idx = in_comp_offset + iz * in_z_dist;
+          Index_t out_idx = out_base_offset + out_comp_offset + iz * out_z_dist;
+          backend->c2r(Nx, Ny, work_ptr + in_idx,
+                       in_x_stride, in_y_dist,
+                       output_ptr + out_idx, out_x_stride, out_y_dist);
         }
       }
     }

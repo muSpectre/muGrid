@@ -1,7 +1,7 @@
 Change log for µGrid
 ====================
 
-0.103.0 (05Jan26)
+0.102.0 (05Jan26)
 -----------------
 
 - ENH: Added `IsotropicStiffnessOperator2D` and `IsotropicStiffnessOperator3D` for solid mechanics
@@ -50,10 +50,6 @@ Change log for µGrid
   - cuFFT does not support strides on real data in R2C/C2R transforms
   - 3D MPI-parallel FFTs on NVIDIA GPUs now raise clear `RuntimeError`
   - Workaround: Use CPU FFT backend or 2D grids on NVIDIA hardware
-
-0.102.0 (30Dec25)
------------------
-
 - ENH: Added `linalg` module with efficient linear algebra operations for muGrid fields
   - `vecdot(a, b)`: Vector dot product (interior only, excludes ghost regions)
   - `norm_sq(x)`: Squared L2 norm (interior only)
@@ -67,7 +63,6 @@ Change log for µGrid
 - ENH: Updated conjugate gradient solver to use new `linalg` module
   - Uses `axpby` for fused update_p step (2 reads + 1 write instead of 3 reads + 2 writes)
   - Uses `axpy_norm_sq` for fused residual update (saves 1 memory read per iteration)
-  - Improved arithmetic intensity from 0.125 to 0.139 FLOP/byte
 - API: Simplified CG solver interface - removed `hessp_vecdot` parameter
   - CG solver now uses only `hessp` for the Hessian-vector product
   - Fused operations handled internally via `axpy_norm_sq` in linalg module

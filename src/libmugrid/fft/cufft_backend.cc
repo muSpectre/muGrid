@@ -127,41 +127,48 @@ cufftHandle cuFFTBackend::get_plan(TransformType type, Index_t n, Index_t batch,
   // For c2r: input has n/2+1 complex, output has n reals
   // For c2c: input and output both have n complex
 
-  // Determine the embedding sizes based on transform type
-  // When using strides, we need to specify the embedding to tell cuFFT
-  // the actual memory layout
-  int inembed[1], onembed[1];
   cufftType cufft_type;
-
   switch (type) {
   case R2C:
-    // Real input with n elements, complex output with n/2+1 elements
-    // The embedding describes the storage size, not the transform size
-    inembed[0] = static_cast<int>(in_dist);  // Storage per batch
-    onembed[0] = static_cast<int>(out_dist); // Storage per batch
     cufft_type = CUFFT_D2Z;
     break;
   case C2R:
-    // Complex input with n/2+1 elements, real output with n elements
-    inembed[0] = static_cast<int>(in_dist);
-    onembed[0] = static_cast<int>(out_dist);
     cufft_type = CUFFT_Z2D;
     break;
   case C2C:
-    // Complex input and output with n elements each
-    inembed[0] = static_cast<int>(in_dist);
-    onembed[0] = static_cast<int>(out_dist);
     cufft_type = CUFFT_Z2Z;
     break;
   default:
     throw RuntimeError("Unknown transform type");
   }
 
-  cufftResult result = cufftPlanMany(
-      &plan, rank, n_arr,
-      inembed, static_cast<int>(in_stride), static_cast<int>(in_dist),
-      onembed, static_cast<int>(out_stride), static_cast<int>(out_dist),
-      cufft_type, static_cast<int>(batch));
+  cufftResult result;
+
+  // For batch=1 with non-unit stride but dist=0, use simplified plan
+  // cuFFT requires valid embed values (>= n) when embed is not NULL
+  if (batch == 1 && in_stride == 1 && out_stride == 1) {
+    // Simple contiguous transform - use basic plan
+    result = cufftPlan1d(&plan, static_cast<int>(n), cufft_type, 1);
+  } else if (batch == 1) {
+    // Single transform with stride - use NULL embed (auto-calculated)
+    // Note: This path should now rarely be used since we batch c2c transforms
+    result = cufftPlanMany(
+        &plan, rank, n_arr,
+        nullptr, static_cast<int>(in_stride), 0,
+        nullptr, static_cast<int>(out_stride), 0,
+        cufft_type, 1);
+  } else {
+    // Batched transform - need embed values
+    // embed must be >= n for the transform to be valid
+    // Use dist as the embed value (storage size per batch)
+    int inembed[1] = {static_cast<int>(in_dist)};
+    int onembed[1] = {static_cast<int>(out_dist)};
+    result = cufftPlanMany(
+        &plan, rank, n_arr,
+        inembed, static_cast<int>(in_stride), static_cast<int>(in_dist),
+        onembed, static_cast<int>(out_stride), static_cast<int>(out_dist),
+        cufft_type, static_cast<int>(batch));
+  }
 
   check_cufft_result(result, "plan creation");
 
@@ -198,6 +205,7 @@ void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
       reinterpret_cast<cufftDoubleComplex *>(output));
 
   check_cufft_result(result, "D2Z execution");
+  cudaDeviceSynchronize();
 }
 
 void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
@@ -247,6 +255,7 @@ void cuFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
       reinterpret_cast<cufftDoubleComplex *>(output), CUFFT_FORWARD);
 
   check_cufft_result(result, "Z2Z forward execution");
+  cudaDeviceSynchronize();
 }
 
 void cuFFTBackend::c2c_backward(Index_t n, Index_t batch, const Complex * input,
