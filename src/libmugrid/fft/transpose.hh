@@ -61,10 +61,9 @@ namespace muGrid {
     /**
      * Handles MPI transpose operations using derived datatypes.
      *
-     * This class performs the same logical operation as PencilTranspose but
-     * uses MPI derived datatypes instead of explicit pack/unpack buffers.
-     * The MPI library handles the non-contiguous memory access patterns,
-     * which can be more efficient and works with GPU-aware MPI.
+     * This class uses MPI derived datatypes instead of explicit pack/unpack
+     * buffers. The MPI library handles the non-contiguous memory access
+     * patterns, which can be more efficient and works with GPU-aware MPI.
      *
      * For pencil decomposition, data needs to be redistributed between ranks to
      * switch which dimension is "local" (not distributed). The transpose

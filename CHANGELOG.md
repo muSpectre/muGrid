@@ -4,52 +4,38 @@ Change log for µGrid
 0.102.0 (05Jan26)
 -----------------
 
+- API: Replaced `MemoryLocation` enum with new `Device` class for device selection
+  - New `Device` class with factory methods: `Device.cpu()`, `Device.cuda(id)`, `Device.rocm(id)`, `Device.gpu(id)`
+  - New `DeviceType` enum following DLPack conventions (CPU, CUDA, CUDAHost, ROCm, ROCmHost)
+  - Supports multi-GPU systems with device IDs (e.g., `Device.cuda(1)` for GPU 1)
+- API: Renamed `memory_location` parameter to `device` in Python wrappers
+  - Affects `GlobalFieldCollection`, `LocalFieldCollection`, `CartesianDecomposition`
+  - Accepts strings (`"cpu"`, `"gpu"`, `"cuda"`, `"cuda:N"`, `"rocm"`, `"rocm:N"`) or `Device` objects
+- API: Pythonic string-based parameter handling
+  - `device`: `"cpu"`, `"gpu"`, `"cuda"`, `"cuda:0"`, `"rocm:1"`, etc.
+  - `open_mode` (FileIONetCDF): `"read"`, `"write"`, `"overwrite"`, `"append"`
+- API: Renamed `StencilGradientOperator` to `GenericLinearOperator`
+  - Clearer naming that reflects the operator's purpose as a general linear convolution operator
+  - Python bindings updated accordingly
+- API: Simplified CG solver interface - removed `hessp_vecdot` parameter
+  - CG solver now uses only `hessp` for the Hessian-vector product
+  - Fused operations handled internally via `axpy_norm_sq` in linalg module
+- API: Removed `apply_vecdot` and `transpose_vecdot` from convolution operators
+  - Removed from `ConvolutionOperatorBase`, `ConvolutionOperator`, `LaplaceOperator`, `FEMGradientOperator`
+  - Performance testing showed negligible benefit; simplifies operator interface
+- API: Removed PAPI hardware counter support from Timer class
+  - Timer now provides time-based measurements only
+  - Removes pypapi dependency and cross-platform compatibility issues
+- API: Standardized Python API to use tuples instead of lists for grid dimensions
+  - All docstrings now document parameters as "tuple of int" instead of "list of int"
+  - Affects `GlobalFieldCollection`, `CartesianDecomposition`, `FFTEngine` parameters
+  - Properties like `nb_subdomain_grid_pts` already returned tuples; documentation now matches
 - ENH: Added `IsotropicStiffnessOperator2D` and `IsotropicStiffnessOperator3D` for solid mechanics
   - Fused elliptic operators computing K @ u = B^T C B @ u for isotropic linear elastic materials
   - Memory efficient: stores only Lamé parameters (λ, μ) per voxel instead of full stiffness matrix
   - Reduces memory from O(N × 24²) for full K storage to O(N × 2) for spatially-varying materials
   - GPU support with optimized CUDA and HIP kernels
   - Uses linear tetrahedral FEM with 5-tetrahedra decomposition (3D) or 2-triangle decomposition (2D)
-- ENH: Added `parprint` utility function for MPI-safe printing
-  - MPI-aware print function that only outputs on rank 0
-  - Works with NuMPI's MPI stub for compatibility with and without MPI
-  - Available as `muGrid.parprint()` in Python API
-- ENH: Enabled MPI parallel execution of Poisson and homogenization examples
-  - Use `suggest_subdivisions` from NuMPI for automatic domain decomposition
-  - Changed from hardcoded serial execution to dynamic MPI-aware subdivision
-  - Both examples now scale efficiently across multiple MPI ranks
-  - Updated all output to use `parprint` for clean parallel execution
-- API: Renamed `StencilGradientOperator` to `GenericLinearOperator`
-  - Clearer naming that reflects the operator's purpose as a general linear convolution operator
-  - Python bindings updated accordingly
-- BUG: Fixed 3D stiffness kernel on GPUs
-- BUG: Gracefully handle non-initialized MPI
-- TST: Added laminate homogenization tests for validating effective material properties
-- TST: MPI-parallel laminate homogenization tests
-- TST: Added MPI parallel tests for Poisson and homogenization examples in CI
-  - Tests run with 2 and 4 MPI ranks for both 2D and 3D cases
-  - Validates domain decomposition, ghost communication, and result consistency
-  - Automatically runs in GitHub Actions CI when MPI is enabled
-- TST: Refactored and unified test infrastructure
-- MAINT: Restructured operators to separate 2D and 3D implementations into distinct source files
-- MAINT: Updated benchmark scripts for performance testing
-- API: Standardized Python API to use tuples instead of lists for grid dimensions
-  - All docstrings now document parameters as "tuple of int" instead of "list of int"
-  - Affects `GlobalFieldCollection`, `CartesianDecomposition`, `FFTEngine` parameters
-  - Properties like `nb_subdomain_grid_pts` already returned tuples; documentation now matches
-- DOC: Added new "Linear Operators" documentation chapter
-  - Comprehensive guide to all operator types in µGrid
-  - Explains generic, gradient/divergence, and fused operators
-  - Details `IsotropicStiffnessOperator` material field requirements
-- DOC: Simplified examples to use fused operators for better performance
-- DOC: Added GPU FFT documentation explaining backend limitations
-- ENH: Native rocFFT backend for AMD GPUs with full stride support
-  - Uses `rocfft_plan_description_set_data_layout()` for arbitrary strides
-  - Enables 3D MPI-parallel FFTs on AMD GPUs (not possible with cuFFT)
-- BUG: Added guard in cuFFT backend for unsupported strided R2C/C2R transforms
-  - cuFFT does not support strides on real data in R2C/C2R transforms
-  - 3D MPI-parallel FFTs on NVIDIA GPUs now raise clear `RuntimeError`
-  - Workaround: Use CPU FFT backend or 2D grids on NVIDIA hardware
 - ENH: Added `linalg` module with efficient linear algebra operations for muGrid fields
   - `vecdot(a, b)`: Vector dot product (interior only, excludes ghost regions)
   - `norm_sq(x)`: Squared L2 norm (interior only)
@@ -63,31 +49,45 @@ Change log for µGrid
 - ENH: Updated conjugate gradient solver to use new `linalg` module
   - Uses `axpby` for fused update_p step (2 reads + 1 write instead of 3 reads + 2 writes)
   - Uses `axpy_norm_sq` for fused residual update (saves 1 memory read per iteration)
-- API: Simplified CG solver interface - removed `hessp_vecdot` parameter
-  - CG solver now uses only `hessp` for the Hessian-vector product
-  - Fused operations handled internally via `axpy_norm_sq` in linalg module
-- API: Removed `apply_vecdot` and `transpose_vecdot` from convolution operators
-  - Removed from `ConvolutionOperatorBase`, `ConvolutionOperator`, `LaplaceOperator`, `FEMGradientOperator`
-  - Performance testing showed negligible benefit; simplifies operator interface
-- API: Removed PAPI hardware counter support from Timer class
-  - Timer now provides time-based measurements only
-  - Removes pypapi dependency and cross-platform compatibility issues
-- BUILD: Fixed `nodiscard` warnings in HIP linalg implementation
-- API: Replaced `MemoryLocation` enum with new `Device` class for device selection
-  - New `Device` class with factory methods: `Device.cpu()`, `Device.cuda(id)`, `Device.rocm(id)`, `Device.gpu(id)`
-  - New `DeviceType` enum following DLPack conventions (CPU, CUDA, CUDAHost, ROCm, ROCmHost)
-  - Supports multi-GPU systems with device IDs (e.g., `Device.cuda(1)` for GPU 1)
+- ENH: Native rocFFT backend for AMD GPUs with full stride support
+  - Uses `rocfft_plan_description_set_data_layout()` for arbitrary strides
+  - Enables 3D MPI-parallel FFTs on AMD GPUs (not possible with cuFFT)
 - ENH: Added `Device.gpu()` factory for portable GPU code
   - Automatically selects CUDA or ROCm based on compile-time configuration
   - Falls back to CPU if no GPU backend is available
   - Recommended for code that should work on any GPU platform
-- API: Renamed `memory_location` parameter to `device` in Python wrappers
-  - Affects `GlobalFieldCollection`, `LocalFieldCollection`, `CartesianDecomposition`
-  - Accepts strings (`"cpu"`, `"gpu"`, `"cuda"`, `"cuda:N"`, `"rocm"`, `"rocm:N"`) or `Device` objects
-- API: Pythonic string-based parameter handling
-  - `device`: `"cpu"`, `"gpu"`, `"cuda"`, `"cuda:0"`, `"rocm:1"`, etc.
-  - `open_mode` (FileIONetCDF): `"read"`, `"write"`, `"overwrite"`, `"append"`
+- ENH: Added `parprint` utility function for MPI-safe printing
+  - MPI-aware print function that only outputs on rank 0
+  - Works with NuMPI's MPI stub for compatibility with and without MPI
+  - Available as `muGrid.parprint()` in Python API
+- ENH: Enabled MPI parallel execution of Poisson and homogenization examples
+  - Use `suggest_subdivisions` from NuMPI for automatic domain decomposition
+  - Changed from hardcoded serial execution to dynamic MPI-aware subdivision
+  - Both examples now scale efficiently across multiple MPI ranks
+  - Updated all output to use `parprint` for clean parallel execution
+- BUG: Fixed 3D stiffness kernel on GPUs
+- BUG: Gracefully handle non-initialized MPI
+- BUG: Added guard in cuFFT backend for unsupported strided R2C/C2R transforms
+  - cuFFT does not support strides on real data in R2C/C2R transforms
+  - 3D MPI-parallel FFTs on NVIDIA GPUs now raise clear `RuntimeError`
+  - Workaround: Use CPU FFT backend or 2D grids on NVIDIA hardware
+- MAINT: Restructured operators to separate 2D and 3D implementations into distinct source files
+- MAINT: Updated benchmark scripts for performance testing
+- BUILD: Fixed `nodiscard` warnings in HIP linalg implementation
+- TST: Added laminate homogenization tests for validating effective material properties
+- TST: MPI-parallel laminate homogenization tests
+- TST: Added MPI parallel tests for Poisson and homogenization examples in CI
+  - Tests run with 2 and 4 MPI ranks for both 2D and 3D cases
+  - Validates domain decomposition, ghost communication, and result consistency
+  - Automatically runs in GitHub Actions CI when MPI is enabled
+- TST: Refactored and unified test infrastructure
+- DOC: Added new "Linear Operators" documentation chapter
+  - Comprehensive guide to all operator types in µGrid
+  - Explains generic, gradient/divergence, and fused operators
+  - Details `IsotropicStiffnessOperator` material field requirements
 - DOC: Updated GPU and Python API documentation for new device selection interface
+- DOC: Added GPU FFT documentation explaining backend limitations
+- DOC: Simplified examples to use fused operators for better performance
 
 0.101.2 (29Dec25)
 -----------------
