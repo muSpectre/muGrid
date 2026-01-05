@@ -5,6 +5,9 @@ This chapter provides step-by-step examples for building numerical solvers with
 *µ*\Grid. We present two complete examples: a Poisson solver and a linear
 elasticity solver for micromechanical homogenization.
 
+For details on the different operator types available and when to use each one,
+see the :doc:`Operators` chapter.
+
 Poisson Solver
 **************
 
@@ -33,12 +36,12 @@ for the stencil operations:
     comm = muGrid.Communicator()
 
     # Grid parameters
-    nb_grid_pts = [64, 64]
+    nb_grid_pts = (64, 64)
     dim = len(nb_grid_pts)
 
     # Ghost layers: 1 cell on each side for the 5-point stencil
-    nb_ghosts_left = [1, 1]
-    nb_ghosts_right = [1, 1]
+    nb_ghosts_left = (1, 1)
+    nb_ghosts_right = (1, 1)
 
     # Create the domain decomposition
     # (works for both serial and MPI-parallel execution)
@@ -52,20 +55,7 @@ for the stencil operations:
 Creating the Laplacian operator
 -------------------------------
 
-*µ*\Grid provides two ways to create discrete operators:
-
-1. **Generic convolution operators**: Flexible, user-defined stencils
-2. **Hard-coded operators**: Optimized implementations for common operators
-
-**Generic convolution operator:**
-
-The 5-point Laplacian stencil in 2D is:
-
-.. math::
-
-    \nabla^2 u \approx \frac{u_{i-1,j} + u_{i+1,j} + u_{i,j-1} + u_{i,j+1} - 4u_{i,j}}{h^2}
-
-We create this with a ``ConvolutionOperator``:
+*µ*\Grid provides an optimized ``LaplaceOperator`` for the discrete Laplacian:
 
 .. code-block:: python
 
@@ -75,27 +65,11 @@ We create this with a ``ConvolutionOperator``:
     # Scale factor: negative because -∇² must be positive definite for CG
     scale = -1.0 / h**2
 
-    # 5-point Laplacian stencil
-    stencil = scale * np.array([
-        [0,  1, 0],
-        [1, -4, 1],
-        [0,  1, 0]
-    ])
-    stencil_offset = [-1, -1]  # Stencil origin relative to center
+    # Hard-coded Laplacian operator (optimized implementation)
+    laplace = muGrid.LaplaceOperator(dim, scale)
 
-    laplace_generic = muGrid.GenericLinearOperator(stencil_offset, stencil)
-
-**Hard-coded Laplacian operator:**
-
-For better performance, use the optimized ``LaplaceOperator``:
-
-.. code-block:: python
-
-    laplace_hardcoded = muGrid.LaplaceOperator(dim, scale)
-
-Both operators have the same interface (``apply`` method) and produce identical
-results, but the hard-coded version is significantly faster (see
-:ref:`performance-comparison` below).
+The ``LaplaceOperator`` implements the standard 5-point stencil in 2D
+(7-point in 3D) with optimized memory access patterns for both CPU and GPU.
 
 Creating fields and setting up the RHS
 --------------------------------------
@@ -108,9 +82,8 @@ Creating fields and setting up the RHS
 
     # Set up a smooth right-hand side
     # Get coordinates for each pixel in the local domain
-    x = np.linspace(0, 1, nb_grid_pts[0], endpoint=False)
-    y = np.linspace(0, 1, nb_grid_pts[1], endpoint=False)
-    X, Y = np.meshgrid(x, y, indexing='ij')
+    coords = decomposition.coords
+    X, Y = coords[0], coords[1]
 
     rhs.p[...] = np.sin(2 * np.pi * X) * np.sin(2 * np.pi * Y)
 
@@ -123,9 +96,6 @@ Solving with conjugate gradients
 The conjugate gradient solver requires a function that applies the linear operator:
 
 .. code-block:: python
-
-    # Choose which operator to use
-    laplace = laplace_hardcoded  # or laplace_generic
 
     def apply_laplacian(x, Ax):
         """Apply the Laplacian operator: Ax = L @ x"""
@@ -160,14 +130,14 @@ Here is the complete, minimal Poisson solver:
 
     # Setup
     comm = muGrid.Communicator()
-    nb_grid_pts = [64, 64]
+    nb_grid_pts = (64, 64)
     h = 1.0 / nb_grid_pts[0]
 
     decomposition = muGrid.CartesianDecomposition(
         comm,
         nb_domain_grid_pts=nb_grid_pts,
-        nb_ghosts_left=[1, 1],
-        nb_ghosts_right=[1, 1],
+        nb_ghosts_left=(1, 1),
+        nb_ghosts_right=(1, 1),
     )
 
     # Laplacian operator (negative for positive-definiteness)
@@ -178,9 +148,8 @@ Here is the complete, minimal Poisson solver:
     solution = decomposition.real_field("solution")
 
     # RHS: smooth function with zero mean
-    x = np.linspace(0, 1, nb_grid_pts[0], endpoint=False)
-    y = np.linspace(0, 1, nb_grid_pts[1], endpoint=False)
-    X, Y = np.meshgrid(x, y, indexing='ij')
+    coords = decomposition.coords
+    X, Y = coords[0], coords[1]
     rhs.p[...] = np.sin(2 * np.pi * X) * np.sin(2 * np.pi * Y)
     rhs.p[...] -= np.mean(rhs.p)
 
@@ -217,11 +186,15 @@ and strain is the symmetric gradient of displacement:
 
     \boldsymbol{\varepsilon} = \frac{1}{2}(\nabla \mathbf{u} + \nabla \mathbf{u}^T)
 
+For isotropic materials, *µ*\Grid provides the fused ``IsotropicStiffnessOperator``
+which computes the entire stiffness operation :math:`\mathbf{K}\mathbf{u} = \mathbf{B}^T \mathbf{C} \mathbf{B} \mathbf{u}`
+efficiently without explicitly forming intermediate tensors.
+
 Material properties
 -------------------
 
-We define isotropic elastic materials using Young's modulus *E* and Poisson's
-ratio *ν*:
+Isotropic elastic materials are characterized by two Lamé parameters (λ, μ),
+which can be computed from Young's modulus *E* and Poisson's ratio *ν*:
 
 .. code-block:: python
 
@@ -229,222 +202,142 @@ ratio *ν*:
     import muGrid
     from muGrid.Solvers import conjugate_gradients
 
-    def isotropic_stiffness_2d(E, nu):
-        """
-        Create 2D plane strain stiffness tensor in Voigt notation.
-        Voigt ordering: [xx, yy, xy]
-        """
+    def lame_parameters(E, nu):
+        """Compute Lamé parameters from Young's modulus and Poisson's ratio."""
         lam = E * nu / ((1 + nu) * (1 - 2 * nu))
         mu = E / (2 * (1 + nu))
-
-        C = np.zeros((3, 3))
-        C[0, 0] = lam + 2 * mu  # C_xxxx
-        C[1, 1] = lam + 2 * mu  # C_yyyy
-        C[2, 2] = mu            # C_xyxy
-        C[0, 1] = C[1, 0] = lam # C_xxyy
-        return C
+        return lam, mu
 
     # Material parameters
     E_matrix = 1.0      # Young's modulus of matrix
     E_inclusion = 10.0  # Young's modulus of inclusion (10x stiffer)
     nu = 0.3            # Poisson's ratio (same for both)
 
-    C_matrix = isotropic_stiffness_2d(E_matrix, nu)
-    C_inclusion = isotropic_stiffness_2d(E_inclusion, nu)
+    lam_matrix, mu_matrix = lame_parameters(E_matrix, nu)
+    lam_inclusion, mu_inclusion = lame_parameters(E_inclusion, nu)
+
+Setting up the grid and operator
+--------------------------------
+
+The ``IsotropicStiffnessOperator`` operates on nodal displacement fields and
+requires material properties (λ, μ) defined per element:
+
+.. code-block:: python
+
+    nb_grid_pts = (32, 32)
+    dim = 2
+
+    # Grid spacing
+    grid_spacing = tuple(1.0 / n for n in nb_grid_pts)
+
+    # Create the fused stiffness operator
+    stiffness_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+
+    # For 3D problems:
+    # stiffness_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
 
 Setting up the microstructure
 -----------------------------
 
-We create a simple circular inclusion in the center:
+We create a simple circular inclusion in the center. Material fields are defined
+per element (one fewer grid point in each direction than nodal fields):
 
 .. code-block:: python
 
-    nb_grid_pts = [32, 32]
-    dim = 2
+    comm = muGrid.Communicator()
 
-    # Grid coordinates (cell centers)
-    x = np.linspace(0, 1, nb_grid_pts[0], endpoint=False) + 0.5 / nb_grid_pts[0]
-    y = np.linspace(0, 1, nb_grid_pts[1], endpoint=False) + 0.5 / nb_grid_pts[1]
-    X, Y = np.meshgrid(x, y, indexing='ij')
+    # Domain decomposition for nodal fields (displacements, forces)
+    decomposition = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts=nb_grid_pts,
+        nb_ghosts_left=(1,) * dim,
+        nb_ghosts_right=(1,) * dim,
+    )
+
+    # Domain decomposition for element fields (material properties)
+    # Elements are defined between nodes, so one fewer in each direction
+    element_grid_pts = tuple(n - 1 for n in nb_grid_pts)
+    element_decomposition = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts=element_grid_pts,
+        nb_ghosts_left=(1,) * dim,
+        nb_ghosts_right=(1,) * dim,
+    )
+
+    # Create material fields
+    lambda_field = element_decomposition.real_field("lambda")
+    mu_field = element_decomposition.real_field("mu")
+
+    # Get element coordinates (centers of elements)
+    coords = element_decomposition.coords
+    X, Y = coords[0], coords[1]
 
     # Circular inclusion at center with radius 0.25
     radius = 0.25
     distance = np.sqrt((X - 0.5)**2 + (Y - 0.5)**2)
     phase = (distance < radius).astype(float)  # 1 = inclusion, 0 = matrix
 
+    # Set material properties
+    lambda_field.p[...] = lam_matrix * (1 - phase) + lam_inclusion * phase
+    mu_field.p[...] = mu_matrix * (1 - phase) + mu_inclusion * phase
+
+    # Fill ghost regions (only needs to be done once)
+    element_decomposition.communicate_ghosts(lambda_field)
+    element_decomposition.communicate_ghosts(mu_field)
+
     print(f"Inclusion volume fraction: {np.mean(phase):.4f}")
 
-Using the FEM gradient operator
--------------------------------
-
-The ``FEMGradientOperator`` computes gradients using linear finite element
-shape functions. It subdivides each pixel into triangular elements with
-quadrature points:
+Creating displacement and force fields
+--------------------------------------
 
 .. code-block:: python
 
-    # Grid spacing
-    grid_spacing = [1.0 / n for n in nb_grid_pts]
-
-    # Create the FEM gradient operator
-    gradient_op = muGrid.FEMGradientOperator(dim, grid_spacing)
-
-    # Get quadrature information
-    nb_quad = gradient_op.nb_quad_pts      # Number of quadrature points per pixel
-    nb_nodes = gradient_op.nb_nodal_pts    # Number of nodal points per pixel
-    quad_weights = gradient_op.get_quadrature_weights()
-
-    print(f"Quadrature points per pixel: {nb_quad}")
-    print(f"Quadrature weights: {quad_weights}")
-
-Setting up the domain and fields
---------------------------------
-
-.. code-block:: python
-
-    comm = muGrid.Communicator()
-
-    # Domain decomposition with ghost regions for the gradient stencil
-    decomposition = muGrid.CartesianDecomposition(
-        comm,
-        nb_domain_grid_pts=nb_grid_pts,
-        nb_ghosts_left=[1, 1],
-        nb_ghosts_right=[1, 1],
-        nb_sub_pts={"quad": nb_quad},  # Register quadrature sub-points
-    )
-
-    # Displacement field: vector with dim components
+    # Displacement field: vector with dim components at nodes
     u_field = decomposition.real_field("displacement", (dim,))
 
-    # Force field (RHS): vector with dim components
+    # Force field (RHS): vector with dim components at nodes
     f_field = decomposition.real_field("force", (dim,))
-
-    # Strain and stress at quadrature points: tensors with (dim, dim) components
-    strain_field = decomposition.real_field("strain", (dim, dim), "quad")
-    stress_field = decomposition.real_field("stress", (dim, dim), "quad")
-
-    # Material stiffness at each quadrature point
-    # Shape: (3, 3, nb_quad, nx, ny) for Voigt notation
-    C_field = np.zeros((3, 3, nb_quad) + tuple(nb_grid_pts))
-    for q in range(nb_quad):
-        for i in range(3):
-            for j in range(3):
-                C_field[i, j, q] = (
-                    C_matrix[i, j] * (1 - phase) +
-                    C_inclusion[i, j] * phase
-                )
-
-Computing strain from displacement
-----------------------------------
-
-.. code-block:: python
-
-    def compute_strain(u, strain_out):
-        """
-        Compute strain from displacement: ε = sym(∇u)
-        """
-        # Fill ghost values for periodic boundaries
-        decomposition.communicate_ghosts(u)
-
-        # Apply gradient operator: computes ∂u_i/∂x_j
-        # Input shape: (dim, 1, nx, ny) - vector field at nodes
-        # Output shape: (dim, dim, quad, nx, ny) - tensor at quad points
-        gradient_op.apply(u, strain_out)
-
-        # Symmetrize: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
-        grad = strain_out.s
-        strain_out.s[...] = 0.5 * (grad + np.swapaxes(grad, 0, 1))
-
-Computing stress from strain
-----------------------------
-
-Using Voigt notation for efficient tensor contraction:
-
-.. code-block:: python
-
-    def compute_stress(strain, stress_out, C):
-        """
-        Compute stress from strain: σ = C : ε
-        Uses Voigt notation for the contraction.
-        """
-        eps = strain.s
-
-        # Convert strain tensor to Voigt vector
-        eps_voigt = np.zeros((3, nb_quad) + tuple(nb_grid_pts))
-        eps_voigt[0] = eps[0, 0]          # εxx
-        eps_voigt[1] = eps[1, 1]          # εyy
-        eps_voigt[2] = 2 * eps[0, 1]      # 2εxy (engineering shear)
-
-        # Stress in Voigt: σ = C @ ε
-        sig_voigt = np.einsum('ijq...,jq...->iq...', C, eps_voigt)
-
-        # Convert back to tensor
-        stress_out.s[0, 0] = sig_voigt[0]  # σxx
-        stress_out.s[1, 1] = sig_voigt[1]  # σyy
-        stress_out.s[0, 1] = sig_voigt[2]  # σxy
-        stress_out.s[1, 0] = sig_voigt[2]  # σyx (symmetric)
-
-Computing divergence (equilibrium)
-----------------------------------
-
-The transpose of the gradient operator computes the divergence:
-
-.. code-block:: python
-
-    def compute_divergence(stress, f_out):
-        """
-        Compute divergence of stress: f = ∇·σ
-        Uses the transpose of the gradient operator.
-        """
-        # Fill ghost values
-        decomposition.communicate_ghosts(stress)
-
-        # Apply transpose with quadrature weights
-        f_out.pg[...] = 0.0
-        gradient_op.transpose(stress, f_out, list(quad_weights))
 
 The stiffness operator
 ----------------------
 
-Combining the above, the stiffness operator computes :math:`\mathbf{K}\mathbf{u} = \mathbf{B}^T \mathbf{C} \mathbf{B} \mathbf{u}`:
+The fused operator combines gradient, constitutive, and divergence operations:
 
 .. code-block:: python
 
     def apply_stiffness(u_in, f_out):
         """
-        Apply stiffness operator: f = B^T C B u
+        Apply stiffness operator: f = K @ u = B^T C B u
         """
-        # Strain: ε = B u
-        compute_strain(u_in, strain_field)
+        decomposition.communicate_ghosts(u_in)
+        stiffness_op.apply(u_in, lambda_field, mu_field, f_out)
 
-        # Stress: σ = C : ε
-        compute_stress(strain_field, stress_field, C_field)
+This is significantly faster than manually computing the sequence
+:math:`\varepsilon = \mathbf{B}\mathbf{u}`, :math:`\sigma = \mathbf{C}:\varepsilon`,
+:math:`\mathbf{f} = \mathbf{B}^T\sigma` because:
 
-        # Force: f = B^T σ
-        compute_divergence(stress_field, f_out)
+1. No intermediate storage for strain and stress tensors
+2. Optimized memory access patterns
+3. Material properties stored as just two scalars per element
+
+See the :doc:`Operators` chapter for detailed performance comparisons.
 
 Solving for effective properties
 --------------------------------
 
 To compute effective properties, we apply unit macroscopic strains and
-measure the resulting average stress:
+measure the resulting average stress. Here's a simplified approach:
 
 .. code-block:: python
 
-    # Apply unit strain in xx-direction
-    E_macro = np.zeros((dim, dim))
-    E_macro[0, 0] = 1.0  # Unit strain εxx
+    # For homogenization, we solve: K @ u = -K @ (E_macro · x)
+    # where E_macro is the applied macroscopic strain
 
-    # Compute RHS: f = -B^T C E_macro
-    # (uniform macroscopic strain throughout the domain)
-    strain_field.s[...] = 0.0
-    strain_field.s[0, 0, ...] = E_macro[0, 0]
-    compute_stress(strain_field, stress_field, C_field)
-    compute_divergence(stress_field, f_field)
-    f_field.s[...] *= -1.0  # RHS is negative
+    # This requires computing the RHS by applying the stiffness operator
+    # to a linear displacement field u_linear = E_macro · x
 
-    # Initialize displacement to zero
-    u_field.s[...] = 0.0
+    # Initialize with the macroscopic strain contribution
+    # (Full implementation in examples/homogenization.py)
 
     # Solve equilibrium
     conjugate_gradients(
@@ -457,155 +350,31 @@ measure the resulting average stress:
         maxiter=500,
     )
 
-    # Compute total strain (macroscopic + fluctuation)
-    compute_strain(u_field, strain_field)
-    strain_field.s[0, 0, ...] += E_macro[0, 0]
+Complete homogenization example
+-------------------------------
 
-    # Compute stress from total strain
-    compute_stress(strain_field, stress_field, C_field)
+A complete homogenization example that computes effective elastic properties
+is provided in ``examples/homogenization.py``. It includes:
 
-    # Average stress = effective stress for unit applied strain
-    sig_xx_avg = np.mean(stress_field.s[0, 0])
-    sig_yy_avg = np.mean(stress_field.s[1, 1])
+- Full RHS computation for applied macroscopic strains
+- Computation of all independent effective stiffness components
+- Validation against analytical bounds (Voigt, Reuss, Hashin-Shtrikman)
+- Support for both 2D and 3D problems
+- MPI parallelization for large-scale computations
+- GPU acceleration
 
-    print(f"Average stress for εxx=1: σxx={sig_xx_avg:.4f}, σyy={sig_yy_avg:.4f}")
-    print(f"These are entries C_eff[0,0] and C_eff[1,0] of the effective stiffness")
+Run the example:
 
-.. _performance-comparison:
+.. code-block:: bash
 
-Convolution Operator Performance
-********************************
+    # 2D, 64×64 grid
+    python examples/homogenization.py -n 64,64
 
-*µ*\Grid provides two types of convolution operators with different performance
-characteristics.
+    # 3D, 32×32×32 grid
+    python examples/homogenization.py -n 32,32,32
 
-Generic ConvolutionOperator
----------------------------
+    # With MPI parallelization
+    mpiexec -n 4 python examples/homogenization.py -n 128,128
 
-The ``ConvolutionOperator`` class accepts arbitrary stencils:
-
-.. code-block:: python
-
-    # Any stencil shape and values
-    stencil = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    op = muGrid.GenericLinearOperator([-1, -1], stencil)
-
-**Advantages:**
-
-- Fully flexible: any stencil shape and coefficients
-- Easy to implement custom operators
-- Supports multiple operators and quadrature points
-
-**Disadvantages:**
-
-- Sparse memory access pattern (indirect indexing)
-- Cannot be fully optimized by the compiler
-
-Hard-coded operators
---------------------
-
-Hard-coded operators like ``LaplaceOperator`` and ``FEMGradientOperator`` have
-optimized implementations:
-
-.. code-block:: python
-
-    laplace = muGrid.LaplaceOperator(dim=2, scale=1.0)
-    gradient = muGrid.FEMGradientOperator(dim=2, grid_spacing=[0.1, 0.1])
-
-**Advantages:**
-
-- Compiler can optimize memory access patterns
-- Better cache utilization
-- SIMD vectorization possible
-- GPU kernels can be highly optimized
-
-**Disadvantages:**
-
-- Fixed stencil structure
-- Less flexible
-
-Performance comparison
-----------------------
-
-Typical performance differences on CPU:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 40 30 30
-
-   * - Operator
-     - Relative Speed
-     - Notes
-   * - Generic ConvolutionOperator
-     - 1× (baseline)
-     - Flexible but slower
-   * - LaplaceOperator
-     - 2-4× faster
-     - Optimized 5/7-point stencil
-   * - FEMGradientOperator
-     - 2-3× faster
-     - Optimized FEM kernels
-
-On GPU, the differences can be even more pronounced (5-10× or more) because:
-
-- Hard-coded operators have predictable memory access patterns
-- Better occupancy and fewer register spills
-- Specialized GPU kernels avoid sparse indexing overhead
-
-**Recommendation:**
-
-- Use hard-coded operators (``LaplaceOperator``, ``FEMGradientOperator``) for
-  production code where performance matters
-- Use ``ConvolutionOperator`` for prototyping, testing custom stencils, or when
-  no hard-coded alternative exists
-
-Example: comparing both approaches
-----------------------------------
-
-.. code-block:: python
-
-    import numpy as np
-    import muGrid
-    import time
-
-    # Setup
-    nb_grid_pts = [512, 512]
-    h = 1.0 / 512
-    scale = -1.0 / h**2
-
-    fc = muGrid.GlobalFieldCollection(
-        nb_grid_pts,
-        nb_ghosts_left=[1, 1],
-        nb_ghosts_right=[1, 1],
-    )
-
-    input_field = fc.real_field("input")
-    output_field = fc.real_field("output")
-    input_field.p[...] = np.random.randn(*nb_grid_pts)
-
-    # Pad ghost regions
-    input_field.pg[...] = np.pad(input_field.p, ((1, 1), (1, 1)), mode='wrap')
-
-    # Generic operator
-    stencil = scale * np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-    generic_op = muGrid.GenericLinearOperator([-1, -1], stencil)
-
-    # Hard-coded operator
-    hardcoded_op = muGrid.LaplaceOperator(2, scale)
-
-    # Benchmark
-    n_iter = 100
-
-    start = time.perf_counter()
-    for _ in range(n_iter):
-        generic_op.apply(input_field, output_field)
-    generic_time = time.perf_counter() - start
-
-    start = time.perf_counter()
-    for _ in range(n_iter):
-        hardcoded_op.apply(input_field, output_field)
-    hardcoded_time = time.perf_counter() - start
-
-    print(f"Generic operator: {generic_time:.3f}s ({n_iter} iterations)")
-    print(f"Hard-coded operator: {hardcoded_time:.3f}s ({n_iter} iterations)")
-    print(f"Speedup: {generic_time / hardcoded_time:.1f}×")
+    # On GPU
+    python examples/homogenization.py -n 256,256 --gpu

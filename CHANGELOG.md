@@ -1,7 +1,7 @@
 Change log for µGrid
 ====================
 
-0.103.0 (03Jan26)
+0.103.0 (05Jan26)
 -----------------
 
 - ENH: Added `IsotropicStiffnessOperator2D` and `IsotropicStiffnessOperator3D` for solid mechanics
@@ -12,7 +12,6 @@ Change log for µGrid
   - Uses linear tetrahedral FEM with 5-tetrahedra decomposition (3D) or 2-triangle decomposition (2D)
 - ENH: Added `parprint` utility function for MPI-safe printing
   - MPI-aware print function that only outputs on rank 0
-  - Similar to ASE's parprint implementation
   - Works with NuMPI's MPI stub for compatibility with and without MPI
   - Available as `muGrid.parprint()` in Python API
 - ENH: Enabled MPI parallel execution of Poisson and homogenization examples
@@ -34,6 +33,15 @@ Change log for µGrid
 - TST: Refactored and unified test infrastructure
 - MAINT: Restructured operators to separate 2D and 3D implementations into distinct source files
 - MAINT: Updated benchmark scripts for performance testing
+- API: Standardized Python API to use tuples instead of lists for grid dimensions
+  - All docstrings now document parameters as "tuple of int" instead of "list of int"
+  - Affects `GlobalFieldCollection`, `CartesianDecomposition`, `FFTEngine` parameters
+  - Properties like `nb_subdomain_grid_pts` already returned tuples; documentation now matches
+- DOC: Added new "Linear Operators" documentation chapter
+  - Comprehensive guide to all operator types in µGrid
+  - Explains generic, gradient/divergence, and fused operators
+  - Details `IsotropicStiffnessOperator` material field requirements
+- DOC: Simplified examples to use fused operators for better performance
 
 0.102.0 (30Dec25)
 -----------------
