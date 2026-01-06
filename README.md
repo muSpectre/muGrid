@@ -37,7 +37,8 @@ use
     pip install -v --no-binary muGrid muGrid
 
 which will compile the code. µGrid will autodetect
-[MPI](https://www.mpi-forum.org/).
+[MPI](https://www.mpi-forum.org/) and
+GPU ([CUDA](https://developer.nvidia.com/cuda)/[ROCm](https://www.amd.com/en/developer/resources/rocm-hub.html)) toolkits.
 For I/O, it will try to use
 [Unidata NetCDF](https://www.unidata.ucar.edu/software/netcdf/)
 for serial builds and
