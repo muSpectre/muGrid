@@ -22,9 +22,11 @@ domain decomposition with ghost cell communication, and NetCDF I/O.
    Python
    FFT
    GPU
+   LinAlg
    Operators
    Examples
    Cplusplus
+   Architecture
    PythonAPI
    CplusplusAPI
    CodingConvention

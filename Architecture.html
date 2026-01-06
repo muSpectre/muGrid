@@ -1,0 +1,1124 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Python API Reference" href="PythonAPI.html"><link rel="prev" title="C++ Bindings" href="Cplusplus.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>Code Architecture - µGrid 0.102.0-1-g65c8af5d documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">µGrid 0.102.0-1-g65c8af5d
+ documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">µGrid 0.102.0-1-g65c8af5d
+ documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="Summary.html">Summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Python.html">Python Bindings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FFT.html">Fast Fourier Transform</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GPU.html">GPU Computing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="LinAlg.html">Linear Algebra</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Operators.html">Linear Operators</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cplusplus.html">C++ Bindings</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="PythonAPI.html">Python API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CplusplusAPI.html">C++ API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CodingConvention.html">Coding Convention</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/Architecture.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="code-architecture">
+<h1>Code Architecture<a class="headerlink" href="#code-architecture" title="Link to this heading">¶</a></h1>
+<p>This section describes the internal design and implementation of key <em>µ</em>Grid
+components, including the FFT engine and discrete differential operators.</p>
+<nav class="contents local" id="table-of-contents">
+<p class="topic-title">Table of Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#fft-engine-design" id="id10">FFT Engine Design</a></p>
+<ul>
+<li><p><a class="reference internal" href="#storage-order" id="id11">Storage Order</a></p></li>
+<li><p><a class="reference internal" href="#stride-calculations" id="id12">Stride Calculations</a></p></li>
+<li><p><a class="reference internal" href="#gpu-backend-limitations" id="id13">GPU Backend Limitations</a></p></li>
+<li><p><a class="reference internal" href="#mpi-parallel-fft-design" id="id14">MPI Parallel FFT Design</a></p></li>
+<li><p><a class="reference internal" href="#forward-2d-fft-algorithm" id="id15">Forward 2D FFT Algorithm</a></p></li>
+<li><p><a class="reference internal" href="#forward-3d-fft-algorithm" id="id16">Forward 3D FFT Algorithm</a></p></li>
+<li><p><a class="reference internal" href="#per-component-looping" id="id17">Per-Component Looping</a></p></li>
+<li><p><a class="reference internal" href="#normalization" id="id18">Normalization</a></p></li>
+<li><p><a class="reference internal" href="#fft-file-structure" id="id19">FFT File Structure</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#operator-kernel-design" id="id20">Operator Kernel Design</a></p>
+<ul>
+<li><p><a class="reference internal" href="#operator-overview" id="id21">Operator Overview</a></p></li>
+<li><p><a class="reference internal" href="#common-design-principles" id="id22">Common Design Principles</a></p></li>
+<li><p><a class="reference internal" href="#genericlinearoperator-design" id="id23">GenericLinearOperator Design</a></p></li>
+<li><p><a class="reference internal" href="#femgradientoperator-design" id="id24">FEMGradientOperator Design</a></p></li>
+<li><p><a class="reference internal" href="#laplaceoperator-design" id="id25">LaplaceOperator Design</a></p></li>
+<li><p><a class="reference internal" href="#isotropicstiffnessoperator-design" id="id26">IsotropicStiffnessOperator Design</a></p></li>
+<li><p><a class="reference internal" href="#memory-layout-details" id="id27">Memory Layout Details</a></p></li>
+<li><p><a class="reference internal" href="#operator-file-structure" id="id28">Operator File Structure</a></p></li>
+<li><p><a class="reference internal" href="#testing" id="id29">Testing</a></p></li>
+</ul>
+</li>
+</ul>
+</nav>
+<section id="fft-engine-design">
+<h2><a class="toc-backref" href="#id10" role="doc-backlink">FFT Engine Design</a><a class="headerlink" href="#fft-engine-design" title="Link to this heading">¶</a></h2>
+<p>The FFT engine provides distributed Fast Fourier Transform operations on
+structured grids with MPI parallelization. It uses pencil decomposition for
+efficient scaling to large numbers of MPI ranks.</p>
+<section id="storage-order">
+<h3><a class="toc-backref" href="#id11" role="doc-backlink">Storage Order</a><a class="headerlink" href="#storage-order" title="Link to this heading">¶</a></h3>
+<section id="array-of-structures-aos-vs-structure-of-arrays-soa">
+<h4>Array of Structures (AoS) vs Structure of Arrays (SoA)<a class="headerlink" href="#array-of-structures-aos-vs-structure-of-arrays-soa" title="Link to this heading">¶</a></h4>
+<p><em>µ</em>Grid supports two storage orders for multi-component fields:</p>
+<p><strong>AoS (Array of Structures)</strong>: Components are interleaved per pixel</p>
+<ul class="simple">
+<li><p>Memory layout: <code class="docutils literal notranslate"><span class="pre">[c0p0,</span> <span class="pre">c1p0,</span> <span class="pre">c2p0,</span> <span class="pre">c0p1,</span> <span class="pre">c1p1,</span> <span class="pre">c2p1,</span> <span class="pre">...]</span></code></p></li>
+<li><p>Used on <strong>CPU</strong> (default for <code class="docutils literal notranslate"><span class="pre">HostSpace</span></code>)</p></li>
+<li><p>Stride between consecutive X elements = <code class="docutils literal notranslate"><span class="pre">nb_components</span></code></p></li>
+<li><p>Component offset = <code class="docutils literal notranslate"><span class="pre">comp</span></code> (component index)</p></li>
+</ul>
+<p><strong>SoA (Structure of Arrays)</strong>: Components are stored in separate contiguous blocks</p>
+<ul class="simple">
+<li><p>Memory layout: <code class="docutils literal notranslate"><span class="pre">[c0p0,</span> <span class="pre">c0p1,</span> <span class="pre">c0p2,</span> <span class="pre">...,</span> <span class="pre">c1p0,</span> <span class="pre">c1p1,</span> <span class="pre">c1p2,</span> <span class="pre">...]</span></code></p></li>
+<li><p>Used on <strong>GPU</strong> (default for <code class="docutils literal notranslate"><span class="pre">CUDASpace</span></code> and <code class="docutils literal notranslate"><span class="pre">ROCmSpace</span></code>)</p></li>
+<li><p>Stride between consecutive X elements = 1</p></li>
+<li><p>Component offset = <code class="docutils literal notranslate"><span class="pre">comp</span> <span class="pre">*</span> <span class="pre">nb_pixels</span></code></p></li>
+</ul>
+</section>
+<section id="why-different-storage-orders">
+<h4>Why Different Storage Orders?<a class="headerlink" href="#why-different-storage-orders" title="Link to this heading">¶</a></h4>
+<p><strong>GPU (SoA)</strong>: Coalesced memory access is critical for GPU performance. When
+threads access consecutive memory locations, the hardware can combine multiple
+accesses into a single transaction. SoA ensures that threads processing different
+pixels of the same component access contiguous memory.</p>
+<p><strong>CPU (AoS)</strong>: Cache locality for multi-component operations. When processing a
+single pixel, all its components are in the same cache line.</p>
+<p><strong>Design Decision</strong>: FFT work buffers use the same storage order as the memory
+space they reside in (SoA on GPU, AoS on CPU). This avoids expensive storage
+order conversions during FFT operations. The FFT engine detects the storage
+order of input/output fields using <code class="docutils literal notranslate"><span class="pre">field.get_storage_order()</span></code> and computes
+the appropriate strides for each buffer.</p>
+</section>
+</section>
+<section id="stride-calculations">
+<h3><a class="toc-backref" href="#id12" role="doc-backlink">Stride Calculations</a><a class="headerlink" href="#stride-calculations" title="Link to this heading">¶</a></h3>
+<section id="d-case">
+<h4>2D Case<a class="headerlink" href="#d-case" title="Link to this heading">¶</a></h4>
+<p>For a 2D field with dimensions <code class="docutils literal notranslate"><span class="pre">[Nx,</span> <span class="pre">Ny]</span></code> and <code class="docutils literal notranslate"><span class="pre">nb_components</span></code> components:</p>
+<p><strong>SoA strides:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>comp_offset_factor = nb_pixels        // Component i starts at i * nb_pixels
+x_stride = 1                          // Consecutive X elements are contiguous
+row_dist = row_width                  // Distance between rows (Y direction)
+</pre></div>
+</div>
+<p><strong>AoS strides:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>comp_offset_factor = 1                // Component i starts at offset i
+x_stride = nb_components              // Skip over all components between X elements
+row_dist = row_width * nb_components  // Distance between rows includes all components
+</pre></div>
+</div>
+</section>
+<section id="id1">
+<h4>3D Case<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h4>
+<p>For a 3D field with dimensions <code class="docutils literal notranslate"><span class="pre">[Nx,</span> <span class="pre">Ny,</span> <span class="pre">Nz]</span></code>:</p>
+<p><strong>SoA strides:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>comp_offset_factor = nb_pixels
+x_stride = 1
+y_dist = row_x
+z_dist = row_x * rows_y
+</pre></div>
+</div>
+<p><strong>AoS strides:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>comp_offset_factor = 1
+x_stride = nb_components
+y_dist = row_x * nb_components
+z_dist = row_x * rows_y * nb_components
+</pre></div>
+</div>
+</section>
+</section>
+<section id="gpu-backend-limitations">
+<h3><a class="toc-backref" href="#id13" role="doc-backlink">GPU Backend Limitations</a><a class="headerlink" href="#gpu-backend-limitations" title="Link to this heading">¶</a></h3>
+<section id="cufft-strided-r2c-c2r-limitation">
+<h4>cuFFT Strided R2C/C2R Limitation<a class="headerlink" href="#cufft-strided-r2c-c2r-limitation" title="Link to this heading">¶</a></h4>
+<p>cuFFT has a documented limitation: <strong>strided real-to-complex (R2C) and
+complex-to-real (C2R) transforms are not supported</strong>. The stride on the real
+data side must be 1.</p>
+<p>This affects multi-component FFTs because with AoS storage, the stride between
+consecutive real values would be <code class="docutils literal notranslate"><span class="pre">nb_components</span></code> (not 1).</p>
+<p><strong>Solution</strong>: With SoA storage order on GPU, each component’s data is contiguous
+(stride = 1), which satisfies cuFFT’s requirement. The FFT engine loops over
+components, executing one batched FFT per component.</p>
+</section>
+<section id="rocfft-native-api">
+<h4>rocFFT Native API<a class="headerlink" href="#rocfft-native-api" title="Link to this heading">¶</a></h4>
+<p>Unlike cuFFT, rocFFT’s native API (<code class="docutils literal notranslate"><span class="pre">rocfft_plan_description_set_data_layout()</span></code>)
+supports arbitrary strides for both input and output. However, for consistency
+and to avoid storage order conversions, we use the same SoA approach on AMD GPUs.</p>
+</section>
+</section>
+<section id="mpi-parallel-fft-design">
+<h3><a class="toc-backref" href="#id14" role="doc-backlink">MPI Parallel FFT Design</a><a class="headerlink" href="#mpi-parallel-fft-design" title="Link to this heading">¶</a></h3>
+<section id="pencil-decomposition">
+<h4>Pencil Decomposition<a class="headerlink" href="#pencil-decomposition" title="Link to this heading">¶</a></h4>
+<p>For 3D distributed FFT, the engine uses pencil decomposition:</p>
+<ol class="arabic simple">
+<li><p><strong>Z-pencil</strong>: Data distributed in Y and Z, FFT along X (r2c)</p></li>
+<li><p><strong>Y-pencil</strong>: Transpose Y&lt;-&gt;Z, FFT along Y (c2c)</p></li>
+<li><p><strong>X-pencil</strong>: Transpose X&lt;-&gt;Z, FFT along Z (c2c)</p></li>
+</ol>
+</section>
+<section id="transpose-operations">
+<h4>Transpose Operations<a class="headerlink" href="#transpose-operations" title="Link to this heading">¶</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">Transpose</span></code> class handles MPI all-to-all communication for redistributing
+data between pencil orientations.</p>
+<p><strong>Current limitation</strong>: Transpose operations assume AoS layout. When using GPU
+memory, this may require storage order conversion or updating the Transpose
+class to handle SoA.</p>
+</section>
+<section id="communication-efficiency">
+<h4>Communication Efficiency<a class="headerlink" href="#communication-efficiency" title="Link to this heading">¶</a></h4>
+<p><strong>Design Decision</strong>: The FFT module is designed so that MPI communication does
+not require explicit packing and unpacking. Data is laid out so that
+<code class="docutils literal notranslate"><span class="pre">MPI_Alltoall</span></code> can operate directly on contiguous memory regions.</p>
+</section>
+</section>
+<section id="forward-2d-fft-algorithm">
+<h3><a class="toc-backref" href="#id15" role="doc-backlink">Forward 2D FFT Algorithm</a><a class="headerlink" href="#forward-2d-fft-algorithm" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>1. r2c FFT along X for each component
+   - Input: real field (with ghosts)
+   - Output: work buffer (half-complex, no ghosts)
+   - Loop over components, batched over Y rows
+
+2. [MPI only] Transpose X&lt;-&gt;Y
+   - Redistributes data across ranks
+   - Changes from Y-local to X-local
+
+3. c2c FFT along Y for each component
+   - In-place on work buffer (serial) or output (MPI)
+   - Batched over X values
+
+4. [Serial only] Copy work to output
+   - Same storage order, direct copy
+</pre></div>
+</div>
+</section>
+<section id="forward-3d-fft-algorithm">
+<h3><a class="toc-backref" href="#id16" role="doc-backlink">Forward 3D FFT Algorithm</a><a class="headerlink" href="#forward-3d-fft-algorithm" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>1. r2c FFT along X for each component
+   - Input: real field
+   - Output: Z-pencil work buffer (half-complex in X)
+   - Batched over Y rows for each Z plane
+
+2a. [MPI] Transpose Y&lt;-&gt;Z
+    - Z-pencil to Y-pencil
+
+2b. c2c FFT along Y for each component
+    - On Y-pencil buffer
+    - Individual transforms per (X, Z) position
+
+2c. [MPI] Transpose Z&lt;-&gt;Y
+    - Y-pencil back to Z-pencil
+
+3. [MPI] Transpose X&lt;-&gt;Z (or copy)
+   - Z-pencil to X-pencil (output)
+
+4. c2c FFT along Z for each component
+   - On output buffer
+   - Individual transforms per (X, Y) position
+
+5. [Serial only] Copy work to output
+</pre></div>
+</div>
+</section>
+<section id="per-component-looping">
+<h3><a class="toc-backref" href="#id17" role="doc-backlink">Per-Component Looping</a><a class="headerlink" href="#per-component-looping" title="Link to this heading">¶</a></h3>
+<p>Instead of attempting to batch across components (which would require non-unit
+strides on GPU), the FFT engine loops over components:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Index_t</span><span class="w"> </span><span class="n">comp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">comp</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nb_components</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">comp</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Index_t</span><span class="w"> </span><span class="n">in_comp_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">comp</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">in_comp_factor</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Index_t</span><span class="w"> </span><span class="n">out_comp_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">comp</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">work_comp_factor</span><span class="p">;</span>
+<span class="w">    </span><span class="n">backend</span><span class="o">-&gt;</span><span class="n">r2c</span><span class="p">(</span><span class="n">Nx</span><span class="p">,</span><span class="w"> </span><span class="n">batch_size</span><span class="p">,</span>
+<span class="w">                 </span><span class="n">input_ptr</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">in_base</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">in_comp_offset</span><span class="p">,</span>
+<span class="w">                 </span><span class="n">in_x_stride</span><span class="p">,</span><span class="w"> </span><span class="n">in_row_dist</span><span class="p">,</span>
+<span class="w">                 </span><span class="n">work_ptr</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">out_comp_offset</span><span class="p">,</span>
+<span class="w">                 </span><span class="n">work_x_stride</span><span class="p">,</span><span class="w"> </span><span class="n">work_row_dist</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This approach:</p>
+<ul class="simple">
+<li><p>Satisfies cuFFT’s unit-stride requirement for R2C/C2R</p></li>
+<li><p>Allows efficient batching within each component</p></li>
+<li><p>Works correctly for both SoA and AoS storage orders</p></li>
+<li><p>Has minimal overhead (one kernel launch per component)</p></li>
+</ul>
+</section>
+<section id="normalization">
+<h3><a class="toc-backref" href="#id18" role="doc-backlink">Normalization</a><a class="headerlink" href="#normalization" title="Link to this heading">¶</a></h3>
+<p>Like FFTW and cuFFT, the transforms are <strong>unnormalized</strong>. A forward FFT followed
+by an inverse FFT multiplies the result by N (the transform size). Users must
+explicitly normalize if needed.</p>
+</section>
+<section id="fft-file-structure">
+<h3><a class="toc-backref" href="#id19" role="doc-backlink">FFT File Structure</a><a class="headerlink" href="#fft-file-structure" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>src/libmugrid/fft/
+├── fft_engine.hh         # Template class FFTEngine&lt;MemorySpace&gt;
+├── fft_engine_base.hh/cc # Base class with field collections and transpose management
+├── fft_1d_backend.hh     # Abstract interface for 1D FFT backends
+├── pocketfft_backend.cc  # CPU backend using pocketfft
+├── cufft_backend.cc      # NVIDIA GPU backend using cuFFT
+├── rocfft_backend.cc     # AMD GPU backend using rocFFT
+└── transpose.hh/cc       # MPI transpose operations
+</pre></div>
+</div>
+</section>
+</section>
+<section id="operator-kernel-design">
+<h2><a class="toc-backref" href="#id20" role="doc-backlink">Operator Kernel Design</a><a class="headerlink" href="#operator-kernel-design" title="Link to this heading">¶</a></h2>
+<p>This section describes the design of the discrete differential operators in
+<em>µ</em>Grid, including their common design principles for ghost region handling
+and periodicity.</p>
+<section id="operator-overview">
+<h3><a class="toc-backref" href="#id21" role="doc-backlink">Operator Overview</a><a class="headerlink" href="#operator-overview" title="Link to this heading">¶</a></h3>
+<p><em>µ</em>Grid provides several discrete differential operators optimized for structured grids:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Operator</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Stencil Size</p></th>
+<th class="head"><p>Input -&gt; Output</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GenericLinearOperator</span></code></p></td>
+<td><p>Flexible stencil-based convolution</p></td>
+<td><p>Configurable</p></td>
+<td><p>nodal -&gt; quad or nodal -&gt; nodal</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">FEMGradientOperator</span></code></p></td>
+<td><p>FEM gradient (nodal -&gt; quadrature)</p></td>
+<td><p>8 nodes (3D), 4 nodes (2D)</p></td>
+<td><p>nodal -&gt; quad</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LaplaceOperator</span></code></p></td>
+<td><p>7-point (3D) or 5-point (2D) Laplacian</p></td>
+<td><p>7 (3D), 5 (2D)</p></td>
+<td><p>nodal -&gt; nodal</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">IsotropicStiffnessOperator</span></code></p></td>
+<td><p>Fused elasticity kernel</p></td>
+<td><p>8 nodes (3D), 4 nodes (2D)</p></td>
+<td><p>nodal -&gt; nodal</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="common-design-principles">
+<h3><a class="toc-backref" href="#id22" role="doc-backlink">Common Design Principles</a><a class="headerlink" href="#common-design-principles" title="Link to this heading">¶</a></h3>
+<p>All operators follow these design principles for consistency and correctness:</p>
+<section id="ghost-region-handling">
+<h4>Ghost Region Handling<a class="headerlink" href="#ghost-region-handling" title="Link to this heading">¶</a></h4>
+<p>All operators make no assumption over boundary conditions and operate on an
+interior region only. Distributed-memory parallelization and periodic boundary
+conditions are implemented through ghost cell communication:</p>
+<ul class="simple">
+<li><p><strong>Ghost regions</strong> are filled by <code class="docutils literal notranslate"><span class="pre">CartesianDecomposition::communicate_ghosts()</span></code>
+before the operator is called</p></li>
+<li><p>For <strong>periodic BC</strong>: ghost regions contain copies from the opposite boundary</p></li>
+<li><p>For <strong>non-periodic BC</strong> with Dirichlet conditions: boundary node values are
+constrained, and their forces are not computed by the fused kernels (they
+would be overwritten anyway)</p></li>
+<li><p><strong>Interior node computation only</strong>: For all BCs, operators compute forces only
+for interior nodes (e.g. indices 1 to n-2, assuming a ghost buffer of width 1),
+not boundary nodes (indices 0 and n-1)</p></li>
+</ul>
+</section>
+<section id="stencil-offset-convention">
+<h4>Stencil Offset Convention<a class="headerlink" href="#stencil-offset-convention" title="Link to this heading">¶</a></h4>
+<p>All operators use a stencil offset to define where the operator “centers”:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: FEMGradientOperator with offset [0, 0, 0]</span>
+<span class="c1"># Output element (0,0,0) uses input nodes at (0,0,0), (1,0,0), (0,1,0), etc.</span>
+<span class="n">grad_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FEMGradientOperator</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">grid_spacing</span><span class="p">)</span>
+
+<span class="c1"># Example: GenericLinearOperator with custom offset</span>
+<span class="n">conv_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">coefficients</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The offset determines which element’s quadrature points correspond to which
+nodal region.</p>
+</section>
+<section id="upfront-validation">
+<h4>Upfront Validation<a class="headerlink" href="#upfront-validation" title="Link to this heading">¶</a></h4>
+<p>Ghost region requirements are validated <strong>once</strong> before kernel execution, not
+during iteration:</p>
+<ul class="simple">
+<li><p>Operators check that sufficient ghost cells exist in the field collection</p></li>
+<li><p>Invalid configurations throw clear error messages</p></li>
+<li><p>No bounds checking inside the hot loop</p></li>
+</ul>
+</section>
+<section id="memory-layout">
+<h4>Memory Layout<a class="headerlink" href="#memory-layout" title="Link to this heading">¶</a></h4>
+<p>CPU operators use AoS, and GPU operators use SoA memory layouts:</p>
+<ul class="simple">
+<li><p><strong>CPU</strong>: DOF components contiguous <code class="docutils literal notranslate"><span class="pre">[ux0,</span> <span class="pre">uy0,</span> <span class="pre">uz0,</span> <span class="pre">ux1,</span> <span class="pre">uy1,</span> <span class="pre">uz1,</span> <span class="pre">...]</span></code></p></li>
+<li><p><strong>GPU</strong>: Spatial indices contiguous <code class="docutils literal notranslate"><span class="pre">[ux0,</span> <span class="pre">ux1,</span> <span class="pre">...,</span> <span class="pre">uy0,</span> <span class="pre">uy1,</span> <span class="pre">...,</span> <span class="pre">uz0,</span> <span class="pre">uz1,</span> <span class="pre">...]</span></code></p></li>
+</ul>
+<p>The kernel implementations may differ between CPU and GPU as they may be
+optimized for the respective target architecture.</p>
+</section>
+</section>
+<section id="genericlinearoperator-design">
+<h3><a class="toc-backref" href="#id23" role="doc-backlink">GenericLinearOperator Design</a><a class="headerlink" href="#genericlinearoperator-design" title="Link to this heading">¶</a></h3>
+<section id="purpose">
+<h4>Purpose<a class="headerlink" href="#purpose" title="Link to this heading">¶</a></h4>
+<p>Flexible stencil-based convolution operator that can represent any linear
+differential operator as a sparse stencil.</p>
+</section>
+<section id="design">
+<h4>Design<a class="headerlink" href="#design" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p>Takes a list of coefficient arrays, one per output component per stencil point</p></li>
+<li><p>Stencil defined by relative offsets from the current position</p></li>
+<li><p>Supports both forward (apply) and adjoint (transpose) operations</p></li>
+</ul>
+</section>
+<section id="ghost-requirements">
+<h4>Ghost Requirements<a class="headerlink" href="#ghost-requirements" title="Link to this heading">¶</a></h4>
+<p>The forward and transpose operations have different ghost requirements because
+the stencil direction is reversed:</p>
+<p><strong>Forward (apply)</strong>: reads at position <code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">+</span> <span class="pre">s</span></code> (stencil offset s)</p>
+<ul class="simple">
+<li><p>Left ghosts: <code class="docutils literal notranslate"><span class="pre">max(-offset,</span> <span class="pre">0)</span></code> in each dimension</p></li>
+<li><p>Right ghosts: <code class="docutils literal notranslate"><span class="pre">max(stencil_shape</span> <span class="pre">-</span> <span class="pre">1</span> <span class="pre">+</span> <span class="pre">offset,</span> <span class="pre">0)</span></code> in each dimension</p></li>
+</ul>
+<p><strong>Transpose</strong>: reads at position <code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">-</span> <span class="pre">s</span></code> (reversed stencil direction)</p>
+<ul class="simple">
+<li><p>Left ghosts: <code class="docutils literal notranslate"><span class="pre">max(stencil_shape</span> <span class="pre">-</span> <span class="pre">1</span> <span class="pre">+</span> <span class="pre">offset,</span> <span class="pre">0)</span></code> in each dimension (swapped from apply’s right)</p></li>
+<li><p>Right ghosts: <code class="docutils literal notranslate"><span class="pre">max(-offset,</span> <span class="pre">0)</span></code> in each dimension (swapped from apply’s left)</p></li>
+</ul>
+<p><strong>Example</strong>: For a stencil with offset <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">0,</span> <span class="pre">0]</span></code> and shape <code class="docutils literal notranslate"><span class="pre">[2,</span> <span class="pre">2,</span> <span class="pre">2]</span></code>:</p>
+<ul class="simple">
+<li><p>Apply: left=0, right=1 (reads ahead)</p></li>
+<li><p>Transpose: left=1, right=0 (gathers from behind)</p></li>
+</ul>
+</section>
+<section id="usage">
+<h4>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create from FEMGradientOperator coefficients</span>
+<span class="n">grad_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FEMGradientOperator</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">grid_spacing</span><span class="p">)</span>
+<span class="n">conv_op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">grad_op</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span>
+
+<span class="c1"># Apply gradient</span>
+<span class="n">conv_op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="p">,</span> <span class="n">quadrature_field</span><span class="p">)</span>
+
+<span class="c1"># Apply divergence (transpose)</span>
+<span class="n">conv_op</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">quadrature_field</span><span class="p">,</span> <span class="n">nodal_field</span><span class="p">,</span> <span class="n">quad_weights</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="femgradientoperator-design">
+<h3><a class="toc-backref" href="#id24" role="doc-backlink">FEMGradientOperator Design</a><a class="headerlink" href="#femgradientoperator-design" title="Link to this heading">¶</a></h3>
+<section id="id2">
+<h4>Purpose<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h4>
+<p>Computes gradients at quadrature points from nodal displacements using linear
+finite element (P1) shape functions.</p>
+</section>
+<section id="mathematical-formulation">
+<h4>Mathematical Formulation<a class="headerlink" href="#mathematical-formulation" title="Link to this heading">¶</a></h4>
+<p>For linear FEM on structured grids:</p>
+<ul class="simple">
+<li><p><strong>2D</strong>: Each pixel decomposed into 2 triangles, 2 quadrature points</p></li>
+<li><p><strong>3D</strong>: Each voxel decomposed into 5 tetrahedra (Kuhn triangulation), 5 quadrature points</p></li>
+</ul>
+<p>The gradient at quadrature point q is:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\frac{\partial u}{\partial x_i} = \sum_I B_q[i,I] \times u_I / h_i\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(B_q\)</span> contains shape function gradients for the element containing q.</p>
+</section>
+<section id="shape-function-gradients">
+<h4>Shape Function Gradients<a class="headerlink" href="#shape-function-gradients" title="Link to this heading">¶</a></h4>
+<p><strong>2D (2 triangles per pixel):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>B_2D[triangle][dim][node]
+Triangle 0: nodes 0,1,2 (lower-left)
+Triangle 1: nodes 1,2,3 (upper-right)
+</pre></div>
+</div>
+<p><strong>3D (5 tetrahedra per voxel):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>B_3D[tet][dim][node]
+Tet 0: central tetrahedron (weight 1/3)
+Tets 1-4: corner tetrahedra (weight 1/6 each)
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h4>Ghost Requirements<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h4>
+<p><strong>Forward (apply): Gradient - nodal -&gt; quadrature</strong></p>
+<ul class="simple">
+<li><p>Input (nodal field): 1 ghost cell on <strong>right</strong> in each dimension</p></li>
+<li><p>Output (quadrature field): no ghosts needed</p></li>
+<li><p>Iteration: over elements [0, n-2], reads nodal values at element corners
+[ix, ix+1] x [iy, iy+1] x [iz, iz+1]</p></li>
+</ul>
+<p><strong>Transpose (transpose): Divergence - quadrature -&gt; nodal</strong></p>
+<ul class="simple">
+<li><p>Input (quadrature/stress field): 1 ghost cell on <strong>left</strong> in each dimension (for periodic BC)</p></li>
+<li><p>Output (nodal field): no specific ghost requirement</p></li>
+<li><p>Iteration: over elements [0, n-2], accumulates contributions to nodal values
+at element corners</p></li>
+</ul>
+<p>The ghost requirement swap occurs because:</p>
+<ul class="simple">
+<li><p>Forward reads “ahead” (node ix+1 when at element ix) -&gt; needs right ghosts</p></li>
+<li><p>Transpose gathers from elements “behind” (element ix-1 contributes to node ix)
+-&gt; needs left ghosts for periodic wraparound</p></li>
+</ul>
+</section>
+</section>
+<section id="laplaceoperator-design">
+<h3><a class="toc-backref" href="#id25" role="doc-backlink">LaplaceOperator Design</a><a class="headerlink" href="#laplaceoperator-design" title="Link to this heading">¶</a></h3>
+<section id="id4">
+<h4>Purpose<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h4>
+<p>Optimized discrete Laplacian for Poisson-type problems.</p>
+</section>
+<section id="id5">
+<h4>Mathematical Formulation<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h4>
+<p>Standard finite difference Laplacian:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\nabla^2 u \approx \frac{u[i+1] + u[i-1] - 2u[i]}{h^2} + \ldots\]</div>
+</div>
+<p><strong>2D (5-point stencil):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>  1
+1 -4 1
+  1
+</pre></div>
+</div>
+<p><strong>3D (7-point stencil):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Center: -6, Neighbors: +1 (x6)
+</pre></div>
+</div>
+</section>
+<section id="id6">
+<h4>Ghost Requirements<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p>1 ghost cell in each direction (for accessing neighbors)</p></li>
+</ul>
+</section>
+<section id="properties">
+<h4>Properties<a class="headerlink" href="#properties" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p>Self-adjoint: transpose equals forward apply</p></li>
+<li><p>Negative semi-definite (positive semi-definite with <code class="docutils literal notranslate"><span class="pre">-scale</span></code>)</p></li>
+<li><p>Configurable scale factor for grid spacing and sign conventions</p></li>
+</ul>
+</section>
+<section id="id7">
+<h4>Usage<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create Laplacian with scale = -1/h^2 for positive-definite form</span>
+<span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">LaplaceOperator3D</span><span class="p">(</span><span class="n">scale</span><span class="o">=-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">h</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">laplace</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">laplacian_u</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="isotropicstiffnessoperator-design">
+<h3><a class="toc-backref" href="#id26" role="doc-backlink">IsotropicStiffnessOperator Design</a><a class="headerlink" href="#isotropicstiffnessoperator-design" title="Link to this heading">¶</a></h3>
+<section id="id8">
+<h4>Purpose<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h4>
+<p>Fused kernel computing <code class="docutils literal notranslate"><span class="pre">force</span> <span class="pre">=</span> <span class="pre">K</span> <span class="pre">&#64;</span> <span class="pre">displacement</span></code> for isotropic linear elastic
+materials, avoiding explicit assembly of the stiffness matrix K.</p>
+</section>
+<section id="id9">
+<h4>Mathematical Formulation<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h4>
+<p>For isotropic materials, the element stiffness matrix decomposes as:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[K_e = 2\mu G + \lambda V\]</div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(G = \sum_q w_q B_q^T I' B_q\)</span> - geometry matrix (shear stiffness)</p></li>
+<li><p><span class="math notranslate nohighlight">\(V = \sum_q w_q (B_q^T m)(m^T B_q)\)</span> - volumetric coupling matrix</p></li>
+<li><p><span class="math notranslate nohighlight">\(I' = \text{diag}(1, 1, 1, 0.5, 0.5, 0.5)\)</span> - Voigt scaling for strain energy</p></li>
+<li><p><span class="math notranslate nohighlight">\(m = [1, 1, 1, 0, 0, 0]^T\)</span> - trace selector vector</p></li>
+</ul>
+<p>This reduces memory from O(N x DOF^2) for full K to O(N x 2) for spatially-varying
+materials.</p>
+</section>
+<section id="element-decomposition">
+<h4>Element Decomposition<a class="headerlink" href="#element-decomposition" title="Link to this heading">¶</a></h4>
+<p><strong>2D:</strong> 2 triangles per pixel</p>
+<ul class="simple">
+<li><p>Quadrature weights: <code class="docutils literal notranslate"><span class="pre">[0.5,</span> <span class="pre">0.5]</span></code></p></li>
+</ul>
+<p><strong>3D:</strong> 5 tetrahedra per voxel (Kuhn triangulation)</p>
+<ul class="simple">
+<li><p>Quadrature weights: <code class="docutils literal notranslate"><span class="pre">[1/3,</span> <span class="pre">1/6,</span> <span class="pre">1/6,</span> <span class="pre">1/6,</span> <span class="pre">1/6]</span></code></p></li>
+</ul>
+</section>
+<section id="field-requirements">
+<h4>Field Requirements<a class="headerlink" href="#field-requirements" title="Link to this heading">¶</a></h4>
+<p>All fields use <strong>node-based indexing</strong> with the same grid dimensions:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 25.0%" />
+<col style="width: 22.0%" />
+<col style="width: 23.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Dimensions</p></th>
+<th class="head"><p>Left Ghosts</p></th>
+<th class="head"><p>Right Ghosts</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Displacement</p></td>
+<td><p>(nx, ny, nz)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Force</p></td>
+<td><p>(nx, ny, nz)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-even"><td><p>Material (lam, mu)</p></td>
+<td><p>(nx, ny, nz)</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Key design principle</strong>: The kernel does not distinguish between periodic and
+non-periodic boundary conditions. Ghost cell communication (via
+<code class="docutils literal notranslate"><span class="pre">CartesianDecomposition::communicate_ghosts()</span></code>) handles periodicity:</p>
+<ul class="simple">
+<li><p>For <strong>periodic BC</strong>: ghost cells contain copies from the opposite boundary</p></li>
+<li><p>For <strong>non-periodic BC</strong>: ghost cells are filled with appropriate boundary values</p></li>
+</ul>
+<p>This unified approach simplifies the kernel implementation and enables consistent
+behavior across CPU and GPU.</p>
+</section>
+<section id="gather-pattern">
+<h4>Gather Pattern<a class="headerlink" href="#gather-pattern" title="Link to this heading">¶</a></h4>
+<p>The kernel iterates over <strong>interior nodes</strong> and gathers contributions from all
+neighboring elements:</p>
+<p><strong>2D (4 elements per node):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Element offsets and local node indices:
+  (-1,-1) -&gt; local node 3    (0,-1) -&gt; local node 2
+  (-1, 0) -&gt; local node 1    (0, 0) -&gt; local node 0
+</pre></div>
+</div>
+<p><strong>3D (8 elements per node):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Element offsets and local node indices:
+  (-1,-1,-1) -&gt; local node 7    (0,-1,-1) -&gt; local node 6
+  (-1, 0,-1) -&gt; local node 5    (0, 0,-1) -&gt; local node 4
+  (-1,-1, 0) -&gt; local node 3    (0,-1, 0) -&gt; local node 2
+  (-1, 0, 0) -&gt; local node 1    (0, 0, 0) -&gt; local node 0
+</pre></div>
+</div>
+</section>
+<section id="iteration-bounds">
+<h4>Iteration Bounds<a class="headerlink" href="#iteration-bounds" title="Link to this heading">¶</a></h4>
+<p>The kernel iterates over all interior nodes (indices 0 to n-1):</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Iterate over all nodes - ghost communication handles periodicity</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">ix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">ix</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nnx</span><span class="p">;</span><span class="w"> </span><span class="n">ix</span><span class="o">++</span><span class="p">)</span><span class="o">:</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">iy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">iy</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nny</span><span class="p">;</span><span class="w"> </span><span class="n">iy</span><span class="o">++</span><span class="p">)</span><span class="o">:</span>
+<span class="w">        </span><span class="c1">// Compute force at node (ix, iy)</span>
+</pre></div>
+</div>
+<p>The kernel reads from ghost cells at positions -1 (left) and n (right), which
+must be populated before calling the operator. For periodic BC, these contain
+copies from the opposite boundary. For non-periodic BC, these contain boundary
+values (typically zero for homogeneous Dirichlet conditions).</p>
+</section>
+<section id="kernel-pseudocode">
+<h4>Kernel Pseudocode<a class="headerlink" href="#kernel-pseudocode" title="Link to this heading">¶</a></h4>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">node</span><span class="w"> </span><span class="p">(</span><span class="n">ix</span><span class="p">,</span><span class="w"> </span><span class="n">iy</span><span class="p">,</span><span class="w"> </span><span class="n">iz</span><span class="p">)</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">nnx</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">nny</span><span class="p">)</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">nnz</span><span class="p">)</span><span class="o">:</span>
+<span class="w">    </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">]</span><span class="w">  </span><span class="c1">// force accumulator</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">neighboring</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="p">(</span><span class="mi">8</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="mi">3</span><span class="n">D</span><span class="p">)</span><span class="o">:</span>
+<span class="w">        </span><span class="c1">// Element indices can be -1 (left ghost) or nx (right ghost)</span>
+<span class="w">        </span><span class="n">ex</span><span class="p">,</span><span class="w"> </span><span class="n">ey</span><span class="p">,</span><span class="w"> </span><span class="n">ez</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="n">indices</span><span class="w"> </span><span class="n">relative</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">node</span>
+<span class="w">        </span><span class="n">local_node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="n">corner</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="k">this</span><span class="w"> </span><span class="n">node</span>
+
+<span class="w">        </span><span class="c1">// Material fields are node-indexed, read from element position</span>
+<span class="w">        </span><span class="c1">// (element at ex,ey,ez has material stored at node ex,ey,ez)</span>
+<span class="w">        </span><span class="n">lam</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">material_lambda</span><span class="p">[</span><span class="n">ex</span><span class="p">,</span><span class="w"> </span><span class="n">ey</span><span class="p">,</span><span class="w"> </span><span class="n">ez</span><span class="p">]</span>
+<span class="w">        </span><span class="n">mu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">material_mu</span><span class="p">[</span><span class="n">ex</span><span class="p">,</span><span class="w"> </span><span class="n">ey</span><span class="p">,</span><span class="w"> </span><span class="n">ez</span><span class="p">]</span>
+
+<span class="w">        </span><span class="c1">// Gather displacement from all element nodes (may read ghosts)</span>
+<span class="w">        </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">displacement</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="n">corner</span><span class="w"> </span><span class="n">node</span><span class="p">]</span>
+
+<span class="w">        </span><span class="c1">// Compute stiffness contribution</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">DOF</span><span class="w"> </span><span class="n">d</span><span class="o">:</span>
+<span class="w">            </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">local_node</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">NB_DOFS</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">d</span>
+<span class="w">            </span><span class="n">f</span><span class="p">[</span><span class="n">d</span><span class="p">]</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">sum_j</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">mu</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">G</span><span class="p">[</span><span class="n">row</span><span class="p">,</span><span class="n">j</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">lam</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">V</span><span class="p">[</span><span class="n">row</span><span class="p">,</span><span class="n">j</span><span class="p">])</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">u</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+
+<span class="w">    </span><span class="n">force</span><span class="p">[</span><span class="n">ix</span><span class="p">,</span><span class="w"> </span><span class="n">iy</span><span class="p">,</span><span class="w"> </span><span class="n">iz</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">f</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="memory-layout-details">
+<h3><a class="toc-backref" href="#id27" role="doc-backlink">Memory Layout Details</a><a class="headerlink" href="#memory-layout-details" title="Link to this heading">¶</a></h3>
+<section id="cpu-layout-array-of-structures">
+<h4>CPU Layout (Array of Structures)<a class="headerlink" href="#cpu-layout-array-of-structures" title="Link to this heading">¶</a></h4>
+<p>DOF components are contiguous in memory:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Memory: [ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ...]
+</pre></div>
+</div>
+<p>Strides:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">disp_stride_d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">                    </span><span class="c1">// DOF components contiguous</span>
+<span class="n">disp_stride_x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NB_DOFS</span><span class="p">;</span><span class="w">              </span><span class="c1">// = 3 for 3D</span>
+<span class="n">disp_stride_y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NB_DOFS</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">nx</span><span class="p">;</span>
+<span class="n">disp_stride_z</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NB_DOFS</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">nx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">ny</span><span class="p">;</span>
+</pre></div>
+</div>
+</section>
+<section id="gpu-layout-structure-of-arrays">
+<h4>GPU Layout (Structure of Arrays)<a class="headerlink" href="#gpu-layout-structure-of-arrays" title="Link to this heading">¶</a></h4>
+<p>Spatial indices are contiguous for coalesced memory access:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Memory: [ux0, ux1, ux2, ..., uy0, uy1, uy2, ..., uz0, uz1, uz2, ...]
+</pre></div>
+</div>
+<p>Strides:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">disp_stride_x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">                    </span><span class="c1">// Spatial x contiguous</span>
+<span class="n">disp_stride_y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nx</span><span class="p">;</span>
+<span class="n">disp_stride_z</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">ny</span><span class="p">;</span>
+<span class="n">disp_stride_d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">ny</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">nz</span><span class="p">;</span><span class="w">         </span><span class="c1">// DOF components separated</span>
+</pre></div>
+</div>
+</section>
+<section id="data-pointer-offset">
+<h4>Data Pointer Offset<a class="headerlink" href="#data-pointer-offset" title="Link to this heading">¶</a></h4>
+<p>Pointers are offset to account for ghost cells:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">const</span><span class="w"> </span><span class="n">Real</span><span class="o">*</span><span class="w"> </span><span class="n">disp_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">displacement</span><span class="p">.</span><span class="n">data</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ghost_offset</span><span class="p">;</span>
+<span class="c1">// Now index 0 = first interior node, index -1 = left ghost</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="operator-file-structure">
+<h3><a class="toc-backref" href="#id28" role="doc-backlink">Operator File Structure</a><a class="headerlink" href="#operator-file-structure" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>src/libmugrid/operators/
+├── linear.hh              # Base LinearOperator class
+├── generic.hh/.cc         # GenericLinearOperator
+├── laplace_2d.hh/.cc      # LaplaceOperator2D
+├── laplace_3d.hh/.cc      # LaplaceOperator3D
+├── fem_gradient_2d.hh/.cc # FEMGradientOperator2D
+├── fem_gradient_3d.hh/.cc # FEMGradientOperator3D
+└── solids/
+    ├── isotropic_stiffness_2d.hh/.cc  # IsotropicStiffnessOperator2D
+    ├── isotropic_stiffness_3d.hh/.cc  # IsotropicStiffnessOperator3D
+    └── isotropic_stiffness_gpu.cc     # GPU kernels
+</pre></div>
+</div>
+</section>
+<section id="testing">
+<h3><a class="toc-backref" href="#id29" role="doc-backlink">Testing</a><a class="headerlink" href="#testing" title="Link to this heading">¶</a></h3>
+<p>Tests are in <code class="docutils literal notranslate"><span class="pre">tests/python_isotropic_stiffness_operator_tests.py</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">test_compare_with_generic_operator</span></code>: Compares fused kernel against explicit B^T C B</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test_unit_impulse_*</span></code>: Verifies response to unit displacement at specific nodes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test_symmetry</span></code>: Verifies K is symmetric</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ValidationGuardTest*</span></code>: Verifies proper error handling for invalid configurations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GPUUnitImpulseTest</span></code>: Verifies GPU kernel matches CPU kernel output</p></li>
+</ul>
+<p>With node-based indexing, all tests compare the full output (all nodes), not
+just interior nodes.</p>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="PythonAPI.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Python API Reference</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="Cplusplus.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">C++ Bindings</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2017-2022 Till Junge, 2018-2024 Lars Pastewka
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Code Architecture</a><ul>
+<li><a class="reference internal" href="#fft-engine-design">FFT Engine Design</a><ul>
+<li><a class="reference internal" href="#storage-order">Storage Order</a><ul>
+<li><a class="reference internal" href="#array-of-structures-aos-vs-structure-of-arrays-soa">Array of Structures (AoS) vs Structure of Arrays (SoA)</a></li>
+<li><a class="reference internal" href="#why-different-storage-orders">Why Different Storage Orders?</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#stride-calculations">Stride Calculations</a><ul>
+<li><a class="reference internal" href="#d-case">2D Case</a></li>
+<li><a class="reference internal" href="#id1">3D Case</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#gpu-backend-limitations">GPU Backend Limitations</a><ul>
+<li><a class="reference internal" href="#cufft-strided-r2c-c2r-limitation">cuFFT Strided R2C/C2R Limitation</a></li>
+<li><a class="reference internal" href="#rocfft-native-api">rocFFT Native API</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mpi-parallel-fft-design">MPI Parallel FFT Design</a><ul>
+<li><a class="reference internal" href="#pencil-decomposition">Pencil Decomposition</a></li>
+<li><a class="reference internal" href="#transpose-operations">Transpose Operations</a></li>
+<li><a class="reference internal" href="#communication-efficiency">Communication Efficiency</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#forward-2d-fft-algorithm">Forward 2D FFT Algorithm</a></li>
+<li><a class="reference internal" href="#forward-3d-fft-algorithm">Forward 3D FFT Algorithm</a></li>
+<li><a class="reference internal" href="#per-component-looping">Per-Component Looping</a></li>
+<li><a class="reference internal" href="#normalization">Normalization</a></li>
+<li><a class="reference internal" href="#fft-file-structure">FFT File Structure</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#operator-kernel-design">Operator Kernel Design</a><ul>
+<li><a class="reference internal" href="#operator-overview">Operator Overview</a></li>
+<li><a class="reference internal" href="#common-design-principles">Common Design Principles</a><ul>
+<li><a class="reference internal" href="#ghost-region-handling">Ghost Region Handling</a></li>
+<li><a class="reference internal" href="#stencil-offset-convention">Stencil Offset Convention</a></li>
+<li><a class="reference internal" href="#upfront-validation">Upfront Validation</a></li>
+<li><a class="reference internal" href="#memory-layout">Memory Layout</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#genericlinearoperator-design">GenericLinearOperator Design</a><ul>
+<li><a class="reference internal" href="#purpose">Purpose</a></li>
+<li><a class="reference internal" href="#design">Design</a></li>
+<li><a class="reference internal" href="#ghost-requirements">Ghost Requirements</a></li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#femgradientoperator-design">FEMGradientOperator Design</a><ul>
+<li><a class="reference internal" href="#id2">Purpose</a></li>
+<li><a class="reference internal" href="#mathematical-formulation">Mathematical Formulation</a></li>
+<li><a class="reference internal" href="#shape-function-gradients">Shape Function Gradients</a></li>
+<li><a class="reference internal" href="#id3">Ghost Requirements</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#laplaceoperator-design">LaplaceOperator Design</a><ul>
+<li><a class="reference internal" href="#id4">Purpose</a></li>
+<li><a class="reference internal" href="#id5">Mathematical Formulation</a></li>
+<li><a class="reference internal" href="#id6">Ghost Requirements</a></li>
+<li><a class="reference internal" href="#properties">Properties</a></li>
+<li><a class="reference internal" href="#id7">Usage</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#isotropicstiffnessoperator-design">IsotropicStiffnessOperator Design</a><ul>
+<li><a class="reference internal" href="#id8">Purpose</a></li>
+<li><a class="reference internal" href="#id9">Mathematical Formulation</a></li>
+<li><a class="reference internal" href="#element-decomposition">Element Decomposition</a></li>
+<li><a class="reference internal" href="#field-requirements">Field Requirements</a></li>
+<li><a class="reference internal" href="#gather-pattern">Gather Pattern</a></li>
+<li><a class="reference internal" href="#iteration-bounds">Iteration Bounds</a></li>
+<li><a class="reference internal" href="#kernel-pseudocode">Kernel Pseudocode</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#memory-layout-details">Memory Layout Details</a><ul>
+<li><a class="reference internal" href="#cpu-layout-array-of-structures">CPU Layout (Array of Structures)</a></li>
+<li><a class="reference internal" href="#gpu-layout-structure-of-arrays">GPU Layout (Structure of Arrays)</a></li>
+<li><a class="reference internal" href="#data-pointer-offset">Data Pointer Offset</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#operator-file-structure">Operator File Structure</a></li>
+<li><a class="reference internal" href="#testing">Testing</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=6aa0b73f"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    </body>
+</html>
