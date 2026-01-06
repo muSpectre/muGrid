@@ -46,8 +46,15 @@ Monitor output to see which of these options were automatically detected.
 
 ## Funding
 
+Development has been funded by the
+`Swiss National Science Foundation <https://snf.ch>`_, the
+`European Research Council <https://erc.europa.eu>`_ and the
+`Deutsche Foschungsgemeinschaft <https://www.dfg.de/>`.
+
+
 This development has received funding from the
-[Swiss National Science Foundation](https://www.snf.ch/en)
-within an Ambizione Project and by the
-[European Research Council](https://erc.europa.eu) within
-[Starting Grant 757343](https://cordis.europa.eu/project/id/757343).
+[Swiss National Science Foundation](https://www.snf.ch/en),
+the
+[European Research Council](https://erc.europa.eu),
+and the
+[Deutsche Foschungsgemeinschaft](https://www.dfg.de/).
