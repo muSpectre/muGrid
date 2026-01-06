@@ -41,11 +41,11 @@ namespace muGrid {
 template class FFTEngine<HostSpace>;
 
 #if defined(MUGRID_ENABLE_CUDA)
-template class FFTEngine<CudaSpace>;
+template class FFTEngine<CUDASpace>;
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-template class FFTEngine<HIPSpace>;
+template class FFTEngine<ROCmSpace>;
 #endif
 
 }  // namespace muGrid

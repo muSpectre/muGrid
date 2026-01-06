@@ -61,8 +61,8 @@ namespace muGrid {
      * Uses StructureOfArrays storage order for optimal GPU memory
      * coalescence when threads in a warp access adjacent pixels.
      */
-    struct CudaSpace {
-        static constexpr const char * name = "Cuda";
+    struct CUDASpace {
+        static constexpr const char * name = "CUDA";
         static constexpr StorageOrder storage_order =
             StorageOrder::StructureOfArrays;
     };
@@ -70,13 +70,13 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_HIP)
     /**
-     * Tag type for HIP device memory space.
+     * Tag type for ROCm device memory space.
      *
      * Uses StructureOfArrays storage order for optimal GPU memory
      * coalescence when threads in a warp access adjacent pixels.
      */
-    struct HIPSpace {
-        static constexpr const char * name = "HIP";
+    struct ROCmSpace {
+        static constexpr const char * name = "ROCm";
         static constexpr StorageOrder storage_order =
             StorageOrder::StructureOfArrays;
     };
@@ -84,9 +84,9 @@ namespace muGrid {
 
     // Default device space based on backend
 #if defined(MUGRID_ENABLE_CUDA)
-    using DefaultDeviceSpace = CudaSpace;
+    using DefaultDeviceSpace = CUDASpace;
 #elif defined(MUGRID_ENABLE_HIP)
-    using DefaultDeviceSpace = HIPSpace;
+    using DefaultDeviceSpace = ROCmSpace;
 #else
     using DefaultDeviceSpace = HostSpace;
 #endif
@@ -108,12 +108,12 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA)
     template <>
-    struct is_device_space<CudaSpace> : std::true_type {};
+    struct is_device_space<CUDASpace> : std::true_type {};
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
     template <>
-    struct is_device_space<HIPSpace> : std::true_type {};
+    struct is_device_space<ROCmSpace> : std::true_type {};
 #endif
 
     template <typename MemorySpace>
@@ -141,14 +141,14 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA)
     template <>
-    struct dlpack_device_type<CudaSpace> {
+    struct dlpack_device_type<CUDASpace> {
         static constexpr int value = DLPackDeviceType::CUDA;
     };
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
     template <>
-    struct dlpack_device_type<HIPSpace> {
+    struct dlpack_device_type<ROCmSpace> {
         static constexpr int value = DLPackDeviceType::ROCm;
     };
 #endif
@@ -166,12 +166,12 @@ namespace muGrid {
             return "cpu";
         }
 #if defined(MUGRID_ENABLE_CUDA)
-        else if constexpr (std::is_same_v<MemorySpace, CudaSpace>) {
+        else if constexpr (std::is_same_v<MemorySpace, CUDASpace>) {
             return "cuda";
         }
 #endif
 #if defined(MUGRID_ENABLE_HIP)
-        else if constexpr (std::is_same_v<MemorySpace, HIPSpace>) {
+        else if constexpr (std::is_same_v<MemorySpace, ROCmSpace>) {
             return "rocm";
         }
 #endif

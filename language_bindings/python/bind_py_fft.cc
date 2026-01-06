@@ -63,13 +63,13 @@ using muGrid::Device;
 using PyFFTEngine = FFTEngine<HostSpace>;
 
 #if defined(MUGRID_ENABLE_CUDA)
-using muGrid::CudaSpace;
-using PyFFTEngineCuda = FFTEngine<CudaSpace>;
+using muGrid::CUDASpace;
+using PyFFTEngineCUDA = FFTEngine<CUDASpace>;
 #endif
 
 #if defined(MUGRID_ENABLE_HIP)
-using muGrid::HIPSpace;
-using PyFFTEngineHIP = FFTEngine<HIPSpace>;
+using muGrid::ROCmSpace;
+using PyFFTEngineROCm = FFTEngine<ROCmSpace>;
 #endif
 
 using muGrid::Int;
@@ -578,7 +578,7 @@ void add_fft_engine(py::module & mod) {
 void add_fft_engine_cuda(py::module & mod) {
   using SubPtMap_t = muGrid::FieldCollection::SubPtMap_t;
 
-  py::class_<PyFFTEngineCuda, muGrid::CartesianDecomposition>(mod, "FFTEngineCuda",
+  py::class_<PyFFTEngineCUDA, muGrid::CartesianDecomposition>(mod, "FFTEngineCUDA",
       R"(
       GPU-accelerated distributed FFT engine using cuFFT.
 
@@ -597,7 +597,7 @@ void add_fft_engine_cuda(py::module & mod) {
              cudaSetDevice(device_id);
              // Create device object with the specified device_id
              Device device = Device::cuda(device_id);
-             return new PyFFTEngineCuda(nb_domain_grid_pts, comm,
+             return new PyFFTEngineCUDA(nb_domain_grid_pts, comm,
                                         nb_ghosts_left, nb_ghosts_right,
                                         nb_sub_pts, device);
            }),
@@ -627,14 +627,14 @@ void add_fft_engine_cuda(py::module & mod) {
            )")
 
       .def("fft",
-           [](PyFFTEngineCuda & self, const Field & input, Field & output) {
+           [](PyFFTEngineCUDA & self, const Field & input, Field & output) {
              self.fft(input, output);
            },
            "input"_a, "output"_a,
            "Forward FFT: real space -> Fourier space (GPU)")
 
       .def("ifft",
-           [](PyFFTEngineCuda & self, const Field & input, Field & output) {
+           [](PyFFTEngineCUDA & self, const Field & input, Field & output) {
              self.ifft(input, output);
            },
            "input"_a, "output"_a,
@@ -642,113 +642,113 @@ void add_fft_engine_cuda(py::module & mod) {
 
       .def("register_real_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineCuda::register_real_space_field),
+               &PyFFTEngineCUDA::register_real_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Register a new real-space field on GPU")
 
       .def("register_fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineCuda::register_fourier_space_field),
+               &PyFFTEngineCUDA::register_fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Register a new Fourier-space field on GPU")
 
       .def("real_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineCuda::real_space_field),
+               &PyFFTEngineCUDA::real_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Get or create a real-space field on GPU")
 
       .def("fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineCuda::fourier_space_field),
+               &PyFFTEngineCUDA::fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Get or create a Fourier-space field on GPU")
 
       .def_property_readonly("real_space_collection",
-           py::overload_cast<>(&PyFFTEngineCuda::get_real_space_collection),
+           py::overload_cast<>(&PyFFTEngineCUDA::get_real_space_collection),
            py::return_value_policy::reference_internal)
 
       .def_property_readonly("fourier_space_collection",
-           py::overload_cast<>(&PyFFTEngineCuda::get_fourier_space_collection),
+           py::overload_cast<>(&PyFFTEngineCUDA::get_fourier_space_collection),
            py::return_value_policy::reference_internal)
 
-      .def_property_readonly("normalisation", &PyFFTEngineCuda::normalisation)
+      .def_property_readonly("normalisation", &PyFFTEngineCUDA::normalisation)
 
       .def_property_readonly("nb_fourier_grid_pts",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              return muGrid::to_tuple(self.get_nb_fourier_grid_pts());
            })
 
       .def_property_readonly("nb_fourier_subdomain_grid_pts",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              return muGrid::to_tuple(self.get_nb_fourier_subdomain_grid_pts());
            })
 
       .def_property_readonly("fourier_subdomain_locations",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              return muGrid::to_tuple(self.get_fourier_subdomain_locations());
            })
 
       .def_property_readonly("nb_subdomain_grid_pts",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              return muGrid::to_tuple(
                  self.get_nb_subdomain_grid_pts_without_ghosts());
            })
 
       .def_property_readonly("subdomain_locations",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              return muGrid::to_tuple(
                  self.get_subdomain_locations_without_ghosts());
            })
 
       .def_property_readonly("process_grid",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              auto grid = self.get_process_grid();
              return py::make_tuple(grid[0], grid[1]);
            })
 
       .def_property_readonly("process_coords",
-           [](const PyFFTEngineCuda & self) {
+           [](const PyFFTEngineCUDA & self) {
              auto coords = self.get_process_coords();
              return py::make_tuple(coords[0], coords[1]);
            })
 
-      .def_property_readonly("backend_name", &PyFFTEngineCuda::get_backend_name)
+      .def_property_readonly("backend_name", &PyFFTEngineCUDA::get_backend_name)
 
-      .def_property_readonly("spatial_dim", &PyFFTEngineCuda::get_spatial_dim)
+      .def_property_readonly("spatial_dim", &PyFFTEngineCUDA::get_spatial_dim)
 
       .def_property_readonly("fftfreq",
-           [](const PyFFTEngineCuda & self) {
-             return muGrid::py_fftfreq<Real, PyFFTEngineCuda>(self);
+           [](const PyFFTEngineCUDA & self) {
+             return muGrid::py_fftfreq<Real, PyFFTEngineCUDA>(self);
            })
 
       .def_property_readonly("fftfreqind",
-           [](const PyFFTEngineCuda & self) {
-             return muGrid::py_fftfreq<Int, PyFFTEngineCuda>(self);
+           [](const PyFFTEngineCUDA & self) {
+             return muGrid::py_fftfreq<Int, PyFFTEngineCUDA>(self);
            })
 
       .def_property_readonly("coords",
-           [](const PyFFTEngineCuda & self) {
-             return py_fft_coords<Real, false, PyFFTEngineCuda>(self);
+           [](const PyFFTEngineCUDA & self) {
+             return py_fft_coords<Real, false, PyFFTEngineCUDA>(self);
            })
 
       .def_property_readonly("icoords",
-           [](const PyFFTEngineCuda & self) {
-             return py_fft_coords<Int, false, PyFFTEngineCuda>(self);
+           [](const PyFFTEngineCUDA & self) {
+             return py_fft_coords<Int, false, PyFFTEngineCUDA>(self);
            })
 
       .def_property_readonly("coordsg",
-           [](const PyFFTEngineCuda & self) {
-             return py_fft_coords<Real, true, PyFFTEngineCuda>(self);
+           [](const PyFFTEngineCUDA & self) {
+             return py_fft_coords<Real, true, PyFFTEngineCUDA>(self);
            })
 
       .def_property_readonly("icoordsg",
-           [](const PyFFTEngineCuda & self) {
-             return py_fft_coords<Int, true, PyFFTEngineCuda>(self);
+           [](const PyFFTEngineCUDA & self) {
+             return py_fft_coords<Int, true, PyFFTEngineCUDA>(self);
            });
 }
 #endif  // MUGRID_ENABLE_CUDA
@@ -757,11 +757,11 @@ void add_fft_engine_cuda(py::module & mod) {
 void add_fft_engine_hip(py::module & mod) {
   using SubPtMap_t = muGrid::FieldCollection::SubPtMap_t;
 
-  py::class_<PyFFTEngineHIP, muGrid::CartesianDecomposition>(mod, "FFTEngineHIP",
+  py::class_<PyFFTEngineROCm, muGrid::CartesianDecomposition>(mod, "FFTEngineROCm",
       R"(
       GPU-accelerated distributed FFT engine using rocFFT.
 
-      This is the HIP/ROCm variant of FFTEngine that performs FFT operations on GPU memory.
+      This is the ROCm variant of FFTEngine that performs FFT operations on GPU memory.
       Fields created by this engine are allocated on the specified AMD GPU device.
 
       See FFTEngine for full documentation of the interface.
@@ -772,11 +772,11 @@ void add_fft_engine_hip(py::module & mod) {
                        const DynGridIndex & nb_ghosts_right,
                        const SubPtMap_t & nb_sub_pts,
                        int device_id) {
-             // Set the HIP device before creating the engine
+             // Set the ROCm device before creating the engine
              hipSetDevice(device_id);
              // Create device object with the specified device_id
-             Device device = Device::hip(device_id);
-             return new PyFFTEngineHIP(nb_domain_grid_pts, comm,
+             Device device = Device::rocm(device_id);
+             return new PyFFTEngineROCm(nb_domain_grid_pts, comm,
                                        nb_ghosts_left, nb_ghosts_right,
                                        nb_sub_pts, device);
            }),
@@ -787,7 +787,7 @@ void add_fft_engine_hip(py::module & mod) {
            "nb_sub_pts"_a = SubPtMap_t{},
            "device_id"_a = 0,
            R"(
-           Construct a GPU FFT engine using HIP/ROCm.
+           Construct a GPU FFT engine using ROCm.
 
            Parameters
            ----------
@@ -802,18 +802,18 @@ void add_fft_engine_hip(py::module & mod) {
            nb_sub_pts : dict, optional
                Number of sub-points per pixel
            device_id : int, optional
-               HIP device ID (default: 0)
+               ROCm device ID (default: 0)
            )")
 
       .def("fft",
-           [](PyFFTEngineHIP & self, const Field & input, Field & output) {
+           [](PyFFTEngineROCm & self, const Field & input, Field & output) {
              self.fft(input, output);
            },
            "input"_a, "output"_a,
            "Forward FFT: real space -> Fourier space (GPU)")
 
       .def("ifft",
-           [](PyFFTEngineHIP & self, const Field & input, Field & output) {
+           [](PyFFTEngineROCm & self, const Field & input, Field & output) {
              self.ifft(input, output);
            },
            "input"_a, "output"_a,
@@ -821,113 +821,113 @@ void add_fft_engine_hip(py::module & mod) {
 
       .def("register_real_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineHIP::register_real_space_field),
+               &PyFFTEngineROCm::register_real_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Register a new real-space field on GPU")
 
       .def("register_fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineHIP::register_fourier_space_field),
+               &PyFFTEngineROCm::register_fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Register a new Fourier-space field on GPU")
 
       .def("real_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineHIP::real_space_field),
+               &PyFFTEngineROCm::real_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Get or create a real-space field on GPU")
 
       .def("fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
-               &PyFFTEngineHIP::fourier_space_field),
+               &PyFFTEngineROCm::fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Get or create a Fourier-space field on GPU")
 
       .def_property_readonly("real_space_collection",
-           py::overload_cast<>(&PyFFTEngineHIP::get_real_space_collection),
+           py::overload_cast<>(&PyFFTEngineROCm::get_real_space_collection),
            py::return_value_policy::reference_internal)
 
       .def_property_readonly("fourier_space_collection",
-           py::overload_cast<>(&PyFFTEngineHIP::get_fourier_space_collection),
+           py::overload_cast<>(&PyFFTEngineROCm::get_fourier_space_collection),
            py::return_value_policy::reference_internal)
 
-      .def_property_readonly("normalisation", &PyFFTEngineHIP::normalisation)
+      .def_property_readonly("normalisation", &PyFFTEngineROCm::normalisation)
 
       .def_property_readonly("nb_fourier_grid_pts",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              return muGrid::to_tuple(self.get_nb_fourier_grid_pts());
            })
 
       .def_property_readonly("nb_fourier_subdomain_grid_pts",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              return muGrid::to_tuple(self.get_nb_fourier_subdomain_grid_pts());
            })
 
       .def_property_readonly("fourier_subdomain_locations",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              return muGrid::to_tuple(self.get_fourier_subdomain_locations());
            })
 
       .def_property_readonly("nb_subdomain_grid_pts",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              return muGrid::to_tuple(
                  self.get_nb_subdomain_grid_pts_without_ghosts());
            })
 
       .def_property_readonly("subdomain_locations",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              return muGrid::to_tuple(
                  self.get_subdomain_locations_without_ghosts());
            })
 
       .def_property_readonly("process_grid",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              auto grid = self.get_process_grid();
              return py::make_tuple(grid[0], grid[1]);
            })
 
       .def_property_readonly("process_coords",
-           [](const PyFFTEngineHIP & self) {
+           [](const PyFFTEngineROCm & self) {
              auto coords = self.get_process_coords();
              return py::make_tuple(coords[0], coords[1]);
            })
 
-      .def_property_readonly("backend_name", &PyFFTEngineHIP::get_backend_name)
+      .def_property_readonly("backend_name", &PyFFTEngineROCm::get_backend_name)
 
-      .def_property_readonly("spatial_dim", &PyFFTEngineHIP::get_spatial_dim)
+      .def_property_readonly("spatial_dim", &PyFFTEngineROCm::get_spatial_dim)
 
       .def_property_readonly("fftfreq",
-           [](const PyFFTEngineHIP & self) {
-             return muGrid::py_fftfreq<Real, PyFFTEngineHIP>(self);
+           [](const PyFFTEngineROCm & self) {
+             return muGrid::py_fftfreq<Real, PyFFTEngineROCm>(self);
            })
 
       .def_property_readonly("fftfreqind",
-           [](const PyFFTEngineHIP & self) {
-             return muGrid::py_fftfreq<Int, PyFFTEngineHIP>(self);
+           [](const PyFFTEngineROCm & self) {
+             return muGrid::py_fftfreq<Int, PyFFTEngineROCm>(self);
            })
 
       .def_property_readonly("coords",
-           [](const PyFFTEngineHIP & self) {
-             return py_fft_coords<Real, false, PyFFTEngineHIP>(self);
+           [](const PyFFTEngineROCm & self) {
+             return py_fft_coords<Real, false, PyFFTEngineROCm>(self);
            })
 
       .def_property_readonly("icoords",
-           [](const PyFFTEngineHIP & self) {
-             return py_fft_coords<Int, false, PyFFTEngineHIP>(self);
+           [](const PyFFTEngineROCm & self) {
+             return py_fft_coords<Int, false, PyFFTEngineROCm>(self);
            })
 
       .def_property_readonly("coordsg",
-           [](const PyFFTEngineHIP & self) {
-             return py_fft_coords<Real, true, PyFFTEngineHIP>(self);
+           [](const PyFFTEngineROCm & self) {
+             return py_fft_coords<Real, true, PyFFTEngineROCm>(self);
            })
 
       .def_property_readonly("icoordsg",
-           [](const PyFFTEngineHIP & self) {
-             return py_fft_coords<Int, true, PyFFTEngineHIP>(self);
+           [](const PyFFTEngineROCm & self) {
+             return py_fft_coords<Int, true, PyFFTEngineROCm>(self);
            });
 }
 #endif  // MUGRID_ENABLE_HIP

@@ -9,7 +9,7 @@
  *
  * This file is compiled with the CUDA or HIP compiler depending on which
  * GPU backend is enabled. The implementation uses DefaultDeviceSpace which
- * resolves to CudaSpace or HIPSpace at compile time.
+ * resolves to CUDASpace or ROCmSpace at compile time.
  *
  * Copyright © 2024 Lars Pastewka
  *

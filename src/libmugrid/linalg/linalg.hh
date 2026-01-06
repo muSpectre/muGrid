@@ -58,7 +58,7 @@ namespace linalg {
  * https://data-apis.org/array-api/latest/API_specification/generated/array_api.vecdot.html
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param a First field
  * @param b Second field (must have same shape as a)
  * @return Scalar dot product (local, not MPI-reduced)
@@ -76,7 +76,7 @@ T vecdot(const TypedField<T, MemorySpace>& a,
  * be overwritten by subsequent ghost communication anyway.
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param alpha Scalar multiplier
  * @param x Input field
  * @param y Input/output field (modified in place)
@@ -93,7 +93,7 @@ void axpy(T alpha,
  * Operates on the FULL buffer for efficiency.
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param alpha Scalar multiplier
  * @param x Input/output field (modified in place)
  */
@@ -109,7 +109,7 @@ void scal(T alpha, TypedField<T, MemorySpace>& x);
  * Operates on the FULL buffer (including ghost regions) for efficiency.
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param alpha Scalar multiplier for x
  * @param x Input field
  * @param beta Scalar multiplier for y
@@ -128,7 +128,7 @@ void axpby(T alpha,
  * Operates on the FULL buffer.
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param src Source field
  * @param dst Destination field (modified in place)
  * @throws FieldError if fields have incompatible shapes
@@ -144,7 +144,7 @@ void copy(const TypedField<T, MemorySpace>& src,
  * Only iterates over interior region (excludes ghosts).
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param x Input field
  * @return Squared norm (local, not MPI-reduced)
  */
@@ -164,7 +164,7 @@ T norm_sq(const TypedField<T, MemorySpace>& x);
  * over interior pixels (excludes ghost regions for MPI correctness).
  *
  * @tparam T Scalar type (Real, Complex, etc.)
- * @tparam MemorySpace Memory space (HostSpace, CudaSpace, HIPSpace)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param alpha Scalar multiplier
  * @param x Input field
  * @param y Input/output field (modified in place)
