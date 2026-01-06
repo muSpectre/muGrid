@@ -9,16 +9,16 @@ with support for MPI parallelization and GPU acceleration.
 
 - **Field collections**: Manage scalar, vector, and tensor fields on structured
   grids with flexible memory layouts
-- **FFT engine**: Built-in Fast Fourier Transform with MPI-parallel support
-  using pencil decomposition
-- **Convolution operators**: Discrete differential operators including Laplacian
-  and FEM gradient operators for spectral methods
 - **Domain decomposition**: Cartesian decomposition with ghost cell communication
   for stencil operations
+- **Linear operators**: Discrete differential operators including Laplacian
+  and FEM gradient operators for spectral methods
+- **FFT engine**: Built-in Fast Fourier Transform with MPI-parallel support
+  using pencil decomposition
 - **GPU support**: Optional CUDA and HIP backends for GPU-accelerated computation
 - **NetCDF I/O**: Serial and parallel file I/O for checkpointing and analysis
 
-µGrid is written in C++17 and has language bindings for
+µGrid is written in C++20 and has language bindings for
 [Python](https://www.python.org/) via pybind11.
 
 This README contains only a small quick start guide. Please refer to the
