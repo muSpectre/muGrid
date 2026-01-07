@@ -190,8 +190,11 @@ namespace muGrid {
             Real scale,
             bool increment) {
 
-            // Process interior points (excluding ghost layers)
-            // Ghost layer is 1 pixel on each side
+            // Process all computable points based on stencil requirements.
+            // The 5-point stencil needs 1 neighbor on each side, so we iterate
+            // [1, n-1) in each dimension. This computes for all points where
+            // the stencil has valid input data, including ghost points beyond
+            // the minimum stencil requirement.
             for (Index_t iy = 1; iy < ny - 1; ++iy) {
                 #if defined(_MSC_VER)
                 #pragma loop(ivdep)

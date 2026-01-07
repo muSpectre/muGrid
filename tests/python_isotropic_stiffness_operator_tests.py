@@ -1513,7 +1513,9 @@ class TestValidationGuard2D:
         with pytest.raises(RuntimeError) as exc_info:
             op.apply(displacement, lambda_field, mu_field, force)
         err_msg = str(exc_info.value).lower()
-        assert "ghost" in err_msg or "ghosts" in err_msg
+        # Error can be about ghosts or computable region mismatch
+        assert ("ghost" in err_msg or "ghosts" in err_msg or
+                "computable region" in err_msg)
 
     def test_valid_config(self):
         """Test that valid configuration does not raise."""

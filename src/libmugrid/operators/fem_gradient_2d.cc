@@ -447,8 +447,10 @@ namespace muGrid {
             const Real inv_hx = alpha / hx;
             const Real inv_hy = alpha / hy;
 
-            // Process interior points (excluding last row/column which need
-            // nodes from the next pixel)
+            // Process all computable pixels based on stencil requirements.
+            // Each pixel uses 4 nodes at corners [ix, ix+1] x [iy, iy+1],
+            // so the stencil needs 0 left, 1 right ghost. We iterate [0, n-1)
+            // in each dimension, computing for all pixels where nodal data is valid.
             for (Index_t iy = 0; iy < ny - 1; ++iy) {
 #if defined(_MSC_VER)
 #pragma loop(ivdep)
@@ -536,8 +538,10 @@ namespace muGrid {
                 }
             }
 
-            // The transpose accumulates contributions from all quadrature
-            // points to the nodal points.
+            // Process all computable pixels based on stencil requirements.
+            // The transpose scatters from pixels to their 4 corner nodes, writing
+            // to nodes at [ix, ix+1] x [iy, iy+1]. We iterate [0, n-1)
+            // in each dimension, which covers all pixels in the gradient field.
             for (Index_t iy = 0; iy < ny - 1; ++iy) {
                 for (Index_t ix = 0; ix < nx - 1; ++ix) {
                     Index_t grad_base = ix * grad_stride_x + iy * grad_stride_y;

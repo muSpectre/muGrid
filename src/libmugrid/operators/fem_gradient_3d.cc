@@ -509,6 +509,10 @@ namespace muGrid {
             const Real inv_hy = alpha / hy;
             const Real inv_hz = alpha / hz;
 
+            // Process all computable voxels based on stencil requirements.
+            // Each voxel uses 8 nodes at corners [ix, ix+1] x [iy, iy+1] x [iz, iz+1],
+            // so the stencil needs 0 left, 1 right ghost. We iterate [0, n-1) in each
+            // dimension, computing for all voxels where nodal data is valid.
             for (Index_t iz = 0; iz < nz - 1; ++iz) {
                 for (Index_t iy = 0; iy < ny - 1; ++iy) {
 #if defined(_MSC_VER)
@@ -598,6 +602,10 @@ namespace muGrid {
             const Real inv_hy = alpha / hy;
             const Real inv_hz = alpha / hz;
 
+            // Process all computable voxels based on stencil requirements.
+            // The transpose scatters from voxels to their 8 corner nodes, writing
+            // to nodes at [ix, ix+1] x [iy, iy+1] x [iz, iz+1]. We iterate [0, n-1)
+            // in each dimension, which covers all voxels in the gradient field.
             for (Index_t iz = 0; iz < nz - 1; ++iz) {
                 for (Index_t iy = 0; iy < ny - 1; ++iy) {
                     for (Index_t ix = 0; ix < nx - 1; ++ix) {

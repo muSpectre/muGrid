@@ -1,6 +1,20 @@
 Change log for µGrid
 ====================
 
+0.103.0 (07Jan26)
+-----------------
+
+- ENH: Kernel operators now use stencil-based iteration bounds
+  - Operators compute results for all points where the stencil has valid input data
+  - If ghost region is larger than stencil requirement, extra ghost points get computed results
+  - Example: Laplace with 1-wide stencil and 3 ghosts per side → computes 2 extra layers beyond interior
+- ENH: Updated all operators for stencil-based computation region
+  - `GenericLinearOperator`: Dynamic stencil requirements from stencil shape
+  - `LaplaceOperator2D/3D`: Requires 1 left, 1 right (centered 5/7-point stencil)
+  - `FEMGradientOperator2D/3D`: apply requires 0 left, 1 right; transpose requires 1 left, 0 right
+  - `IsotropicStiffnessOperator2D/3D`: Requires 1 left, 1 right (CPU and GPU kernels)
+- DOC: Updated `doc/KERNELS.md` with stencil-based iteration semantics
+
 0.102.0 (05Jan26)
 -----------------
 

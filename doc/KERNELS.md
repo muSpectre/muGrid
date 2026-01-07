@@ -19,12 +19,33 @@ All operators follow these design principles for consistency and correctness:
 
 ### 1. Ghost Region Handling
 
-All operators make no assumption over boundary conditions and operator on a interior region only. Distributed-memory parallelization and periodic boundary conditions are implemented through ghost cell communication:
+All operators make no assumption over boundary conditions. They do not wrap anything to periodic domains. Distributed-memory parallelization and periodic boundary conditions are implemented through ghost cell communication:
 
 - **Ghost regions** are filled by `CartesianDecomposition::communicate_ghosts()` before the operator is called
 - For **periodic BC**: ghost regions contain copies from the opposite boundary
 - For **non-periodic BC** with Dirichlet conditions: boundary node values are constrained, and their forces are not computed by the fused kernels (they would be overwritten anyway)
-- **Interior node computation only**: For all BCs, operators compute forces only for interior nodes (e.g. indices 1 to n-2, assuming a ghost buffer of with 1), not boundary nodes (indices 0 and n-1)
+- **Stencil-based computation region**: Operators compute results for all points where the stencil has valid input data. The iteration bounds are determined by the stencil's requirements, not by the ghost region size.
+
+### Stencil Requirements vs Ghost Size
+
+Each operator has intrinsic **stencil requirements** (minimum ghost cells needed for valid data access):
+
+| Operator | Left Requirement | Right Requirement |
+|----------|------------------|-------------------|
+| LaplaceOperator2D/3D | 1 | 1 |
+| FEMGradientOperator apply | 0 | 1 |
+| FEMGradientOperator transpose | 1 | 0 |
+| GenericLinearOperator | dynamic | dynamic |
+| IsotropicStiffnessOperator | 1 | 1 |
+
+**Validation**: If the ghost region is smaller than the stencil requirement, an error is thrown.
+
+**Extended computation**: If the ghost region is larger than the stencil requirement, the operator computes results in the extra ghost points where valid data exists.
+
+**Example** (LaplaceOperator3D with user-configured 3 ghosts on each side):
+- Stencil requires 1 left, 1 right neighbor
+- With 3 ghost cells: iteration bounds are `[1, n-2)` where n includes all ghosts
+- Result: computes for interior + 2 extra points on each side (where stencil has valid data)
 
 ### 2. Stencil Offset Convention
 
@@ -269,13 +290,20 @@ Element offsets and local node indices:
 
 ### Iteration Bounds
 
-The kernel iterates over all interior nodes (indices 0 to n-1):
+The kernel computes results for all nodes where the stencil has valid input data. With stencil requirements of 1 left and 1 right ghost:
+
 ```cpp
-// Iterate over all nodes - ghost communication handles periodicity
+// Computable region: from stencil_left to total - stencil_right
+// nnx, nny, nnz = grid_with_ghosts - stencil_left - stencil_right
 for (ix = 0; ix < nnx; ix++):
     for (iy = 0; iy < nny; iy++):
         // Compute force at node (ix, iy)
 ```
+
+**Example**: For a 100-point interior with 3 ghost cells on each side (106 total):
+- Stencil requires 1 left, 1 right
+- Computable region: indices 1 to 104 (104 points computed)
+- This includes interior (100 points) + 2 extra points on each side
 
 The kernel reads from ghost cells at positions -1 (left) and n (right), which must be populated before calling the operator. For periodic BC, these contain copies from the opposite boundary. For non-periodic BC, these contain boundary values (typically zero for homogeneous Dirichlet conditions).
 
@@ -349,11 +377,14 @@ disp_stride_d = nx * ny * nz;         // DOF components separated
 
 ### Data Pointer Offset
 
-Pointers are offset to account for ghost cells:
+Pointers are offset to point to the first computable node (based on stencil requirements):
 ```cpp
-const Real* disp_data = displacement.data() + ghost_offset;
-// Now index 0 = first interior node, index -1 = left ghost
+// Offset based on stencil requirements, not ghost size
+const Real* disp_data = displacement.data() + stencil_left_offset;
+// Now index 0 = first computable node, index -1 = left neighbor (in ghost region)
 ```
+
+This allows kernels to iterate from 0 to the computable region size, with negative indices accessing the ghost region for stencil neighbors.
 
 ---
 

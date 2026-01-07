@@ -532,23 +532,26 @@ void IsotropicStiffnessOperator2D::apply_impl(
             "right side of displacement/force fields");
     }
 
-    // Get number of interior nodes
-    auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nnx = nb_interior[0];
-    Index_t nny = nb_interior[1];
+    // Stencil requirements: 1 left, 1 right ghost needed
+    constexpr Index_t STENCIL_LEFT = 1;
+    constexpr Index_t STENCIL_RIGHT = 1;
 
-    // Material field dimensions (interior, without ghosts)
-    // Node-based indexing: material field must have same size as node field
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
+    // Compute computable region: total with ghosts minus stencil requirements
+    auto nb_with_ghosts = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
 
-    // Validate material field dimensions match node field
+    // Material field dimensions (computable region)
+    auto mat_nb_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+
+    // Validate material field computable region matches node field
     if (nelx != nnx || nely != nny) {
         throw RuntimeError(
-            "IsotropicStiffnessOperator2D: material field dimensions (" +
+            "IsotropicStiffnessOperator2D: material field computable region (" +
             std::to_string(nelx) + ", " + std::to_string(nely) +
-            ") must match node field dimensions (" +
+            ") must match node field computable region (" +
             std::to_string(nnx) + ", " + std::to_string(nny) + ")");
     }
 
@@ -565,20 +568,18 @@ void IsotropicStiffnessOperator2D::apply_impl(
     }
 
     // Node dimensions (for displacement/force fields with ghosts)
-    auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nx = nb_nodes[0];
-    Index_t ny = nb_nodes[1];
+    Index_t nx = nb_with_ghosts[0];
+    Index_t ny = nb_with_ghosts[1];
 
     // Material field dimensions with ghosts
-    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
-    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
+    Index_t mat_nx = mat_nb_with_ghosts[0];
+    Index_t mat_ny = mat_nb_with_ghosts[1];
 
-    // Ghost offsets
-    Index_t ghost_offset_x = nb_ghosts_left[0];
-    Index_t ghost_offset_y = nb_ghosts_left[1];
-    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
-    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
+    // Offset to first computable node (based on stencil requirements)
+    Index_t ghost_offset_x = STENCIL_LEFT;
+    Index_t ghost_offset_y = STENCIL_LEFT;
+    Index_t mat_ghost_offset_x = STENCIL_LEFT;
+    Index_t mat_ghost_offset_y = STENCIL_LEFT;
 
     // GPU uses SoA layout: [d, x, y]
     Index_t disp_stride_d = nx * ny;
@@ -666,25 +667,28 @@ void IsotropicStiffnessOperator3D::apply_impl(
             "right side of displacement/force fields");
     }
 
-    // Get number of interior nodes
-    auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nnx = nb_interior[0];
-    Index_t nny = nb_interior[1];
-    Index_t nnz = nb_interior[2];
+    // Stencil requirements: 1 left, 1 right ghost needed
+    constexpr Index_t STENCIL_LEFT = 1;
+    constexpr Index_t STENCIL_RIGHT = 1;
 
-    // Material field dimensions (interior, without ghosts)
-    // Node-based indexing: material field must have same size as node field
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
-    Index_t nelz = nb_elements[2];
+    // Compute computable region: total with ghosts minus stencil requirements
+    auto nb_with_ghosts = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nnz = nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
 
-    // Validate material field dimensions match node field
+    // Material field dimensions (computable region)
+    auto mat_nb_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nelz = mat_nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
+
+    // Validate material field computable region matches node field
     if (nelx != nnx || nely != nny || nelz != nnz) {
         throw RuntimeError(
-            "IsotropicStiffnessOperator3D: material field dimensions (" +
+            "IsotropicStiffnessOperator3D: material field computable region (" +
             std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
-            std::to_string(nelz) + ") must match node field dimensions (" +
+            std::to_string(nelz) + ") must match node field computable region (" +
             std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
             std::to_string(nnz) + ")");
     }
@@ -702,24 +706,22 @@ void IsotropicStiffnessOperator3D::apply_impl(
     }
 
     // Node dimensions (for displacement/force fields with ghosts)
-    auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nx = nb_nodes[0];
-    Index_t ny = nb_nodes[1];
-    Index_t nz = nb_nodes[2];
+    Index_t nx = nb_with_ghosts[0];
+    Index_t ny = nb_with_ghosts[1];
+    Index_t nz = nb_with_ghosts[2];
 
     // Material field dimensions with ghosts
-    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
-    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
-    Index_t mat_nz = mat_nb_pts_with_ghosts[2];
+    Index_t mat_nx = mat_nb_with_ghosts[0];
+    Index_t mat_ny = mat_nb_with_ghosts[1];
+    Index_t mat_nz = mat_nb_with_ghosts[2];
 
-    // Ghost offsets
-    Index_t ghost_offset_x = nb_ghosts_left[0];
-    Index_t ghost_offset_y = nb_ghosts_left[1];
-    Index_t ghost_offset_z = nb_ghosts_left[2];
-    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
-    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
-    Index_t mat_ghost_offset_z = mat_nb_ghosts_left[2];
+    // Offset to first computable node (based on stencil requirements)
+    Index_t ghost_offset_x = STENCIL_LEFT;
+    Index_t ghost_offset_y = STENCIL_LEFT;
+    Index_t ghost_offset_z = STENCIL_LEFT;
+    Index_t mat_ghost_offset_x = STENCIL_LEFT;
+    Index_t mat_ghost_offset_y = STENCIL_LEFT;
+    Index_t mat_ghost_offset_z = STENCIL_LEFT;
 
     // GPU uses SoA layout: [d, x, y, z]
     Index_t disp_stride_d = nx * ny * nz;
@@ -815,23 +817,26 @@ void IsotropicStiffnessOperator2D::apply_impl(
             "right side of displacement/force fields");
     }
 
-    // Get number of interior nodes
-    auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nnx = nb_interior[0];
-    Index_t nny = nb_interior[1];
+    // Stencil requirements: 1 left, 1 right ghost needed
+    constexpr Index_t STENCIL_LEFT = 1;
+    constexpr Index_t STENCIL_RIGHT = 1;
 
-    // Material field dimensions (interior, without ghosts)
-    // Node-based indexing: material field must have same size as node field
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
+    // Compute computable region: total with ghosts minus stencil requirements
+    auto nb_with_ghosts = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
 
-    // Validate material field dimensions match node field
+    // Material field dimensions (computable region)
+    auto mat_nb_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+
+    // Validate material field computable region matches node field
     if (nelx != nnx || nely != nny) {
         throw RuntimeError(
-            "IsotropicStiffnessOperator2D: material field dimensions (" +
+            "IsotropicStiffnessOperator2D: material field computable region (" +
             std::to_string(nelx) + ", " + std::to_string(nely) +
-            ") must match node field dimensions (" +
+            ") must match node field computable region (" +
             std::to_string(nnx) + ", " + std::to_string(nny) + ")");
     }
 
@@ -848,20 +853,18 @@ void IsotropicStiffnessOperator2D::apply_impl(
     }
 
     // Node dimensions (for displacement/force fields with ghosts)
-    auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nx = nb_nodes[0];
-    Index_t ny = nb_nodes[1];
+    Index_t nx = nb_with_ghosts[0];
+    Index_t ny = nb_with_ghosts[1];
 
     // Material field dimensions with ghosts
-    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
-    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
+    Index_t mat_nx = mat_nb_with_ghosts[0];
+    Index_t mat_ny = mat_nb_with_ghosts[1];
 
-    // Ghost offsets
-    Index_t ghost_offset_x = nb_ghosts_left[0];
-    Index_t ghost_offset_y = nb_ghosts_left[1];
-    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
-    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
+    // Offset to first computable node (based on stencil requirements)
+    Index_t ghost_offset_x = STENCIL_LEFT;
+    Index_t ghost_offset_y = STENCIL_LEFT;
+    Index_t mat_ghost_offset_x = STENCIL_LEFT;
+    Index_t mat_ghost_offset_y = STENCIL_LEFT;
 
     // GPU uses SoA layout: [d, x, y]
     Index_t disp_stride_d = nx * ny;
@@ -949,25 +952,28 @@ void IsotropicStiffnessOperator3D::apply_impl(
             "right side of displacement/force fields");
     }
 
-    // Get number of interior nodes
-    auto nb_interior = disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nnx = nb_interior[0];
-    Index_t nny = nb_interior[1];
-    Index_t nnz = nb_interior[2];
+    // Stencil requirements: 1 left, 1 right ghost needed
+    constexpr Index_t STENCIL_LEFT = 1;
+    constexpr Index_t STENCIL_RIGHT = 1;
 
-    // Material field dimensions (interior, without ghosts)
-    // Node-based indexing: material field must have same size as node field
-    auto nb_elements = mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-    Index_t nelx = nb_elements[0];
-    Index_t nely = nb_elements[1];
-    Index_t nelz = nb_elements[2];
+    // Compute computable region: total with ghosts minus stencil requirements
+    auto nb_with_ghosts = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nnz = nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
 
-    // Validate material field dimensions match node field
+    // Material field dimensions (computable region)
+    auto mat_nb_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+    Index_t nelz = mat_nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
+
+    // Validate material field computable region matches node field
     if (nelx != nnx || nely != nny || nelz != nnz) {
         throw RuntimeError(
-            "IsotropicStiffnessOperator3D: material field dimensions (" +
+            "IsotropicStiffnessOperator3D: material field computable region (" +
             std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
-            std::to_string(nelz) + ") must match node field dimensions (" +
+            std::to_string(nelz) + ") must match node field computable region (" +
             std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
             std::to_string(nnz) + ")");
     }
@@ -985,24 +991,22 @@ void IsotropicStiffnessOperator3D::apply_impl(
     }
 
     // Node dimensions (for displacement/force fields with ghosts)
-    auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nx = nb_nodes[0];
-    Index_t ny = nb_nodes[1];
-    Index_t nz = nb_nodes[2];
+    Index_t nx = nb_with_ghosts[0];
+    Index_t ny = nb_with_ghosts[1];
+    Index_t nz = nb_with_ghosts[2];
 
     // Material field dimensions with ghosts
-    auto mat_nb_pts_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t mat_nx = mat_nb_pts_with_ghosts[0];
-    Index_t mat_ny = mat_nb_pts_with_ghosts[1];
-    Index_t mat_nz = mat_nb_pts_with_ghosts[2];
+    Index_t mat_nx = mat_nb_with_ghosts[0];
+    Index_t mat_ny = mat_nb_with_ghosts[1];
+    Index_t mat_nz = mat_nb_with_ghosts[2];
 
-    // Ghost offsets
-    Index_t ghost_offset_x = nb_ghosts_left[0];
-    Index_t ghost_offset_y = nb_ghosts_left[1];
-    Index_t ghost_offset_z = nb_ghosts_left[2];
-    Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
-    Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
-    Index_t mat_ghost_offset_z = mat_nb_ghosts_left[2];
+    // Offset to first computable node (based on stencil requirements)
+    Index_t ghost_offset_x = STENCIL_LEFT;
+    Index_t ghost_offset_y = STENCIL_LEFT;
+    Index_t ghost_offset_z = STENCIL_LEFT;
+    Index_t mat_ghost_offset_x = STENCIL_LEFT;
+    Index_t mat_ghost_offset_y = STENCIL_LEFT;
+    Index_t mat_ghost_offset_z = STENCIL_LEFT;
 
     // GPU uses SoA layout: [d, x, y, z]
     Index_t disp_stride_d = nx * ny * nz;
