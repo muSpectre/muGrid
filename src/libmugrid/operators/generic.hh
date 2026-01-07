@@ -462,7 +462,13 @@ namespace muGrid {
          * @param collection The field collection
          * @param nb_nodal_components Number of nodal components
          * @param nb_quad_components Number of quadrature components
+         * @param is_transpose If true, use transpose stencil requirements
+         *        (left/right swapped)
          * @return GridTraversalParams structure with all computed values
+         *
+         * The computable region is determined by stencil requirements, not
+         * ghost size. This allows computing results in ghost regions where
+         * the stencil has valid input data.
          *
          * For ArrayOfStructures: stride_x = elems_per_pixel
          * For StructureOfArrays: stride_x = 1 (pixels consecutive per
@@ -472,7 +478,8 @@ namespace muGrid {
         GridTraversalParams
         compute_traversal_params(const GlobalFieldCollection & collection,
                                  Index_t nb_nodal_components,
-                                 Index_t nb_quad_components) const;
+                                 Index_t nb_quad_components,
+                                 bool is_transpose) const;
 
         /**
          * Apply convolution on device memory fields.

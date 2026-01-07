@@ -257,27 +257,35 @@ namespace muGrid {
                                "displacement/force fields");
         }
 
-        // Get number of interior nodes
-        auto nb_interior =
-            disp_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-        Index_t nnx = nb_interior[0];
-        Index_t nny = nb_interior[1];
-        Index_t nnz = nb_interior[2];
+        // Stencil requirements: the kernel gathers from 8 neighboring elements
+        // at offsets [-1, 0] in each dimension, and each element accesses its
+        // 8 corner nodes at offsets [0, 1]. This requires:
+        // - 1 left ghost (for elements at -1 and their nodes)
+        // - 1 right ghost (for nodes at +1 in elements at offset 0)
+        constexpr Index_t STENCIL_LEFT = 1;
+        constexpr Index_t STENCIL_RIGHT = 1;
 
-        // Material field dimensions (interior, without ghosts)
+        // Compute computable region: total with ghosts minus stencil requirements
+        auto nb_with_ghosts =
+            disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+        Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+        Index_t nnz = nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
+
+        // Material field dimensions (computable region)
         // Node-based indexing: material field must have same size as node field
-        auto nb_elements =
-            mat_global_fc->get_nb_subdomain_grid_pts_without_ghosts();
-        Index_t nelx = nb_elements[0];
-        Index_t nely = nb_elements[1];
-        Index_t nelz = nb_elements[2];
+        auto mat_nb_with_ghosts =
+            mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+        Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+        Index_t nelz = mat_nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
 
-        // Validate material field dimensions match node field
+        // Validate material field computable region matches node field
         if (nelx != nnx || nely != nny || nelz != nnz) {
             throw RuntimeError(
-                "IsotropicStiffnessOperator3D: material field dimensions (" +
+                "IsotropicStiffnessOperator3D: material field computable region (" +
                 std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
-                std::to_string(nelz) + ") must match node field dimensions (" +
+                std::to_string(nelz) + ") must match node field computable region (" +
                 std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
                 std::to_string(nnz) + ")");
         }
@@ -303,13 +311,14 @@ namespace muGrid {
         Index_t nx = nb_nodes[0];
         Index_t ny = nb_nodes[1];
 
-        // Ghost offsets (interior starts at this offset in the ghosted array)
-        Index_t disp_ghost_offset_x = nb_ghosts_left[0];
-        Index_t disp_ghost_offset_y = nb_ghosts_left[1];
-        Index_t disp_ghost_offset_z = nb_ghosts_left[2];
-        Index_t mat_ghost_offset_x = mat_nb_ghosts_left[0];
-        Index_t mat_ghost_offset_y = mat_nb_ghosts_left[1];
-        Index_t mat_ghost_offset_z = mat_nb_ghosts_left[2];
+        // Offset to first computable node (based on stencil requirements, not ghost size)
+        // This allows computing in ghost regions where stencil has valid data
+        Index_t disp_offset_x = STENCIL_LEFT;
+        Index_t disp_offset_y = STENCIL_LEFT;
+        Index_t disp_offset_z = STENCIL_LEFT;
+        Index_t mat_offset_x = STENCIL_LEFT;
+        Index_t mat_offset_y = STENCIL_LEFT;
+        Index_t mat_offset_z = STENCIL_LEFT;
 
         // Compute strides (AoS layout for host)
         Index_t disp_stride_d = 1;
@@ -331,16 +340,16 @@ namespace muGrid {
         Index_t force_stride_y = NB_DOFS_PER_NODE * nx;
         Index_t force_stride_z = NB_DOFS_PER_NODE * nx * ny;
 
-        // Offset data pointers to account for left ghosts
-        Index_t disp_offset = disp_ghost_offset_x * disp_stride_x +
-                              disp_ghost_offset_y * disp_stride_y +
-                              disp_ghost_offset_z * disp_stride_z;
-        Index_t force_offset = disp_ghost_offset_x * force_stride_x +
-                               disp_ghost_offset_y * force_stride_y +
-                               disp_ghost_offset_z * force_stride_z;
-        Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
-                             mat_ghost_offset_y * mat_stride_y +
-                             mat_ghost_offset_z * mat_stride_z;
+        // Offset data pointers to point to first computable node
+        Index_t disp_offset = disp_offset_x * disp_stride_x +
+                              disp_offset_y * disp_stride_y +
+                              disp_offset_z * disp_stride_z;
+        Index_t force_offset = disp_offset_x * force_stride_x +
+                               disp_offset_y * force_stride_y +
+                               disp_offset_z * force_stride_z;
+        Index_t mat_offset = mat_offset_x * mat_stride_x +
+                             mat_offset_y * mat_stride_y +
+                             mat_offset_z * mat_stride_z;
 
         const Real * disp_data = displacement.data() + disp_offset;
         const Real * lambda_data = lambda.data() + mat_offset;
@@ -417,8 +426,10 @@ namespace muGrid {
                 {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
                 {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
 
-            // Iteration bounds: iterate over all interior nodes (0 to nn-1)
-            // Ghost cells handle periodicity and MPI boundaries
+            // Iteration bounds: iterate over all computable nodes based on stencil
+            // requirements. The computable region is determined by where the stencil
+            // has valid input data, not by the ghost region size. This allows
+            // computing in ghost regions beyond the minimum stencil requirement.
             SIndex_t ix_start = 0;
             SIndex_t iy_start = 0;
             SIndex_t iz_start = 0;
@@ -426,7 +437,7 @@ namespace muGrid {
             SIndex_t iy_end = static_cast<SIndex_t>(nny);
             SIndex_t iz_end = static_cast<SIndex_t>(nnz);
 
-            // Gather pattern: loop over all interior NODES, gather from neighboring
+            // Gather pattern: loop over all computable nodes, gather from neighboring
             // elements. Ghost cells handle periodicity and MPI boundaries.
             for (SIndex_t iz = iz_start; iz < iz_end; ++iz) {
                 for (SIndex_t iy = iy_start; iy < iy_end; ++iy) {

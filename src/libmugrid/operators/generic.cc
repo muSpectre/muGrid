@@ -277,15 +277,35 @@ namespace muGrid {
     GridTraversalParams GenericLinearOperator::compute_traversal_params(
         const GlobalFieldCollection& collection,
         Index_t nb_nodal_components,
-        Index_t nb_quad_components) const {
+        Index_t nb_quad_components,
+        bool is_transpose) const {
         GridTraversalParams params;
 
-        // Get shape of the pixels without ghosts (pad to 3D)
-        auto nb_pixels_without_ghosts = pad_shape_to_3d(
-            collection.get_pixels_shape_without_ghosts());
-        params.nx = nb_pixels_without_ghosts[0];
-        params.ny = nb_pixels_without_ghosts[1];
-        params.nz = nb_pixels_without_ghosts[2];
+        // Get shape of the full grid including ghosts (pad to 3D)
+        auto nb_pixels_with_ghosts = pad_shape_to_3d(
+            collection.get_nb_subdomain_grid_pts_with_ghosts());
+
+        // Compute stencil requirements for the operation direction
+        // Apply: reads at (p + s), needs ghosts based on positive stencil offsets
+        // Transpose: reads at (p - s), needs ghosts based on negative stencil offsets
+        const auto apply_min_left{DynGridIndex(this->spatial_dim_, 0) -
+                                  DynGridIndex(this->offset_)};
+        const auto apply_min_right{DynGridIndex(this->stencil_shape_) -
+                                   DynGridIndex(this->spatial_dim_, 1) +
+                                   DynGridIndex(this->offset_)};
+
+        // For transpose, swap left/right requirements
+        const auto min_left{is_transpose ? apply_min_right : apply_min_left};
+        const auto min_right{is_transpose ? apply_min_left : apply_min_right};
+
+        // Pad stencil requirements to 3D
+        auto stencil_left = pad_shape_to_3d(min_left, 0);
+        auto stencil_right = pad_shape_to_3d(min_right, 0);
+
+        // Computable region: total with ghosts minus stencil requirements
+        params.nx = nb_pixels_with_ghosts[0] - stencil_left[0] - stencil_right[0];
+        params.ny = nb_pixels_with_ghosts[1] - stencil_left[1] - stencil_right[1];
+        params.nz = nb_pixels_with_ghosts[2] - stencil_left[2] - stencil_right[2];
         params.total_pixels = params.nx * params.ny * params.nz;
 
         // Elements per pixel - used for base offset calculation in kernel
@@ -301,21 +321,29 @@ namespace muGrid {
             params.quad_elems_per_pixel = 1;
         }
 
-        // Starting pixel index (skip ghosts)
-        params.start_pixel_index = collection.get_pixels_index_diff();
+        // Starting pixel index based on stencil requirements (not ghost size)
+        // This points to the first computable pixel
+        params.start_pixel_index = stencil_left[0];
+        if (nb_pixels_with_ghosts[1] > 1) {
+            params.start_pixel_index += stencil_left[1] * nb_pixels_with_ghosts[0];
+        }
+        if (nb_pixels_with_ghosts[2] > 1) {
+            params.start_pixel_index += stencil_left[2] * nb_pixels_with_ghosts[0] *
+                                        nb_pixels_with_ghosts[1];
+        }
 
         // Ghost counts (pad to 3D)
         auto ghosts_count = pad_shape_to_3d(
             collection.get_nb_ghosts_left() + collection.get_nb_ghosts_right(),
             0);
 
-        // Row width including ghosts
-        params.row_width = params.nx + ghosts_count[0];
+        // Row width including ghosts (full buffer width)
+        params.row_width = nb_pixels_with_ghosts[0];
 
         // Total buffer pixels (including ghosts)
-        Index_t buffer_nx = params.nx + ghosts_count[0];
-        Index_t buffer_ny = params.ny + ghosts_count[1];
-        Index_t buffer_nz = params.nz + ghosts_count[2];
+        Index_t buffer_nx = nb_pixels_with_ghosts[0];
+        Index_t buffer_ny = nb_pixels_with_ghosts[1];
+        Index_t buffer_nz = nb_pixels_with_ghosts[2];
         Index_t total_buffer_pixels = buffer_nx * buffer_ny * buffer_nz;
 
         // Total elements in buffers (for SoA indexing)
@@ -355,10 +383,10 @@ namespace muGrid {
     // Explicit template instantiations
     template GridTraversalParams GenericLinearOperator::compute_traversal_params<
         StorageOrder::ArrayOfStructures>(
-        const GlobalFieldCollection&, Index_t, Index_t) const;
+        const GlobalFieldCollection&, Index_t, Index_t, bool) const;
     template GridTraversalParams GenericLinearOperator::compute_traversal_params<
         StorageOrder::StructureOfArrays>(
-        const GlobalFieldCollection&, Index_t, Index_t) const;
+        const GlobalFieldCollection&, Index_t, Index_t, bool) const;
 
     /* ---------------------------------------------------------------------- */
     const SparseOperatorSoA<HostSpace>&
@@ -685,8 +713,9 @@ namespace muGrid {
         const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
         // Compute traversal parameters (use HostSpace storage order)
+        // is_transpose=false for apply operation
         const auto params = this->compute_traversal_params<HostSpace::storage_order>(
-            collection, nb_nodal_components, nb_quad_components);
+            collection, nb_nodal_components, nb_quad_components, false);
 
         // Get cached sparse operator (row-major for write locality to quad_data)
         const auto & sparse_op = this->get_apply_operator(
@@ -728,8 +757,9 @@ namespace muGrid {
         const Index_t nb_quad_components = quadrature_point_field.get_nb_components();
 
         // Compute traversal parameters (use HostSpace storage order)
+        // is_transpose=true for transpose operation
         const auto params = this->compute_traversal_params<HostSpace::storage_order>(
-            collection, nb_nodal_components, nb_quad_components);
+            collection, nb_nodal_components, nb_quad_components, true);
 
         // Get cached sparse operator (col-major for write locality to nodal_data)
         const auto & sparse_op = this->get_transpose_operator(
