@@ -220,9 +220,10 @@ class TestMPIFFTForwardTransform:
         )
         local_input = global_input[subdomain_slices]
 
-        # Set local field data (squeeze to remove component dimension)
+        # Set local field data
+        # Scalar field .p has shape (nx, ny), no component dimension
         # Convert to device array if needed
-        real_field.p[0, ...] = xp.asarray(local_input)
+        real_field.p[...] = xp.asarray(local_input)
 
         # Perform FFT
         engine.fft(real_field, fourier_field)
@@ -233,9 +234,9 @@ class TestMPIFFTForwardTransform:
         )
         expected_local = global_ref[fourier_slices]
 
-        # Compare (squeeze to remove component dimension)
+        # Compare - scalar field .p has shape (nx_fourier, ny)
         # Convert result to numpy for comparison
-        result = fourier_field.p.squeeze()
+        result = fourier_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         tol = 1e-12 * np.prod(nb_grid_pts)
@@ -271,7 +272,8 @@ class TestMPIFFTForwardTransform:
             engine.subdomain_locations, engine.nb_subdomain_grid_pts
         )
         local_input = global_input[subdomain_slices]
-        real_field.p[0, ...] = xp.asarray(local_input)
+        # Scalar field .p has shape (nx, ny, nz), no component dimension
+        real_field.p[...] = xp.asarray(local_input)
 
         # Perform FFT
         engine.fft(real_field, fourier_field)
@@ -282,8 +284,8 @@ class TestMPIFFTForwardTransform:
         )
         expected_local = global_ref[fourier_slices]
 
-        # Convert result to numpy for comparison
-        result = fourier_field.p.squeeze()
+        # Convert result to numpy for comparison - scalar .p has no component dim
+        result = fourier_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         tol = 1e-12 * np.prod(nb_grid_pts)
@@ -328,11 +330,12 @@ class TestMPIFFTInverseTransform:
             engine.fourier_subdomain_locations, engine.nb_fourier_subdomain_grid_pts
         )
         local_fourier = global_fourier[fourier_slices]
-        fourier_field.p[0, ...] = xp.asarray(local_fourier)
+        # Scalar field .p has shape (nx_fourier, ny), no component dimension
+        fourier_field.p[...] = xp.asarray(local_fourier)
 
         # Perform inverse FFT
         engine.ifft(fourier_field, real_field)
-        real_field.p[0, ...] *= engine.normalisation
+        real_field.p[...] *= engine.normalisation
 
         # Extract expected local real data
         subdomain_slices = make_subdomain_slices(
@@ -340,8 +343,8 @@ class TestMPIFFTInverseTransform:
         )
         expected_local = global_ref[subdomain_slices]
 
-        # Convert result to numpy for comparison
-        result = real_field.p.squeeze()
+        # Convert result to numpy for comparison - scalar .p has no component dim
+        result = real_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         tol = 1e-12 * np.prod(nb_grid_pts)
@@ -374,7 +377,8 @@ class TestMPIFFTRoundtrip:
         # Initialize with random data (numpy for reference)
         np.random.seed(42 + comm.rank)  # Different seed per rank
         original = np.random.randn(*engine.nb_subdomain_grid_pts)
-        real_field.p[0, ...] = xp.asarray(original)
+        # Scalar field .p has shape matching subdomain, no component dimension
+        real_field.p[...] = xp.asarray(original)
 
         # Forward FFT
         engine.fft(real_field, fourier_field)
@@ -383,10 +387,10 @@ class TestMPIFFTRoundtrip:
         engine.ifft(fourier_field, real_field)
 
         # Normalize
-        real_field.p[0, ...] *= engine.normalisation
+        real_field.p[...] *= engine.normalisation
 
-        # Check roundtrip
-        result = real_field.p.squeeze()
+        # Check roundtrip - scalar .p has no component dim
+        result = real_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         assert_allclose(result, original, atol=1e-14)
@@ -417,14 +421,16 @@ class TestMPIFFTRoundtrip:
         original = np.sin(2 * np.pi * X / nb_grid_pts[0]) * np.cos(
             2 * np.pi * Y / nb_grid_pts[1]
         )
-        real_field.p[0, ...] = xp.asarray(original)
+        # Scalar field .p has shape (nx, ny), no component dimension
+        real_field.p[...] = xp.asarray(original)
 
         # Roundtrip
         engine.fft(real_field, fourier_field)
         engine.ifft(fourier_field, real_field)
-        real_field.p[0, ...] *= engine.normalisation
+        real_field.p[...] *= engine.normalisation
 
-        result = real_field.p.squeeze()
+        # Scalar .p has no component dim
+        result = real_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         assert_allclose(result, original, atol=1e-13)
@@ -444,8 +450,8 @@ class TestMPIFFTMultipleComponents:
         engine = FFTEngine(nb_grid_pts, comm, device=dev)
 
         # Create 2-component fields
-        real_field = engine.real_space_field("real_vec", nb_components=2)
-        fourier_field = engine.fourier_space_field("fourier_vec", nb_components=2)
+        real_field = engine.real_space_field("real_vec", components=(2,))
+        fourier_field = engine.fourier_space_field("fourier_vec", components=(2,))
 
         # Initialize with random data (numpy for reference)
         np.random.seed(42 + comm.rank)
@@ -472,8 +478,8 @@ class TestMPIFFTMultipleComponents:
         engine = FFTEngine(nb_grid_pts, comm, device=dev)
 
         # Create 9-component field (3x3 tensor)
-        real_field = engine.real_space_field("real_tensor", nb_components=9)
-        fourier_field = engine.fourier_space_field("fourier_tensor", nb_components=9)
+        real_field = engine.real_space_field("real_tensor", components=(9,))
+        fourier_field = engine.fourier_space_field("fourier_tensor", components=(9,))
 
         # Initialize with random data (numpy for reference)
         np.random.seed(42)
@@ -506,16 +512,16 @@ class TestMPIFFTDCComponent:
         real_field = engine.real_space_field("real")
         fourier_field = engine.fourier_space_field("fourier")
 
-        # Constant field
+        # Constant field - scalar .p has shape (nx, ny), no component dimension
         constant_value = 5.0
-        real_field.p[0, ...] = constant_value
+        real_field.p[...] = constant_value
 
         engine.fft(real_field, fourier_field)
 
         # DC component should be at (0,0) = constant_value * total_points
         expected_dc = constant_value * np.prod(nb_grid_pts)
 
-        # Get result on CPU for comparison
+        # Get result on CPU for comparison - scalar .p has no component dim
         fourier_p = fourier_field.p
         if device == "gpu":
             fourier_p = fourier_p.get()  # CuPy to numpy
@@ -525,8 +531,8 @@ class TestMPIFFTDCComponent:
             engine.fourier_subdomain_locations[0] == 0
             and engine.fourier_subdomain_locations[1] == 0
         ):
-            assert abs(fourier_p[0, 0, 0].real - expected_dc) < 1e-10
-            assert abs(fourier_p[0, 0, 0].imag) < 1e-10
+            assert abs(fourier_p[0, 0].real - expected_dc) < 1e-10
+            assert abs(fourier_p[0, 0].imag) < 1e-10
 
         # All other components should be zero (globally)
         local_non_dc_sum = 0.0
@@ -535,7 +541,7 @@ class TestMPIFFTDCComponent:
                 gi = engine.fourier_subdomain_locations[0] + i
                 gj = engine.fourier_subdomain_locations[1] + j
                 if gi != 0 or gj != 0:
-                    local_non_dc_sum += abs(fourier_p[0, i, j])
+                    local_non_dc_sum += abs(fourier_p[i, j])
 
         global_non_dc_sum = comm.sum(local_non_dc_sum)
         assert global_non_dc_sum < 1e-10
@@ -606,14 +612,15 @@ class TestMPIFFTEdgeCases:
         subdomain_shape = engine.nb_subdomain_grid_pts
         if np.prod(subdomain_shape) > 0:
             original = np.random.randn(*subdomain_shape)
-            real_field.p[0, ...] = xp.asarray(original)
+            # Scalar field .p has shape matching subdomain, no component dimension
+            real_field.p[...] = xp.asarray(original)
 
             engine.fft(real_field, fourier_field)
             engine.ifft(fourier_field, real_field)
-            real_field.p[0, ...] *= engine.normalisation
+            real_field.p[...] *= engine.normalisation
 
-            # Compare without squeeze to handle subdomains with size-1 dimensions
-            result = real_field.p[0, ...]
+            # Compare - scalar .p has no component dim
+            result = real_field.p
             if device == "gpu":
                 result = result.get()  # CuPy to numpy
             assert_allclose(result, original, atol=1e-14)
@@ -632,13 +639,15 @@ class TestMPIFFTEdgeCases:
 
         np.random.seed(42 + comm.rank)
         original = np.random.randn(*engine.nb_subdomain_grid_pts)
-        real_field.p[0, ...] = xp.asarray(original)
+        # Scalar field .p has shape matching subdomain, no component dimension
+        real_field.p[...] = xp.asarray(original)
 
         engine.fft(real_field, fourier_field)
         engine.ifft(fourier_field, real_field)
-        real_field.p[0, ...] *= engine.normalisation
+        real_field.p[...] *= engine.normalisation
 
-        result = real_field.p.squeeze()
+        # Scalar .p has no component dim
+        result = real_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         assert_allclose(result, original, atol=1e-14)
