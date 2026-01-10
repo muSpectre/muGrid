@@ -551,8 +551,8 @@ FFTEngine
    **Example**::
 
        >>> engine = muGrid.FFTEngine([64, 64])
-       >>> real_field = engine.real_space_field("displacement", nb_components=3)
-       >>> fourier_field = engine.fourier_space_field("displacement_k", nb_components=3)
+       >>> real_field = engine.real_space_field("displacement", components=(3,))
+       >>> fourier_field = engine.fourier_space_field("displacement_k", components=(3,))
        >>> engine.fft(real_field, fourier_field)
        >>> engine.ifft(fourier_field, real_field)
        >>> real_field.s[:] *= engine.normalisation
@@ -581,7 +581,7 @@ FFTEngine
       :param output_field: Real-space field (must be in this engine's real collection).
       :type output_field: Field
 
-   .. py:method:: register_real_space_field(name, nb_components=1)
+   .. py:method:: register_real_space_field(name, components=())
 
       Register a new real-space field.
 
@@ -589,13 +589,13 @@ FFTEngine
 
       :param name: Unique field name.
       :type name: str
-      :param nb_components: Number of components. Default is 1.
-      :type nb_components: int, optional
+      :param components: Shape of field components. Default is () for scalar.
+      :type components: tuple of int, optional
       :returns: Wrapped real-valued field with array accessors.
       :rtype: Field
       :raises RuntimeError: If a field with the given name already exists.
 
-   .. py:method:: register_fourier_space_field(name, nb_components=1)
+   .. py:method:: register_fourier_space_field(name, components=())
 
       Register a new Fourier-space field.
 
@@ -603,37 +603,37 @@ FFTEngine
 
       :param name: Unique field name.
       :type name: str
-      :param nb_components: Number of components. Default is 1.
-      :type nb_components: int, optional
+      :param components: Shape of field components. Default is () for scalar.
+      :type components: tuple of int, optional
       :returns: Wrapped complex-valued field with array accessors.
       :rtype: Field
       :raises RuntimeError: If a field with the given name already exists.
 
-   .. py:method:: real_space_field(name, nb_components=1)
+   .. py:method:: real_space_field(name, components=())
 
       Get or create a real-space field for FFT operations.
 
       If a field with the given name already exists, returns it.
-      Otherwise creates a new field with the specified number of components.
+      Otherwise creates a new field with the specified component shape.
 
       :param name: Unique field name.
       :type name: str
-      :param nb_components: Number of components. Default is 1.
-      :type nb_components: int, optional
+      :param components: Shape of field components. Default is () for scalar.
+      :type components: tuple of int, optional
       :returns: Wrapped real-valued field with array accessors.
       :rtype: Field
 
-   .. py:method:: fourier_space_field(name, nb_components=1)
+   .. py:method:: fourier_space_field(name, components=())
 
       Get or create a Fourier-space field for FFT operations.
 
       If a field with the given name already exists, returns it.
-      Otherwise creates a new field with the specified number of components.
+      Otherwise creates a new field with the specified component shape.
 
       :param name: Unique field name.
       :type name: str
-      :param nb_components: Number of components. Default is 1.
-      :type nb_components: int, optional
+      :param components: Shape of field components. Default is () for scalar.
+      :type components: tuple of int, optional
       :returns: Wrapped complex-valued field with array accessors.
       :rtype: Field
 

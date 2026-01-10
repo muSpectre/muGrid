@@ -21,7 +21,8 @@ X = X * Lx  # Scale from [0, 1) to [0, Lx)
 Y = Y * Ly
 
 # Initialize with a smooth function: f = sin(x) * cos(y)
-f.s[0, 0, :, :] = np.sin(X) * np.cos(Y)
+# Note: scalar fields have .s shape (sub_pts, spatial) = (1, nx, ny)
+f.s[0, :, :] = np.sin(X) * np.cos(Y)
 
 # Forward FFT
 engine.fft(f, f_hat)
@@ -34,17 +35,17 @@ KX = 2 * np.pi * QX * nx / Lx  # Physical wavevector
 KY = 2 * np.pi * QY * ny / Ly
 
 # Derivative in x: multiply by i*kx
-grad_hat.s[0, 0, :, :] = 1j * KX * f_hat.s[0, 0, :, :]
+grad_hat.s[0, :, :] = 1j * KX * f_hat.s[0, :, :]
 engine.ifft(grad_hat, grad_x)
 grad_x.s[:] *= engine.normalisation
 
 # Derivative in y: multiply by i*ky
-grad_hat.s[0, 0, :, :] = 1j * KY * f_hat.s[0, 0, :, :]
+grad_hat.s[0, :, :] = 1j * KY * f_hat.s[0, :, :]
 engine.ifft(grad_hat, grad_y)
 grad_y.s[:] *= engine.normalisation
 
 # Verify: d/dx[sin(x)cos(y)] = cos(x)cos(y)
 expected_grad_x = np.cos(X) * np.cos(Y)
-np.testing.assert_allclose(grad_x.s[0, 0], expected_grad_x, atol=1e-10)
+np.testing.assert_allclose(grad_x.s[0], expected_grad_x, atol=1e-10)
 
 print("Fourier derivative test passed!")

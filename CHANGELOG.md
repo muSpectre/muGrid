@@ -1,6 +1,24 @@
 Change log for µGrid
 ====================
 
+0.104.0 (10Jan26)
+-----------------
+
+- API: FFTEngine field methods now use `components` parameter instead of `nb_components`
+  - `real_space_field(name, components=())` - creates scalar field by default
+  - `fourier_space_field(name, components=())` - creates scalar field by default
+  - `register_real_space_field(name, components=())` - creates scalar field by default
+  - `register_fourier_space_field(name, components=())` - creates scalar field by default
+  - This makes the API consistent with `FieldCollection.real_field()` and `CartesianDecomposition.real_field()`
+- API: Scalar fields now have different shapes than unit component fields
+  - Scalar field (`components=()`): `.p.shape = (nx, ny)`, `.s.shape = (1, nx, ny)`
+  - Unit component (`components=(1,)`): `.p.shape = (1, nx, ny)`, `.s.shape = (1, 1, nx, ny)`
+  - Use `components=(1,)` explicitly if you need the component dimension
+- ENH: Added `Shape_t` overloads for all FFTEngine field registration methods
+  - Supports arbitrary component shapes like `(3,)` for vectors or `(3, 3)` for tensors
+  - Available for CPU, CUDA, and ROCm backends
+- DOC: Updated `fourier_derivative.py` example for scalar field indexing
+
 0.103.0 (07Jan26)
 -----------------
 

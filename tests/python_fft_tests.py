@@ -121,13 +121,15 @@ class FFTFieldTest(unittest.TestCase):
         """Test creating real-space field."""
         field = self.engine_2d.real_space_field("test_real")
         self.assertEqual(field.name, "test_real")
-        self.assertEqual(field.s.shape, (1, 1, 16, 20))
+        # Scalar fields have shape (sub_pts, spatial) = (1, nx, ny)
+        self.assertEqual(field.s.shape, (1, 16, 20))
 
     def test_create_fourier_field(self):
         """Test creating Fourier-space field."""
         field = self.engine_2d.fourier_space_field("test_fourier")
         self.assertEqual(field.name, "test_fourier")
-        self.assertEqual(field.s.shape, (1, 1, 9, 20))  # Half-complex
+        # Scalar fields have shape (sub_pts, spatial) = (1, nx_fourier, ny)
+        self.assertEqual(field.s.shape, (1, 9, 20))  # Half-complex
 
     def test_field_data_types(self):
         """Test field data types."""
@@ -141,19 +143,20 @@ class FFTFieldTest(unittest.TestCase):
         """Test pixel layout access."""
         real_field = self.engine_2d.real_space_field("real_p")
 
-        # SubPt layout: (components, sub_pts, nx, ny)
-        self.assertEqual(real_field.s.shape, (1, 1, 16, 20))
+        # Scalar field SubPt layout: (sub_pts, nx, ny)
+        self.assertEqual(real_field.s.shape, (1, 16, 20))
 
-        # Pixel layout: (components * sub_pts, nx, ny)
-        self.assertEqual(real_field.p.shape, (1, 16, 20))
+        # Scalar field Pixel layout: (nx, ny)
+        self.assertEqual(real_field.p.shape, (16, 20))
 
     def test_field_3d_shapes(self):
         """Test 3D field shapes."""
         real_field = self.engine_3d.real_space_field("real_3d")
         fourier_field = self.engine_3d.fourier_space_field("fourier_3d")
 
-        self.assertEqual(real_field.s.shape, (1, 1, 8, 10, 12))
-        self.assertEqual(fourier_field.s.shape, (1, 1, 5, 10, 12))
+        # Scalar fields have shape (sub_pts, nx, ny, nz)
+        self.assertEqual(real_field.s.shape, (1, 8, 10, 12))
+        self.assertEqual(fourier_field.s.shape, (1, 5, 10, 12))
 
     def test_field_write_access(self):
         """Test that field data can be written."""
@@ -220,8 +223,8 @@ class FFTRoundtripTest(unittest.TestCase):
         real_field = engine.real_space_field("real")
         fourier_field = engine.fourier_space_field("fourier")
 
-        # Initialize with sine wave
-        x = np.arange(16 * 20).reshape(1, 1, 16, 20)
+        # Initialize with sine wave (scalar field has shape (1, nx, ny))
+        x = np.arange(16 * 20).reshape(1, 16, 20)
         real_field.s[:] = np.sin(2 * np.pi * x / (16 * 20))
         original = real_field.s.copy()
 
@@ -241,9 +244,9 @@ class FFTRoundtripTest(unittest.TestCase):
         real_field = engine.real_space_field("real")
         fourier_field = engine.fourier_space_field("fourier")
 
-        # Initialize with random data
+        # Initialize with random data (scalar field has shape (1, nx, ny))
         np.random.seed(42)
-        real_field.s[:] = np.random.randn(1, 1, 16, 20)
+        real_field.s[:] = np.random.randn(1, 16, 20)
         original = real_field.s.copy()
 
         # Forward and inverse FFT
@@ -260,9 +263,9 @@ class FFTRoundtripTest(unittest.TestCase):
         real_field = engine.real_space_field("real")
         fourier_field = engine.fourier_space_field("fourier")
 
-        # Initialize
+        # Initialize (scalar field has shape (1, nx, ny, nz))
         np.random.seed(42)
-        real_field.s[:] = np.random.randn(1, 1, 8, 10, 12)
+        real_field.s[:] = np.random.randn(1, 8, 10, 12)
         original = real_field.s.copy()
 
         # Forward and inverse FFT
@@ -285,12 +288,13 @@ class FFTRoundtripTest(unittest.TestCase):
         engine.fft(real_field, fourier_field)
 
         # DC component should be sum = 5 * 80 = 400
-        self.assertAlmostEqual(fourier_field.s[0, 0, 0, 0].real, 400.0, places=10)
-        self.assertAlmostEqual(fourier_field.s[0, 0, 0, 0].imag, 0.0, places=10)
+        # Scalar field .s has shape (sub_pts, nx, ny) = (1, 5, 10)
+        self.assertAlmostEqual(fourier_field.s[0, 0, 0].real, 400.0, places=10)
+        self.assertAlmostEqual(fourier_field.s[0, 0, 0].imag, 0.0, places=10)
 
         # All other components should be zero
         fourier_copy = fourier_field.s.copy()
-        fourier_copy[0, 0, 0, 0] = 0
+        fourier_copy[0, 0, 0] = 0
         assert_allclose(fourier_copy, 0, atol=1e-12)
 
 
@@ -312,8 +316,8 @@ class TestFFTMultiComponent:
         xp = get_array_module(device)
 
         engine = muGrid.FFTEngine([16, 20], device=_get_device_string(device))
-        real_field = engine.real_space_field("vector", nb_components=2)
-        fourier_field = engine.fourier_space_field("vector_k", nb_components=2)
+        real_field = engine.real_space_field("vector", components=(2,))
+        fourier_field = engine.fourier_space_field("vector_k", components=(2,))
 
         # Initialize with different patterns for each component
         np.random.seed(42)
@@ -341,8 +345,8 @@ class TestFFTMultiComponent:
         xp = get_array_module(device)
 
         engine = muGrid.FFTEngine([16, 20], device=_get_device_string(device))
-        real_field = engine.real_space_field("tensor", nb_components=4)
-        fourier_field = engine.fourier_space_field("tensor_k", nb_components=4)
+        real_field = engine.real_space_field("tensor", components=(4,))
+        fourier_field = engine.fourier_space_field("tensor_k", components=(4,))
 
         # Initialize with different patterns for each component
         np.random.seed(123)
@@ -370,8 +374,8 @@ class TestFFTMultiComponent:
         xp = get_array_module(device)
 
         engine = muGrid.FFTEngine([8, 10, 12], device=_get_device_string(device))
-        real_field = engine.real_space_field("vector3d", nb_components=3)
-        fourier_field = engine.fourier_space_field("vector3d_k", nb_components=3)
+        real_field = engine.real_space_field("vector3d", components=(3,))
+        fourier_field = engine.fourier_space_field("vector3d_k", components=(3,))
 
         # Initialize with different patterns for each component
         np.random.seed(456)
@@ -398,8 +402,8 @@ class TestFFTMultiComponent:
         skip_if_gpu_unavailable(device)
 
         engine = muGrid.FFTEngine([8, 10], device=_get_device_string(device))
-        real_field = engine.real_space_field("vec", nb_components=2)
-        fourier_field = engine.fourier_space_field("vec_k", nb_components=2)
+        real_field = engine.real_space_field("vec", components=(2,))
+        fourier_field = engine.fourier_space_field("vec_k", components=(2,))
 
         # Constant field: component 0 = 3.0, component 1 = 5.0
         real_field.p[0, ...] = 3.0
@@ -433,14 +437,14 @@ class TestFFTMultiComponent:
         engine = muGrid.FFTEngine([16, 20], device=_get_device_string(device))
 
         # Multi-component field
-        real_multi = engine.real_space_field("multi", nb_components=2)
-        fourier_multi = engine.fourier_space_field("multi_k", nb_components=2)
+        real_multi = engine.real_space_field("multi", components=(2,))
+        fourier_multi = engine.fourier_space_field("multi_k", components=(2,))
 
         # Single component fields for reference
-        real_single0 = engine.real_space_field("single0", nb_components=1)
-        fourier_single0 = engine.fourier_space_field("single0_k", nb_components=1)
-        real_single1 = engine.real_space_field("single1", nb_components=1)
-        fourier_single1 = engine.fourier_space_field("single1_k", nb_components=1)
+        real_single0 = engine.real_space_field("single0", components=(1,))
+        fourier_single0 = engine.fourier_space_field("single0_k", components=(1,))
+        real_single1 = engine.real_space_field("single1", components=(1,))
+        fourier_single1 = engine.fourier_space_field("single1_k", components=(1,))
 
         # Initialize with same data
         np.random.seed(789)
@@ -588,9 +592,9 @@ class FFTFrequencyTest(unittest.TestCase):
         fourier_field = engine.fourier_space_field("fourier")
 
         # Set a single x-direction mode
+        # Scalar field .s has shape (sub_pts, nx_fourier, ny) = (1, 4, 4)
         fourier_field.s[:] = 0
         fourier_field.s[
-            0,
             0,
             np.logical_and(
                 np.abs(np.abs(qx) * nx - 1) < 1e-6, np.abs(np.abs(qy) * ny - 0) < 1e-6
@@ -599,12 +603,12 @@ class FFTFrequencyTest(unittest.TestCase):
 
         engine.ifft(fourier_field, real_field)
         # Should produce cos(2*pi*x)
-        assert_allclose(real_field.p[0], np.cos(2 * np.pi * x), atol=1e-12)
+        # Scalar field .p has shape (nx, ny)
+        assert_allclose(real_field.p, np.cos(2 * np.pi * x), atol=1e-12)
 
         # Set a single y-direction mode
         fourier_field.s[:] = 0
         fourier_field.s[
-            0,
             0,
             np.logical_and(
                 np.abs(np.abs(qx) * nx - 0) < 1e-6, np.abs(np.abs(qy) * ny - 1) < 1e-6
@@ -613,7 +617,7 @@ class FFTFrequencyTest(unittest.TestCase):
 
         engine.ifft(fourier_field, real_field)
         # Should produce cos(2*pi*y)
-        assert_allclose(real_field.p[0], np.cos(2 * np.pi * y), atol=1e-12)
+        assert_allclose(real_field.p, np.cos(2 * np.pi * y), atol=1e-12)
 
     def test_properties_return_tuples(self):
         """Test that dimension properties return tuples."""

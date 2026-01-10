@@ -313,6 +313,34 @@ void add_fft_engine(py::module & mod) {
                If a field with the given name already exists
            )")
 
+      .def("register_real_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngine::register_real_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           R"(
+           Register a new real-space field with component shape.
+
+           Raises an error if a field with the given name already exists.
+
+           Parameters
+           ----------
+           name : str
+               Unique field name
+           components : tuple of int, optional
+               Shape of field components. Default is () for scalar.
+
+           Returns
+           -------
+           Field
+               Reference to the created field
+
+           Raises
+           ------
+           RuntimeError
+               If a field with the given name already exists
+           )")
+
       .def("register_fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngine::register_fourier_space_field),
@@ -329,6 +357,34 @@ void add_fft_engine(py::module & mod) {
                Unique field name
            nb_components : int, optional
                Number of components (default 1)
+
+           Returns
+           -------
+           Field
+               Reference to the created field
+
+           Raises
+           ------
+           RuntimeError
+               If a field with the given name already exists
+           )")
+
+      .def("register_fourier_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngine::register_fourier_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           R"(
+           Register a new Fourier-space field with component shape.
+
+           Raises an error if a field with the given name already exists.
+
+           Parameters
+           ----------
+           name : str
+               Unique field name
+           components : tuple of int, optional
+               Shape of field components. Default is () for scalar.
 
            Returns
            -------
@@ -366,6 +422,30 @@ void add_fft_engine(py::module & mod) {
                Reference to the field
            )")
 
+      .def("real_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngine::real_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           R"(
+           Get or create a real-space field with component shape.
+
+           If a field with the given name already exists, returns it.
+           Otherwise creates a new field with the specified component shape.
+
+           Parameters
+           ----------
+           name : str
+               Unique field name
+           components : tuple of int, optional
+               Shape of field components. Default is () for scalar.
+
+           Returns
+           -------
+           Field
+               Reference to the field
+           )")
+
       .def("fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngine::fourier_space_field),
@@ -383,6 +463,30 @@ void add_fft_engine(py::module & mod) {
                Unique field name
            nb_components : int, optional
                Number of components (default 1)
+
+           Returns
+           -------
+           Field
+               Reference to the field
+           )")
+
+      .def("fourier_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngine::fourier_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           R"(
+           Get or create a Fourier-space field with component shape.
+
+           If a field with the given name already exists, returns it.
+           Otherwise creates a new field with the specified component shape.
+
+           Parameters
+           ----------
+           name : str
+               Unique field name
+           components : tuple of int, optional
+               Shape of field components. Default is () for scalar.
 
            Returns
            -------
@@ -647,12 +751,26 @@ void add_fft_engine_cuda(py::module & mod) {
            py::return_value_policy::reference_internal,
            "Register a new real-space field on GPU")
 
+      .def("register_real_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineCUDA::register_real_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Register a new real-space field on GPU with component shape")
+
       .def("register_fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngineCUDA::register_fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Register a new Fourier-space field on GPU")
+
+      .def("register_fourier_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineCUDA::register_fourier_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Register a new Fourier-space field on GPU with component shape")
 
       .def("real_space_field",
            py::overload_cast<const std::string &, Index_t>(
@@ -661,12 +779,26 @@ void add_fft_engine_cuda(py::module & mod) {
            py::return_value_policy::reference_internal,
            "Get or create a real-space field on GPU")
 
+      .def("real_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineCUDA::real_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Get or create a real-space field on GPU with component shape")
+
       .def("fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngineCUDA::fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Get or create a Fourier-space field on GPU")
+
+      .def("fourier_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineCUDA::fourier_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Get or create a Fourier-space field on GPU with component shape")
 
       .def_property_readonly("real_space_collection",
            py::overload_cast<>(&PyFFTEngineCUDA::get_real_space_collection),
@@ -826,12 +958,26 @@ void add_fft_engine_hip(py::module & mod) {
            py::return_value_policy::reference_internal,
            "Register a new real-space field on GPU")
 
+      .def("register_real_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineROCm::register_real_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Register a new real-space field on GPU with component shape")
+
       .def("register_fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngineROCm::register_fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Register a new Fourier-space field on GPU")
+
+      .def("register_fourier_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineROCm::register_fourier_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Register a new Fourier-space field on GPU with component shape")
 
       .def("real_space_field",
            py::overload_cast<const std::string &, Index_t>(
@@ -840,12 +986,26 @@ void add_fft_engine_hip(py::module & mod) {
            py::return_value_policy::reference_internal,
            "Get or create a real-space field on GPU")
 
+      .def("real_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineROCm::real_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Get or create a real-space field on GPU with component shape")
+
       .def("fourier_space_field",
            py::overload_cast<const std::string &, Index_t>(
                &PyFFTEngineROCm::fourier_space_field),
            "name"_a, "nb_components"_a = 1,
            py::return_value_policy::reference_internal,
            "Get or create a Fourier-space field on GPU")
+
+      .def("fourier_space_field",
+           py::overload_cast<const std::string &, const muGrid::Shape_t &>(
+               &PyFFTEngineROCm::fourier_space_field),
+           "name"_a, "components"_a = muGrid::Shape_t{},
+           py::return_value_policy::reference_internal,
+           "Get or create a Fourier-space field on GPU with component shape")
 
       .def_property_readonly("real_space_collection",
            py::overload_cast<>(&PyFFTEngineROCm::get_real_space_collection),
