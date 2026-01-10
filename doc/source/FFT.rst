@@ -264,8 +264,8 @@ FFT fields can have multiple components:
     engine = muGrid.FFTEngine([16, 20])
 
     # Create field with 3 components (e.g., velocity vector)
-    velocity = engine.real_space_field("velocity", nb_components=3)
-    velocity_hat = engine.fourier_space_field("velocity_hat", nb_components=3)
+    velocity = engine.real_space_field("velocity", components=(3,))
+    velocity_hat = engine.fourier_space_field("velocity_hat", components=(3,))
 
     print(f"Velocity shape: {velocity.s.shape}")      # (3, 1, 16, 20)
     print(f"Velocity_hat shape: {velocity_hat.s.shape}")  # (3, 1, 9, 20)
@@ -328,10 +328,10 @@ ghost buffer sizes:
     )
 
     # Real-space fields include ghost regions
-    real_field = engine.real_space_field("displacement", nb_components=3)
+    real_field = engine.real_space_field("displacement", components=(3,))
 
     # Fourier-space fields have no ghosts (hard assumption)
-    fourier_field = engine.fourier_space_field("displacement_k", nb_components=3)
+    fourier_field = engine.fourier_space_field("displacement_k", components=(3,))
 
 Run with MPI:
 

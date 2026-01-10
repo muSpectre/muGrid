@@ -633,8 +633,8 @@ class FFTEngine:
     Examples
     --------
     >>> engine = FFTEngine([64, 64])
-    >>> real_field = engine.real_space_field("displacement", nb_components=3)
-    >>> fourier_field = engine.fourier_space_field("displacement_k", nb_components=3)
+    >>> real_field = engine.real_space_field("displacement", components=(3,))
+    >>> fourier_field = engine.fourier_space_field("displacement_k", components=(3,))
     >>> engine.fft(real_field, fourier_field)
     >>> engine.ifft(fourier_field, real_field)
     >>> real_field.s[:] *= engine.normalisation
@@ -744,7 +744,7 @@ class FFTEngine:
         self._cpp.ifft(_unwrap(input_field), _unwrap(output_field))
 
     def register_real_space_field(
-        self, name: str, nb_components: int = 1
+        self, name: str, components: Shape = ()
     ) -> Field:
         """
         Register a new real-space field.
@@ -755,8 +755,8 @@ class FFTEngine:
         ----------
         name : str
             Unique field name.
-        nb_components : int, optional
-            Number of components. Default is 1.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
 
         Returns
         -------
@@ -768,11 +768,11 @@ class FFTEngine:
         RuntimeError
             If a field with the given name already exists.
         """
-        cpp_field = self._cpp.register_real_space_field(name, nb_components)
+        cpp_field = self._cpp.register_real_space_field(name, components)
         return Field(cpp_field)
 
     def register_fourier_space_field(
-        self, name: str, nb_components: int = 1
+        self, name: str, components: Shape = ()
     ) -> Field:
         """
         Register a new Fourier-space field.
@@ -783,8 +783,8 @@ class FFTEngine:
         ----------
         name : str
             Unique field name.
-        nb_components : int, optional
-            Number of components. Default is 1.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
 
         Returns
         -------
@@ -796,51 +796,51 @@ class FFTEngine:
         RuntimeError
             If a field with the given name already exists.
         """
-        cpp_field = self._cpp.register_fourier_space_field(name, nb_components)
+        cpp_field = self._cpp.register_fourier_space_field(name, components)
         return Field(cpp_field)
 
-    def real_space_field(self, name: str, nb_components: int = 1) -> Field:
+    def real_space_field(self, name: str, components: Shape = ()) -> Field:
         """
         Get or create a real-space field for FFT operations.
 
         If a field with the given name already exists, returns it.
-        Otherwise creates a new field with the specified number of components.
+        Otherwise creates a new field with the specified component shape.
 
         Parameters
         ----------
         name : str
             Unique field name.
-        nb_components : int, optional
-            Number of components. Default is 1.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
 
         Returns
         -------
         Field
             Wrapped real-valued field with array accessors.
         """
-        cpp_field = self._cpp.real_space_field(name, nb_components)
+        cpp_field = self._cpp.real_space_field(name, components)
         return Field(cpp_field)
 
-    def fourier_space_field(self, name: str, nb_components: int = 1) -> Field:
+    def fourier_space_field(self, name: str, components: Shape = ()) -> Field:
         """
         Get or create a Fourier-space field for FFT operations.
 
         If a field with the given name already exists, returns it.
-        Otherwise creates a new field with the specified number of components.
+        Otherwise creates a new field with the specified component shape.
 
         Parameters
         ----------
         name : str
             Unique field name.
-        nb_components : int, optional
-            Number of components. Default is 1.
+        components : tuple of int, optional
+            Shape of field components. Default is () for scalar.
 
         Returns
         -------
         Field
             Wrapped complex-valued field with array accessors.
         """
-        cpp_field = self._cpp.fourier_space_field(name, nb_components)
+        cpp_field = self._cpp.fourier_space_field(name, components)
         return Field(cpp_field)
 
     @property
