@@ -130,7 +130,9 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
-    if (this->spatial_dim == 2) {
+    if (this->spatial_dim == 1) {
+      fft_1d(input, output);
+    } else if (this->spatial_dim == 2) {
       fft_2d(input, output);
     } else {
       fft_3d(input, output);
@@ -166,7 +168,9 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
-    if (this->spatial_dim == 2) {
+    if (this->spatial_dim == 1) {
+      ifft_1d(input, output);
+    } else if (this->spatial_dim == 2) {
       ifft_2d(input, output);
     } else {
       ifft_3d(input, output);
@@ -178,6 +182,102 @@ class FFTEngine : public FFTEngineBase {
   }
 
  protected:
+  void fft_1d(const Field & input, Field & output) {
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const DynGridIndex & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
+
+    Index_t nb_components = input.get_nb_components();
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
+
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Real * input_ptr =
+        static_cast<const Real *>(input.get_void_data_ptr(!is_device));
+    Complex * output_ptr =
+        static_cast<Complex *>(output.get_void_data_ptr(!is_device));
+
+    Index_t Nx = nb_grid_pts[0];
+    Index_t Fx = Nx / 2 + 1;
+
+    StorageOrder storage_order = input.get_storage_order();
+    bool is_soa = (storage_order == StorageOrder::StructureOfArrays);
+
+    Index_t nb_buffer_pixels = local_with_ghosts[0];
+    Index_t ghost_offset = ghosts_left[0];
+
+    if (is_soa) {
+      // SoA: components in separate blocks
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->r2c(Nx, 1,
+                     input_ptr + ghost_offset + comp * nb_buffer_pixels,
+                     1, Nx,
+                     output_ptr + comp * Fx,
+                     1, Fx);
+      }
+    } else {
+      // AoS: components interleaved
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->r2c(Nx, 1,
+                     input_ptr + ghost_offset * nb_components + comp,
+                     nb_components, Nx * nb_components,
+                     output_ptr + comp,
+                     nb_components, Fx * nb_components);
+      }
+    }
+  }
+
+  void ifft_1d(const Field & input, Field & output) {
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const DynGridIndex & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
+
+    Index_t nb_components = input.get_nb_components();
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
+
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Complex * input_ptr =
+        static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
+    Real * output_ptr =
+        static_cast<Real *>(output.get_void_data_ptr(!is_device));
+
+    Index_t Nx = nb_grid_pts[0];
+    Index_t Fx = Nx / 2 + 1;
+
+    StorageOrder storage_order = output.get_storage_order();
+    bool is_soa = (storage_order == StorageOrder::StructureOfArrays);
+
+    Index_t nb_buffer_pixels = local_with_ghosts[0];
+    Index_t ghost_offset = ghosts_left[0];
+
+    if (is_soa) {
+      // SoA: components in separate blocks
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2r(Nx, 1,
+                     input_ptr + comp * Fx,
+                     1, Fx,
+                     output_ptr + ghost_offset + comp * nb_buffer_pixels,
+                     1, Nx);
+      }
+    } else {
+      // AoS: components interleaved
+      for (Index_t comp = 0; comp < nb_components; ++comp) {
+        backend->c2r(Nx, 1,
+                     input_ptr + comp,
+                     nb_components, Fx * nb_components,
+                     output_ptr + ghost_offset * nb_components + comp,
+                     nb_components, Nx * nb_components);
+      }
+    }
+  }
+
   void fft_2d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();

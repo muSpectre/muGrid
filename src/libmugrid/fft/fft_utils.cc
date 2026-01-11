@@ -125,6 +125,16 @@ void distribute_dimension(Index_t global_size, int comm_size, int rank,
 
 void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & p1,
                          int & p2) {
+  // For 1D grids: no MPI distribution supported
+  if (nb_grid_pts.get_dim() == 1) {
+    if (num_ranks != 1) {
+      throw RuntimeError("1D FFT only supports serial execution (1 MPI rank)");
+    }
+    p1 = 1;
+    p2 = 1;
+    return;
+  }
+
   // For 2D grids, we just have one distribution dimension
   if (nb_grid_pts.get_dim() == 2) {
     p1 = 1;

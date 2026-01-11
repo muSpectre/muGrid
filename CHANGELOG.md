@@ -1,6 +1,24 @@
 Change log for µGrid
 ====================
 
+0.105.0 (11Jan26)
+-----------------
+
+- ENH: Added 1D FFT support to `FFTEngine`
+  - `FFTEngine([N])` creates a 1D FFT engine for grids of size N
+  - Forward FFT: `real[N] → complex[N/2+1]` using r2c transform
+  - Inverse FFT: `complex[N/2+1] → real[N]` using c2r transform
+  - Supports all backends: PocketFFT (CPU), cuFFT (CUDA), rocFFT (ROCm)
+  - Supports both AoS (CPU) and SoA (GPU) storage orders
+  - Multi-component fields supported (vectors, tensors)
+  - Note: 1D FFT is serial-only (no MPI parallelization)
+- DOC: Updated FFT documentation to include 1D examples
+- TST: Added comprehensive 1D FFT test suite
+  - Engine creation and properties tests
+  - Roundtrip accuracy tests
+  - Comparison with NumPy's `fft.rfft`
+  - Multi-component field tests
+
 0.104.0 (10Jan26)
 -----------------
 

@@ -203,7 +203,7 @@ void add_fft_engine(py::module & mod) {
       scaling to large numbers of ranks.
 
       Key features:
-      - Supports 2D and 3D grids
+      - Supports 1D, 2D, and 3D grids
       - Handles arbitrary ghost buffer configurations in real space
       - No ghosts in Fourier space (hard assumption)
       - Supports host and device (GPU) memory
@@ -234,7 +234,7 @@ void add_fft_engine(py::module & mod) {
            Parameters
            ----------
            nb_domain_grid_pts : tuple of int
-               Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
+               Global grid dimensions (Nx,), (Nx, Ny), or (Nx, Ny, Nz)
            comm : Communicator, optional
                MPI communicator (default: serial)
            nb_ghosts_left : tuple of int, optional
@@ -717,7 +717,7 @@ void add_fft_engine_cuda(py::module & mod) {
            Parameters
            ----------
            nb_domain_grid_pts : tuple of int
-               Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
+               Global grid dimensions (Nx,), (Nx, Ny), or (Nx, Ny, Nz)
            comm : Communicator, optional
                MPI communicator (default: serial)
            nb_ghosts_left : tuple of int, optional
@@ -924,7 +924,7 @@ void add_fft_engine_hip(py::module & mod) {
            Parameters
            ----------
            nb_domain_grid_pts : tuple of int
-               Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
+               Global grid dimensions (Nx,), (Nx, Ny), or (Nx, Ny, Nz)
            comm : Communicator, optional
                MPI communicator (default: serial)
            nb_ghosts_left : tuple of int, optional

@@ -47,6 +47,11 @@ import muGrid
 class FFTUtilsTest(unittest.TestCase):
     """Test FFT utility functions."""
 
+    def test_get_hermitian_grid_pts_1d(self):
+        """Test hermitian grid dimensions for 1D."""
+        fourier = muGrid.get_hermitian_grid_pts([16])
+        self.assertEqual(fourier[0], 9)  # 16/2 + 1
+
     def test_get_hermitian_grid_pts_2d(self):
         """Test hermitian grid dimensions for 2D."""
         fourier = muGrid.get_hermitian_grid_pts([8, 10])
@@ -108,6 +113,87 @@ class FFTEngineCreationTest(unittest.TestCase):
         """Test backend name is reported."""
         engine = muGrid.FFTEngine([8, 10])
         self.assertEqual(engine.backend_name, "PocketFFT")
+
+
+class FFT1DEngineTest(unittest.TestCase):
+    """Test 1D FFT engine."""
+
+    def test_create_1d_engine(self):
+        """Test creating a 1D FFT engine."""
+        engine = muGrid.FFTEngine([32])
+        self.assertEqual(engine.nb_domain_grid_pts[0], 32)
+        self.assertEqual(engine.nb_fourier_grid_pts[0], 17)  # 32/2 + 1
+        self.assertEqual(engine.spatial_dim, 1)
+
+    def test_1d_normalization(self):
+        """Test 1D normalization factor."""
+        engine = muGrid.FFTEngine([32])
+        self.assertAlmostEqual(engine.normalisation, 1.0 / 32, places=15)
+
+    def test_1d_roundtrip(self):
+        """Test 1D FFT roundtrip."""
+        N = 64
+        engine = muGrid.FFTEngine([N])
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        np.random.seed(42)
+        real_field.p[:] = np.random.randn(N)
+        original = real_field.p.copy()
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.p[:] *= engine.normalisation
+
+        assert_allclose(real_field.p, original, atol=1e-14)
+
+    def test_1d_compare_numpy(self):
+        """Test 1D FFT matches numpy.fft.rfft."""
+        N = 64
+        engine = muGrid.FFTEngine([N])
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        np.random.seed(123)
+        data = np.random.randn(N)
+        real_field.p[:] = data
+
+        engine.fft(real_field, fourier_field)
+
+        numpy_result = np.fft.rfft(data)
+        assert_allclose(fourier_field.p.flatten(), numpy_result, atol=1e-12)
+
+    def test_1d_dc_component(self):
+        """Test DC component of constant field."""
+        N = 32
+        engine = muGrid.FFTEngine([N])
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        real_field.p[:] = 5.0
+        engine.fft(real_field, fourier_field)
+
+        # DC = sum = 5 * 32 = 160
+        self.assertAlmostEqual(fourier_field.p[0].real, 160.0, places=10)
+        self.assertAlmostEqual(fourier_field.p[0].imag, 0.0, places=10)
+
+    def test_1d_vector_field_roundtrip(self):
+        """Test 1D FFT roundtrip with multi-component field."""
+        N = 64
+        engine = muGrid.FFTEngine([N])
+        real_field = engine.real_space_field("vector", components=(3,))
+        fourier_field = engine.fourier_space_field("vector_k", components=(3,))
+
+        np.random.seed(42)
+        for c in range(3):
+            real_field.p[c, :] = np.random.randn(N)
+        original = real_field.p.copy()
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.p[:] *= engine.normalisation
+
+        assert_allclose(real_field.p, original, atol=1e-14)
 
 
 class FFTFieldTest(unittest.TestCase):

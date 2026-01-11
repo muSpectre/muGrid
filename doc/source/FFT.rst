@@ -14,11 +14,17 @@ Instantiating an FFT engine is straightforward:
 
     import muGrid
 
+    # Create a 1D FFT engine
+    engine = muGrid.FFTEngine([nx])
+
     # Create a 2D FFT engine
     engine = muGrid.FFTEngine([nx, ny])
 
     # Create a 3D FFT engine
     engine = muGrid.FFTEngine([nx, ny, nz])
+
+The FFT engine supports 1D, 2D, and 3D grids. Note that 1D FFT is serial-only
+(no MPI parallelization), while 2D and 3D support MPI-parallel execution.
 
 The FFT engine provides properties for querying the grid dimensions:
 
@@ -61,6 +67,54 @@ The ``fft`` method performs the forward transform (real to Fourier space) and
 
 .. literalinclude:: ../../examples/fft_roundtrip.py
     :language: python
+
+1D FFT
+******
+
+For 1D problems (e.g., time series analysis, 1D signal processing), create
+a 1D FFT engine by passing a single-element list:
+
+.. code-block:: python
+
+    import numpy as np
+    import muGrid
+
+    # Create 1D FFT engine
+    N = 64
+    engine = muGrid.FFTEngine([N])
+
+    # Create fields
+    real_field = engine.real_space_field("signal")
+    fourier_field = engine.fourier_space_field("spectrum")
+
+    # Initialize with a test signal (e.g., sine wave)
+    x = np.linspace(0, 1, N, endpoint=False)
+    real_field.p[:] = np.sin(2 * np.pi * 3 * x)  # 3 Hz sine wave
+
+    # Forward FFT
+    engine.fft(real_field, fourier_field)
+
+    # The Fourier field has N/2+1 complex values due to Hermitian symmetry
+    print(f"Fourier shape: {fourier_field.p.shape}")  # (33,) for N=64
+
+    # Inverse FFT and normalize
+    engine.ifft(fourier_field, real_field)
+    real_field.p[:] *= engine.normalisation
+
+The 1D FFT output matches NumPy's ``fft.rfft``:
+
+.. code-block:: python
+
+    # Compare with NumPy
+    data = np.random.randn(64)
+    real_field.p[:] = data
+    engine.fft(real_field, fourier_field)
+
+    numpy_result = np.fft.rfft(data)
+    np.testing.assert_allclose(fourier_field.p.flatten(), numpy_result)
+
+Note that 1D FFT is **serial-only** and will raise an error if used with
+multiple MPI ranks.
 
 Normalization
 *************
@@ -224,9 +278,17 @@ symmetry. Use ``get_hermitian_grid_pts`` to compute the Fourier-space grid size:
 
     import muGrid
 
-    real_grid = [64, 64, 64]
-    fourier_grid = muGrid.get_hermitian_grid_pts(real_grid)
-    print(f"Fourier grid: {fourier_grid}")  # [33, 64, 64]
+    # 1D example
+    fourier_1d = muGrid.get_hermitian_grid_pts([64])
+    print(f"1D Fourier grid: {fourier_1d}")  # [33]
+
+    # 2D example
+    fourier_2d = muGrid.get_hermitian_grid_pts([64, 64])
+    print(f"2D Fourier grid: {fourier_2d}")  # [33, 64]
+
+    # 3D example
+    fourier_3d = muGrid.get_hermitian_grid_pts([64, 64, 64])
+    print(f"3D Fourier grid: {fourier_3d}")  # [33, 64, 64]
 
 The first dimension is reduced to ``n//2 + 1``.
 

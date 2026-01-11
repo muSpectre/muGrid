@@ -51,8 +51,8 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
     : Parent_t{comm, nb_domain_grid_pts.get_dim(), nb_sub_pts, device},
       spatial_dim{nb_domain_grid_pts.get_dim()} {
   // Validate dimensions
-  if (spatial_dim != 2 && spatial_dim != 3) {
-    throw RuntimeError("FFTEngine only supports 2D and 3D grids");
+  if (spatial_dim < 1 || spatial_dim > 3) {
+    throw RuntimeError("FFTEngine supports 1D, 2D, and 3D grids");
   }
 
   // Set up the process grid for pencil decomposition
@@ -86,13 +86,16 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
 #endif
 
   // Compute the real-space subdomain distribution
+  // For 1D: X is not distributed
   // For 2D: Y is distributed across P2 ranks
   // For 3D: Y is distributed across P2, Z across P1
   DynGridIndex nb_subdivisions(spatial_dim);
   nb_subdivisions[0] = 1;  // X is not distributed in real space
-  nb_subdivisions[1] = this->proc_grid_p2;
-  if (spatial_dim == 3) {
-    nb_subdivisions[2] = this->proc_grid_p1;
+  if (spatial_dim >= 2) {
+    nb_subdivisions[1] = this->proc_grid_p2;
+    if (spatial_dim == 3) {
+      nb_subdivisions[2] = this->proc_grid_p1;
+    }
   }
 
   // Initialize the parent CartesianDecomposition
@@ -116,10 +119,14 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
 
   // Compute local Fourier subdomain
   Index_t local_fx, offset_fx;
-  Index_t local_fy, offset_fy;
+  Index_t local_fy = 1, offset_fy = 0;
   Index_t local_fz = 1, offset_fz = 0;
 
-  if (spatial_dim == 2) {
+  if (spatial_dim == 1) {
+    // 1D: X is the only dimension, no distribution
+    local_fx = this->nb_fourier_grid_pts[0];
+    offset_fx = 0;
+  } else if (spatial_dim == 2) {
     // 2D: After transpose, X is distributed across P2, Y is full
     distribute_dimension(this->nb_fourier_grid_pts[0], this->proc_grid_p2,
                          this->proc_coord_p2, local_fx, offset_fx);
@@ -138,16 +145,20 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
 
   this->nb_fourier_subdomain_grid_pts = DynGridIndex(spatial_dim);
   this->nb_fourier_subdomain_grid_pts[0] = local_fx;
-  this->nb_fourier_subdomain_grid_pts[1] = local_fy;
-  if (spatial_dim == 3) {
-    this->nb_fourier_subdomain_grid_pts[2] = local_fz;
+  if (spatial_dim >= 2) {
+    this->nb_fourier_subdomain_grid_pts[1] = local_fy;
+    if (spatial_dim == 3) {
+      this->nb_fourier_subdomain_grid_pts[2] = local_fz;
+    }
   }
 
   this->fourier_subdomain_locations = DynGridIndex(spatial_dim);
   this->fourier_subdomain_locations[0] = offset_fx;
-  this->fourier_subdomain_locations[1] = offset_fy;
-  if (spatial_dim == 3) {
-    this->fourier_subdomain_locations[2] = offset_fz;
+  if (spatial_dim >= 2) {
+    this->fourier_subdomain_locations[1] = offset_fy;
+    if (spatial_dim == 3) {
+      this->fourier_subdomain_locations[2] = offset_fz;
+    }
   }
 
   // Initialize the Fourier collection (no ghosts in Fourier space)
@@ -166,6 +177,11 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
 }
 
 void FFTEngineBase::initialise_fft_base() {
+  // For 1D: no work buffers or transposes needed
+  if (this->spatial_dim == 1) {
+    return;
+  }
+
   const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
   auto device = this->get_device();
 
