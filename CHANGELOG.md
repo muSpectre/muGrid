@@ -1,6 +1,13 @@
 Change log for µGrid
 ====================
 
+0.105.1 (11Jan26)
+-----------------
+
+- BUG: Fixed `ifftfreq` property name on GPU FFT engines (CUDA/ROCm)
+  - Was incorrectly named `fftfreqind` instead of `ifftfreq`
+  - Now consistent with CPU `FFTEngine` naming
+
 0.105.0 (11Jan26)
 -----------------
 

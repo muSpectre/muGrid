@@ -858,7 +858,7 @@ void add_fft_engine_cuda(py::module & mod) {
              return muGrid::py_fftfreq<Real, PyFFTEngineCUDA>(self);
            })
 
-      .def_property_readonly("fftfreqind",
+      .def_property_readonly("ifftfreq",
            [](const PyFFTEngineCUDA & self) {
              return muGrid::py_fftfreq<Int, PyFFTEngineCUDA>(self);
            })
@@ -1065,7 +1065,7 @@ void add_fft_engine_hip(py::module & mod) {
              return muGrid::py_fftfreq<Real, PyFFTEngineROCm>(self);
            })
 
-      .def_property_readonly("fftfreqind",
+      .def_property_readonly("ifftfreq",
            [](const PyFFTEngineROCm & self) {
              return muGrid::py_fftfreq<Int, PyFFTEngineROCm>(self);
            })
