@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="GPU Computing" href="GPU.html"><link rel="prev" title="Python Bindings" href="Python.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Fast Fourier Transform - µGrid 0.104.0 documentation</title>
+        <title>Fast Fourier Transform - µGrid 0.104.0-1-ge36e18e9 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.104.0
+      <a href="index.html"><div class="brand">µGrid 0.104.0-1-ge36e18e9
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.104.0
+  <span class="sidebar-brand-text">µGrid 0.104.0-1-ge36e18e9
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -255,6 +255,9 @@ for efficient FFT computation.</p>
 <p>Instantiating an FFT engine is straightforward:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
+<span class="c1"># Create a 1D FFT engine</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="n">nx</span><span class="p">])</span>
+
 <span class="c1"># Create a 2D FFT engine</span>
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">])</span>
 
@@ -262,6 +265,8 @@ for efficient FFT computation.</p>
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">,</span> <span class="n">nz</span><span class="p">])</span>
 </pre></div>
 </div>
+<p>The FFT engine supports 1D, 2D, and 3D grids. Note that 1D FFT is serial-only
+(no MPI parallelization), while 2D and 3D support MPI-parallel execution.</p>
 <p>The FFT engine provides properties for querying the grid dimensions:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="mi">16</span><span class="p">,</span> <span class="mi">20</span><span class="p">])</span>
 
@@ -320,6 +325,49 @@ Fourier-space fields. Use the engine’s methods to create fields:</p>
 <span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">real_field</span><span class="o">.</span><span class="n">s</span><span class="p">,</span> <span class="n">original</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-14</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+<section id="d-fft">
+<h2>1D FFT<a class="headerlink" href="#d-fft" title="Link to this heading">¶</a></h2>
+<p>For 1D problems (e.g., time series analysis, 1D signal processing), create
+a 1D FFT engine by passing a single-element list:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+
+<span class="c1"># Create 1D FFT engine</span>
+<span class="n">N</span> <span class="o">=</span> <span class="mi">64</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">([</span><span class="n">N</span><span class="p">])</span>
+
+<span class="c1"># Create fields</span>
+<span class="n">real_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;signal&quot;</span><span class="p">)</span>
+<span class="n">fourier_field</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fourier_space_field</span><span class="p">(</span><span class="s2">&quot;spectrum&quot;</span><span class="p">)</span>
+
+<span class="c1"># Initialize with a test signal (e.g., sine wave)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">real_field</span><span class="o">.</span><span class="n">p</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>  <span class="c1"># 3 Hz sine wave</span>
+
+<span class="c1"># Forward FFT</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">real_field</span><span class="p">,</span> <span class="n">fourier_field</span><span class="p">)</span>
+
+<span class="c1"># The Fourier field has N/2+1 complex values due to Hermitian symmetry</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fourier shape: </span><span class="si">{</span><span class="n">fourier_field</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># (33,) for N=64</span>
+
+<span class="c1"># Inverse FFT and normalize</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">ifft</span><span class="p">(</span><span class="n">fourier_field</span><span class="p">,</span> <span class="n">real_field</span><span class="p">)</span>
+<span class="n">real_field</span><span class="o">.</span><span class="n">p</span><span class="p">[:]</span> <span class="o">*=</span> <span class="n">engine</span><span class="o">.</span><span class="n">normalisation</span>
+</pre></div>
+</div>
+<p>The 1D FFT output matches NumPy’s <code class="docutils literal notranslate"><span class="pre">fft.rfft</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compare with NumPy</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span>
+<span class="n">real_field</span><span class="o">.</span><span class="n">p</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">data</span>
+<span class="n">engine</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">real_field</span><span class="p">,</span> <span class="n">fourier_field</span><span class="p">)</span>
+
+<span class="n">numpy_result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfft</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">fourier_field</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">numpy_result</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that 1D FFT is <strong>serial-only</strong> and will raise an error if used with
+multiple MPI ranks.</p>
 </section>
 <section id="normalization">
 <h2>Normalization<a class="headerlink" href="#normalization" title="Link to this heading">¶</a></h2>
@@ -463,9 +511,17 @@ local subdomain owned by each rank:</p>
 symmetry. Use <code class="docutils literal notranslate"><span class="pre">get_hermitian_grid_pts</span></code> to compute the Fourier-space grid size:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
 
-<span class="n">real_grid</span> <span class="o">=</span> <span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">]</span>
-<span class="n">fourier_grid</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">get_hermitian_grid_pts</span><span class="p">(</span><span class="n">real_grid</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fourier grid: </span><span class="si">{</span><span class="n">fourier_grid</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># [33, 64, 64]</span>
+<span class="c1"># 1D example</span>
+<span class="n">fourier_1d</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">get_hermitian_grid_pts</span><span class="p">([</span><span class="mi">64</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;1D Fourier grid: </span><span class="si">{</span><span class="n">fourier_1d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># [33]</span>
+
+<span class="c1"># 2D example</span>
+<span class="n">fourier_2d</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">get_hermitian_grid_pts</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;2D Fourier grid: </span><span class="si">{</span><span class="n">fourier_2d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># [33, 64]</span>
+
+<span class="c1"># 3D example</span>
+<span class="n">fourier_3d</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">get_hermitian_grid_pts</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;3D Fourier grid: </span><span class="si">{</span><span class="n">fourier_3d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># [33, 64, 64]</span>
 </pre></div>
 </div>
 <p>The first dimension is reduced to <code class="docutils literal notranslate"><span class="pre">n//2</span> <span class="pre">+</span> <span class="pre">1</span></code>.</p>
@@ -686,6 +742,7 @@ you can transfer data between host and device fields as needed.</p>
 <li><a class="reference internal" href="#the-fftengine-class">The FFTEngine class</a></li>
 <li><a class="reference internal" href="#creating-fft-fields">Creating FFT fields</a></li>
 <li><a class="reference internal" href="#forward-and-inverse-transforms">Forward and inverse transforms</a></li>
+<li><a class="reference internal" href="#d-fft">1D FFT</a></li>
 <li><a class="reference internal" href="#normalization">Normalization</a></li>
 <li><a class="reference internal" href="#frequency-and-coordinate-arrays">Frequency and coordinate arrays</a><ul>
 <li><a class="reference internal" href="#frequency-arrays">Frequency arrays</a></li>
@@ -715,7 +772,7 @@ you can transfer data between host and device fields as needed.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=d41e3a40"></script>
+</div><script src="_static/documentation_options.js?v=671c9571"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
