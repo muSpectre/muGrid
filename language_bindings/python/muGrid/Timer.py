@@ -48,6 +48,7 @@ class Timer:
     - Accumulation of time across multiple calls to the same timer
     - Call counting for repeated operations
     - Hierarchical summary output in tabular format
+    - Optional depth limiting for nested timers
 
     Example usage:
         from muGrid import Timer
@@ -70,7 +71,7 @@ class Timer:
         Name                                  Total    Calls      Average   % Parent
         ------------------------------ ------------ -------- ------------ ----------
         outer                             10.00 ms        1            -          -
-          inner                            5.00 ms        2     2.50 ms      50.0%
+          inner                            5.00 ms        2      2.50 ms      50.0%
           (other)                          5.00 ms        -            -      50.0%
         ==============================================================================
     """
@@ -87,13 +88,16 @@ class Timer:
         self._roots = []  # top-level timer names in order of first use
 
     @contextmanager
-    def __call__(self, name):
+    def __call__(self, name: str, max_depth: int = None):
         """
         Context manager for timing a named code section.
 
         Args:
             name: Identifier for this timing section. Repeated calls with the
                   same name accumulate time and increment the call counter.
+            max_depth: Optional maximum depth for nested timing. If the current
+                       nesting level exceeds the max_depth of any parent timer,
+                       this timer will not record time.
 
         Yields:
             None
@@ -103,6 +107,11 @@ class Timer:
                 # code to time
                 pass
         """
+        # Check if depth constraints allow timing
+        if not self._is_depth_allowed():
+            yield
+            return
+
         # Build hierarchical name based on current stack
         if self._stack:
             parent_name = self._stack[-1][0]
@@ -128,7 +137,7 @@ class Timer:
 
         # Push onto stack and start timing
         start = time.perf_counter()
-        self._stack.append((full_name, start))
+        self._stack.append((full_name, start, max_depth))
 
         try:
             yield
@@ -138,6 +147,19 @@ class Timer:
             self._stack.pop()
             self._timers[full_name]["total"] += elapsed
             self._timers[full_name]["calls"] += 1
+
+    def _is_depth_allowed(self):
+        """Check parent timers' max_depth constraints.
+
+        Returns:
+            bool, True if the timer is within all parent timer max_depth limits
+        """
+        for i, (_, _, max_depth) in enumerate(self._stack):
+            if max_depth is not None:
+                current_depth = len(self._stack) - i
+                if current_depth > max_depth:
+                    return False
+        return True
 
     def get_time(self, name):
         """
