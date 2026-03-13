@@ -48,7 +48,7 @@ def conjugate_gradients(
         - "r": residual field
         - "p": search direction field
         - "rr": squared residual norm (float)
-    timer : muGrid.Timer, optional
+    timer : muTimer.Timer, optional
         Timer object for performance profiling. If provided, the solver will
         record timing for the hessp (Hessian-vector product) operations.
 

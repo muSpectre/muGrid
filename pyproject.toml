@@ -22,7 +22,8 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "numpy>=2.1"
+    "numpy>=2.1",
+    "muTimer"
 ]
 
 [project.optional-dependencies]

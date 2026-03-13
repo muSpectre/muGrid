@@ -7,6 +7,7 @@ try:
     import matplotlib.pyplot as plt
 except ModuleNotFoundError:
     plt = None
+import muTimer
 import numpy as np
 
 import muGrid
@@ -173,7 +174,7 @@ rhs.p[...] -= arr.mean(rhs.p)
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
 # Create global timer for hierarchical timing
-timer = muGrid.Timer()
+timer = muTimer.Timer()
 
 
 def callback(iteration, state):

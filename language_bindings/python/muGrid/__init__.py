@@ -183,9 +183,6 @@ from .Field import wrap_field  # noqa: E402
 # MPI communicator and parallel utilities
 from .Parallel import Communicator, parprint  # noqa: E402
 
-# Timing utility
-from .Timer import Timer  # noqa: E402
-
 # Version information
 __version__ = _muGrid.version.description()
 
@@ -236,7 +233,6 @@ __all__ = [
     "Unit",
     "Verbosity",
     # Utilities
-    "Timer",
     "parprint",
     # Linear algebra
     "linalg",

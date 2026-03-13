@@ -43,10 +43,10 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 import pytest
+from muTimer import Timer
 from NuMPI.Testing.Subdivision import suggest_subdivisions
 
 import muGrid
-from muGrid import Timer
 from muGrid.Solvers import conjugate_gradients
 
 # =============================================================================

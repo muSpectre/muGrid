@@ -29,6 +29,7 @@ try:
 except ModuleNotFoundError:
     plt = None
 
+import muTimer
 import numpy as np
 
 import muGrid
@@ -452,7 +453,7 @@ if args.kernel == "fused":
         )
 
 # Create global timer for hierarchical timing
-timer = muGrid.Timer()
+timer = muTimer.Timer()
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)

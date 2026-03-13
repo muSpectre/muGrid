@@ -45,9 +45,9 @@ from conftest import (
     get_test_devices,
     skip_if_gpu_unavailable,
 )
+from muTimer import Timer
 
 import muGrid
-from muGrid import Timer
 
 # =============================================================================
 # Test Configuration
