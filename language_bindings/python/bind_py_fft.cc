@@ -116,18 +116,33 @@ auto py_fft_coords(const EngineType & eng) {
         shape.push_back(n);
     }
 
-    // Strides: first index (dim) is contiguous
+    // Use contiguous col-major strides for the numpy array.
+    // pixels.get_strides() returns ghost-buffer strides for pixels_without_ghosts
+    // (e.g. [1, 6] for a 4x4 grid embedded in a 6x6 ghost buffer). Those strides
+    // would allocate extra space and leave the last dimension uninitialized.
+    const auto contiguous_pixel_strides =
+        muGrid::CcoordOps::get_col_major_strides(
+            pixels.get_nb_subdomain_grid_pts());
+
     std::vector<Index_t> strides;
     strides.push_back(sizeof(T));
-    for (auto && s : pixels.get_strides()) {
+    for (auto && s : contiguous_pixel_strides) {
         strides.push_back(s * dim * sizeof(T));
     }
 
     py::array_t<T> coords(shape, strides);
     T * ptr = static_cast<T *>(coords.request().ptr);
 
-    // Iterate over local pixels and compute coordinates
-    for (auto && pix : pixels.coordinates()) {
+    // Use a Pixels object with contiguous strides for iteration so that
+    // linear indices 0..size()-1 correctly enumerate all grid points.
+    // With ghost-buffer strides, indices that fall in the ghost gaps would
+    // produce out-of-range coordinates.
+    muGrid::CcoordOps::Pixels iter_pixels(
+        pixels.get_nb_subdomain_grid_pts(),
+        pixels.get_subdomain_locations(),
+        contiguous_pixel_strides);
+
+    for (auto && pix : iter_pixels.coordinates()) {
         for (Index_t i = 0; i < dim; ++i) {
             // pix[i] is the global coordinate (may be negative for ghosts)
             ptr[i] = muGrid::normalize_coord<T>(pix[i], nb_domain_grid_pts[i]);

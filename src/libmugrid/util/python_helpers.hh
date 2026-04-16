@@ -40,6 +40,7 @@
 #include <pybind11/numpy.h>
 
 #include "grid/index_ops.hh"
+#include "grid/pixels.hh"
 #include "core/coordinates.hh"
 #include "fft/fft_utils.hh"
 
@@ -162,18 +163,29 @@ namespace muGrid {
             shape.push_back(n);
         }
 
-        // Strides: first index (dim) is contiguous
+        // Use contiguous col-major strides for the numpy array.
+        // pixels.get_strides() would return ghost-buffer strides for
+        // pixels_without_ghosts, leaving the last dimension uninitialized.
+        const auto contiguous_pixel_strides =
+            CcoordOps::get_col_major_strides(pixels.get_nb_subdomain_grid_pts());
+
         std::vector<Index_t> strides;
         strides.push_back(sizeof(T));
-        for (auto && s : pixels.get_strides()) {
+        for (auto && s : contiguous_pixel_strides) {
             strides.push_back(s * dim * sizeof(T));
         }
 
         py::array_t<T> fftfreqs(shape, strides);
         T * ptr = static_cast<T *>(fftfreqs.request().ptr);
 
-        // Iterate over local Fourier pixels and compute frequencies
-        for (auto && pix : pixels.coordinates()) {
+        // Use contiguous-stride Pixels for iteration so that linear indices
+        // 0..size()-1 correctly enumerate all grid points without ghost gaps.
+        CcoordOps::Pixels iter_pixels(
+            pixels.get_nb_subdomain_grid_pts(),
+            pixels.get_subdomain_locations(),
+            contiguous_pixel_strides);
+
+        for (auto && pix : iter_pixels.coordinates()) {
             for (Index_t i = 0; i < dim; ++i) {
                 // pix[i] is the global coordinate
                 // fft_freqind converts position to frequency index

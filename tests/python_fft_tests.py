@@ -623,6 +623,50 @@ class FFTFrequencyTest(unittest.TestCase):
         assert_allclose(x, xref / nx)
         assert_allclose(y, yref / ny)
 
+    def test_coords_2d_with_ghosts(self):
+        """Test 2D coords/coordsg with ghost cells.
+
+        Regression test: pixels_without_ghosts carries the ghost-buffer strides
+        (e.g. [1, 6] for a 4x4 grid in a 6x6 buffer). The old code used those
+        strides for the numpy layout, leaving the last column of coords
+        uninitialized (garbage).
+        """
+        nb_grid_pts = [4, 4]
+        nx, ny = nb_grid_pts
+        engine = muGrid.FFTEngine(
+            nb_grid_pts,
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
+        )
+
+        # --- coords (without ghosts): shape [2, nx, ny] ---
+        coords = engine.coords
+        assert_array_equal(coords.shape, [2, nx, ny])
+
+        xref, yref = np.mgrid[0:nx, 0:ny]
+        # Every element must be a valid fraction in [0, 1).
+        # The bug manifested as garbage (e.g. 1e-322) in the last column.
+        assert_allclose(coords[0], xref / nx, atol=1e-15,
+                        err_msg="x-coords broken (last column likely uninitialized)")
+        assert_allclose(coords[1], yref / ny, atol=1e-15,
+                        err_msg="y-coords broken (last column likely uninitialized)")
+
+        # --- coordsg (with ghosts): shape [2, nx+2, ny+2] ---
+        coordsg = engine.coordsg
+        assert_array_equal(coordsg.shape, [2, nx + 2, ny + 2])
+
+        # Ghost indices wrap around periodically.
+        # Axis-0 ghost positions: -1 → (nx-1)/nx, 0..nx-1 → i/nx, nx → 0
+        x_ghost_indices = np.array([-1] + list(range(nx)) + [nx])
+        y_ghost_indices = np.array([-1] + list(range(ny)) + [ny])
+        xgref, ygref = np.meshgrid(
+            x_ghost_indices % nx / nx,
+            y_ghost_indices % ny / ny,
+            indexing="ij",
+        )
+        assert_allclose(coordsg[0], xgref, atol=1e-15)
+        assert_allclose(coordsg[1], ygref, atol=1e-15)
+
     def test_coords_3d(self):
         """Test 3D coords property."""
         nb_grid_pts = [7, 4, 5]
