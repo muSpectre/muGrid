@@ -89,7 +89,6 @@ install(FILES
     muGrid/linalg.py
     muGrid/Parallel.py
     muGrid/Solvers.py
-    muGrid/Timer.py
     muGrid/Wrappers.py
     DESTINATION "${MUGRID_PYTHON_INSTALL_DIR}"
     COMPONENT python
