@@ -6,15 +6,6 @@ Change log for µGrid
 
 - BUG: Fixed `coords`/`icoords` returning garbage in the last grid dimension
   when the FFT engine is created with ghost cells
-  - `pixels_without_ghosts` carries ghost-buffer strides (e.g. `[1, 6]` for a
-    4×4 grid inside a 6×6 buffer); these were used verbatim for the numpy array
-    layout, over-allocating the buffer and leaving the last column uninitialized
-  - The iteration over `pixels_without_ghosts.coordinates()` also produced
-    out-of-range coordinates for indices that fell in ghost gaps
-  - Fix: use contiguous col-major strides (derived from the without-ghost grid
-    size) for both the numpy layout and the pixel iteration in `py_fft_coords`
-    and `py_fftfreq`
-  - `coordsg`/`icoordsg` were unaffected (ghost buffer is always contiguous)
 - TST: Added regression test `test_coords_2d_with_ghosts` that exercises
   `coords` and `coordsg` when ghost cells are present
 
