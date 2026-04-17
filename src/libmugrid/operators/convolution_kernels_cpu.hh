@@ -68,13 +68,17 @@ namespace muGrid {
         Array<Index_t, MemorySpace> quad_indices;
         Array<Index_t, MemorySpace> nodal_indices;
         Array<Real, MemorySpace> values;
+        //! Quadrature-point index (0..nb_quad_pts-1) for each non-zero.
+        //! Used by the transpose kernel to look up per-quad-point weights.
+        Array<Index_t, MemorySpace> quad_pt_indices;
 
         //! Default constructor - creates empty operator
         SparseOperatorSoA() = default;
 
         //! Constructor that allocates arrays of given size
         explicit SparseOperatorSoA(Index_t n)
-            : size{n}, quad_indices(n), nodal_indices(n), values(n) {}
+            : size{n}, quad_indices(n), nodal_indices(n), values(n),
+              quad_pt_indices(n) {}
 
         //! Check if operator is empty
         bool empty() const { return size == 0; }
@@ -170,6 +174,8 @@ namespace muGrid {
             const Index_t* MUGRID_RESTRICT quad_indices,
             const Index_t* MUGRID_RESTRICT nodal_indices,
             const Real* MUGRID_RESTRICT op_values,
+            const Index_t* MUGRID_RESTRICT quad_pt_indices,
+            const Real* MUGRID_RESTRICT weights,  // nullptr → unweighted
             const Index_t nnz) {
 
             const Index_t nx = params.nx;
@@ -190,7 +196,9 @@ namespace muGrid {
             for (Index_t i = 0; i < nnz; ++i) {
                 const Index_t nodal_idx = nodal_indices[i];
                 const Index_t quad_idx = quad_indices[i];
-                const Real scaled_op_val = alpha * op_values[i];
+                const Real w = (weights != nullptr) ? weights[quad_pt_indices[i]]
+                                                    : Real{1};
+                const Real scaled_op_val = alpha * w * op_values[i];
 
                 for (Index_t z = 0; z < nz; ++z) {
                     const Index_t nodal_z = nodal_base + z * nodal_stride_z + nodal_idx;

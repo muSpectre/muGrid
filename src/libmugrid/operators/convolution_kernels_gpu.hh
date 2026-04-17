@@ -129,6 +129,8 @@ namespace gpu {
         const Index_t* MUGRID_RESTRICT quad_indices,
         const Index_t* MUGRID_RESTRICT nodal_indices,
         const Real* MUGRID_RESTRICT op_values,
+        const Index_t* MUGRID_RESTRICT quad_pt_indices,
+        const Real* MUGRID_RESTRICT weights,  // device pointer, may be nullptr
         const Index_t nnz) {
 
         const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -142,8 +144,10 @@ namespace gpu {
                 z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
 
             for (Index_t i = 0; i < nnz; ++i) {
+                const Real w = (weights != nullptr) ? weights[quad_pt_indices[i]]
+                                                    : Real{1};
                 nodal_data[nodal_offset + nodal_indices[i]] +=
-                    alpha * quad_data[quad_offset + quad_indices[i]] *
+                    alpha * w * quad_data[quad_offset + quad_indices[i]] *
                     op_values[i];
             }
         }
@@ -201,6 +205,8 @@ namespace gpu {
         const Index_t* quad_indices,
         const Index_t* nodal_indices,
         const Real* op_values,
+        const Index_t* quad_pt_indices,
+        const Real* weights,  // device pointer, may be nullptr
         const Index_t nnz,
         gpuStream_t stream = 0) {
 
@@ -223,7 +229,7 @@ namespace gpu {
             nodal_base, quad_base,
             params.nodal_stride_x, params.nodal_stride_y, params.nodal_stride_z,
             params.quad_stride_x, params.quad_stride_y, params.quad_stride_z,
-            quad_indices, nodal_indices, op_values, nnz
+            quad_indices, nodal_indices, op_values, quad_pt_indices, weights, nnz
         );
     }
 

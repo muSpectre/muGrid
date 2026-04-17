@@ -42,6 +42,7 @@
 
 #include "operators/generic.hh"
 #include "collection/field_collection_global.hh"
+#include "memory/array.hh"
 
 namespace muGrid {
 
@@ -101,9 +102,6 @@ namespace muGrid {
         const Real & alpha,
         TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
-        // Note: weights are currently ignored for device implementation
-        (void)weights;
-
         // Validate fields using generic version
         const auto & collection = this->validate_fields_generic(nodal_field,
                                                                 quadrature_point_field,
@@ -127,9 +125,17 @@ namespace muGrid {
         Real* nodal_data = nodal_field.view().data();
         const Real* quad_data = quadrature_point_field.view().data();
 
-        // Use device kernel
-        this->transpose_on_device<DefaultDeviceSpace>(
-            quad_data, nodal_data, alpha, params);
+        // Copy weights to device if provided, then run kernel
+        if (weights.empty()) {
+            this->transpose_on_device<DefaultDeviceSpace>(
+                quad_data, nodal_data, alpha, params, nullptr);
+        } else {
+            Array<Real, DefaultDeviceSpace> d_weights(weights.size());
+            deep_copy<Real, DefaultDeviceSpace, HostSpace>(
+                d_weights.data(), weights.data(), weights.size());
+            this->transpose_on_device<DefaultDeviceSpace>(
+                quad_data, nodal_data, alpha, params, d_weights.data());
+        }
     }
 
 }  // namespace muGrid

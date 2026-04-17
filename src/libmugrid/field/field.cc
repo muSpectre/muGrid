@@ -64,7 +64,12 @@ namespace muGrid {
   const std::string & Field::get_name() const { return this->name; }
 
   /* ---------------------------------------------------------------------- */
-  FieldCollection & Field::get_collection() const { return this->collection; }
+  FieldCollection & Field::get_collection() { return this->collection; }
+
+  /* ---------------------------------------------------------------------- */
+  const FieldCollection & Field::get_collection() const {
+    return this->collection;
+  }
 
   /* ---------------------------------------------------------------------- */
   void Field::assert_type_descriptor(TypeDescriptor type_desc) const {

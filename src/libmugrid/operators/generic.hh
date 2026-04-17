@@ -505,11 +505,14 @@ namespace muGrid {
          * @param nodal_data Pointer to nodal field data in device memory
          * @param alpha Scaling factor
          * @param params Grid traversal parameters
+         * @param weights Device pointer to per-quad-point weights; nullptr for
+         *   unweighted (all weights treated as 1)
          */
         template <typename DeviceSpace>
         void transpose_on_device(const Real * quad_data, Real * nodal_data,
                                  const Real alpha,
-                                 const GridTraversalParams & params) const;
+                                 const GridTraversalParams & params,
+                                 const Real * weights = nullptr) const;
 
         /**
          * Get or create device-space sparse operator for apply operation.
@@ -593,13 +596,13 @@ namespace muGrid {
     template <typename DeviceSpace>
     void GenericLinearOperator::transpose_on_device(
         const Real * quad_data, Real * nodal_data, const Real alpha,
-        const GridTraversalParams & params) const {
+        const GridTraversalParams & params, const Real * weights) const {
         // Get device sparse operator (lazily copies from host if needed)
         const auto & sparse_op = this->cached_device_transpose_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
         KernelDispatcher<DeviceSpace>::transpose_convolution(
-            quad_data, nodal_data, alpha, params, sparse_op);
+            quad_data, nodal_data, alpha, params, sparse_op, weights);
     }
 
     template <typename DeviceSpace>

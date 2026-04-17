@@ -467,6 +467,7 @@ namespace muGrid {
         sparse_op.quad_indices.resize(nnz);
         sparse_op.nodal_indices.resize(nnz);
         sparse_op.values.resize(nnz);
+        sparse_op.quad_pt_indices.resize(nnz);
 
         // Second pass: fill the arrays
         // Row-major order groups entries by quad index, providing write
@@ -516,6 +517,7 @@ namespace muGrid {
                                 sparse_op.quad_indices[entry_idx] = index_diff_quad;
                                 sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
                                 sparse_op.values[entry_idx] = op_value;
+                                sparse_op.quad_pt_indices[entry_idx] = i_quad;
                                 ++entry_idx;
                             }
                         }
@@ -569,6 +571,7 @@ namespace muGrid {
         sparse_op.quad_indices.resize(nnz);
         sparse_op.nodal_indices.resize(nnz);
         sparse_op.values.resize(nnz);
+        sparse_op.quad_pt_indices.resize(nnz);
 
         // Second pass: fill the arrays
         // Column-major order groups entries by nodal index, providing write
@@ -616,6 +619,7 @@ namespace muGrid {
                                 sparse_op.quad_indices[entry_idx] = index_diff_quad;
                                 sparse_op.nodal_indices[entry_idx] = index_diff_nodal;
                                 sparse_op.values[entry_idx] = op_value;
+                                sparse_op.quad_pt_indices[entry_idx] = i_quad;
                                 ++entry_idx;
                             }
                         }
@@ -772,7 +776,8 @@ namespace muGrid {
 
         // Use KernelDispatcher for backend-agnostic kernel execution
         KernelDispatcher<HostSpace>::transpose_convolution(
-            quad_data, nodal_data, alpha, params, sparse_op);
+            quad_data, nodal_data, alpha, params, sparse_op,
+            weights.empty() ? nullptr : weights.data());
     }
 
     /* ---------------------------------------------------------------------- */

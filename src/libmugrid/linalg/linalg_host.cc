@@ -38,10 +38,22 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
+#include <complex>
+
 namespace muGrid {
 namespace linalg {
 
 namespace internal {
+
+// Sesquilinear product: conj(a)*b for complex, a*b for real.
+template <typename T>
+inline T conj_product(T a, T b) {
+    if constexpr (std::is_same_v<T, Complex>) {
+        return std::conj(a) * b;
+    } else {
+        return a * b;
+    }
+}
 
 /**
  * Helper to compute dot product of ghost region only.
@@ -69,7 +81,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
         for (Index_t ix = 0; ix < gx_left; ++ix) {
             const Index_t offset = ix * sx * nb_components_per_pixel;
             for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                result += a_data[offset + c] * b_data[offset + c];
+                result += conj_product(a_data[offset + c], b_data[offset + c]);
             }
         }
 
@@ -77,7 +89,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
         for (Index_t ix = nx_total - gx_right; ix < nx_total; ++ix) {
             const Index_t offset = ix * sx * nb_components_per_pixel;
             for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                result += a_data[offset + c] * b_data[offset + c];
+                result += conj_product(a_data[offset + c], b_data[offset + c]);
             }
         }
     } else if (spatial_dim == 2) {
@@ -95,7 +107,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
             for (Index_t ix = 0; ix < gx_left; ++ix) {
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result += a_data[offset + c] * b_data[offset + c];
+                    result += conj_product(a_data[offset + c], b_data[offset + c]);
                 }
             }
         }
@@ -105,7 +117,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
             for (Index_t ix = nx_total - gx_right; ix < nx_total; ++ix) {
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result += a_data[offset + c] * b_data[offset + c];
+                    result += conj_product(a_data[offset + c], b_data[offset + c]);
                 }
             }
         }
@@ -115,7 +127,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
             for (Index_t ix = gx_left; ix < nx_total - gx_right; ++ix) {
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result += a_data[offset + c] * b_data[offset + c];
+                    result += conj_product(a_data[offset + c], b_data[offset + c]);
                 }
             }
         }
@@ -125,7 +137,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
             for (Index_t ix = gx_left; ix < nx_total - gx_right; ++ix) {
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result += a_data[offset + c] * b_data[offset + c];
+                    result += conj_product(a_data[offset + c], b_data[offset + c]);
                 }
             }
         }
@@ -164,7 +176,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
                     const Index_t offset =
                         (ix * sx + iy * sy + iz * sz) * nb_components_per_pixel;
                     for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                        result += a_data[offset + c] * b_data[offset + c];
+                        result += conj_product(a_data[offset + c], b_data[offset + c]);
                     }
                 }
             }
@@ -202,7 +214,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
             const Index_t offset = ix * sx * nb_components_per_pixel;
             for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                 const T val = data[offset + c];
-                result += val * val;
+                result += std::norm(val);
             }
         }
 
@@ -211,7 +223,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
             const Index_t offset = ix * sx * nb_components_per_pixel;
             for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                 const T val = data[offset + c];
-                result += val * val;
+                result += std::norm(val);
             }
         }
     } else if (spatial_dim == 2) {
@@ -230,7 +242,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                     const T val = data[offset + c];
-                    result += val * val;
+                    result += std::norm(val);
                 }
             }
         }
@@ -241,7 +253,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                     const T val = data[offset + c];
-                    result += val * val;
+                    result += std::norm(val);
                 }
             }
         }
@@ -252,7 +264,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                     const T val = data[offset + c];
-                    result += val * val;
+                    result += std::norm(val);
                 }
             }
         }
@@ -263,7 +275,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
                 const Index_t offset = (ix * sx + iy * sy) * nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                     const T val = data[offset + c];
-                    result += val * val;
+                    result += std::norm(val);
                 }
             }
         }
@@ -303,7 +315,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
                         (ix * sx + iy * sy + iz * sz) * nb_components_per_pixel;
                     for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
                         const T val = data[offset + c];
-                        result += val * val;
+                        result += std::norm(val);
                     }
                 }
             }

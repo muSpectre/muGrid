@@ -89,14 +89,18 @@ namespace muGrid {
         }
 
         /**
-         * @brief Transpose convolution: nodal_data += alpha * Op^T * quad_data
+         * @brief Transpose convolution: nodal_data += alpha * Op^T * (W * quad_data)
+         *
+         * @param weights Per-quad-point integration weights. Pass nullptr (or
+         *   rely on the default) to skip weighting (all weights treated as 1).
          */
         static void transpose_convolution(
             const Real* quad_data,
             Real* nodal_data,
             const Real alpha,
             const GridTraversalParams& params,
-            const SparseOperatorSoA<MemorySpace>& sparse_op) {
+            const SparseOperatorSoA<MemorySpace>& sparse_op,
+            const Real* weights = nullptr) {
 
             if constexpr (is_host_space_v<MemorySpace>) {
                 cpu::transpose_convolution_kernel(
@@ -104,6 +108,8 @@ namespace muGrid {
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
                     sparse_op.values.data(),
+                    sparse_op.quad_pt_indices.data(),
+                    weights,
                     sparse_op.size);
             }
 #if (defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)) && \
@@ -114,6 +120,8 @@ namespace muGrid {
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
                     sparse_op.values.data(),
+                    sparse_op.quad_pt_indices.data(),
+                    weights,
                     sparse_op.size);
             }
 #endif
@@ -137,10 +145,12 @@ namespace muGrid {
         dst.quad_indices.resize(src.quad_indices.size());
         dst.nodal_indices.resize(src.nodal_indices.size());
         dst.values.resize(src.values.size());
+        dst.quad_pt_indices.resize(src.quad_pt_indices.size());
 
         deep_copy(dst.quad_indices, src.quad_indices);
         deep_copy(dst.nodal_indices, src.nodal_indices);
         deep_copy(dst.values, src.values);
+        deep_copy(dst.quad_pt_indices, src.quad_pt_indices);
 
         return dst;
     }

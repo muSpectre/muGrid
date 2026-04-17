@@ -131,8 +131,11 @@ namespace muGrid {
         //! return the field's unique name
         const std::string & get_name() const;
 
+        //! return a reference to the field's collection
+        FieldCollection & get_collection();
+
         //! return a const reference to the field's collection
-        FieldCollection & get_collection() const;
+        const FieldCollection & get_collection() const;
 
         //! return the number of components stored per sub-point point
         const Index_t & get_nb_components() const;

@@ -224,6 +224,44 @@ namespace muGrid {
   using LargeConvolutionFixtures = boost::mpl::list<FixtureLarge2D, FixtureLarge3D>;
 
   /* ---------------------------------------------------------------------- */
+  /* Fixture with 2 quad points per pixel for testing weights                */
+  /* ---------------------------------------------------------------------- */
+
+  // A local (single-pixel stencil) operator with 2 quad points and 1 output
+  // component, so the weights vector is non-trivial.
+  // Coefficients layout: [nb_output=1, nb_quad=2, nb_input=1, nb_stencil=1]
+  //   both quad points just copy from the local nodal value (coeff = 1).
+  struct WeightsFixture2D {
+    static constexpr Index_t Dim = twoD;
+    static constexpr Index_t grid_size = 6;
+    static constexpr Index_t NbQuadPts = 2;
+    static constexpr Index_t NbInputComponents = 1;
+    static constexpr Index_t NbOutputComponents = 1;
+
+    DynGridIndex nb_grid_pts{grid_size, grid_size};
+    DynGridIndex nb_subdomain_grid_pts{grid_size + 2, grid_size + 2};
+    DynGridIndex subdomain_locations{0, 0};
+    DynGridIndex nb_ghosts_left{1, 1};
+    DynGridIndex nb_ghosts_right{1, 1};
+
+    GenericLinearOperator op{
+        {0, 0},      // offset: local stencil
+        {1.0, 1.0},  // coefficients: both quad pts read the central node
+        {1, 1},      // stencil_shape: 1x1
+        NbInputComponents,
+        NbQuadPts,
+        NbOutputComponents};
+
+    GlobalFieldCollection collection;
+
+    WeightsFixture2D()
+        : collection(nb_grid_pts, nb_subdomain_grid_pts, subdomain_locations,
+                     {{PixelTag, NbInputComponents}, {"quad", NbQuadPts}},
+                     StorageOrder::ArrayOfStructures,
+                     nb_ghosts_left, nb_ghosts_right) {}
+  };
+
+  /* ---------------------------------------------------------------------- */
   BOOST_AUTO_TEST_SUITE(convolution_operator);
 
   /* ---------------------------------------------------------------------- */
@@ -611,6 +649,89 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  /* Tests for transpose with weights using WeightsFixture2D                 */
+  /* ---------------------------------------------------------------------- */
+  // WeightsFixture2D has NbQuadPts=2, NbOutputComponents=1, local stencil.
+  // Both quad points read the same nodal node with coefficient 1.0, so:
+  //   apply:      quad[p][0] = nodal[p],  quad[p][1] = nodal[p]
+  //   transpose:  nodal[p] = w0*quad[p][0] + w1*quad[p][1]
+
+  BOOST_FIXTURE_TEST_CASE(transpose_weights_zero, WeightsFixture2D) {
+    // Zero weights → result must be all zeros
+    auto & nodal = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal", NbInputComponents, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        collection.register_real_field("quad", NbOutputComponents, "quad"));
+
+    quad.eigen_vec().setRandom();
+    op.transpose(quad, nodal, {0.0, 0.0});
+
+    Real max_abs = nodal.eigen_vec().cwiseAbs().maxCoeff();
+    BOOST_CHECK_LE(max_abs, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE(transpose_weights_unit, WeightsFixture2D) {
+    // Unit weights {1, 1} must produce the same result as the unweighted call
+    auto & nodal_no_w = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_no_w", NbInputComponents, PixelTag));
+    auto & nodal_unit = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_unit", NbInputComponents, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        collection.register_real_field("quad", NbOutputComponents, "quad"));
+
+    quad.eigen_vec().setRandom();
+    op.transpose(quad, nodal_no_w);
+    op.transpose(quad, nodal_unit, {1.0, 1.0});
+
+    Real error = testGoodies::rel_error(nodal_no_w.eigen_vec(), nodal_unit.eigen_vec());
+    BOOST_CHECK_LE(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE(transpose_weights_uniform_scale, WeightsFixture2D) {
+    // Uniform weights {w, w} must scale the unweighted result by w
+    const Real w = 3.7;
+    auto & nodal_no_w = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_no_w", NbInputComponents, PixelTag));
+    auto & nodal_w = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_w", NbInputComponents, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        collection.register_real_field("quad", NbOutputComponents, "quad"));
+
+    quad.eigen_vec().setRandom();
+    op.transpose(quad, nodal_no_w);
+    op.transpose(quad, nodal_w, {w, w});
+
+    Eigen::VectorXd expected = w * nodal_no_w.eigen_vec();
+    Real error = testGoodies::rel_error(nodal_w.eigen_vec(), expected);
+    BOOST_CHECK_LE(error, tol);
+  }
+
+  BOOST_FIXTURE_TEST_CASE(transpose_weights_linearity, WeightsFixture2D) {
+    // By linearity: B^T_{w0,w1} q  ==  w0 * B^T_{1,0} q  +  w1 * B^T_{0,1} q
+    // This verifies that w0 and w1 are applied to the correct quad sub-points.
+    const Real w0 = 2.0, w1 = 5.0;
+    auto & nodal_w = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_w", NbInputComponents, PixelTag));
+    auto & nodal_q0 = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_q0", NbInputComponents, PixelTag));
+    auto & nodal_q1 = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_q1", NbInputComponents, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        collection.register_real_field("quad", NbOutputComponents, "quad"));
+
+    quad.eigen_vec().setRandom();
+
+    op.transpose(quad, nodal_w,  {w0, w1});   // combined weights
+    op.transpose(quad, nodal_q0, {1.0, 0.0}); // only quad pt 0
+    op.transpose(quad, nodal_q1, {0.0, 1.0}); // only quad pt 1
+
+    // Expected: w0 * nodal_q0 + w1 * nodal_q1
+    Eigen::VectorXd expected = w0 * nodal_q0.eigen_vec() + w1 * nodal_q1.eigen_vec();
+    Real error = testGoodies::rel_error(nodal_w.eigen_vec(), expected);
+    BOOST_CHECK_LE(error, tol);
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* Tests for SparseOperatorSoA structure                                   */
   /* ---------------------------------------------------------------------- */
 
@@ -777,11 +898,12 @@ namespace muGrid {
     const Index_t size = 100;
     SparseOperatorSoA<HostSpace> host_op(size);
 
-    // Fill with test data
+    // Fill with test data (including quad_pt_indices added for weights support)
     for (Index_t i = 0; i < size; ++i) {
       host_op.quad_indices[i] = i * 2;
       host_op.nodal_indices[i] = i * 3;
       host_op.values[i] = static_cast<Real>(i) * 0.5;
+      host_op.quad_pt_indices[i] = i % 4;  // quad point index (0..3 cycling)
     }
 
     // Copy to device
@@ -792,12 +914,39 @@ namespace muGrid {
     // Copy back to host for verification
     auto host_copy = deep_copy_sparse_operator<HostSpace, DefaultDeviceSpace>(device_op);
 
-    // Verify data round-tripped correctly
+    // Verify all arrays round-tripped correctly (including quad_pt_indices)
     for (Index_t i = 0; i < size; ++i) {
       BOOST_CHECK_EQUAL(host_copy.quad_indices[i], host_op.quad_indices[i]);
       BOOST_CHECK_EQUAL(host_copy.nodal_indices[i], host_op.nodal_indices[i]);
       BOOST_CHECK_EQUAL(host_copy.values[i], host_op.values[i]);
+      BOOST_CHECK_EQUAL(host_copy.quad_pt_indices[i], host_op.quad_pt_indices[i]);
     }
+  }
+
+  BOOST_FIXTURE_TEST_CASE(device_transpose_weights_linearity, WeightsFixture2D) {
+    // Mirror of transpose_weights_linearity for GPU-enabled builds.
+    // These tests use HostSpace fields; they verify correctness when compiled
+    // with GPU support (the CPU kernel path is exercised).  Full device-field
+    // tests require GPU hardware and a separate test harness.
+    const Real w0 = 2.0, w1 = 5.0;
+    auto & nodal_w = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_w", NbInputComponents, PixelTag));
+    auto & nodal_q0 = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_q0", NbInputComponents, PixelTag));
+    auto & nodal_q1 = dynamic_cast<RealField &>(
+        collection.register_real_field("nodal_q1", NbInputComponents, PixelTag));
+    auto & quad = dynamic_cast<RealField &>(
+        collection.register_real_field("quad", NbOutputComponents, "quad"));
+
+    quad.eigen_vec().setRandom();
+
+    op.transpose(quad, nodal_w,  {w0, w1});
+    op.transpose(quad, nodal_q0, {1.0, 0.0});
+    op.transpose(quad, nodal_q1, {0.0, 1.0});
+
+    Eigen::VectorXd expected = w0 * nodal_q0.eigen_vec() + w1 * nodal_q1.eigen_vec();
+    Real error = testGoodies::rel_error(nodal_w.eigen_vec(), expected);
+    BOOST_CHECK_LE(error, tol);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(device_apply_consistency, Fix,
