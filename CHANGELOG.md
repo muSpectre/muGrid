@@ -1,7 +1,7 @@
 Change log for µGrid
 ====================
 
-0.105.2 (16Apr26)
+0.105.2 (17Apr26)
 -----------------
 
 - BUG: Fixed `coords`/`icoords` returning garbage in the last grid dimension
