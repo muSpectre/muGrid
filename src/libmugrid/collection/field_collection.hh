@@ -776,7 +776,7 @@ namespace muGrid {
          */
         IndexIterable get_sub_pt_indices(const std::string & tag) const;
 
-        const std::vector<Index_t> & get_pixel_ids() {
+        const std::vector<Index_t> & get_pixel_ids() const {
             return this->pixel_indices;
         }
 
@@ -817,7 +817,7 @@ namespace muGrid {
 
         //! preregister a map for latent initialisation
         void
-        preregister_map(std::shared_ptr<std::function<void()>> & call_back);
+        preregister_map(std::shared_ptr<std::function<void()>> & call_back) const;
 
         /**
          * run-time checker for nb_sub_pts: checks whether the number of
@@ -899,7 +899,7 @@ namespace muGrid {
 
         //! Maps registered before initialisation which will need their data_ptr
         //! set
-        std::vector<std::weak_ptr<std::function<void()>>> init_callbacks{};
+        mutable std::vector<std::weak_ptr<std::function<void()>>> init_callbacks{};
         //! domain of validity
         ValidityDomain domain;
         //! spatial dimension

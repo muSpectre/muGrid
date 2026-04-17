@@ -501,7 +501,7 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     void FieldCollection::preregister_map(
-        std::shared_ptr<std::function<void()>> & call_back) {
+        std::shared_ptr<std::function<void()>> & call_back) const {
         if (this->initialised) {
             throw FieldCollectionError("Collection is already initialised");
         }

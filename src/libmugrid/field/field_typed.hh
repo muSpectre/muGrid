@@ -517,7 +517,7 @@ namespace muGrid {
      * fields. If set to true, the copy will be made into the existing field.
      */
     TypedField & clone(const std::string & new_name,
-                       const bool & allow_overwrite = false) const;
+                       const bool & allow_overwrite = false);
 
     //! give access to collections
     friend FieldCollection;

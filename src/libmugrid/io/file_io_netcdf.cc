@@ -1160,7 +1160,7 @@ namespace muGrid {
       std::vector<std::shared_ptr<NetCDFDim>> & field_dims,
       std::string state_field_name) {
     auto & nb_grid_pts{
-        dynamic_cast<muGrid::GlobalFieldCollection &>(field.get_collection())
+        dynamic_cast<const muGrid::GlobalFieldCollection &>(field.get_collection())
             .get_nb_domain_grid_pts()};                     // x, y, z
     auto & nb_subpt{field.get_nb_sub_pts()};                // s
     Shape_t component_shape{field.get_components_shape()};  // tensor dims
@@ -2023,7 +2023,7 @@ namespace muGrid {
       } else if (base_name == "nx") {
         if (this->get_field().is_global()) {
           count = static_cast<IOSize_t>(
-              dynamic_cast<muGrid::GlobalFieldCollection &>(
+              dynamic_cast<const muGrid::GlobalFieldCollection &>(
                   this->get_field().get_collection())
                   .get_nb_subdomain_grid_pts_without_ghosts()[0]);
         } else {
@@ -2032,7 +2032,7 @@ namespace muGrid {
       } else if (base_name == "ny") {
         if (this->get_field().is_global()) {
           count = static_cast<IOSize_t>(
-              dynamic_cast<muGrid::GlobalFieldCollection &>(
+              dynamic_cast<const muGrid::GlobalFieldCollection &>(
                   this->get_field().get_collection())
                   .get_nb_subdomain_grid_pts_without_ghosts()[1]);
         } else {
@@ -2041,7 +2041,7 @@ namespace muGrid {
       } else if (base_name == "nz") {
         if (this->get_field().is_global()) {
           count = static_cast<IOSize_t>(
-              dynamic_cast<muGrid::GlobalFieldCollection &>(
+              dynamic_cast<const muGrid::GlobalFieldCollection &>(
                   this->get_field().get_collection())
                   .get_nb_subdomain_grid_pts_without_ghosts()[2]);
         } else {
@@ -2554,7 +2554,7 @@ namespace muGrid {
     } else if (base_name == "nx") {
       if (this->get_field().is_global()) {
         result.value = static_cast<IOSize_t>(
-            dynamic_cast<muGrid::GlobalFieldCollection &>(
+            dynamic_cast<const muGrid::GlobalFieldCollection &>(
                 this->get_field().get_collection())
                 .get_subdomain_locations_without_ghosts()[0]);
         result.found = true;
@@ -2562,7 +2562,7 @@ namespace muGrid {
     } else if (base_name == "ny") {
       if (this->get_field().is_global()) {
         result.value = static_cast<IOSize_t>(
-            dynamic_cast<muGrid::GlobalFieldCollection &>(
+            dynamic_cast<const muGrid::GlobalFieldCollection &>(
                 this->get_field().get_collection())
                 .get_subdomain_locations_without_ghosts()[1]);
         result.found = true;
@@ -2570,7 +2570,7 @@ namespace muGrid {
     } else if (base_name == "nz") {
       if (this->get_field().is_global()) {
         result.value = static_cast<IOSize_t>(
-            dynamic_cast<muGrid::GlobalFieldCollection &>(
+            dynamic_cast<const muGrid::GlobalFieldCollection &>(
                 this->get_field().get_collection())
                 .get_subdomain_locations_without_ghosts()[2]);
         result.found = true;

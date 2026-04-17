@@ -245,9 +245,9 @@ namespace muGrid {
     DynGridIndex nb_ghosts_right{1, 1};
 
     GenericLinearOperator op{
-        {0, 0},      // offset: local stencil
-        {1.0, 1.0},  // coefficients: both quad pts read the central node
-        {1, 1},      // stencil_shape: 1x1
+        {0, 0},                              // offset: local stencil
+        std::array<Real, 2>{1.0, 1.0},       // coefficients: both quad pts read the central node
+        {1, 1},                              // stencil_shape: 1x1
         NbInputComponents,
         NbQuadPts,
         NbOutputComponents};

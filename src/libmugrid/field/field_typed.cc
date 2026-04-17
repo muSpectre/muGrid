@@ -381,7 +381,7 @@ namespace muGrid {
   template <typename T, typename MemorySpace>
   TypedField<T, MemorySpace> &
   TypedField<T, MemorySpace>::clone(const std::string & new_name,
-                                    const bool & allow_overwrite) const {
+                                    const bool & allow_overwrite) {
     const bool field_exists{this->get_collection().field_exists(new_name)};
 
     if (field_exists and not allow_overwrite) {
