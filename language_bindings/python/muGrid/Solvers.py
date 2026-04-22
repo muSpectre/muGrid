@@ -4,13 +4,13 @@ Collection of simple parallel solvers
 
 from . import linalg
 
-
 def conjugate_gradients(
     comm,
     fc,
     b,
     x,
     hessp: callable,
+    prec: callable = None,
     tol: float = 1e-6,
     maxiter: int = 1000,
     callback: callable = None,
@@ -37,6 +37,10 @@ def conjugate_gradients(
     hessp : callable
         Function that computes the product of the Hessian matrix A with a vector.
         Signature: hessp(input_field, output_field) where both are muGrid.Field.
+    prec : callable, optional
+        Function that applies the preconditioner P to a vector r: z = P*r.
+        Signature: prec(input_field, output_field) where both are muGrid.Field.
+        If None, no preconditioning is applied (P is identity).
     tol : float, optional
         Tolerance for convergence. The default is 1e-6.
     maxiter : int, optional
@@ -48,7 +52,7 @@ def conjugate_gradients(
         - "r": residual field
         - "p": search direction field
         - "rr": squared residual norm (float)
-    timer : muTimer.Timer, optional
+    timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
         record timing for the hessp (Hessian-vector product) operations.
 
@@ -71,13 +75,18 @@ def conjugate_gradients(
     def timed(name):
         return timer(name) if timer is not None else nullcontext()
 
+    if prec is None:
+        prec = linalg.copy
+
     with timed("startup"):
         # Create temporary fields with matching component shape
         # r: residual field
         # p: search direction field
+        # z: preconditioned search direction field
         # Ap: Hessian product field
         r = fc.real_field("cg-residual", b.components_shape)
         p = fc.real_field("cg-search-direction", b.components_shape)
+        z = fc.real_field("cg-preconditioned-residual", b.components_shape)
         Ap = fc.real_field("cg-hessian-product", b.components_shape)
 
         # Initial residual: r = b - A*x
@@ -87,15 +96,22 @@ def conjugate_gradients(
         # r = r - Ap = b - A*x (axpy with alpha=-1)
         linalg.axpy(-1.0, Ap, r)
 
-        # Initial search direction: p = r
-        linalg.copy(r, p)
+        # precondioner
+        prec(r, z)
 
-        if callback:
-            rr = comm.sum(linalg.norm_sq(r))
-            callback(0, {"x": x, "r": r, "p": p, "rr": rr})
+        # Initial search direction: p = z
+        linalg.copy(z, p)
+
+
 
         with timed("dot_rr"):
             rr = comm.sum(linalg.norm_sq(r))
+            rz = comm.sum(linalg.vecdot(r, z))
+
+        if callback:
+            rr = comm.sum(linalg.norm_sq(r))
+            callback(0, {"x": x, "r": r, "p": p, "z": z, "rr": rr, "rz": rz})
+
         rr_val = float(rr)
 
         if rr_val < tol_sq:
@@ -112,20 +128,27 @@ def conjugate_gradients(
                 pAp = comm.sum(linalg.vecdot(p, Ap))
 
             # Compute alpha
-            alpha = rr / pAp
+            alpha = rz / pAp
 
             # Update solution: x += alpha * p
             with timed("update_x"):
                 linalg.axpy(alpha, p, x)
 
-            # Update residual and compute norm in one pass: r -= alpha * Ap
+            # Update residual: r -= alpha * Ap
             with timed("update_r"):
                 next_rr = comm.sum(linalg.axpy_norm_sq(-alpha, Ap, r))
+
             next_rr_val = float(next_rr)
+
+            # apply precondioner z=P*r
+            prec(r, z)
+
+            # Compute next_rz after applying precondioner
+            next_rz = comm.sum(linalg.vecdot(r, z))
 
             if callback:
                 with timed("callback"):
-                    callback(iteration + 1, {"x": x, "r": r, "p": p, "rr": next_rr})
+                    callback(iteration + 1, {"x": x, "r": r, "p": p,"z": z,  "rr": next_rr,  "rz": next_rz})
 
             # Check for numerical issues (NaN indicates non-positive-definite H)
             if next_rr_val != next_rr_val:  # NaN check
@@ -137,13 +160,12 @@ def conjugate_gradients(
                 return x
 
             # Compute beta
-            beta = next_rr / rr
+            beta = next_rz / rz
+            # Update rz for next iteration
+            rz = next_rz
 
-            # Update rr for next iteration
-            rr = next_rr
-
-            # Update search direction: p = r + beta * p
+            # Update search direction: p = z + beta * p
             with timed("update_p"):
-                linalg.axpby(1.0, r, beta, p)
+                linalg.axpby(1.0, z, beta, p)
 
-    raise RuntimeError("Conjugate gradient algorithm did not converge")
+    raise RuntimeError("Preconditioned conjugate gradient algorithm did not converge")
