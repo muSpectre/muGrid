@@ -1,6 +1,11 @@
 Change log for µGrid
 ====================
 
+0.106.0 (24Apr26)
+-----------------
+
+- ENH: Preconditioned conjugate gradients
+
 0.105.2 (17Apr26)
 -----------------
 
