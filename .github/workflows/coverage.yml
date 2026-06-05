@@ -1,0 +1,99 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qy
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            libboost-test-dev \
+            libnetcdf-dev
+          python3 -m venv venv
+          source venv/bin/activate
+          python3 -m pip install --upgrade pip
+          # gcovr turns the raw .gcda data into reports; pytest-cov measures the
+          # Python wrapper layer.
+          python3 -m pip install "numpy>=2.1" pytest pytest-cov gcovr \
+            "NuMPI[test]" netCDF4 muTimer
+
+      - name: Configure (coverage-instrumented, Debug)
+        run: |
+          source venv/bin/activate
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUGRID_ENABLE_COVERAGE=ON \
+            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_NETCDF=ON \
+            -DMUGRID_ENABLE_PYTHON=ON \
+            -DMUGRID_ENABLE_TESTS=ON \
+            -DMUGRID_ENABLE_EXAMPLES=OFF \
+            -DPython_EXECUTABLE=$(which python3)
+
+      - name: Build
+        run: |
+          source venv/bin/activate
+          cmake --build build
+
+      - name: Run test suite (populates coverage counters)
+        run: |
+          source venv/bin/activate
+          ctest --test-dir build --output-on-failure
+
+      - name: Generate C++ coverage reports
+        run: |
+          source venv/bin/activate
+          cmake --build build --target coverage
+
+      - name: Python wrapper-layer coverage
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          export TESTS_BUILDDIR=$PWD/build/tests
+          python3 -m pytest tests -q \
+            --cov=muGrid --cov-report=xml:build/coverage-python.xml \
+            --cov-report=term-missing || true
+
+      - name: Upload coverage reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            build/coverage.xml
+            build/coverage-python.xml
+            build/coverage_html/
+          if-no-files-found: warn
+
+      # Best-effort upload to Codecov. Does not fail the job if Codecov is not
+      # configured for this repository.
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        continue-on-error: true
+        with:
+          files: build/coverage.xml,build/coverage-python.xml
+          fail_ci_if_error: false

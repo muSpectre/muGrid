@@ -149,6 +149,10 @@ target_include_directories(muGrid
 # Link Eigen3
 target_link_libraries(muGrid PUBLIC Eigen3::Eigen)
 
+# Propagate code-coverage instrumentation (no-op unless MUGRID_ENABLE_COVERAGE).
+# PUBLIC so the flags also reach targets that link muGrid (tests, bindings).
+target_link_libraries(muGrid PUBLIC mugrid::coverage)
+
 # Compile definitions
 if(MUGRID_ENABLE_MPI)
     target_compile_definitions(muGrid PUBLIC WITH_MPI)
@@ -208,8 +212,10 @@ if(WIN32)
 endif()
 
 # Installation
-# Build list of targets to export (muGrid + any FetchContent dependencies)
-set(_MUGRID_INSTALL_TARGETS muGrid)
+# Build list of targets to export (muGrid + any FetchContent dependencies).
+# mugrid_coverage is a no-op INTERFACE target that muGrid links PUBLIC, so it
+# must be part of the same export set.
+set(_MUGRID_INSTALL_TARGETS muGrid mugrid_coverage)
 if(MUGRID_EIGEN_FROM_FETCHCONTENT)
     list(APPEND _MUGRID_INSTALL_TARGETS eigen)
 endif()
