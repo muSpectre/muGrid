@@ -25,7 +25,6 @@ set(MUGRID_SOURCES
     core/units.cc
     core/type_descriptor.cc
     # grid/
-    grid/index_ops.cc
     grid/pixels.cc
     grid/strides.cc
     # field/
@@ -58,7 +57,6 @@ set(MUGRID_SOURCES
     # linalg/
     linalg/linalg_host.cc
     # fft/
-    fft/fft_backend_factory.cc
     fft/pocketfft_backend.cc
     fft/transpose.cc
     fft/fft_utils.cc

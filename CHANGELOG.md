@@ -1,6 +1,21 @@
 Change log for µGrid
 ====================
 
+unreleased
+----------
+
+- ENH: Optional code-coverage instrumentation via the `MUGRID_ENABLE_COVERAGE`
+  CMake option, with `coverage`/`coverage-{xml,html,summary}` report targets and
+  a `Coverage` CI workflow (see `doc/source/Coverage.rst`)
+- ENH: Bound `LaplaceOperator.apply_increment` and `LaplaceOperator.transpose`
+  to Python (the wrapper advertised these but the C++ methods were not exposed)
+- TST: Added functional tests for the hard-coded 2D/3D Laplace operator
+  (`python_laplace_operator_tests.py`), raising coverage of `laplace_2d.cc`/
+  `laplace_3d.cc` from ~3% to ~78%
+- CLEAN: Removed dead code with no callers: the superseded
+  `get_host_fft_backend`/`get_device_fft_backend` factory functions and the
+  unused `CcoordOps::get_index`/`compute_pixel_volume` dynamic overloads
+
 0.106.0 (24Apr26)
 -----------------
 

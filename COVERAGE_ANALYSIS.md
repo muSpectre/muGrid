@@ -62,12 +62,12 @@ of all conditional branches in the library are never exercised in both
 directions. Much of this is untested error handling (`throw` branches were
 *excluded* from the count, so this is genuine logic, not exception plumbing).
 
-## 3. Dead / dangling code (high confidence)
+## 3. Dead / dangling code (high confidence) — REMOVED
 
-These symbols are compiled into the library but have **no callers anywhere** in
-`src/`, `language_bindings/`, `tests/` or `examples/`. They should be removed or,
-if they are intended public API for downstream consumers (e.g. muSpectre),
-documented and given at least one test.
+> **Status: resolved.** All three items below were compiled into the library but
+> had **no callers anywhere** in `src/`, `language_bindings/`, `tests/` or
+> `examples/`. They have been removed (the library and full test suite still
+> build and pass). The findings are retained here for the record.
 
 ### 3.1 `fft/fft_backend_factory.cc` — superseded factory functions (0 %)
 
@@ -102,17 +102,25 @@ against downstream usage, then remove or test.
 Unlike §3, the code below *is* reachable and likely used in production, but the
 test suite never drives it.
 
-### 4.1 Laplace operators — bound to Python but never tested (~3 %)
+### 4.1 Laplace operators — bound to Python but never tested (~3 %) — ADDRESSED
 
-`operators/laplace_2d.cc` (3 %) and `operators/laplace_3d.cc` (3 %) implement
-`LaplaceOperator2D` / `LaplaceOperator3D`, which **are exported to Python**
-(`bind_py_operators.cc`, `Wrappers.py::LaplaceOperator`) and advertised in the
-README as a headline feature. Yet there is no `python_laplace_*_tests.py` and no
-C++ test instantiates them — only the constructor registration is touched.
-Sibling operators (convolution, FEM gradient, isotropic stiffness) all have
-dedicated test files; Laplace is the gap. **This is the single highest-value
-test to add** because it is a shipped, documented, public operator with
-essentially zero coverage.
+> **Status: resolved.** `operators/laplace_2d.cc` and `operators/laplace_3d.cc`
+> implement `LaplaceOperator2D` / `LaplaceOperator3D`, which are exported to
+> Python (`bind_py_operators.cc`, `Wrappers.py::LaplaceOperator`) and advertised
+> in the README, yet had no test — only the constructor registration was
+> touched (~3 %).
+>
+> A functional test suite was added in `tests/python_laplace_operator_tests.py`
+> (27 cases). These are not smoke tests: they check the discrete-plane-wave
+> eigenvalue analytically, cross-check against an independent
+> `GenericLinearOperator` built from the same stencil, and verify
+> self-adjointness, linearity, scaling and the impulse response in 2D and 3D.
+> Coverage of the two files rose from ~3 % to ~78 % (the remainder is
+> GPU-guarded code and a few error branches).
+>
+> Writing the tests also surfaced a real defect: `Wrappers.py::LaplaceOperator`
+> advertised `apply_increment` and `transpose`, but those C++ methods were never
+> bound — calling them raised `AttributeError`. The bindings have been added.
 
 ### 4.2 NetCDF type descriptors / I/O details
 
@@ -166,10 +174,11 @@ statement count with many untaken branches.
 
 ## 6. Prioritised recommendations
 
-1. **Remove the dead code in §3** (or cover it if it is intended public API) —
-   `fft_backend_factory.cc` and the unused `index_ops.cc` overloads.
-2. **Add a Laplace operator test** (§4.1) — highest-value gap: a shipped,
-   documented operator at ~3 % coverage.
+1. ~~**Remove the dead code in §3**~~ — **done**: `fft_backend_factory.cc` and
+   the unused `index_ops.cc` overloads have been removed.
+2. ~~**Add a Laplace operator test** (§4.1)~~ — **done**: 27 functional tests
+   added; coverage of the Laplace sources went from ~3 % to ~78 %, and a missing
+   `apply_increment`/`transpose` binding was fixed along the way.
 3. **Add an MPI + GPU coverage CI run** so MPI-only files (`transpose.cc`,
    `cartesian_*`) and GPU files stop reading as false 0 %.
 4. **Cheap wins**: exhaustively test `type_descriptor.cc` and the `enums.cc`
