@@ -14,30 +14,34 @@ repeated and tracked over time.
 
 ## 1. Measurement configuration & caveats
 
-The numbers below were produced with:
+The `Coverage` CI workflow runs **two** instrumented legs and merges them in
+Codecov:
 
 - Compiler: GCC 13.3, `CMAKE_BUILD_TYPE=Debug`, `-O0 --coverage`
-- `MUGRID_ENABLE_MPI=OFF`, GPU backends **off**, NetCDF **on**, Python **on**
+- A **serial** leg (`MUGRID_ENABLE_MPI=OFF`) and an **MPI** leg
+  (`MUGRID_ENABLE_MPI=ON`, tests run under `mpiexec` at np = 1, 2, 4, 8), both
+  with NetCDF and Python on
 - Test runners: the C++ Boost.Test suites (`ctest`) **and** the full `pytest`
-  Python binding suite (211 passed, 53 skipped)
+  Python binding suite
+- The vendored `fft/pocketfft/` header is excluded from the report (it is
+  third-party Max-Planck-Society code, not muGrid's own)
 
-**Two caveats are essential when reading the per-file numbers:**
+**One caveat remains:**
 
-1. **Serial build.** MPI was disabled, so all MPI-only code reports as
-   unexecuted. This is a property of the *configuration*, not of the test
-   suite — those paths are covered only by the `mpi_*` runners under `mpiexec`.
-   The clearest example is `fft/transpose.cc` (0%), which is the MPI pencil
-   transpose and contains no serial code path.
-2. **CPU build.** GPU backends were off, so `memory/device.cc` and the `*_gpu`
-   translation units are absent or unexercised.
+- **GPU device code is not measured.** GitHub-hosted runners have no GPU, so the
+  CUDA/HIP `*_gpu` translation units and parts of `memory/device.cc` cannot be
+  exercised. This is the only remaining source of structural false-zeros.
 
-A complete picture therefore also requires an MPI + GPU coverage run; the
-`Coverage` CI workflow currently runs the serial+CPU configuration, which is the
-floor, not the ceiling, of achievable coverage.
+The numbers in §2 below are from the **serial** leg and predate the MPI leg;
+they are kept because the per-file analysis that follows refers to them. The
+MPI leg lifts the previously false-zero files substantially — e.g.
+`fft/transpose.cc` 0 % → 69 %, `mpi/cartesian_decomposition.cc` → 94 % — and the
+merged, pocketfft-excluded headline is roughly **62 % lines / 76 % functions /
+43 % branches**.
 
 ## 2. Headline numbers
 
-C++ library (`src/libmugrid`, serial/CPU configuration):
+C++ library (`src/libmugrid`, serial/CPU leg, pocketfft included):
 
 | Metric    | Covered / Total   | Coverage |
 |-----------|-------------------|----------|
@@ -179,8 +183,11 @@ statement count with many untaken branches.
 2. ~~**Add a Laplace operator test** (§4.1)~~ — **done**: 27 functional tests
    added; coverage of the Laplace sources went from ~3 % to ~78 %, and a missing
    `apply_increment`/`transpose` binding was fixed along the way.
-3. **Add an MPI + GPU coverage CI run** so MPI-only files (`transpose.cc`,
-   `cartesian_*`) and GPU files stop reading as false 0 %.
+3. ~~**Add an MPI coverage CI run**~~ — **done**: the workflow now runs a
+   serial and an MPI leg (merged in Codecov), and excludes vendored pocketfft.
+   MPI-only files (`transpose.cc`, `cartesian_*`) are now measured and no longer
+   read as false 0 %. GPU device coverage remains out of reach on CI (no GPU
+   runners).
 4. **Cheap wins**: exhaustively test `type_descriptor.cc` and the `enums.cc`
    stream operators (§4.3) — small files, large percentage gains.
 5. **Drive branch coverage up** in the four hotspots in §4.5, focusing on the

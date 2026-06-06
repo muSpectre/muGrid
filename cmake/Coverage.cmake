@@ -97,8 +97,16 @@ set(_gcovr_common
     -j 1
     --filter "${CMAKE_SOURCE_DIR}/src/libmugrid/"
     --exclude ".*\\.skeleton"
+    # pocketfft is vendored third-party code (Max-Planck-Society); we only
+    # exercise the entry points we call, so its internals would otherwise drag
+    # the headline numbers down without reflecting muGrid's own test quality.
+    --exclude ".*/fft/pocketfft/.*"
     --exclude-unreachable-branches
     --exclude-throw-branches
+    # Under MPI, several ranks merge counters into the same .gcda files; the
+    # merged hit counts can trip gcov's "suspicious hit count" heuristic. Treat
+    # those as warnings rather than fatal errors (a no-op for serial builds).
+    --gcov-ignore-parse-errors=suspicious_hits.warn
     --print-summary
 )
 

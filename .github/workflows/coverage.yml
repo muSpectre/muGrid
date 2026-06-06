@@ -10,10 +10,23 @@ on:
     branches:
       - '**'
 
+# Note on scope: this workflow measures the C++ library (gcov) and the Python
+# wrapper layer (pytest-cov) on CPU runners. It runs both a serial and an
+# MPI-enabled instrumented build so that MPI-only code (e.g. fft/transpose.cc,
+# the cartesian communicator/decomposition) is exercised rather than reported as
+# a false 0%. Both legs upload to Codecov, which merges them into a single
+# report. GPU device code (CUDA/HIP kernels) cannot be coverage-measured here
+# because GitHub-hosted runners have no GPU; that remains a known gap.
+
 jobs:
   coverage:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mpi: ['no', 'yes']
 
     steps:
       - uses: actions/checkout@v6
@@ -29,11 +42,6 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qy
-          sudo apt-get install -y \
-            cmake \
-            ninja-build \
-            libboost-test-dev \
-            libnetcdf-dev
           python3 -m venv venv
           source venv/bin/activate
           python3 -m pip install --upgrade pip
@@ -41,6 +49,23 @@ jobs:
           # Python wrapper layer.
           python3 -m pip install "numpy>=2.1" pytest pytest-cov gcovr \
             "NuMPI[test]" netCDF4 muTimer
+          if [ "${{ matrix.mpi }}" == "yes" ]; then
+            sudo apt-get install -y \
+              cmake \
+              ninja-build \
+              libboost-test-dev \
+              openmpi-bin \
+              libopenmpi-dev \
+              libpnetcdf-dev \
+              libnetcdf-dev
+            CC=mpicc python3 -m pip install -v --no-binary mpi4py "mpi4py==4.0.3"
+          else
+            sudo apt-get install -y \
+              cmake \
+              ninja-build \
+              libboost-test-dev \
+              libnetcdf-dev
+          fi
 
       - name: Configure (coverage-instrumented, Debug)
         run: |
@@ -48,7 +73,7 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DMUGRID_ENABLE_COVERAGE=ON \
-            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_MPI=${{ matrix.mpi == 'yes' && 'ON' || 'OFF' }} \
             -DMUGRID_ENABLE_NETCDF=ON \
             -DMUGRID_ENABLE_PYTHON=ON \
             -DMUGRID_ENABLE_TESTS=ON \
@@ -82,18 +107,20 @@ jobs:
       - name: Upload coverage reports as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-reports
+          name: coverage-reports-mpi-${{ matrix.mpi }}
           path: |
             build/coverage.xml
             build/coverage-python.xml
             build/coverage_html/
           if-no-files-found: warn
 
-      # Best-effort upload to Codecov. Does not fail the job if Codecov is not
+      # Best-effort upload to Codecov. Codecov merges the serial and MPI legs
+      # into a single report. Does not fail the job if Codecov is not
       # configured for this repository.
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         continue-on-error: true
         with:
           files: build/coverage.xml,build/coverage-python.xml
+          flags: mpi-${{ matrix.mpi }}
           fail_ci_if_error: false

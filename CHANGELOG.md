@@ -6,7 +6,8 @@ unreleased
 
 - ENH: Optional code-coverage instrumentation via the `MUGRID_ENABLE_COVERAGE`
   CMake option, with `coverage`/`coverage-{xml,html,summary}` report targets and
-  a `Coverage` CI workflow (see `doc/source/Coverage.rst`)
+  a `Coverage` CI workflow that runs a serial and an MPI leg (merged in Codecov)
+  and excludes vendored pocketfft (see `doc/source/Coverage.rst`)
 - ENH: Bound `LaplaceOperator.apply_increment` and `LaplaceOperator.transpose`
   to Python (the wrapper advertised these but the C++ methods were not exposed)
 - TST: Added functional tests for the hard-coded 2D/3D Laplace operator
