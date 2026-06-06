@@ -360,5 +360,110 @@ class TestGPUValidation:
             linalg.axpy_norm_sq(1.0, x, y)
 
 
+# ===========================================================================
+# Sub-point fields (nb_sub_pts > 1)
+# ===========================================================================
+#
+# Regression coverage for the element-count computation. The total buffer size
+# is get_nb_entries() * nb_components, and get_nb_entries() already includes the
+# number of sub-points. A formula that multiplies by nb_sub_pts again overruns
+# the buffer once nb_sub_pts > 1 (harmless for the scalar/nodal fields the rest
+# of the suite uses).
+
+def _subpt_collection(nb_grid_pts, nb_quad=2):
+    g = (1,) * len(nb_grid_pts)
+    return muGrid.GlobalFieldCollection(
+        list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+        sub_pts={"quad": nb_quad},
+    )
+
+
+class TestSubPointsHost:
+    def test_norm_sq_subpoints(self, rng):
+        fc = _subpt_collection((5, 6))
+        x = fc.real_field("x", (2,), "quad")  # 2 components x 2 quad pts per pixel
+        _fill(x, rng)
+        ref = np.sum(np.abs(np.array(x.s)) ** 2)
+        assert complex(linalg.norm_sq(x)).real == pytest.approx(ref, rel=1e-12)
+
+    def test_vecdot_subpoints(self, rng):
+        fc = _subpt_collection((5, 6))
+        a = fc.real_field("a", (2,), "quad")
+        b = fc.real_field("b", (2,), "quad")
+        _fill(a, rng)
+        _fill(b, rng)
+        ref = np.sum(np.array(a.s) * np.array(b.s))
+        assert linalg.vecdot(a, b) == pytest.approx(ref, rel=1e-12)
+
+    def test_axpy_subpoints_full_buffer(self, rng):
+        fc = _subpt_collection((5, 6))
+        x = fc.real_field("x", (2,), "quad")
+        y = fc.real_field("y", (2,), "quad")
+        x0 = _fill(x, rng)
+        y0 = _fill(y, rng)
+        linalg.axpy(2.0, x, y)
+        np.testing.assert_allclose(np.array(y.sg), 2.0 * x0 + y0, rtol=1e-12)
+
+
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not compiled in")
+class TestGPUSubPoints:
+    """The GPU element count had an extra nb_sub_pts factor that overran the
+    device buffer for sub-point fields. Compare CPU and GPU on a quad field
+    (nb_sub_pts = 2); they must agree and match the analytical value."""
+
+    def setup_method(self, method):
+        if not muGrid.is_gpu_available():
+            pytest.skip("No GPU device available at runtime")
+        from conftest import HAS_CUPY
+        if not HAS_CUPY:
+            pytest.skip("CuPy not available for GPU array access")
+
+    def _collections(self, nb_grid_pts=(8, 8), nb_quad=2):
+        g = (1,) * len(nb_grid_pts)
+        cpu = muGrid.GlobalFieldCollection(
+            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            sub_pts={"quad": nb_quad},
+        )
+        gpu = muGrid.GlobalFieldCollection(
+            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            sub_pts={"quad": nb_quad}, device=muGrid.Device.gpu(),
+        )
+        return cpu, gpu
+
+    def test_norm_sq_subpoints_cpu_gpu_match(self):
+        nb = (8, 8)
+        nb_components, nb_quad, fill = 2, 2, 3.5
+        cpu_fc, gpu_fc = self._collections(nb, nb_quad)
+        cpu = cpu_fc.real_field("x", (nb_components,), "quad")
+        gpu = gpu_fc.real_field("x", (nb_components,), "quad")
+        cpu.s[...] = fill
+        gpu.s[...] = fill
+
+        cpu_res = linalg.norm_sq(cpu)
+        gpu_res = linalg.norm_sq(gpu)
+        assert cpu_res == pytest.approx(gpu_res, rel=1e-10)
+        expected = nb[0] * nb[1] * nb_components * nb_quad * fill * fill
+        assert cpu_res == pytest.approx(expected, rel=1e-10)
+
+    def test_axpy_subpoints_cpu_gpu_match(self):
+        nb = (8, 8)
+        nb_components, nb_quad = 2, 2
+        alpha, fx, fy = 0.5, 2.0, 3.0
+        cpu_fc, gpu_fc = self._collections(nb, nb_quad)
+        cx = cpu_fc.real_field("x", (nb_components,), "quad")
+        cy = cpu_fc.real_field("y", (nb_components,), "quad")
+        gx = gpu_fc.real_field("x", (nb_components,), "quad")
+        gy = gpu_fc.real_field("y", (nb_components,), "quad")
+        cx.s[...] = fx
+        cy.s[...] = fy
+        gx.s[...] = fx
+        gy.s[...] = fy
+
+        linalg.axpy(alpha, cx, cy)
+        linalg.axpy(alpha, gx, gy)
+        # Interior norm of the updated y must match between CPU and GPU.
+        assert linalg.norm_sq(cy) == pytest.approx(linalg.norm_sq(gy), rel=1e-10)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

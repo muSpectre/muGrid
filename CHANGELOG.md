@@ -20,6 +20,11 @@ unreleased
 - BUG: Included `<pybind11/complex.h>` in the linalg bindings; the Complex
   `linalg` operations were exposed but raised `Unregistered type
   std::complex<double>` when called from Python
+- BUG: Fixed the GPU linalg element count, which multiplied by `nb_sub_pts`
+  twice (`get_nb_entries()` already counts sub-points). For sub-point fields
+  (`nb_sub_pts > 1`) the device kernels ran past the end of the buffer
+  (out-of-bounds); scalar/nodal fields were unaffected. Now uses
+  `get_nb_entries() * nb_components` to match the host buffer size.
 - BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields whose
   component counts differ. Previously this passed the entry-count check; on the
   host it then aborted via an Eigen size assertion, and on the GPU it launched a

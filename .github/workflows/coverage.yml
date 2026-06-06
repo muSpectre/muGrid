@@ -101,7 +101,9 @@ jobs:
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           export TESTS_BUILDDIR=$PWD/build/tests
-          python3 -m pytest tests -q \
+          # -v -rA makes every test's outcome (passed/skipped, with reasons)
+          # visible in the log, so it can be audited which tests actually ran.
+          python3 -m pytest tests -v -rA \
             --cov=muGrid --cov-report=xml:build/coverage-python.xml \
             --cov-report=term-missing || true
 
@@ -200,6 +202,17 @@ jobs:
         run: |
           source venv/bin/activate
           ctest --test-dir build --output-on-failure
+
+      # ctest hides a passing test's stdout, so the device test outcomes are not
+      # otherwise visible. Re-run the Python tests with -v -rA so the log shows
+      # exactly which GPU tests executed (vs. skipped) and their result. Failures
+      # here surface as the device tests actually running.
+      - name: Inspect Python test outcomes on GPU
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          export TESTS_BUILDDIR=$PWD/build/tests
+          python3 -m pytest tests -v -rA -p no:cacheprovider
 
       - name: Generate C++ coverage reports
         run: |

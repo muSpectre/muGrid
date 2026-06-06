@@ -601,10 +601,11 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
     }
 
     const auto& coll = a.get_collection();
-    // Total number of scalar elements = pixels * components * sub_pts
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
     const Index_t nb_components_per_pixel =
         a.get_nb_components() * a.get_nb_sub_pts();
-    const Index_t n = a.get_nb_entries() * nb_components_per_pixel;
+    const Index_t n = a.get_nb_entries() * a.get_nb_components();
 
     // Allocate device memory for partial sums
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
@@ -715,10 +716,11 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
 template <>
 Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
     const auto& coll = x.get_collection();
-    // Total number of scalar elements = pixels * components * sub_pts
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
     const Index_t nb_components_per_pixel =
         x.get_nb_components() * x.get_nb_sub_pts();
-    const Index_t n = x.get_nb_entries() * nb_components_per_pixel;
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
 
     // Allocate device memory for partial sums
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
@@ -838,8 +840,9 @@ void axpy<Real, DeviceSpace>(Real alpha,
         throw FieldError("axpy: fields must have the same number of entries");
     }
 
-    // Total number of scalar elements = pixels * components * sub_pts
-    const Index_t n = x.get_nb_entries() * x.get_nb_components() * x.get_nb_sub_pts();
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -851,8 +854,9 @@ void axpy<Real, DeviceSpace>(Real alpha,
 
 template <>
 void scal<Real, DeviceSpace>(Real alpha, TypedField<Real, DeviceSpace>& x) {
-    // Total number of scalar elements = pixels * components * sub_pts
-    const Index_t n = x.get_nb_entries() * x.get_nb_components() * x.get_nb_sub_pts();
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -875,8 +879,9 @@ void axpby<Real, DeviceSpace>(Real alpha,
         throw FieldError("axpby: fields must have the same number of entries");
     }
 
-    // Total number of scalar elements = pixels * components * sub_pts
-    const Index_t n = x.get_nb_entries() * x.get_nb_components() * x.get_nb_sub_pts();
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -897,8 +902,9 @@ void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
         throw FieldError("copy: fields must have the same number of entries");
     }
 
-    // Total number of scalar elements = pixels * components * sub_pts
-    const Index_t n = src.get_nb_entries() * src.get_nb_components() * src.get_nb_sub_pts();
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = src.get_nb_entries() * src.get_nb_components();
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -921,10 +927,11 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
     }
 
     const auto& coll = x.get_collection();
-    // Total number of scalar elements = pixels * components * sub_pts
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
     const Index_t nb_components_per_pixel =
         x.get_nb_components() * x.get_nb_sub_pts();
-    const Index_t n = x.get_nb_entries() * nb_components_per_pixel;
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
 
     // Allocate device memory for partial sums
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
