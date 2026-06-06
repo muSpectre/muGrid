@@ -21,8 +21,10 @@ unreleased
   `linalg` operations were exposed but raised `Unregistered type
   std::complex<double>` when called from Python
 - BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields whose
-  component counts differ (previously this passed the entry-count check and
-  aborted via an Eigen size assertion instead of raising)
+  component counts differ. Previously this passed the entry-count check; on the
+  host it then aborted via an Eigen size assertion, and on the GPU it launched a
+  kernel indexing past the shorter buffer (out-of-bounds device access). Fixed
+  in both `linalg_host.cc` and `linalg_gpu.cc`.
 - CLEAN: Removed dead code with no callers: the superseded
   `get_host_fft_backend`/`get_device_fft_backend` factory functions and the
   unused `CcoordOps::get_index`/`compute_pixel_volume` dynamic overloads
