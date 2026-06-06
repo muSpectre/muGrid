@@ -305,5 +305,60 @@ class TestErrors:
             linalg.axpby(1.0, x, 1.0, y)
 
 
+# ===========================================================================
+# GPU validation regression tests
+# ===========================================================================
+#
+# These mirror the host component-mismatch tests on the device. The guard is
+# memory-safety critical on the GPU: without it the element count `n` is derived
+# from the first operand's component count and the kernel indexes BOTH operands
+# up to `n`, reading/writing past the shorter device buffer. The validation must
+# raise (FieldError -> RuntimeError) before any kernel launch, so these tests
+# need a GPU at runtime but not CuPy (no array data is touched).
+
+GPU_AVAILABLE = muGrid.has_gpu
+
+
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not compiled in")
+class TestGPUValidation:
+    def setup_method(self, method):
+        if not muGrid.is_gpu_available():
+            pytest.skip("No GPU device available at runtime")
+
+    def _device_collection(self):
+        return muGrid.GlobalFieldCollection(
+            [4, 4], nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
+            device=muGrid.Device.gpu(),
+        )
+
+    def test_axpy_component_mismatch(self):
+        fc = self._device_collection()
+        x = fc.real_field("x", (2,))
+        y = fc.real_field("y", (3,))
+        with pytest.raises(RuntimeError):
+            linalg.axpy(1.0, x, y)
+
+    def test_axpby_component_mismatch(self):
+        fc = self._device_collection()
+        x = fc.real_field("x", (2,))
+        y = fc.real_field("y", (3,))
+        with pytest.raises(RuntimeError):
+            linalg.axpby(1.0, x, 1.0, y)
+
+    def test_copy_component_mismatch(self):
+        fc = self._device_collection()
+        src = fc.real_field("src", (2,))
+        dst = fc.real_field("dst", (3,))
+        with pytest.raises(RuntimeError):
+            linalg.copy(src, dst)
+
+    def test_axpy_norm_sq_component_mismatch(self):
+        fc = self._device_collection()
+        x = fc.real_field("x", (2,))
+        y = fc.real_field("y", (3,))
+        with pytest.raises(RuntimeError):
+            linalg.axpy_norm_sq(1.0, x, y)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
