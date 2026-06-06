@@ -11,12 +11,13 @@ on:
       - '**'
 
 # Note on scope: this workflow measures the C++ library (gcov) and the Python
-# wrapper layer (pytest-cov) on CPU runners. It runs both a serial and an
-# MPI-enabled instrumented build so that MPI-only code (e.g. fft/transpose.cc,
-# the cartesian communicator/decomposition) is exercised rather than reported as
-# a false 0%. Both legs upload to Codecov, which merges them into a single
-# report. GPU device code (CUDA/HIP kernels) cannot be coverage-measured here
-# because GitHub-hosted runners have no GPU; that remains a known gap.
+# wrapper layer (pytest-cov). The `coverage` job runs a serial and an
+# MPI-enabled build on CPU runners so MPI-only code (e.g. fft/transpose.cc, the
+# cartesian communicator/decomposition) is exercised rather than reported as a
+# false 0%. The `coverage-gpu` job runs on the GPU-equipped runner and measures
+# the host-side CUDA dispatch code. All legs upload to Codecov, which merges
+# them. The only remaining gap is CUDA __global__ kernel bodies, which gcov
+# (host-only) cannot instrument.
 
 jobs:
   coverage:
@@ -123,4 +124,100 @@ jobs:
         with:
           files: build/coverage.xml,build/coverage-python.xml
           flags: mpi-${{ matrix.mpi }}
+          fail_ci_if_error: false
+
+  # GPU (CUDA) coverage leg. Runs on the GPU-equipped self-hosted runner and
+  # measures the host-side GPU dispatch code in the *_gpu translation units and
+  # memory/device.cc (gcov is host-only, so CUDA __global__ kernels themselves
+  # are not instrumented). There is no HIP coverage leg.
+  coverage-gpu:
+    runs-on: linux-x86-cuda
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.35
+        id: cuda-toolkit
+        with:
+          cuda: '12.6.3'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart-dev", "nvrtc-dev"]'
+          non-cuda-sub-packages: '["libcufft-dev", "libcublas-dev", "libcurand-dev"]'
+
+      - name: Show GPU info
+        run: |
+          nvidia-smi
+          nvcc --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qy
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            libboost-test-dev
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          python3 -m pip install --upgrade pip
+          python3 -m pip install numpy pytest pytest-cov gcovr \
+            "NuMPI[test]" cupy-cuda12x muTimer
+
+      - name: Configure (coverage-instrumented, CUDA, Debug)
+        run: |
+          source venv/bin/activate
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUGRID_ENABLE_COVERAGE=ON \
+            -DMUGRID_ENABLE_CUDA=ON \
+            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_NETCDF=OFF \
+            -DMUGRID_ENABLE_PYTHON=ON \
+            -DMUGRID_ENABLE_TESTS=ON \
+            -DMUGRID_ENABLE_EXAMPLES=OFF \
+            -DCMAKE_CUDA_ARCHITECTURES="75" \
+            -DPython_EXECUTABLE=$(which python3)
+
+      - name: Build
+        run: |
+          source venv/bin/activate
+          cmake --build build --parallel
+
+      - name: Run test suite on GPU (populates coverage counters)
+        run: |
+          source venv/bin/activate
+          ctest --test-dir build --output-on-failure
+
+      - name: Generate C++ coverage reports
+        run: |
+          source venv/bin/activate
+          cmake --build build --target coverage
+
+      - name: Upload coverage reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-gpu
+          path: |
+            build/coverage.xml
+            build/coverage_html/
+          if-no-files-found: warn
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        continue-on-error: true
+        with:
+          files: build/coverage.xml
+          flags: gpu
           fail_ci_if_error: false

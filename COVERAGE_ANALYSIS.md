@@ -28,9 +28,11 @@ Codecov:
 
 **One caveat remains:**
 
-- **GPU device code is not measured.** GitHub-hosted runners have no GPU, so the
-  CUDA/HIP `*_gpu` translation units and parts of `memory/device.cc` cannot be
-  exercised. This is the only remaining source of structural false-zeros.
+- **CUDA device kernels are not measured.** A third leg (`coverage-gpu`) runs on
+  the GPU-equipped `linux-x86-cuda` runner and instruments the *host-side* GPU
+  dispatch code in the `*_gpu` translation units and `memory/device.cc`. The
+  `__global__` kernel bodies themselves are still not covered, because gcov is
+  host-only. (There is no HIP coverage leg.)
 
 The numbers in §2 below are from the **serial** leg and predate the MPI leg;
 they are kept because the per-file analysis that follows refers to them. The

@@ -56,14 +56,39 @@ message(STATUS "  Coverage       : ON")
 # -lgcov (or the Clang equivalent) at link time.  -O0 -g keep the line mapping
 # faithful, and disabling inlining/elision avoids attributing code to the wrong
 # lines.
+#
+# The flags are applied per source language. Plain C++ sources get them
+# directly; CUDA sources are compiled by nvcc, which only understands
+# host-compiler flags when they are forwarded with -Xcompiler. Device kernels
+# themselves are NOT instrumented (gcov is host-only), but the host-side launch
+# and dispatch code in the *_gpu translation units is.
+set(_cov_cxx_flags --coverage -O0 -g -fno-inline)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC-only inlining knobs; Clang/hipcc reject these.
+    list(APPEND _cov_cxx_flags -fno-inline-small-functions -fno-default-inline)
+endif()
+
 target_compile_options(mugrid_coverage INTERFACE
-    --coverage
-    -O0
-    -g
-    -fno-inline
-    -fno-inline-small-functions
-    -fno-default-inline
+    $<$<COMPILE_LANGUAGE:CXX>:${_cov_cxx_flags}>
 )
+
+if(MUGRID_ENABLE_CUDA)
+    set(_cov_cuda_flags "")
+    foreach(_flag IN LISTS _cov_cxx_flags)
+        list(APPEND _cov_cuda_flags "-Xcompiler=${_flag}")
+    endforeach()
+    target_compile_options(mugrid_coverage INTERFACE
+        $<$<COMPILE_LANGUAGE:CUDA>:${_cov_cuda_flags}>
+    )
+endif()
+
+if(MUGRID_ENABLE_HIP)
+    # hipcc is Clang-based and accepts these flags directly.
+    target_compile_options(mugrid_coverage INTERFACE
+        $<$<COMPILE_LANGUAGE:HIP>:--coverage;-O0;-g;-fno-inline>
+    )
+endif()
+
 target_link_options(mugrid_coverage INTERFACE --coverage)
 
 # ---------------------------------------------------------------------------
