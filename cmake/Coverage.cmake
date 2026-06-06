@@ -132,6 +132,12 @@ set(_gcovr_common
     # merged hit counts can trip gcov's "suspicious hit count" heuristic. Treat
     # those as warnings rather than fatal errors (a no-op for serial builds).
     --gcov-ignore-parse-errors=suspicious_hits.warn
+    # When the same (often inlined) function is attributed to different lines
+    # across translation units, gcovr's default "strict" function merge aborts
+    # (e.g. Communicator::rank() seen at two lines when the C++ test exe and the
+    # Python module's data are combined). Reconcile to the lowest line instead;
+    # this only affects function-record bookkeeping, not line/branch counts.
+    --merge-mode-functions=merge-use-line-min
     --print-summary
 )
 
