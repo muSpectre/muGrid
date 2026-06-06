@@ -122,6 +122,7 @@ jobs:
         uses: codecov/codecov-action@v5
         continue-on-error: true
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: build/coverage.xml,build/coverage-python.xml
           flags: mpi-${{ matrix.mpi }}
           fail_ci_if_error: false
@@ -218,6 +219,7 @@ jobs:
         uses: codecov/codecov-action@v5
         continue-on-error: true
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: build/coverage.xml
           flags: gpu
           fail_ci_if_error: false

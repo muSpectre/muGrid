@@ -67,6 +67,16 @@ Continuous integration
 ----------------------
 
 The ``Coverage`` GitHub Actions workflow
-(``.github/workflows/coverage.yml``) performs an instrumented build on every
-push and pull request, runs the full test suite, generates the reports, uploads
-them as build artifacts and makes a best-effort upload to Codecov.
+(``.github/workflows/coverage.yml``) runs on every push and pull request. It has
+three legs that all generate reports, upload them as build artifacts, and make a
+best-effort upload to Codecov:
+
+* a **serial** CPU build,
+* an **MPI** CPU build (tests under ``mpiexec`` at np = 1, 2, 4, 8), so MPI-only
+  code is exercised, and
+* a **CUDA** build on the ``linux-x86-cuda`` GPU runner, which measures the
+  host-side GPU dispatch code (gcov cannot instrument device kernels).
+
+Codecov merges the three legs into a single report. The upload requires a
+``CODECOV_TOKEN`` repository secret; without it the upload step is skipped
+(``continue-on-error``) but the artifacts are still produced.
