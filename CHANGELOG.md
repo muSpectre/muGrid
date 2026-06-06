@@ -13,6 +13,16 @@ unreleased
 - TST: Added functional tests for the hard-coded 2D/3D Laplace operator
   (`python_laplace_operator_tests.py`), raising coverage of `laplace_2d.cc`/
   `laplace_3d.cc` from ~3% to ~78%
+- TST: Added functional tests for the host linear-algebra operations
+  (`python_linalg_host_tests.py`): `vecdot`/`norm_sq`/`axpy`/`scal`/`axpby`/
+  `copy`/`axpy_norm_sq` for Real and Complex fields in 1D/2D/3D, including the
+  ghost-exclusion and input-validation paths
+- BUG: Included `<pybind11/complex.h>` in the linalg bindings; the Complex
+  `linalg` operations were exposed but raised `Unregistered type
+  std::complex<double>` when called from Python
+- BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields whose
+  component counts differ (previously this passed the entry-count check and
+  aborted via an Eigen size assertion instead of raising)
 - CLEAN: Removed dead code with no callers: the superseded
   `get_host_fft_backend`/`get_device_fft_backend` factory functions and the
   unused `CcoordOps::get_index`/`compute_pixel_volume` dynamic overloads
