@@ -135,6 +135,15 @@ set(_gcovr_common
     --print-summary
 )
 
+if(MUGRID_ENABLE_CUDA OR MUGRID_ENABLE_HIP)
+    # nvcc/hipcc compile the *_gpu translation units (and an internal stub) with
+    # recorded paths that gcovr resolves to '/', where it cannot create the
+    # temporary .gcov files. Tolerate those gcov *invocation* errors so the
+    # report is still produced for the resolvable host code. Kept off for the
+    # pure-CPU legs so they stay strict.
+    list(APPEND _gcovr_common --gcov-ignore-errors=all)
+endif()
+
 add_custom_target(coverage-xml
     COMMAND ${GCOVR_EXECUTABLE} ${_gcovr_common}
             --xml-pretty --output "${CMAKE_BINARY_DIR}/coverage.xml"
