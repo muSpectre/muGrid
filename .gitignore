@@ -17,6 +17,16 @@
 
 *.pyc
 
+# Code coverage artifacts
+*.gcno
+*.gcda
+*.gcov
+/coverage.xml
+/coverage-python.xml
+/coverage_html/
+.coverage
+.coverage.*
+
 .fleet
 .vscode
 .idea

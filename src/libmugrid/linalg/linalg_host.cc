@@ -402,7 +402,8 @@ void axpy<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy: fields must belong to the same collection");
     }
-    if (x.get_nb_entries() != y.get_nb_entries()) {
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy: fields must have the same number of entries");
     }
 
@@ -417,7 +418,8 @@ void axpy<Complex, HostSpace>(Complex alpha, const TypedField<Complex, HostSpace
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy: fields must belong to the same collection");
     }
-    if (x.get_nb_entries() != y.get_nb_entries()) {
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy: fields must have the same number of entries");
     }
 
@@ -446,7 +448,8 @@ void axpby<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpby: fields must belong to the same collection");
     }
-    if (x.get_nb_entries() != y.get_nb_entries()) {
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpby: fields must have the same number of entries");
     }
 
@@ -462,7 +465,8 @@ void axpby<Complex, HostSpace>(Complex alpha, const TypedField<Complex, HostSpac
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpby: fields must belong to the same collection");
     }
-    if (x.get_nb_entries() != y.get_nb_entries()) {
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpby: fields must have the same number of entries");
     }
 
@@ -479,7 +483,8 @@ void copy<Real, HostSpace>(const TypedField<Real, HostSpace>& src,
     if (&src.get_collection() != &dst.get_collection()) {
         throw FieldError("copy: fields must belong to the same collection");
     }
-    if (src.get_nb_entries() != dst.get_nb_entries()) {
+    if (src.get_nb_entries() != dst.get_nb_entries() ||
+        src.get_nb_components() != dst.get_nb_components()) {
         throw FieldError("copy: fields must have the same number of entries");
     }
 
@@ -494,7 +499,8 @@ void copy<Complex, HostSpace>(const TypedField<Complex, HostSpace>& src,
     if (&src.get_collection() != &dst.get_collection()) {
         throw FieldError("copy: fields must belong to the same collection");
     }
-    if (src.get_nb_entries() != dst.get_nb_entries()) {
+    if (src.get_nb_entries() != dst.get_nb_entries() ||
+        src.get_nb_components() != dst.get_nb_components()) {
         throw FieldError("copy: fields must have the same number of entries");
     }
 
@@ -552,7 +558,8 @@ Real axpy_norm_sq<Real, HostSpace>(Real alpha,
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy_norm_sq: fields must belong to the same collection");
     }
-    if (x.get_nb_entries() != y.get_nb_entries()) {
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
 
@@ -584,7 +591,8 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy_norm_sq: fields must belong to the same collection");
     }
-    if (x.get_nb_entries() != y.get_nb_entries()) {
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
 

@@ -101,6 +101,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Code coverage instrumentation (defines the MUGRID_ENABLE_COVERAGE option and
+# the mugrid::coverage interface target used by the library and test targets)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(Coverage)
+
 # Include FetchContent for downloading dependencies
 include(FetchContent)
 
@@ -301,6 +306,7 @@ endif()
 
 message(STATUS "  Tests          : ${MUGRID_ENABLE_TESTS}")
 message(STATUS "  Examples       : ${MUGRID_ENABLE_EXAMPLES}")
+message(STATUS "  Coverage       : ${MUGRID_ENABLE_COVERAGE}")
 message(STATUS "--------------------")
 
 # Add subdirectories

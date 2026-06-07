@@ -179,11 +179,6 @@ namespace muGrid {
             return retval;
         }
 
-        //! get the linear index of a pixel in a column-major grid
-        Dim_t get_index(const DynGridIndex & nb_grid_pts,
-                        const DynGridIndex & locations,
-                        const DynGridIndex & ccoord);
-
         //-----------------------------------------------------------------------//
         //! these functions can be used whenever it is necessary to calculate
         //! the volume of a cell or each pixels of the cell
@@ -208,9 +203,6 @@ namespace muGrid {
             }
             return vol;
         }
-
-        Real compute_pixel_volume(const DynGridIndex & nb_grid_pts,
-                                  const DynCoord<fourD, Real> & lengths);
 
         //! get the linear index of a pixel given a set of strides
         template <size_t Dim>

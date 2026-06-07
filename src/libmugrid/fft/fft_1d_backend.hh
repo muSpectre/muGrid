@@ -126,18 +126,6 @@ class FFT1DBackend {
   virtual const char * name() const = 0;
 };
 
-/**
- * Get the appropriate FFT backend for host memory.
- * Returns PocketFFT (always available).
- */
-std::unique_ptr<FFT1DBackend> get_host_fft_backend();
-
-/**
- * Get the appropriate FFT backend for device memory.
- * Returns cuFFT, rocFFT, or nullptr if no GPU backend available.
- */
-std::unique_ptr<FFT1DBackend> get_device_fft_backend();
-
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_FFT_FFT_1D_BACKEND_HH_

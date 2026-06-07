@@ -383,6 +383,9 @@ void add_stencil_gradient_operator(py::module & mod) {
 void add_laplace_operator_2d(py::module & mod) {
     using ApplyHostFn = void (LaplaceOperator2D::*)(const RealFieldHost &,
                                                     RealFieldHost &) const;
+    using ApplyIncrementHostFn =
+        void (LaplaceOperator2D::*)(const RealFieldHost &, const Real &,
+                                    RealFieldHost &) const;
 
     auto laplace_op =
         py::class_<LaplaceOperator2D, LinearOperator>(mod,
@@ -401,6 +404,15 @@ void add_laplace_operator_2d(py::module & mod) {
             .def("apply", static_cast<ApplyHostFn>(&LaplaceOperator2D::apply),
                  "input_field"_a, "output_field"_a,
                  "Apply the Laplace operator to host (CPU) fields")
+            .def("apply_increment",
+                 static_cast<ApplyIncrementHostFn>(
+                     &LaplaceOperator2D::apply_increment),
+                 "input_field"_a, "alpha"_a, "output_field"_a,
+                 "Add alpha * Laplace(input) to output on host (CPU) fields")
+            .def("transpose", &LaplaceOperator2D::transpose, "input_field"_a,
+                 "output_field"_a, "weights"_a = std::vector<Real>{},
+                 "Apply the transpose; identical to apply for the self-adjoint "
+                 "Laplacian (weights are ignored)")
             .def_property_readonly("nb_stencil_pts",
                                    &LaplaceOperator2D::get_nb_stencil_pts)
             .def_property_readonly("scale", &LaplaceOperator2D::get_scale)
@@ -444,6 +456,9 @@ void add_laplace_operator_2d(py::module & mod) {
 void add_laplace_operator_3d(py::module & mod) {
     using ApplyHostFn = void (LaplaceOperator3D::*)(const RealFieldHost &,
                                                     RealFieldHost &) const;
+    using ApplyIncrementHostFn =
+        void (LaplaceOperator3D::*)(const RealFieldHost &, const Real &,
+                                    RealFieldHost &) const;
 
     auto laplace_op =
         py::class_<LaplaceOperator3D, LinearOperator>(mod,
@@ -462,6 +477,15 @@ void add_laplace_operator_3d(py::module & mod) {
             .def("apply", static_cast<ApplyHostFn>(&LaplaceOperator3D::apply),
                  "input_field"_a, "output_field"_a,
                  "Apply the Laplace operator to host (CPU) fields")
+            .def("apply_increment",
+                 static_cast<ApplyIncrementHostFn>(
+                     &LaplaceOperator3D::apply_increment),
+                 "input_field"_a, "alpha"_a, "output_field"_a,
+                 "Add alpha * Laplace(input) to output on host (CPU) fields")
+            .def("transpose", &LaplaceOperator3D::transpose, "input_field"_a,
+                 "output_field"_a, "weights"_a = std::vector<Real>{},
+                 "Apply the transpose; identical to apply for the self-adjoint "
+                 "Laplacian (weights are ignored)")
             .def_property_readonly("nb_stencil_pts",
                                    &LaplaceOperator3D::get_nb_stencil_pts)
             .def_property_readonly("scale", &LaplaceOperator3D::get_scale)

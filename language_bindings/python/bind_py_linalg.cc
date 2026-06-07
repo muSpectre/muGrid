@@ -38,6 +38,7 @@
 #include "linalg/linalg.hh"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/complex.h>
 
 using muGrid::Real;
 using muGrid::Complex;
