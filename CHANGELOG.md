@@ -1,38 +1,21 @@
 Change log for µGrid
 ====================
 
-unreleased
-----------
+v0.107.0 (09Jun26)
+------------------
 
 - ENH: Optional code-coverage instrumentation via the `MUGRID_ENABLE_COVERAGE`
-  CMake option, with `coverage`/`coverage-{xml,html,summary}` report targets and
-  a `Coverage` CI workflow that runs a serial and an MPI leg (merged in Codecov)
-  and excludes vendored pocketfft (see `doc/source/Coverage.rst`)
 - ENH: Bound `LaplaceOperator.apply_increment` and `LaplaceOperator.transpose`
-  to Python (the wrapper advertised these but the C++ methods were not exposed)
+  to Python
 - TST: Added functional tests for the hard-coded 2D/3D Laplace operator
-  (`python_laplace_operator_tests.py`), raising coverage of `laplace_2d.cc`/
-  `laplace_3d.cc` from ~3% to ~78%
-- TST: Added functional tests for the host linear-algebra operations
-  (`python_linalg_host_tests.py`): `vecdot`/`norm_sq`/`axpy`/`scal`/`axpby`/
-  `copy`/`axpy_norm_sq` for Real and Complex fields in 1D/2D/3D, including the
-  ghost-exclusion and input-validation paths
-- BUG: Included `<pybind11/complex.h>` in the linalg bindings; the Complex
-  `linalg` operations were exposed but raised `Unregistered type
-  std::complex<double>` when called from Python
-- BUG: Fixed the GPU linalg element count, which multiplied by `nb_sub_pts`
-  twice (`get_nb_entries()` already counts sub-points). For sub-point fields
+- TST: Added functional tests for the host linear-algebra operations:
+  `vecdot`/`norm_sq`/`axpy`/`scal`/`axpby`/ `copy`/`axpy_norm_sq` for Real and
+  Complex fields in 1D/2D/3D, including the ghost-exclusion and input-validation paths
+- BUG: Fixed the GPU linalg element count. For sub-point fields
   (`nb_sub_pts > 1`) the device kernels ran past the end of the buffer
-  (out-of-bounds); scalar/nodal fields were unaffected. Now uses
-  `get_nb_entries() * nb_components` to match the host buffer size.
 - BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields whose
-  component counts differ. Previously this passed the entry-count check; on the
-  host it then aborted via an Eigen size assertion, and on the GPU it launched a
-  kernel indexing past the shorter buffer (out-of-bounds device access). Fixed
-  in both `linalg_host.cc` and `linalg_gpu.cc`.
-- CLEAN: Removed dead code with no callers: the superseded
-  `get_host_fft_backend`/`get_device_fft_backend` factory functions and the
-  unused `CcoordOps::get_index`/`compute_pixel_volume` dynamic overloads
+  component counts differ
+- MAINT: Removed dead code with no callers
 
 0.106.0 (24Apr26)
 -----------------
