@@ -1,6 +1,54 @@
 Change log for µGrid
 ====================
 
+unreleased
+----------
+
+- BUG: Fixed state-field index rotation using bitwise `&` instead of modulo,
+  which aliased `current()`/`old()` for `nb_memory` not of the form 2^k-1
+- BUG: Fixed 3D MPI FFT silently skipping the Y transform for process grids
+  with P2 == 1 and P1 > 1 (roundtrips were self-consistent but wrong vs numpy)
+- BUG: Fixed NetCDF `compute_tensor_dim_index` constructing but never throwing
+  its error (returning a negative index) and an inverted `static_assert` in
+  the NetCDF type mapping
+- BUG: Fixed `Unit` streaming emitting an empty string for tagged-but-unitless
+  units
+- BUG: Bound `FEMGradientOperator.apply_increment`/`.transpose_increment`,
+  `Communicator.max`/`.all`/`.any`, and corrected the
+  `register_uint_state_field`/`uint_state_field` names (misspelled aliases kept)
+- BUG: Fixed the `PyGradientOperator.transpose_increment` trampoline calling
+  the Python `transpose` method
+- BUG: Added Python wrappers for `IsotropicStiffnessOperator2D`/`3D` that accept
+  wrapped `Field` objects; `from muGrid import *` no longer breaks on undefined
+  `Verbosity`/conditional `OpenMode`
+- BUG: The DLPack capsule now keeps the owning field (and its collection)
+  alive for the lifetime of the exported tensor
+- BUG: Fixed host<->device `deep_copy` permuting multi-axis component /
+  multi-sub-point data (AoS vs SoA dof ordering)
+- BUG: `FieldMap::size()` / `eigen_vec()` / `get_empty_clone()` now handle
+  buffer padding and ghost specifications correctly
+- BUG: Fixed 64-bit index overflow in `get_index`, `is_buffer_contiguous` and
+  `get_nb_from_shape` for grids exceeding 2^31 points
+- BUG: Free the MPI communicator created by `MPI_Cart_create`; removed
+  collective MPI calls from `assert`s (debug/release deadlock)
+- BUG: GPU isotropic-stiffness now uploads per-instance G/V matrices (a second
+  operator with different grid spacing no longer reuses stale matrices); the
+  device `GenericLinearOperator` caches are invalidated on grid change
+- BUG: GPU linalg ghost reductions now handle 1D fields; cuFFT inverse
+  transforms synchronize before GPU-aware MPI
+- BUG: MPI ghost accumulation now honours device memory and the actual element
+  type (Complex/Int), instead of hard-coding host-side `Real`
+- BUG: `reduce_ghosts` rejects halos larger than the subdomain instead of
+  silently producing a wrong reduction
+- TST: Added regression tests for the state-field rotation and the Python API
+  surface (star import, FEM-gradient increments, isotropic-stiffness wrapper)
+- DOC: Corrected numerous C++ doxygen and Sphinx documentation mismatches
+  (units, storage order, Device properties, FFT/GPU sections, README GPU
+  autodetection, operator constructor argument names)
+- MAINT: Removed dead code (`fft_work_buffer.hh`, repo-root stray files) and a
+  dead `[tool.flake8]` section; fixed latent compile-breakers in const `zip`
+  and `StaticStateFieldMap` const accessors
+
 0.106.0 (09Jun26)
 -----------------
 
