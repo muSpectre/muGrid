@@ -73,10 +73,11 @@ namespace muGrid {
      * geometry matrices shared by all pixels.
      *
      * Memory layout:
-     * - Displacement field: [3, nx, ny] (3 DOFs per node: ux, uy for 2D +
-     * ghost)
-     * - Material field: [2, nx-1, ny-1] (λ, μ per pixel)
-     * - Force field: [3, nx, ny] (same as displacement)
+     * - Displacement field: [2, nx, ny] (2 DOFs per node: ux, uy)
+     * - Material fields: lambda and mu, each [1, nx, ny]; the material
+     *   collection's computable region must match the node field's region
+     *   (node-indexed, same grid size, not (nx-1, ny-1))
+     * - Force field: [2, nx, ny] (same as displacement)
      */
     class IsotropicStiffnessOperator2D {
        public:
@@ -106,8 +107,8 @@ namespace muGrid {
          * @brief Apply the stiffness operator: force = K @ displacement
          *
          * @param displacement Input displacement field [2, nx, ny]
-         * @param lambda Lamé first parameter field [nx-1, ny-1]
-         * @param mu Lamé second parameter (shear modulus) field [nx-1, ny-1]
+         * @param lambda Lamé first parameter field [1, nx, ny]
+         * @param mu Lamé second parameter (shear modulus) field [1, nx, ny]
          * @param force Output force field [2, nx, ny]
          */
         void apply(const TypedFieldBase<Real> & displacement,

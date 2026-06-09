@@ -72,7 +72,9 @@ namespace muGrid {
      *
      * Memory layout:
      * - Displacement field: [3, nx, ny, nz] (3 DOFs per node)
-     * - Material field: [2, nx-1, ny-1, nz-1] (λ, μ per voxel)
+     * - Material fields: lambda and mu, each [1, nx, ny, nz]; the material
+     *   collection's computable region must match the node field's region
+     *   (node-indexed, same grid size, not (nx-1, ny-1, nz-1))
      * - Force field: [3, nx, ny, nz]
      */
     class IsotropicStiffnessOperator3D {
@@ -103,8 +105,8 @@ namespace muGrid {
          * @brief Apply the stiffness operator: force = K @ displacement
          *
          * @param displacement Input displacement field [3, nx, ny, nz]
-         * @param lambda Lamé first parameter field [nx-1, ny-1, nz-1]
-         * @param mu Lamé second parameter (shear modulus) field [nx-1, ny-1, nz-1]
+         * @param lambda Lamé first parameter field [1, nx, ny, nz]
+         * @param mu Lamé second parameter (shear modulus) field [1, nx, ny, nz]
          * @param force Output force field [3, nx, ny, nz]
          */
         void apply(const TypedFieldBase<Real>& displacement,

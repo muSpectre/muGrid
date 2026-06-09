@@ -44,7 +44,7 @@ namespace muGrid {
                               const IterUnit & sub_division) {
         switch (sub_division) {
         case IterUnit::Pixel: {
-            os << "free number of points";
+            os << "Pixel";
             break;
         }
         case IterUnit::SubPt: {

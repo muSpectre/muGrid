@@ -219,8 +219,8 @@ namespace muGrid {
          *
          * @param quadrature_point_field input field in device memory
          * @param nodal_field output field in device memory
-         * @param weights Gaussian quadrature weights (currently ignored for
-         * device)
+         * @param weights Gaussian quadrature weights (copied to the device and
+         * applied by the kernel)
          */
         void transpose(const TypedFieldBase<Real, DefaultDeviceSpace> &
                            quadrature_point_field,
@@ -234,8 +234,8 @@ namespace muGrid {
          * @param quadrature_point_field input field in device memory
          * @param alpha scaling factor for the increment
          * @param nodal_field output field in device memory
-         * @param weights Gaussian quadrature weights (currently ignored for
-         * device)
+         * @param weights Gaussian quadrature weights (copied to the device and
+         * applied by the kernel)
          */
         void transpose_increment(
             const TypedFieldBase<Real, DefaultDeviceSpace> &

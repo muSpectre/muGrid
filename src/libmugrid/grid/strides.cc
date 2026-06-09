@@ -1,11 +1,11 @@
 /**
- * @file   pixels.cc
+ * @file   strides.cc
  *
  * @author Till Junge <till.junge@epfl.ch>
  *
  * @date   01 Oct 2019
  *
- * @brief  pre-compilable pixel operations
+ * @brief  pre-compilable stride/buffer operations
  *
  * Copyright © 2019 Till Junge
  *
@@ -35,7 +35,7 @@
 #include <iostream>
 
 #include "core/exception.hh"
-#include "grid/pixels.hh"
+#include "grid/strides.hh"
 
 namespace muGrid {
 

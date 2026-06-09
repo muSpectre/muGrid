@@ -182,7 +182,7 @@ T ghost_vecdot(const T* a_data, const T* b_data,
             }
         }
     } else {
-        throw FieldError("ghost_vecdot only supports 2D and 3D fields");
+        throw FieldError("ghost_vecdot only supports 1D, 2D and 3D fields");
     }
 
     return result;
@@ -321,7 +321,7 @@ T ghost_norm_sq(const T* data, const GlobalFieldCollection& coll,
             }
         }
     } else {
-        throw FieldError("ghost_norm_sq only supports 2D and 3D fields");
+        throw FieldError("ghost_norm_sq only supports 1D, 2D and 3D fields");
     }
 
     return result;
