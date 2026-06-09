@@ -775,16 +775,22 @@ Utilities
 Timer
 -----
 
-.. py:class:: muGrid.Timer()
+.. py:class:: muTimer.Timer()
 
    Hierarchical timer utility for performance measurement with context manager support.
+
+   .. note::
+
+      ``Timer`` is **not** part of µGrid. It is provided by the separate
+      ``muTimer`` package (``import muTimer``), which the examples depend on.
 
    The Timer supports nested timing regions and can be used as a context manager
    for convenient timing of code blocks.
 
    **Example**::
 
-       >>> timer = muGrid.Timer()
+       >>> import muTimer
+       >>> timer = muTimer.Timer()
        >>> with timer("outer"):
        ...     with timer("inner"):
        ...         # ... some computation ...
@@ -839,7 +845,7 @@ Solvers
 
 The Solvers module provides simple parallel iterative solvers.
 
-.. py:function:: muGrid.Solvers.conjugate_gradients(comm, fc, b, x, hessp, tol=1e-6, maxiter=1000, callback=None, timer=None)
+.. py:function:: muGrid.Solvers.conjugate_gradients(comm, fc, b, x, hessp, prec=None, tol=1e-6, maxiter=1000, callback=None, timer=None)
 
    Conjugate gradient method for matrix-free solution of the linear problem
    ``Ax = b``, where ``A`` is represented by the function ``hessp`` (which computes the
@@ -858,6 +864,9 @@ The Solvers module provides simple parallel iterative solvers.
    :param hessp: Function that computes the product of the Hessian matrix ``A`` with a vector.
       Signature: ``hessp(input_field, output_field)`` where both are ``muGrid.Field``.
    :type hessp: callable
+   :param prec: Optional preconditioner applied to the residual, with signature
+      ``prec(input_field, output_field)``. Default is ``None`` (no preconditioning).
+   :type prec: callable, optional
    :param tol: Tolerance for convergence. Default is ``1e-6``.
    :type tol: float, optional
    :param maxiter: Maximum number of iterations. Default is ``1000``.
@@ -868,7 +877,7 @@ The Solvers module provides simple parallel iterative solvers.
    :type callback: callable, optional
    :param timer: Timer object for performance profiling. If provided, the solver
       will record timing for various operations (hessp, dot products, updates).
-   :type timer: muGrid.Timer, optional
+   :type timer: muTimer.Timer, optional
    :returns: Solution to the system ``Ax = b`` (same as input field ``x``).
    :rtype: muGrid.Field
    :raises RuntimeError: If the algorithm does not converge within ``maxiter`` iterations,
@@ -932,33 +941,30 @@ Device
       :returns: A Device for the default GPU backend.
       :rtype: Device
 
-   .. py:method:: is_host()
+   .. py:attribute:: is_host
 
-      Check if this is a host (CPU) device.
+      Read-only property: ``True`` if this is a host (CPU) device.
 
-      :returns: ``True`` if CPU device, ``False`` otherwise.
-      :rtype: bool
+      :type: bool
 
-   .. py:method:: is_device()
+   .. py:attribute:: is_device
 
-      Check if this is a device (GPU) memory location.
+      Read-only property: ``True`` if this is a device (GPU) memory location.
 
-      :returns: ``True`` if GPU device, ``False`` otherwise.
-      :rtype: bool
+      :type: bool
 
-   .. py:method:: get_type()
+   .. py:attribute:: device_type
 
-      Get the device type.
+      Read-only property giving the device type enum value.
 
-      :returns: The device type enum value.
-      :rtype: DeviceType
+      :type: DeviceType
 
-   .. py:method:: get_device_id()
+   .. py:attribute:: device_id
 
-      Get the device ID for multi-GPU systems.
+      Read-only property giving the device ID for multi-GPU systems
+      (0 for single-GPU or CPU).
 
-      :returns: Device ID (0 for single-GPU or CPU).
-      :rtype: int
+      :type: int
 
    **Example**::
 
@@ -967,10 +973,10 @@ Device
        >>> cpu = muGrid.Device.cpu()
        >>> gpu0 = muGrid.Device.cuda()
        >>> gpu1 = muGrid.Device.cuda(1)
-       >>> # Check device type
-       >>> cpu.is_host()
+       >>> # Check device type (properties, not methods)
+       >>> cpu.is_host
        True
-       >>> gpu0.is_device()
+       >>> gpu0.is_device
        True
        >>> # Use with field collections
        >>> fc = muGrid.GlobalFieldCollection([64, 64], device=muGrid.Device.cuda())
@@ -1021,13 +1027,17 @@ Enumerations
 
    Enumeration for array storage order.
 
-   .. py:attribute:: ColMajor
+   .. py:attribute:: ArrayOfStructures
 
-      Column-major (Fortran) storage order.
+      Components are consecutive in memory (the default host layout).
 
-   .. py:attribute:: RowMajor
+   .. py:attribute:: StructureOfArrays
 
-      Row-major (C) storage order.
+      Pixels are consecutive in memory (the device layout).
+
+   .. py:attribute:: Automatic
+
+      Inherit the storage order from the ``FieldCollection``.
 
 Module Constants
 ****************

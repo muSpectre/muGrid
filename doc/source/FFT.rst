@@ -53,11 +53,11 @@ Fourier-space fields. Use the engine's methods to create fields:
 
     # Create real-space field (real-valued)
     real_field = engine.real_space_field("real")
-    print(f"Real field shape: {real_field.s.shape}")  # (1, 1, 16, 20)
+    print(f"Real field shape: {real_field.s.shape}")  # (1, 16, 20)
 
     # Create Fourier-space field (complex-valued)
     fourier_field = engine.fourier_space_field("fourier")
-    print(f"Fourier field shape: {fourier_field.s.shape}")  # (1, 1, 9, 20)
+    print(f"Fourier field shape: {fourier_field.s.shape}")  # (1, 9, 20)
 
 Forward and inverse transforms
 ******************************
@@ -408,5 +408,7 @@ When *µ*\Grid is compiled with CUDA or HIP support, FFT operations can run on G
 See the :doc:`GPU` documentation for details on building with GPU support and
 working with GPU fields.
 
-Currently, the FFT engine operates on host (CPU) memory. For GPU-accelerated FFT,
-you can transfer data between host and device fields as needed.
+The FFT engine also runs natively on GPU memory: pass ``device=`` to the
+``FFTEngine`` wrapper (or use the ``FFTEngineCUDA`` / ``FFTEngineROCm`` engines),
+which dispatch to the cuFFT / rocFFT backends. See the :doc:`GPU` documentation
+for the "FFT on GPU" section.

@@ -149,7 +149,7 @@ Creating the operator
     grid_spacing = (0.1, 0.1)  # 2D
     # grid_spacing = (0.1, 0.1, 0.1)  # 3D
 
-    gradient_op = muGrid.FEMGradientOperator(dim=2, grid_spacing=grid_spacing)
+    gradient_op = muGrid.FEMGradientOperator(spatial_dim=2, grid_spacing=grid_spacing)
 
     # Query operator properties
     print(f"Quadrature points: {gradient_op.nb_quad_pts}")
@@ -198,7 +198,7 @@ Laplacian using the standard 5-point (2D) or 7-point (3D) stencil.
     # Create Laplacian with scaling factor
     # Negative scale makes the operator positive-definite (for CG solver)
     scale = -1.0 / h**2
-    laplace = muGrid.LaplaceOperator(dim=2, scale=scale)
+    laplace = muGrid.LaplaceOperator(spatial_dim=2, scale=scale)
 
     # Apply to fields
     decomposition.communicate_ghosts(u_field)
