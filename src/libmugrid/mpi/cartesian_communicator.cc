@@ -88,34 +88,35 @@ namespace muGrid {
          * @param nb_elements Number of Real elements to accumulate
          * @param is_device_memory If true, use GPU device accumulation
          */
-        void device_accumulate(Real * dst, const Real * src, size_t nb_elements,
-                               bool is_device_memory) {
+        template <typename T>
+        void device_accumulate_typed(T * dst, const T * src, size_t nb_elements,
+                                     bool is_device_memory) {
             if (is_device_memory) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
                 // For device memory, copy to host, accumulate, copy back
                 // This is not optimal but works for correctness.
                 // A proper implementation would use a GPU kernel.
-                std::vector<Real> host_dst(nb_elements);
-                std::vector<Real> host_src(nb_elements);
+                std::vector<T> host_dst(nb_elements);
+                std::vector<T> host_src(nb_elements);
 #if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
+                cudaMemcpy(host_dst.data(), dst, nb_elements * sizeof(T),
                            cudaMemcpyDeviceToHost);
-                cudaMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
+                cudaMemcpy(host_src.data(), src, nb_elements * sizeof(T),
                            cudaMemcpyDeviceToHost);
 #elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(Real),
+                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(T),
                                 hipMemcpyDeviceToHost);
-                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(Real),
+                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(T),
                                 hipMemcpyDeviceToHost);
 #endif
                 for (size_t i{0}; i < nb_elements; ++i) {
                     host_dst[i] += host_src[i];
                 }
 #if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
+                cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(T),
                            cudaMemcpyHostToDevice);
 #elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(Real),
+                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(T),
                                 hipMemcpyHostToDevice);
 #endif
 #else
@@ -128,6 +129,51 @@ namespace muGrid {
                 for (size_t i{0}; i < nb_elements; ++i) {
                     dst[i] += src[i];
                 }
+            }
+        }
+
+        /**
+         * @brief Accumulate nb_elements of the given type from src into dst,
+         * honouring device memory and the actual element type.
+         *
+         * dst/src are byte pointers to (possibly device) memory; nb_elements is
+         * the number of field elements (not bytes). Dispatching on the type
+         * descriptor keeps Complex/Int reductions correct (the previous code
+         * hard-coded Real, so e.g. a Complex field only had its real part
+         * accumulated, and device pointers were dereferenced on the host).
+         */
+        void accumulate_elements(char * dst, const char * src,
+                                 size_t nb_elements, TypeDescriptor type_desc,
+                                 bool is_device_memory) {
+            switch (type_desc) {
+            case TypeDescriptor::Real:
+                device_accumulate_typed(reinterpret_cast<Real *>(dst),
+                                        reinterpret_cast<const Real *>(src),
+                                        nb_elements, is_device_memory);
+                break;
+            case TypeDescriptor::Complex:
+                device_accumulate_typed(reinterpret_cast<Complex *>(dst),
+                                        reinterpret_cast<const Complex *>(src),
+                                        nb_elements, is_device_memory);
+                break;
+            case TypeDescriptor::Int:
+                device_accumulate_typed(reinterpret_cast<Int *>(dst),
+                                        reinterpret_cast<const Int *>(src),
+                                        nb_elements, is_device_memory);
+                break;
+            case TypeDescriptor::Uint:
+                device_accumulate_typed(reinterpret_cast<Uint *>(dst),
+                                        reinterpret_cast<const Uint *>(src),
+                                        nb_elements, is_device_memory);
+                break;
+            case TypeDescriptor::Index:
+                device_accumulate_typed(reinterpret_cast<Index_t *>(dst),
+                                        reinterpret_cast<const Index_t *>(src),
+                                        nb_elements, is_device_memory);
+                break;
+            default:
+                throw std::runtime_error(
+                    "accumulate_elements: unsupported type descriptor");
             }
         }
 
@@ -169,7 +215,8 @@ namespace muGrid {
             int block_stride, int nb_send_blocks, int send_block_len,
             Index_t send_offset, int nb_recv_blocks, int recv_block_len,
             Index_t recv_offset, char * data, int stride_in_direction,
-            int elem_size_in_bytes, bool is_device_memory) {
+            int elem_size_in_bytes, TypeDescriptor type_desc,
+            bool is_device_memory) {
             if (nb_send_blocks != nb_recv_blocks) {
                 throw std::runtime_error(
                     "serial_sendrecv_accumulate: nb_send_blocks != nb_recv_blocks");
@@ -180,12 +227,14 @@ namespace muGrid {
             }
             char * base_data{data};
             for (int count{0}; count < nb_send_blocks; ++count) {
-                auto recv_addr{reinterpret_cast<Real *>(
-                    base_data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-                auto send_addr{reinterpret_cast<Real *>(
-                    base_data + send_offset * stride_in_direction * elem_size_in_bytes)};
-                device_accumulate(recv_addr, send_addr, send_block_len,
-                                  is_device_memory);
+                auto * recv_addr{
+                    base_data +
+                    recv_offset * stride_in_direction * elem_size_in_bytes};
+                auto * send_addr{
+                    base_data +
+                    send_offset * stride_in_direction * elem_size_in_bytes};
+                accumulate_elements(recv_addr, send_addr, send_block_len,
+                                    type_desc, is_device_memory);
                 base_data += block_stride * elem_size_in_bytes;
             }
         }
@@ -386,7 +435,8 @@ namespace muGrid {
             serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                        send_offset, nb_recv_blocks, recv_block_len,
                                        recv_offset, data, stride_in_direction,
-                                       elem_size_in_bytes, is_device_memory);
+                                       elem_size_in_bytes, type_desc,
+                                       is_device_memory);
             return;
         }
         // Convert TypeDescriptor to MPI_Datatype
@@ -417,18 +467,17 @@ namespace muGrid {
 
         MPI_Type_free(&send_buffer_mpi_t);
 
-        // Accumulate received data into destination
-        // The receive buffer is contiguous; we need to scatter to strided destination
+        // Accumulate received data into destination. The receive buffer is
+        // contiguous (host memory); scatter it to the (possibly device) strided
+        // destination using a type- and device-aware accumulation. The previous
+        // host-side loop hard-coded Real and dereferenced device pointers.
         auto * recv_ptr{recv_buffer.data()};
         for (int block{0}; block < nb_recv_blocks; ++block) {
-            auto dest_addr{data + (recv_offset * stride_in_direction +
-                                   block * block_stride) * elem_size_in_bytes};
-            // Add element by element (assuming Real = double)
-            auto * dest{reinterpret_cast<Real *>(dest_addr)};
-            auto * src{reinterpret_cast<Real *>(recv_ptr)};
-            for (int i{0}; i < recv_block_len; ++i) {
-                dest[i] += src[i];
-            }
+            auto * dest_addr{data + (recv_offset * stride_in_direction +
+                                     block * block_stride) * elem_size_in_bytes};
+            accumulate_elements(dest_addr, recv_ptr,
+                                static_cast<size_t>(recv_block_len), type_desc,
+                                is_device_memory);
             recv_ptr += recv_block_len * elem_size_in_bytes;
         }
     }
@@ -444,7 +493,8 @@ namespace muGrid {
             serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                        send_offset, nb_recv_blocks, recv_block_len,
                                        recv_offset, data, stride_in_direction,
-                                       elem_size_in_bytes, is_device_memory);
+                                       elem_size_in_bytes, type_desc,
+                                       is_device_memory);
             return;
         }
         // Convert TypeDescriptor to MPI_Datatype
@@ -475,17 +525,16 @@ namespace muGrid {
 
         MPI_Type_free(&send_buffer_mpi_t);
 
-        // Accumulate received data into destination
+        // Accumulate received data into destination using a type- and
+        // device-aware accumulation (the previous loop hard-coded Real and
+        // dereferenced device pointers on the host).
         auto * recv_ptr{recv_buffer.data()};
         for (int block{0}; block < nb_recv_blocks; ++block) {
-            auto dest_addr{data + (recv_offset * stride_in_direction +
-                                   block * block_stride) * elem_size_in_bytes};
-            // Add element by element (assuming Real = double)
-            auto * dest{reinterpret_cast<Real *>(dest_addr)};
-            auto * src{reinterpret_cast<Real *>(recv_ptr)};
-            for (int i{0}; i < recv_block_len; ++i) {
-                dest[i] += src[i];
-            }
+            auto * dest_addr{data + (recv_offset * stride_in_direction +
+                                     block * block_stride) * elem_size_in_bytes};
+            accumulate_elements(dest_addr, recv_ptr,
+                                static_cast<size_t>(recv_block_len), type_desc,
+                                is_device_memory);
             recv_ptr += recv_block_len * elem_size_in_bytes;
         }
     }
@@ -545,12 +594,12 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        (void)type_desc;
         (void)direction;
         serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                    send_offset, nb_recv_blocks, recv_block_len,
                                    recv_offset, data, stride_in_direction,
-                                   elem_size_in_bytes, is_device_memory);
+                                   elem_size_in_bytes, type_desc,
+                                   is_device_memory);
     }
 
     void CartesianCommunicator::sendrecv_left_accumulate(
@@ -559,12 +608,12 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        (void)type_desc;
         (void)direction;
         serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                    send_offset, nb_recv_blocks, recv_block_len,
                                    recv_offset, data, stride_in_direction,
-                                   elem_size_in_bytes, is_device_memory);
+                                   elem_size_in_bytes, type_desc,
+                                   is_device_memory);
     }
 #endif  // WITH_MPI
 
