@@ -1,26 +1,19 @@
 Change log for µGrid
 ====================
 
-v0.107.0 (09Jun26)
-------------------
-
-- ENH: Optional code-coverage instrumentation via the `MUGRID_ENABLE_COVERAGE`
-- ENH: Bound `LaplaceOperator.apply_increment` and `LaplaceOperator.transpose`
-  to Python
-- TST: Added functional tests for the hard-coded 2D/3D Laplace operator
-- TST: Added functional tests for the host linear-algebra operations:
-  `vecdot`/`norm_sq`/`axpy`/`scal`/`axpby`/ `copy`/`axpy_norm_sq` for Real and
-  Complex fields in 1D/2D/3D, including the ghost-exclusion and input-validation paths
-- BUG: Fixed the GPU linalg element count. For sub-point fields
-  (`nb_sub_pts > 1`) the device kernels ran past the end of the buffer
-- BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields whose
-  component counts differ
-- MAINT: Removed dead code with no callers
-
-0.106.0 (24Apr26)
+0.106.0 (09Jun26)
 -----------------
 
 - ENH: Preconditioned conjugate gradients
+- ENH: Optional code-coverage instrumentation via `MUGRID_ENABLE_COVERAGE`
+- ENH: Bound `LaplaceOperator.apply_increment` and `.transpose` to Python
+- BUG: Fixed GPU linalg element count for sub-point fields (`nb_sub_pts > 1`),
+  where device kernels ran past the end of the buffer
+- BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields with
+  mismatched component counts
+- TST: Added functional tests for the 2D/3D Laplace operator
+- TST: Added functional tests for host linear-algebra operations
+- MAINT: Removed dead code with no callers
 
 0.105.2 (17Apr26)
 -----------------
