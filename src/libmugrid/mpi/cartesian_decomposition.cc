@@ -445,6 +445,22 @@ namespace muGrid {
             auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
             auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
 
+            // reduce_ghosts uses a single communication step (below), which is
+            // only correct when each ghost region maps into a single neighbor's
+            // interior, i.e. the halo does not exceed the interior extent.
+            // communicate_ghosts cascades for larger halos, but the reverse
+            // (reduce) cascade is not implemented; reject it rather than
+            // silently producing a wrong reduction.
+            if (nb_ghosts_left > nb_subdomain_grid_pts_without_ghosts ||
+                nb_ghosts_right > nb_subdomain_grid_pts_without_ghosts) {
+                throw RuntimeError(
+                    "reduce_ghosts does not support a ghost halo larger than "
+                    "the interior subdomain extent in a given direction "
+                    "(multi-step reduction is not implemented). Reduce the "
+                    "number of ghosts or the number of ranks in this "
+                    "direction.");
+            }
+
             // For reduce_ghosts, we reverse the communication direction:
             // - Send our LEFT ghost to LEFT neighbor → they add to their RIGHT interior
             // - Send our RIGHT ghost to RIGHT neighbor → they add to their LEFT interior
