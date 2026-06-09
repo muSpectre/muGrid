@@ -121,7 +121,7 @@ jobs:
       # into a single report. Does not fail the job if Codecov is not
       # configured for this repository.
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -229,7 +229,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
