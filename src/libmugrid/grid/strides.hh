@@ -273,7 +273,9 @@ namespace muGrid {
                     "strides");
             }
             auto axes{compute_axes_order(nb_grid_pts, strides)};
-            Dim_t stride{1};
+            // Accumulate the running stride in Index_t (not int): a contiguous
+            // buffer for a grid > 2^31 points would otherwise overflow.
+            Index_t stride{1};
             bool is_contiguous{true};
             for (Index_t i{0}; i < dim; ++i) {
                 is_contiguous &= strides[axes[i]] == stride;

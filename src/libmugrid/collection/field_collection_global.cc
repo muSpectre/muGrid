@@ -122,14 +122,24 @@ namespace muGrid {
                     << "initialisation.";
             throw FieldCollectionError(s.str());
         }
-        // sanity check 2 - the subdomain and / or ghosts
+        // sanity check 2 - the subdomain and / or ghosts.
+        // Check per component, not just the product: a product test lets
+        // negative counts slip through (e.g. {-1, -1} has product 1).
+        auto has_negative_entry{[](const DynGridIndex & idx) {
+            for (auto && v : idx) {
+                if (v < 0) {
+                    return true;
+                }
+            }
+            return false;
+        }};
         auto _nb_ghosts_left{nb_ghosts_left.get_dim() == 0
                                    ? DynGridIndex(nb_domain_grid_pts.get_dim())
                                    : nb_ghosts_left};
         auto total_nb_ghosts_left{
             get_nb_from_shape(_nb_ghosts_left)
         };
-        if (total_nb_ghosts_left < 0) {
+        if (has_negative_entry(_nb_ghosts_left) || total_nb_ghosts_left < 0) {
             std::stringstream s;
             s << "Invalid nb_ghosts_left " << _nb_ghosts_left
                     << " (" << total_nb_ghosts_left
@@ -144,7 +154,7 @@ namespace muGrid {
         auto total_nb_ghosts_right{
             get_nb_from_shape(_nb_ghosts_right)
         };
-        if (total_nb_ghosts_right < 0) {
+        if (has_negative_entry(_nb_ghosts_right) || total_nb_ghosts_right < 0) {
             std::stringstream s;
             s << "Invalid nb_ghosts_right " << _nb_ghosts_right
                     << " (" << total_nb_ghosts_right
@@ -161,7 +171,8 @@ namespace muGrid {
         auto nb_subdomain_grid_pts_total{
             get_nb_from_shape(_nb_subdomain_grid_pts)
         };
-        if (nb_subdomain_grid_pts_total < 0) {
+        if (has_negative_entry(_nb_subdomain_grid_pts) ||
+            nb_subdomain_grid_pts_total < 0) {
             std::stringstream s;
             s << "Invalid nb_subdomain_grid_pts " << _nb_subdomain_grid_pts
                     << " (" << nb_subdomain_grid_pts_total

@@ -60,7 +60,13 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   FileIONetCDF::~FileIONetCDF() {
     if (this->netcdf_id != -1) {
-      this->close();
+      // close() can throw FileIOError on NetCDF failures; a throwing
+      // destructor would call std::terminate during stack unwinding, so
+      // swallow the exception here (the file is being torn down anyway).
+      try {
+        this->close();
+      } catch (...) {  // NOLINT
+      }
     }
   }
 

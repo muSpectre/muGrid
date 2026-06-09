@@ -78,9 +78,12 @@ namespace muGrid {
     //! helper to get the number of elements from a shape
     template <typename T>
     Index_t get_nb_from_shape(const T & shape) {
-        return shape.size() > 0 ? std::accumulate(shape.begin(), shape.end(), 1,
-                                                  std::multiplies<Index_t>())
-                                : 1;
+        // Use an Index_t accumulator: deducing it from the literal 1 would make
+        // every partial product an int and overflow for grids > 2^31 points.
+        return shape.size() > 0
+                   ? std::accumulate(shape.begin(), shape.end(), Index_t{1},
+                                     std::multiplies<Index_t>())
+                   : Index_t{1};
     }
 
 }  // namespace muGrid

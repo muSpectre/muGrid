@@ -82,6 +82,8 @@ namespace muGrid {
     explicit RefArray(Vals &... vals) : values{&vals...} {
       static_assert(internal::TypeChecker<T, Vals...>::value,
                     "Only refs to type T allowed");
+      static_assert(sizeof...(Vals) == N,
+                    "Number of references must match the array size N");
     }
 
     //! Copy constructor

@@ -232,6 +232,8 @@ namespace muGrid {
         std::copy(nb_subdivisions.begin(), nb_subdivisions.end(), narr.begin());
         MPI_Cart_create(this->comm, spatial_dim, narr.data(),
                         is_periodic.data(), reoder_is_allowed, &this->comm);
+        // We created this communicator, so we are responsible for freeing it.
+        this->owns_comm = true;
 
         // get coordinates of current rank
         MPI_Cart_coords(this->comm, this->rank(), spatial_dim, narr.data());
@@ -253,9 +255,45 @@ namespace muGrid {
           nb_subdivisions{nb_subdivisions}, coordinates{coordinates},
           left_ranks{left_ranks}, right_ranks{right_ranks} {}
 
+    CartesianCommunicator::CartesianCommunicator(
+        const CartesianCommunicator & other)
+        : Parent_t{other.comm}, parent{other.parent},
+          nb_subdivisions{other.nb_subdivisions},
+          coordinates{other.coordinates}, left_ranks{other.left_ranks},
+          right_ranks{other.right_ranks} {
+        // The copy shares the handle but does not own it; only the original
+        // (owns_comm == true) frees it. owns_comm defaults to false.
+    }
+
+    CartesianCommunicator::~CartesianCommunicator() {
+        if (this->owns_comm && this->comm != MPI_COMM_NULL) {
+            int initialized{0}, finalized{0};
+            MPI_Initialized(&initialized);
+            MPI_Finalized(&finalized);
+            if (initialized && !finalized) {
+                MPI_Comm_free(&this->comm);
+            }
+        }
+    }
+
     CartesianCommunicator &
     CartesianCommunicator::operator=(const CartesianCommunicator & other) {
+        if (this == &other) {
+            return *this;
+        }
+        // Release any communicator we currently own before overwriting it.
+        if (this->owns_comm && this->comm != MPI_COMM_NULL &&
+            this->comm != other.comm) {
+            int initialized{0}, finalized{0};
+            MPI_Initialized(&initialized);
+            MPI_Finalized(&finalized);
+            if (initialized && !finalized) {
+                MPI_Comm_free(&this->comm);
+            }
+        }
         this->comm = other.comm;
+        // We only share the handle; ownership stays with the original.
+        this->owns_comm = false;
         return *this;
     }
 
@@ -456,6 +494,22 @@ namespace muGrid {
         const Parent_t & parent, const DynGridIndex & nb_subdivisions)
         : Parent_t{}, parent{parent}, nb_subdivisions{nb_subdivisions},
           coordinates(nb_subdivisions.size(), 0) {}
+
+    CartesianCommunicator::CartesianCommunicator(
+        const CartesianCommunicator & other)
+        : Parent_t{}, parent{other.parent},
+          nb_subdivisions{other.nb_subdivisions},
+          coordinates{other.coordinates} {}
+
+    CartesianCommunicator::~CartesianCommunicator() {}
+
+    CartesianCommunicator &
+    CartesianCommunicator::operator=(const CartesianCommunicator & other) {
+        this->parent = other.parent;
+        this->nb_subdivisions = other.nb_subdivisions;
+        this->coordinates = other.coordinates;
+        return *this;
+    }
 
     void CartesianCommunicator::sendrecv_right(
         int direction, int block_stride, int nb_send_blocks, int send_block_len,

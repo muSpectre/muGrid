@@ -110,6 +110,7 @@ namespace muGrid {
             // Compute the sequence of sendrecv events required to fill the
             // ghost buffer
             this->recv_right_sequence[direction].resize(0);
+            this->recv_left_sequence[direction].resize(0);
             Index_t nb_cum_send_right{0}, nb_cum_send_left{0};
 
             // Ghost buffers in direction
@@ -293,20 +294,15 @@ namespace muGrid {
             // Loop until ghost buffers have been filled
             for (Index_t step{0}; step < this->nb_sendrecv_steps[direction];
                  ++step) {
-                // Idiot check that there is still stuff left to send
-                assert(
-                    this->cart_comm->any(nb_cum_send_right < nb_ghosts_left ||
-                                         nb_cum_send_left < nb_ghosts_right));
+                // NB: do not validate the cached sequence here with collective
+                // calls (any()/sendrecv) inside assert(): those vanish under
+                // NDEBUG, so a debug/release build mix across ranks would
+                // deadlock (and debug builds would do redundant communication).
+                // The sequence was already validated when it was built.
 
                 // Get the number of elements that we will receive
                 auto nb_recv_left{this->recv_left_sequence[direction][step]};
                 auto nb_recv_right{this->recv_right_sequence[direction][step]};
-
-                // Idiot check the cached receive sequence
-                assert(nb_recv_left == this->cart_comm->sendrecv_right(
-                                           direction, nb_send_right));
-                assert(nb_recv_right ==
-                       this->cart_comm->sendrecv_left(direction, nb_send_left));
 
                 // Perform send to the RIGHT, receive from the LEFT
                 this->cart_comm->sendrecv_right(
