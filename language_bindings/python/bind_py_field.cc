@@ -79,11 +79,17 @@ namespace py = pybind11;
 template<typename T, typename MemorySpace = muGrid::HostSpace>
 struct DLPackContext {
     TypedFieldBase<T, MemorySpace>* field;
+    // Owning Python object (the field wrapper). Holding a reference here keeps
+    // the field - and transitively its owning FieldCollection and data buffer -
+    // alive for as long as the exported DLPack tensor exists, preventing a
+    // use-after-free if the consumer outlives the original Python references.
+    py::object owner;
     std::vector<int64_t> shape;
     std::vector<int64_t> strides;
 
-    DLPackContext(TypedFieldBase<T, MemorySpace>* f, const Shape_t& s, const Shape_t& st)
-        : field(f), shape(s.begin(), s.end()) {
+    DLPackContext(TypedFieldBase<T, MemorySpace>* f, py::object owner_,
+                  const Shape_t& s, const Shape_t& st)
+        : field(f), owner(std::move(owner_)), shape(s.begin(), s.end()) {
         // DLPack spec says strides are in elements, not bytes
         strides.reserve(st.size());
         for (auto stride : st) {
@@ -98,7 +104,12 @@ struct DLPackContext {
 template<typename T, typename MemorySpace = muGrid::HostSpace>
 void dlpack_deleter(DLManagedTensorVersioned* tensor) {
     auto* ctx = static_cast<DLPackContext<T, MemorySpace>*>(tensor->manager_ctx);
-    delete ctx;
+    // Releasing the owning Python reference requires the GIL, since the deleter
+    // may be invoked from the consumer's garbage collector.
+    {
+        py::gil_scoped_acquire acquire;
+        delete ctx;
+    }
     delete tensor;
 }
 
@@ -155,7 +166,8 @@ DLDataType get_dlpack_dtype<std::complex<double>>() {
  * Requires numpy >= 2.1 or other consumers that support versioned dlpack.
  */
 template<typename T, typename MemorySpace = muGrid::HostSpace>
-py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
+py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field,
+                                  py::object owner) {
     auto& coll = field.get_collection();
     if (!coll.is_initialised()) {
         throw RuntimeError("Field collection isn't initialised yet");
@@ -166,8 +178,9 @@ py::capsule create_dlpack_capsule(TypedFieldBase<T, MemorySpace>& field) {
     Shape_t shape = field.get_shape(iter_unit);
     Shape_t strides = field.get_strides(iter_unit, 1);  // strides in elements
 
-    // Create context to hold shape/stride data
-    auto* ctx = new DLPackContext<T, MemorySpace>(&field, shape, strides);
+    // Create context to hold shape/stride data and keep the owner alive
+    auto* ctx = new DLPackContext<T, MemorySpace>(&field, std::move(owner),
+                                                  shape, strides);
 
     // Create DLManagedTensorVersioned (the modern DLPack protocol)
     auto* managed = new DLManagedTensorVersioned();
@@ -330,9 +343,10 @@ void add_typed_field(py::module &mod, std::string name) {
             // DLPack support: versioned protocol for numpy >= 2.1
             .def(
                 "__dlpack__",
-                [](TypedFieldBase<T> &self, py::object stream) {
+                [](py::object self_obj, py::object stream) {
                     (void)stream;  // Stream parameter not used for CPU tensors
-                    return create_dlpack_capsule(self);
+                    auto &self = self_obj.cast<TypedFieldBase<T> &>();
+                    return create_dlpack_capsule(self, self_obj);
                 },
                 "stream"_a = py::none(),
                 "Export field data via DLPack for zero-copy interop with NumPy, PyTorch, JAX, CuPy, etc.")
@@ -386,9 +400,10 @@ void add_typed_field_device(py::module &mod, std::string name) {
             // DLPack support: versioned protocol for numpy >= 2.1
             .def(
                 "__dlpack__",
-                [](TypedFieldBase<T, DeviceSpace> &self, py::object stream) {
+                [](py::object self_obj, py::object stream) {
                     (void)stream;  // TODO: support CUDA stream for async transfers
-                    return create_dlpack_capsule(self);
+                    auto &self = self_obj.cast<TypedFieldBase<T, DeviceSpace> &>();
+                    return create_dlpack_capsule(self, self_obj);
                 },
                 "stream"_a = py::none(),
                 "Export GPU field data via DLPack for zero-copy interop with CuPy, PyTorch, JAX, etc.")

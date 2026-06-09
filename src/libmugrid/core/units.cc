@@ -469,11 +469,11 @@ namespace muGrid {
       }
     }
     if (unit.tag) {
-      if (first) {
-        first = false;
-      } else {
-        os << ", tag(" << unit.tag << ')';
+      if (!first) {
+        os << ", ";
       }
+      first = false;
+      os << "tag(" << unit.tag << ')';
     }
     if (first) {
       // no Unit
