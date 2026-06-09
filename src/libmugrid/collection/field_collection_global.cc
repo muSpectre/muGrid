@@ -264,9 +264,14 @@ namespace muGrid {
             this->get_storage_order(),
             this->get_device()
         };
-        ret_val.initialise(this->nb_domain_grid_pts,
-                           this->pixels_with_ghosts.get_nb_subdomain_grid_pts(),
-                           this->pixels_with_ghosts.get_subdomain_locations());
+        // Forward the ghost specification and pixel strides so the clone has
+        // an identical layout (interior region, ghost counts and memory order).
+        ret_val.initialise(
+            this->nb_domain_grid_pts,
+            this->pixels_with_ghosts.get_nb_subdomain_grid_pts(),
+            this->pixels_with_ghosts.get_subdomain_locations(),
+            this->pixels_with_ghosts.get_strides(), this->nb_ghosts_left,
+            this->nb_ghosts_right);
         return ret_val;
     }
 

@@ -45,6 +45,7 @@
 
 #include <type_traits>
 #include <memory>
+#include <vector>
 
 namespace muGrid {
 
@@ -601,18 +602,53 @@ namespace muGrid {
       return;
     }
 
+    // The within-pixel "dof" index is laid out differently in the two storage
+    // orders, so a plain transpose of (pixel, dof) is not enough: the dof index
+    // itself must be permuted. With c the component multi-index and s the
+    // sub-point index:
+    //   AoS (host):   dof = c_colmajor + s * nb_components
+    //                 (components column-major, sub-point slowest)
+    //   SoA (device): dof = c_rowmajor * nb_sub_pts + s
+    //                 (components row-major, sub-point between comps and pixels)
+    // These coincide only for scalar / single-axis components with one
+    // sub-point, which is why a host->device->host round trip (and the existing
+    // 1-D test) cannot detect a wrong permutation.
+    const auto components_shape = src.get_components_shape();
+    const Index_t nb_comp_dims =
+        static_cast<Index_t>(components_shape.size());
+    std::vector<Index_t> aos_to_soa_dof(nb_dof_per_pixel);
+    for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
+      const Index_t s = dof / nb_components;
+      Index_t c_colmajor = dof % nb_components;
+      // Decode the column-major component index into per-axis indices.
+      std::vector<Index_t> comp_idx(nb_comp_dims);
+      Index_t rem = c_colmajor;
+      for (Index_t i = 0; i < nb_comp_dims; ++i) {
+        comp_idx[i] = rem % components_shape[i];
+        rem /= components_shape[i];
+      }
+      // Re-encode as a row-major component index.
+      Index_t c_rowmajor{0};
+      Index_t stride{1};
+      for (Index_t i = nb_comp_dims - 1; i >= 0; --i) {
+        c_rowmajor += comp_idx[i] * stride;
+        stride *= components_shape[i];
+      }
+      aos_to_soa_dof[dof] = c_rowmajor * nb_sub_pts + s;
+    }
+
     // Allocate temporary host buffer for conversion
     Array<T, HostSpace> tmp(total_size);
 
     if constexpr (is_host_space_v<SrcSpace> && is_device_space_v<DstSpace>) {
       // Host (AoS) -> Device (SoA): Convert on host, then copy to device
       // AoS: data[pixel * nb_dof_per_pixel + dof]
-      // SoA: data[dof * nb_buffer_pixels + pixel]
+      // SoA: data[soa_dof * nb_buffer_pixels + pixel]
       const T * src_data = src.view().data();
       T * tmp_data = tmp.data();
       for (Index_t pixel = 0; pixel < nb_buffer_pixels; ++pixel) {
         for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
-          tmp_data[dof * nb_buffer_pixels + pixel] =
+          tmp_data[aos_to_soa_dof[dof] * nb_buffer_pixels + pixel] =
               src_data[pixel * nb_dof_per_pixel + dof];
         }
       }
@@ -629,7 +665,7 @@ namespace muGrid {
       for (Index_t pixel = 0; pixel < nb_buffer_pixels; ++pixel) {
         for (Index_t dof = 0; dof < nb_dof_per_pixel; ++dof) {
           dst_data[pixel * nb_dof_per_pixel + dof] =
-              tmp_data[dof * nb_buffer_pixels + pixel];
+              tmp_data[aos_to_soa_dof[dof] * nb_buffer_pixels + pixel];
         }
       }
     } else {

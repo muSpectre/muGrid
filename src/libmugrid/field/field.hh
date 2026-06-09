@@ -311,7 +311,8 @@ namespace muGrid {
          **/
         virtual void * get_void_data_ptr(bool assert_host_memory = true) const = 0;
 
-        //! number of entries in the field (= nb_pixel × nb_sub_pts)
+        //! number of entries currently allocated in the buffer
+        //! (= nb_buffer_pixels × nb_sub_pts, i.e. including any padding pixels)
         Index_t get_current_nb_entries() const;
 
         //! size of the internal buffer (in scalars)

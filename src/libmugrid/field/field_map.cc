@@ -178,9 +178,12 @@ namespace muGrid {
   size_t FieldMap<T, Mutability>::size() const {
     size_t size{0};
     if (this->field.get_nb_entries() != 0) {
-      // size is only != 0 if the processor holds a part of the field
+      // size is only != 0 if the processor holds a part of the field.
+      // Both branches exclude buffer padding so that iteration, sum() and
+      // mean() never touch padding pixels (get_current_nb_entries() counts
+      // nb_buffer_pixels, which includes padding).
       size = (this->iteration == IterUnit::SubPt)
-                 ? this->field.get_current_nb_entries()
+                 ? this->field.get_nb_entries()
                  : this->field.get_collection().get_nb_pixels();
     }
     return size;
