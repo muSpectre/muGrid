@@ -143,12 +143,12 @@ namespace muGrid {
 
     StaticFieldMap_t & get_current() { return this->get_current_static(); }
 
-    //! return a const ref to an the current map
-    StaticFieldMap_t & get_current_static() const {
-      return this->static_maps[this->state_field.get_indices()[0]];
+    //! return a const ref to the current map
+    const CStaticFieldMap_t & get_current_static() const {
+      return this->static_cmaps[this->state_field.get_indices()[0]];
     }
 
-    StaticFieldMap_t & get_current() const {
+    const CStaticFieldMap_t & get_current() const {
       return this->get_current_static();
     }
 

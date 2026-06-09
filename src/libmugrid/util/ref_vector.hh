@@ -33,9 +33,10 @@
  *
  */
 
-#include <vector>
 #ifndef SRC_LIBMUGRID_REF_VECTOR_HH_
 #define SRC_LIBMUGRID_REF_VECTOR_HH_
+
+#include <vector>
 
 namespace muGrid {
 
