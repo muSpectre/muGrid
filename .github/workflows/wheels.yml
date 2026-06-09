@@ -56,7 +56,10 @@ jobs:
           # Install NetCDF on all platforms
           CIBW_BEFORE_BUILD_LINUX: bash .github/install_netcdf4.sh
           CIBW_BEFORE_BUILD_MACOS: bash .github/install_netcdf4.sh
-          CIBW_BEFORE_BUILD_WINDOWS: powershell -ExecutionPolicy Bypass -File .github/install_netcdf4_windows.ps1
+          # delvewheel must be installed explicitly because the custom
+          # CIBW_REPAIR_WHEEL_COMMAND_WINDOWS below disables cibuildwheel's
+          # automatic installation of the repair tool.
+          CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel && powershell -ExecutionPolicy Bypass -File .github/install_netcdf4_windows.ps1
           CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}*
           CIBW_ARCHS: ${{ matrix.buildplat[2] }}
           CIBW_ENVIRONMENT_PASS_LINUX: RUNNER_OS
