@@ -632,7 +632,41 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const auto spatial_dim = global_coll.get_spatial_dim();
 
-        if (spatial_dim == 2) {
+        if (spatial_dim == 1) {
+            // Reuse the 2D ghost kernel with ny = 1 and no y-ghosts: this
+            // matches the host implementation, which handles 1D as well.
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            const auto field_strides = a.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 1];
+            // ny == 1, so the y index is always 0 and field_stride_y is unused.
+            const Index_t field_stride_y = field_stride_x;
+
+            Index_t ghost_pixels = nb_ghosts_left[0] + nb_ghosts_right[0];
+            if (ghost_pixels > 0) {
+                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                                   gpu_kernels::REDUCE_BLOCK_SIZE;
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_dot_2d_kernel,
+                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  a.view().data(), b.view().data(), d_partial,
+                                  nb_pts[0], Index_t{1},
+                                  nb_ghosts_left[0], nb_ghosts_right[0],
+                                  Index_t{0}, Index_t{0},
+                                  field_stride_c, field_stride_x, field_stride_y,
+                                  nb_components_per_pixel);
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  d_partial, ghost_blocks);
+
+                Real ghost_dot;
+                GPU_MEMCPY_D2H(&ghost_dot, d_partial, sizeof(Real));
+                full_dot -= ghost_dot;
+            }
+        } else if (spatial_dim == 2) {
             const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
@@ -747,7 +781,40 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const auto spatial_dim = global_coll.get_spatial_dim();
 
-        if (spatial_dim == 2) {
+        if (spatial_dim == 1) {
+            // Reuse the 2D ghost kernel with ny = 1 and no y-ghosts, matching
+            // the host implementation which handles 1D as well.
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            const auto field_strides = x.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 1];
+            const Index_t field_stride_y = field_stride_x;  // ny == 1, unused
+
+            Index_t ghost_pixels = nb_ghosts_left[0] + nb_ghosts_right[0];
+            if (ghost_pixels > 0) {
+                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                                   gpu_kernels::REDUCE_BLOCK_SIZE;
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
+                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  x.view().data(), d_partial,
+                                  nb_pts[0], Index_t{1},
+                                  nb_ghosts_left[0], nb_ghosts_right[0],
+                                  Index_t{0}, Index_t{0},
+                                  field_stride_c, field_stride_x, field_stride_y,
+                                  nb_components_per_pixel);
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  d_partial, ghost_blocks);
+
+                Real ghost_norm;
+                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
+                full_norm -= ghost_norm;
+            }
+        } else if (spatial_dim == 2) {
             const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
@@ -958,7 +1025,40 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         const auto spatial_dim = global_coll.get_spatial_dim();
 
-        if (spatial_dim == 2) {
+        if (spatial_dim == 1) {
+            // Reuse the 2D ghost kernel with ny = 1 and no y-ghosts, matching
+            // the host implementation which handles 1D as well.
+            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
+            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
+            const auto field_strides = y.get_strides(IterUnit::Pixel);
+            const Index_t field_stride_c = field_strides[0];
+            const Index_t field_stride_x = field_strides[field_strides.size() - 1];
+            const Index_t field_stride_y = field_stride_x;  // ny == 1, unused
+
+            Index_t ghost_pixels = nb_ghosts_left[0] + nb_ghosts_right[0];
+            if (ghost_pixels > 0) {
+                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                                   gpu_kernels::REDUCE_BLOCK_SIZE;
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
+                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  y.view().data(), d_partial,
+                                  nb_pts[0], Index_t{1},
+                                  nb_ghosts_left[0], nb_ghosts_right[0],
+                                  Index_t{0}, Index_t{0},
+                                  field_stride_c, field_stride_x, field_stride_y,
+                                  nb_components_per_pixel);
+
+                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                                  d_partial, ghost_blocks);
+
+                Real ghost_norm;
+                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
+                full_norm -= ghost_norm;
+            }
+        } else if (spatial_dim == 2) {
             const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
             const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
             const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();

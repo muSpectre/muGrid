@@ -131,8 +131,12 @@ template <typename MemorySpace>
 constexpr Device memory_space_to_device() {
   if constexpr (is_host_space_v<MemorySpace>) {
     return Device::cpu();
+  } else if constexpr (std::is_same_v<MemorySpace, ROCmSpace>) {
+    return Device::rocm();
   } else {
-    return Device::cuda();  // or Device::rocm() depending on build config
+    // Device::gpu() selects CUDA or ROCm according to the build config, so a
+    // ROCm build does not get mis-tagged as CUDA.
+    return Device::gpu();
   }
 }
 

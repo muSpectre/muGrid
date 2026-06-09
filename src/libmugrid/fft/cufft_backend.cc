@@ -239,6 +239,9 @@ void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
       output);
 
   check_cufft_result(result, "Z2D execution");
+  // Synchronize so the result is complete before the caller hands the buffer
+  // to GPU-aware MPI (which is not ordered against the cuFFT stream).
+  cudaDeviceSynchronize();
 }
 
 void cuFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
@@ -272,6 +275,9 @@ void cuFFTBackend::c2c_backward(Index_t n, Index_t batch, const Complex * input,
       reinterpret_cast<cufftDoubleComplex *>(output), CUFFT_INVERSE);
 
   check_cufft_result(result, "Z2Z backward execution");
+  // Synchronize so the result is complete before the caller hands the buffer
+  // to GPU-aware MPI (which is not ordered against the cuFFT stream).
+  cudaDeviceSynchronize();
 }
 
 }  // namespace muGrid
