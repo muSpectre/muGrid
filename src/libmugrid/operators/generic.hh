@@ -354,6 +354,10 @@ namespace muGrid {
             cached_device_apply_op_{};
         mutable std::optional<SparseOperatorSoA<DefaultDeviceSpace>>
             cached_device_transpose_op_{};
+        //! Grid/components key the device caches were built for; the device
+        //! caches must be rebuilt when it changes (e.g. the operator is reused
+        //! on a different grid), just like the host cache key.
+        mutable std::optional<SparseOperatorCacheKey> cached_device_key_{};
 
         /**
          * @brief Validate that fields are compatible with this operator
@@ -609,8 +613,12 @@ namespace muGrid {
     const SparseOperatorSoA<DeviceSpace> &
     GenericLinearOperator::get_device_apply_operator(
         const DynGridIndex & nb_grid_pts, Index_t nb_nodal_components) const {
-        // Check if device cache needs update
-        if (!this->cached_device_apply_op_.has_value()) {
+        // Rebuild when the cache is empty or was built for a different grid /
+        // number of components (the precomputed indices are grid-specific).
+        const SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
+        const bool stale = this->cached_device_key_.has_value() &&
+                           !(this->cached_device_key_.value() == key);
+        if (!this->cached_device_apply_op_.has_value() || stale) {
             // Create operator with SoA indices (device storage order) and copy
             // to device Device spaces use StructureOfArrays for optimal memory
             // coalescence
@@ -620,6 +628,11 @@ namespace muGrid {
             this->cached_device_apply_op_ =
                 muGrid::deep_copy_sparse_operator<DeviceSpace, HostSpace>(
                     host_soa_op);
+            if (stale) {
+                // Grid changed: the transpose cache is now stale too.
+                this->cached_device_transpose_op_.reset();
+            }
+            this->cached_device_key_ = key;
         }
 
         return this->cached_device_apply_op_.value();
@@ -629,8 +642,12 @@ namespace muGrid {
     const SparseOperatorSoA<DeviceSpace> &
     GenericLinearOperator::get_device_transpose_operator(
         const DynGridIndex & nb_grid_pts, Index_t nb_nodal_components) const {
-        // Check if device cache needs update
-        if (!this->cached_device_transpose_op_.has_value()) {
+        // Rebuild when the cache is empty or was built for a different grid /
+        // number of components (the precomputed indices are grid-specific).
+        const SparseOperatorCacheKey key{nb_grid_pts, nb_nodal_components};
+        const bool stale = this->cached_device_key_.has_value() &&
+                           !(this->cached_device_key_.value() == key);
+        if (!this->cached_device_transpose_op_.has_value() || stale) {
             // Create operator with SoA indices (device storage order) and copy
             // to device Device spaces use StructureOfArrays for optimal memory
             // coalescence
@@ -640,6 +657,11 @@ namespace muGrid {
             this->cached_device_transpose_op_ =
                 muGrid::deep_copy_sparse_operator<DeviceSpace, HostSpace>(
                     host_soa_op);
+            if (stale) {
+                // Grid changed: the apply cache is now stale too.
+                this->cached_device_apply_op_.reset();
+            }
+            this->cached_device_key_ = key;
         }
 
         return this->cached_device_transpose_op_.value();

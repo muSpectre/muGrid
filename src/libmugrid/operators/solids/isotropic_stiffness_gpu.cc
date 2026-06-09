@@ -300,9 +300,6 @@ namespace isotropic_stiffness_kernels {
 
 #if defined(MUGRID_ENABLE_CUDA)
 
-static bool g_2d_constants_initialized = false;
-static bool g_3d_constants_initialized = false;
-
 void isotropic_stiffness_2d_cuda(
     const Real* displacement, const Real* lambda, const Real* mu,
     Real* force,
@@ -314,12 +311,13 @@ void isotropic_stiffness_2d_cuda(
     const Real* G, const Real* V,
     Real alpha, bool increment) {
 
-    // Copy G and V to constant memory if not already done
-    if (!g_2d_constants_initialized) {
-        cudaMemcpyToSymbol(d_G_2D, G, 64 * sizeof(Real));
-        cudaMemcpyToSymbol(d_V_2D, V, 64 * sizeof(Real));
-        g_2d_constants_initialized = true;
-    }
+    // Copy this instance's G and V to constant memory before every launch:
+    // the matrices depend on the operator's grid_spacing, so a one-shot upload
+    // would make a second operator with a different spacing silently use the
+    // first one's matrices. The default-stream ordering makes the copy safe
+    // (the kernel below runs after it).
+    cudaMemcpyToSymbol(d_G_2D, G, 64 * sizeof(Real));
+    cudaMemcpyToSymbol(d_V_2D, V, 64 * sizeof(Real));
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
@@ -354,12 +352,11 @@ void isotropic_stiffness_3d_cuda(
     const Real* G, const Real* V,
     Real alpha, bool increment) {
 
-    // Copy G and V to constant memory if not already done
-    if (!g_3d_constants_initialized) {
-        cudaMemcpyToSymbol(d_G_3D, G, 576 * sizeof(Real));
-        cudaMemcpyToSymbol(d_V_3D, V, 576 * sizeof(Real));
-        g_3d_constants_initialized = true;
-    }
+    // Copy this instance's G and V to constant memory before every launch (see
+    // the 2D variant: the matrices depend on grid_spacing, so a one-shot upload
+    // would let a second operator silently reuse the first one's matrices).
+    cudaMemcpyToSymbol(d_G_3D, G, 576 * sizeof(Real));
+    cudaMemcpyToSymbol(d_V_3D, V, 576 * sizeof(Real));
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
@@ -387,9 +384,6 @@ void isotropic_stiffness_3d_cuda(
 
 #if defined(MUGRID_ENABLE_HIP)
 
-static bool g_2d_constants_initialized = false;
-static bool g_3d_constants_initialized = false;
-
 void isotropic_stiffness_2d_hip(
     const Real* displacement, const Real* lambda, const Real* mu,
     Real* force,
@@ -401,12 +395,11 @@ void isotropic_stiffness_2d_hip(
     const Real* G, const Real* V,
     Real alpha, bool increment) {
 
-    // Copy G and V to constant memory if not already done
-    if (!g_2d_constants_initialized) {
-        hipMemcpyToSymbol(d_G_2D, G, 64 * sizeof(Real));
-        hipMemcpyToSymbol(d_V_2D, V, 64 * sizeof(Real));
-        g_2d_constants_initialized = true;
-    }
+    // Copy this instance's G and V before every launch (the matrices depend on
+    // grid_spacing; a one-shot upload would let a second operator silently
+    // reuse the first one's matrices). Default-stream ordering makes this safe.
+    hipMemcpyToSymbol(d_G_2D, G, 64 * sizeof(Real));
+    hipMemcpyToSymbol(d_V_2D, V, 64 * sizeof(Real));
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
@@ -441,12 +434,9 @@ void isotropic_stiffness_3d_hip(
     const Real* G, const Real* V,
     Real alpha, bool increment) {
 
-    // Copy G and V to constant memory if not already done
-    if (!g_3d_constants_initialized) {
-        hipMemcpyToSymbol(d_G_3D, G, 576 * sizeof(Real));
-        hipMemcpyToSymbol(d_V_3D, V, 576 * sizeof(Real));
-        g_3d_constants_initialized = true;
-    }
+    // Copy this instance's G and V before every launch (see the 2D variant).
+    hipMemcpyToSymbol(d_G_3D, G, 576 * sizeof(Real));
+    hipMemcpyToSymbol(d_V_3D, V, 576 * sizeof(Real));
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
