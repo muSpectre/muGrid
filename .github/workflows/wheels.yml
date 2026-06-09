@@ -70,6 +70,11 @@ jobs:
           CIBW_ENVIRONMENT_WINDOWS: >-
             CMAKE_PREFIX_PATH="C:/netcdf-install"
             netCDF_DIR="C:/netcdf-install/lib/cmake/netCDF"
+          # Don't vendor the MSVC runtime: the ARM64 copy isn't on the
+          # x86-64 host's search path when cross-compiling, and it's supplied
+          # by the VC++ redistributable on the target machine anyway.
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >-
+            delvewheel repair --exclude msvcp140.dll --exclude vcruntime140.dll --exclude vcruntime140_1.dll -w {dest_dir} {wheel}
           # Test with NetCDF on all platforms
           CIBW_TEST_COMMAND: python -c "import muGrid; print(muGrid.__version__); from muGrid._muGrid import FileIONetCDF"
 
