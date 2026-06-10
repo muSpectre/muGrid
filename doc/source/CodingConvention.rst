@@ -58,7 +58,9 @@ project-specific rules.
 Language Standard
 =================
 
-µGrid uses **C++17**. Use modern C++ features:
+µGrid uses **C++20** (since release 0.97.0). Building from source requires a
+toolchain with C++20 standard-library support, e.g. ``<ranges>`` (GCC ≥ 12,
+Clang/libc++ ≥ 15, Apple Xcode ≥ 15, MSVC ≥ 19.34). Use modern C++ features:
 
 - ``auto`` for type inference where it improves readability
 - Range-based for loops

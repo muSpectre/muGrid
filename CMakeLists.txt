@@ -88,6 +88,43 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Fail early, with an actionable message, if the toolchain does not provide
+# the C++20 standard library features muGrid uses (<ranges>, <span>).
+# Without this check, outdated compilers fail much later with a cryptic
+# "fatal error: 'ranges' file not found" deep inside the build (a frequent
+# support request from macOS versions whose newest Xcode predates C++20).
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("
+#include <ranges>
+#include <span>
+int main() {
+    int data[]{1, 2, 3, 4};
+    std::span<int> s{data};
+    auto odd = s | std::views::filter([](int i) { return i % 2; });
+    return static_cast<int>(std::ranges::distance(odd)) - 2;
+}
+" MUGRID_HAS_CXX20_STDLIB)
+if(NOT MUGRID_HAS_CXX20_STDLIB)
+    message(FATAL_ERROR
+        "Your C++ compiler or its standard library is too old to build "
+        "muGrid: C++20 library support (<ranges>, <span>) is required "
+        "(since muGrid 0.97.0), but a test program using it failed to "
+        "compile with '${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}' "
+        "(${CMAKE_CXX_COMPILER}).\n"
+        "Known-good minimum compilers: GCC 12, Clang/libc++ 15, "
+        "Apple Clang 15 (Xcode 15), MSVC 19.34 (Visual Studio 2022 17.4).\n"
+        "Possible remedies:\n"
+        "  - Update your compiler / Xcode, or select a newer one via the "
+        "CC/CXX environment variables.\n"
+        "  - In a conda environment: 'conda install -c conda-forge "
+        "cxx-compiler', then re-activate the environment and rebuild.\n"
+        "  - On macOS versions that cannot run Xcode 15 (older than "
+        "Ventura), the stock toolchain cannot build muGrid; use the conda "
+        "compiler above, prebuilt wheels on a supported platform, or "
+        "'pip install \"muGrid==0.96.0\"' (the last C++17 release).\n"
+        "See CMakeError.log for the failing test program output.")
+endif()
+
 # Build options
 option(MUGRID_ENABLE_MPI "Enable MPI support" ON)
 option(MUGRID_ENABLE_NETCDF "Enable NetCDF I/O" ON)

@@ -30,6 +30,12 @@ unreleased
 - TST: MPI FFT tests now compare against numpy for grids that do not divide
   evenly across the process grid (odd Y/Z), for multi-component fields, and
   for the 3D inverse transform
+- ENH: CMake now probes for C++20 standard-library support (`<ranges>`,
+  `<span>`) at configure time and fails with an actionable message (minimum
+  compiler versions, conda-forge toolchain instructions, last C++17
+  release) instead of a cryptic "'ranges' file not found" mid-build —
+  outdated toolchains, e.g. any Xcode on macOS older than Ventura, cannot
+  build muGrid ≥ 0.97.0
 - DOC: Coding convention: use brace initialization (non-narrowing); narrowing
   conversions must be explicit `static_cast`s (applied throughout the FFT
   subsystem)
@@ -41,6 +47,23 @@ unreleased
   global minimum interior extent (precomputed collectively at
   initialisation), so all ranks throw consistently
 - ENH: Added `Communicator::min` (C++ and Python), mirroring `max`
+- ENH: New `muGrid.Preconditioners` module with a generic `Preconditioner`
+  interface for the matrix-free solvers (`prec(r, z)` computing `z = M⁻¹r`),
+  an `IdentityPreconditioner`, a `JacobiPreconditioner` (diagonal scaling,
+  accepting a field, array or scalar), and a `FourierPreconditioner` that
+  applies a spectral kernel `z = F⁻¹[k(q)·F r]` via an `FFTEngine`
+  (MPI-transparent, broadcasts over field components, folds in the FFT
+  normalisation, projects out modes where the kernel vanishes). Tested by
+  solving the periodic finite-difference Poisson problem with the exact
+  inverse FD symbol as preconditioner (CG converges in O(1) iterations
+  instead of dozens) and a heterogeneous screened Poisson problem with
+  Jacobi (164 → 21 iterations); documented in the Examples chapter
+- ENH: The Python `FFTEngine` wrapper now exposes `communicate_ghosts` and
+  `reduce_ghosts` accepting wrapped fields, so an FFT engine constructed
+  with ghost buffers can serve as the single decomposition for both stencil
+  operators and FFTs (required for spectral preconditioning under MPI,
+  where a separate `CartesianDecomposition` would split the domain
+  differently than the FFT's pencil grid)
 - BUG: Fixed state-field index rotation using bitwise `&` instead of modulo,
   which aliased `current()`/`old()` for `nb_memory` not of the form 2^k-1
 - BUG: Fixed 3D MPI FFT silently skipping the Y transform for process grids

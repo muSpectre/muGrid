@@ -743,6 +743,36 @@ class FFTEngine:
         """
         self._cpp.ifft(_unwrap(input_field), _unwrap(output_field))
 
+    def communicate_ghosts(self, field: Field) -> None:
+        """
+        Exchange ghost buffer data for a real-space field.
+
+        The FFT engine is also a CartesianDecomposition; when constructed
+        with ghost buffers, real-space fields support the same ghost
+        communication as a stand-alone decomposition. This lets stencil
+        operators and FFTs share one set of fields (e.g. for spectral
+        preconditioning of a finite-difference solve).
+
+        Parameters
+        ----------
+        field : Field
+            The field whose ghost buffers should be filled from neighbors.
+        """
+        self._cpp.communicate_ghosts(_unwrap(field))
+
+    def reduce_ghosts(self, field: Field) -> None:
+        """
+        Accumulate ghost buffer contributions back to the interior domain.
+
+        Adjoint of communicate_ghosts; ghost buffers are zeroed afterwards.
+
+        Parameters
+        ----------
+        field : Field
+            The field whose ghost buffers should be reduced to interior.
+        """
+        self._cpp.reduce_ghosts(_unwrap(field))
+
     def register_real_space_field(
         self, name: str, components: Shape = ()
     ) -> Field:
