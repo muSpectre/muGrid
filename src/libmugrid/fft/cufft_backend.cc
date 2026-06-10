@@ -50,6 +50,27 @@ bool is_complex_aligned(const void * ptr) {
   return reinterpret_cast<std::uintptr_t>(ptr) % sizeof(cufftDoubleComplex) ==
          0;
 }
+
+// muGrid guarantees this alignment by construction: the FFT engine's
+// real-space collection is padded to an even x-storage width and even left
+// ghost count (see the FFTEngineBase constructor), so every base pointer
+// the FFT engine computes is an even number of doubles from the
+// cudaMalloc'ed allocation. A violation here means that layout invariant
+// was broken.
+void check_complex_aligned(const void * ptr, const char * operation) {
+  if (!is_complex_aligned(ptr)) {
+    std::stringstream error;
+    error << "The real array passed to the cuFFT " << operation
+          << " transform is not aligned to the complex type (16 bytes) as "
+             "required by cuFFT. muGrid pads the layout of FFT engine "
+             "real-space fields so that this cannot happen; this error "
+             "indicates a bug in muGrid's layout padding, or a field whose "
+             "memory was not allocated through a muGrid FFT engine. "
+             "External arrays must be copied into an engine field before "
+             "transforming.";
+    throw RuntimeError(error.str());
+  }
+}
 }  // namespace
 
 cuFFTBackend::cuFFTBackend() : plan_cache{} {}
@@ -59,26 +80,6 @@ cuFFTBackend::~cuFFTBackend() {
   for (auto & entry : this->plan_cache) {
     cufftDestroy(entry.second);
   }
-  if (this->scratch != nullptr) {
-    cudaFree(this->scratch);
-  }
-}
-
-void * cuFFTBackend::get_scratch(std::size_t nb_bytes) {
-  if (nb_bytes > this->scratch_bytes) {
-    if (this->scratch != nullptr) {
-      cudaFree(this->scratch);
-      this->scratch = nullptr;
-      this->scratch_bytes = 0;
-    }
-    cudaError_t err = cudaMalloc(&this->scratch, nb_bytes);
-    if (err != cudaSuccess) {
-      throw RuntimeError(std::string{"cudaMalloc of cuFFT scratch failed: "} +
-                         cudaGetErrorString(err));
-    }
-    this->scratch_bytes = nb_bytes;
-  }
-  return this->scratch;
 }
 
 void cuFFTBackend::check_cufft_result(cufftResult result,
@@ -234,34 +235,15 @@ void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
         "or use 2D grids which support batched transforms with unit stride.");
   }
 
+  check_complex_aligned(input, "D2Z");
+
   cufftHandle plan =
       get_plan(R2C, n, batch, in_stride, in_dist, out_stride, out_dist);
-
-  // cufftExecD2Z rejects real input arrays that are not aligned like a
-  // complex array (CUFFT_INVALID_VALUE). This happens when a z-slab of a 3D
-  // field starts at an odd number of doubles from the (aligned) allocation,
-  // e.g. for odd grid dimensions. Stage such input through an aligned
-  // scratch buffer.
-  const Real * exec_input{input};
-  if (!is_complex_aligned(input)) {
-    Index_t nb_input_elems{(batch - 1) * in_dist + n};
-    std::size_t nb_bytes{static_cast<std::size_t>(nb_input_elems) *
-                         sizeof(Real)};
-    Real * aligned_input{static_cast<Real *>(this->get_scratch(nb_bytes))};
-    cudaError_t err =
-        cudaMemcpy(aligned_input, input, nb_bytes, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      throw RuntimeError(
-          std::string{"cudaMemcpy to cuFFT scratch failed: "} +
-          cudaGetErrorString(err));
-    }
-    exec_input = aligned_input;
-  }
 
   // cuFFT's D2Z expects cufftDoubleReal* and cufftDoubleComplex*
   // These are compatible with double* and std::complex<double>*
   cufftResult result = cufftExecD2Z(
-      plan, const_cast<cufftDoubleReal *>(exec_input),
+      plan, const_cast<cufftDoubleReal *>(input),
       reinterpret_cast<cufftDoubleComplex *>(output));
 
   check_cufft_result(result, "D2Z execution");
@@ -292,32 +274,10 @@ void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
         "or use 2D grids which support batched transforms with unit stride.");
   }
 
+  check_complex_aligned(output, "Z2D");
+
   cufftHandle plan =
       get_plan(C2R, n, batch, in_stride, in_dist, out_stride, out_dist);
-
-  // cufftExecZ2D rejects real output arrays that are not aligned like a
-  // complex array (CUFFT_INVALID_VALUE); see r2c above. Transform into an
-  // aligned scratch buffer and copy to the destination afterwards.
-  Real * exec_output{output};
-  Index_t nb_output_elems{(batch - 1) * out_dist + n};
-  std::size_t nb_output_bytes{static_cast<std::size_t>(nb_output_elems) *
-                              sizeof(Real)};
-  bool output_misaligned{!is_complex_aligned(output)};
-  if (output_misaligned) {
-    exec_output = static_cast<Real *>(this->get_scratch(nb_output_bytes));
-    if (out_dist > n) {
-      // Gaps between batches (e.g. ghost cells) are not written by the
-      // transform; pre-fill the scratch with the destination content so the
-      // copy-back below does not clobber them with stale scratch data.
-      cudaError_t err = cudaMemcpy(exec_output, output, nb_output_bytes,
-                                   cudaMemcpyDeviceToDevice);
-      if (err != cudaSuccess) {
-        throw RuntimeError(
-            std::string{"cudaMemcpy to cuFFT scratch failed: "} +
-            cudaGetErrorString(err));
-      }
-    }
-  }
 
   // Note: cuFFT may modify the input during c2r transforms
   // The const_cast is necessary but the input data may be modified
@@ -325,19 +285,9 @@ void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
       plan,
       const_cast<cufftDoubleComplex *>(
           reinterpret_cast<const cufftDoubleComplex *>(input)),
-      exec_output);
+      output);
 
   check_cufft_result(result, "Z2D execution");
-
-  if (output_misaligned) {
-    cudaError_t err = cudaMemcpy(output, exec_output, nb_output_bytes,
-                                 cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
-      throw RuntimeError(
-          std::string{"cudaMemcpy from cuFFT scratch failed: "} +
-          cudaGetErrorString(err));
-    }
-  }
   // Synchronize so the result is complete before the caller hands the buffer
   // to GPU-aware MPI (which is not ordered against the cuFFT stream).
   cudaDeviceSynchronize();

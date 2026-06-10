@@ -651,13 +651,17 @@ class FFTFrequencyTest(unittest.TestCase):
         assert_allclose(coords[1], yref / ny, atol=1e-15,
                         err_msg="y-coords broken (last column likely uninitialized)")
 
-        # --- coordsg (with ghosts): shape [2, nx+2, ny+2] ---
+        # --- coordsg (with ghosts) ---
+        # The engine pads the ghost buffers in x so that GPU FFT base
+        # pointers stay 16-byte aligned: the left ghost count and the
+        # x-storage width must be even. Requested ghosts (1, 1) in x thus
+        # become (2, 2): shape [2, nx+4, ny+2].
         coordsg = engine.coordsg
-        assert_array_equal(coordsg.shape, [2, nx + 2, ny + 2])
+        assert_array_equal(coordsg.shape, [2, nx + 4, ny + 2])
 
         # Ghost indices wrap around periodically.
         # Axis-0 ghost positions: -1 → (nx-1)/nx, 0..nx-1 → i/nx, nx → 0
-        x_ghost_indices = np.array([-1] + list(range(nx)) + [nx])
+        x_ghost_indices = np.array([-2, -1] + list(range(nx)) + [nx, nx + 1])
         y_ghost_indices = np.array([-1] + list(range(ny)) + [ny])
         xgref, ygref = np.meshgrid(
             x_ghost_indices % nx / nx,
@@ -769,6 +773,98 @@ class FFTFrequencyTest(unittest.TestCase):
 
         engine_3d = muGrid.FFTEngine([8, 10, 12])
         self.assertEqual(engine_3d.spatial_dim, 3)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestFFTGhostAlignment:
+    """FFT on fields with ghost buffers.
+
+    Regression tests for the cuFFT alignment requirement: the real array of
+    a D2Z/Z2D transform must be 16-byte aligned. An odd left ghost count in
+    x shifts every slab base pointer by an odd number of doubles, which used
+    to fail (or deadlock under MPI) on the GPU even for even grids. Device
+    layouts are now padded to keep base pointers aligned (see
+    CartesianDecomposition::initialise).
+    """
+
+    @pytest.mark.parametrize("nb_grid_pts", [[8, 10, 12], [7, 9, 11]])
+    def test_3d_roundtrip_with_odd_ghosts(self, device, nb_grid_pts):
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        engine = muGrid.FFTEngine(
+            nb_grid_pts,
+            nb_ghosts_left=(1, 1, 1),
+            nb_ghosts_right=(1, 1, 1),
+            device=_get_device_string(device),
+        )
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        np.random.seed(42)
+        real_field.p[...] = xp.asarray(np.random.randn(1, *nb_grid_pts))
+        original = real_field.p.copy()
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.p[:] *= engine.normalisation
+
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()
+            original = original.get()
+        assert_allclose(result, original, atol=1e-14)
+
+    @pytest.mark.parametrize("nb_grid_pts", [[16, 20], [15, 17]])
+    def test_2d_roundtrip_with_odd_ghosts(self, device, nb_grid_pts):
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        engine = muGrid.FFTEngine(
+            nb_grid_pts,
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
+            device=_get_device_string(device),
+        )
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        np.random.seed(43)
+        real_field.p[...] = xp.asarray(np.random.randn(1, *nb_grid_pts))
+        original = real_field.p.copy()
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.p[:] *= engine.normalisation
+
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()
+            original = original.get()
+        assert_allclose(result, original, atol=1e-14)
+
+    def test_engine_layout_is_padded(self, device):
+        """The padding invariant itself: the storage row width in x (incl.
+        ghosts) and the left ghost count of an engine's real-space fields
+        must be even so that GPU FFT base pointers stay 16-byte aligned.
+        Host engines are padded identically so host/device engine twins
+        keep identical buffer layouts (e.g. for deep_copy)."""
+        skip_if_gpu_unavailable(device)
+
+        engine = muGrid.FFTEngine(
+            [7, 9, 11],
+            nb_ghosts_left=(1, 0, 0),
+            nb_ghosts_right=(0, 0, 0),
+            device=_get_device_string(device),
+        )
+        real_field = engine.real_space_field("real")
+        # Scalar fields have no leading component axis; x is axis 0
+        storage_x = real_field.pg.shape[0]
+        interior_x = real_field.p.shape[0]
+
+        assert interior_x == 7
+        # gl0: 1 -> 2, then Sx = 2 + 7 + 0 -> padded right to 10
+        assert storage_x == 10
 
 
 if __name__ == "__main__":

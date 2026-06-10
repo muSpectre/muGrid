@@ -38,9 +38,32 @@
 
 #include <hip/hip_runtime.h>
 
+#include <cstdint>
 #include <sstream>
 
 namespace muGrid {
+
+namespace {
+// muGrid pads the layout of FFT engine real-space fields so that the real
+// array of every real<->complex transform is aligned like a complex array
+// (16 bytes); see the FFTEngineBase constructor. rocFFT does not document
+// an alignment requirement, but the layout invariant holds here regardless
+// — enforce it for symmetry with the cuFFT backend so a padding regression
+// fails loudly on either GPU vendor.
+void check_complex_aligned(const void * ptr, const char * operation) {
+  if (reinterpret_cast<std::uintptr_t>(ptr) % (2 * sizeof(Real)) != 0) {
+    std::stringstream error;
+    error << "The real array passed to the rocFFT " << operation
+          << " transform is not aligned to the complex type (16 bytes). "
+             "muGrid pads the layout of FFT engine real-space fields so "
+             "that this cannot happen; this error indicates a bug in "
+             "muGrid's layout padding, or a field whose memory was not "
+             "allocated through a muGrid FFT engine. External arrays "
+             "must be copied into an engine field before transforming.";
+    throw RuntimeError(error.str());
+  }
+}
+}  // namespace
 
 // Static member initialization
 bool rocFFTBackend::rocfft_initialized = false;
@@ -242,6 +265,8 @@ void rocFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
     return;
   }
 
+  check_complex_aligned(input, "R2C");
+
   CachedPlan & cached =
       get_plan(R2C, FORWARD, n, batch, in_stride, in_dist, out_stride,
                out_dist);
@@ -265,6 +290,8 @@ void rocFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
   if (batch == 0) {
     return;
   }
+
+  check_complex_aligned(output, "C2R");
 
   CachedPlan & cached =
       get_plan(C2R, BACKWARD, n, batch, in_stride, in_dist, out_stride,

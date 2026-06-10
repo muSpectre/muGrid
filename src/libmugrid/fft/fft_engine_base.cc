@@ -109,6 +109,25 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
     effective_ghosts_right = DynGridIndex(spatial_dim, 0);
   }
 
+  // GPU FFT backends (cuFFT) require the real array of a real<->complex
+  // transform to be aligned like a complex array (16 bytes). The base
+  // pointers the transform loops compute are offset from the (aligned)
+  // allocation by ghost_offset + iz * Sx * Sy doubles, so they stay
+  // aligned iff the left ghost count and the storage row width Sx in x
+  // are both even. Pad the ghost buffers of the real-space collection
+  // accordingly; the extra layer holds valid (communicated) ghost data
+  // and is invisible to the interior. fft()/ifft() only accept fields of
+  // this collection, so the invariant covers every transform. Host
+  // engines are padded identically so that real-space fields of host and
+  // device engines with the same parameters keep identical buffer
+  // layouts (e.g. for deep_copy). X is never subdivided, so the padding
+  // is identical on all ranks.
+  effective_ghosts_left[0] += effective_ghosts_left[0] % 2;
+  effective_ghosts_right[0] += (nb_domain_grid_pts[0] +
+                                effective_ghosts_left[0] +
+                                effective_ghosts_right[0]) %
+                               2;
+
   Parent_t::initialise(nb_domain_grid_pts, nb_subdivisions,
                        effective_ghosts_left, effective_ghosts_right);
 
