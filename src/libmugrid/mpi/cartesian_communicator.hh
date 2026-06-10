@@ -129,7 +129,9 @@ namespace muGrid {
         //! does not take ownership of it (only the original frees it).
         CartesianCommunicator(const CartesianCommunicator & other);
 
-        ~CartesianCommunicator() override;
+        // NB: the base Communicator has a non-virtual destructor, so this is a
+        // new virtual destructor rather than an override.
+        virtual ~CartesianCommunicator();
 
         /**
          * @brief Assignment operator.
