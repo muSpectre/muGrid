@@ -4,6 +4,31 @@ Change log for µGrid
 unreleased
 ----------
 
+- ENH: The 3D MPI FFT now uses a true pencil decomposition: the Y stage is a
+  genuine scatter-gather transpose (Z-pencil `[Fx, Ny/P2, Nz/P1]` → Y-pencil
+  `[Fx/P2, Ny, Nz/P1]` → X-pencil `[Fx/P2, Ny/P1, Nz]`) instead of an
+  allgather of the full Y dimension followed by a redundant Y-FFT on every
+  rank and a scatter-back. Per-rank work-buffer memory and Y-FFT compute now
+  scale as O(N³/P); two `MPI_Alltoallw` calls replace the previous three.
+  The Fourier-space domain decomposition changed accordingly: X is now
+  distributed across P2 and Y across P1 (query
+  `fourier_subdomain_locations` / `nb_fourier_subdomain_grid_pts` as before)
+- BUG: Removed the allgather/scatter-only `MPI_Alltoallw` modes of
+  `Transpose`, which posted overlapping receive buffers (undefined behaviour
+  per the MPI standard) and produced wrong results for multi-component
+  fields (e.g. 3-component 3D forward transforms on 3 ranks)
+- BUG: The FFT transposes now honour the storage order (AoS/SoA) of the
+  fields they operate on; previously multi-component device (SoA) fields
+  would have been transposed with AoS datatypes, garbling components
+- ENH: The MPI transposes remain pure MPI derived-datatype operations
+  (`MPI_Type_create_subarray`/`hvector` + `MPI_Alltoallw`) with no manual
+  pack/unpack, so they run directly on device buffers with a GPU-aware MPI
+- TST: MPI FFT tests now compare against numpy for grids that do not divide
+  evenly across the process grid (odd Y/Z), for multi-component fields, and
+  for the 3D inverse transform
+- DOC: Coding convention: use brace initialization (non-narrowing); narrowing
+  conversions must be explicit `static_cast`s (applied throughout the FFT
+  subsystem)
 - BUG: Fixed state-field index rotation using bitwise `&` instead of modulo,
   which aliased `current()`/`old()` for `nb_memory` not of the form 2^k-1
 - BUG: Fixed 3D MPI FFT silently skipping the Y transform for process grids

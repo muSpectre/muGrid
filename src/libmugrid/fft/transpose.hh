@@ -70,6 +70,13 @@ namespace muGrid {
      * operation is characterized by:
      * - Input: Data distributed along axis_in, full along axis_out
      * - Output: Data distributed along axis_out, full along axis_in
+     *
+     * The transpose is a genuine scatter-gather: every rank sends a disjoint
+     * block to every peer and receives into a disjoint block of the output.
+     * All send and receive buffers are non-overlapping, as required by the
+     * MPI standard for MPI_Alltoallw. Because only MPI intrinsics operate on
+     * the data buffers (no manual pack/unpack), the same code path works on
+     * device memory with a GPU-aware MPI implementation.
      */
     class Transpose {
        public:
@@ -256,12 +263,6 @@ namespace muGrid {
 
         //! Flag indicating if datatypes have been initialized
         bool types_initialized{false};
-
-        //! Flag indicating if this is an allgather (no scatter) operation
-        bool is_allgather{false};
-
-        //! Flag indicating if this is a scatter-only (no gather) operation
-        bool is_scatter_only{false};
     };
 
 }  // namespace muGrid

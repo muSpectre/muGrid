@@ -94,21 +94,40 @@ Unlike cuFFT, rocFFT's native API (`rocfft_plan_description_set_data_layout()`) 
 
 ### Pencil Decomposition
 
-For 3D distributed FFT, the engine uses pencil decomposition:
+For 3D distributed FFT with a `P1 x P2` process grid (Z distributed across
+P1, Y across P2 in real space), the engine uses a true pencil decomposition:
 
-1. **Z-pencil**: Data distributed in Y and Z, FFT along X (r2c)
-2. **Y-pencil**: Transpose Y<->Z, FFT along Y (c2c)
-3. **X-pencil**: Transpose X<->Z, FFT along Z (c2c)
+1. **Z-pencil** `[Fx, Ny/P2, Nz/P1]`: FFT along X (r2c)
+2. **Y-pencil** `[Fx/P2, Ny, Nz/P1]`: Transpose X<->Y within the row
+   communicator (scatter X across P2, gather Y), then FFT along Y (c2c)
+3. **X-pencil** `[Fx/P2, Ny/P1, Nz]`: Transpose Y<->Z within the column
+   communicator (scatter Y across P1, gather Z), then FFT along Z (c2c)
+
+Each rank holds O(N³/P) data at every stage; no dimension is ever
+replicated across ranks. The X-pencil is the final Fourier-space layout: X
+distributed across P2, Y across P1, Z full.
 
 ### Transpose Operations
 
-The `Transpose` class handles MPI all-to-all communication for redistributing data between pencil orientations.
-
-**Current limitation**: Transpose operations assume AoS layout. When using GPU memory, this may require storage order conversion or updating the Transpose class to handle SoA.
+The `Transpose` class handles MPI all-to-all communication for
+redistributing data between pencil orientations. Every transpose is a
+genuine scatter-gather: each rank sends a disjoint block to every peer and
+receives into a disjoint block, as required by the MPI standard for
+`MPI_Alltoallw`. Both AoS (host) and SoA (device) storage orders are
+supported; the engine threads the storage order of the fields through to
+the datatype construction.
 
 ### Communication Efficiency
 
-**Design Decision**: The FFT module is designed so that MPI communication does not require explicit packing and unpacking. Data is laid out so that `MPI_Alltoall` can operate directly on contiguous memory regions.
+**Design Decision**: MPI communication does not require explicit packing
+and unpacking. Non-contiguous blocks are described with MPI derived
+datatypes (`MPI_Type_create_subarray` for the spatial block,
+`MPI_Type_contiguous`/`MPI_Type_create_hvector` for AoS/SoA components) and
+communicated with a single `MPI_Alltoallw` per transpose. Because only MPI
+intrinsics touch the data buffers, the same code path operates directly on
+device memory with a GPU-aware MPI implementation — responsibility for
+packing lands on the MPI library, which can use specialized device kernels
+or staging as appropriate.
 
 ## Algorithm: Forward 2D FFT
 
@@ -138,22 +157,23 @@ The `Transpose` class handles MPI all-to-all communication for redistributing da
    - Output: Z-pencil work buffer (half-complex in X)
    - Batched over Y rows for each Z plane
 
-2a. [MPI] Transpose Y<->Z
-    - Z-pencil to Y-pencil
+2a. [MPI, P2 > 1] Transpose X<->Y (row communicator)
+    - Z-pencil [Fx, Ny/P2, Nz/P1] to Y-pencil [Fx/P2, Ny, Nz/P1]
+    - Scatter X across P2, gather Y
+    - (P2 == 1: plain copy, shapes are identical)
 
 2b. c2c FFT along Y for each component
     - On Y-pencil buffer
-    - Individual transforms per (X, Z) position
+    - Batched over local X values per Z plane
 
-2c. [MPI] Transpose Z<->Y
-    - Y-pencil back to Z-pencil
-
-3. [MPI] Transpose X<->Z (or copy)
-   - Z-pencil to X-pencil (output)
+3. [MPI, P1 > 1] Transpose Y<->Z (column communicator)
+   - Y-pencil [Fx/P2, Ny, Nz/P1] to X-pencil [Fx/P2, Ny/P1, Nz] (output)
+   - Scatter Y across P1, gather Z
+   - (P1 == 1: plain copy, shapes are identical)
 
 4. c2c FFT along Z for each component
    - On output buffer
-   - Individual transforms per (X, Y) position
+   - Batched over local (X, Y) positions
 
 5. [Serial only] Copy work to output
 ```
@@ -196,8 +216,8 @@ Like FFTW and cuFFT, the transforms are **unnormalized**. A forward FFT followed
 
 ## Future Improvements
 
-1. **Transpose SoA support**: Update Transpose class to handle SoA storage order natively, avoiding potential storage order conversions in MPI paths.
+1. **Batched multi-component GPU FFT**: For c2c transforms (which don't have the stride limitation), explore batching across all components in a single kernel launch.
 
-2. **Batched multi-component GPU FFT**: For c2c transforms (which don't have the stride limitation), explore batching across all components in a single kernel launch.
+2. **deep_copy with storage order conversion**: Extend the `deep_copy` utility to optionally convert between AoS and SoA during the copy, enabling more flexible data movement.
 
-3. **deep_copy with storage order conversion**: Extend the `deep_copy` utility to optionally convert between AoS and SoA during the copy, enabling more flexible data movement.
+3. **GPU derived-datatype performance**: GPU-aware MPI implementations vary in how efficiently they handle derived datatypes on device memory (some use specialized pack kernels, others stage through host). If profiling shows the `MPI_Alltoallw` transposes dominate on a given system, consider a vendor multi-GPU FFT backend (cuFFTMp/heFFTe) as an alternative.

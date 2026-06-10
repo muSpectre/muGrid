@@ -291,6 +291,61 @@ class TestMPIFFTForwardTransform:
         tol = 1e-12 * np.prod(nb_grid_pts)
         assert_allclose(result, expected_local, atol=tol)
 
+    @pytest.mark.parametrize(
+        "nb_grid_pts",
+        [
+            [8, 9, 12],   # odd Y, not divisible by typical process grids
+            [7, 9, 11],   # all odd, nothing divides evenly
+            [12, 5, 9],   # Y smaller than typical rank counts
+        ],
+    )
+    def test_forward_transform_3d_odd_sizes(self, comm, device, nb_grid_pts):
+        """Test 3D forward FFT against numpy for grids that do not divide
+        evenly across the process grid.
+
+        Unlike test_forward_transform_3d, the grid is NOT scaled with the
+        number of ranks, so Y and Z splits are uneven and exercise the
+        remainder handling of the pencil transposes.
+        """
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        # Create global input array (numpy for reference)
+        np.random.seed(42)
+        global_input = np.random.randn(*nb_grid_pts)
+
+        # Compute global reference using numpy
+        global_ref = np.fft.rfftn(global_input.T).T
+
+        # Extract local subdomain
+        subdomain_slices = make_subdomain_slices(
+            engine.subdomain_locations, engine.nb_subdomain_grid_pts
+        )
+        local_input = global_input[subdomain_slices]
+        # Scalar field .p has shape (nx, ny, nz), no component dimension
+        real_field.p[...] = xp.asarray(local_input)
+
+        # Perform FFT
+        engine.fft(real_field, fourier_field)
+
+        # Extract expected local Fourier data
+        fourier_slices = make_fourier_slices(
+            engine.fourier_subdomain_locations, engine.nb_fourier_subdomain_grid_pts
+        )
+        expected_local = global_ref[fourier_slices]
+
+        # Convert result to numpy for comparison - scalar .p has no component dim
+        result = fourier_field.p
+        if device == "gpu":
+            result = result.get()  # CuPy to numpy
+        tol = 1e-12 * np.prod(nb_grid_pts)
+        assert_allclose(result, expected_local, atol=tol)
+
 
 @pytest.mark.parametrize("device", get_test_devices())
 class TestMPIFFTInverseTransform:
@@ -344,6 +399,53 @@ class TestMPIFFTInverseTransform:
         expected_local = global_ref[subdomain_slices]
 
         # Convert result to numpy for comparison - scalar .p has no component dim
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()  # CuPy to numpy
+        tol = 1e-12 * np.prod(nb_grid_pts)
+        assert_allclose(result, expected_local, atol=tol)
+
+    @pytest.mark.parametrize(
+        "nb_grid_pts",
+        [
+            [8, 10, 12],
+            [8, 9, 11],  # odd sizes, uneven splits
+        ],
+    )
+    def test_inverse_transform_3d(self, comm, device, nb_grid_pts):
+        """Test 3D inverse FFT against numpy reference."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        real_field = engine.real_space_field("real")
+        fourier_field = engine.fourier_space_field("fourier")
+
+        # Create a global real array and obtain a self-consistent Fourier
+        # representation (satisfies the Hermitian symmetry of r2c data)
+        np.random.seed(42)
+        global_real = np.random.randn(*nb_grid_pts)
+        global_fourier = np.fft.rfftn(global_real.T).T
+
+        # Extract local Fourier subdomain
+        fourier_slices = make_fourier_slices(
+            engine.fourier_subdomain_locations, engine.nb_fourier_subdomain_grid_pts
+        )
+        local_fourier = global_fourier[fourier_slices]
+        fourier_field.p[...] = xp.asarray(local_fourier)
+
+        # Perform inverse FFT
+        engine.ifft(fourier_field, real_field)
+        real_field.p[...] *= engine.normalisation
+
+        # Extract expected local real data
+        subdomain_slices = make_subdomain_slices(
+            engine.subdomain_locations, engine.nb_subdomain_grid_pts
+        )
+        expected_local = global_real[subdomain_slices]
+
         result = real_field.p
         if device == "gpu":
             result = result.get()  # CuPy to numpy
@@ -467,6 +569,61 @@ class TestMPIFFTMultipleComponents:
         if device == "gpu":
             result = result.get()  # CuPy to numpy
         assert_allclose(result, original, atol=1e-14)
+
+    @pytest.mark.parametrize(
+        "nb_grid_pts",
+        [
+            [16, 20],
+            [8, 9, 11],  # odd 3D grid, uneven splits
+            [8, 10, 12],
+        ],
+    )
+    def test_vector_field_forward_vs_numpy(self, comm, device, nb_grid_pts):
+        """Test multi-component forward FFT against numpy reference.
+
+        Roundtrip tests cannot detect a transpose that garbles components
+        in a self-inverse way; comparing each component against numpy can.
+        """
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        nb_components = 3
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        real_field = engine.real_space_field("real_vec", components=(nb_components,))
+        fourier_field = engine.fourier_space_field(
+            "fourier_vec", components=(nb_components,)
+        )
+
+        # Global input, component index first
+        np.random.seed(42)
+        global_input = np.random.randn(nb_components, *nb_grid_pts)
+
+        # numpy reference per component
+        global_ref = np.array(
+            [np.fft.rfftn(global_input[c].T).T for c in range(nb_components)]
+        )
+
+        # Extract local subdomain
+        subdomain_slices = make_subdomain_slices(
+            engine.subdomain_locations, engine.nb_subdomain_grid_pts
+        )
+        local_input = global_input[(slice(None),) + subdomain_slices]
+        real_field.p[...] = xp.asarray(local_input)
+
+        engine.fft(real_field, fourier_field)
+
+        fourier_slices = make_fourier_slices(
+            engine.fourier_subdomain_locations, engine.nb_fourier_subdomain_grid_pts
+        )
+        expected_local = global_ref[(slice(None),) + fourier_slices]
+
+        result = fourier_field.p
+        if device == "gpu":
+            result = result.get()  # CuPy to numpy
+        tol = 1e-12 * np.prod(nb_grid_pts)
+        assert_allclose(result, expected_local, atol=tol)
 
     def test_tensor_field_3d(self, comm, device):
         """Test FFT of 3x3 tensor field in 3D."""

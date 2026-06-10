@@ -47,6 +47,7 @@
 #include <array>
 #include <string>
 #include <map>
+#include <utility>
 
 namespace muGrid {
 
@@ -196,11 +197,20 @@ class FFTEngineBase : public CartesianDecomposition {
   };
 
   /**
-   * Get or create a transpose for the given nb_components.
+   * Get or create a transpose for the given nb_components and memory layout.
+   *
+   * The layout describes how multi-component data is stored in the buffers
+   * the transpose operates on (ArrayOfStructures on host,
+   * StructureOfArrays on device).
+   *
+   * get_transpose_xy: scatter X / gather Y within the row communicator.
+   *   2D: the only transpose; 3D: Z-pencil [Fx, Ny/P2, Nz/P1] ->
+   *   Y-pencil [Fx/P2, Ny, Nz/P1].
+   * get_transpose_yz: scatter Y / gather Z within the column communicator
+   *   (3D only). Y-pencil [Fx/P2, Ny, Nz/P1] -> X-pencil [Fx/P2, Ny/P1, Nz].
    */
-  Transpose * get_transpose_xz(Index_t nb_components);
-  Transpose * get_transpose_yz_forward(Index_t nb_components);
-  Transpose * get_transpose_yz_backward(Index_t nb_components);
+  Transpose * get_transpose_xy(Index_t nb_components, StorageOrder layout);
+  Transpose * get_transpose_yz(Index_t nb_components, StorageOrder layout);
 
   // === Process grid ===
   int proc_grid_p1{1};   //!< First dimension of process grid
@@ -215,15 +225,15 @@ class FFTEngineBase : public CartesianDecomposition {
 #endif
 
   // === Transpose operations ===
-  TransposeConfig transpose_xz_config;
-  TransposeConfig transpose_yz_fwd_config;
-  TransposeConfig transpose_yz_bwd_config;
+  using TransposeKey = std::pair<Index_t, StorageOrder>;
 
-  std::map<Index_t, std::unique_ptr<Transpose>> transpose_xz_cache;
-  std::map<Index_t, std::unique_ptr<Transpose>> transpose_yz_fwd_cache;
-  std::map<Index_t, std::unique_ptr<Transpose>> transpose_yz_bwd_cache;
+  TransposeConfig transpose_xy_config;
+  TransposeConfig transpose_yz_config;
 
-  bool need_transpose_xz{false};
+  std::map<TransposeKey, std::unique_ptr<Transpose>> transpose_xy_cache;
+  std::map<TransposeKey, std::unique_ptr<Transpose>> transpose_yz_cache;
+
+  bool need_transpose_xy{false};
   bool need_transpose_yz{false};
 
   // === Work buffer collections ===

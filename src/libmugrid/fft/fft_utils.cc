@@ -45,13 +45,13 @@ std::vector<Int> fft_freqind(Index_t n) {
 
   // First half: 0, 1, 2, ..., n/2 (or (n-1)/2 for odd n)
   // Second half: -n/2, ..., -2, -1 (or -(n-1)/2, ..., -1 for odd n)
-  Index_t half = (n + 1) / 2;  // Ceiling division
+  Index_t half{(n + 1) / 2};  // Ceiling division
 
-  for (Index_t i = 0; i < half; ++i) {
+  for (Index_t i{0}; i < half; ++i) {
     freq[i] = static_cast<Int>(i);
   }
 
-  for (Index_t i = half; i < n; ++i) {
+  for (Index_t i{half}; i < n; ++i) {
     freq[i] = static_cast<Int>(i - n);
   }
 
@@ -62,8 +62,8 @@ std::vector<Real> fft_freq(Index_t n, Real d) {
   std::vector<Int> indices = fft_freqind(n);
   std::vector<Real> freq(n);
 
-  Real scale = 1.0 / (n * d);
-  for (Index_t i = 0; i < n; ++i) {
+  Real scale{1.0 / (n * d)};
+  for (Index_t i{0}; i < n; ++i) {
     freq[i] = indices[i] * scale;
   }
 
@@ -71,10 +71,10 @@ std::vector<Real> fft_freq(Index_t n, Real d) {
 }
 
 std::vector<Int> rfft_freqind(Index_t n) {
-  Index_t nout = n / 2 + 1;
+  Index_t nout{n / 2 + 1};
   std::vector<Int> freq(nout);
 
-  for (Index_t i = 0; i < nout; ++i) {
+  for (Index_t i{0}; i < nout; ++i) {
     freq[i] = static_cast<Int>(i);
   }
 
@@ -85,7 +85,7 @@ std::vector<Real> rfft_freq(Index_t n, Real d) {
   std::vector<Int> indices = rfft_freqind(n);
   std::vector<Real> freq(indices.size());
 
-  Real scale = 1.0 / (n * d);
+  Real scale{1.0 / (n * d)};
   for (size_t i = 0; i < indices.size(); ++i) {
     freq[i] = indices[i] * scale;
   }
@@ -101,8 +101,8 @@ DynGridIndex get_hermitian_grid_pts(const DynGridIndex & nb_grid_pts,
 }
 
 Real fft_normalization(const DynGridIndex & nb_grid_pts) {
-  Index_t total = 1;
-  for (Dim_t d = 0; d < nb_grid_pts.get_dim(); ++d) {
+  Index_t total{1};
+  for (Dim_t d{0}; d < nb_grid_pts.get_dim(); ++d) {
     total *= nb_grid_pts[d];
   }
   return 1.0 / total;
@@ -110,8 +110,8 @@ Real fft_normalization(const DynGridIndex & nb_grid_pts) {
 
 void distribute_dimension(Index_t global_size, int comm_size, int rank,
                           Index_t & local_size, Index_t & offset) {
-  Index_t base_size = global_size / comm_size;
-  Index_t remainder = global_size % comm_size;
+  Index_t base_size{global_size / comm_size};
+  Index_t remainder{global_size % comm_size};
 
   // First 'remainder' ranks get one extra element
   if (rank < remainder) {
@@ -146,20 +146,20 @@ void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & 
   // Heuristic: prefer the most "square" factorization
   // Also prefer factorizations where grid dimensions are evenly divisible
 
-  int best_p1 = 1;
-  int best_p2 = num_ranks;
+  int best_p1{1};
+  int best_p2{num_ranks};
   double best_score = 0.0;
 
   // Get grid dimensions (for 3D: Y is distributed among P2, Z among P1)
-  Index_t Ny = nb_grid_pts.get_dim() > 1 ? nb_grid_pts[1] : 1;
-  Index_t Nz = nb_grid_pts.get_dim() > 2 ? nb_grid_pts[2] : 1;
+  Index_t Ny{nb_grid_pts.get_dim() > 1 ? nb_grid_pts[1] : 1};
+  Index_t Nz{nb_grid_pts.get_dim() > 2 ? nb_grid_pts[2] : 1};
 
   // Try all factorizations
-  for (int test_p1 = 1; test_p1 <= num_ranks; ++test_p1) {
+  for (int test_p1{1}; test_p1 <= num_ranks; ++test_p1) {
     if (num_ranks % test_p1 != 0) {
       continue;
     }
-    int test_p2 = num_ranks / test_p1;
+    int test_p2{num_ranks / test_p1};
 
     // Compute a score based on:
     // 1. Squareness (higher is better)
