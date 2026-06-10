@@ -58,6 +58,9 @@ bool is_complex_aligned(const void * ptr) {
 // cudaMalloc'ed allocation. A violation here means that layout invariant
 // was broken.
 void check_complex_aligned(const void * ptr, const char * operation) {
+  // The error branch is unreachable through the public API (the layout
+  // invariant guarantees alignment), so it is excluded from coverage.
+  // GCOVR_EXCL_START
   if (!is_complex_aligned(ptr)) {
     std::stringstream error;
     error << "The real array passed to the cuFFT " << operation
@@ -70,6 +73,7 @@ void check_complex_aligned(const void * ptr, const char * operation) {
              "transforming.";
     throw RuntimeError(error.str());
   }
+  // GCOVR_EXCL_STOP
 }
 }  // namespace
 
