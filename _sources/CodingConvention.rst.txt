@@ -66,6 +66,32 @@ Language Standard
 - ``constexpr`` for compile-time constants
 - Structured bindings where appropriate
 
+Initialization and Narrowing Conversions
+========================================
+
+Use brace (list) initialization for variable definitions. Brace
+initialization makes implicit narrowing conversions a compile-time error and
+is therefore preferred over ``=`` initialization:
+
+.. code-block:: c++
+
+    Index_t nb_pixels{shape[0] * shape[1]};   // good: narrowing is rejected
+    Index_t nb_pixels = shape[0] * shape[1];  // avoid
+
+    for (Index_t comp{0}; comp < nb_components; ++comp) { ... }
+
+Where a narrowing conversion is genuinely required — for example at the MPI
+boundary, where the standard mandates ``int`` arguments — make it explicit
+with ``static_cast`` so the intent is visible and grep-able:
+
+.. code-block:: c++
+
+    int sizes[2] = {static_cast<int>(local_shape[0]),
+                    static_cast<int>(local_shape[1])};
+
+Never rely on implicit narrowing in assignments, function arguments, or
+return statements.
+
 Namespaces
 ==========
 

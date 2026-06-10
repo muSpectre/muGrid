@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Code coverage" href="Coverage.html"><link rel="prev" title="C++ API Reference" href="CplusplusAPI.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Coding Convention - µGrid 0.106.0-15-g7b79b36f documentation</title>
+        <title>Coding Convention - µGrid 0.106.0-16-gcc1f0f1f documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.106.0-15-g7b79b36f
+      <a href="index.html"><div class="brand">µGrid 0.106.0-16-gcc1f0f1f
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.106.0-15-g7b79b36f
+  <span class="sidebar-brand-text">µGrid 0.106.0-16-gcc1f0f1f
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -301,6 +301,27 @@ project-specific rules.</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">constexpr</span></code> for compile-time constants</p></li>
 <li><p>Structured bindings where appropriate</p></li>
 </ul>
+</section>
+<section id="initialization-and-narrowing-conversions">
+<h3>Initialization and Narrowing Conversions<a class="headerlink" href="#initialization-and-narrowing-conversions" title="Link to this heading">¶</a></h3>
+<p>Use brace (list) initialization for variable definitions. Brace
+initialization makes implicit narrowing conversions a compile-time error and
+is therefore preferred over <code class="docutils literal notranslate"><span class="pre">=</span></code> initialization:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">Index_t</span><span class="w"> </span><span class="n">nb_pixels</span><span class="p">{</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]};</span><span class="w">   </span><span class="c1">// good: narrowing is rejected</span>
+<span class="n">Index_t</span><span class="w"> </span><span class="n">nb_pixels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span><span class="w">  </span><span class="c1">// avoid</span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Index_t</span><span class="w"> </span><span class="n">comp</span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"> </span><span class="n">comp</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nb_components</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">comp</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Where a narrowing conversion is genuinely required — for example at the MPI
+boundary, where the standard mandates <code class="docutils literal notranslate"><span class="pre">int</span></code> arguments — make it explicit
+with <code class="docutils literal notranslate"><span class="pre">static_cast</span></code> so the intent is visible and grep-able:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">sizes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="n">local_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+<span class="w">                </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="n">local_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])};</span>
+</pre></div>
+</div>
+<p>Never rely on implicit narrowing in assignments, function arguments, or
+return statements.</p>
 </section>
 <section id="namespaces">
 <h3>Namespaces<a class="headerlink" href="#namespaces" title="Link to this heading">¶</a></h3>
@@ -561,6 +582,7 @@ bugs.</p>
 </li>
 <li><a class="reference internal" href="#c-conventions">C++ Conventions</a><ul>
 <li><a class="reference internal" href="#language-standard">Language Standard</a></li>
+<li><a class="reference internal" href="#initialization-and-narrowing-conversions">Initialization and Narrowing Conversions</a></li>
 <li><a class="reference internal" href="#namespaces">Namespaces</a></li>
 <li><a class="reference internal" href="#file-names-and-extensions">File Names and Extensions</a></li>
 <li><a class="reference internal" href="#header-guards">Header Guards</a></li>
@@ -592,7 +614,7 @@ bugs.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=bd58a17e"></script>
+</div><script src="_static/documentation_options.js?v=326e9b22"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
