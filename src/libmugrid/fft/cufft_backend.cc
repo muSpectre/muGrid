@@ -36,9 +36,21 @@
 #include "cufft_backend.hh"
 #include "core/exception.hh"
 
+#include <cuda_runtime.h>
+
+#include <cstdint>
 #include <sstream>
 
 namespace muGrid {
+
+namespace {
+// cuFFT requires the real array of D2Z/Z2D transforms to be aligned like a
+// complex array; check against the complex type's size.
+bool is_complex_aligned(const void * ptr) {
+  return reinterpret_cast<std::uintptr_t>(ptr) % sizeof(cufftDoubleComplex) ==
+         0;
+}
+}  // namespace
 
 cuFFTBackend::cuFFTBackend() : plan_cache{} {}
 
@@ -47,6 +59,26 @@ cuFFTBackend::~cuFFTBackend() {
   for (auto & entry : this->plan_cache) {
     cufftDestroy(entry.second);
   }
+  if (this->scratch != nullptr) {
+    cudaFree(this->scratch);
+  }
+}
+
+void * cuFFTBackend::get_scratch(std::size_t nb_bytes) {
+  if (nb_bytes > this->scratch_bytes) {
+    if (this->scratch != nullptr) {
+      cudaFree(this->scratch);
+      this->scratch = nullptr;
+      this->scratch_bytes = 0;
+    }
+    cudaError_t err = cudaMalloc(&this->scratch, nb_bytes);
+    if (err != cudaSuccess) {
+      throw RuntimeError(std::string{"cudaMalloc of cuFFT scratch failed: "} +
+                         cudaGetErrorString(err));
+    }
+    this->scratch_bytes = nb_bytes;
+  }
+  return this->scratch;
 }
 
 void cuFFTBackend::check_cufft_result(cufftResult result,
@@ -179,6 +211,13 @@ cufftHandle cuFFTBackend::get_plan(TransformType type, Index_t n, Index_t batch,
 void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
                        Index_t in_stride, Index_t in_dist, Complex * output,
                        Index_t out_stride, Index_t out_dist) {
+  // Ranks with an empty subdomain (possible when a grid dimension is
+  // smaller than the process grid) have nothing to transform; cuFFT
+  // rejects batch == 0 at plan creation.
+  if (batch == 0) {
+    return;
+  }
+
   // cuFFT does not support strided real-to-complex transforms.
   // This is a documented limitation: "Strides on the real part of
   // real-to-complex and complex-to-real transforms are not supported."
@@ -198,10 +237,31 @@ void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
   cufftHandle plan =
       get_plan(R2C, n, batch, in_stride, in_dist, out_stride, out_dist);
 
+  // cufftExecD2Z rejects real input arrays that are not aligned like a
+  // complex array (CUFFT_INVALID_VALUE). This happens when a z-slab of a 3D
+  // field starts at an odd number of doubles from the (aligned) allocation,
+  // e.g. for odd grid dimensions. Stage such input through an aligned
+  // scratch buffer.
+  const Real * exec_input{input};
+  if (!is_complex_aligned(input)) {
+    Index_t nb_input_elems{(batch - 1) * in_dist + n};
+    std::size_t nb_bytes{static_cast<std::size_t>(nb_input_elems) *
+                         sizeof(Real)};
+    Real * aligned_input{static_cast<Real *>(this->get_scratch(nb_bytes))};
+    cudaError_t err =
+        cudaMemcpy(aligned_input, input, nb_bytes, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      throw RuntimeError(
+          std::string{"cudaMemcpy to cuFFT scratch failed: "} +
+          cudaGetErrorString(err));
+    }
+    exec_input = aligned_input;
+  }
+
   // cuFFT's D2Z expects cufftDoubleReal* and cufftDoubleComplex*
   // These are compatible with double* and std::complex<double>*
   cufftResult result = cufftExecD2Z(
-      plan, const_cast<cufftDoubleReal *>(input),
+      plan, const_cast<cufftDoubleReal *>(exec_input),
       reinterpret_cast<cufftDoubleComplex *>(output));
 
   check_cufft_result(result, "D2Z execution");
@@ -211,6 +271,11 @@ void cuFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
 void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
                        Index_t in_stride, Index_t in_dist, Real * output,
                        Index_t out_stride, Index_t out_dist) {
+  // Empty subdomain: nothing to transform (see r2c)
+  if (batch == 0) {
+    return;
+  }
+
   // cuFFT does not support strided complex-to-real transforms.
   // This is a documented limitation: "Strides on the real part of
   // real-to-complex and complex-to-real transforms are not supported."
@@ -230,15 +295,49 @@ void cuFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
   cufftHandle plan =
       get_plan(C2R, n, batch, in_stride, in_dist, out_stride, out_dist);
 
+  // cufftExecZ2D rejects real output arrays that are not aligned like a
+  // complex array (CUFFT_INVALID_VALUE); see r2c above. Transform into an
+  // aligned scratch buffer and copy to the destination afterwards.
+  Real * exec_output{output};
+  Index_t nb_output_elems{(batch - 1) * out_dist + n};
+  std::size_t nb_output_bytes{static_cast<std::size_t>(nb_output_elems) *
+                              sizeof(Real)};
+  bool output_misaligned{!is_complex_aligned(output)};
+  if (output_misaligned) {
+    exec_output = static_cast<Real *>(this->get_scratch(nb_output_bytes));
+    if (out_dist > n) {
+      // Gaps between batches (e.g. ghost cells) are not written by the
+      // transform; pre-fill the scratch with the destination content so the
+      // copy-back below does not clobber them with stale scratch data.
+      cudaError_t err = cudaMemcpy(exec_output, output, nb_output_bytes,
+                                   cudaMemcpyDeviceToDevice);
+      if (err != cudaSuccess) {
+        throw RuntimeError(
+            std::string{"cudaMemcpy to cuFFT scratch failed: "} +
+            cudaGetErrorString(err));
+      }
+    }
+  }
+
   // Note: cuFFT may modify the input during c2r transforms
   // The const_cast is necessary but the input data may be modified
   cufftResult result = cufftExecZ2D(
       plan,
       const_cast<cufftDoubleComplex *>(
           reinterpret_cast<const cufftDoubleComplex *>(input)),
-      output);
+      exec_output);
 
   check_cufft_result(result, "Z2D execution");
+
+  if (output_misaligned) {
+    cudaError_t err = cudaMemcpy(output, exec_output, nb_output_bytes,
+                                 cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      throw RuntimeError(
+          std::string{"cudaMemcpy from cuFFT scratch failed: "} +
+          cudaGetErrorString(err));
+    }
+  }
   // Synchronize so the result is complete before the caller hands the buffer
   // to GPU-aware MPI (which is not ordered against the cuFFT stream).
   cudaDeviceSynchronize();
@@ -248,6 +347,11 @@ void cuFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
                                Index_t in_stride, Index_t in_dist,
                                Complex * output, Index_t out_stride,
                                Index_t out_dist) {
+  // Empty subdomain: nothing to transform (see r2c)
+  if (batch == 0) {
+    return;
+  }
+
   cufftHandle plan =
       get_plan(C2C, n, batch, in_stride, in_dist, out_stride, out_dist);
 
@@ -265,6 +369,11 @@ void cuFFTBackend::c2c_backward(Index_t n, Index_t batch, const Complex * input,
                                 Index_t in_stride, Index_t in_dist,
                                 Complex * output, Index_t out_stride,
                                 Index_t out_dist) {
+  // Empty subdomain: nothing to transform (see r2c)
+  if (batch == 0) {
+    return;
+  }
+
   cufftHandle plan =
       get_plan(C2C, n, batch, in_stride, in_dist, out_stride, out_dist);
 

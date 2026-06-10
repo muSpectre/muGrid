@@ -236,6 +236,12 @@ rocFFTBackend::get_plan(TransformType type, Direction direction, Index_t n,
 void rocFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
                         Index_t in_stride, Index_t in_dist, Complex * output,
                         Index_t out_stride, Index_t out_dist) {
+  // Ranks with an empty subdomain (possible when a grid dimension is
+  // smaller than the process grid) have nothing to transform.
+  if (batch == 0) {
+    return;
+  }
+
   CachedPlan & cached =
       get_plan(R2C, FORWARD, n, batch, in_stride, in_dist, out_stride,
                out_dist);
@@ -255,6 +261,11 @@ void rocFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
 void rocFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
                         Index_t in_stride, Index_t in_dist, Real * output,
                         Index_t out_stride, Index_t out_dist) {
+  // Empty subdomain: nothing to transform (see r2c)
+  if (batch == 0) {
+    return;
+  }
+
   CachedPlan & cached =
       get_plan(C2R, BACKWARD, n, batch, in_stride, in_dist, out_stride,
                out_dist);
@@ -276,6 +287,11 @@ void rocFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
                                 Index_t in_stride, Index_t in_dist,
                                 Complex * output, Index_t out_stride,
                                 Index_t out_dist) {
+  // Empty subdomain: nothing to transform (see r2c)
+  if (batch == 0) {
+    return;
+  }
+
   CachedPlan & cached =
       get_plan(C2C, FORWARD, n, batch, in_stride, in_dist, out_stride,
                out_dist);
@@ -295,6 +311,11 @@ void rocFFTBackend::c2c_backward(Index_t n, Index_t batch,
                                  const Complex * input, Index_t in_stride,
                                  Index_t in_dist, Complex * output,
                                  Index_t out_stride, Index_t out_dist) {
+  // Empty subdomain: nothing to transform (see r2c)
+  if (batch == 0) {
+    return;
+  }
+
   CachedPlan & cached =
       get_plan(C2C, BACKWARD, n, batch, in_stride, in_dist, out_stride,
                out_dist);

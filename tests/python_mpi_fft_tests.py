@@ -48,8 +48,11 @@ def get_device_for_rank(device, comm):
     """Get device specification for a given MPI rank.
 
     For CPU tests, returns None (default device).
-    For GPU tests, returns "cuda:N" where N is the MPI rank,
-    so each rank uses a different GPU.
+    For GPU tests, returns "cuda:N" where N is the MPI rank modulo the
+    number of available GPUs, so ranks are distributed round-robin across
+    the devices. (A plain "cuda:{rank}" raises cudaErrorInvalidDevice on
+    ranks beyond the device count; since only those ranks raise, the
+    remaining ranks deadlock in the next collective.)
 
     Parameters
     ----------
@@ -65,8 +68,11 @@ def get_device_for_rank(device, comm):
     """
     if device == "cpu":
         return None
-    # For GPU, each MPI rank uses its own GPU
-    return f"cuda:{comm.rank}"
+    # For GPU, distribute ranks round-robin across the available devices
+    import cupy
+
+    nb_devices = cupy.cuda.runtime.getDeviceCount()
+    return f"cuda:{comm.rank % nb_devices}"
 
 
 def make_subdomain_slices(locations, nb_pts):

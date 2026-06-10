@@ -138,8 +138,26 @@ class cuFFTBackend : public FFT1DBackend {
    */
   static void check_cufft_result(cufftResult result, const char * operation);
 
+  /**
+   * Return a device scratch buffer of at least nb_bytes, reallocating the
+   * cached buffer if necessary.
+   *
+   * cuFFT requires the real array of D2Z/Z2D transforms to be aligned like
+   * a complex array (16 bytes); slab pointers offset by an odd number of
+   * doubles are only 8-byte aligned and make cufftExec* fail with
+   * CUFFT_INVALID_VALUE. Misaligned transforms are staged through this
+   * buffer.
+   */
+  void * get_scratch(std::size_t nb_bytes);
+
   //! Plan cache
   std::unordered_map<PlanKey, cufftHandle, PlanKeyHash> plan_cache;
+
+  //! Scratch buffer for misaligned real arrays (device memory)
+  void * scratch{nullptr};
+
+  //! Current size of the scratch buffer in bytes
+  std::size_t scratch_bytes{0};
 };
 
 }  // namespace muGrid

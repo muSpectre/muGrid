@@ -169,8 +169,11 @@ if(MUGRID_ENABLE_PYTHON)
                     COMMAND ${MPIEXEC_EXECUTABLE} -n ${NP} --oversubscribe
                         ${MUGRID_PYTHON_EXECUTABLE} -m pytest -v -s ${CMAKE_CURRENT_SOURCE_DIR}
                 )
+                # The full pytest suite per rank count includes the
+                # convolution performance tests, which exceed 300 s at high
+                # rank counts on oversubscribed machines.
                 set_tests_properties(mpi_mugrid_python_binding_tests-np_${NP} PROPERTIES
-                    TIMEOUT 300
+                    TIMEOUT 900
                     PROCESSORS ${NP}
                     ENVIRONMENT "${PYTHON_TEST_ENV}"
                 )
