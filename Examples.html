@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="C++ Bindings" href="Cplusplus.html"><link rel="prev" title="Linear Operators" href="Operators.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Examples - µGrid 0.106.0-18-ge6627fca documentation</title>
+        <title>Examples - µGrid 0.106.0-19-gce803a2d documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.106.0-18-ge6627fca
+      <a href="index.html"><div class="brand">µGrid 0.106.0-19-gce803a2d
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.106.0-18-ge6627fca
+  <span class="sidebar-brand-text">µGrid 0.106.0-19-gce803a2d
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -395,6 +395,105 @@ for the stencil operations:</p>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Solved! Solution range: [</span><span class="si">{</span><span class="n">solution</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">solution</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+<section id="preconditioning">
+<h3>Preconditioning<a class="headerlink" href="#preconditioning" title="Link to this heading">¶</a></h3>
+<p>The conjugate-gradient solver accepts a preconditioner through its <code class="docutils literal notranslate"><span class="pre">prec</span></code>
+argument: any callable <code class="docutils literal notranslate"><span class="pre">prec(r,</span> <span class="pre">z)</span></code> that overwrites <code class="docutils literal notranslate"><span class="pre">z</span></code> with <code class="docutils literal notranslate"><span class="pre">M⁻¹</span> <span class="pre">r</span></code>.
+The <a href="#id1"><span class="problematic" id="id2">:mod:`muGrid.Preconditioners`</span></a> module provides a small class hierarchy
+implementing this contract:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">IdentityPreconditioner</span></code> — no-op, equivalent to <code class="docutils literal notranslate"><span class="pre">prec=None</span></code>;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">JacobiPreconditioner(diagonal)</span></code> — divides by the operator diagonal.
+Useful for strongly heterogeneous coefficients, where it equilibrates the
+spectrum (for a constant diagonal it merely rescales the system and does
+not change the iteration);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FourierPreconditioner(engine,</span> <span class="pre">kernel)</span></code> — applies a spectral kernel,
+<code class="docutils literal notranslate"><span class="pre">z</span> <span class="pre">=</span> <span class="pre">F⁻¹[k(q)</span> <span class="pre">·</span> <span class="pre">F</span> <span class="pre">r]</span></code>, using a muGrid <code class="docutils literal notranslate"><span class="pre">FFTEngine</span></code>. With the inverse
+symbol of (an approximation to) the operator as the kernel, this is the
+classic FFT preconditioner.</p></li>
+</ul>
+<section id="spectral-fft-preconditioning-of-the-poisson-problem">
+<h4>Spectral (FFT) preconditioning of the Poisson problem<a class="headerlink" href="#spectral-fft-preconditioning-of-the-poisson-problem" title="Link to this heading">¶</a></h4>
+<p>The finite-difference Laplacian diagonalizes in Fourier space, so its exact
+inverse symbol is available in closed form — with it, conjugate gradients
+converges in a single iteration (it becomes a direct solver). For operators
+that are only <em>approximately</em> diagonalized by the FFT (e.g. weakly
+heterogeneous coefficients), the same kernel built from the homogeneous
+reference operator still yields mesh-independent iteration counts.</p>
+<p>One detail is essential for MPI runs: the solver fields and the FFT must
+share a single domain decomposition. A stand-alone
+<code class="docutils literal notranslate"><span class="pre">CartesianDecomposition</span></code> would in general split the domain differently
+than the FFT’s pencil decomposition. Since the <code class="docutils literal notranslate"><span class="pre">FFTEngine</span></code> <em>is</em> a
+<code class="docutils literal notranslate"><span class="pre">CartesianDecomposition</span></code> (it supports ghost buffers in real space), the
+engine itself serves as the decomposition for everything — the stencil
+operator, the solver work fields, and the transforms:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid.Preconditioners</span><span class="w"> </span><span class="kn">import</span> <span class="n">FourierPreconditioner</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">muGrid.Solvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">conjugate_gradients</span>
+
+<span class="n">comm</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">Communicator</span><span class="p">()</span>
+<span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span>
+<span class="n">h</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">nb_grid_pts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c1"># The FFT engine doubles as the (ghosted) domain decomposition</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">comm</span><span class="p">,</span>
+                          <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+<span class="n">laplace</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">LaplaceOperator</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">),</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">h</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="n">rhs</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;rhs&quot;</span><span class="p">)</span>
+<span class="n">solution</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;solution&quot;</span><span class="p">)</span>
+
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">coords</span>
+<span class="n">rhs</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">X</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">Y</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">hessp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Ax</span><span class="p">):</span>
+    <span class="n">engine</span><span class="o">.</span><span class="n">communicate_ghosts</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">laplace</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Ax</span><span class="p">)</span>
+
+<span class="c1"># Exact inverse symbol of -FD-Laplacian/h²; the q = 0 mode of the</span>
+<span class="c1"># periodic Laplacian is singular and is projected out by a zero entry</span>
+<span class="c1"># (the right-hand side must be free of it, i.e. have zero mean).</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inverse_fd_laplacian</span><span class="p">(</span><span class="n">engine</span><span class="p">):</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">fftfreq</span>  <span class="c1"># shape [dim, *local_fourier_shape]</span>
+    <span class="n">denom</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">q</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">h</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">denom</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">denom</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">denom</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="mf">0.0</span><span class="p">)</span>
+
+<span class="n">prec</span> <span class="o">=</span> <span class="n">FourierPreconditioner</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">inverse_fd_laplacian</span><span class="p">)</span>
+
+<span class="n">conjugate_gradients</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_collection</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">solution</span><span class="p">,</span>
+                    <span class="n">hessp</span><span class="o">=</span><span class="n">hessp</span><span class="p">,</span> <span class="n">prec</span><span class="o">=</span><span class="n">prec</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span> <span class="n">maxiter</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The kernel is evaluated once on the rank-local Fourier subdomain
+(<code class="docutils literal notranslate"><span class="pre">engine.fftfreq</span></code> only exposes local frequencies), so the code is
+unchanged between serial and MPI-parallel execution. The FFT normalisation
+is folded into the kernel; the kernel broadcasts over field components, so
+vector- and tensor-valued unknowns are preconditioned per component.</p>
+</section>
+<section id="jacobi-preconditioning-of-heterogeneous-problems">
+<h4>Jacobi preconditioning of heterogeneous problems<a class="headerlink" href="#jacobi-preconditioning-of-heterogeneous-problems" title="Link to this heading">¶</a></h4>
+<p>For a screened Poisson problem <code class="docutils literal notranslate"><span class="pre">(-∇²/h²</span> <span class="pre">+</span> <span class="pre">c(x))</span> <span class="pre">u</span> <span class="pre">=</span> <span class="pre">b</span></code> with a coefficient
+<code class="docutils literal notranslate"><span class="pre">c(x)</span></code> varying over many orders of magnitude, dividing by the operator
+diagonal restores a well-clustered spectrum:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">muGrid.Preconditioners</span><span class="w"> </span><span class="kn">import</span> <span class="n">JacobiPreconditioner</span>
+
+<span class="n">diag</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_field</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
+<span class="n">diag</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">/</span> <span class="n">h</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">c</span>  <span class="c1"># stencil center plus screening coefficient</span>
+
+<span class="n">conjugate_gradients</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">engine</span><span class="o">.</span><span class="n">real_space_collection</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">solution</span><span class="p">,</span>
+                    <span class="n">hessp</span><span class="o">=</span><span class="n">hessp_screened</span><span class="p">,</span>
+                    <span class="n">prec</span><span class="o">=</span><span class="n">JacobiPreconditioner</span><span class="p">(</span><span class="n">diag</span><span class="p">),</span>
+                    <span class="n">tol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span> <span class="n">maxiter</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In the test suite (<code class="docutils literal notranslate"><span class="pre">tests/python_preconditioner_tests.py</span></code>), this reduces
+the iteration count on a 32×32 problem with <code class="docutils literal notranslate"><span class="pre">c</span></code> spanning six orders of
+magnitude from 164 to 21; the FFT-preconditioned Poisson solve converges in
+a single iteration.</p>
+</section>
 </section>
 </section>
 <section id="linear-elasticity-solver">
@@ -658,6 +757,11 @@ python<span class="w"> </span>examples/homogenization.py<span class="w"> </span>
 <li><a class="reference internal" href="#creating-fields-and-setting-up-the-rhs">Creating fields and setting up the RHS</a></li>
 <li><a class="reference internal" href="#solving-with-conjugate-gradients">Solving with conjugate gradients</a></li>
 <li><a class="reference internal" href="#complete-poisson-solver">Complete Poisson solver</a></li>
+<li><a class="reference internal" href="#preconditioning">Preconditioning</a><ul>
+<li><a class="reference internal" href="#spectral-fft-preconditioning-of-the-poisson-problem">Spectral (FFT) preconditioning of the Poisson problem</a></li>
+<li><a class="reference internal" href="#jacobi-preconditioning-of-heterogeneous-problems">Jacobi preconditioning of heterogeneous problems</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#linear-elasticity-solver">Linear Elasticity Solver</a><ul>
@@ -681,7 +785,7 @@ python<span class="w"> </span>examples/homogenization.py<span class="w"> </span>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=3b9b174e"></script>
+</div><script src="_static/documentation_options.js?v=4a56076b"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

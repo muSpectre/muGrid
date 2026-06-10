@@ -164,6 +164,112 @@ Here is the complete, minimal Poisson solver:
 
     print(f"Solved! Solution range: [{solution.p.min():.4f}, {solution.p.max():.4f}]")
 
+Preconditioning
+---------------
+
+The conjugate-gradient solver accepts a preconditioner through its ``prec``
+argument: any callable ``prec(r, z)`` that overwrites ``z`` with ``M⁻¹ r``.
+The :mod:`muGrid.Preconditioners` module provides a small class hierarchy
+implementing this contract:
+
+- ``IdentityPreconditioner`` — no-op, equivalent to ``prec=None``;
+- ``JacobiPreconditioner(diagonal)`` — divides by the operator diagonal.
+  Useful for strongly heterogeneous coefficients, where it equilibrates the
+  spectrum (for a constant diagonal it merely rescales the system and does
+  not change the iteration);
+- ``FourierPreconditioner(engine, kernel)`` — applies a spectral kernel,
+  ``z = F⁻¹[k(q) · F r]``, using a muGrid ``FFTEngine``. With the inverse
+  symbol of (an approximation to) the operator as the kernel, this is the
+  classic FFT preconditioner.
+
+Spectral (FFT) preconditioning of the Poisson problem
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The finite-difference Laplacian diagonalizes in Fourier space, so its exact
+inverse symbol is available in closed form — with it, conjugate gradients
+converges in a single iteration (it becomes a direct solver). For operators
+that are only *approximately* diagonalized by the FFT (e.g. weakly
+heterogeneous coefficients), the same kernel built from the homogeneous
+reference operator still yields mesh-independent iteration counts.
+
+One detail is essential for MPI runs: the solver fields and the FFT must
+share a single domain decomposition. A stand-alone
+``CartesianDecomposition`` would in general split the domain differently
+than the FFT's pencil decomposition. Since the ``FFTEngine`` *is* a
+``CartesianDecomposition`` (it supports ghost buffers in real space), the
+engine itself serves as the decomposition for everything — the stencil
+operator, the solver work fields, and the transforms:
+
+.. code-block:: python
+
+    import numpy as np
+    import muGrid
+    from muGrid.Preconditioners import FourierPreconditioner
+    from muGrid.Solvers import conjugate_gradients
+
+    comm = muGrid.Communicator()
+    nb_grid_pts = (64, 64)
+    h = 1.0 / nb_grid_pts[0]
+
+    # The FFT engine doubles as the (ghosted) domain decomposition
+    engine = muGrid.FFTEngine(nb_grid_pts, comm,
+                              nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1))
+
+    laplace = muGrid.LaplaceOperator(len(nb_grid_pts), -1.0 / h**2)
+
+    rhs = engine.real_space_field("rhs")
+    solution = engine.real_space_field("solution")
+
+    X, Y = engine.coords
+    rhs.p[...] = np.sin(2 * np.pi * X) * np.sin(2 * np.pi * Y)
+
+    def hessp(x, Ax):
+        engine.communicate_ghosts(x)
+        laplace.apply(x, Ax)
+
+    # Exact inverse symbol of -FD-Laplacian/h²; the q = 0 mode of the
+    # periodic Laplacian is singular and is projected out by a zero entry
+    # (the right-hand side must be free of it, i.e. have zero mean).
+    def inverse_fd_laplacian(engine):
+        q = engine.fftfreq  # shape [dim, *local_fourier_shape]
+        denom = (4 * np.sin(np.pi * q) ** 2 / h**2).sum(axis=0)
+        return np.where(denom > 0, 1 / np.where(denom > 0, denom, 1), 0.0)
+
+    prec = FourierPreconditioner(engine, inverse_fd_laplacian)
+
+    conjugate_gradients(comm, engine.real_space_collection, rhs, solution,
+                        hessp=hessp, prec=prec, tol=1e-8, maxiter=10)
+
+The kernel is evaluated once on the rank-local Fourier subdomain
+(``engine.fftfreq`` only exposes local frequencies), so the code is
+unchanged between serial and MPI-parallel execution. The FFT normalisation
+is folded into the kernel; the kernel broadcasts over field components, so
+vector- and tensor-valued unknowns are preconditioned per component.
+
+Jacobi preconditioning of heterogeneous problems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For a screened Poisson problem ``(-∇²/h² + c(x)) u = b`` with a coefficient
+``c(x)`` varying over many orders of magnitude, dividing by the operator
+diagonal restores a well-clustered spectrum:
+
+.. code-block:: python
+
+    from muGrid.Preconditioners import JacobiPreconditioner
+
+    diag = engine.real_space_field("diagonal")
+    diag.p[...] = 4 / h**2 + c  # stencil center plus screening coefficient
+
+    conjugate_gradients(comm, engine.real_space_collection, rhs, solution,
+                        hessp=hessp_screened,
+                        prec=JacobiPreconditioner(diag),
+                        tol=1e-8, maxiter=1000)
+
+In the test suite (``tests/python_preconditioner_tests.py``), this reduces
+the iteration count on a 32×32 problem with ``c`` spanning six orders of
+magnitude from 164 to 21; the FFT-preconditioned Poisson solve converges in
+a single iteration.
+
 Linear Elasticity Solver
 ************************
 
