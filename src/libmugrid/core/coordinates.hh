@@ -163,7 +163,10 @@ namespace muGrid {
          */
         explicit DynCoord(Dim_t dim, const T value = T{})
             : dim{dim}, long_array{} {
-            if (this->dim > Dim_t(MaxDim) || this->dim < 0) {
+            // Match the initializer-list/vector constructors: only the upper
+            // bound is validated. A negative dim (e.g. Unknown == -1) is a
+            // legitimate sentinel used before the grid size is known.
+            if (this->dim > Dim_t(MaxDim)) {
                 std::stringstream error{};
                 error << "The maximum dimension representable by this dynamic "
                          "array is "
@@ -171,8 +174,7 @@ namespace muGrid {
                       << ".";
                 throw RuntimeError(error.str());
             }
-            std::fill(this->long_array.begin(),
-                      this->long_array.begin() + this->dim, value);
+            std::fill(this->long_array.begin(), this->long_array.end(), value);
         }
 
         //! Constructor from a statically sized coord
