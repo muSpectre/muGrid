@@ -23,6 +23,10 @@ unreleased
 - ENH: The MPI transposes remain pure MPI derived-datatype operations
   (`MPI_Type_create_subarray`/`hvector` + `MPI_Alltoallw`) with no manual
   pack/unpack, so they run directly on device buffers with a GPU-aware MPI
+- ENH: The FFT engine now verifies at construction that its real-space and
+  Fourier-space collections use the same storage order; together with the
+  existing collection-membership checks in `fft()`/`ifft()` this guarantees
+  the single-layout assumption of the work buffers and MPI transposes
 - TST: MPI FFT tests now compare against numpy for grids that do not divide
   evenly across the process grid (odd Y/Z), for multi-component fields, and
   for the 3D inverse transform

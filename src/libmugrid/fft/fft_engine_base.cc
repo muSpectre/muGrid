@@ -171,6 +171,22 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
       StorageOrder::ArrayOfStructures, fourier_no_ghosts,
       fourier_no_ghosts, device);
 
+  // The FFT engine uses a single memory layout (AoS/SoA) for its work
+  // buffers and MPI transposes, taken from the input field. Fields cannot
+  // override their collection's storage order, so verifying once that the
+  // real-space and Fourier-space collections agree guarantees that every
+  // fft()/ifft() call operates on a consistent layout. (Both collections
+  // are currently constructed AoS on host and forced to SoA on device, so
+  // this guards against future changes to collection construction.)
+  if (this->get_collection().get_storage_order() !=
+      this->fourier_collection->get_storage_order()) {
+    throw RuntimeError(
+        "The real-space and Fourier-space field collections of an FFT "
+        "engine must use the same storage order (AoS/SoA): the FFT work "
+        "buffers and MPI transposes assume a single memory layout for "
+        "input and output fields.");
+  }
+
   // Compute normalization factor
   this->norm_factor = fft_normalization(nb_domain_grid_pts);
 
