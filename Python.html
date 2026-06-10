@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Fast Fourier Transform" href="FFT.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Python Bindings - µGrid 0.106.0 documentation</title>
+        <title>Python Bindings - µGrid 0.106.0-15-g7b79b36f documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.106.0
+      <a href="index.html"><div class="brand">µGrid 0.106.0-15-g7b79b36f
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.106.0
+  <span class="sidebar-brand-text">µGrid 0.106.0-15-g7b79b36f
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -335,7 +335,9 @@ certain locations in the domain.</p></li>
 <span class="k">assert</span> <span class="n">field2</span><span class="o">.</span><span class="n">p</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
 </pre></div>
 </div>
-<p>The first argument to the constructor of <cite>FieldCollection</cite> is the spatial dimension.
+<p>The first argument to the constructor of <cite>GlobalFieldCollection</cite> is the number of
+grid points (the grid shape), as in the example above. (Only <cite>LocalFieldCollection</cite>
+takes the spatial dimension as its first argument.)
 Fields are then registered with the field accessor methods of the field collection,
 e.g. <cite>real_field</cite> in the example above. Fields are <em>named</em>, and the name needs to be
 unique. Accessing a field of the same name yield the same field object.</p>
@@ -466,6 +468,15 @@ to represent it. The stencil then has the shape</p>
 <p>Note that the stencil can be of a lower dimensional shape, in which case missing dimensions are assumed to
 be unity. It is assumed that first <cite>nodel-points</cite>, then <cite>quadrature-points</cite> and finally <cite>operators</cite> are
 missing. This means we can represent a simple forward-differences gradient operator in two dimensions as</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">stencil</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="p">[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span>
+    <span class="p">[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]</span>
+<span class="p">])</span>
+<span class="c1"># The first argument is the stencil offset (one entry per spatial</span>
+<span class="c1"># dimension), not the dimension.</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">stencil</span><span class="p">)</span>
+</pre></div>
+</div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
@@ -593,7 +604,7 @@ of the field from</p>
 <a class="reference external" href="https://numpy.org/doc/stable/user/basics.broadcasting.html">broadcasting rules</a>
 make it simple to vectorize over pixels,
 for example normalizing the displacement field could look like:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">ux</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uy</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uz</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">displacement_field</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">ux</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uy</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">uz</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Note that the default storage order of the field is column-major, which means the
@@ -740,7 +751,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=37b4aef2"></script>
+</div><script src="_static/documentation_options.js?v=bd58a17e"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

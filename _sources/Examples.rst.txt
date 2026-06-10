@@ -377,4 +377,4 @@ Run the example:
     mpiexec -n 4 python examples/homogenization.py -n 128,128
 
     # On GPU
-    python examples/homogenization.py -n 256,256 --gpu
+    python examples/homogenization.py -n 256,256 -d gpu

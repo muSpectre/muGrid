@@ -184,7 +184,8 @@ specify the device:
     # Create GPU field
     field = decomp.real_field("gpu_field")
 
-    # Access coordinates (returned as CuPy arrays on GPU)
+    # Access coordinates (always returned as host-side NumPy arrays,
+    # regardless of the field's device)
     x, y = decomp.coords
 
 Convolution operators on GPU
