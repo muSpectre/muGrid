@@ -32,6 +32,13 @@
 .idea
 .ccls-cache
 .cache
+.junie
 
 /subprojects/*
 !/subprojects/*.wrap
+
+.venv
+
+# Agents
+AGENTS.md
+CLAUDE.md

@@ -29,6 +29,14 @@ unreleased
 - DOC: Coding convention: use brace initialization (non-narrowing); narrowing
   conversions must be explicit `static_cast`s (applied throughout the FFT
   subsystem)
+- BUG: Fixed a deadlock in `CartesianDecomposition::reduce_ghosts` when
+  subdomain sizes differ across ranks (e.g. 5 grid points over 4 ranks with
+  2-wide halos): the halo-larger-than-interior rejection was evaluated
+  against the rank-local interior extent, so small ranks threw while large
+  ranks blocked forever in `sendrecv_*_accumulate`. The check now uses the
+  global minimum interior extent (precomputed collectively at
+  initialisation), so all ranks throw consistently
+- ENH: Added `Communicator::min` (C++ and Python), mirroring `max`
 - BUG: Fixed state-field index rotation using bitwise `&` instead of modulo,
   which aliased `current()`/`old()` for `nb_memory` not of the form 2^k-1
 - BUG: Fixed 3D MPI FFT silently skipping the Y transform for process grids

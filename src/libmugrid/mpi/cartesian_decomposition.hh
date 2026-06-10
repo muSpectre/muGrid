@@ -134,6 +134,13 @@ namespace muGrid {
         std::vector<std::vector<Index_t>> recv_left_sequence;
         std::vector<Index_t> nb_sendrecv_steps;
 
+        //! Global minimum (over all ranks) of the interior subdomain extent
+        //! per direction. Computed collectively in initialise(); used by
+        //! reduce_ghosts() so that support checks make the same decision on
+        //! every rank (a rank-local check would throw on some ranks only and
+        //! deadlock the others in the subsequent sendrecv).
+        DynGridIndex global_min_nb_subdomain_grid_pts{};
+
         void check_dimension(const DynGridIndex & n,
                              const std::string & name) const;
     };

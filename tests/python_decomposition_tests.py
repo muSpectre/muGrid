@@ -57,6 +57,22 @@ def make_subdivisions():
     return [(comm, s) for s in nb_subdivisions]
 
 
+def reduce_ghosts_supported(
+    nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
+):
+    """reduce_ghosts supports halos no wider than the smallest interior
+    subdomain extent (per direction, over all ranks); the multi-step
+    reduction cascade is not implemented. The smallest interior extent is
+    the floor division because muGrid assigns the residual points to the
+    lowest-coordinate ranks.
+    """
+    min_interior = np.asarray(nb_domain_grid_pts) // np.asarray(nb_subdivisions)
+    return bool(
+        np.all(np.asarray(nb_ghosts_left) <= min_interior)
+        and np.all(np.asarray(nb_ghosts_right) <= min_interior)
+    )
+
+
 @pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
 def test_communicate_ghosts(comm, nb_subdivisions):
     # Create a Cartesian decomposition
@@ -225,6 +241,15 @@ def test_reduce_ghosts(comm, nb_subdivisions):
     # Store original interior values for comparison
     interior_before = field.s.copy()
 
+    # Halos wider than the smallest interior subdomain are rejected (the
+    # error is raised consistently on all ranks, so this does not deadlock)
+    if not reduce_ghosts_supported(
+        nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
+    ):
+        with pytest.raises(RuntimeError):
+            cart_decomp.reduce_ghosts(field)
+        return
+
     # Perform ghost reduction
     cart_decomp.reduce_ghosts(field)
 
@@ -275,6 +300,14 @@ def test_reduce_ghosts_multicomponent(comm, nb_subdivisions):
     # Fill with component-dependent values
     for comp in range(nb_components):
         field.sg[comp, ...] = comp + 1.0
+
+    # Halos wider than the smallest interior subdomain are rejected
+    if not reduce_ghosts_supported(
+        nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
+    ):
+        with pytest.raises(RuntimeError):
+            cart_decomp.reduce_ghosts(field)
+        return
 
     # Reduce ghosts
     cart_decomp.reduce_ghosts(field)
@@ -344,6 +377,14 @@ def test_reduce_ghosts_asymmetric(comm, nb_subdivisions):
             field.sg[(..., *index)] = 20.0
         else:
             field.sg[(..., *index)] = 1.0
+
+    # Halos wider than the smallest interior subdomain are rejected
+    if not reduce_ghosts_supported(
+        nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
+    ):
+        with pytest.raises(RuntimeError):
+            cart_decomp.reduce_ghosts(field)
+        return
 
     # Reduce
     cart_decomp.reduce_ghosts(field)

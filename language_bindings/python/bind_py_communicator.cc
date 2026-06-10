@@ -104,6 +104,14 @@ void add_communicator(py::module & mod) {
                      const Uint & arg) { return comm.max(arg); })
       .def("max", [](muGrid::Communicator & comm,
                      const Index_t & arg) { return comm.max(arg); })
+      .def("min", [](muGrid::Communicator & comm,
+                     const int & arg) { return comm.min(arg); })
+      .def("min", [](muGrid::Communicator & comm,
+                     const Real & arg) { return comm.min(arg); })
+      .def("min", [](muGrid::Communicator & comm,
+                     const Uint & arg) { return comm.min(arg); })
+      .def("min", [](muGrid::Communicator & comm,
+                     const Index_t & arg) { return comm.min(arg); })
       .def("all", [](muGrid::Communicator & comm,
                      const bool & arg) { return comm.all(arg); })
       .def("any", [](muGrid::Communicator & comm,

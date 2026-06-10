@@ -101,6 +101,17 @@ namespace muGrid {
                 subdomain_strides, nb_ghosts_left, nb_ghosts_right);
         }
 
+        // Compute the global minimum interior extent per direction. This is
+        // a collective operation; the result is identical on all ranks and
+        // lets reduce_ghosts() make rank-consistent support decisions.
+        this->global_min_nb_subdomain_grid_pts =
+            DynGridIndex(this->get_spatial_dim());
+        for (Dim_t direction{0}; direction < this->get_spatial_dim();
+             ++direction) {
+            this->global_min_nb_subdomain_grid_pts[direction] = this->comm.min(
+                nb_subdomain_grid_pts_without_ghosts[direction]);
+        }
+
         // Determine communication strategy
         this->recv_right_sequence.resize(this->get_spatial_dim());
         this->recv_left_sequence.resize(this->get_spatial_dim());
@@ -447,18 +458,25 @@ namespace muGrid {
 
             // reduce_ghosts uses a single communication step (below), which is
             // only correct when each ghost region maps into a single neighbor's
-            // interior, i.e. the halo does not exceed the interior extent.
-            // communicate_ghosts cascades for larger halos, but the reverse
-            // (reduce) cascade is not implemented; reject it rather than
-            // silently producing a wrong reduction.
-            if (nb_ghosts_left > nb_subdomain_grid_pts_without_ghosts ||
-                nb_ghosts_right > nb_subdomain_grid_pts_without_ghosts) {
+            // interior, i.e. the halo does not exceed the interior extent on
+            // ANY rank. communicate_ghosts cascades for larger halos, but the
+            // reverse (reduce) cascade is not implemented; reject it rather
+            // than silently producing a wrong reduction.
+            //
+            // The check MUST be made against the global minimum interior
+            // extent (identical on all ranks, precomputed collectively in
+            // initialise): a rank-local check would throw on the small ranks
+            // only and deadlock the remaining ranks in the sendrecv below.
+            auto min_interior{
+                this->global_min_nb_subdomain_grid_pts[direction]};
+            if (nb_ghosts_left > min_interior ||
+                nb_ghosts_right > min_interior) {
                 throw RuntimeError(
                     "reduce_ghosts does not support a ghost halo larger than "
-                    "the interior subdomain extent in a given direction "
-                    "(multi-step reduction is not implemented). Reduce the "
-                    "number of ghosts or the number of ranks in this "
-                    "direction.");
+                    "the interior subdomain extent of any rank in a given "
+                    "direction (multi-step reduction is not implemented). "
+                    "Reduce the number of ghosts or the number of ranks in "
+                    "this direction.");
             }
 
             // For reduce_ghosts, we reverse the communication direction:
