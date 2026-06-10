@@ -1182,6 +1182,93 @@ class FEMGradientOperator:
         return f"FEMGradientOperator(spatial_dim={self._cpp.spatial_dim})"
 
 
+class IsotropicStiffnessOperator:
+    """
+    Python wrapper for the fused isotropic linear-elastic stiffness operator.
+
+    Computes ``force = K @ displacement`` with ``K = B^T C B`` for linear
+    triangular (2D) or tetrahedral (3D) elements, where ``C`` is the isotropic
+    elasticity tensor parameterized by per-element Lamé fields ``lambda`` and
+    ``mu``. The geometry-only matrices are precomputed from the grid spacing at
+    construction time.
+
+    Parameters
+    ----------
+    spatial_dim : int
+        Spatial dimension (2 or 3).
+    grid_spacing : sequence of float
+        Grid spacing in each direction, e.g. ``[hx, hy]`` (2D) or
+        ``[hx, hy, hz]`` (3D).
+
+    Examples
+    --------
+    >>> op = IsotropicStiffnessOperator(2, [0.1, 0.1])
+    >>> op.apply(displacement, lambda_field, mu_field, force)
+    """
+
+    def __init__(self, spatial_dim: int, grid_spacing: Sequence[float]) -> None:
+        if spatial_dim == 2:
+            self._cpp = _muGrid.IsotropicStiffnessOperator2D(list(grid_spacing))
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
+        else:
+            raise ValueError(f"spatial_dim must be 2 or 3, got {spatial_dim}")
+        self._spatial_dim = spatial_dim
+
+    def apply(
+        self,
+        displacement: Field,
+        lambda_field: Field,
+        mu_field: Field,
+        force: Field,
+    ) -> None:
+        """Compute ``force = K @ displacement``."""
+        self._cpp.apply(
+            _unwrap(displacement),
+            _unwrap(lambda_field),
+            _unwrap(mu_field),
+            _unwrap(force),
+        )
+
+    def apply_increment(
+        self,
+        displacement: Field,
+        lambda_field: Field,
+        mu_field: Field,
+        alpha: float,
+        force: Field,
+    ) -> None:
+        """Compute ``force += alpha * K @ displacement``."""
+        self._cpp.apply_increment(
+            _unwrap(displacement),
+            _unwrap(lambda_field),
+            _unwrap(mu_field),
+            alpha,
+            _unwrap(force),
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying C++ object."""
+        return getattr(self._cpp, name)
+
+    def __repr__(self) -> str:
+        return f"IsotropicStiffnessOperator(spatial_dim={self._spatial_dim})"
+
+
+class IsotropicStiffnessOperator2D(IsotropicStiffnessOperator):
+    """Convenience wrapper fixing the spatial dimension to 2."""
+
+    def __init__(self, grid_spacing: Sequence[float]) -> None:
+        super().__init__(2, grid_spacing)
+
+
+class IsotropicStiffnessOperator3D(IsotropicStiffnessOperator):
+    """Convenience wrapper fixing the spatial dimension to 3."""
+
+    def __init__(self, grid_spacing: Sequence[float]) -> None:
+        super().__init__(3, grid_spacing)
+
+
 # FileIONetCDF wrapper (only if NetCDF is available)
 if hasattr(_muGrid, "FileIONetCDF"):
     _OpenMode = _muGrid.FileIONetCDF.OpenMode
@@ -1245,6 +1332,7 @@ if hasattr(_muGrid, "FileIONetCDF"):
                 open_mode = mode_map[open_mode_lower]
 
             self._cpp = _muGrid.FileIONetCDF(file_name, open_mode, _unwrap(comm))
+            self._file_name = file_name
 
         def register_field_collection(
             self,
@@ -1288,7 +1376,7 @@ if hasattr(_muGrid, "FileIONetCDF"):
             return getattr(self._cpp, name)
 
         def __repr__(self) -> str:
-            return f"FileIONetCDF({self._cpp.file_name!r})"
+            return f"FileIONetCDF({self._file_name!r})"
 
 else:
     # Placeholder when NetCDF is not available

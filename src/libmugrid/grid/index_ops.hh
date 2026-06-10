@@ -101,7 +101,7 @@ namespace muGrid {
             const GridIndex<dim> & nb_grid_pts, const GridIndex<dim> & locations,
             const GridIndex<dim> & strides, const GridIndex<dim> & axes_order,
             Index_t index) {
-            GridIndex<dim> retval{{nb_grid_pts[0]}};
+            GridIndex<dim> retval{};
             for (Index_t i{dim - 1}; i >= 0; --i) {
                 Index_t cur_coord{index / strides[axes_order[i]]};
                 retval[axes_order[i]] = cur_coord;
@@ -165,11 +165,13 @@ namespace muGrid {
         //------------------------------------------------------------------------//
         //! get the linear index of a pixel in a column-major grid
         template <size_t Dim>
-        constexpr Dim_t get_index(const GridIndex<Dim> & nb_grid_pts,
-                                  const GridIndex<Dim> & locations,
-                                  const GridIndex<Dim> & ccoord) {
-            Dim_t retval{0};
-            Dim_t factor{1};
+        constexpr Index_t get_index(const GridIndex<Dim> & nb_grid_pts,
+                                    const GridIndex<Dim> & locations,
+                                    const GridIndex<Dim> & ccoord) {
+            // Accumulate in Index_t (not Dim_t/int): grids can exceed 2^31
+            // pixels (e.g. 65536 x 65536), which would overflow an int index.
+            Index_t retval{0};
+            Index_t factor{1};
             for (size_t i{0}; i < Dim; ++i) {
                 retval += (ccoord[i] - locations[i]) * factor;
                 if (i != Dim - 1) {

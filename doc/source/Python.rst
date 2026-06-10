@@ -78,7 +78,9 @@ The following example shows how to initialize a field collection and create scal
 .. literalinclude:: ../../examples/field_collection.py
     :language: python
 
-The first argument to the constructor of `FieldCollection` is the spatial dimension.
+The first argument to the constructor of `GlobalFieldCollection` is the number of
+grid points (the grid shape), as in the example above. (Only `LocalFieldCollection`
+takes the spatial dimension as its first argument.)
 Fields are then registered with the field accessor methods of the field collection,
 e.g. `real_field` in the example above. Fields are *named*, and the name needs to be
 unique. Accessing a field of the same name yield the same field object.
@@ -194,11 +196,14 @@ be unity. It is assumed that first `nodel-points`, then `quadrature-points` and 
 missing. This means we can represent a simple forward-differences gradient operator in two dimensions as
 
 .. code-block:: Python
+
     stencil = np.array([
         [[-1, 1], [0, 0]],
         [[-1, 0], [1, 0]]
     ])
-    op = muGrid.GenericLinearOperator(2, stencil)
+    # The first argument is the stencil offset (one entry per spatial
+    # dimension), not the dimension.
+    op = muGrid.GenericLinearOperator([0, 0], stencil)
 
 .. literalinclude:: ../../examples/gradient.py
     :language: python
@@ -278,7 +283,7 @@ for example normalizing the displacement field could look like:
 
 .. code-block:: Python
 
-    displacement_field.s /= np.sqrt(ux**2 + uy**2 + uz**2)
+    displacement_field.s[...] /= np.sqrt(ux**2 + uy**2 + uz**2)
 
 Note that the default storage order of the field is column-major, which means the
 field components are stored next to each other in memory.

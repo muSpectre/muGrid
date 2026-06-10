@@ -60,7 +60,13 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   FileIONetCDF::~FileIONetCDF() {
     if (this->netcdf_id != -1) {
-      this->close();
+      // close() can throw FileIOError on NetCDF failures; a throwing
+      // destructor would call std::terminate during stack unwinding, so
+      // swallow the exception here (the file is being torn down anyway).
+      try {
+        this->close();
+      } catch (...) {  // NOLINT
+      }
     }
   }
 
@@ -1361,10 +1367,10 @@ namespace muGrid {
       auto const pos{this->name.find_last_of("-")};
       tensor_dim_index = std::stoi(this->name.substr(pos + 1));
     } else {
-      FileIOError("The function 'NetCDFDim::compute_tensor_dim_index()' "
-                  "is only valid to call on NetCDFDims with base name "
-                  "'tensor_dim'. You called it on the NetCDFDim '" +
-                  this->name + "' with base name '" + base_name + "'.");
+      throw FileIOError("The function 'NetCDFDim::compute_tensor_dim_index()' "
+                        "is only valid to call on NetCDFDims with base name "
+                        "'tensor_dim'. You called it on the NetCDFDim '" +
+                        this->name + "' with base name '" + base_name + "'.");
     }
     return tensor_dim_index;
   }

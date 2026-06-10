@@ -527,6 +527,11 @@ namespace muGrid {
             << "' has not been initialised";
       throw FieldError(error.str());
     }
+    if (not CcoordOps::is_buffer_contiguous(this->get_pixels_shape(),
+                                            this->get_pixels_strides())) {
+      throw FieldError("Eigen representation is only available for fields with "
+                       "contiguous storage.");
+    }
     return EigenVec_map(this->values.data(),
                         this->get_nb_entries() * this->nb_components);
   }
@@ -545,6 +550,11 @@ namespace muGrid {
     }
     if (this->get_nb_entries() == Unknown) {
       throw FieldError("Field has unknown number of entries");
+    }
+    if (not CcoordOps::is_buffer_contiguous(this->get_pixels_shape(),
+                                            this->get_pixels_strides())) {
+      throw FieldError("Eigen representation is only available for fields with "
+                       "contiguous storage.");
     }
     return EigenVec_cmap(this->values.data(),
                          this->get_nb_entries() * this->nb_components);

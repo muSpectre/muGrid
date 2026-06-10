@@ -512,6 +512,12 @@ class FFTEngine : public FFTEngineBase {
       if (transpose_yz_fwd != nullptr) {
         // TODO: Transpose needs to handle storage order
         transpose_yz_fwd->forward(work_z_ptr, work_y_ptr);
+      } else {
+        // No Y<->Z redistribution needed (e.g. P2 == 1): Y is already local,
+        // so copy the data through. Without this the Y-FFT below would run on
+        // an uninitialised work_y, silently dropping the Y transform (the
+        // X<->Z step below has the same else-copy fallback).
+        deep_copy<Complex, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
       }
 
       // Step 2b: c2c FFT along Y for each component
@@ -925,6 +931,11 @@ class FFTEngine : public FFTEngineBase {
       if (transpose_yz_bwd != nullptr) {
         // TODO: Transpose needs to handle storage order
         transpose_yz_bwd->backward(work_z_ptr, work_y_ptr);
+      } else {
+        // No Y<->Z redistribution needed (e.g. P2 == 1): copy the data through
+        // so the Y-IFFT below does not run on an uninitialised work_y. Mirrors
+        // the forward path and the X<->Z else-copy fallback.
+        deep_copy<Complex, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
       }
 
       // Step 3b: c2c IFFT along Y for each component
@@ -944,6 +955,9 @@ class FFTEngine : public FFTEngineBase {
       if (transpose_yz_fwd != nullptr) {
         // TODO: Transpose needs to handle storage order
         transpose_yz_fwd->backward(work_y_ptr, work_z_ptr);
+      } else {
+        // No redistribution needed: copy the Y-IFFT result back into work_z.
+        deep_copy<Complex, MemorySpace>(work_z_ptr, work_y_ptr, ypencil_size);
       }
 
       // Step 4: c2r IFFT along X for each component

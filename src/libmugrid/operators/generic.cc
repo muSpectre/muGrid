@@ -645,6 +645,7 @@ namespace muGrid {
         this->cached_key_.reset();
         this->cached_device_apply_op_.reset();
         this->cached_device_transpose_op_.reset();
+        this->cached_device_key_.reset();
     }
 
     /* ---------------------------------------------------------------------- */

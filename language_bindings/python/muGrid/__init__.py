@@ -128,6 +128,9 @@ from .Wrappers import (  # noqa: E402, E305
     FileIONetCDF,
     GenericLinearOperator,
     GlobalFieldCollection,
+    IsotropicStiffnessOperator,
+    IsotropicStiffnessOperator2D,
+    IsotropicStiffnessOperator3D,
     LaplaceOperator,
     LocalFieldCollection,
 )
@@ -152,9 +155,10 @@ GradientOperator = _muGrid.GradientOperator
 ConvolutionOperatorBase = GradientOperator
 Decomposition = _muGrid.Decomposition
 
-# Isotropic stiffness operators (fused elliptic kernels)
-IsotropicStiffnessOperator2D = _muGrid.IsotropicStiffnessOperator2D
-IsotropicStiffnessOperator3D = _muGrid.IsotropicStiffnessOperator3D
+# Low-level isotropic stiffness operators (raw C++ classes; the Python
+# wrappers imported above accept wrapped Field objects)
+_IsotropicStiffnessOperator2D = _muGrid.IsotropicStiffnessOperator2D
+_IsotropicStiffnessOperator3D = _muGrid.IsotropicStiffnessOperator3D
 DynCoord = _muGrid.DynCoord
 DynRcoord = _muGrid.DynRcoord
 IterUnit = _muGrid.IterUnit
@@ -220,20 +224,23 @@ __all__ = [
     "ConvolutionOperatorBase",  # Backwards compatibility alias
     "LaplaceOperator",
     "FEMGradientOperator",
+    "IsotropicStiffnessOperator",
     "IsotropicStiffnessOperator2D",
     "IsotropicStiffnessOperator3D",
     "Decomposition",
     "DynCoord",
     "DynRcoord",
     "IterUnit",
-    "OpenMode",
     "Pixel",
     "StorageOrder",
     "SubPt",
     "Unit",
-    "Verbosity",
     # Utilities
     "parprint",
     # Linear algebra
     "linalg",
 ]
+
+# OpenMode is only available on NetCDF-enabled builds
+if hasattr(_muGrid, "FileIONetCDF"):
+    __all__.append("OpenMode")

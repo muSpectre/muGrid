@@ -231,6 +231,21 @@ void add_field_collection(py::module & mod) {
             "unit"_a = muGrid::Unit::unitless(),
             py::return_value_policy::reference_internal)
         .def(
+            "register_uint_state_field",
+            [](FieldCollection & collection, const std::string & unique_prefix,
+               const Index_t & nb_memory, const Index_t & nb_components,
+               const std::string & sub_division_tag,
+               const muGrid::Unit & unit) -> muGrid::TypedStateField<Uint> & {
+                return collection.register_uint_state_field(
+                    unique_prefix, nb_memory, nb_components, sub_division_tag,
+                    unit);
+            },
+            "unique_prefix"_a, "nb_memory"_a, "nb_components"_a = 1,
+            "sub_division_tag"_a = muGrid::PixelTag,
+            "unit"_a = muGrid::Unit::unitless(),
+            py::return_value_policy::reference_internal)
+        // Deprecated misspelled alias, kept for backwards compatibility.
+        .def(
             "register_unint_state_field",
             [](FieldCollection & collection, const std::string & unique_prefix,
                const Index_t & nb_memory, const Index_t & nb_components,
@@ -386,6 +401,21 @@ void add_field_collection(py::module & mod) {
             "sub_division_tag"_a = muGrid::PixelTag,
             "unit"_a = muGrid::Unit::unitless(),
             py::return_value_policy::reference_internal)
+        .def(
+            "uint_state_field",
+            [](FieldCollection & collection, const std::string & unique_prefix,
+               const Index_t & nb_memory, const Index_t & nb_components,
+               const std::string & sub_division_tag,
+               const muGrid::Unit & unit) -> muGrid::TypedStateField<Uint> & {
+                return collection.uint_state_field(unique_prefix, nb_memory,
+                                                   nb_components,
+                                                   sub_division_tag, unit);
+            },
+            "unique_prefix"_a, "nb_memory"_a, "nb_components"_a,
+            "sub_division_tag"_a = muGrid::PixelTag,
+            "unit"_a = muGrid::Unit::unitless(),
+            py::return_value_policy::reference_internal)
+        // Deprecated misspelled alias, kept for backwards compatibility.
         .def(
             "unint_state_field",
             [](FieldCollection & collection, const std::string & unique_prefix,

@@ -129,9 +129,9 @@ namespace muGrid {
 
   template <int size>
   constexpr nc_type netcdf_signed_type() {
-    static_assert(!(size == 1 || size == 2 || size == 4 || size == 8),
+    static_assert(size == 1 || size == 2 || size == 4 || size == 8,
                   "Unsupported integer storage size");
-    return NC_UINT64;
+    return NC_INT64;
   }
   template <>
   constexpr nc_type netcdf_signed_type<1>() {
@@ -152,7 +152,7 @@ namespace muGrid {
 
   template <int size>
   constexpr nc_type netcdf_unsigned_type() {
-    static_assert(!(size == 1 || size == 2 || size == 4 || size == 8),
+    static_assert(size == 1 || size == 2 || size == 4 || size == 8,
                   "Unsupported unsigned integer storage size");
     return NC_UINT64;
   }

@@ -80,7 +80,7 @@ namespace muGrid {
      */
     enum class StorageOrder {
         ArrayOfStructures,  //!< components are consecutive in memory
-        StructureOfArrays,  //< pixels are consecutive in memory
+        StructureOfArrays,  //!< pixels are consecutive in memory
         Automatic  //!< inherit storage order from `FieldCollection`
     };
 

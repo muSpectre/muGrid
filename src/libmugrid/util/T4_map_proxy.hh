@@ -83,7 +83,7 @@ namespace muGrid {
   };
 
   /**
-   * provides index-based access to fourth-order Tensors represented
+   * provides constant index-based access to fourth-order Tensors represented
    * by square matrices
    */
   template <typename T4>
@@ -99,7 +99,7 @@ namespace muGrid {
   }
 
   /**
-   * provides constant index-based access to fourth-order Tensors represented
+   * provides mutable index-based access to fourth-order Tensors represented
    * by square matrices
    */
   template <typename T4>

@@ -54,7 +54,7 @@ namespace muGrid {
       }
     }
 
-    if (tmp_frame_index > this->nb_frames) {
+    if (tmp_frame_index >= this->nb_frames) {
       throw FileIOError{
           "The frame " + std::to_string(tmp_frame_index) +
           " exceeds the total number of frames (" +

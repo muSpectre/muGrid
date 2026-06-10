@@ -93,6 +93,37 @@ namespace muGrid {
     }
   }
 
+  // Regression test: the initial index map used a bitwise & instead of a
+  // modulo, which aliased current() and old() to the same field for nb_memory
+  // values not of the form 2^k - 1 (e.g. 2). With nb_memory = 2 the indices
+  // must be a permutation of {0, 1, 2}; writing a distinct value into each
+  // slot (via the mutable current(), cycling between writes) and reading them
+  // back via old() must round-trip. If two indices alias, a later write
+  // overwrites an earlier slot and the read-back fails.
+  BOOST_FIXTURE_TEST_CASE(distinct_indices_nb_memory_2,
+                          LocalFieldBasicFixture) {
+    constexpr Dim_t NbMemory{2}, NbComponents{1};
+    auto & state_field{fc.register_state_field<Real>(
+        "test", NbMemory, NbComponents, SubDivision())};
+    this->fc.add_pixel(4);
+    this->fc.set_nb_sub_pts(SubDivision(), 1);
+    this->fc.initialise();
+
+    // Write 0 into the current slot, then 1 and 2 into the slots that become
+    // current after each cycle.
+    state_field.current().eigen_vec().setConstant(0.);
+    for (Dim_t i{1}; i <= NbMemory; ++i) {
+      state_field.cycle();
+      state_field.current().eigen_vec().setConstant(static_cast<Real>(i));
+    }
+
+    // The three physical buffers now hold the distinct values 0, 1, 2; after
+    // the cycles current() == 2, old(1) == 1, old(2) == 0.
+    BOOST_CHECK_EQUAL(state_field.current().eigen_vec()(0), 2.);
+    BOOST_CHECK_EQUAL(state_field.old(1).eigen_vec()(0), 1.);
+    BOOST_CHECK_EQUAL(state_field.old(2).eigen_vec()(0), 0.);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

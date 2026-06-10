@@ -158,15 +158,15 @@ namespace akantu {
                 : containers(std::forward<Containers>(containers)...) {}
 
             decltype(auto) begin() const {
-                return zip_iterator(
-                    tuple::transform([](auto && c) { return c.begin(); },
-                                     std::forward<containers_t>(containers)));
+                // Pass the (const) member as a const lvalue: forwarding it as
+                // containers_t&& would cast away const and fail to compile.
+                return zip_iterator(tuple::transform(
+                    [](auto && c) { return c.begin(); }, containers));
             }
 
             decltype(auto) end() const {
-                return zip_iterator(
-                    tuple::transform([](auto && c) { return c.end(); },
-                                     std::forward<containers_t>(containers)));
+                return zip_iterator(tuple::transform(
+                    [](auto && c) { return c.end(); }, containers));
             }
 
             decltype(auto) begin() {

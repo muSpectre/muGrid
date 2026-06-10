@@ -59,7 +59,7 @@ namespace muGrid {
     this->fields.reserve(nb_memory + 1);
 
     for (Index_t i{0}; i < nb_memory + 1; ++i) {
-      indices.push_back((nb_memory + 1 - i) & nb_memory);
+      indices.push_back((nb_memory + 1 - i) % (nb_memory + 1));
     }
   }
 

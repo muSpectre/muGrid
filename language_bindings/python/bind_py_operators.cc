@@ -112,7 +112,7 @@ class PyGradientOperator : public LinearOperator {
     transpose_increment(const TypedFieldBase<Real> & quadrature_point_field,
                         const Real & alpha, TypedFieldBase<Real> & nodal_field,
                         const std::vector<Real> & weights = {}) const override {
-        PYBIND11_OVERRIDE_PURE(void, LinearOperator, transpose,
+        PYBIND11_OVERRIDE_PURE(void, LinearOperator, transpose_increment,
                                quadrature_point_field, alpha, nodal_field,
                                weights);
     }
@@ -532,6 +532,13 @@ void add_fem_gradient_operator_2d(py::module & mod) {
     using TransposeHostFn =
         void (FEMGradientOperator2D::*)(const RealFieldHost &, RealFieldHost &,
                                         const std::vector<Real> &) const;
+    using ApplyIncrementHostFn =
+        void (FEMGradientOperator2D::*)(const RealFieldHost &, const Real &,
+                                        RealFieldHost &) const;
+    using TransposeIncrementHostFn =
+        void (FEMGradientOperator2D::*)(const RealFieldHost &, const Real &,
+                                        RealFieldHost &,
+                                        const std::vector<Real> &) const;
 
     auto fem_grad_op =
         py::class_<FEMGradientOperator2D, LinearOperator>(
@@ -551,12 +558,25 @@ void add_fem_gradient_operator_2d(py::module & mod) {
                  static_cast<ApplyHostFn>(&FEMGradientOperator2D::apply),
                  "nodal_field"_a, "gradient_field"_a,
                  "Apply gradient operator to host fields")
+            .def("apply_increment",
+                 static_cast<ApplyIncrementHostFn>(
+                     &FEMGradientOperator2D::apply_increment),
+                 "nodal_field"_a, "alpha"_a, "gradient_field"_a,
+                 "Add alpha * grad(nodal_field) to gradient_field on host "
+                 "fields")
             .def(
                 "transpose",
                 static_cast<TransposeHostFn>(&FEMGradientOperator2D::transpose),
                 "gradient_field"_a, "nodal_field"_a,
                 "weights"_a = std::vector<Real>{},
                 "Apply transpose (divergence) to host fields")
+            .def("transpose_increment",
+                 static_cast<TransposeIncrementHostFn>(
+                     &FEMGradientOperator2D::transpose_increment),
+                 "gradient_field"_a, "alpha"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Add alpha * (-div(gradient_field)) to nodal_field on host "
+                 "fields")
             .def_property_readonly("grid_spacing",
                                    &FEMGradientOperator2D::get_grid_spacing)
             .def_property_readonly(
@@ -598,15 +618,32 @@ void add_fem_gradient_operator_2d(py::module & mod) {
     using TransposeDeviceFn = void (FEMGradientOperator2D::*)(
         const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
         const;
+    using ApplyIncrementDeviceFn = void (FEMGradientOperator2D::*)(
+        const RealFieldDevice &, const Real &, RealFieldDevice &) const;
+    using TransposeIncrementDeviceFn = void (FEMGradientOperator2D::*)(
+        const RealFieldDevice &, const Real &, RealFieldDevice &,
+        const std::vector<Real> &) const;
     fem_grad_op
         .def("apply", static_cast<ApplyDeviceFn>(&FEMGradientOperator2D::apply),
              "nodal_field"_a, "gradient_field"_a,
              "Apply gradient operator to device fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(
+                 &FEMGradientOperator2D::apply_increment),
+             "nodal_field"_a, "alpha"_a, "gradient_field"_a,
+             "Add alpha * grad(nodal_field) to gradient_field on device fields")
         .def("transpose",
              static_cast<TransposeDeviceFn>(&FEMGradientOperator2D::transpose),
              "gradient_field"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
-             "Apply transpose to device fields");
+             "Apply transpose to device fields")
+        .def("transpose_increment",
+             static_cast<TransposeIncrementDeviceFn>(
+                 &FEMGradientOperator2D::transpose_increment),
+             "gradient_field"_a, "alpha"_a, "nodal_field"_a,
+             "weights"_a = std::vector<Real>{},
+             "Add alpha * (-div(gradient_field)) to nodal_field on device "
+             "fields");
 #endif
 }
 
@@ -616,6 +653,13 @@ void add_fem_gradient_operator_3d(py::module & mod) {
                                                         RealFieldHost &) const;
     using TransposeHostFn =
         void (FEMGradientOperator3D::*)(const RealFieldHost &, RealFieldHost &,
+                                        const std::vector<Real> &) const;
+    using ApplyIncrementHostFn =
+        void (FEMGradientOperator3D::*)(const RealFieldHost &, const Real &,
+                                        RealFieldHost &) const;
+    using TransposeIncrementHostFn =
+        void (FEMGradientOperator3D::*)(const RealFieldHost &, const Real &,
+                                        RealFieldHost &,
                                         const std::vector<Real> &) const;
 
     auto fem_grad_op =
@@ -637,12 +681,25 @@ void add_fem_gradient_operator_3d(py::module & mod) {
                  static_cast<ApplyHostFn>(&FEMGradientOperator3D::apply),
                  "nodal_field"_a, "gradient_field"_a,
                  "Apply gradient operator to host fields")
+            .def("apply_increment",
+                 static_cast<ApplyIncrementHostFn>(
+                     &FEMGradientOperator3D::apply_increment),
+                 "nodal_field"_a, "alpha"_a, "gradient_field"_a,
+                 "Add alpha * grad(nodal_field) to gradient_field on host "
+                 "fields")
             .def(
                 "transpose",
                 static_cast<TransposeHostFn>(&FEMGradientOperator3D::transpose),
                 "gradient_field"_a, "nodal_field"_a,
                 "weights"_a = std::vector<Real>{},
                 "Apply transpose (divergence) to host fields")
+            .def("transpose_increment",
+                 static_cast<TransposeIncrementHostFn>(
+                     &FEMGradientOperator3D::transpose_increment),
+                 "gradient_field"_a, "alpha"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Add alpha * (-div(gradient_field)) to nodal_field on host "
+                 "fields")
             .def_property_readonly("grid_spacing",
                                    &FEMGradientOperator3D::get_grid_spacing)
             .def_property_readonly(
@@ -684,15 +741,32 @@ void add_fem_gradient_operator_3d(py::module & mod) {
     using TransposeDeviceFn = void (FEMGradientOperator3D::*)(
         const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
         const;
+    using ApplyIncrementDeviceFn = void (FEMGradientOperator3D::*)(
+        const RealFieldDevice &, const Real &, RealFieldDevice &) const;
+    using TransposeIncrementDeviceFn = void (FEMGradientOperator3D::*)(
+        const RealFieldDevice &, const Real &, RealFieldDevice &,
+        const std::vector<Real> &) const;
     fem_grad_op
         .def("apply", static_cast<ApplyDeviceFn>(&FEMGradientOperator3D::apply),
              "nodal_field"_a, "gradient_field"_a,
              "Apply gradient operator to device fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(
+                 &FEMGradientOperator3D::apply_increment),
+             "nodal_field"_a, "alpha"_a, "gradient_field"_a,
+             "Add alpha * grad(nodal_field) to gradient_field on device fields")
         .def("transpose",
              static_cast<TransposeDeviceFn>(&FEMGradientOperator3D::transpose),
              "gradient_field"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
-             "Apply transpose to device fields");
+             "Apply transpose to device fields")
+        .def("transpose_increment",
+             static_cast<TransposeIncrementDeviceFn>(
+                 &FEMGradientOperator3D::transpose_increment),
+             "gradient_field"_a, "alpha"_a, "nodal_field"_a,
+             "weights"_a = std::vector<Real>{},
+             "Add alpha * (-div(gradient_field)) to nodal_field on device "
+             "fields");
 #endif
 }
 

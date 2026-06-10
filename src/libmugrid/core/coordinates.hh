@@ -163,6 +163,17 @@ namespace muGrid {
          */
         explicit DynCoord(Dim_t dim, const T value = T{})
             : dim{dim}, long_array{} {
+            // Match the initializer-list/vector constructors: only the upper
+            // bound is validated. A negative dim (e.g. Unknown == -1) is a
+            // legitimate sentinel used before the grid size is known.
+            if (this->dim > Dim_t(MaxDim)) {
+                std::stringstream error{};
+                error << "The maximum dimension representable by this dynamic "
+                         "array is "
+                      << MaxDim << ". You supplied a dimension of " << dim
+                      << ".";
+                throw RuntimeError(error.str());
+            }
             std::fill(this->long_array.begin(), this->long_array.end(), value);
         }
 
@@ -541,10 +552,15 @@ namespace muGrid {
     std::ostream & operator<<(std::ostream & os,
                               const std::array<T, dim> & values) {
         os << "(";
-        for (size_t i = 0; i < dim - 1; ++i) {
-            os << values[i] << ", ";
+        if (dim > 0) {
+            // Guard dim == 0: the loop bound dim - 1 would underflow (size_t)
+            // and values.back() would be UB on an empty array.
+            for (size_t i = 0; i < dim - 1; ++i) {
+                os << values[i] << ", ";
+            }
+            os << values.back();
         }
-        os << values.back() << ")";
+        os << ")";
         return os;
     }
 

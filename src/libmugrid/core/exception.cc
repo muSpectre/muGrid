@@ -51,6 +51,8 @@
 
 #include "core/exception.hh"
 
+#include <algorithm>
+
 using muGrid::Traceback;
 using muGrid::TracebackEntry;
 
@@ -190,8 +192,11 @@ Traceback::Traceback(int discard_entries) : stack{} {
     int size = backtrace(buffer, MAX_DEPTH);
     char ** symbols = backtrace_symbols(buffer, size);
 
-    for (int i = discard_entries; i < size; ++i) {
-        this->stack.push_back(TracebackEntry{buffer[i], symbols[i]});
+    for (int i = std::min(discard_entries, size); i < size; ++i) {
+        // backtrace_symbols returns NULL on allocation failure; fall back to an
+        // empty symbol string rather than dereferencing a null pointer.
+        this->stack.push_back(
+            TracebackEntry{buffer[i], symbols ? symbols[i] : ""});
     }
 
     free(symbols);

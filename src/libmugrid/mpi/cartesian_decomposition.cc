@@ -110,6 +110,7 @@ namespace muGrid {
             // Compute the sequence of sendrecv events required to fill the
             // ghost buffer
             this->recv_right_sequence[direction].resize(0);
+            this->recv_left_sequence[direction].resize(0);
             Index_t nb_cum_send_right{0}, nb_cum_send_left{0};
 
             // Ghost buffers in direction
@@ -293,20 +294,15 @@ namespace muGrid {
             // Loop until ghost buffers have been filled
             for (Index_t step{0}; step < this->nb_sendrecv_steps[direction];
                  ++step) {
-                // Idiot check that there is still stuff left to send
-                assert(
-                    this->cart_comm->any(nb_cum_send_right < nb_ghosts_left ||
-                                         nb_cum_send_left < nb_ghosts_right));
+                // NB: do not validate the cached sequence here with collective
+                // calls (any()/sendrecv) inside assert(): those vanish under
+                // NDEBUG, so a debug/release build mix across ranks would
+                // deadlock (and debug builds would do redundant communication).
+                // The sequence was already validated when it was built.
 
                 // Get the number of elements that we will receive
                 auto nb_recv_left{this->recv_left_sequence[direction][step]};
                 auto nb_recv_right{this->recv_right_sequence[direction][step]};
-
-                // Idiot check the cached receive sequence
-                assert(nb_recv_left == this->cart_comm->sendrecv_right(
-                                           direction, nb_send_right));
-                assert(nb_recv_right ==
-                       this->cart_comm->sendrecv_left(direction, nb_send_left));
 
                 // Perform send to the RIGHT, receive from the LEFT
                 this->cart_comm->sendrecv_right(
@@ -448,6 +444,22 @@ namespace muGrid {
             // Ghost counts
             auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
             auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
+
+            // reduce_ghosts uses a single communication step (below), which is
+            // only correct when each ghost region maps into a single neighbor's
+            // interior, i.e. the halo does not exceed the interior extent.
+            // communicate_ghosts cascades for larger halos, but the reverse
+            // (reduce) cascade is not implemented; reject it rather than
+            // silently producing a wrong reduction.
+            if (nb_ghosts_left > nb_subdomain_grid_pts_without_ghosts ||
+                nb_ghosts_right > nb_subdomain_grid_pts_without_ghosts) {
+                throw RuntimeError(
+                    "reduce_ghosts does not support a ghost halo larger than "
+                    "the interior subdomain extent in a given direction "
+                    "(multi-step reduction is not implemented). Reduce the "
+                    "number of ghosts or the number of ranks in this "
+                    "direction.");
+            }
 
             // For reduce_ghosts, we reverse the communication direction:
             // - Send our LEFT ghost to LEFT neighbor → they add to their RIGHT interior

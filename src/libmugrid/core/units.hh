@@ -145,10 +145,10 @@ namespace muGrid {
   std::ostream & operator<<(std::ostream & os, const UnitExponent & unit);
 
   /**
-   * A wrapper class around 5 DynBaseUnit objects representing length, mass,
-   * time, temperature, and change. This should be sufficient to handle all of
-   * µSpectre's needs, but could easily be extended by mol and luminous
-   * intensity to represent the full SI.
+   * A wrapper class around the 7 SI base-unit exponents, representing length,
+   * mass, time, temperature, electric current, luminous intensity and amount
+   * of substance. This is sufficient to represent the full SI and handle all
+   * of µSpectre's needs.
    */
   class Unit {
    public:
@@ -189,7 +189,7 @@ namespace muGrid {
     //! factory function for base unit amount of matter
     static Unit amount(const Int & tag = 0);
 
-    //! factory function for mechanical stress
+    //! factory function for mechanical force
     static Unit force(const Int & tag = 0);
 
     //! factory function for mechanical stress

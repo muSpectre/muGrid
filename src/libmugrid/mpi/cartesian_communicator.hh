@@ -125,7 +125,13 @@ namespace muGrid {
 
         CartesianCommunicator() = delete;
 
-        virtual ~CartesianCommunicator() {}
+        //! Copy constructor. The copy shares the MPI communicator handle but
+        //! does not take ownership of it (only the original frees it).
+        CartesianCommunicator(const CartesianCommunicator & other);
+
+        // NB: the base Communicator has a non-virtual destructor, so this is a
+        // new virtual destructor rather than an override.
+        virtual ~CartesianCommunicator();
 
         /**
          * @brief Assignment operator.
@@ -384,7 +390,7 @@ namespace muGrid {
         //! dimension).
         DynGridIndex coordinates;
 
-#if WITH_MPI
+#ifdef WITH_MPI
         //! Ranks of the left neighbors (lower coordinate) in each dimension.
         //! Uses MPI_PROC_NULL for periodic boundaries.
         std::vector<int> left_ranks;
@@ -392,6 +398,11 @@ namespace muGrid {
         //! Ranks of the right neighbors (higher coordinate) in each dimension.
         //! Uses MPI_PROC_NULL for periodic boundaries.
         std::vector<int> right_ranks;
+
+        //! Whether this object owns (and must free) the MPI communicator. Only
+        //! true for the instance that created the topology via MPI_Cart_create;
+        //! copies share the handle without taking ownership.
+        bool owns_comm{false};
 #endif  // WITH_MPI
     };
 }  // namespace muGrid
