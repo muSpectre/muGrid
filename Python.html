@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Fast Fourier Transform" href="FFT.html"><link rel="prev" title="Getting Started" href="GettingStarted.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Python Bindings - µGrid 0.106.0-23-gacf66535 documentation</title>
+        <title>Python Bindings - µGrid 0.106.0-37-g75fdb63c documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.106.0-23-gacf66535
+      <a href="index.html"><div class="brand">µGrid 0.106.0-37-g75fdb63c
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.106.0-23-gacf66535
+  <span class="sidebar-brand-text">µGrid 0.106.0-37-g75fdb63c
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -490,14 +490,30 @@ missing. This means we can represent a simple forward-differences gradient opera
 
 <span class="c1"># Two dimensional grid</span>
 <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span> <span class="o">=</span> <span class="n">nb_grid_pts</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-<span class="c1"># Add some ghosts for computing</span>
-<span class="n">nb_ghosts_left</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="n">nb_ghosts_right</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Derivative stencil of shape (2, quad, 2, 2)</span>
+<span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="p">[</span>  <span class="c1"># Derivative in x-direction</span>
+            <span class="p">[[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]],</span>  <span class="c1"># Bottom-left triangle (first quadrature point)</span>
+            <span class="p">[[[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span>  <span class="c1"># Top-right triangle (second quadrature point)</span>
+        <span class="p">],</span>
+        <span class="p">[</span>  <span class="c1"># Derivative in y-direction</span>
+            <span class="p">[[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]],</span>  <span class="c1"># Bottom-left triangle (first quadrature point)</span>
+            <span class="p">[[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span>  <span class="c1"># Top-right triangle (second quadrature point)</span>
+        <span class="p">],</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
+
+<span class="c1"># The operator reports the ghost layers it needs; we only call apply()</span>
+<span class="c1"># here, so the apply-only requirement suffices (the default</span>
+<span class="c1"># `ghosts=op` would also cover transpose)</span>
+<span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">apply_ghost_requirement</span>
 <span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">(</span>
     <span class="n">nb_grid_pts</span><span class="p">,</span>
     <span class="n">nb_sub_pts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quad&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
-    <span class="n">nb_ghosts_left</span><span class="o">=</span><span class="n">nb_ghosts_left</span><span class="p">,</span>
-    <span class="n">nb_ghosts_right</span><span class="o">=</span><span class="n">nb_ghosts_right</span><span class="p">,</span>
+    <span class="n">ghosts</span><span class="o">=</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">),</span>
 <span class="p">)</span>
 
 <span class="c1"># Get nodal field</span>
@@ -514,21 +530,6 @@ missing. This means we can represent a simple forward-differences gradient opera
 <span class="n">nodal_field</span><span class="o">.</span><span class="n">pg</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
     <span class="n">nodal_field</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">nb_ghosts_left</span><span class="p">,</span> <span class="n">nb_ghosts_right</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wrap&quot;</span>
 <span class="p">)</span>
-
-<span class="c1"># Derivative stencil of shape (2, quad, 2, 2)</span>
-<span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
-    <span class="p">[</span>
-        <span class="p">[</span>  <span class="c1"># Derivative in x-direction</span>
-            <span class="p">[[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]],</span>  <span class="c1"># Bottom-left triangle (first quadrature point)</span>
-            <span class="p">[[[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span>  <span class="c1"># Top-right triangle (second quadrature point)</span>
-        <span class="p">],</span>
-        <span class="p">[</span>  <span class="c1"># Derivative in y-direction</span>
-            <span class="p">[[[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]],</span>  <span class="c1"># Bottom-left triangle (first quadrature point)</span>
-            <span class="p">[[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span>  <span class="c1"># Top-right triangle (second quadrature point)</span>
-        <span class="p">],</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-<span class="n">op</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GenericLinearOperator</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">gradient</span><span class="p">)</span>
 
 <span class="c1"># Apply the gradient operator to the nodal field and write result to the quad field</span>
 <span class="n">op</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">nodal_field</span><span class="p">,</span> <span class="n">quad_field</span><span class="p">)</span>
@@ -751,7 +752,7 @@ from a field collection to disk:</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=982c3192"></script>
+</div><script src="_static/documentation_options.js?v=2f63eb2a"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
