@@ -591,14 +591,17 @@ class LaminateHomogenization:
             # Initialize displacement
             self.u_field.s[...] = 0.0
 
-            # Solve
+            # Solve. The homogeneous-material case has a (near-)zero RHS,
+            # for which a relative criterion is unreachable; keep the
+            # absolute criterion these tests were tuned with.
             conjugate_gradients(
                 self.comm,
                 self.decomposition,
                 self.rhs_field,
                 self.u_field,
                 hessp=self._apply_stiffness,
-                tol=self.tol,
+                atol=self.tol,
+                rtol=0.0,
                 maxiter=self.maxiter,
                 timer=timer,
             )

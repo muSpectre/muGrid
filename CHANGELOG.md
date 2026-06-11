@@ -4,6 +4,11 @@ Change log for µGrid
 0.107.0 (11Jun26)
 -----------------
 
+- API: `conjugate_gradients` now converges on a relative criterion by
+  default, ``||b - Ax|| <= max(rtol * ||b||, atol)`` with ``rtol=1e-6``,
+  ``atol=0``; the old absolute `tol` is deprecated (it maps to `atol` with
+  ``rtol=0``). An absolute criterion is unreachable in double precision
+  when ``||b||`` is large and was the cause of erratic CG termination
 - BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and
   GPU now sum the interior region directly instead of subtracting the ghost
   contribution from a full-buffer reduction (minimizing floating point overflows)

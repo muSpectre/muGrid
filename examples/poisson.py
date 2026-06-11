@@ -275,7 +275,7 @@ with timer("conjugate_gradients"):
             solution,
             hessp=hessp,
             prec=prec,
-            tol=1e-6,
+            rtol=1e-6,
             callback=callback,
             maxiter=args.maxiter,
             timer=timer,
