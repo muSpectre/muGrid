@@ -230,6 +230,68 @@ __global__ void norm_sq_reduce_kernel(const Real* x, Real* partial_sums,
 }
 
 /**
+ * Dot product over the interior (non-ghost) region only (1D/2D/3D).
+ *
+ * Sums the interior directly. Do NOT compute interior reductions as
+ * full-buffer result minus ghost contribution: the ghost buffers hold large
+ * stale data (stencil operators write results into ghost pixels), so the
+ * subtraction cancels catastrophically once the interior values are small.
+ * This destroyed converged CG residuals — the reported squared norm carried
+ * an absolute error of order eps * ||ghosts||^2 and could even go negative.
+ * Mirrors internal::interior_vecdot in linalg_host.cc.
+ *
+ * The interior box has extents (nx, ny, nz) and starts at (x0, y0, z0);
+ * unused trailing dimensions degenerate to extent 1, start 0, stride 0.
+ * Uses field data strides directly for correct SoA layout handling:
+ * field[c, x, y, z] = base + c * stride_c + x * stride_x + y * stride_y
+ *                     + z * stride_z
+ */
+__global__ void interior_dot_kernel(
+    const Real* a, const Real* b, Real* partial_sums,
+    Index_t nx, Index_t ny, Index_t nz,
+    Index_t x0, Index_t y0, Index_t z0,
+    Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
+    Index_t nb_components) {
+
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t nb_pixels = nx * ny * nz;
+
+    Real sum = 0.0;
+    for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
+         pixel_idx += blockDim.x * gridDim.x) {
+        // x runs fastest (smallest stride) so consecutive threads make
+        // coalesced accesses
+        Index_t ix = x0 + pixel_idx % nx;
+        Index_t rem = pixel_idx / nx;
+        Index_t iy = y0 + rem % ny;
+        Index_t iz = z0 + rem / ny;
+
+        Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
+        for (Index_t c = 0; c < nb_components; ++c) {
+            sum += a[offset + c * stride_c] * b[offset + c * stride_c];
+        }
+    }
+
+    shared_data[tid] = sum;
+    __syncthreads();
+
+    // Reduce within block
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_data[tid] += shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        partial_sums[blockIdx.x] = shared_data[0];
+    }
+}
+
+/**
  * Final reduction kernel - sums partial results.
  */
 __global__ void final_reduce_kernel(Real* data, Index_t n) {
@@ -259,339 +321,89 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
     }
 }
 
-/* ---------------------------------------------------------------------- */
-/* Ghost region kernels for subtraction                                    */
-/* ---------------------------------------------------------------------- */
-
-/**
- * Compute dot product over ghost region only (2D).
- * Ghost region = left/right columns + top/bottom rows (excluding corners).
- * Uses field data strides directly for correct SoA layout handling.
- */
-__global__ void ghost_dot_2d_kernel(
-    const Real* a, const Real* b, Real* partial_sums,
-    Index_t nx_total, Index_t ny_total,
-    Index_t gx_left, Index_t gx_right,
-    Index_t gy_left, Index_t gy_right,
-    Index_t field_stride_c, Index_t field_stride_x, Index_t field_stride_y,
-    Index_t nb_components) {
-
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-
-    Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Interior bounds
-    Index_t x_start = gx_left;
-    Index_t x_end = nx_total - gx_right;
-    Index_t y_end = ny_total - gy_right;
-
-    // Count total ghost pixels
-    Index_t total_ghost_pixels =
-        gx_left * ny_total +                          // Left columns
-        gx_right * ny_total +                         // Right columns
-        (x_end - x_start) * gy_left +                 // Top rows (excl corners)
-        (x_end - x_start) * gy_right;                 // Bottom rows (excl corners)
-
-    Real sum = 0.0;
-
-    // Each thread processes multiple ghost pixels
-    for (Index_t ghost_idx = global_tid; ghost_idx < total_ghost_pixels;
-         ghost_idx += blockDim.x * gridDim.x) {
-
-        Index_t ix, iy;
-
-        // Map ghost_idx to (ix, iy) - this is the tricky part
-        if (ghost_idx < gx_left * ny_total) {
-            // Left columns
-            ix = ghost_idx / ny_total;
-            iy = ghost_idx % ny_total;
-        } else if (ghost_idx < (gx_left + gx_right) * ny_total) {
-            // Right columns
-            Index_t local_idx = ghost_idx - gx_left * ny_total;
-            ix = nx_total - gx_right + local_idx / ny_total;
-            iy = local_idx % ny_total;
-        } else if (ghost_idx < (gx_left + gx_right) * ny_total +
-                               (x_end - x_start) * gy_left) {
-            // Top rows (excluding corners)
-            Index_t local_idx = ghost_idx - (gx_left + gx_right) * ny_total;
-            ix = x_start + local_idx / gy_left;
-            iy = local_idx % gy_left;
-        } else {
-            // Bottom rows (excluding corners)
-            Index_t local_idx = ghost_idx - (gx_left + gx_right) * ny_total -
-                                (x_end - x_start) * gy_left;
-            ix = x_start + local_idx / gy_right;
-            iy = y_end + local_idx % gy_right;
-        }
-
-        // Use field strides for correct SoA layout handling
-        // field[c, x, y] = base + c * field_stride_c + x * field_stride_x + y * field_stride_y
-        for (Index_t c = 0; c < nb_components; ++c) {
-            Index_t offset = c * field_stride_c + ix * field_stride_x + iy * field_stride_y;
-            sum += a[offset] * b[offset];
-        }
-    }
-
-    shared_data[tid] = sum;
-    __syncthreads();
-
-    // Reduce within block
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
-/**
- * Compute squared norm over ghost region only (2D).
- * Uses field data strides directly for correct SoA layout handling.
- */
-__global__ void ghost_norm_sq_2d_kernel(
-    const Real* x, Real* partial_sums,
-    Index_t nx_total, Index_t ny_total,
-    Index_t gx_left, Index_t gx_right,
-    Index_t gy_left, Index_t gy_right,
-    Index_t field_stride_c, Index_t field_stride_x, Index_t field_stride_y,
-    Index_t nb_components) {
-
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-
-    Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Interior bounds
-    Index_t x_start = gx_left;
-    Index_t x_end = nx_total - gx_right;
-
-    // Count total ghost pixels
-    Index_t total_ghost_pixels =
-        gx_left * ny_total +
-        gx_right * ny_total +
-        (x_end - x_start) * gy_left +
-        (x_end - x_start) * gy_right;
-
-    Real sum = 0.0;
-
-    for (Index_t ghost_idx = global_tid; ghost_idx < total_ghost_pixels;
-         ghost_idx += blockDim.x * gridDim.x) {
-
-        Index_t ix, iy;
-        Index_t y_end = ny_total - gy_right;
-
-        if (ghost_idx < gx_left * ny_total) {
-            ix = ghost_idx / ny_total;
-            iy = ghost_idx % ny_total;
-        } else if (ghost_idx < (gx_left + gx_right) * ny_total) {
-            Index_t local_idx = ghost_idx - gx_left * ny_total;
-            ix = nx_total - gx_right + local_idx / ny_total;
-            iy = local_idx % ny_total;
-        } else if (ghost_idx < (gx_left + gx_right) * ny_total +
-                               (x_end - x_start) * gy_left) {
-            Index_t local_idx = ghost_idx - (gx_left + gx_right) * ny_total;
-            ix = x_start + local_idx / gy_left;
-            iy = local_idx % gy_left;
-        } else {
-            Index_t local_idx = ghost_idx - (gx_left + gx_right) * ny_total -
-                                (x_end - x_start) * gy_left;
-            ix = x_start + local_idx / gy_right;
-            iy = y_end + local_idx % gy_right;
-        }
-
-        // Use field strides for correct SoA layout handling
-        // field[c, x, y] = base + c * field_stride_c + x * field_stride_x + y * field_stride_y
-        for (Index_t c = 0; c < nb_components; ++c) {
-            Index_t offset = c * field_stride_c + ix * field_stride_x + iy * field_stride_y;
-            Real val = x[offset];
-            sum += val * val;
-        }
-    }
-
-    shared_data[tid] = sum;
-    __syncthreads();
-
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
-/**
- * Compute dot product over ghost region only (3D).
- * Ghost region = all pixels outside the interior box.
- * Uses a simple approach: iterate all pixels, skip interior ones.
- * Uses field strides for correct SoA layout handling.
- */
-__global__ void ghost_dot_3d_kernel(
-    const Real* a, const Real* b, Real* partial_sums,
-    Index_t nx_total, Index_t ny_total, Index_t nz_total,
-    Index_t gx_left, Index_t gx_right,
-    Index_t gy_left, Index_t gy_right,
-    Index_t gz_left, Index_t gz_right,
-    Index_t field_stride_c, Index_t field_stride_x,
-    Index_t field_stride_y, Index_t field_stride_z,
-    Index_t nb_components) {
-
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-
-    Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Interior bounds
-    Index_t x_start = gx_left;
-    Index_t x_end = nx_total - gx_right;
-    Index_t y_start = gy_left;
-    Index_t y_end = ny_total - gy_right;
-    Index_t z_start = gz_left;
-    Index_t z_end = nz_total - gz_right;
-
-    // Total pixels in the domain
-    Index_t total_pixels = nx_total * ny_total * nz_total;
-
-    Real sum = 0.0;
-
-    // Each thread processes multiple pixels
-    for (Index_t pixel_idx = global_tid; pixel_idx < total_pixels;
-         pixel_idx += blockDim.x * gridDim.x) {
-
-        Index_t ix = pixel_idx / (ny_total * nz_total);
-        Index_t rem = pixel_idx % (ny_total * nz_total);
-        Index_t iy = rem / nz_total;
-        Index_t iz = rem % nz_total;
-
-        // Skip interior pixels
-        if (ix >= x_start && ix < x_end &&
-            iy >= y_start && iy < y_end &&
-            iz >= z_start && iz < z_end) {
-            continue;
-        }
-
-        // Use field strides for correct SoA layout handling
-        // field[c, x, y, z] = base + c * stride_c + x * stride_x + y * stride_y + z * stride_z
-        for (Index_t c = 0; c < nb_components; ++c) {
-            Index_t offset = c * field_stride_c +
-                             ix * field_stride_x +
-                             iy * field_stride_y +
-                             iz * field_stride_z;
-            sum += a[offset] * b[offset];
-        }
-    }
-
-    shared_data[tid] = sum;
-    __syncthreads();
-
-    // Reduce within block
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
-/**
- * Compute squared norm over ghost region only (3D).
- * Uses a simple approach: iterate all pixels, skip interior ones.
- * Uses field strides for correct SoA layout handling.
- */
-__global__ void ghost_norm_sq_3d_kernel(
-    const Real* x, Real* partial_sums,
-    Index_t nx_total, Index_t ny_total, Index_t nz_total,
-    Index_t gx_left, Index_t gx_right,
-    Index_t gy_left, Index_t gy_right,
-    Index_t gz_left, Index_t gz_right,
-    Index_t field_stride_c, Index_t field_stride_x,
-    Index_t field_stride_y, Index_t field_stride_z,
-    Index_t nb_components) {
-
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-
-    Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Interior bounds
-    Index_t x_start = gx_left;
-    Index_t x_end = nx_total - gx_right;
-    Index_t y_start = gy_left;
-    Index_t y_end = ny_total - gy_right;
-    Index_t z_start = gz_left;
-    Index_t z_end = nz_total - gz_right;
-
-    // Total pixels in the domain
-    Index_t total_pixels = nx_total * ny_total * nz_total;
-
-    Real sum = 0.0;
-
-    for (Index_t pixel_idx = global_tid; pixel_idx < total_pixels;
-         pixel_idx += blockDim.x * gridDim.x) {
-
-        Index_t ix = pixel_idx / (ny_total * nz_total);
-        Index_t rem = pixel_idx % (ny_total * nz_total);
-        Index_t iy = rem / nz_total;
-        Index_t iz = rem % nz_total;
-
-        // Skip interior pixels
-        if (ix >= x_start && ix < x_end &&
-            iy >= y_start && iy < y_end &&
-            iz >= z_start && iz < z_end) {
-            continue;
-        }
-
-        // Use field strides for correct SoA layout handling
-        // field[c, x, y, z] = base + c * stride_c + x * stride_x + y * stride_y + z * stride_z
-        for (Index_t c = 0; c < nb_components; ++c) {
-            Index_t offset = c * field_stride_c +
-                             ix * field_stride_x +
-                             iy * field_stride_y +
-                             iz * field_stride_z;
-            Real val = x[offset];
-            sum += val * val;
-        }
-    }
-
-    shared_data[tid] = sum;
-    __syncthreads();
-
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
 }  // namespace gpu_kernels
+
+namespace {
+
+/**
+ * True if the collection carries ghost buffers in any direction.
+ */
+bool has_ghosts(const GlobalFieldCollection& coll) {
+    const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
+    const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
+    for (Dim_t d = 0; d < coll.get_spatial_dim(); ++d) {
+        if (nb_ghosts_left[d] != 0 || nb_ghosts_right[d] != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Launch the interior dot-product reduction for two fields of `coll` and
+ * return the result. Strides are taken from `a`; the caller guarantees that
+ * `b` shares the same layout (fields of the same collection with the same
+ * number of components and sub-points).
+ */
+Real interior_dot(const TypedField<Real, DeviceSpace>& a,
+                  const TypedField<Real, DeviceSpace>& b,
+                  const GlobalFieldCollection& coll) {
+    const auto spatial_dim = coll.get_spatial_dim();
+    if (spatial_dim < 1 || spatial_dim > 3) {
+        throw FieldError("interior_dot only supports 1D, 2D and 3D fields");
+    }
+    const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
+    const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
+    const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
+    const auto field_strides = a.get_strides(IterUnit::Pixel);
+    const Index_t stride_c = field_strides[0];
+    const Index_t nb_components_per_pixel =
+        a.get_nb_components() * a.get_nb_sub_pts();
+
+    // Interior bounds; unused trailing dimensions degenerate to one pass
+    Index_t extent[3]{1, 1, 1};
+    Index_t start[3]{0, 0, 0};
+    Index_t stride[3]{0, 0, 0};
+    for (Dim_t d = 0; d < spatial_dim; ++d) {
+        start[d] = nb_ghosts_left[d];
+        extent[d] = nb_pts[d] - nb_ghosts_left[d] - nb_ghosts_right[d];
+        stride[d] = field_strides[field_strides.size() - spatial_dim + d];
+    }
+
+    const Index_t nb_interior_pixels = extent[0] * extent[1] * extent[2];
+    if (nb_interior_pixels <= 0) {
+        return 0.0;
+    }
+
+    const int num_blocks =
+        (nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+        gpu_kernels::REDUCE_BLOCK_SIZE;
+    Real* d_partial;
+    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_kernel,
+                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      a.view().data(), b.view().data(), d_partial,
+                      extent[0], extent[1], extent[2],
+                      start[0], start[1], start[2],
+                      stride_c, stride[0], stride[1], stride[2],
+                      nb_components_per_pixel);
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      d_partial, num_blocks);
+
+    Real result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
+    GPU_FREE(d_partial);
+    return result;
+}
+
+}  // namespace
 
 /* ---------------------------------------------------------------------- */
 /* Public API implementations                                              */
 /* ---------------------------------------------------------------------- */
-
-// TODO(numerics): These reductions compute the full-buffer result and
-// subtract the ghost contribution. The subtraction cancels catastrophically
-// when the interior values are small but the ghost buffers hold large stale
-// data (e.g. a converged CG residual), and can even return a negative
-// squared norm. The host implementation (linalg_host.cc) was changed to sum
-// the interior region directly; the GPU kernels need the same treatment.
 
 template <>
 Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
@@ -608,298 +420,73 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
     }
 
     const auto& coll = a.get_collection();
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t nb_components_per_pixel =
-        a.get_nb_components() * a.get_nb_sub_pts();
-    const Index_t n = a.get_nb_entries() * a.get_nb_components();
 
-    // Allocate device memory for partial sums
+    // For GlobalFieldCollection with ghosts, sum the interior directly;
+    // full-buffer-minus-ghosts cancels catastrophically when the interior
+    // values are small
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        if (has_ghosts(global_coll)) {
+            return interior_dot(a, b, global_coll);
+        }
+    }
+
+    // No ghosts: reduce the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = a.get_nb_entries() * a.get_nb_components();
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
     Real* d_partial;
     GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
 
-    // Full buffer reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
                       a.view().data(), b.view().data(), d_partial, n);
 
-    // Final reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                       1, gpu_kernels::REDUCE_BLOCK_SIZE,
                       d_partial, num_blocks);
 
-    // Copy result back
-    Real full_dot;
-    GPU_MEMCPY_D2H(&full_dot, d_partial, sizeof(Real));
-
-    // For GlobalFieldCollection, subtract ghost contributions
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        const auto spatial_dim = global_coll.get_spatial_dim();
-
-        if (spatial_dim == 1) {
-            // Reuse the 2D ghost kernel with ny = 1 and no y-ghosts: this
-            // matches the host implementation, which handles 1D as well.
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            const auto field_strides = a.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 1];
-            // ny == 1, so the y index is always 0 and field_stride_y is unused.
-            const Index_t field_stride_y = field_stride_x;
-
-            Index_t ghost_pixels = nb_ghosts_left[0] + nb_ghosts_right[0];
-            if (ghost_pixels > 0) {
-                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                                   gpu_kernels::REDUCE_BLOCK_SIZE;
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_dot_2d_kernel,
-                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  a.view().data(), b.view().data(), d_partial,
-                                  nb_pts[0], Index_t{1},
-                                  nb_ghosts_left[0], nb_ghosts_right[0],
-                                  Index_t{0}, Index_t{0},
-                                  field_stride_c, field_stride_x, field_stride_y,
-                                  nb_components_per_pixel);
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  d_partial, ghost_blocks);
-
-                Real ghost_dot;
-                GPU_MEMCPY_D2H(&ghost_dot, d_partial, sizeof(Real));
-                full_dot -= ghost_dot;
-            }
-        } else if (spatial_dim == 2) {
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            // Get field data strides (for SoA layout)
-            const auto field_strides = a.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 2];
-            const Index_t field_stride_y = field_strides[field_strides.size() - 1];
-
-            // Count ghost pixels for block sizing
-            Index_t x_start = nb_ghosts_left[0];
-            Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
-            Index_t ghost_pixels =
-                nb_ghosts_left[0] * nb_pts[1] +
-                nb_ghosts_right[0] * nb_pts[1] +
-                (x_end - x_start) * nb_ghosts_left[1] +
-                (x_end - x_start) * nb_ghosts_right[1];
-
-            if (ghost_pixels > 0) {
-                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                                   gpu_kernels::REDUCE_BLOCK_SIZE;
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_dot_2d_kernel,
-                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  a.view().data(), b.view().data(), d_partial,
-                                  nb_pts[0], nb_pts[1],
-                                  nb_ghosts_left[0], nb_ghosts_right[0],
-                                  nb_ghosts_left[1], nb_ghosts_right[1],
-                                  field_stride_c, field_stride_x, field_stride_y,
-                                  nb_components_per_pixel);
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  d_partial, ghost_blocks);
-
-                Real ghost_dot;
-                GPU_MEMCPY_D2H(&ghost_dot, d_partial, sizeof(Real));
-                full_dot -= ghost_dot;
-            }
-        } else if (spatial_dim == 3) {
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            // Get field data strides (for SoA layout)
-            const auto field_strides = a.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 3];
-            const Index_t field_stride_y = field_strides[field_strides.size() - 2];
-            const Index_t field_stride_z = field_strides[field_strides.size() - 1];
-
-            // Total pixels for block count
-            Index_t total_pixels = nb_pts[0] * nb_pts[1] * nb_pts[2];
-            int ghost_blocks = (total_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                               gpu_kernels::REDUCE_BLOCK_SIZE;
-
-            GPU_LAUNCH_KERNEL(gpu_kernels::ghost_dot_3d_kernel,
-                              ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                              a.view().data(), b.view().data(), d_partial,
-                              nb_pts[0], nb_pts[1], nb_pts[2],
-                              nb_ghosts_left[0], nb_ghosts_right[0],
-                              nb_ghosts_left[1], nb_ghosts_right[1],
-                              nb_ghosts_left[2], nb_ghosts_right[2],
-                              field_stride_c, field_stride_x,
-                              field_stride_y, field_stride_z,
-                              nb_components_per_pixel);
-
-            GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                              1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                              d_partial, ghost_blocks);
-
-            Real ghost_dot;
-            GPU_MEMCPY_D2H(&ghost_dot, d_partial, sizeof(Real));
-            full_dot -= ghost_dot;
-        }
-    }
-
+    Real result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
     GPU_FREE(d_partial);
-    return full_dot;
+    return result;
 }
 
 template <>
 Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
     const auto& coll = x.get_collection();
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t nb_components_per_pixel =
-        x.get_nb_components() * x.get_nb_sub_pts();
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
 
-    // Allocate device memory for partial sums
+    // For GlobalFieldCollection with ghosts, sum the interior directly;
+    // full-buffer-minus-ghosts cancels catastrophically when the interior
+    // values are small
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        if (has_ghosts(global_coll)) {
+            return interior_dot(x, x, global_coll);
+        }
+    }
+
+    // No ghosts: reduce the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
     Real* d_partial;
     GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
 
-    // Full buffer reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::norm_sq_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
                       x.view().data(), d_partial, n);
 
-    // Final reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                       1, gpu_kernels::REDUCE_BLOCK_SIZE,
                       d_partial, num_blocks);
 
-    // Copy result back
-    Real full_norm;
-    GPU_MEMCPY_D2H(&full_norm, d_partial, sizeof(Real));
-
-    // For GlobalFieldCollection, subtract ghost contributions
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        const auto spatial_dim = global_coll.get_spatial_dim();
-
-        if (spatial_dim == 1) {
-            // Reuse the 2D ghost kernel with ny = 1 and no y-ghosts, matching
-            // the host implementation which handles 1D as well.
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            const auto field_strides = x.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 1];
-            const Index_t field_stride_y = field_stride_x;  // ny == 1, unused
-
-            Index_t ghost_pixels = nb_ghosts_left[0] + nb_ghosts_right[0];
-            if (ghost_pixels > 0) {
-                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                                   gpu_kernels::REDUCE_BLOCK_SIZE;
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
-                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  x.view().data(), d_partial,
-                                  nb_pts[0], Index_t{1},
-                                  nb_ghosts_left[0], nb_ghosts_right[0],
-                                  Index_t{0}, Index_t{0},
-                                  field_stride_c, field_stride_x, field_stride_y,
-                                  nb_components_per_pixel);
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  d_partial, ghost_blocks);
-
-                Real ghost_norm;
-                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
-                full_norm -= ghost_norm;
-            }
-        } else if (spatial_dim == 2) {
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            // Get field data strides (for SoA layout: [comp_stride, sub_pt_stride, x_stride, y_stride])
-            const auto field_strides = x.get_strides(IterUnit::Pixel);
-            // Component stride is first, spatial strides come after component and sub_pt dimensions
-            const Index_t field_stride_c = field_strides[0];  // component stride
-            const Index_t field_stride_x = field_strides[field_strides.size() - 2];  // x stride
-            const Index_t field_stride_y = field_strides[field_strides.size() - 1];  // y stride
-
-            Index_t x_start = nb_ghosts_left[0];
-            Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
-            Index_t ghost_pixels =
-                nb_ghosts_left[0] * nb_pts[1] +
-                nb_ghosts_right[0] * nb_pts[1] +
-                (x_end - x_start) * nb_ghosts_left[1] +
-                (x_end - x_start) * nb_ghosts_right[1];
-
-            if (ghost_pixels > 0) {
-                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                                   gpu_kernels::REDUCE_BLOCK_SIZE;
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
-                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  x.view().data(), d_partial,
-                                  nb_pts[0], nb_pts[1],
-                                  nb_ghosts_left[0], nb_ghosts_right[0],
-                                  nb_ghosts_left[1], nb_ghosts_right[1],
-                                  field_stride_c, field_stride_x, field_stride_y,
-                                  nb_components_per_pixel);
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  d_partial, ghost_blocks);
-
-                Real ghost_norm;
-                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
-                full_norm -= ghost_norm;
-            }
-        } else if (spatial_dim == 3) {
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            // Get field data strides (for SoA layout)
-            const auto field_strides = x.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 3];
-            const Index_t field_stride_y = field_strides[field_strides.size() - 2];
-            const Index_t field_stride_z = field_strides[field_strides.size() - 1];
-
-            // Total pixels for block count
-            Index_t total_pixels = nb_pts[0] * nb_pts[1] * nb_pts[2];
-            int ghost_blocks = (total_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                               gpu_kernels::REDUCE_BLOCK_SIZE;
-
-            GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_3d_kernel,
-                              ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                              x.view().data(), d_partial,
-                              nb_pts[0], nb_pts[1], nb_pts[2],
-                              nb_ghosts_left[0], nb_ghosts_right[0],
-                              nb_ghosts_left[1], nb_ghosts_right[1],
-                              nb_ghosts_left[2], nb_ghosts_right[2],
-                              field_stride_c, field_stride_x,
-                              field_stride_y, field_stride_z,
-                              nb_components_per_pixel);
-
-            GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                              1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                              d_partial, ghost_blocks);
-
-            Real ghost_norm;
-            GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
-            full_norm -= ghost_norm;
-        }
-    }
-
+    Real result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
     GPU_FREE(d_partial);
-    return full_norm;
+    return result;
 }
 
 template <>
@@ -1003,146 +590,44 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
     const auto& coll = x.get_collection();
     // Total scalar elements in the full buffer (get_nb_entries already counts
     // sub-points, so multiply only by the number of components)
-    const Index_t nb_components_per_pixel =
-        x.get_nb_components() * x.get_nb_sub_pts();
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
 
-    // Allocate device memory for partial sums
+    // For GlobalFieldCollection with ghosts: update y over the full buffer
+    // (ghost pixels included, keeping the buffer consistent), then sum the
+    // interior directly. Full-buffer-minus-ghosts cancels catastrophically
+    // when the interior values are small.
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        if (has_ghosts(global_coll)) {
+            const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                                   gpu_kernels::BLOCK_SIZE;
+            GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel,
+                              num_blocks, gpu_kernels::BLOCK_SIZE,
+                              alpha, x.view().data(), y.view().data(), n);
+            // Kernels on the default stream serialize, so the interior
+            // reduction sees the updated y
+            return interior_dot(y, y, global_coll);
+        }
+    }
+
+    // No ghosts: fused single-pass AXPY + norm_sq
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
     Real* d_partial;
     GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
 
-    // Fused AXPY + norm_sq kernel
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
                       alpha, x.view().data(), y.view().data(), d_partial, n);
 
-    // Final reduction
     GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
                       1, gpu_kernels::REDUCE_BLOCK_SIZE,
                       d_partial, num_blocks);
 
-    // Copy result back
-    Real full_norm;
-    GPU_MEMCPY_D2H(&full_norm, d_partial, sizeof(Real));
-
-    // For GlobalFieldCollection, subtract ghost contributions
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        const auto spatial_dim = global_coll.get_spatial_dim();
-
-        if (spatial_dim == 1) {
-            // Reuse the 2D ghost kernel with ny = 1 and no y-ghosts, matching
-            // the host implementation which handles 1D as well.
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            const auto field_strides = y.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 1];
-            const Index_t field_stride_y = field_stride_x;  // ny == 1, unused
-
-            Index_t ghost_pixels = nb_ghosts_left[0] + nb_ghosts_right[0];
-            if (ghost_pixels > 0) {
-                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                                   gpu_kernels::REDUCE_BLOCK_SIZE;
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
-                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  y.view().data(), d_partial,
-                                  nb_pts[0], Index_t{1},
-                                  nb_ghosts_left[0], nb_ghosts_right[0],
-                                  Index_t{0}, Index_t{0},
-                                  field_stride_c, field_stride_x, field_stride_y,
-                                  nb_components_per_pixel);
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  d_partial, ghost_blocks);
-
-                Real ghost_norm;
-                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
-                full_norm -= ghost_norm;
-            }
-        } else if (spatial_dim == 2) {
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            // Get field data strides from y (for SoA layout)
-            const auto field_strides = y.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 2];
-            const Index_t field_stride_y = field_strides[field_strides.size() - 1];
-
-            Index_t x_start = nb_ghosts_left[0];
-            Index_t x_end = nb_pts[0] - nb_ghosts_right[0];
-            Index_t ghost_pixels =
-                nb_ghosts_left[0] * nb_pts[1] +
-                nb_ghosts_right[0] * nb_pts[1] +
-                (x_end - x_start) * nb_ghosts_left[1] +
-                (x_end - x_start) * nb_ghosts_right[1];
-
-            if (ghost_pixels > 0) {
-                int ghost_blocks = (ghost_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                                   gpu_kernels::REDUCE_BLOCK_SIZE;
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_2d_kernel,
-                                  ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  y.view().data(), d_partial,
-                                  nb_pts[0], nb_pts[1],
-                                  nb_ghosts_left[0], nb_ghosts_right[0],
-                                  nb_ghosts_left[1], nb_ghosts_right[1],
-                                  field_stride_c, field_stride_x, field_stride_y,
-                                  nb_components_per_pixel);
-
-                GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                                  1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                                  d_partial, ghost_blocks);
-
-                Real ghost_norm;
-                GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
-                full_norm -= ghost_norm;
-            }
-        } else if (spatial_dim == 3) {
-            const auto& nb_pts = global_coll.get_nb_subdomain_grid_pts_with_ghosts();
-            const auto& nb_ghosts_left = global_coll.get_nb_ghosts_left();
-            const auto& nb_ghosts_right = global_coll.get_nb_ghosts_right();
-            // Get field data strides from y (for SoA layout)
-            const auto field_strides = y.get_strides(IterUnit::Pixel);
-            const Index_t field_stride_c = field_strides[0];
-            const Index_t field_stride_x = field_strides[field_strides.size() - 3];
-            const Index_t field_stride_y = field_strides[field_strides.size() - 2];
-            const Index_t field_stride_z = field_strides[field_strides.size() - 1];
-
-            // Total pixels for block count
-            Index_t total_pixels = nb_pts[0] * nb_pts[1] * nb_pts[2];
-            int ghost_blocks = (total_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                               gpu_kernels::REDUCE_BLOCK_SIZE;
-
-            GPU_LAUNCH_KERNEL(gpu_kernels::ghost_norm_sq_3d_kernel,
-                              ghost_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                              y.view().data(), d_partial,
-                              nb_pts[0], nb_pts[1], nb_pts[2],
-                              nb_ghosts_left[0], nb_ghosts_right[0],
-                              nb_ghosts_left[1], nb_ghosts_right[1],
-                              nb_ghosts_left[2], nb_ghosts_right[2],
-                              field_stride_c, field_stride_x,
-                              field_stride_y, field_stride_z,
-                              nb_components_per_pixel);
-
-            GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                              1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                              d_partial, ghost_blocks);
-
-            Real ghost_norm;
-            GPU_MEMCPY_D2H(&ghost_norm, d_partial, sizeof(Real));
-            full_norm -= ghost_norm;
-        }
-    }
-
+    Real result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
     GPU_FREE(d_partial);
-    return full_norm;
+    return result;
 }
 
 // Complex versions would follow the same pattern but with Complex type

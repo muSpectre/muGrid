@@ -4,6 +4,9 @@ Change log for µGrid
 0.107.0 (11Jun26)
 -----------------
 
+- BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and
+  GPU now sum the interior region directly instead of subtracting the ghost
+  contribution from a full-buffer reduction (minimizing floating point overflows)
 - ENH: Stencil operators now report the ghost layers they need
 - ENH: All stencil operators (including the FEM gradients, which previously
   did not check) now validate at apply/transpose time that the field
