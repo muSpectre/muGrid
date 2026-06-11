@@ -512,5 +512,62 @@ class TestDeepCopy:
         )
 
 
+# =============================================================================
+# Interior accuracy with large ghost values (CPU)
+# =============================================================================
+
+
+class TestLinalgInteriorAccuracy:
+    """Small interior values must survive large stale ghost values.
+
+    Regression tests: the reductions used to compute the full-buffer result
+    and subtract the ghost contribution. That difference of two large
+    numbers cancels catastrophically once the interior values are small
+    (e.g. a converged CG residual while the ghost buffers hold large stale
+    operator output) and could even return a NEGATIVE squared norm, which
+    spuriously satisfied the CG convergence test.
+
+    CPU-only: the GPU reductions still use the subtraction approach.
+    """
+
+    interior_value = 1.0e-6
+    ghost_value = 1.0e5
+
+    def _make_field(self, fc, name):
+        field = fc.real_field(name)
+        field.pg[...] = self.ghost_value
+        field.p[...] = self.interior_value
+        return field
+
+    def test_norm_sq_small_interior_large_ghosts(self):
+        fc = muGrid.GlobalFieldCollection([16, 16, 16], ghosts=1)
+        field = self._make_field(fc, "f")
+        expected = 16**3 * self.interior_value**2
+        result = linalg.norm_sq(field)
+        assert result == pytest.approx(expected, rel=1e-12)
+
+    def test_vecdot_small_interior_large_ghosts(self):
+        fc = muGrid.GlobalFieldCollection([16, 16, 16], ghosts=1)
+        a = self._make_field(fc, "a")
+        b = self._make_field(fc, "b")
+        expected = 16**3 * self.interior_value**2
+        result = linalg.vecdot(a, b)
+        assert result == pytest.approx(expected, rel=1e-12)
+
+    def test_axpy_norm_sq_small_interior_large_ghosts(self):
+        fc = muGrid.GlobalFieldCollection([16, 16, 16], ghosts=1)
+        x = self._make_field(fc, "x")
+        y = self._make_field(fc, "y")
+        # y -= x leaves the interior at interior_value while the ghost
+        # buffers stay large (2 * ghost_value)
+        y.pg[...] = 3 * self.ghost_value
+        y.p[...] = 2 * self.interior_value
+        result = linalg.axpy_norm_sq(-1.0, x, y)
+        expected = 16**3 * self.interior_value**2
+        assert result == pytest.approx(expected, rel=1e-12)
+        # A squared norm can never be negative
+        assert result >= 0.0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

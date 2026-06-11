@@ -70,7 +70,7 @@ def global_rhs(nb_grid_pts):
     return rhs - rhs.mean()
 
 
-def run_poisson_cg(comm, engine, prec, tol=1e-8, maxiter=200):
+def run_poisson_cg(comm, engine, prec, rtol=1e-8, maxiter=200):
     """Solve the FD Poisson problem; return (local solution, iterations)."""
     (nx, ny) = nb_grid_pts = tuple(engine.nb_domain_grid_pts)
     assert nx == ny, "test assumes square grid (isotropic spacing)"
@@ -95,7 +95,7 @@ def run_poisson_cg(comm, engine, prec, tol=1e-8, maxiter=200):
         solution,
         hessp=fd_laplace_hessp(engine, grid_spacing),
         prec=prec,
-        tol=tol,
+        rtol=rtol,
         maxiter=maxiter,
         callback=callback,
     )
@@ -225,7 +225,7 @@ def test_jacobi_apply(comm):
         JacobiPreconditioner(0.0)
 
 
-def screened_poisson_cg(comm, engine, prec, tol=1e-8, maxiter=1000):
+def screened_poisson_cg(comm, engine, prec, rtol=1e-8, maxiter=1000):
     """Solve (-FD-Laplacian / h^2 + c(x)) u = b with strongly varying c."""
     (nx, ny) = nb_grid_pts = tuple(engine.nb_domain_grid_pts)
     grid_spacing = 1 / nx
@@ -254,7 +254,7 @@ def screened_poisson_cg(comm, engine, prec, tol=1e-8, maxiter=1000):
         solution,
         hessp=hessp,
         prec=prec,
-        tol=tol,
+        rtol=rtol,
         maxiter=maxiter,
         callback=lambda it, state: iterations.append(it),
     )

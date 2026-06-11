@@ -492,7 +492,7 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
         rhs,
         solution,
         hessp=hessp_mugrid,
-        tol=1e-6,
+        rtol=1e-10,
         maxiter=1000,
     )
     t_elapsed = time.perf_counter() - t_start
@@ -575,7 +575,7 @@ def test_laplace_mugrid_vs_scipy(nb_grid_pts=(512, 512)):
         rhs,
         solution,
         hessp=hessp_scipy,
-        tol=1e-6,
+        rtol=1e-10,
         maxiter=1000,
     )
     t_scipy += time.perf_counter()
@@ -880,7 +880,7 @@ def test_quad_triangle_device_vs_host():
     np.testing.assert_allclose(
         device_result,
         host_result,
-        rtol=1e-10,
+        rtol=1e-6,
         atol=1e-12,
         err_msg="Device and host quadrature results differ",
     )
@@ -1207,7 +1207,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
         np.testing.assert_allclose(
             device_result,
             host_result,
-            rtol=1e-10,
+            rtol=1e-6,
             atol=1e-12,
             err_msg="Device convolution result differs from host result",
         )

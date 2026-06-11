@@ -4,10 +4,22 @@ Change log for µGrid
 0.107.0 (11Jun26)
 -----------------
 
+- API: `conjugate_gradients` now converges on a relative criterion by
+  default, ``||b - Ax|| <= max(rtol * ||b||, atol)`` with ``rtol=1e-6``,
+  ``atol=0``; the old absolute `tol` is deprecated (it maps to `atol` with
+  ``rtol=0``). An absolute criterion is unreachable in double precision
+  when ``||b||`` is large and was the cause of erratic CG termination
 - ENH: Stencil operators now report the ghost layers they need
 - ENH: All stencil operators (including the FEM gradients, which previously
   did not check) now validate at apply/transpose time that the field
   collection provides the ghost layers they report
+- BUG: Host `norm_sq`/`vecdot`/`axpy_norm_sq` now sum the interior region
+  directly instead of subtracting the ghost contribution from the
+  full-buffer result; the subtraction cancelled catastrophically once the
+  interior values were small (converged CG residuals were reported with an
+  absolute error of order eps·‖ghosts‖² and could even go negative,
+  spuriously triggering or preventing CG convergence). The GPU reductions
+  still use the subtraction and need the same fix
 - BUG: Removed the allgather/scatter-only `Transpose` modes, which posted
   overlapping receive buffers (UB) and garbled multi-component 3D transforms
 - BUG: FFT transposes now honour field storage order (AoS/SoA); device fields
