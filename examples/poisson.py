@@ -205,8 +205,8 @@ rhs.p[...] -= arr.mean(rhs.p)
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
-# Create global timer for hierarchical timing
-timer = muTimer.Timer()
+# Create global timer for hierarchical timing (MPI-aware: prints on rank 0)
+timer = muTimer.Timer(comm=comm)
 
 
 def inverse_fd_symbol(engine):

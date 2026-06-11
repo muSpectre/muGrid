@@ -125,6 +125,16 @@ class CommunicatorWrapper:
         self._mpi_comm = mpi_comm
 
     @property
+    def mpi4py_comm(self):
+        """The underlying mpi4py communicator, or None if unavailable.
+
+        Tools like muTimer use this to gather Python objects across ranks.
+        Note that `mpi_comm` (delegated to the C++ communicator) returns the
+        raw MPI handle instead.
+        """
+        return self._mpi_comm
+
+    @property
     def rank(self):
         """Get rank of present process."""
         return self._cpp.rank
