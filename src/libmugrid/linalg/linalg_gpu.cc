@@ -586,6 +586,13 @@ __global__ void ghost_norm_sq_3d_kernel(
 /* Public API implementations                                              */
 /* ---------------------------------------------------------------------- */
 
+// TODO(numerics): These reductions compute the full-buffer result and
+// subtract the ghost contribution. The subtraction cancels catastrophically
+// when the interior values are small but the ghost buffers hold large stale
+// data (e.g. a converged CG residual), and can even return a negative
+// squared norm. The host implementation (linalg_host.cc) was changed to sum
+// the interior region directly; the GPU kernels need the same treatment.
+
 template <>
 Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
                                 const TypedField<Real, DeviceSpace>& b) {
