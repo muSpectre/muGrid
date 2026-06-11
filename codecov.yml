@@ -1,0 +1,6 @@
+# HIP/ROCm sources are never built by the coverage workflow (the GPU
+# coverage leg is CUDA-only; see .github/workflows/coverage.yml), so any
+# change to them would count against patch coverage as untestable lines.
+ignore:
+  - src/libmugrid/fft/rocfft_backend.cc
+  - src/libmugrid/fft/rocfft_backend.hh
