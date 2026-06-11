@@ -47,17 +47,10 @@ unreleased
   global minimum interior extent (precomputed collectively at
   initialisation), so all ranks throw consistently
 - ENH: Added `Communicator::min` (C++ and Python), mirroring `max`
-- ENH: New `muGrid.Preconditioners` module with a generic `Preconditioner`
-  interface for the matrix-free solvers (`prec(r, z)` computing `z = M⁻¹r`),
-  an `IdentityPreconditioner`, a `JacobiPreconditioner` (diagonal scaling,
-  accepting a field, array or scalar), and a `FourierPreconditioner` that
-  applies a spectral kernel `z = F⁻¹[k(q)·F r]` via an `FFTEngine`
-  (MPI-transparent, broadcasts over field components, folds in the FFT
-  normalisation, projects out modes where the kernel vanishes). Tested by
-  solving the periodic finite-difference Poisson problem with the exact
-  inverse FD symbol as preconditioner (CG converges in O(1) iterations
-  instead of dozens) and a heterogeneous screened Poisson problem with
-  Jacobi (164 → 21 iterations); documented in the Examples chapter
+- ENH: New `muGrid.Preconditioners` module for the matrix-free CG solver, with
+  `Identity`, `Jacobi` (diagonal scaling) and `Fourier` (spectral kernel via `FFTEngine`) preconditioners
+- ENH: The Poisson example (`examples/poisson.py`) gained a `-P/--preconditioner`
+  option (`fourier`/`fourier-exact`) that reuses the `FFTEngine` pencil grid for spectral CG preconditioning, with per-stage (fft/kernel/ifft) timing
 - ENH: The Python `FFTEngine` wrapper now exposes `communicate_ghosts` and
   `reduce_ghosts` accepting wrapped fields, so an FFT engine constructed
   with ghost buffers can serve as the single decomposition for both stencil

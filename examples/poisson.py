@@ -354,6 +354,11 @@ apply_flops_rate = (
     (nb_iterations * flops_per_hessp) / apply_time if apply_time > 0 else 0
 )
 
+# The per-iteration memory/FLOP model only covers the stencil CG operations;
+# with a preconditioner the FFT work dominates and the estimates are not
+# meaningful, so they are omitted from the output.
+report_estimates = args.preconditioner == "none"
+
 if args.json:
     # JSON output (convert numpy types to Python types for JSON serialization)
     # Timer's to_dict() includes PAPI data when available
@@ -376,16 +381,22 @@ if args.json:
             "total_lattice_updates": int(total_lattice_updates),
             "MLUPS": float(lups / 1e6),
             "GLUPS": float(lups / 1e9),
-            "reads_per_grid_point": int(reads_per_iteration),
-            "writes_per_grid_point": int(writes_per_iteration),
-            "bytes_per_iteration": int(bytes_per_iteration),
-            "total_bytes": int(total_bytes),
-            "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_grid_point": int(flops_per_iteration),
-            "flops_per_iteration": int(flops_per_cg_iteration),
-            "total_flops": int(total_flops),
-            "flops_rate_GFLOPs": float(flops_rate / 1e9),
-            "arithmetic_intensity": float(arithmetic_intensity),
+            **(
+                {
+                    "reads_per_grid_point": int(reads_per_iteration),
+                    "writes_per_grid_point": int(writes_per_iteration),
+                    "bytes_per_iteration": int(bytes_per_iteration),
+                    "total_bytes": int(total_bytes),
+                    "memory_throughput_GBps": float(memory_throughput / 1e9),
+                    "flops_per_grid_point": int(flops_per_iteration),
+                    "flops_per_iteration": int(flops_per_cg_iteration),
+                    "total_flops": int(total_flops),
+                    "flops_rate_GFLOPs": float(flops_rate / 1e9),
+                    "arithmetic_intensity": float(arithmetic_intensity),
+                }
+                if report_estimates
+                else {}
+            ),
             "apply_time_seconds": float(apply_time),
             "apply_MLUPS": float(apply_lups / 1e6),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
@@ -420,44 +431,46 @@ else:
     parprint(f"  Total lattice updates: {total_lattice_updates:,}", comm=comm)
     parprint(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)", comm=comm)
 
-    parprint("\nMemory traffic per CG iteration (estimated):", comm=comm)
-    parprint(
-        f"  Per grid point: {reads_per_iteration} reads + "
-        f"{writes_per_iteration} writes "
-        f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes",
-        comm=comm,
-    )
-    parprint(f"    hessp:    {nb_stencil_pts} reads, 1 write", comm=comm)
-    parprint("    dot_pAp:  2 reads", comm=comm)
-    parprint("    update_x: 2 reads, 1 write", comm=comm)
-    parprint("    update_r: 2 reads, 1 write (fused axpy_norm_sq)", comm=comm)
-    parprint("    update_p: 2 reads, 1 write", comm=comm)
-    parprint(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB", comm=comm)
-    parprint(f"  Total: {total_bytes / 1e9:.2f} GB", comm=comm)
-    parprint(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s", comm=comm)
+    if report_estimates:
+        parprint("\nMemory traffic per CG iteration (estimated):", comm=comm)
+        parprint(
+            f"  Per grid point: {reads_per_iteration} reads + "
+            f"{writes_per_iteration} writes "
+            f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes",
+            comm=comm,
+        )
+        parprint(f"    hessp:    {nb_stencil_pts} reads, 1 write", comm=comm)
+        parprint("    dot_pAp:  2 reads", comm=comm)
+        parprint("    update_x: 2 reads, 1 write", comm=comm)
+        parprint("    update_r: 2 reads, 1 write (fused axpy_norm_sq)", comm=comm)
+        parprint("    update_p: 2 reads, 1 write", comm=comm)
+        parprint(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB", comm=comm)
+        parprint(f"  Total: {total_bytes / 1e9:.2f} GB", comm=comm)
+        parprint(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s", comm=comm)
 
-    parprint("\nFLOPs per CG iteration (estimated):", comm=comm)
-    parprint(f"  Per grid point: {flops_per_iteration} FLOPs", comm=comm)
-    parprint(f"    hessp:    {2 * nb_stencil_pts} FLOPs", comm=comm)
-    parprint("    dot_pAp:  2 FLOPs", comm=comm)
-    parprint("    update_x: 2 FLOPs", comm=comm)
-    parprint("    update_r: 4 FLOPs (fused axpy_norm_sq)", comm=comm)
-    parprint("    update_p: 2 FLOPs", comm=comm)
-    parprint(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP", comm=comm)
-    parprint(f"  Total: {total_flops / 1e9:.2f} GFLOP", comm=comm)
-    parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
+        parprint("\nFLOPs per CG iteration (estimated):", comm=comm)
+        parprint(f"  Per grid point: {flops_per_iteration} FLOPs", comm=comm)
+        parprint(f"    hessp:    {2 * nb_stencil_pts} FLOPs", comm=comm)
+        parprint("    dot_pAp:  2 FLOPs", comm=comm)
+        parprint("    update_x: 2 FLOPs", comm=comm)
+        parprint("    update_r: 4 FLOPs (fused axpy_norm_sq)", comm=comm)
+        parprint("    update_p: 2 FLOPs", comm=comm)
+        parprint(
+            f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP", comm=comm
+        )
+        parprint(f"  Total: {total_flops / 1e9:.2f} GFLOP", comm=comm)
+        parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
 
-    parprint(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte", comm=comm)
+        parprint(
+            f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte",
+            comm=comm,
+        )
 
     if args.preconditioner != "none":
         parprint("\nFFT preconditioner (totals over all CG iterations):", comm=comm)
         parprint(
             f"  total: {prec_time:.4f} s (fft: {prec_fft_time:.4f} s, "
             f"kernel: {prec_scale_time:.4f} s, ifft: {prec_ifft_time:.4f} s)",
-            comm=comm,
-        )
-        parprint(
-            "  Note: memory/FLOP estimates above exclude the preconditioner.",
             comm=comm,
         )
     parprint(f"{'='*60}", comm=comm)
