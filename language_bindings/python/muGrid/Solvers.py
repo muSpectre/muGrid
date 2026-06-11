@@ -7,6 +7,15 @@ import warnings
 from . import linalg
 
 
+class ConvergenceError(RuntimeError):
+    """
+    Raised when an iterative solver fails to converge. Subclasses
+    ``RuntimeError`` for backwards compatibility; catching it specifically
+    avoids masking unrelated runtime errors (e.g. out-of-memory) as
+    non-convergence.
+    """
+
+
 def conjugate_gradients(
     comm,
     fc,
@@ -82,7 +91,7 @@ def conjugate_gradients(
 
     Raises
     ------
-    RuntimeError
+    ConvergenceError
         If the algorithm does not converge within maxiter iterations,
         or if the residual becomes NaN (indicating numerical issues).
     """
@@ -197,7 +206,7 @@ def conjugate_gradients(
 
             # Check for numerical issues (NaN indicates non-positive-definite H)
             if next_rr_val != next_rr_val:  # NaN check
-                raise RuntimeError(
+                raise ConvergenceError(
                     "Residual became NaN - Hessian may not be positive definite"
                 )
 
@@ -213,4 +222,6 @@ def conjugate_gradients(
             with timed("update_p"):
                 linalg.axpby(1.0, z, beta, p)
 
-    raise RuntimeError("Preconditioned conjugate gradient algorithm did not converge")
+    raise ConvergenceError(
+        "Preconditioned conjugate gradient algorithm did not converge"
+    )

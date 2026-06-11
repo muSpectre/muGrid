@@ -204,7 +204,10 @@ class FourierPreconditioner(Preconditioner):
             kernel = cupy.asarray(kernel)
             self._kernel = kernel
         # Broadcasts over leading component axes; normalisation is folded in.
+        # In-place multiply on the view, NOT `s[...] *= kernel`: cupy's
+        # __setitem__ materialises a contiguous copy of the whole strided
+        # field (1 GiB at 512^3).
         with self._timed("scale"):
-            s[...] *= kernel
+            s *= kernel
         with self._timed("ifft"):
             engine.ifft(work, z)

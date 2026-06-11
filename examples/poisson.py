@@ -18,7 +18,7 @@ import numpy as np
 import muGrid
 from muGrid import parprint
 from muGrid.Preconditioners import FourierPreconditioner
-from muGrid.Solvers import conjugate_gradients
+from muGrid.Solvers import ConvergenceError, conjugate_gradients
 
 try:
     from mpi4py import MPI
@@ -283,7 +283,7 @@ with timer("conjugate_gradients"):
         converged = True
         if not args.quiet:
             parprint("CG converged.", comm=comm)
-    except RuntimeError:
+    except ConvergenceError:
         if not args.quiet:
             parprint("CG did not converge.", comm=comm)
 
