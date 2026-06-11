@@ -50,6 +50,7 @@
 
 #include <sstream>
 
+using muGrid::GhostRequirement;
 using muGrid::LinearOperator;
 using muGrid::GenericLinearOperator;
 using muGrid::LaplaceOperator2D;
@@ -134,7 +135,28 @@ class PyGradientOperator : public LinearOperator {
     Dim_t get_spatial_dim() const override {
         PYBIND11_OVERRIDE_PURE(Index_t, LinearOperator, get_spatial_dim, );
     }
+
+    muGrid::Shape_t get_offset() const override {
+        PYBIND11_OVERRIDE_PURE(muGrid::Shape_t, LinearOperator, get_offset, );
+    }
+
+    muGrid::Shape_t get_stencil_shape() const override {
+        PYBIND11_OVERRIDE_PURE(muGrid::Shape_t, LinearOperator,
+                               get_stencil_shape, );
+    }
 };
+
+// Convert a GhostRequirement to a ((left...), (right...)) pair of tuples
+static py::tuple ghost_requirement_to_python(const GhostRequirement & req) {
+    auto shape_to_tuple{[](const muGrid::Shape_t & shape) {
+        py::tuple t(shape.size());
+        for (std::size_t i{0}; i < shape.size(); ++i) {
+            t[i] = shape[i];
+        }
+        return t;
+    }};
+    return py::make_tuple(shape_to_tuple(req.left), shape_to_tuple(req.right));
+}
 
 // Bind class GradientOperator
 void add_gradient_operator(py::module & mod) {
@@ -149,7 +171,30 @@ void add_gradient_operator(py::module & mod) {
         .def_property_readonly("nb_output_components",
                                &LinearOperator::get_nb_output_components)
         .def_property_readonly("spatial_dim",
-                               &LinearOperator::get_spatial_dim);
+                               &LinearOperator::get_spatial_dim)
+        .def_property_readonly(
+            "apply_ghost_requirement",
+            [](const LinearOperator & op) {
+                return ghost_requirement_to_python(
+                    op.get_apply_ghost_requirement());
+            },
+            "Ghost layers (left, right) required by apply()")
+        .def_property_readonly(
+            "transpose_ghost_requirement",
+            [](const LinearOperator & op) {
+                return ghost_requirement_to_python(
+                    op.get_transpose_ghost_requirement());
+            },
+            "Ghost layers (left, right) required by transpose()")
+        .def_property_readonly(
+            "ghost_requirement",
+            [](const LinearOperator & op) {
+                return ghost_requirement_to_python(op.get_ghost_requirement());
+            },
+            "Ghost layers (left, right) sufficient for both apply() and "
+            "transpose(); pass an operator (or a list of operators) as the "
+            "`ghosts` argument of CartesianDecomposition or FFTEngine to "
+            "size the ghost buffers automatically");
 }
 
 // Bind class GenericLinearOperator
@@ -833,7 +878,21 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                     const auto & V = op.get_V();
                     return py::array_t<Real>({8, 8}, V.data());
                 },
-                "Precomputed V matrix (volumetric stiffness geometry)");
+                "Precomputed V matrix (volumetric stiffness geometry)")
+            .def_property_readonly(
+                "apply_ghost_requirement",
+                [](const IsotropicStiffnessOperator2D & op) {
+                    return ghost_requirement_to_python(
+                        op.get_apply_ghost_requirement());
+                },
+                "Ghost layers (left, right) required by apply()")
+            .def_property_readonly(
+                "ghost_requirement",
+                [](const IsotropicStiffnessOperator2D & op) {
+                    return ghost_requirement_to_python(
+                        op.get_ghost_requirement());
+                },
+                "Ghost layers (left, right) sufficient for all operations");
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     using ApplyDeviceFn = void (IsotropicStiffnessOperator2D::*)(
@@ -914,7 +973,21 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                     const auto & V = op.get_V();
                     return py::array_t<Real>({24, 24}, V.data());
                 },
-                "Precomputed V matrix (volumetric stiffness geometry)");
+                "Precomputed V matrix (volumetric stiffness geometry)")
+            .def_property_readonly(
+                "apply_ghost_requirement",
+                [](const IsotropicStiffnessOperator3D & op) {
+                    return ghost_requirement_to_python(
+                        op.get_apply_ghost_requirement());
+                },
+                "Ghost layers (left, right) required by apply()")
+            .def_property_readonly(
+                "ghost_requirement",
+                [](const IsotropicStiffnessOperator3D & op) {
+                    return ghost_requirement_to_python(
+                        op.get_ghost_requirement());
+                },
+                "Ghost layers (left, right) sufficient for all operations");
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     using ApplyDeviceFn = void (IsotropicStiffnessOperator3D::*)(

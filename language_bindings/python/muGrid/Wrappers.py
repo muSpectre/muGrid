@@ -279,6 +279,117 @@ def _parse_device(
         )
 
 
+def _ghost_requirement(op: Any) -> Optional[Tuple[Tuple[int, ...], Tuple[int, ...]]]:
+    """
+    Return the (left, right) ghost requirement reported by an operator,
+    or None if the object does not report one.
+
+    Any object exposing a `ghost_requirement` attribute of the form
+    ((left...), (right...)) qualifies; this includes all muGrid stencil
+    operators and user-defined operators following the same protocol.
+    """
+    return getattr(_unwrap(op), "ghost_requirement", None)
+
+
+def _as_ghost_shape(value: Any, nb_dims: int, name: str) -> List[int]:
+    """Normalize an int or per-dimension sequence to a list of ghost counts."""
+    if isinstance(value, (int, np.integer)):
+        return [int(value)] * nb_dims
+    counts = [int(v) for v in value]
+    if len(counts) != nb_dims:
+        raise ValueError(
+            f"{name} has {len(counts)} entries, but the grid is {nb_dims}D"
+        )
+    return counts
+
+
+def _resolve_ghosts(
+    ghosts: Any,
+    nb_ghosts_left: Optional[Shape],
+    nb_ghosts_right: Optional[Shape],
+    nb_dims: int,
+) -> Tuple[List[int], List[int]]:
+    """
+    Resolve the `ghosts` argument of CartesianDecomposition/FFTEngine to
+    explicit (nb_ghosts_left, nb_ghosts_right) lists.
+
+    Parameters
+    ----------
+    ghosts : operator, sequence of operators, int, or (left, right) pair
+        - An operator (anything exposing `ghost_requirement`): use the
+          ghost layers the operator reports for all of its operations.
+        - A sequence of operators: elementwise maximum of their
+          requirements (one decomposition serving several stencils).
+        - An int n: n ghost layers on both sides of every dimension.
+        - A pair (left, right), each an int or a per-dimension sequence:
+          explicit ghost counts (expert override).
+    nb_ghosts_left, nb_ghosts_right : sequence of int, optional
+        Legacy explicit ghost counts; mutually exclusive with `ghosts`.
+    nb_dims : int
+        Spatial dimension of the grid, used for validation.
+
+    Returns
+    -------
+    (left, right) : pair of lists of int
+        Ghost layers per dimension.
+    """
+    if ghosts is None:
+        left = [0] * nb_dims if nb_ghosts_left is None else list(nb_ghosts_left)
+        right = (
+            [0] * nb_dims if nb_ghosts_right is None else list(nb_ghosts_right)
+        )
+        return left, right
+    if nb_ghosts_left is not None or nb_ghosts_right is not None:
+        raise ValueError(
+            "Specify either `ghosts` or `nb_ghosts_left`/`nb_ghosts_right`, "
+            "not both"
+        )
+
+    # Uniform ghost count on both sides of every dimension
+    if isinstance(ghosts, (int, np.integer)):
+        return [int(ghosts)] * nb_dims, [int(ghosts)] * nb_dims
+
+    # Single operator reporting its own requirement
+    requirement = _ghost_requirement(ghosts)
+    if requirement is not None:
+        requirements = [requirement]
+    else:
+        items = list(ghosts)
+        item_requirements = [_ghost_requirement(item) for item in items]
+        if items and all(r is not None for r in item_requirements):
+            # Sequence of operators
+            requirements = item_requirements
+        elif any(r is not None for r in item_requirements):
+            raise TypeError(
+                "Cannot mix operators and explicit ghost counts in `ghosts`; "
+                "pass either operators or a (left, right) pair"
+            )
+        elif len(items) == 2:
+            # Explicit (left, right) pair
+            return (
+                _as_ghost_shape(items[0], nb_dims, "ghosts[0] (left)"),
+                _as_ghost_shape(items[1], nb_dims, "ghosts[1] (right)"),
+            )
+        else:
+            raise TypeError(
+                "`ghosts` must be an operator, a sequence of operators, an "
+                "int, or a (left, right) pair of ghost counts"
+            )
+
+    left = [0] * nb_dims
+    right = [0] * nb_dims
+    for requirement in requirements:
+        req_left, req_right = requirement
+        if len(req_left) != nb_dims:
+            raise ValueError(
+                f"Operator reports a {len(req_left)}D ghost requirement, "
+                f"but the grid is {nb_dims}D"
+            )
+        left = [max(a, int(b)) for a, b in zip(left, req_left)]
+        right = [max(a, int(b)) for a, b in zip(right, req_right)]
+    return left, right
+
+
 class GlobalFieldCollection(FieldCollectionMixin):
     """
     Python wrapper for muGrid GlobalFieldCollection.
@@ -295,12 +406,22 @@ class GlobalFieldCollection(FieldCollectionMixin):
         Number of sub-points per pixel for each sub-point type.
         Default is {}. Alias: sub_pts.
     nb_ghosts_left : Sequence[int], optional
-        Ghost cells on low-index side. Default is no ghosts.
+        Ghost cells on low-index side. Default is no ghosts. Prefer the
+        `ghosts` argument, which sizes the buffers from the operators that
+        will run on this collection.
     nb_ghosts_right : Sequence[int], optional
-        Ghost cells on high-index side. Default is no ghosts.
+        Ghost cells on high-index side. Default is no ghosts. Prefer the
+        `ghosts` argument.
     device : str or Device, optional
         Device for field allocation: "cpu", "cuda", "cuda:N", "rocm:N",
         or a Device instance. Default is "cpu".
+    ghosts : operator, sequence of operators, int, or (left, right), optional
+        Ghost-buffer specification; mutually exclusive with
+        `nb_ghosts_left`/`nb_ghosts_right`. Pass the stencil operator (or a
+        list of operators) that will run on this collection to size the
+        ghost buffers from the requirement the operators report. An int n
+        means n ghost layers on both sides of every dimension; a
+        (left, right) pair gives explicit per-side counts.
 
     Examples
     --------
@@ -332,6 +453,7 @@ class GlobalFieldCollection(FieldCollectionMixin):
         sub_pts = kwargs.get("sub_pts")
         nb_ghosts_left = kwargs.get("nb_ghosts_left")
         nb_ghosts_right = kwargs.get("nb_ghosts_right")
+        ghosts = kwargs.get("ghosts")
         device = kwargs.get("device")
         nb_subdomain_grid_pts = kwargs.get("nb_subdomain_grid_pts")
 
@@ -347,10 +469,9 @@ class GlobalFieldCollection(FieldCollectionMixin):
             nb_sub_pts = {}
 
         # Handle ghost defaults
-        if nb_ghosts_left is None:
-            nb_ghosts_left = []
-        if nb_ghosts_right is None:
-            nb_ghosts_right = []
+        nb_ghosts_left, nb_ghosts_right = _resolve_ghosts(
+            ghosts, nb_ghosts_left, nb_ghosts_right, len(nb_grid_pts)
+        )
 
         # Build C++ constructor arguments
         cpp_kwargs = {
@@ -462,24 +583,34 @@ class CartesianDecomposition(FieldCollectionMixin):
     nb_subdivisions : Sequence[int], optional
         Number of subdivisions in each dimension. Default is automatic.
     nb_ghosts_left : Sequence[int], optional
-        Ghost cells on low-index side. Default is no ghosts.
+        Ghost cells on low-index side. Default is no ghosts. Prefer the
+        `ghosts` argument, which sizes the buffers from the operators that
+        will run on this decomposition.
     nb_ghosts_right : Sequence[int], optional
-        Ghost cells on high-index side. Default is no ghosts.
+        Ghost cells on high-index side. Default is no ghosts. Prefer the
+        `ghosts` argument.
     nb_sub_pts : dict, optional
         Number of sub-points per pixel for each sub-point type.
     device : Device or str, optional
         Device for field allocation: Device instance, "host", "device",
         "cpu", "cuda:N", or "rocm:N". Default is CPU.
+    ghosts : operator, sequence of operators, int, or (left, right), optional
+        Ghost-buffer specification; mutually exclusive with
+        `nb_ghosts_left`/`nb_ghosts_right`. Pass the stencil operator (or a
+        list of operators) that will run on this decomposition to size the
+        ghost buffers from the requirement the operators report. An int n
+        means n ghost layers on both sides of every dimension; a
+        (left, right) pair gives explicit per-side counts.
 
     Examples
     --------
-    >>> from muGrid import Communicator, CartesianDecomposition
+    >>> from muGrid import Communicator, CartesianDecomposition, LaplaceOperator
     >>> comm = Communicator()
+    >>> laplace = LaplaceOperator(2)
     >>> decomp = CartesianDecomposition(
     ...     comm,
     ...     nb_domain_grid_pts=[128, 128],
-    ...     nb_ghosts_left=[1, 1],
-    ...     nb_ghosts_right=[1, 1]
+    ...     ghosts=laplace,
     ... )
     >>> field = decomp.real_field("displacement", components=(3,))
     """
@@ -496,6 +627,7 @@ class CartesianDecomposition(FieldCollectionMixin):
         nb_ghosts_right: Optional[Shape] = None,
         nb_sub_pts: Optional[SubPtMap] = None,
         device: Optional[Union[DeviceStr, "_muGrid.Device"]] = None,
+        ghosts: Any = None,
     ) -> None:
         from .Parallel import Communicator as CommFactory
 
@@ -507,10 +639,9 @@ class CartesianDecomposition(FieldCollectionMixin):
         nb_dims = len(nb_domain_grid_pts)
         if nb_subdivisions is None:
             nb_subdivisions = [0] * nb_dims
-        if nb_ghosts_left is None:
-            nb_ghosts_left = [0] * nb_dims
-        if nb_ghosts_right is None:
-            nb_ghosts_right = [0] * nb_dims
+        nb_ghosts_left, nb_ghosts_right = _resolve_ghosts(
+            ghosts, nb_ghosts_left, nb_ghosts_right, nb_dims
+        )
         if nb_sub_pts is None:
             nb_sub_pts = {}
 
@@ -620,15 +751,26 @@ class FFTEngine:
     communicator : Communicator, optional
         MPI communicator. Default is serial execution.
     nb_ghosts_left : Sequence[int], optional
-        Ghost cells on low-index side of each dimension.
+        Ghost cells on low-index side of each dimension. Prefer the
+        `ghosts` argument, which sizes the buffers from the operators that
+        will run on this engine's real-space fields.
     nb_ghosts_right : Sequence[int], optional
-        Ghost cells on high-index side of each dimension.
+        Ghost cells on high-index side of each dimension. Prefer the
+        `ghosts` argument.
     nb_sub_pts : dict, optional
         Number of sub-points per pixel.
     device : str or Device, optional
         Device for FFT execution: "cpu" (default), "cuda", "cuda:N", "gpu",
         or a Device instance. When a GPU device is specified, the FFT uses
         cuFFT and fields are allocated on GPU memory.
+    ghosts : operator, sequence of operators, int, or (left, right), optional
+        Ghost-buffer specification for the real-space fields; mutually
+        exclusive with `nb_ghosts_left`/`nb_ghosts_right`. Pass the stencil
+        operator (or a list of operators) that will run on this engine's
+        real-space fields to size the ghost buffers from the requirement
+        the operators report. An int n means n ghost layers on both sides
+        of every dimension; a (left, right) pair gives explicit per-side
+        counts.
 
     Examples
     --------
@@ -654,6 +796,7 @@ class FFTEngine:
         nb_ghosts_right: Optional[Shape] = None,
         nb_sub_pts: Optional[SubPtMap] = None,
         device: Optional[Union[DeviceStr, "_muGrid.Device"]] = None,
+        ghosts: Any = None,
     ) -> None:
         from .Parallel import Communicator as CommFactory
 
@@ -666,10 +809,9 @@ class FFTEngine:
             comm = communicator
 
         # Handle defaults
-        if nb_ghosts_left is None:
-            nb_ghosts_left = []
-        if nb_ghosts_right is None:
-            nb_ghosts_right = []
+        nb_ghosts_left, nb_ghosts_right = _resolve_ghosts(
+            ghosts, nb_ghosts_left, nb_ghosts_right, len(nb_domain_grid_pts)
+        )
         if nb_sub_pts is None:
             nb_sub_pts = {}
 

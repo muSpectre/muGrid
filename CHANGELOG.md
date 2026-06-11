@@ -4,6 +4,10 @@ Change log for µGrid
 0.107.0 (11Jun26)
 -----------------
 
+- ENH: Stencil operators now report the ghost layers they need
+- ENH: All stencil operators (including the FEM gradients, which previously
+  did not check) now validate at apply/transpose time that the field
+  collection provides the ghost layers they report
 - BUG: Removed the allgather/scatter-only `Transpose` modes, which posted
   overlapping receive buffers (UB) and garbled multi-component 3D transforms
 - BUG: FFT transposes now honour field storage order (AoS/SoA); device fields

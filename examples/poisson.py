@@ -121,31 +121,6 @@ dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
     raise ValueError("Only 2D and 3D grids are supported")
 
-# Set up ghost layers for the stencil (1 layer in each direction)
-left_ghosts = (1,) * dim
-right_ghosts = (1,) * dim
-
-if args.preconditioner == "none":
-    s = suggest_subdivisions(dim, comm.size)
-    decomposition = muGrid.CartesianDecomposition(
-        comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=device
-    )
-    fft_engine = None
-    fc = decomposition  # field collection for the solver's work fields
-else:
-    # The FFT engine is also a Cartesian decomposition: its real-space
-    # fields carry ghost buffers for the stencil and live in the engine's
-    # pencil decomposition, so the spectral preconditioner can transform
-    # them without intermediate copies.
-    fft_engine = muGrid.FFTEngine(
-        args.nb_grid_pts,
-        comm,
-        nb_ghosts_left=left_ghosts,
-        nb_ghosts_right=right_ghosts,
-        device=device,
-    )
-    decomposition = fft_engine
-    fc = fft_engine.real_space_collection
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 # FD-stencil for the Laplacian
@@ -185,6 +160,29 @@ else:
     # Pass scale factor to fold in grid spacing and positive-definiteness
     laplace = muGrid.LaplaceOperator(dim, laplace_scale)
     stencil_name = "Hard-coded Laplace operator"
+
+# The decomposition's ghost buffers are sized from the requirement the
+# Laplace operator reports (ghosts=laplace)
+if args.preconditioner == "none":
+    s = suggest_subdivisions(dim, comm.size)
+    decomposition = muGrid.CartesianDecomposition(
+        comm, args.nb_grid_pts, s, ghosts=laplace, device=device
+    )
+    fft_engine = None
+    fc = decomposition  # field collection for the solver's work fields
+else:
+    # The FFT engine is also a Cartesian decomposition: its real-space
+    # fields carry ghost buffers for the stencil and live in the engine's
+    # pencil decomposition, so the spectral preconditioner can transform
+    # them without intermediate copies.
+    fft_engine = muGrid.FFTEngine(
+        args.nb_grid_pts,
+        comm,
+        ghosts=laplace,
+        device=device,
+    )
+    decomposition = fft_engine
+    fc = fft_engine.real_space_collection
 
 coords = decomposition.coords  # Domain-local coords for each pixel
 

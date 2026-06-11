@@ -132,6 +132,11 @@ namespace muGrid {
                                ") does not match operator dimension (3)");
         }
 
+        // Check ghost layers against the reported stencil requirement; the
+        // scatter-style transpose has the same requirement as apply
+        this->check_ghost_requirement(*global_fc, false,
+                                      "FEMGradientOperator3D");
+
         Index_t nb_nodal_components = nodal_field.get_nb_components();
         Index_t nb_grad_components = gradient_field.get_nb_components();
         Index_t expected_grad_components =

@@ -37,6 +37,8 @@
 #include "test_goodies.hh"
 
 #include "operators/generic.hh"
+#include "operators/laplace_2d.hh"
+#include "operators/fem_gradient_2d.hh"
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "field/field_map.hh"
@@ -280,6 +282,56 @@ namespace muGrid {
                                   Fix::NbInputComponents *
                                   static_cast<Index_t>(std::pow(2, Fix::Dim));
     BOOST_CHECK_EQUAL(coefficients.size(), expected_size);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Operators report their ghost requirements                               */
+  /* ---------------------------------------------------------------------- */
+
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(ghost_requirement_test, Fix,
+                                   ConvolutionFixtures, Fix) {
+    // Fixture stencil: offset 0, shape 2 in every direction
+    const auto apply_req{Fix::op.get_apply_ghost_requirement()};
+    const auto transpose_req{Fix::op.get_transpose_ghost_requirement()};
+    const auto union_req{Fix::op.get_ghost_requirement()};
+    for (Index_t direction{0}; direction < Fix::Dim; ++direction) {
+      BOOST_CHECK_EQUAL(apply_req.left[direction], 0);
+      BOOST_CHECK_EQUAL(apply_req.right[direction], 1);
+      // gather-style transpose mirrors the apply requirement
+      BOOST_CHECK_EQUAL(transpose_req.left[direction], 1);
+      BOOST_CHECK_EQUAL(transpose_req.right[direction], 0);
+      BOOST_CHECK_EQUAL(union_req.left[direction], 1);
+      BOOST_CHECK_EQUAL(union_req.right[direction], 1);
+    }
+  }
+
+  BOOST_AUTO_TEST_CASE(hardcoded_ghost_requirement_test) {
+    const LaplaceOperator2D laplace{1.0};
+    const auto laplace_req{laplace.get_ghost_requirement()};
+    BOOST_CHECK_EQUAL(laplace_req.left[0], 1);
+    BOOST_CHECK_EQUAL(laplace_req.left[1], 1);
+    BOOST_CHECK_EQUAL(laplace_req.right[0], 1);
+    BOOST_CHECK_EQUAL(laplace_req.right[1], 1);
+
+    // The FEM gradient's scatter-style transpose shares the apply buffers,
+    // so the union requirement stays one-sided
+    const FEMGradientOperator2D fem{{1.0, 1.0}};
+    const auto fem_req{fem.get_ghost_requirement()};
+    BOOST_CHECK_EQUAL(fem_req.left[0], 0);
+    BOOST_CHECK_EQUAL(fem_req.left[1], 0);
+    BOOST_CHECK_EQUAL(fem_req.right[0], 1);
+    BOOST_CHECK_EQUAL(fem_req.right[1], 1);
+
+    // Elementwise maximum combines requirements of several operators
+    const auto combined{
+        GhostRequirement::max(laplace_req, fem_req)};
+    BOOST_CHECK_EQUAL(combined.left[0], 1);
+    BOOST_CHECK_EQUAL(combined.right[0], 1);
+
+    // Combining requirements of different dimensions is an error
+    const GhostRequirement req_3d{Shape_t{1, 1, 1}, Shape_t{1, 1, 1}};
+    BOOST_CHECK_THROW(GhostRequirement::max(laplace_req, req_3d),
+                      RuntimeError);
   }
 
   /* ---------------------------------------------------------------------- */

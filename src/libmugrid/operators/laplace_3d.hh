@@ -209,13 +209,13 @@ namespace muGrid {
          * @brief Get the stencil offset.
          * @return Stencil offset in pixels (centered: [-1,-1,-1])
          */
-        Shape_t get_offset() const { return Shape_t{-1, -1, -1}; }
+        Shape_t get_offset() const override { return Shape_t{-1, -1, -1}; }
 
         /**
          * @brief Get the stencil shape.
          * @return Shape of the stencil ([3,3,3])
          */
-        Shape_t get_stencil_shape() const { return Shape_t{3, 3, 3}; }
+        Shape_t get_stencil_shape() const override { return Shape_t{3, 3, 3}; }
 
         /**
          * @brief Get the stencil coefficients in reshaped form.

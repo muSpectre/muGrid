@@ -253,12 +253,12 @@ namespace muGrid {
         /**
          * Return the stencil offset in number of pixels.
          */
-        const Shape_t & get_offset() const;
+        Shape_t get_offset() const final;
 
         /**
          * Return the shape of the stencil.
          */
-        const Shape_t & get_stencil_shape() const;
+        Shape_t get_stencil_shape() const final;
 
         /**
          * returns the number of quadrature points are associated with any
