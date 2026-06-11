@@ -5,7 +5,7 @@ set(MUGRID_PYTHON_SOURCES
     bind_py_communicator.cc
     bind_py_device.cc
     bind_py_decomposition.cc
-        bind_py_operators.cc
+    bind_py_operators.cc
     bind_py_field.cc
     bind_py_state_field.cc
     bind_py_field_collection.cc
@@ -88,6 +88,7 @@ install(FILES
     muGrid/Field.py
     muGrid/linalg.py
     muGrid/Parallel.py
+    muGrid/Preconditioners.py
     muGrid/Solvers.py
     muGrid/Wrappers.py
     DESTINATION "${MUGRID_PYTHON_INSTALL_DIR}"
