@@ -313,11 +313,6 @@ void FFTEngineBase::initialise_fft_base() {
 #endif
   }
 
-  // Register persistent work fields
-  this->work_zpencil->register_complex_field("work", 1);
-  if (this->work_ypencil) {
-    this->work_ypencil->register_complex_field("work", 1);
-  }
 }
 
 #ifdef WITH_MPI

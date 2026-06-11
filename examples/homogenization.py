@@ -200,7 +200,7 @@ parser.add_argument(
     "--tol",
     type=float,
     default=1e-6,
-    help="CG convergence tolerance (default: 1e-6)",
+    help="Relative CG convergence tolerance, |r| <= tol * |b| (default: 1e-6)",
 )
 
 parser.add_argument(
@@ -452,8 +452,8 @@ if args.kernel == "fused":
             comm=comm,
         )
 
-# Create global timer for hierarchical timing
-timer = muTimer.Timer()
+# Create global timer for hierarchical timing (MPI-aware: prints on rank 0)
+timer = muTimer.Timer(comm=comm)
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
@@ -761,7 +761,7 @@ with timer("total_solve"):
                 rhs_field,
                 u_field,
                 hessp=apply_stiffness,
-                tol=args.tol,
+                rtol=args.tol,
                 callback=callback,
                 maxiter=args.maxiter,
                 timer=timer,

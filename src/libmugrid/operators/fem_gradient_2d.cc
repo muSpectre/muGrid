@@ -90,6 +90,11 @@ namespace muGrid {
                                ") does not match operator dimension (2)");
         }
 
+        // Check ghost layers against the reported stencil requirement; the
+        // scatter-style transpose has the same requirement as apply
+        this->check_ghost_requirement(*global_fc, false,
+                                      "FEMGradientOperator2D");
+
         // Get and validate component counts
         Index_t nb_nodal_components = nodal_field.get_nb_components();
         Index_t nb_grad_components = gradient_field.get_nb_components();

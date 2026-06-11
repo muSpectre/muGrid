@@ -214,13 +214,24 @@ namespace muGrid {
          * @brief Get the stencil offset.
          * @return Stencil offset in pixels ([0,0,0])
          */
-        Shape_t get_offset() const { return Shape_t{0, 0, 0}; }
+        Shape_t get_offset() const override { return Shape_t{0, 0, 0}; }
 
         /**
          * @brief Get the stencil shape.
          * @return Shape of the stencil ([2,2,2])
          */
-        Shape_t get_stencil_shape() const { return Shape_t{2, 2, 2}; }
+        Shape_t get_stencil_shape() const override { return Shape_t{2, 2, 2}; }
+
+        /**
+         * @brief Ghost layers required by transpose().
+         *
+         * The transpose scatters into the same ghost buffers that apply()
+         * reads (followed by ghost reduction), so it has the same ghost
+         * requirement as apply().
+         */
+        GhostRequirement get_transpose_ghost_requirement() const override {
+            return this->get_apply_ghost_requirement();
+        }
 
         /**
          * @brief Get the stencil coefficients.

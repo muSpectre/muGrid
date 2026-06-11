@@ -70,16 +70,9 @@ namespace muGrid {
                 ") does not match operator dimension (3)");
         }
 
-        // Check ghost layers (need at least 1 in each direction)
-        auto left_ghosts = global_fc->get_nb_ghosts_left();
-        auto right_ghosts = global_fc->get_nb_ghosts_right();
-
-        for (Index_t d = 0; d < 3; ++d) {
-            if (left_ghosts[d] < 1 || right_ghosts[d] < 1) {
-                throw RuntimeError("LaplaceOperator3D requires at least 1 ghost "
-                                   "layer in each direction");
-            }
-        }
+        // Check ghost layers against the reported stencil requirement (the
+        // stencil is symmetric, so apply and transpose are equivalent here)
+        this->check_ghost_requirement(*global_fc, false, "LaplaceOperator3D");
 
         return *global_fc;
     }

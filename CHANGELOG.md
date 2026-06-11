@@ -1,113 +1,83 @@
 Change log for µGrid
 ====================
 
-unreleased
-----------
+0.107.0 (11Jun26)
+-----------------
 
-- ENH: The 3D MPI FFT now uses a true pencil decomposition: the Y stage is a
-  genuine scatter-gather transpose (Z-pencil `[Fx, Ny/P2, Nz/P1]` → Y-pencil
-  `[Fx/P2, Ny, Nz/P1]` → X-pencil `[Fx/P2, Ny/P1, Nz]`) instead of an
-  allgather of the full Y dimension followed by a redundant Y-FFT on every
-  rank and a scatter-back. Per-rank work-buffer memory and Y-FFT compute now
-  scale as O(N³/P); two `MPI_Alltoallw` calls replace the previous three.
-  The Fourier-space domain decomposition changed accordingly: X is now
-  distributed across P2 and Y across P1 (query
-  `fourier_subdomain_locations` / `nb_fourier_subdomain_grid_pts` as before)
-- BUG: Removed the allgather/scatter-only `MPI_Alltoallw` modes of
-  `Transpose`, which posted overlapping receive buffers (undefined behaviour
-  per the MPI standard) and produced wrong results for multi-component
-  fields (e.g. 3-component 3D forward transforms on 3 ranks)
-- BUG: The FFT transposes now honour the storage order (AoS/SoA) of the
-  fields they operate on; previously multi-component device (SoA) fields
-  would have been transposed with AoS datatypes, garbling components
-- ENH: The MPI transposes remain pure MPI derived-datatype operations
-  (`MPI_Type_create_subarray`/`hvector` + `MPI_Alltoallw`) with no manual
-  pack/unpack, so they run directly on device buffers with a GPU-aware MPI
-- ENH: The FFT engine now verifies at construction that its real-space and
-  Fourier-space collections use the same storage order; together with the
-  existing collection-membership checks in `fft()`/`ifft()` this guarantees
-  the single-layout assumption of the work buffers and MPI transposes
-- TST: MPI FFT tests now compare against numpy for grids that do not divide
-  evenly across the process grid (odd Y/Z), for multi-component fields, and
-  for the 3D inverse transform
-- ENH: CMake now probes for C++20 standard-library support (`<ranges>`,
-  `<span>`) at configure time and fails with an actionable message (minimum
-  compiler versions, conda-forge toolchain instructions, last C++17
-  release) instead of a cryptic "'ranges' file not found" mid-build —
-  outdated toolchains, e.g. any Xcode on macOS older than Ventura, cannot
-  build muGrid ≥ 0.97.0
-- DOC: Coding convention: use brace initialization (non-narrowing); narrowing
-  conversions must be explicit `static_cast`s (applied throughout the FFT
-  subsystem)
-- BUG: Fixed a deadlock in `CartesianDecomposition::reduce_ghosts` when
-  subdomain sizes differ across ranks (e.g. 5 grid points over 4 ranks with
-  2-wide halos): the halo-larger-than-interior rejection was evaluated
-  against the rank-local interior extent, so small ranks threw while large
-  ranks blocked forever in `sendrecv_*_accumulate`. The check now uses the
-  global minimum interior extent (precomputed collectively at
-  initialisation), so all ranks throw consistently
-- ENH: Added `Communicator::min` (C++ and Python), mirroring `max`
-- ENH: New `muGrid.Preconditioners` module with a generic `Preconditioner`
-  interface for the matrix-free solvers (`prec(r, z)` computing `z = M⁻¹r`),
-  an `IdentityPreconditioner`, a `JacobiPreconditioner` (diagonal scaling,
-  accepting a field, array or scalar), and a `FourierPreconditioner` that
-  applies a spectral kernel `z = F⁻¹[k(q)·F r]` via an `FFTEngine`
-  (MPI-transparent, broadcasts over field components, folds in the FFT
-  normalisation, projects out modes where the kernel vanishes). Tested by
-  solving the periodic finite-difference Poisson problem with the exact
-  inverse FD symbol as preconditioner (CG converges in O(1) iterations
-  instead of dozens) and a heterogeneous screened Poisson problem with
-  Jacobi (164 → 21 iterations); documented in the Examples chapter
-- ENH: The Python `FFTEngine` wrapper now exposes `communicate_ghosts` and
-  `reduce_ghosts` accepting wrapped fields, so an FFT engine constructed
-  with ghost buffers can serve as the single decomposition for both stencil
-  operators and FFTs (required for spectral preconditioning under MPI,
-  where a separate `CartesianDecomposition` would split the domain
-  differently than the FFT's pencil grid)
+- API: `conjugate_gradients` now converges on a relative criterion by
+  default, ``||b - Ax|| <= max(rtol * ||b||, atol)`` with ``rtol=1e-6``,
+  ``atol=0``; the old absolute `tol` is deprecated (it maps to `atol` with
+  ``rtol=0``). An absolute criterion is unreachable in double precision
+  when ``||b||`` is large and was the cause of erratic CG termination
+- BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and
+  GPU now sum the interior region directly instead of subtracting the ghost
+  contribution from a full-buffer reduction (minimizing floating point overflows)
+- ENH: Stencil operators now report the ghost layers they need
+- ENH: All stencil operators (including the FEM gradients, which previously
+  did not check) now validate at apply/transpose time that the field
+  collection provides the ghost layers they report
+- BUG: Removed the allgather/scatter-only `Transpose` modes, which posted
+  overlapping receive buffers (UB) and garbled multi-component 3D transforms
+- BUG: FFT transposes now honour field storage order (AoS/SoA); device fields
+  were transposed with AoS datatypes, garbling components
+- BUG: Fixed a deadlock in `CartesianDecomposition::reduce_ghosts` for uneven
+  subdomains; the halo-size check now uses the global minimum interior extent
 - BUG: Fixed state-field index rotation using bitwise `&` instead of modulo,
   which aliased `current()`/`old()` for `nb_memory` not of the form 2^k-1
-- BUG: Fixed 3D MPI FFT silently skipping the Y transform for process grids
-  with P2 == 1 and P1 > 1 (roundtrips were self-consistent but wrong vs numpy)
-- BUG: Fixed NetCDF `compute_tensor_dim_index` constructing but never throwing
-  its error (returning a negative index) and an inverted `static_assert` in
-  the NetCDF type mapping
+- BUG: Fixed the 3D MPI FFT silently skipping the Y transform for process
+  grids with P2 == 1 and P1 > 1
+- BUG: Fixed NetCDF `compute_tensor_dim_index` never throwing its error and an
+  inverted `static_assert` in the NetCDF type mapping
 - BUG: Fixed `Unit` streaming emitting an empty string for tagged-but-unitless
   units
-- BUG: Bound `FEMGradientOperator.apply_increment`/`.transpose_increment`,
-  `Communicator.max`/`.all`/`.any`, and corrected the
-  `register_uint_state_field`/`uint_state_field` names (misspelled aliases kept)
+- BUG: Bound `FEMGradientOperator.apply_increment`/`.transpose_increment` and
+  `Communicator.max`/`.all`/`.any`; corrected misspelled `uint_state_field`
 - BUG: Fixed the `PyGradientOperator.transpose_increment` trampoline calling
-  the Python `transpose` method
-- BUG: Added Python wrappers for `IsotropicStiffnessOperator2D`/`3D` that accept
-  wrapped `Field` objects; `from muGrid import *` no longer breaks on undefined
-  `Verbosity`/conditional `OpenMode`
+  `transpose`
+- BUG: Added Python wrappers for `IsotropicStiffnessOperator2D`/`3D`;
+  `from muGrid import *` no longer breaks
 - BUG: The DLPack capsule now keeps the owning field (and its collection)
   alive for the lifetime of the exported tensor
 - BUG: Fixed host<->device `deep_copy` permuting multi-axis component /
   multi-sub-point data (AoS vs SoA dof ordering)
-- BUG: `FieldMap::size()` / `eigen_vec()` / `get_empty_clone()` now handle
-  buffer padding and ghost specifications correctly
-- BUG: Fixed 64-bit index overflow in `get_index`, `is_buffer_contiguous` and
-  `get_nb_from_shape` for grids exceeding 2^31 points
+- BUG: `FieldMap::size()`/`eigen_vec()`/`get_empty_clone()` now handle buffer
+  padding and ghost specifications correctly
+- BUG: Fixed 64-bit index overflow in index helpers for grids exceeding 2^31
+  points
 - BUG: Free the MPI communicator created by `MPI_Cart_create`; removed
   collective MPI calls from `assert`s (debug/release deadlock)
-- BUG: GPU isotropic-stiffness now uploads per-instance G/V matrices (a second
-  operator with different grid spacing no longer reuses stale matrices); the
-  device `GenericLinearOperator` caches are invalidated on grid change
+- BUG: GPU isotropic-stiffness now uploads per-instance G/V matrices; device
+  `GenericLinearOperator` caches are invalidated on grid change
 - BUG: GPU linalg ghost reductions now handle 1D fields; cuFFT inverse
   transforms synchronize before GPU-aware MPI
 - BUG: MPI ghost accumulation now honours device memory and the actual element
-  type (Complex/Int), instead of hard-coding host-side `Real`
+  type (Complex/Int) instead of hard-coding host-side `Real`
 - BUG: `reduce_ghosts` rejects halos larger than the subdomain instead of
   silently producing a wrong reduction
+- ENH: The 3D MPI FFT now uses a true pencil decomposition; per-rank memory
+  scales as O(N³/P) and Fourier space distributes X across P2, Y across P1
+- ENH: MPI transposes are pure derived-datatype `MPI_Alltoallw` operations
+  (no pack/unpack), running directly on device buffers with a GPU-aware MPI
+- ENH: The FFT engine verifies at construction that its real- and
+  Fourier-space collections use the same storage order
+- ENH: CMake now probes for C++20 standard-library support at configure time
+  and fails with an actionable message instead of a cryptic mid-build error
+- ENH: Added `Communicator::min` (C++ and Python), mirroring `max`
+- ENH: New `muGrid.Preconditioners` module for the matrix-free CG solver, with
+  `Identity`, `Jacobi` and `Fourier` (spectral kernel) preconditioners
+- ENH: The Poisson example gained a `-P/--preconditioner` option
+  (`fourier`/`fourier-exact`) with per-stage (fft/kernel/ifft) timing
+- ENH: The Python `FFTEngine` exposes `communicate_ghosts`/`reduce_ghosts`, so
+  one engine can serve as the single decomposition for stencils and FFTs
+- MAINT: Removed dead code (`fft_work_buffer.hh`, stray repo-root files, dead
+  `[tool.flake8]` section); fixed latent compile-breakers in const accessors
+- TST: MPI FFT tests now compare against numpy for unevenly dividing grids,
+  multi-component fields and the 3D inverse transform
 - TST: Added regression tests for the state-field rotation and the Python API
   surface (star import, FEM-gradient increments, isotropic-stiffness wrapper)
+- DOC: Coding convention: use brace initialization (non-narrowing); narrowing
+  conversions must be explicit `static_cast`s
 - DOC: Corrected numerous C++ doxygen and Sphinx documentation mismatches
-  (units, storage order, Device properties, FFT/GPU sections, README GPU
-  autodetection, operator constructor argument names)
-- MAINT: Removed dead code (`fft_work_buffer.hh`, repo-root stray files) and a
-  dead `[tool.flake8]` section; fixed latent compile-breakers in const `zip`
-  and `StaticStateFieldMap` const accessors
 
 0.106.0 (09Jun26)
 -----------------

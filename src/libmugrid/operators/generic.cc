@@ -108,50 +108,10 @@ namespace muGrid {
         // Ghost requirements depend on operation direction:
         // - Apply reads at (p + s), needs ghosts based on positive stencil offsets
         // - Transpose reads at (p - s), needs ghosts based on negative stencil offsets
-        // For transpose, the left/right requirements are swapped.
-        const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
-        const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
-
-        // Base requirements for apply operation
-        const auto apply_min_left{DynGridIndex(this->spatial_dim_, 0) -
-                                  DynGridIndex(this->offset_)};
-        const auto apply_min_right{DynGridIndex(this->stencil_shape_) -
-                                   DynGridIndex(this->spatial_dim_, 1) +
-                                   DynGridIndex(this->offset_)};
-
-        // For transpose, swap left/right requirements
-        const auto min_ghosts_left{is_transpose ? apply_min_right : apply_min_left};
-        const auto min_ghosts_right{is_transpose ? apply_min_left : apply_min_right};
-
-        for (Dim_t direction{0}; direction < collection.get_spatial_dim();
-             ++direction) {
-            if (nb_ghosts_left[direction] < min_ghosts_left[direction]) {
-                std::stringstream err_msg{};
-                err_msg
-                    << "Ambiguous field shape: on axis " << direction
-                    << ", the " << (is_transpose ? "transpose" : "apply")
-                    << " operation expects a minimum of "
-                    << min_ghosts_left[direction]
-                    << " cells on the left, but the provided fields have only "
-                    << nb_ghosts_left[direction] << " ghosts on the left.";
-                throw RuntimeError{err_msg.str()};
-            }
-        }
-
-        for (Dim_t direction{0}; direction < collection.get_spatial_dim();
-             ++direction) {
-            if (nb_ghosts_right[direction] < min_ghosts_right[direction]) {
-                std::stringstream err_msg{};
-                err_msg
-                    << "Ambiguous field shape: on axis " << direction
-                    << ", the " << (is_transpose ? "transpose" : "apply")
-                    << " operation expects a minimum of "
-                    << min_ghosts_right[direction]
-                    << " cells on the right, but the provided fields have only "
-                    << nb_ghosts_right[direction] << " ghosts on the right.";
-                throw RuntimeError{err_msg.str()};
-            }
-        }
+        // The check uses the same requirement the operator reports via
+        // get_apply_ghost_requirement() / get_transpose_ghost_requirement().
+        this->check_ghost_requirement(collection, is_transpose,
+                                      "GenericLinearOperator");
 
         // number of components in the fields
         Index_t nb_nodal_components{nodal_field.get_nb_components()};
@@ -787,12 +747,12 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
-    const Shape_t & GenericLinearOperator::get_offset() const {
+    Shape_t GenericLinearOperator::get_offset() const {
         return this->offset_;
     }
 
     /* ---------------------------------------------------------------------- */
-    const Shape_t & GenericLinearOperator::get_stencil_shape() const {
+    Shape_t GenericLinearOperator::get_stencil_shape() const {
         return this->stencil_shape_;
     }
 

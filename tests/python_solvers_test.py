@@ -31,7 +31,34 @@ def test_conjugate_gradients(A, b, x0):
     rhs.p[...] = np.array(b)
 
     conjugate_gradients(
-        comm, fc, hessp, rhs, solution, tol=1e-6, maxiter=10
+        comm, fc, rhs, solution, hessp=hessp, rtol=1e-8, maxiter=10
     )
 
     np.testing.assert_allclose(solution.p, np.linalg.solve(A, b), atol=1e-6)
+
+
+@pytest.mark.skipif(Communicator().size > 1, reason="Test only works in serial")
+def test_conjugate_gradients_deprecated_tol():
+    """`tol` keeps working as an absolute tolerance but warns."""
+    comm = Communicator()
+
+    fc = GlobalFieldCollection((2,))
+    A = np.array([[4, 1], [1, 3]])
+
+    def hessp(x, Ax):
+        Ax.p[...] = A @ x.p
+        return Ax
+
+    solution = fc.real_field("solution")
+    solution.p[...] = 0.0
+    rhs = fc.real_field("rhs")
+    rhs.p[...] = np.array([1.0, 2.0])
+
+    with pytest.warns(DeprecationWarning):
+        conjugate_gradients(
+            comm, fc, rhs, solution, hessp=hessp, tol=1e-6, maxiter=10
+        )
+
+    np.testing.assert_allclose(
+        solution.p, np.linalg.solve(A, [1.0, 2.0]), atol=1e-6
+    )

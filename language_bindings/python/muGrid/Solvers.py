@@ -2,7 +2,19 @@
 Collection of simple parallel solvers
 """
 
+import warnings
+
 from . import linalg
+
+
+class ConvergenceError(RuntimeError):
+    """
+    Raised when an iterative solver fails to converge. Subclasses
+    ``RuntimeError`` for backwards compatibility; catching it specifically
+    avoids masking unrelated runtime errors (e.g. out-of-memory) as
+    non-convergence.
+    """
+
 
 def conjugate_gradients(
     comm,
@@ -11,17 +23,19 @@ def conjugate_gradients(
     x,
     hessp: callable,
     prec: callable = None,
-    tol: float = 1e-6,
+    tol: float = None,
     maxiter: int = 1000,
     callback: callable = None,
     timer=None,
+    rtol: float = None,
+    atol: float = 0.0,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
     Ax = b, where A is represented by the function hessp (which computes the
-    product of A with a vector). The method iteratively refines the solution x
-    until the residual ||Ax - b|| is less than tol or until maxiter iterations
-    are reached.
+    product of A with a vector). The method iteratively refines the solution
+    x until the residual satisfies ``||b - Ax|| <= max(rtol * ||b||, atol)``
+    or until maxiter iterations are reached.
 
     Parameters
     ----------
@@ -42,7 +56,10 @@ def conjugate_gradients(
         Signature: prec(input_field, output_field) where both are muGrid.Field.
         If None, no preconditioning is applied (P is identity).
     tol : float, optional
-        Tolerance for convergence. The default is 1e-6.
+        Deprecated alias for `atol`. Passing it restores the historic,
+        purely absolute criterion ``||b - Ax|| < tol`` (it also sets
+        ``rtol = 0`` unless `rtol` is given explicitly). Use `rtol`/`atol`
+        instead.
     maxiter : int, optional
         Maximum number of iterations. The default is 1000.
     callback : callable, optional
@@ -54,7 +71,18 @@ def conjugate_gradients(
         - "rr": squared residual norm (float)
     timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
-        record timing for the hessp (Hessian-vector product) operations.
+        record timing for the individual solver operations (Hessian-vector
+        products, preconditioner applications, dot products and vector
+        updates).
+    rtol : float, optional
+        Relative tolerance: convergence when ``||b - Ax|| <= rtol * ||b||``.
+        The default is 1e-6. A relative criterion is robust against the
+        scale of the right-hand side and the grid size; an absolute one is
+        unreachable in double precision when ``||b||`` is large.
+    atol : float, optional
+        Absolute tolerance: convergence when ``||b - Ax|| <= atol``,
+        whichever of the two criteria is weaker. The default is 0 (purely
+        relative convergence).
 
     Returns
     -------
@@ -63,11 +91,22 @@ def conjugate_gradients(
 
     Raises
     ------
-    RuntimeError
+    ConvergenceError
         If the algorithm does not converge within maxiter iterations,
         or if the residual becomes NaN (indicating numerical issues).
     """
-    tol_sq = tol * tol
+    if tol is not None:
+        warnings.warn(
+            "`tol` is deprecated; use `atol` for an absolute or `rtol` for "
+            "a relative convergence criterion",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        atol = tol
+        if rtol is None:
+            rtol = 0.0
+    if rtol is None:
+        rtol = 1e-6
 
     # Timer context manager (no-op if timer is None)
     from contextlib import nullcontext
@@ -96,25 +135,28 @@ def conjugate_gradients(
         # r = r - Ap = b - A*x (axpy with alpha=-1)
         linalg.axpy(-1.0, Ap, r)
 
-        # precondioner
-        prec(r, z)
+        # preconditioner
+        with timed("prec"):
+            prec(r, z)
 
         # Initial search direction: p = z
         linalg.copy(z, p)
 
-
-
         with timed("dot_rr"):
+            bb = comm.sum(linalg.norm_sq(b))
             rr = comm.sum(linalg.norm_sq(r))
             rz = comm.sum(linalg.vecdot(r, z))
 
+        # Convergence threshold on the squared residual norm:
+        # ||r|| <= max(rtol * ||b||, atol)
+        tol_sq = max(rtol * rtol * float(bb), atol * atol)
+
         if callback:
-            rr = comm.sum(linalg.norm_sq(r))
             callback(0, {"x": x, "r": r, "p": p, "z": z, "rr": rr, "rz": rz})
 
         rr_val = float(rr)
 
-        if rr_val < tol_sq:
+        if rr_val <= tol_sq:
             return x
 
     with timed("iteration"):
@@ -140,23 +182,35 @@ def conjugate_gradients(
 
             next_rr_val = float(next_rr)
 
-            # apply precondioner z=P*r
-            prec(r, z)
+            # apply preconditioner z=P*r
+            with timed("prec"):
+                prec(r, z)
 
-            # Compute next_rz after applying precondioner
-            next_rz = comm.sum(linalg.vecdot(r, z))
+            # Compute next_rz after applying preconditioner
+            with timed("dot_rz"):
+                next_rz = comm.sum(linalg.vecdot(r, z))
 
             if callback:
                 with timed("callback"):
-                    callback(iteration + 1, {"x": x, "r": r, "p": p,"z": z,  "rr": next_rr,  "rz": next_rz})
+                    callback(
+                        iteration + 1,
+                        {
+                            "x": x,
+                            "r": r,
+                            "p": p,
+                            "z": z,
+                            "rr": next_rr,
+                            "rz": next_rz,
+                        },
+                    )
 
             # Check for numerical issues (NaN indicates non-positive-definite H)
             if next_rr_val != next_rr_val:  # NaN check
-                raise RuntimeError(
+                raise ConvergenceError(
                     "Residual became NaN - Hessian may not be positive definite"
                 )
 
-            if next_rr_val < tol_sq:
+            if next_rr_val <= tol_sq:
                 return x
 
             # Compute beta
@@ -168,4 +222,6 @@ def conjugate_gradients(
             with timed("update_p"):
                 linalg.axpby(1.0, z, beta, p)
 
-    raise RuntimeError("Preconditioned conjugate gradient algorithm did not converge")
+    raise ConvergenceError(
+        "Preconditioned conjugate gradient algorithm did not converge"
+    )

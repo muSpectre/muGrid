@@ -34,13 +34,57 @@
  *
  */
 
+#include "core/exception.hh"
 #include "core/types.hh"
+#include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
+
+#include <algorithm>
+#include <sstream>
+#include <string>
 
 #ifndef SRC_LIBMUGRID_LINEAR_OPERATOR_BASE_HH_
 #define SRC_LIBMUGRID_LINEAR_OPERATOR_BASE_HH_
 
 namespace muGrid {
+
+  /**
+   * @struct GhostRequirement
+   * @brief Number of ghost layers an operator needs on each side of the
+   *        subdomain in each spatial direction.
+   *
+   * Used by stencil operators to report their ghost-buffer needs, so that
+   * domain decompositions and FFT engines can be constructed directly from
+   * the operators that will run on them instead of hand-written ghost
+   * counts.
+   */
+  struct GhostRequirement {
+    Shape_t left{};   //!< ghost layers on the low-index side, per direction
+    Shape_t right{};  //!< ghost layers on the high-index side, per direction
+
+    /**
+     * Elementwise maximum of two requirements; use to size one
+     * decomposition serving several operators.
+     */
+    static GhostRequirement max(const GhostRequirement & a,
+                                const GhostRequirement & b) {
+      if (a.left.size() != b.left.size()) {
+        std::stringstream err_msg{};
+        err_msg << "Dimension mismatch: cannot combine a ghost requirement "
+                << "for " << a.left.size() << "D with one for "
+                << b.left.size() << "D";
+        throw RuntimeError{err_msg.str()};
+      }
+      GhostRequirement combined{a};
+      for (std::size_t direction{0}; direction < a.left.size(); ++direction) {
+        combined.left[direction] =
+            std::max(a.left[direction], b.left[direction]);
+        combined.right[direction] =
+            std::max(a.right[direction], b.right[direction]);
+      }
+      return combined;
+    }
+  };
 
   /**
    * @class LinearOperator
@@ -220,7 +264,116 @@ namespace muGrid {
      */
     virtual Dim_t get_spatial_dim() const = 0;
 
+    /**
+     * @brief Returns the stencil offset in pixels.
+     *
+     * The offset is the position of the first stencil entry relative to the
+     * pixel the operator is applied at; apply() reads input values in the
+     * range [offset, offset + stencil_shape - 1] around each pixel.
+     *
+     * @return The stencil offset, one entry per spatial direction.
+     */
+    virtual Shape_t get_offset() const = 0;
+
+    /**
+     * @brief Returns the shape of the stencil in pixels.
+     *
+     * @return The stencil shape, one entry per spatial direction.
+     */
+    virtual Shape_t get_stencil_shape() const = 0;
+
+    /**
+     * @brief Ghost layers required by apply().
+     *
+     * Derived from the stencil geometry: apply() reads input values at
+     * [offset, offset + stencil_shape - 1] around each pixel, requiring
+     * max(0, -offset) ghost layers on the left and
+     * max(0, offset + stencil_shape - 1) on the right.
+     *
+     * @return The minimum ghost layers for apply(), per direction.
+     */
+    GhostRequirement get_apply_ghost_requirement() const {
+      const Shape_t offset{this->get_offset()};
+      const Shape_t stencil_shape{this->get_stencil_shape()};
+      GhostRequirement requirement{};
+      for (std::size_t direction{0}; direction < offset.size(); ++direction) {
+        requirement.left.push_back(
+            std::max(Index_t{0}, -offset[direction]));
+        requirement.right.push_back(std::max(
+            Index_t{0}, offset[direction] + stencil_shape[direction] - 1));
+      }
+      return requirement;
+    }
+
+    /**
+     * @brief Ghost layers required by transpose().
+     *
+     * The default assumes a gather-style transpose that reads at mirrored
+     * stencil offsets, i.e. the mirror image of the apply() requirement.
+     * Operators with a scatter-style transpose (writing into the same ghost
+     * buffers that apply() reads, followed by ghost reduction) override
+     * this method.
+     *
+     * @return The minimum ghost layers for transpose(), per direction.
+     */
+    virtual GhostRequirement get_transpose_ghost_requirement() const {
+      GhostRequirement requirement{this->get_apply_ghost_requirement()};
+      std::swap(requirement.left, requirement.right);
+      return requirement;
+    }
+
+    /**
+     * @brief Ghost layers covering both apply() and transpose().
+     *
+     * The elementwise maximum of the apply() and transpose() requirements.
+     * This is the safe default for sizing a domain decomposition or FFT
+     * engine that this operator will run on.
+     *
+     * @return Ghost layers sufficient for all operations, per direction.
+     */
+    GhostRequirement get_ghost_requirement() const {
+      return GhostRequirement::max(this->get_apply_ghost_requirement(),
+                                   this->get_transpose_ghost_requirement());
+    }
+
    protected:
+    /**
+     * @brief Throws if a field collection's ghost buffers are too small for
+     *        this operator.
+     *
+     * Checks against get_apply_ghost_requirement() or
+     * get_transpose_ghost_requirement(), so the runtime check can never
+     * diverge from the reported requirement.
+     *
+     * @param collection The field collection holding the operator's fields.
+     * @param is_transpose Check the transpose requirement.
+     * @param operator_name Name used in the error message.
+     */
+    void check_ghost_requirement(const GlobalFieldCollection & collection,
+                                 const bool & is_transpose,
+                                 const std::string & operator_name) const {
+      const GhostRequirement requirement{
+          is_transpose ? this->get_transpose_ghost_requirement()
+                       : this->get_apply_ghost_requirement()};
+      const auto & nb_ghosts_left{collection.get_nb_ghosts_left()};
+      const auto & nb_ghosts_right{collection.get_nb_ghosts_right()};
+      for (Dim_t direction{0}; direction < collection.get_spatial_dim();
+           ++direction) {
+        if (nb_ghosts_left[direction] < requirement.left[direction] ||
+            nb_ghosts_right[direction] < requirement.right[direction]) {
+          std::stringstream err_msg{};
+          err_msg << operator_name << " requires at least "
+                  << requirement.left[direction] << " ghost layer(s) on the "
+                  << "left and " << requirement.right[direction]
+                  << " on the right of axis " << direction << " for the "
+                  << (is_transpose ? "transpose" : "apply")
+                  << " operation, but the field collection has "
+                  << nb_ghosts_left[direction] << " on the left and "
+                  << nb_ghosts_right[direction] << " on the right.";
+          throw RuntimeError{err_msg.str()};
+        }
+      }
+    }
   };
 
 }  // namespace muGrid

@@ -36,6 +36,8 @@
 #ifndef SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 #define SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 
+#include <array>
+
 #include "fft_engine_base.hh"
 #include "fft_backend_traits.hh"
 #include "memory/array.hh"
@@ -340,8 +342,7 @@ class FFTEngine : public FFTEngineBase {
                : get_aos_strides(nb_work_pixels, Fx);
 
     Index_t work_size{nb_work_pixels * nb_components};
-    WorkBuffer work_buffer(work_size);
-    Complex * work_ptr = work_buffer.data();
+    Complex * work_ptr{this->get_work_buffer(0, work_size)};
 
     // Step 1: r2c FFT along X for each component
     for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -474,8 +475,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
                  : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
 
-      WorkBuffer work_z(zpencil_size);
-      Complex * work_z_ptr = work_z.data();
+      Complex * work_z_ptr{this->get_work_buffer(0, zpencil_size)};
 
       // Step 1: r2c FFT along X for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -505,8 +505,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_ypencil_pixels, local_yfx, Ny)
                  : get_aos_strides_3d(nb_ypencil_pixels, local_yfx, Ny);
 
-      WorkBuffer work_y(ypencil_size);
-      Complex * work_y_ptr = work_y.data();
+      Complex * work_y_ptr{this->get_work_buffer(1, ypencil_size)};
 
       if (transpose_xy != nullptr) {
         transpose_xy->forward(work_z_ptr, work_y_ptr);
@@ -589,8 +588,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
                  : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
 
-      WorkBuffer work_buffer(work_size);
-      Complex * work_ptr = work_buffer.data();
+      Complex * work_ptr{this->get_work_buffer(0, work_size)};
 
       // Step 1: r2c FFT along X for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -711,23 +709,23 @@ class FFTEngine : public FFTEngineBase {
           in_is_soa ? get_soa_strides(local_fourier_pixels, local_fx)
                     : get_aos_strides(local_fourier_pixels, local_fx);
 
-      WorkBuffer temp(local_fourier_size);
-      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, local_fourier_size);
+      Complex * temp_ptr{this->get_work_buffer(0, local_fourier_size)};
+      deep_copy<Complex, MemorySpace>(temp_ptr, input_ptr, local_fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
         Index_t comp_offset{comp * in_comp_factor};
         backend->c2c_backward(Ny, local_fx,
-                              temp.data() + comp_offset, in_row_dist, in_x_stride,
-                              temp.data() + comp_offset, in_row_dist, in_x_stride);
+                              temp_ptr + comp_offset, in_row_dist, in_x_stride,
+                              temp_ptr + comp_offset, in_row_dist, in_x_stride);
       }
 
       // Step 2: Transpose X<->Y backward
       Index_t nb_work_pixels{Fx * local_real[1]};
       Index_t work_size{nb_work_pixels * nb_components};
-      WorkBuffer work_buffer(work_size);
+      Complex * work_buffer_ptr{this->get_work_buffer(1, work_size)};
 
-      transpose->backward(temp.data(), work_buffer.data());
+      transpose->backward(temp_ptr, work_buffer_ptr);
 
       // Work buffer strides (same storage order)
       auto [work_comp_factor, work_x_stride, work_row_dist] =
@@ -739,7 +737,7 @@ class FFTEngine : public FFTEngineBase {
         Index_t work_comp_offset{comp * work_comp_factor};
         Index_t out_comp_offset{comp * out_comp_factor};
         backend->c2r(Nx, local_real[1],
-                     work_buffer.data() + work_comp_offset,
+                     work_buffer_ptr + work_comp_offset,
                      work_x_stride, work_row_dist,
                      output_ptr + out_base_offset + out_comp_offset,
                      out_x_stride, out_row_dist);
@@ -756,15 +754,15 @@ class FFTEngine : public FFTEngineBase {
                     : get_aos_strides(nb_fourier_pixels, Fx);
 
       // Work buffer uses same storage order
-      WorkBuffer temp(fourier_size);
-      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
+      Complex * temp_ptr{this->get_work_buffer(0, fourier_size)};
+      deep_copy<Complex, MemorySpace>(temp_ptr, input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
         Index_t comp_offset{comp * in_comp_factor};
         backend->c2c_backward(local_fy, Fx,
-                              temp.data() + comp_offset, in_row_dist, in_x_stride,
-                              temp.data() + comp_offset, in_row_dist, in_x_stride);
+                              temp_ptr + comp_offset, in_row_dist, in_x_stride,
+                              temp_ptr + comp_offset, in_row_dist, in_x_stride);
       }
 
       // Step 2: c2r IFFT along X for each component
@@ -772,7 +770,7 @@ class FFTEngine : public FFTEngineBase {
         Index_t in_comp_offset{comp * in_comp_factor};
         Index_t out_comp_offset{comp * out_comp_factor};
         backend->c2r(Nx, local_fy,
-                     temp.data() + in_comp_offset,
+                     temp_ptr + in_comp_offset,
                      in_x_stride, in_row_dist,
                      output_ptr + out_base_offset + out_comp_offset,
                      out_x_stride, out_row_dist);
@@ -856,8 +854,8 @@ class FFTEngine : public FFTEngineBase {
                     : get_aos_strides_3d(nb_fourier_pixels, fourier_local[0],
                                          fourier_local[1]);
 
-      WorkBuffer temp(fourier_size);
-      deep_copy<Complex, MemorySpace>(temp.data(), input_ptr, fourier_size);
+      Complex * temp_ptr{this->get_work_buffer(0, fourier_size)};
+      deep_copy<Complex, MemorySpace>(temp_ptr, input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Z for each component
       // For SoA: Batch all local_fx * local_fy transforms together
@@ -866,9 +864,9 @@ class FFTEngine : public FFTEngineBase {
         Index_t batch_z{fourier_local[0] * fourier_local[1]};
         for (Index_t comp{0}; comp < nb_components; ++comp) {
           Index_t comp_offset{comp * in_comp_factor};
-          backend->c2c_backward(Nz, batch_z, temp.data() + comp_offset,
+          backend->c2c_backward(Nz, batch_z, temp_ptr + comp_offset,
                                 in_z_dist, Index_t{1},
-                                temp.data() + comp_offset,
+                                temp_ptr + comp_offset,
                                 in_z_dist, Index_t{1});
         }
       } else {
@@ -877,9 +875,9 @@ class FFTEngine : public FFTEngineBase {
           Index_t comp_offset{comp * in_comp_factor};
           for (Index_t iy{0}; iy < fourier_local[1]; ++iy) {
             Index_t idx{comp_offset + iy * in_y_dist};
-            backend->c2c_backward(Nz, fourier_local[0], temp.data() + idx,
+            backend->c2c_backward(Nz, fourier_local[0], temp_ptr + idx,
                                   in_z_dist, in_x_stride,
-                                  temp.data() + idx,
+                                  temp_ptr + idx,
                                   in_z_dist, in_x_stride);
           }
         }
@@ -897,17 +895,16 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_ypencil_pixels, local_yfx, Ny)
                  : get_aos_strides_3d(nb_ypencil_pixels, local_yfx, Ny);
 
-      WorkBuffer work_y(ypencil_size);
-      Complex * work_y_ptr = work_y.data();
+      Complex * work_y_ptr{this->get_work_buffer(1, ypencil_size)};
 
       // Step 2: Transpose Y<->Z backward (gather Y, scatter Z across P1)
       if (transpose_yz != nullptr) {
-        transpose_yz->backward(temp.data(), work_y_ptr);
+        transpose_yz->backward(temp_ptr, work_y_ptr);
       } else {
         // No Y<->Z redistribution needed (P1 == 1): the Fourier layout has
         // the same shape as the Y-pencil; copy the data through so the
         // Y-IFFT below does not run on an uninitialised work_y.
-        deep_copy<Complex, MemorySpace>(work_y_ptr, temp.data(), ypencil_size);
+        deep_copy<Complex, MemorySpace>(work_y_ptr, temp_ptr, ypencil_size);
       }
 
       // Step 3: c2c IFFT along Y for each component
@@ -932,8 +929,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
                  : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
 
-      WorkBuffer work_z(zpencil_size);
-      Complex * work_z_ptr = work_z.data();
+      Complex * work_z_ptr{this->get_work_buffer(2, zpencil_size)};
 
       // Step 4: Transpose X<->Y backward (gather X, scatter Y across P2)
       if (transpose_xy != nullptr) {
@@ -968,8 +964,7 @@ class FFTEngine : public FFTEngineBase {
                     : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
 
       // Work buffer with same storage order
-      WorkBuffer work_buffer(work_size);
-      Complex * work_ptr = work_buffer.data();
+      Complex * work_ptr{this->get_work_buffer(0, work_size)};
       deep_copy<Complex, MemorySpace>(work_ptr, input_ptr, work_size);
 
       // Step 1: c2c IFFT along Z for each component
@@ -1027,8 +1022,25 @@ class FFTEngine : public FFTEngineBase {
     }
   }
 
+  //! Return scratch space of at least `size` complex values for `slot`.
+  //! The buffers grow on demand and are reused across transforms: a fresh
+  //! device allocation per fft/ifft call is expensive and can fail when
+  //! the device is near capacity (e.g. when a cupy memory pool holds the
+  //! remaining free memory).
+  Complex * get_work_buffer(std::size_t slot, Index_t size) {
+    WorkBuffer & buf{this->work_buffers.at(slot)};
+    if (buf.size() < static_cast<std::size_t>(size)) {
+      buf.resize(static_cast<std::size_t>(size));
+    }
+    return buf.data();
+  }
+
   //! FFT backend for this memory space
   std::unique_ptr<FFT1DBackend> backend;
+
+  //! Scratch buffers reused across transforms; at most three are alive at
+  //! once (3D MPI inverse transform)
+  std::array<WorkBuffer, 3> work_buffers{};
 };
 
 // Explicit template instantiation declarations for common memory spaces

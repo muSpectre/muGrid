@@ -111,7 +111,7 @@ def test_fd_poisson_solver(comm, nb_grid_pts=(128, 128)):
         rhs,
         solution,
         hessp=hessp,
-        tol=1e-6,
+        rtol=1e-6,
         callback=callback,
         maxiter=10,
     )

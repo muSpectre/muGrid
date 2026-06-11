@@ -54,6 +54,7 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
+#include "operators/linear.hh"
 
 #include <array>
 #include <vector>
@@ -151,6 +152,33 @@ namespace muGrid {
          */
         const std::array<Real, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS>& get_V() const {
             return V_matrix;
+        }
+
+        /**
+         * @brief Get the stencil offset.
+         * @return Stencil offset in pixels; the operator gathers
+         *         displacements from [-1, +1] neighbor nodes
+         */
+        Shape_t get_offset() const { return Shape_t{-1, -1, -1}; }
+
+        /**
+         * @brief Get the stencil shape.
+         * @return Shape of the stencil ([3,3,3])
+         */
+        Shape_t get_stencil_shape() const { return Shape_t{3, 3, 3}; }
+
+        /**
+         * @brief Ghost layers required by apply().
+         */
+        GhostRequirement get_apply_ghost_requirement() const {
+            return GhostRequirement{Shape_t{1, 1, 1}, Shape_t{1, 1, 1}};
+        }
+
+        /**
+         * @brief Ghost layers required by all operations of this operator.
+         */
+        GhostRequirement get_ghost_requirement() const {
+            return this->get_apply_ghost_requirement();
         }
 
     private:

@@ -203,6 +203,93 @@ class TestLinalgGhostExclusion:
 
 
 # =============================================================================
+# Regression tests for catastrophic cancellation in interior reductions
+# =============================================================================
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestLinalgInteriorAccuracy:
+    """Test that interior reductions stay accurate next to large ghost data.
+
+    The reductions used to be computed as full-buffer result minus ghost
+    contribution. Stencil operators write results into ghost pixels, so the
+    ghost buffers hold large stale data; once the interior values are small
+    (e.g. a converged CG residual), the subtraction cancels catastrophically
+    and the reported squared norm carried an absolute error of order
+    eps * ||ghosts||^2 — it could even go negative. The reductions must sum
+    the interior directly.
+    """
+
+    interior_value = 1e-6
+    ghost_value = 1e5
+
+    def _make_decomposition(self, device):
+        nb_grid_pts = [8, 8]
+        spatial_dim = 2
+
+        comm = muGrid.Communicator()
+        device_obj = create_device(device)
+        kwargs = {} if device_obj is None else {"device": device_obj}
+        return muGrid.CartesianDecomposition(
+            comm,
+            nb_grid_pts,
+            nb_subdivisions=(1,) * spatial_dim,
+            nb_ghosts_left=(1,) * spatial_dim,
+            nb_ghosts_right=(1,) * spatial_dim,
+            **kwargs,
+        )
+
+    def test_norm_sq_small_interior_large_ghosts(self, device):
+        skip_if_gpu_unavailable(device)
+        decomposition = self._make_decomposition(device)
+        field = decomposition.real_field("test", (2,))
+
+        field.sg[...] = self.ghost_value
+        field.s[...] = self.interior_value
+
+        expected = field.s.size * self.interior_value**2
+
+        result = linalg.norm_sq(field)
+        assert result >= 0.0
+        assert result == pytest.approx(expected, rel=1e-12)
+
+    def test_vecdot_small_interior_large_ghosts(self, device):
+        skip_if_gpu_unavailable(device)
+        decomposition = self._make_decomposition(device)
+        field_a = decomposition.real_field("test_a", (2,))
+        field_b = decomposition.real_field("test_b", (2,))
+
+        field_a.sg[...] = self.ghost_value
+        field_b.sg[...] = -self.ghost_value
+        field_a.s[...] = self.interior_value
+        field_b.s[...] = 2 * self.interior_value
+
+        expected = field_a.s.size * 2 * self.interior_value**2
+
+        result = linalg.vecdot(field_a, field_b)
+        assert result == pytest.approx(expected, rel=1e-12)
+
+    def test_axpy_norm_sq_small_interior_large_ghosts(self, device):
+        skip_if_gpu_unavailable(device)
+        decomposition = self._make_decomposition(device)
+        field_x = decomposition.real_field("test_x", (2,))
+        field_y = decomposition.real_field("test_y", (2,))
+
+        alpha = 0.5
+        field_x.sg[...] = self.ghost_value
+        field_y.sg[...] = self.ghost_value
+        # y_new = alpha * x + y = -1e-6 + 2e-6 = 1e-6 in the interior
+        field_x.s[...] = -2 * self.interior_value
+        field_y.s[...] = 2 * self.interior_value
+
+        expected = field_y.s.size * self.interior_value**2
+
+        result = linalg.axpy_norm_sq(alpha, field_x, field_y)
+        assert result >= 0.0
+        assert result == pytest.approx(expected, rel=1e-12)
+
+
+# =============================================================================
 # CPU vs GPU comparison tests (dual-device tests)
 # =============================================================================
 

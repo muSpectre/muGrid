@@ -45,6 +45,7 @@
 #include "collection/field_collection_local.hh"
 #include "field/state_field.hh"
 #include "memory/device.hh"
+#include "util/python_helpers.hh"
 
 #include <map>
 
@@ -587,7 +588,19 @@ void add_global_field_collection(py::module & mod) {
             "nb_ghosts_left"_a = DynGridIndex{},
             "nb_ghosts_right"_a = DynGridIndex{},
             "device"_a = Device::cpu())
-        .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels_with_ghosts);
+        .def_property_readonly("pixels", &GlobalFieldCollection::get_pixels_with_ghosts)
+        .def_property_readonly(
+            "nb_ghosts_left",
+            [](const GlobalFieldCollection & fc) {
+                return muGrid::to_tuple(fc.get_nb_ghosts_left());
+            },
+            "Ghost layers on the low-index side of each dimension")
+        .def_property_readonly(
+            "nb_ghosts_right",
+            [](const GlobalFieldCollection & fc) {
+                return muGrid::to_tuple(fc.get_nb_ghosts_right());
+            },
+            "Ghost layers on the high-index side of each dimension");
 }
 
 void add_local_field_collection(py::module & mod) {

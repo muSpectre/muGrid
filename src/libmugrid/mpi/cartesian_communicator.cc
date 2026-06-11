@@ -352,8 +352,15 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Check if MPI is available (comm may be NULL if MPI was not initialized)
-        if (this->comm == MPI_COMM_NULL) {
+        // Take the local-copy path when MPI is not initialized (comm is
+        // NULL) or when this rank is its own neighbor (direction not
+        // subdivided, periodic wrap). Self-communication through
+        // MPI_Sendrecv with strided datatypes is functionally correct but
+        // catastrophically slow on device memory (UCX packs the vector
+        // type block by block).
+        if (this->comm == MPI_COMM_NULL ||
+            (this->right_ranks[direction] == this->rank() &&
+             this->left_ranks[direction] == this->rank())) {
             serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
                             send_offset, nb_recv_blocks, recv_block_len,
                             recv_offset, data, stride_in_direction,
@@ -391,8 +398,11 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Check if MPI is available (comm may be NULL if MPI was not initialized)
-        if (this->comm == MPI_COMM_NULL) {
+        // Local-copy path when MPI is uninitialized or this rank is its own
+        // neighbor (see sendrecv_right).
+        if (this->comm == MPI_COMM_NULL ||
+            (this->right_ranks[direction] == this->rank() &&
+             this->left_ranks[direction] == this->rank())) {
             serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
                             send_offset, nb_recv_blocks, recv_block_len,
                             recv_offset, data, stride_in_direction,
@@ -430,8 +440,11 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Check if MPI is available (comm may be NULL if MPI was not initialized)
-        if (this->comm == MPI_COMM_NULL) {
+        // Local path when MPI is uninitialized or this rank is its own
+        // neighbor (see sendrecv_right).
+        if (this->comm == MPI_COMM_NULL ||
+            (this->right_ranks[direction] == this->rank() &&
+             this->left_ranks[direction] == this->rank())) {
             serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                        send_offset, nb_recv_blocks, recv_block_len,
                                        recv_offset, data, stride_in_direction,
@@ -488,8 +501,11 @@ namespace muGrid {
         Index_t recv_offset, char * data, int stride_in_direction,
         int elem_size_in_bytes, TypeDescriptor type_desc,
         bool is_device_memory) const {
-        // Check if MPI is available (comm may be NULL if MPI was not initialized)
-        if (this->comm == MPI_COMM_NULL) {
+        // Local path when MPI is uninitialized or this rank is its own
+        // neighbor (see sendrecv_right).
+        if (this->comm == MPI_COMM_NULL ||
+            (this->right_ranks[direction] == this->rank() &&
+             this->left_ranks[direction] == this->rank())) {
             serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                        send_offset, nb_recv_blocks, recv_block_len,
                                        recv_offset, data, stride_in_direction,

@@ -1,4 +1,9 @@
 # Solver for the Poisson equation
+#
+# Examples:
+#   python3 poisson.py -n 256,256
+#   python3 poisson.py -n 256,256 -P fourier
+#   mpiexec -n 4 python3 poisson.py -n 128,128,128 -P fourier
 
 import argparse
 import json
@@ -12,7 +17,8 @@ import numpy as np
 
 import muGrid
 from muGrid import parprint
-from muGrid.Solvers import conjugate_gradients
+from muGrid.Preconditioners import FourierPreconditioner
+from muGrid.Solvers import ConvergenceError, conjugate_gradients
 
 try:
     from mpi4py import MPI
@@ -74,6 +80,18 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "-P",
+    "--preconditioner",
+    choices=["none", "fourier", "fourier-exact"],
+    default="none",
+    help="Preconditioner for the CG solver: 'none', 'fourier' (inverse "
+    "continuum Laplacian 1/k^2; grid-size independent iteration count, "
+    "exercises the FFT in every CG iteration) or 'fourier-exact' (exact "
+    "inverse of the finite-difference stencil symbol; converges in a "
+    "single iteration, i.e. a pure FFT solve) (default: none)",
+)
+
+parser.add_argument(
     "-q",
     "--quiet",
     action="store_true",
@@ -103,15 +121,6 @@ dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
     raise ValueError("Only 2D and 3D grids are supported")
 
-s = suggest_subdivisions(dim, comm.size)
-
-# Set up ghost layers for the stencil (1 layer in each direction)
-left_ghosts = (1,) * dim
-right_ghosts = (1,) * dim
-
-decomposition = muGrid.CartesianDecomposition(
-    comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=device
-)
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 # FD-stencil for the Laplacian
@@ -152,11 +161,34 @@ else:
     laplace = muGrid.LaplaceOperator(dim, laplace_scale)
     stencil_name = "Hard-coded Laplace operator"
 
+# The decomposition's ghost buffers are sized from the requirement the
+# Laplace operator reports (ghosts=laplace)
+if args.preconditioner == "none":
+    s = suggest_subdivisions(dim, comm.size)
+    decomposition = muGrid.CartesianDecomposition(
+        comm, args.nb_grid_pts, s, ghosts=laplace, device=device
+    )
+    fft_engine = None
+    fc = decomposition  # field collection for the solver's work fields
+else:
+    # The FFT engine is also a Cartesian decomposition: its real-space
+    # fields carry ghost buffers for the stencil and live in the engine's
+    # pencil decomposition, so the spectral preconditioner can transform
+    # them without intermediate copies.
+    fft_engine = muGrid.FFTEngine(
+        args.nb_grid_pts,
+        comm,
+        ghosts=laplace,
+        device=device,
+    )
+    decomposition = fft_engine
+    fc = fft_engine.real_space_collection
+
 coords = decomposition.coords  # Domain-local coords for each pixel
 
-# Create fields using the decomposition's method API
-rhs = decomposition.real_field("rhs")
-solution = decomposition.real_field("solution")
+# Create fields in the solver's field collection
+rhs = fc.real_field("rhs")
+solution = fc.real_field("solution")
 
 # Set up RHS with a smooth function
 if dim == 2:
@@ -173,8 +205,44 @@ rhs.p[...] -= arr.mean(rhs.p)
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
-# Create global timer for hierarchical timing
-timer = muTimer.Timer()
+# Create global timer for hierarchical timing (MPI-aware: prints on rank 0)
+timer = muTimer.Timer(comm=comm)
+
+
+def inverse_fd_symbol(engine):
+    """
+    Exact inverse of the Fourier symbol of the scaled finite-difference
+    Laplace stencil. The zero mode is projected out (the RHS is zero-mean).
+    """
+    q = np.array(engine.fftfreq)  # normalized frequencies, [dim, *local]
+    denom = -4 * laplace_scale * np.sum(np.sin(np.pi * q) ** 2, axis=0)
+    with np.errstate(divide="ignore"):
+        return np.where(denom > 0, 1 / denom, 0.0)
+
+
+def inverse_continuum_symbol(engine):
+    """
+    Inverse symbol 1/|k|^2 of the continuum operator -Laplace (domain
+    length 1 in each direction). Spectrally equivalent to the stencil, so
+    PCG converges in a grid-size independent number of iterations. The
+    zero mode is projected out (the RHS is zero-mean).
+    """
+    q = np.array(engine.fftfreq)  # normalized frequencies, [dim, *local]
+    n = np.array(args.nb_grid_pts).reshape((dim,) + (1,) * dim)
+    k_sq = np.sum((2 * np.pi * q * n) ** 2, axis=0)
+    with np.errstate(divide="ignore"):
+        return np.where(k_sq > 0, 1 / k_sq, 0.0)
+
+
+prec = None
+if args.preconditioner != "none":
+    with timer("preconditioner_setup"):
+        kernel = (
+            inverse_fd_symbol
+            if args.preconditioner == "fourier-exact"
+            else inverse_continuum_symbol
+        )
+        prec = FourierPreconditioner(fft_engine, kernel, timer=timer)
 
 
 def callback(iteration, state):
@@ -202,11 +270,12 @@ with timer("conjugate_gradients"):
     try:
         conjugate_gradients(
             comm,
-            decomposition,
+            fc,
             rhs,
             solution,
             hessp=hessp,
-            tol=1e-6,
+            prec=prec,
+            rtol=1e-6,
             callback=callback,
             maxiter=args.maxiter,
             timer=timer,
@@ -214,7 +283,7 @@ with timer("conjugate_gradients"):
         converged = True
         if not args.quiet:
             parprint("CG converged.", comm=comm)
-    except RuntimeError:
+    except ConvergenceError:
         if not args.quiet:
             parprint("CG did not converge.", comm=comm)
 
@@ -265,6 +334,12 @@ arithmetic_intensity = flops_per_iteration / (
     (reads_per_iteration + writes_per_iteration) * 8
 )
 
+# Preconditioner timing breakdown (0.0 when no preconditioner is used)
+prec_time = timer.get_time("conjugate_gradients/iteration/prec")
+prec_fft_time = timer.get_time("conjugate_gradients/iteration/prec/fft")
+prec_scale_time = timer.get_time("conjugate_gradients/iteration/prec/scale")
+prec_ifft_time = timer.get_time("conjugate_gradients/iteration/prec/ifft")
+
 # Breakdown: hessp (apply) only
 bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8
 flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
@@ -277,6 +352,11 @@ apply_flops_rate = (
     (nb_iterations * flops_per_hessp) / apply_time if apply_time > 0 else 0
 )
 
+# The per-iteration memory/FLOP model only covers the stencil CG operations;
+# with a preconditioner the FFT work dominates and the estimates are not
+# meaningful, so they are omitted from the output.
+report_estimates = args.preconditioner == "none"
+
 if args.json:
     # JSON output (convert numpy types to Python types for JSON serialization)
     # Timer's to_dict() includes PAPI data when available
@@ -288,6 +368,7 @@ if args.json:
             "kernel": args.kernel,
             "stencil_name": stencil_name,
             "nb_stencil_pts": int(nb_stencil_pts),
+            "preconditioner": args.preconditioner,
             "device": device.device_string,
             "maxiter": int(args.maxiter),
         },
@@ -298,20 +379,30 @@ if args.json:
             "total_lattice_updates": int(total_lattice_updates),
             "MLUPS": float(lups / 1e6),
             "GLUPS": float(lups / 1e9),
-            "reads_per_grid_point": int(reads_per_iteration),
-            "writes_per_grid_point": int(writes_per_iteration),
-            "bytes_per_iteration": int(bytes_per_iteration),
-            "total_bytes": int(total_bytes),
-            "memory_throughput_GBps": float(memory_throughput / 1e9),
-            "flops_per_grid_point": int(flops_per_iteration),
-            "flops_per_iteration": int(flops_per_cg_iteration),
-            "total_flops": int(total_flops),
-            "flops_rate_GFLOPs": float(flops_rate / 1e9),
-            "arithmetic_intensity": float(arithmetic_intensity),
+            **(
+                {
+                    "reads_per_grid_point": int(reads_per_iteration),
+                    "writes_per_grid_point": int(writes_per_iteration),
+                    "bytes_per_iteration": int(bytes_per_iteration),
+                    "total_bytes": int(total_bytes),
+                    "memory_throughput_GBps": float(memory_throughput / 1e9),
+                    "flops_per_grid_point": int(flops_per_iteration),
+                    "flops_per_iteration": int(flops_per_cg_iteration),
+                    "total_flops": int(total_flops),
+                    "flops_rate_GFLOPs": float(flops_rate / 1e9),
+                    "arithmetic_intensity": float(arithmetic_intensity),
+                }
+                if report_estimates
+                else {}
+            ),
             "apply_time_seconds": float(apply_time),
             "apply_MLUPS": float(apply_lups / 1e6),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
             "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
+            "prec_time_seconds": float(prec_time),
+            "prec_fft_time_seconds": float(prec_fft_time),
+            "prec_scale_time_seconds": float(prec_scale_time),
+            "prec_ifft_time_seconds": float(prec_ifft_time),
         },
         "timing": timer.to_dict(),
     }
@@ -330,6 +421,7 @@ else:
     parprint(f"Device: {device.device_string}", comm=comm)
     parprint(f"Stencil implementation: {stencil_name}", comm=comm)
     parprint(f"Stencil points: {nb_stencil_pts}", comm=comm)
+    parprint(f"Preconditioner: {args.preconditioner}", comm=comm)
     parprint(f"CG iterations: {nb_iterations}", comm=comm)
     parprint(f"Total time: {elapsed_time:.4f} seconds", comm=comm)
 
@@ -337,34 +429,48 @@ else:
     parprint(f"  Total lattice updates: {total_lattice_updates:,}", comm=comm)
     parprint(f"  LUPS: {lups / 1e6:.2f} MLUPS ({lups / 1e9:.4f} GLUPS)", comm=comm)
 
-    parprint("\nMemory traffic per CG iteration (estimated):", comm=comm)
-    parprint(
-        f"  Per grid point: {reads_per_iteration} reads + "
-        f"{writes_per_iteration} writes "
-        f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes",
-        comm=comm,
-    )
-    parprint(f"    hessp:    {nb_stencil_pts} reads, 1 write", comm=comm)
-    parprint("    dot_pAp:  2 reads", comm=comm)
-    parprint("    update_x: 2 reads, 1 write", comm=comm)
-    parprint("    update_r: 2 reads, 1 write (fused axpy_norm_sq)", comm=comm)
-    parprint("    update_p: 2 reads, 1 write", comm=comm)
-    parprint(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB", comm=comm)
-    parprint(f"  Total: {total_bytes / 1e9:.2f} GB", comm=comm)
-    parprint(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s", comm=comm)
+    if report_estimates:
+        parprint("\nMemory traffic per CG iteration (estimated):", comm=comm)
+        parprint(
+            f"  Per grid point: {reads_per_iteration} reads + "
+            f"{writes_per_iteration} writes "
+            f"= {(reads_per_iteration + writes_per_iteration) * 8} bytes",
+            comm=comm,
+        )
+        parprint(f"    hessp:    {nb_stencil_pts} reads, 1 write", comm=comm)
+        parprint("    dot_pAp:  2 reads", comm=comm)
+        parprint("    update_x: 2 reads, 1 write", comm=comm)
+        parprint("    update_r: 2 reads, 1 write (fused axpy_norm_sq)", comm=comm)
+        parprint("    update_p: 2 reads, 1 write", comm=comm)
+        parprint(f"  Per iteration: {bytes_per_iteration / 1e6:.2f} MB", comm=comm)
+        parprint(f"  Total: {total_bytes / 1e9:.2f} GB", comm=comm)
+        parprint(f"  Throughput: {memory_throughput / 1e9:.2f} GB/s", comm=comm)
 
-    parprint("\nFLOPs per CG iteration (estimated):", comm=comm)
-    parprint(f"  Per grid point: {flops_per_iteration} FLOPs", comm=comm)
-    parprint(f"    hessp:    {2 * nb_stencil_pts} FLOPs", comm=comm)
-    parprint("    dot_pAp:  2 FLOPs", comm=comm)
-    parprint("    update_x: 2 FLOPs", comm=comm)
-    parprint("    update_r: 4 FLOPs (fused axpy_norm_sq)", comm=comm)
-    parprint("    update_p: 2 FLOPs", comm=comm)
-    parprint(f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP", comm=comm)
-    parprint(f"  Total: {total_flops / 1e9:.2f} GFLOP", comm=comm)
-    parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
+        parprint("\nFLOPs per CG iteration (estimated):", comm=comm)
+        parprint(f"  Per grid point: {flops_per_iteration} FLOPs", comm=comm)
+        parprint(f"    hessp:    {2 * nb_stencil_pts} FLOPs", comm=comm)
+        parprint("    dot_pAp:  2 FLOPs", comm=comm)
+        parprint("    update_x: 2 FLOPs", comm=comm)
+        parprint("    update_r: 4 FLOPs (fused axpy_norm_sq)", comm=comm)
+        parprint("    update_p: 2 FLOPs", comm=comm)
+        parprint(
+            f"  Per iteration: {flops_per_cg_iteration / 1e6:.2f} MFLOP", comm=comm
+        )
+        parprint(f"  Total: {total_flops / 1e9:.2f} GFLOP", comm=comm)
+        parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
 
-    parprint(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte", comm=comm)
+        parprint(
+            f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte",
+            comm=comm,
+        )
+
+    if args.preconditioner != "none":
+        parprint("\nFFT preconditioner (totals over all CG iterations):", comm=comm)
+        parprint(
+            f"  total: {prec_time:.4f} s (fft: {prec_fft_time:.4f} s, "
+            f"kernel: {prec_scale_time:.4f} s, ifft: {prec_ifft_time:.4f} s)",
+            comm=comm,
+        )
     parprint(f"{'='*60}", comm=comm)
 
     # Print hierarchical timing breakdown (includes PAPI data when enabled)
