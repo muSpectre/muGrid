@@ -4,6 +4,7 @@ Collection of simple parallel solvers
 
 from . import linalg
 
+
 def conjugate_gradients(
     comm,
     fc,
@@ -54,7 +55,9 @@ def conjugate_gradients(
         - "rr": squared residual norm (float)
     timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
-        record timing for the hessp (Hessian-vector product) operations.
+        record timing for the individual solver operations (Hessian-vector
+        products, preconditioner applications, dot products and vector
+        updates).
 
     Returns
     -------
@@ -96,13 +99,12 @@ def conjugate_gradients(
         # r = r - Ap = b - A*x (axpy with alpha=-1)
         linalg.axpy(-1.0, Ap, r)
 
-        # precondioner
-        prec(r, z)
+        # preconditioner
+        with timed("prec"):
+            prec(r, z)
 
         # Initial search direction: p = z
         linalg.copy(z, p)
-
-
 
         with timed("dot_rr"):
             rr = comm.sum(linalg.norm_sq(r))
@@ -140,15 +142,27 @@ def conjugate_gradients(
 
             next_rr_val = float(next_rr)
 
-            # apply precondioner z=P*r
-            prec(r, z)
+            # apply preconditioner z=P*r
+            with timed("prec"):
+                prec(r, z)
 
-            # Compute next_rz after applying precondioner
-            next_rz = comm.sum(linalg.vecdot(r, z))
+            # Compute next_rz after applying preconditioner
+            with timed("dot_rz"):
+                next_rz = comm.sum(linalg.vecdot(r, z))
 
             if callback:
                 with timed("callback"):
-                    callback(iteration + 1, {"x": x, "r": r, "p": p,"z": z,  "rr": next_rr,  "rz": next_rz})
+                    callback(
+                        iteration + 1,
+                        {
+                            "x": x,
+                            "r": r,
+                            "p": p,
+                            "z": z,
+                            "rr": next_rr,
+                            "rz": next_rz,
+                        },
+                    )
 
             # Check for numerical issues (NaN indicates non-positive-definite H)
             if next_rr_val != next_rr_val:  # NaN check

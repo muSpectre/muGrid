@@ -1,4 +1,9 @@
 # Solver for the Poisson equation
+#
+# Examples:
+#   python3 poisson.py -n 256,256
+#   python3 poisson.py -n 256,256 -P fourier
+#   mpiexec -n 4 python3 poisson.py -n 128,128,128 -P fourier
 
 import argparse
 import json
@@ -12,6 +17,7 @@ import numpy as np
 
 import muGrid
 from muGrid import parprint
+from muGrid.Preconditioners import FourierPreconditioner
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -74,6 +80,18 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "-P",
+    "--preconditioner",
+    choices=["none", "fourier", "fourier-exact"],
+    default="none",
+    help="Preconditioner for the CG solver: 'none', 'fourier' (inverse "
+    "continuum Laplacian 1/k^2; grid-size independent iteration count, "
+    "exercises the FFT in every CG iteration) or 'fourier-exact' (exact "
+    "inverse of the finite-difference stencil symbol; converges in a "
+    "single iteration, i.e. a pure FFT solve) (default: none)",
+)
+
+parser.add_argument(
     "-q",
     "--quiet",
     action="store_true",
@@ -103,15 +121,31 @@ dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
     raise ValueError("Only 2D and 3D grids are supported")
 
-s = suggest_subdivisions(dim, comm.size)
-
 # Set up ghost layers for the stencil (1 layer in each direction)
 left_ghosts = (1,) * dim
 right_ghosts = (1,) * dim
 
-decomposition = muGrid.CartesianDecomposition(
-    comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=device
-)
+if args.preconditioner == "none":
+    s = suggest_subdivisions(dim, comm.size)
+    decomposition = muGrid.CartesianDecomposition(
+        comm, args.nb_grid_pts, s, left_ghosts, right_ghosts, device=device
+    )
+    fft_engine = None
+    fc = decomposition  # field collection for the solver's work fields
+else:
+    # The FFT engine is also a Cartesian decomposition: its real-space
+    # fields carry ghost buffers for the stencil and live in the engine's
+    # pencil decomposition, so the spectral preconditioner can transform
+    # them without intermediate copies.
+    fft_engine = muGrid.FFTEngine(
+        args.nb_grid_pts,
+        comm,
+        nb_ghosts_left=left_ghosts,
+        nb_ghosts_right=right_ghosts,
+        device=device,
+    )
+    decomposition = fft_engine
+    fc = fft_engine.real_space_collection
 grid_spacing = 1 / np.array(args.nb_grid_pts)  # Grid spacing
 
 # FD-stencil for the Laplacian
@@ -154,9 +188,9 @@ else:
 
 coords = decomposition.coords  # Domain-local coords for each pixel
 
-# Create fields using the decomposition's method API
-rhs = decomposition.real_field("rhs")
-solution = decomposition.real_field("solution")
+# Create fields in the solver's field collection
+rhs = fc.real_field("rhs")
+solution = fc.real_field("solution")
 
 # Set up RHS with a smooth function
 if dim == 2:
@@ -175,6 +209,42 @@ nb_grid_pts_total = np.prod(args.nb_grid_pts)
 
 # Create global timer for hierarchical timing
 timer = muTimer.Timer()
+
+
+def inverse_fd_symbol(engine):
+    """
+    Exact inverse of the Fourier symbol of the scaled finite-difference
+    Laplace stencil. The zero mode is projected out (the RHS is zero-mean).
+    """
+    q = np.array(engine.fftfreq)  # normalized frequencies, [dim, *local]
+    denom = -4 * laplace_scale * np.sum(np.sin(np.pi * q) ** 2, axis=0)
+    with np.errstate(divide="ignore"):
+        return np.where(denom > 0, 1 / denom, 0.0)
+
+
+def inverse_continuum_symbol(engine):
+    """
+    Inverse symbol 1/|k|^2 of the continuum operator -Laplace (domain
+    length 1 in each direction). Spectrally equivalent to the stencil, so
+    PCG converges in a grid-size independent number of iterations. The
+    zero mode is projected out (the RHS is zero-mean).
+    """
+    q = np.array(engine.fftfreq)  # normalized frequencies, [dim, *local]
+    n = np.array(args.nb_grid_pts).reshape((dim,) + (1,) * dim)
+    k_sq = np.sum((2 * np.pi * q * n) ** 2, axis=0)
+    with np.errstate(divide="ignore"):
+        return np.where(k_sq > 0, 1 / k_sq, 0.0)
+
+
+prec = None
+if args.preconditioner != "none":
+    with timer("preconditioner_setup"):
+        kernel = (
+            inverse_fd_symbol
+            if args.preconditioner == "fourier-exact"
+            else inverse_continuum_symbol
+        )
+        prec = FourierPreconditioner(fft_engine, kernel, timer=timer)
 
 
 def callback(iteration, state):
@@ -202,10 +272,11 @@ with timer("conjugate_gradients"):
     try:
         conjugate_gradients(
             comm,
-            decomposition,
+            fc,
             rhs,
             solution,
             hessp=hessp,
+            prec=prec,
             tol=1e-6,
             callback=callback,
             maxiter=args.maxiter,
@@ -265,6 +336,12 @@ arithmetic_intensity = flops_per_iteration / (
     (reads_per_iteration + writes_per_iteration) * 8
 )
 
+# Preconditioner timing breakdown (0.0 when no preconditioner is used)
+prec_time = timer.get_time("conjugate_gradients/iteration/prec")
+prec_fft_time = timer.get_time("conjugate_gradients/iteration/prec/fft")
+prec_scale_time = timer.get_time("conjugate_gradients/iteration/prec/scale")
+prec_ifft_time = timer.get_time("conjugate_gradients/iteration/prec/ifft")
+
 # Breakdown: hessp (apply) only
 bytes_per_hessp = nb_grid_pts_total * (nb_stencil_pts + 1) * 8
 flops_per_hessp = nb_grid_pts_total * (2 * nb_stencil_pts)
@@ -288,6 +365,7 @@ if args.json:
             "kernel": args.kernel,
             "stencil_name": stencil_name,
             "nb_stencil_pts": int(nb_stencil_pts),
+            "preconditioner": args.preconditioner,
             "device": device.device_string,
             "maxiter": int(args.maxiter),
         },
@@ -312,6 +390,10 @@ if args.json:
             "apply_MLUPS": float(apply_lups / 1e6),
             "apply_throughput_GBps": float(apply_throughput / 1e9),
             "apply_flops_rate_GFLOPs": float(apply_flops_rate / 1e9),
+            "prec_time_seconds": float(prec_time),
+            "prec_fft_time_seconds": float(prec_fft_time),
+            "prec_scale_time_seconds": float(prec_scale_time),
+            "prec_ifft_time_seconds": float(prec_ifft_time),
         },
         "timing": timer.to_dict(),
     }
@@ -330,6 +412,7 @@ else:
     parprint(f"Device: {device.device_string}", comm=comm)
     parprint(f"Stencil implementation: {stencil_name}", comm=comm)
     parprint(f"Stencil points: {nb_stencil_pts}", comm=comm)
+    parprint(f"Preconditioner: {args.preconditioner}", comm=comm)
     parprint(f"CG iterations: {nb_iterations}", comm=comm)
     parprint(f"Total time: {elapsed_time:.4f} seconds", comm=comm)
 
@@ -365,6 +448,18 @@ else:
     parprint(f"  FLOP rate: {flops_rate / 1e9:.2f} GFLOP/s", comm=comm)
 
     parprint(f"\nArithmetic intensity: {arithmetic_intensity:.3f} FLOP/byte", comm=comm)
+
+    if args.preconditioner != "none":
+        parprint("\nFFT preconditioner (totals over all CG iterations):", comm=comm)
+        parprint(
+            f"  total: {prec_time:.4f} s (fft: {prec_fft_time:.4f} s, "
+            f"kernel: {prec_scale_time:.4f} s, ifft: {prec_ifft_time:.4f} s)",
+            comm=comm,
+        )
+        parprint(
+            "  Note: memory/FLOP estimates above exclude the preconditioner.",
+            comm=comm,
+        )
     parprint(f"{'='*60}", comm=comm)
 
     # Print hierarchical timing breakdown (includes PAPI data when enabled)

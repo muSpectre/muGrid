@@ -15,6 +15,8 @@ projects that mode out; in that case the right-hand side must not contain
 it.
 """
 
+from contextlib import nullcontext
+
 import numpy as np
 
 from . import linalg
@@ -127,6 +129,10 @@ class FourierPreconditioner(Preconditioner):
         ``[dim, *local_fourier_shape]``) to build it.
     name : str, optional
         Prefix for the engine-managed Fourier work fields.
+    timer : muTimer.Timer, optional
+        Timer for performance profiling. When given, :meth:`apply` records
+        the forward transform ("fft"), the pointwise kernel multiplication
+        ("scale") and the inverse transform ("ifft").
 
     Examples
     --------
@@ -145,9 +151,10 @@ class FourierPreconditioner(Preconditioner):
                             rhs, solution, hessp=hessp, prec=prec)
     """
 
-    def __init__(self, engine, kernel, name="fourier-preconditioner"):
+    def __init__(self, engine, kernel, name="fourier-preconditioner", timer=None):
         self._engine = engine
         self._name = name
+        self._timer = timer
         self._work = {}  # work field per components shape
 
         if callable(kernel):
@@ -174,6 +181,9 @@ class FourierPreconditioner(Preconditioner):
             )
         return self._work[key]
 
+    def _timed(self, name):
+        return self._timer(name) if self._timer is not None else nullcontext()
+
     def apply(self, r, z):
         """
         Compute ``z = F⁻¹ [ k(q) · F r ]``.
@@ -183,7 +193,8 @@ class FourierPreconditioner(Preconditioner):
         """
         work = self._work_field(r.components_shape)
         engine = self._engine
-        engine.fft(r, work)
+        with self._timed("fft"):
+            engine.fft(r, work)
         s = work.s
         kernel = self._kernel
         if type(s).__module__.partition(".")[0] == "cupy":
@@ -193,5 +204,7 @@ class FourierPreconditioner(Preconditioner):
             kernel = cupy.asarray(kernel)
             self._kernel = kernel
         # Broadcasts over leading component axes; normalisation is folded in.
-        s[...] *= kernel
-        engine.ifft(work, z)
+        with self._timed("scale"):
+            s[...] *= kernel
+        with self._timed("ifft"):
+            engine.ifft(work, z)
