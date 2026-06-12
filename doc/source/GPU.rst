@@ -235,19 +235,11 @@ On NVIDIA GPUs, *µ*\Grid uses the cuFFT library. cuFFT has a **documented limit
     *"Strides on the real part of real-to-complex and complex-to-real transforms
     are not supported."*
 
-This limitation affects **3D MPI-parallel FFTs** on NVIDIA GPUs. In the pencil
-decomposition used for distributed FFTs, the data layout after transpose
-operations results in non-unit strides for the R2C/C2R transforms along the
-X-direction.
-
-**Consequence**: 3D MPI-parallel FFTs on NVIDIA GPUs will raise a ``RuntimeError``
-with a clear explanation of the limitation.
-
-**Workarounds**:
-
-1. Use the CPU FFT backend (PocketFFT) for 3D MPI-parallel transforms
-2. Use 2D grids, which support batched transforms with unit stride
-3. Use single-GPU (non-MPI) execution where the data layout is contiguous
+*µ*\Grid arranges its transform work buffers so that the real-to-complex
+and complex-to-real passes always operate with unit stride (the
+real-space ghost buffers are padded accordingly), so 2D and 3D
+transforms — serial and MPI-parallel — run on cuFFT. The MPI FFT test
+suite exercises these paths on the GPU.
 
 AMD GPUs (rocFFT)
 -----------------
@@ -288,6 +280,95 @@ For code that needs to handle both 2D and 3D cases on GPU:
 
     # Create FFT engine
     engine = muGrid.FFTEngine(nb_grid_pts, device=device)
+
+GPU data and MPI
+****************
+
+Technical background
+--------------------
+
+In MPI-parallel runs, *µ*\Grid has to communicate data that lives in GPU
+memory: ghost (halo) layers of the domain decomposition and the global
+transposes of the distributed FFT. Two properties of MPI implementations
+shape how this is done:
+
+1. **Strided datatypes are slow on device memory.** MPI derived datatypes
+   (``MPI_Type_vector``, subarrays) describe non-contiguous data
+   declaratively, and on host memory implementations handle them well. On
+   device memory, however, common MPI stacks pack such datatypes block by
+   block with one small device copy each — for a halo slice this can mean
+   tens of thousands of 8-byte copies and a slowdown of several orders of
+   magnitude. *µ*\Grid therefore never hands strided device data to MPI:
+   halos and transpose blocks are first gathered into contiguous device
+   staging buffers, sent as flat messages, and scattered on the receiving
+   side.
+
+2. **Not every MPI can read device pointers at all.** Passing a GPU
+   pointer to MPI requires a *GPU-aware* build of the MPI library (e.g.
+   Open MPI/UCX with CUDA support, HPC-X, MVAPICH2-GDR, Cray MPICH with
+   GTL). A plain MPI build — including the stock packages of most Linux
+   distributions — dereferences the pointer on the host and crashes.
+
+Runtime detection and host fallback
+-----------------------------------
+
+*µ*\Grid detects GPU-aware MPI at runtime. With Open MPI (and derivatives
+such as HPC-X), the official ``MPIX_Query_cuda_support()`` /
+``MPIX_Query_rocm_support()`` extensions are queried. For MPI stacks that
+cannot be queried, the conservative answer is *not GPU-aware*.
+
+When MPI is not GPU-aware, the contiguous staging buffers are bounced
+through host memory: pack on the device, copy once to a pinned-size host
+buffer, communicate, copy back, unpack on the device. This is correct
+with any MPI library and, because only flat buffers are copied, costs a
+single device-host round trip per message (measured at roughly 30-40 %
+on the total time of an FFT-preconditioned solve across two GPUs,
+compared to a GPU-aware MPI taking the device pointers directly).
+
+The ``MUGRID_GPU_AWARE_MPI`` environment variable
+-------------------------------------------------
+
+The environment variable ``MUGRID_GPU_AWARE_MPI`` overrides the
+detection in both directions:
+
+* ``MUGRID_GPU_AWARE_MPI=1`` forces direct device pointers. Use this for
+  MPI stacks that are GPU-aware but cannot be queried (e.g. some MPICH
+  derivatives), where detection would needlessly fall back to host
+  staging.
+
+* ``MUGRID_GPU_AWARE_MPI=0`` forces the host bounce — a kill switch for
+  *broken* GPU-aware stacks. GPU support in MPI is a complex, layered
+  feature (UCX transports, IPC, GPUDirect), and real installations have
+  been observed to *silently corrupt* device messages in specific size
+  windows (e.g. UCX's ``cuda_ipc`` transport between consumer GPUs).
+  Forcing the host path trades some bandwidth for transfers that only
+  use plain ``cudaMemcpy``/``hipMemcpy``.
+
+.. code-block:: sh
+
+    # Force the host-staging fallback (kill switch)
+    MUGRID_GPU_AWARE_MPI=0 mpiexec -n 4 python3 my_solver.py
+
+    # Assert that the MPI stack is GPU-aware
+    MUGRID_GPU_AWARE_MPI=1 mpiexec -n 4 python3 my_solver.py
+
+Validating an installation
+--------------------------
+
+If you suspect the MPI/GPU stack, two quick checks help:
+
+* Run the MPI test suite on the GPU device::
+
+      mpiexec -n 2 python3 -m pytest tests/python_mpi_fft_tests.py -k gpu
+
+  with and without ``MUGRID_GPU_AWARE_MPI=0``. If results differ, the
+  GPU-aware path of your MPI installation is broken; keep the kill
+  switch on and report the issue to your MPI/UCX vendor.
+
+* Time the communication primitives with
+  ``benchmarks/communication_benchmark.py`` (per-axis halo exchange and
+  FFT/transpose timings). Per-call halo times should be milliseconds;
+  much larger values indicate that messages take a slow path.
 
 Performance considerations
 **************************

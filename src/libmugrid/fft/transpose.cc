@@ -38,6 +38,7 @@
 #include "core/exception.hh"
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
+#include "mpi/gpu_aware_mpi.hh"
 
 #include <algorithm>
 #include <numeric>
@@ -476,6 +477,25 @@ namespace muGrid {
         char * recv_staging{
             this->get_device_staging(1, recv_total * sizeof(Complex))};
 
+        // Without GPU-aware MPI, the flat exchange below operates on host
+        // bounce buffers instead of the device staging (correct with any
+        // MPI library); the pack/unpack stays on the device either way.
+        const bool bounce{!mpi_is_gpu_aware()};
+        char * send_buffer{send_staging};
+        char * recv_buffer{recv_staging};
+        if (bounce) {
+            auto & host_send{this->host_staging[0]};
+            auto & host_recv{this->host_staging[1]};
+            if (host_send.size() < send_total * sizeof(Complex)) {
+                host_send.resize(send_total * sizeof(Complex));
+            }
+            if (host_recv.size() < recv_total * sizeof(Complex)) {
+                host_recv.resize(recv_total * sizeof(Complex));
+            }
+            send_buffer = host_send.data();
+            recv_buffer = host_recv.data();
+        }
+
         // Pack: gather each peer's block into the contiguous send buffer
         for (int r{0}; r < comm_size; ++r) {
             if (src_counts[r] == 0) {
@@ -512,6 +532,10 @@ namespace muGrid {
         // host; MPI must not read the staging buffer before the gather is
         // complete.
         GPU_DEVICE_SYNCHRONIZE();
+        if (bounce && send_total > 0) {
+            GPU_MEMCPY_D2H(send_buffer, send_staging,
+                           send_total * sizeof(Complex));
+        }
 #endif
         // Pairwise ring exchange instead of MPI_Alltoallv: collective
         // components are not reliably GPU-aware, while point-to-point on
@@ -531,6 +555,7 @@ namespace muGrid {
                                    send_counts_el[my_rank]) *
                                sizeof(Complex)};
                     if (bytes > 0) {
+                        // The self block never leaves the device
                         strided_device_copy(
                             recv_staging + static_cast<std::size_t>(
                                                recv_displs_el[my_rank]) *
@@ -545,13 +570,13 @@ namespace muGrid {
                 int send_peer{(my_rank + step) % comm_size};
                 int recv_peer{(my_rank - step + comm_size) % comm_size};
                 MPI_Status status;
-                MPI_Sendrecv(send_staging +
+                MPI_Sendrecv(send_buffer +
                                  static_cast<std::size_t>(
                                      send_displs_el[send_peer]) *
                                      sizeof(Complex),
                              send_counts_el[send_peer], mpi_type<Complex>(),
                              send_peer, 0,
-                             recv_staging +
+                             recv_buffer +
                                  static_cast<std::size_t>(
                                      recv_displs_el[recv_peer]) *
                                      sizeof(Complex),
@@ -560,6 +585,29 @@ namespace muGrid {
             }
         }
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        if (bounce && recv_total > 0) {
+            // The self block (still on the device) occupies its slice of
+            // recv_staging; copying the bounced host data must not clobber
+            // it, so copy the two surrounding extents.
+            auto self_begin{static_cast<std::size_t>(
+                                recv_displs_el[this->comm.rank()]) *
+                            sizeof(Complex)};
+            auto self_end{self_begin +
+                          static_cast<std::size_t>(
+                              recv_counts_el[this->comm.rank()]) *
+                              sizeof(Complex)};
+            if (self_begin > 0) {
+                GPU_MEMCPY_H2D(recv_staging, recv_buffer, self_begin);
+            }
+            auto total_bytes{recv_total * sizeof(Complex)};
+            if (self_end < total_bytes) {
+                GPU_MEMCPY_H2D(recv_staging + self_end,
+                               recv_buffer + self_end,
+                               total_bytes - self_end);
+            }
+        }
+#endif
         // Unpack: scatter each peer's block from the contiguous receive
         // buffer into the output field. Runs on the default stream, so
         // subsequent kernels are ordered after it.

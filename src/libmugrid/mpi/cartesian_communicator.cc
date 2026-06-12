@@ -15,6 +15,7 @@
 
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
+#include "mpi/gpu_aware_mpi.hh"
 
 namespace muGrid {
 
@@ -366,11 +367,38 @@ namespace muGrid {
         // completed.
         GPU_DEVICE_SYNCHRONIZE();
 #endif
+        // Without GPU-aware MPI, bounce the contiguous staging buffers
+        // through host memory (correct with any MPI library).
+        const bool bounce{!mpi_is_gpu_aware()};
+        char * send_buffer{send_staging};
+        char * recv_buffer{recv_staging};
+        if (bounce) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            auto & host_send{this->host_staging[0]};
+            auto & host_recv{this->host_staging[1]};
+            if (host_send.size() < send_bytes) {
+                host_send.resize(send_bytes);
+            }
+            if (host_recv.size() < recv_bytes) {
+                host_recv.resize(recv_bytes);
+            }
+            if (send_bytes > 0) {
+                GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
+            }
+            send_buffer = host_send.data();
+            recv_buffer = host_recv.data();
+#endif
+        }
         MPI_Status status;
-        MPI_Sendrecv(send_staging, nb_send_blocks * send_block_len,
-                     mpi_datatype, dest_rank, 0, recv_staging,
+        MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
+                     mpi_datatype, dest_rank, 0, recv_buffer,
                      nb_recv_blocks * recv_block_len, mpi_datatype, src_rank, 0,
                      this->comm, &status);
+        if (bounce && recv_bytes > 0) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            GPU_MEMCPY_H2D(recv_staging, recv_buffer, recv_bytes);
+#endif
+        }
         if (recv_bytes > 0) {
             // Scatter the contiguous receive buffer into the strided halo.
             // This runs on the default stream, so subsequent kernels and the
@@ -562,7 +590,22 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
             GPU_DEVICE_SYNCHRONIZE();
 #endif
-            MPI_Sendrecv(send_staging, nb_send_blocks * send_block_len,
+            // Without GPU-aware MPI, bounce the contiguous send staging
+            // through host memory (the receive buffer is host already).
+            char * send_buffer{send_staging};
+            if (!mpi_is_gpu_aware()) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                auto & host_send{this->host_staging[0]};
+                if (host_send.size() < send_bytes) {
+                    host_send.resize(send_bytes);
+                }
+                if (send_bytes > 0) {
+                    GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
+                }
+                send_buffer = host_send.data();
+#endif
+            }
+            MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
                          mpi_datatype, this->right_ranks[direction], 0,
                          recv_buffer.data(), total_recv_elems, mpi_datatype,
                          this->left_ranks[direction], 0, this->comm, &status);
@@ -648,7 +691,22 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
             GPU_DEVICE_SYNCHRONIZE();
 #endif
-            MPI_Sendrecv(send_staging, nb_send_blocks * send_block_len,
+            // Without GPU-aware MPI, bounce the contiguous send staging
+            // through host memory (the receive buffer is host already).
+            char * send_buffer{send_staging};
+            if (!mpi_is_gpu_aware()) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                auto & host_send{this->host_staging[0]};
+                if (host_send.size() < send_bytes) {
+                    host_send.resize(send_bytes);
+                }
+                if (send_bytes > 0) {
+                    GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
+                }
+                send_buffer = host_send.data();
+#endif
+            }
+            MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
                          mpi_datatype, this->left_ranks[direction], 0,
                          recv_buffer.data(), total_recv_elems, mpi_datatype,
                          this->right_ranks[direction], 0, this->comm, &status);

@@ -17,9 +17,11 @@ on:
 # false 0%. The `coverage-gpu` job runs on the GPU-equipped runner with MPI
 # enabled, so the device communication paths (contiguous staging in the
 # transposes and the halo exchange) are exercised by the multi-rank ctest runs
-# sharing the single GPU. All legs upload to Codecov, which merges them. The
-# only remaining gap is CUDA __global__ kernel bodies, which gcov (host-only)
-# cannot instrument.
+# sharing the single GPU. The runner's stock OpenMPI is not GPU-aware; muGrid
+# detects this at runtime and bounces the staging buffers through host memory,
+# so this leg covers exactly the code path users with a plain MPI hit. All
+# legs upload to Codecov, which merges them. The only remaining gap is CUDA
+# __global__ kernel bodies, which gcov (host-only) cannot instrument.
 
 jobs:
   coverage:
@@ -185,7 +187,8 @@ jobs:
 
       # MPI is enabled so the multi-rank ctest runs (which oversubscribe the
       # single GPU) exercise the device communication paths: staged halo
-      # exchange and the staged FFT transposes.
+      # exchange and the staged FFT transposes, via the host-bounce fallback
+      # (stock OpenMPI is not GPU-aware).
       - name: Configure (coverage-instrumented, CUDA + MPI, Debug)
         run: |
           source venv/bin/activate

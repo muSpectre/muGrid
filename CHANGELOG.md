@@ -1,45 +1,14 @@
 Change log for µGrid
 ====================
 
-0.107.0 (11Jun26)
+0.107.0 (12Jun26)
 -----------------
 
-- ENH: Device halo exchange and FFT transposes now pack into contiguous
-  device staging buffers instead of handing strided MPI derived datatypes
-  to the MPI library (which packs them block by block on device memory,
-  orders of magnitude slower); multi-GPU stencil and FFT operations now
-  scale. Self-neighbor exchanges (periodic directions that are not
-  subdivided) short-circuit to a local device copy
-- ENH: FFT scratch buffers are cached across transforms instead of being
-  allocated per call; together with the removal of two unused
-  construction-time work fields this reduces device memory pressure and
-  eliminates per-transform cudaMalloc latency
-- ENH: `linalg.scal` accepts a real field as the multiplier, broadcast over
-  components (single-component alpha) or applied elementwise (alpha with
-  matching components), on host and device, for real and complex fields
-- ENH: `FourierPreconditioner` and `JacobiPreconditioner` apply through the
-  fused field kernels and run entirely on the device when the solver fields
-  live there; `JacobiPreconditioner` supports per-component diagonals
-- ENH: `muGrid.use_cupy_allocator()` routes all muGrid device allocations
-  through cupy's memory pool so that one allocator owns the GPU; this
-  prevents out-of-memory failures caused by cupy's pool caching memory that
-  muGrid's raw allocator cannot see (`set_device_allocator` provides the
-  generic hook)
-- ENH: `__dlpack__` honours the consumer's `stream` argument (synchronizes
-  for non-default streams)
-- ENH: New `Solvers.ConvergenceError` (a `RuntimeError` subclass) raised on
-  CG non-convergence, so genuine runtime errors (e.g. out of memory) are
-  distinguishable from non-convergence
-- ENH: All CUDA/HIP portability macros consolidated in a single shim header
-  (`memory/gpu_runtime.hh`); duplicated per-backend GPU wrapper code removed
-- ENH: New microbenchmark `benchmarks/communication_benchmark.py` for halo
-  exchange (per split axis) and FFT/transpose timings
-
-- API: `conjugate_gradients` now converges on a relative criterion by
-  default, ``||b - Ax|| <= max(rtol * ||b||, atol)`` with ``rtol=1e-6``,
-  ``atol=0``; the old absolute `tol` is deprecated (it maps to `atol` with
-  ``rtol=0``). An absolute criterion is unreachable in double precision
-  when ``||b||`` is large and was the cause of erratic CG termination
+- ENH: Multi-GPU halo exchange and FFT transposes now scale: contiguous
+  staging buffers (with a host bounce when MPI is not GPU-aware)
+  instead of strided MPI datatypes; FFT scratch is cached across transforms
+- ENH: Solvers run entirely on the device
+- API: `conjugate_gradients` now converges on a relative criterion
 - BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and
   GPU now sum the interior region directly instead of subtracting the ghost
   contribution from a full-buffer reduction (minimizing floating point overflows)
@@ -87,8 +56,9 @@ Change log for µGrid
   silently producing a wrong reduction
 - ENH: The 3D MPI FFT now uses a true pencil decomposition; per-rank memory
   scales as O(N³/P) and Fourier space distributes X across P2, Y across P1
-- ENH: MPI transposes are pure derived-datatype `MPI_Alltoallw` operations
-  (no pack/unpack), running directly on device buffers with a GPU-aware MPI
+- ENH: MPI transposes use pure derived-datatype `MPI_Alltoallw` operations
+  (no pack/unpack) on host buffers; device buffers use contiguous staging
+  (see above)
 - ENH: The FFT engine verifies at construction that its real- and
   Fourier-space collections use the same storage order
 - ENH: CMake now probes for C++20 standard-library support at configure time

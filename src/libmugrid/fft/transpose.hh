@@ -307,6 +307,9 @@ namespace muGrid {
         mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
         //! Sizes of the staging buffers in bytes
         mutable std::array<std::size_t, 2> device_staging_size{{0, 0}};
+        //! Host bounce buffers (send, recv) used when the MPI library is
+        //! not GPU-aware (see mpi/gpu_aware_mpi.hh)
+        mutable std::array<std::vector<char>, 2> host_staging{};
     };
 
 }  // namespace muGrid
