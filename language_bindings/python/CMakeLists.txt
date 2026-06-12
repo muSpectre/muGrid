@@ -85,6 +85,7 @@ install(TARGETS _muGrid
 # Install pure Python files
 install(FILES
     muGrid/__init__.py
+    muGrid/DeviceMemory.py
     muGrid/Field.py
     muGrid/linalg.py
     muGrid/Parallel.py
