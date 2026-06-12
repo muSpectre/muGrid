@@ -73,12 +73,6 @@ namespace muGrid {
         state.deallocate = deallocate;
     }
 
-    bool has_external_device_allocator() {
-        auto & state{allocator_state()};
-        std::lock_guard<std::mutex> lock{state.mutex};
-        return state.allocate != nullptr;
-    }
-
     void * device_allocate(std::size_t bytes) {
         if (bytes == 0) {
             return nullptr;
@@ -114,8 +108,11 @@ namespace muGrid {
         }
         return ptr;
 #else
+        // GCOVR_EXCL_START -- unreachable: device fields cannot be created
+        // in a build without a GPU backend
         throw RuntimeError(
             "device_allocate: muGrid was compiled without GPU support");
+        // GCOVR_EXCL_STOP
 #endif
     }
 

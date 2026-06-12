@@ -60,10 +60,10 @@ import pytest
 import muGrid
 from muGrid import linalg
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _collection(nb_grid_pts, nb_ghosts=1):
     g = (nb_ghosts,) * len(nb_grid_pts)
@@ -463,6 +463,54 @@ class TestGPUSubPoints:
         linalg.axpy(alpha, gx, gy)
         # Interior norm of the updated y must match between CPU and GPU.
         assert linalg.norm_sq(cy) == pytest.approx(linalg.norm_sq(gy), rel=1e-10)
+
+
+class TestFieldScal:
+    """scal with a field-valued alpha: broadcast and elementwise modes, on
+    both storage orders (host collections default to AoS; SoA is what GPU
+    collections use and is also constructible on the host)."""
+
+    @pytest.mark.parametrize(
+        "storage_order",
+        [muGrid.StorageOrder.ArrayOfStructures,
+         muGrid.StorageOrder.StructureOfArrays],
+    )
+    @pytest.mark.parametrize("complex_", [False, True])
+    @pytest.mark.parametrize("nb_alpha_components", [1, 2])
+    def test_scal_field_alpha(self, rng, storage_order, complex_,
+                              nb_alpha_components):
+        fc = muGrid.GlobalFieldCollection(
+            [7, 5], storage_order=storage_order
+        )
+        x = _make(fc, "x", components=(2,), complex_=complex_)
+        alpha = fc.real_field(
+            "alpha", () if nb_alpha_components == 1 else (2,)
+        )
+        x_before = _fill(x, rng, complex_=complex_)
+        alpha_values = _fill(alpha, rng)
+
+        linalg.scal(alpha, x)
+
+        # numpy reference: broadcast a single-component alpha over the
+        # components of x, apply a matching alpha elementwise
+        expected = x_before * alpha_values
+        np.testing.assert_allclose(np.array(x.sg), expected, atol=1e-14)
+
+    def test_scal_field_alpha_validation(self, rng):
+        fc = muGrid.GlobalFieldCollection([7, 5])
+        other = muGrid.GlobalFieldCollection([7, 5])
+        x = _make(fc, "x", components=(2,))
+        _fill(x, rng)
+
+        # alpha from a different collection is rejected
+        alpha_other = other.real_field("alpha")
+        with pytest.raises(RuntimeError, match="same collection"):
+            linalg.scal(alpha_other, x)
+
+        # component-count mismatch (neither 1 nor x's count) is rejected
+        alpha_bad = fc.real_field("alpha3", (3,))
+        with pytest.raises(RuntimeError, match="components"):
+            linalg.scal(alpha_bad, x)
 
 
 if __name__ == "__main__":

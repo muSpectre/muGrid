@@ -2,6 +2,12 @@ import os
 
 import numpy as np
 import pytest
+from conftest import (
+    create_device,
+    get_array_module,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 from NuMPI import MPI
 from NuMPI.Testing.Assertions import assert_all_allclose
 from NuMPI.Testing.Subdivision import suggest_subdivisions
@@ -623,3 +629,55 @@ def test_collection_field_creation(comm, nb_subdivisions):
 
     # Verify ghost values are properly filled (all ones for constant field)
     np.testing.assert_array_almost_equal(field.sg, 1.0)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_ghost_operations_devices(comm, device):
+    """Device communicate_ghosts and reduce_ghosts match the host results
+    (exercises the contiguous-staging device communication, including the
+    host-bounce fallback when MPI is not GPU-aware)."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    nb_domain_grid_pts = [8, 6, 4]
+    subdivisions = [comm.size, 1, 1]
+    ghosts = [1, 1, 1]
+
+    buffers = {}
+    for dev in ("cpu", device):
+        dec = muGrid.CartesianDecomposition(
+            comm,
+            nb_domain_grid_pts,
+            subdivisions,
+            ghosts,
+            ghosts,
+            device=create_device(dev),
+        )
+        field = dec.real_field("ghost_ops")
+        x, y, z = dec.coords
+        values = 100 * x + 10 * y + z  # globally unique interior values
+        arr = xp.asarray(values) if dev != "cpu" else values
+
+        # communicate_ghosts: ghosts get filled from the periodic neighbors
+        field.pg[...] = -1.0
+        field.p[...] = arr
+        dec.communicate_ghosts(field)
+        comm_result = field.sg
+        comm_result = (
+            comm_result.get() if hasattr(comm_result, "get")
+            else np.array(comm_result)
+        )
+
+        # reduce_ghosts: ghost values accumulate onto the interior
+        field.pg[...] = 2.0
+        field.p[...] = arr
+        dec.reduce_ghosts(field)
+        reduce_result = field.sg
+        reduce_result = (
+            reduce_result.get() if hasattr(reduce_result, "get")
+            else np.array(reduce_result)
+        )
+
+        buffers[dev] = (comm_result, reduce_result)
+
+    np.testing.assert_allclose(buffers[device][0], buffers["cpu"][0])
+    np.testing.assert_allclose(buffers[device][1], buffers["cpu"][1])

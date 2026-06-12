@@ -323,6 +323,10 @@ class CupyAllocatorTests(unittest.TestCase):
 
     def test_field_memory_from_cupy_pool(self):
         muGrid.use_cupy_allocator()
+        # Drop garbage from earlier tests so the pool baseline is stable
+        import gc
+
+        gc.collect()
         pool = cp.get_default_memory_pool()
         used_before = pool.used_bytes()
 
@@ -339,8 +343,6 @@ class CupyAllocatorTests(unittest.TestCase):
 
         # Destroying the collection returns the memory to the pool
         del field, fc
-        import gc
-
         gc.collect()
         self.assertEqual(pool.used_bytes(), used_before)
 

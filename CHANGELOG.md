@@ -9,6 +9,9 @@ Change log for µGrid
   instead of strided MPI datatypes; FFT scratch is cached across transforms
 - ENH: Solvers run entirely on the device
 - API: `conjugate_gradients` now converges on a relative criterion
+- BUG: Fixed device `reduce_ghosts` silently dropping all contributions
+  received from MPI neighbors (the host receive buffer was treated as device
+  memory during accumulation); found by a new device-vs-host equivalence test
 - BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and
   GPU now sum the interior region directly instead of subtracting the ghost
   contribution from a full-buffer reduction (minimizing floating point overflows)

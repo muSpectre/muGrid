@@ -65,9 +65,6 @@ namespace muGrid {
     void set_device_allocator(DeviceAllocateFn allocate,
                               DeviceDeallocateFn deallocate);
 
-    //! True if an external device allocator is registered.
-    bool has_external_device_allocator();
-
     /**
      * Allocate `bytes` bytes of device memory through the registered
      * allocator (or raw cudaMalloc/hipMalloc by default). Throws

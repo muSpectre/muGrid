@@ -49,9 +49,12 @@ namespace muGrid {
                 GPU_MEMCPY_2D_D2D(dst, dst_pitch, src, src_pitch, block_len,
                                   nb_blocks);
 #else
+                // GCOVR_EXCL_START -- unreachable: device fields cannot be
+                // created in a build without a GPU backend
                 throw RuntimeError(
                     "device_memcpy_strided: muGrid was compiled without GPU "
                     "support");
+                // GCOVR_EXCL_STOP
 #endif
             } else {
                 // Host memory: use loop of memcpy
@@ -79,40 +82,34 @@ namespace muGrid {
          */
         template <typename T>
         void device_accumulate_typed(T * dst, const T * src, size_t nb_elements,
-                                     bool is_device_memory) {
-            if (is_device_memory) {
+                                     bool dst_on_device, bool src_on_device) {
+            if (dst_on_device) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-                // For device memory, copy to host, accumulate, copy back
+                // For device memory, copy to host, accumulate, copy back.
                 // This is not optimal but works for correctness.
                 // A proper implementation would use a GPU kernel.
                 std::vector<T> host_dst(nb_elements);
-                std::vector<T> host_src(nb_elements);
-#if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(host_dst.data(), dst, nb_elements * sizeof(T),
-                           cudaMemcpyDeviceToHost);
-                cudaMemcpy(host_src.data(), src, nb_elements * sizeof(T),
-                           cudaMemcpyDeviceToHost);
-#elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(T),
-                                hipMemcpyDeviceToHost);
-                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(T),
-                                hipMemcpyDeviceToHost);
-#endif
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    host_dst[i] += host_src[i];
+                GPU_MEMCPY_D2H(host_dst.data(), dst, nb_elements * sizeof(T));
+                const T * src_values{src};
+                std::vector<T> host_src{};
+                if (src_on_device) {
+                    host_src.resize(nb_elements);
+                    GPU_MEMCPY_D2H(host_src.data(), src,
+                                   nb_elements * sizeof(T));
+                    src_values = host_src.data();
                 }
-#if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(T),
-                           cudaMemcpyHostToDevice);
-#elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(T),
-                                hipMemcpyHostToDevice);
-#endif
+                for (size_t i{0}; i < nb_elements; ++i) {
+                    host_dst[i] += src_values[i];
+                }
+                GPU_MEMCPY_H2D(dst, host_dst.data(), nb_elements * sizeof(T));
 #else
-                // Fallback: should not happen
+                // GCOVR_EXCL_START -- unreachable: device fields cannot be
+                // created in a build without a GPU backend
+                (void)src_on_device;
                 for (size_t i{0}; i < nb_elements; ++i) {
                     dst[i] += src[i];
                 }
+                // GCOVR_EXCL_STOP
 #endif
             } else {
                 for (size_t i{0}; i < nb_elements; ++i) {
@@ -133,32 +130,37 @@ namespace muGrid {
          */
         void accumulate_elements(char * dst, const char * src,
                                  size_t nb_elements, TypeDescriptor type_desc,
-                                 bool is_device_memory) {
+                                 bool dst_on_device, bool src_on_device) {
             switch (type_desc) {
             case TypeDescriptor::Real:
                 device_accumulate_typed(reinterpret_cast<Real *>(dst),
                                         reinterpret_cast<const Real *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Complex:
                 device_accumulate_typed(reinterpret_cast<Complex *>(dst),
                                         reinterpret_cast<const Complex *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Int:
                 device_accumulate_typed(reinterpret_cast<Int *>(dst),
                                         reinterpret_cast<const Int *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Uint:
                 device_accumulate_typed(reinterpret_cast<Uint *>(dst),
                                         reinterpret_cast<const Uint *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Index:
                 device_accumulate_typed(reinterpret_cast<Index_t *>(dst),
                                         reinterpret_cast<const Index_t *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             default:
                 throw std::runtime_error(
@@ -224,7 +226,8 @@ namespace muGrid {
                     base_data +
                     send_offset * stride_in_direction * elem_size_in_bytes};
                 accumulate_elements(recv_addr, send_addr, send_block_len,
-                                    type_desc, is_device_memory);
+                                    type_desc, is_device_memory,
+                                    is_device_memory);
                 base_data += block_stride * elem_size_in_bytes;
             }
         }
@@ -635,7 +638,7 @@ namespace muGrid {
                                      block * block_stride) * elem_size_in_bytes};
             accumulate_elements(dest_addr, recv_ptr,
                                 static_cast<size_t>(recv_block_len), type_desc,
-                                is_device_memory);
+                                is_device_memory, false);
             recv_ptr += recv_block_len * elem_size_in_bytes;
         }
     }
@@ -735,7 +738,7 @@ namespace muGrid {
                                      block * block_stride) * elem_size_in_bytes};
             accumulate_elements(dest_addr, recv_ptr,
                                 static_cast<size_t>(recv_block_len), type_desc,
-                                is_device_memory);
+                                is_device_memory, false);
             recv_ptr += recv_block_len * elem_size_in_bytes;
         }
     }

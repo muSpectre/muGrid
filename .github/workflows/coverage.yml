@@ -217,13 +217,16 @@ jobs:
       # ctest hides a passing test's stdout, so the device test outcomes are not
       # otherwise visible. Re-run the Python tests with -v -rA so the log shows
       # exactly which GPU tests executed (vs. skipped) and their result. Failures
-      # here surface as the device tests actually running.
-      - name: Inspect Python test outcomes on GPU
+      # here surface as the device tests actually running. This run also
+      # measures the Python wrapper layer with pytest-cov: GPU-only wrapper
+      # code (e.g. DeviceMemory.py) can only be covered on this leg.
+      - name: Inspect Python test outcomes on GPU (with coverage)
         run: |
           source venv/bin/activate
           export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
           export TESTS_BUILDDIR=$PWD/build/tests
-          python3 -m pytest tests -v -rA -p no:cacheprovider
+          python3 -m pytest tests -v -rA -p no:cacheprovider \
+            --cov=muGrid --cov-report=xml:build/coverage-python.xml
 
       - name: Generate C++ coverage reports
         run: |
@@ -236,6 +239,7 @@ jobs:
           name: coverage-reports-gpu
           path: |
             build/coverage.xml
+            build/coverage-python.xml
             build/coverage_html/
           if-no-files-found: warn
 
@@ -244,6 +248,6 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: build/coverage.xml
+          files: build/coverage.xml,build/coverage-python.xml
           flags: gpu
           fail_ci_if_error: false

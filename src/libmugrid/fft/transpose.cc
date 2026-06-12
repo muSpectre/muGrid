@@ -396,6 +396,8 @@ namespace muGrid {
             GPU_MEMCPY_2D_D2D(dst, dst_pitch_bytes, src, src_pitch_bytes,
                               width_bytes, nb_rows);
 #else
+            // GCOVR_EXCL_START -- unreachable: device transposes require
+            // device fields, which cannot exist in a non-GPU build
             (void)dst;
             (void)src;
             (void)width_bytes;
@@ -403,6 +405,7 @@ namespace muGrid {
             (void)dst_pitch_bytes;
             (void)src_pitch_bytes;
             throw RuntimeError("Transpose: device data requires a GPU build");
+            // GCOVR_EXCL_STOP
 #endif
         }
     }  // namespace
