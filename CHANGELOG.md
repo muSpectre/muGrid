@@ -4,6 +4,37 @@ Change log for µGrid
 0.107.0 (11Jun26)
 -----------------
 
+- ENH: Device halo exchange and FFT transposes now pack into contiguous
+  device staging buffers instead of handing strided MPI derived datatypes
+  to the MPI library (which packs them block by block on device memory,
+  orders of magnitude slower); multi-GPU stencil and FFT operations now
+  scale. Self-neighbor exchanges (periodic directions that are not
+  subdivided) short-circuit to a local device copy
+- ENH: FFT scratch buffers are cached across transforms instead of being
+  allocated per call; together with the removal of two unused
+  construction-time work fields this reduces device memory pressure and
+  eliminates per-transform cudaMalloc latency
+- ENH: `linalg.scal` accepts a real field as the multiplier, broadcast over
+  components (single-component alpha) or applied elementwise (alpha with
+  matching components), on host and device, for real and complex fields
+- ENH: `FourierPreconditioner` and `JacobiPreconditioner` apply through the
+  fused field kernels and run entirely on the device when the solver fields
+  live there; `JacobiPreconditioner` supports per-component diagonals
+- ENH: `muGrid.use_cupy_allocator()` routes all muGrid device allocations
+  through cupy's memory pool so that one allocator owns the GPU; this
+  prevents out-of-memory failures caused by cupy's pool caching memory that
+  muGrid's raw allocator cannot see (`set_device_allocator` provides the
+  generic hook)
+- ENH: `__dlpack__` honours the consumer's `stream` argument (synchronizes
+  for non-default streams)
+- ENH: New `Solvers.ConvergenceError` (a `RuntimeError` subclass) raised on
+  CG non-convergence, so genuine runtime errors (e.g. out of memory) are
+  distinguishable from non-convergence
+- ENH: All CUDA/HIP portability macros consolidated in a single shim header
+  (`memory/gpu_runtime.hh`); duplicated per-backend GPU wrapper code removed
+- ENH: New microbenchmark `benchmarks/communication_benchmark.py` for halo
+  exchange (per split axis) and FFT/transpose timings
+
 - API: `conjugate_gradients` now converges on a relative criterion by
   default, ``||b - Ax|| <= max(rtol * ||b||, atol)`` with ``rtol=1e-6``,
   ``atol=0``; the old absolute `tol` is deprecated (it maps to `atol` with

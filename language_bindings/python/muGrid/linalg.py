@@ -94,14 +94,26 @@ def scal(alpha, x):
     """
     Scale operation: x = alpha * x (full buffer).
 
+    Following BLAS *scal, but alpha may also be a real field on the same
+    collection, applied per pixel: a single-component alpha is broadcast
+    over the components of x (e.g. the inverse symbol of an operator in
+    a Fourier-space preconditioner), an alpha with x's number of
+    components is applied elementwise (e.g. a per-component Jacobi
+    diagonal). Works on host and device fields; x may be real or
+    complex.
+
     Parameters
     ----------
-    alpha : float or complex
-        Scalar multiplier
+    alpha : float, complex or Field
+        Scalar multiplier, or a real field of per-pixel multipliers with
+        one or x's number of components
     x : Field
         Input/output field (modified in place)
     """
-    _linalg.scal(alpha, _get_cpp(x))
+    if hasattr(alpha, "_cpp") or not isinstance(alpha, (int, float, complex)):
+        _linalg.scal(_get_cpp(alpha), _get_cpp(x))
+    else:
+        _linalg.scal(alpha, _get_cpp(x))
 
 
 def axpby(alpha, x, beta, y):
@@ -167,22 +179,3 @@ def axpy_norm_sq(alpha, x, y):
 
 
 __all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy", "axpy_norm_sq"]
-
-
-def pointwise_scale(x, kernel):
-    """
-    Pointwise spectral scale: ``x[c, i] *= kernel[i]`` for every component.
-
-    Multiplies each component of a complex field elementwise by a
-    single-component real field on the same collection, e.g. the inverse
-    symbol of an operator in a Fourier-space preconditioner. Works on host
-    and device fields.
-
-    Parameters
-    ----------
-    x : Field
-        Complex input/output field (modified in place)
-    kernel : Field
-        Real single-component field of multipliers
-    """
-    _linalg.pointwise_scale(_get_cpp(x), _get_cpp(kernel))

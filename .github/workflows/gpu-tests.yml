@@ -95,6 +95,8 @@ jobs:
           cd tests
           python3 -m pytest python_field_gpu_tests.py -v -s
           python3 -m pytest python_fem_gradient_gpu_tests.py -v -s
+          # Device-parameterized tests (run their [gpu] variants here)
+          python3 -m pytest python_preconditioner_tests.py -v -s
 
       - name: Run Poisson example (host)
         run: |

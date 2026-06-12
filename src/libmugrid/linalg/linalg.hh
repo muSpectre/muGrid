@@ -177,21 +177,62 @@ T axpy_norm_sq(T alpha,
                TypedField<T, MemorySpace>& y);
 
 /**
- * Pointwise spectral scale: x[c, i] *= kernel[i] for every component c.
+ * Scale operation with per-pixel multiplier: x[c, i] *= alpha[c, i].
  *
- * Multiplies each component of a complex field elementwise by a
- * single-component real field on the same collection (e.g. the inverse
- * symbol of an operator in a Fourier-space preconditioner). Operates on
- * the FULL buffer; both fields must belong to the same (ghost-free
- * Fourier) collection.
+ * Overload of scal() where alpha generalizes from a scalar to a real
+ * field on the same collection. A single-component alpha is broadcast
+ * over the components of x (e.g. the inverse symbol of an operator in a
+ * Fourier-space preconditioner); an alpha with the same number of
+ * components as x is applied elementwise (e.g. a per-component Jacobi
+ * diagonal). Operates on the FULL buffer; entries of alpha in ghost
+ * pixels scale the corresponding ghost entries of x.
  *
  * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ * @param alpha Real field of multipliers (1 or x's number of components)
  * @param x Complex input/output field (modified in place)
- * @param kernel Real single-component field of multipliers
  */
 template <typename MemorySpace>
-void pointwise_scale(TypedField<Complex, MemorySpace>& x,
-                     const TypedField<Real, MemorySpace>& kernel);
+void scal(const TypedField<Real, MemorySpace>& alpha,
+          TypedField<Complex, MemorySpace>& x);
+
+/**
+ * Scale operation with per-pixel multiplier: x[c, i] *= alpha[c, i].
+ *
+ * Real-field variant of the overload above, with the same broadcast
+ * rules; together with copy() this runs a Jacobi preconditioner
+ * entirely on the device.
+ *
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ * @param alpha Real field of multipliers (1 or x's number of components)
+ * @param x Real input/output field (modified in place)
+ */
+template <typename MemorySpace>
+void scal(const TypedField<Real, MemorySpace>& alpha,
+          TypedField<Real, MemorySpace>& x);
+
+namespace internal {
+
+    //! Validate a field-valued alpha for scal(): same collection, same
+    //! number of entries, and one or x's number of components
+    template <typename AlphaField, typename XField>
+    void check_field_alpha(const AlphaField& alpha, const XField& x) {
+        if (&x.get_collection() != &alpha.get_collection()) {
+            throw FieldError(
+                "scal: fields must belong to the same collection");
+        }
+        if (alpha.get_nb_entries() != x.get_nb_entries()) {
+            throw FieldError(
+                "scal: fields must have the same number of entries");
+        }
+        if (alpha.get_nb_components() != 1 &&
+            alpha.get_nb_components() != x.get_nb_components()) {
+            throw FieldError(
+                "scal: the field-valued alpha must have a single component "
+                "(broadcast) or the same number of components as x");
+        }
+    }
+
+}  // namespace internal
 
 }  // namespace linalg
 }  // namespace muGrid

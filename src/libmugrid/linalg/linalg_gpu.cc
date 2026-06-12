@@ -304,17 +304,35 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
     }
 }
 
-// Pointwise spectral scale: complex x scaled by real kernel, broadcast
-// over components. Operates on the doubles of the complex buffer to
-// avoid complex arithmetic in device code.
-__global__ void pointwise_scale_kernel(Real* x2, const Real* k,
-                                       Index_t npix, Index_t ncomp,
-                                       bool soa, Index_t n2) {
+// Scale complex x by a real per-pixel field alpha; alpha is either
+// broadcast over the components of x (alpha_per_comp == false) or
+// applied elementwise (alpha has x's components). Operates on the
+// doubles of the complex buffer to avoid complex arithmetic in device
+// code.
+__global__ void field_scal_complex_kernel(Real* x2, const Real* a,
+                                          Index_t npix, Index_t ncomp,
+                                          bool soa, bool alpha_per_comp,
+                                          Index_t n2) {
     Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
     if (j < n2) {
-        Index_t pair = j >> 1;  // complex element index
-        Index_t i = soa ? (pair % npix) : (pair / ncomp);
-        x2[j] *= k[i];
+        Index_t elem = j >> 1;  // complex element index
+        Index_t i = alpha_per_comp
+                        ? elem
+                        : (soa ? (elem % npix) : (elem / ncomp));
+        x2[j] *= a[i];
+    }
+}
+
+// Real variant of the kernel above
+__global__ void field_scal_real_kernel(Real* x, const Real* a,
+                                       Index_t npix, Index_t ncomp,
+                                       bool soa, bool alpha_per_comp,
+                                       Index_t n) {
+    Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (j < n) {
+        Index_t i =
+            alpha_per_comp ? j : (soa ? (j % npix) : (j / ncomp));
+        x[j] *= a[i];
     }
 }
 
@@ -629,33 +647,48 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
 
 /* ---------------------------------------------------------------------- */
 template <>
-void pointwise_scale<DeviceSpace>(TypedField<Complex, DeviceSpace>& x,
-                                  const TypedField<Real, DeviceSpace>& kernel) {
-    if (&x.get_collection() != &kernel.get_collection()) {
-        throw FieldError(
-            "pointwise_scale: fields must belong to the same collection");
-    }
-    if (kernel.get_nb_components() != 1) {
-        throw FieldError(
-            "pointwise_scale: kernel must have a single component");
-    }
-    if (kernel.get_nb_entries() != x.get_nb_entries()) {
-        throw FieldError(
-            "pointwise_scale: fields must have the same number of entries");
-    }
+void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
+                       TypedField<Complex, DeviceSpace>& x) {
+    internal::check_field_alpha(alpha, x);
 
     const Index_t npix = x.get_nb_entries();
     const Index_t ncomp = x.get_nb_components();
     const Index_t n2 = npix * ncomp * 2;
     const bool soa =
         (x.get_storage_order() == StorageOrder::StructureOfArrays);
+    const bool alpha_per_comp = (alpha.get_nb_components() == ncomp &&
+                                 ncomp != 1);
     const int num_blocks = (n2 + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
-    GPU_LAUNCH_KERNEL(gpu_kernels::pointwise_scale_kernel,
+    GPU_LAUNCH_KERNEL(gpu_kernels::field_scal_complex_kernel,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       reinterpret_cast<Real*>(x.view().data()),
-                      kernel.view().data(), npix, ncomp, soa, n2);
+                      alpha.view().data(), npix, ncomp, soa,
+                      alpha_per_comp, n2);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
+                       TypedField<Real, DeviceSpace>& x) {
+    internal::check_field_alpha(alpha, x);
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    const Index_t n = npix * ncomp;
+    const bool soa =
+        (x.get_storage_order() == StorageOrder::StructureOfArrays);
+    const bool alpha_per_comp = (alpha.get_nb_components() == ncomp &&
+                                 ncomp != 1);
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::field_scal_real_kernel,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      x.view().data(), alpha.view().data(), npix, ncomp,
+                      soa, alpha_per_comp, n);
     GPU_DEVICE_SYNCHRONIZE();
 }
 
