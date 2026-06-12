@@ -424,5 +424,43 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
     return y.eigen_vec().squaredNorm();
 }
 
+/* ---------------------------------------------------------------------- */
+template <>
+void pointwise_scale<HostSpace>(TypedField<Complex, HostSpace>& x,
+                                const TypedField<Real, HostSpace>& kernel) {
+    if (&x.get_collection() != &kernel.get_collection()) {
+        throw FieldError(
+            "pointwise_scale: fields must belong to the same collection");
+    }
+    if (kernel.get_nb_components() != 1) {
+        throw FieldError(
+            "pointwise_scale: kernel must have a single component");
+    }
+    if (kernel.get_nb_entries() != x.get_nb_entries()) {
+        throw FieldError(
+            "pointwise_scale: fields must have the same number of entries");
+    }
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    Complex* xd = x.view().data();
+    const Real* kd = kernel.view().data();
+
+    if (x.get_storage_order() == StorageOrder::StructureOfArrays) {
+        for (Index_t c{0}; c < ncomp; ++c) {
+            Complex* xc = xd + c * npix;
+            for (Index_t i{0}; i < npix; ++i) {
+                xc[i] *= kd[i];
+            }
+        }
+    } else {
+        for (Index_t i{0}; i < npix; ++i) {
+            for (Index_t c{0}; c < ncomp; ++c) {
+                xd[i * ncomp + c] *= kd[i];
+            }
+        }
+    }
+}
+
 }  // namespace linalg
 }  // namespace muGrid

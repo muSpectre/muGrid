@@ -267,6 +267,25 @@ void add_linalg_functions(py::module &mod) {
         "alpha"_a, "x"_a, "y"_a,
         "Fused AXPY + norm_sq for complex fields: y = alpha * x + y, returns ||y||².");
 
+    linalg.def("pointwise_scale",
+        static_cast<void (*)(ComplexFieldHost&, const RealFieldHost&)>(
+            &muGrid::linalg::pointwise_scale<HostSpace>),
+        "x"_a, "kernel"_a,
+        R"pbdoc(
+        Pointwise spectral scale: x[c, i] *= kernel[i] for every component c.
+
+        Multiplies each component of a complex field elementwise by a
+        single-component real field on the same collection (e.g. the
+        inverse symbol of an operator in a Fourier-space preconditioner).
+
+        Parameters
+        ----------
+        x : ComplexField
+            Complex input/output field (modified in place)
+        kernel : RealField
+            Real single-component field of multipliers
+        )pbdoc");
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---
 
@@ -311,6 +330,12 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::axpy_norm_sq<Real, DeviceSpace>),
         "alpha"_a, "x"_a, "y"_a,
         "Fused AXPY + norm_sq on device (GPU): y = alpha * x + y, returns ||y||².");
+
+    linalg.def("pointwise_scale",
+        static_cast<void (*)(ComplexFieldDevice&, const RealFieldDevice&)>(
+            &muGrid::linalg::pointwise_scale<DeviceSpace>),
+        "x"_a, "kernel"_a,
+        "Pointwise spectral scale on device (GPU): x[c, i] *= kernel[i].");
 
     // --- Complex field operations (device) ---
 

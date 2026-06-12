@@ -64,6 +64,11 @@ device_arch = _muGrid.device_arch
 Device = _muGrid.Device
 DeviceType = _muGrid.DeviceType
 
+from .DeviceMemory import (  # noqa: F401, E402
+    clear_device_allocator,
+    set_device_allocator,
+    use_cupy_allocator,
+)
 
 # Cache for runtime GPU availability check
 _gpu_available_cache = None

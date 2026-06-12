@@ -168,9 +168,24 @@ class FourierPreconditioner(Preconditioner):
                 f"Fourier subdomain {expected} of the FFT engine"
             )
 
-        # Fold the inverse-transform normalisation into the kernel so apply()
-        # is a single pointwise multiplication.
-        self._kernel = kernel * engine.normalisation
+        # Store the kernel in a real field on the engine's Fourier
+        # collection (host or device, matching the work fields) and fold
+        # the inverse-transform normalisation in, so apply() is a single
+        # linalg.pointwise_scale with no array-library dependence in the
+        # hot loop.
+        self._kernel_field = engine.fourier_space_collection.real_field(
+            f"{name}-kernel"
+        )
+        values = kernel * engine.normalisation
+        s = self._kernel_field.s
+        try:
+            s[...] = values
+        except (TypeError, ValueError):
+            # Device view: cupy's __setitem__ does not accept numpy
+            # sources; convert once at setup.
+            import cupy
+
+            s[...] = cupy.asarray(values)
 
     def _work_field(self, components_shape):
         key = tuple(components_shape)
@@ -195,19 +210,9 @@ class FourierPreconditioner(Preconditioner):
         engine = self._engine
         with self._timed("fft"):
             engine.fft(r, work)
-        s = work.s
-        kernel = self._kernel
-        if type(s).__module__.partition(".")[0] == "cupy":
-            # Device fields: move the kernel over once, lazily.
-            import cupy
-
-            kernel = cupy.asarray(kernel)
-            self._kernel = kernel
-        # Broadcasts over leading component axes; normalisation is folded in.
-        # In-place multiply on the view, NOT `s[...] *= kernel`: cupy's
-        # __setitem__ materialises a contiguous copy of the whole strided
-        # field (1 GiB at 512^3).
+        # Fused C++ kernel, host or device; broadcasts over components and
+        # has the inverse-transform normalisation folded in.
         with self._timed("scale"):
-            s *= kernel
+            linalg.pointwise_scale(work, self._kernel_field)
         with self._timed("ifft"):
             engine.ifft(work, z)

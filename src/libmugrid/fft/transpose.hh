@@ -50,6 +50,8 @@
 #include "core/coordinates.hh"
 #include "mpi/communicator.hh"
 
+#include <array>
+#include <cstddef>
 #include <vector>
 
 #ifdef WITH_MPI
@@ -97,12 +99,21 @@ namespace muGrid {
          * distributed)
          * @param nb_components  Number of field components (default: 1)
          * @param layout         Memory layout for multi-component fields
+         * @param on_device      True if the data pointers passed to
+         *                       forward()/backward() are device memory. Device
+         *                       transposes are staged through contiguous
+         *                       buffers instead of derived datatypes: MPI
+         *                       implementations pack strided datatypes on
+         *                       device memory block by block, which is orders
+         *                       of magnitude slower than a device-side gather
+         *                       followed by a contiguous all-to-all.
          */
         Transpose(const Communicator & comm, const DynGridIndex & local_in,
                   const DynGridIndex & local_out, Index_t global_in,
                   Index_t global_out, Index_t axis_in, Index_t axis_out,
                   Index_t nb_components = 1,
-                  StorageOrder layout = StorageOrder::ArrayOfStructures);
+                  StorageOrder layout = StorageOrder::ArrayOfStructures,
+                  bool on_device = false);
 
         Transpose() = delete;
         Transpose(const Transpose & other) = delete;
@@ -186,7 +197,29 @@ namespace muGrid {
          * Initialize datatypes for backward transpose.
          */
         void init_backward_types();
+
+        /**
+         * All-to-all through contiguous device staging buffers: gather each
+         * peer's subarray block of `input` into a flat send buffer
+         * (one strided 2D copy per block), MPI_Alltoallv, scatter the flat
+         * receive buffer into `output`. Block geometry: full extent in all
+         * dimensions except `src_axis`/`dst_axis`, where peer r owns
+         * `src_counts[r]` slices starting at `src_displs[r]`.
+         */
+        void staged_alltoall(const Complex * input, Complex * output,
+                             const DynGridIndex & src_shape, Index_t src_axis,
+                             const std::vector<Index_t> & src_counts,
+                             const std::vector<Index_t> & src_displs,
+                             const DynGridIndex & dst_shape, Index_t dst_axis,
+                             const std::vector<Index_t> & dst_counts,
+                             const std::vector<Index_t> & dst_displs) const;
+
+        //! Cached contiguous device staging buffer (slot 0: send, 1: recv)
+        char * get_device_staging(std::size_t slot, std::size_t size) const;
 #endif
+
+        //! Release the device staging buffers
+        void free_staging();
 
         /**
          * Compute how a dimension is distributed across ranks.
@@ -263,6 +296,14 @@ namespace muGrid {
 
         //! Flag indicating if datatypes have been initialized
         bool types_initialized{false};
+
+        //! True if forward()/backward() receive device pointers
+        bool on_device{false};
+
+        //! Contiguous device staging buffers (send, recv), grown on demand
+        mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
+        //! Sizes of the staging buffers in bytes
+        mutable std::array<std::size_t, 2> device_staging_size{{0, 0}};
     };
 
 }  // namespace muGrid

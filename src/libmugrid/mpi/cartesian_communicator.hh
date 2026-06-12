@@ -38,6 +38,9 @@
 #include <mpi.h>
 #endif
 
+#include <array>
+#include <cstddef>
+
 #include "core/coordinates.hh"
 #include "core/type_descriptor.hh"
 #include "mpi/communicator.hh"
@@ -403,6 +406,36 @@ namespace muGrid {
         //! true for the instance that created the topology via MPI_Cart_create;
         //! copies share the handle without taking ownership.
         bool owns_comm{false};
+
+        /**
+         * Return a cached contiguous device staging buffer of at least
+         * `size` bytes (slot 0: send, slot 1: receive). Strided device
+         * halos are packed into these buffers before communication: MPI
+         * implementations pack strided datatypes on device memory block
+         * by block, which is orders of magnitude slower than a device-side
+         * gather followed by a contiguous transfer. Buffers grow on
+         * demand and live for the communicator's lifetime; they are
+         * per-instance and not copied.
+         */
+        char * get_device_staging(std::size_t slot, std::size_t size) const;
+
+        /**
+         * Exchange strided device data through contiguous staging buffers:
+         * pack (device gather) → MPI_Sendrecv of flat bytes → unpack
+         * (device scatter). Used instead of strided derived datatypes for
+         * device memory; see get_device_staging.
+         */
+        void sendrecv_staged(int block_stride, int nb_send_blocks,
+                             int send_block_len, int nb_recv_blocks,
+                             int recv_block_len, void * send_addr,
+                             void * recv_addr, int elem_size_in_bytes,
+                             MPI_Datatype mpi_datatype, int dest_rank,
+                             int src_rank) const;
+
+        //! Contiguous device staging buffers for halo exchange (send, recv)
+        mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
+        //! Sizes of the staging buffers in bytes
+        mutable std::array<std::size_t, 2> device_staging_size{{0, 0}};
 #endif  // WITH_MPI
     };
 }  // namespace muGrid

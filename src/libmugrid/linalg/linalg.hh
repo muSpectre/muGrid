@@ -176,6 +176,23 @@ T axpy_norm_sq(T alpha,
                const TypedField<T, MemorySpace>& x,
                TypedField<T, MemorySpace>& y);
 
+/**
+ * Pointwise spectral scale: x[c, i] *= kernel[i] for every component c.
+ *
+ * Multiplies each component of a complex field elementwise by a
+ * single-component real field on the same collection (e.g. the inverse
+ * symbol of an operator in a Fourier-space preconditioner). Operates on
+ * the FULL buffer; both fields must belong to the same (ghost-free
+ * Fourier) collection.
+ *
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ * @param x Complex input/output field (modified in place)
+ * @param kernel Real single-component field of multipliers
+ */
+template <typename MemorySpace>
+void pointwise_scale(TypedField<Complex, MemorySpace>& x,
+                     const TypedField<Real, MemorySpace>& kernel);
+
 }  // namespace linalg
 }  // namespace muGrid
 

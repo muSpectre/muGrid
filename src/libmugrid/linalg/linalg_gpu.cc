@@ -42,28 +42,11 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
-// Unified GPU abstraction macros
+#include "memory/gpu_runtime.hh"
+
 #if defined(MUGRID_ENABLE_CUDA)
-    #include <cuda_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-        kernel<<<grid, block>>>(__VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
-    #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
-    #define GPU_FREE(ptr) (void)cudaFree(ptr)
-    #define GPU_MEMCPY_D2H(dst, src, size) \
-        (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
-    #define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
     using DeviceSpace = muGrid::CUDASpace;
 #elif defined(MUGRID_ENABLE_HIP)
-    #include <hip/hip_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-        hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
-    #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
-    #define GPU_FREE(ptr) (void)hipFree(ptr)
-    #define GPU_MEMCPY_D2H(dst, src, size) \
-        (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
-    #define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
     using DeviceSpace = muGrid::ROCmSpace;
 #endif
 
@@ -318,6 +301,20 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
     // Write final result
     if (tid == 0) {
         data[0] = shared_data[0];
+    }
+}
+
+// Pointwise spectral scale: complex x scaled by real kernel, broadcast
+// over components. Operates on the doubles of the complex buffer to
+// avoid complex arithmetic in device code.
+__global__ void pointwise_scale_kernel(Real* x2, const Real* k,
+                                       Index_t npix, Index_t ncomp,
+                                       bool soa, Index_t n2) {
+    Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (j < n2) {
+        Index_t pair = j >> 1;  // complex element index
+        Index_t i = soa ? (pair % npix) : (pair / ncomp);
+        x2[j] *= k[i];
     }
 }
 
@@ -628,6 +625,38 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
     GPU_FREE(d_partial);
     return result;
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void pointwise_scale<DeviceSpace>(TypedField<Complex, DeviceSpace>& x,
+                                  const TypedField<Real, DeviceSpace>& kernel) {
+    if (&x.get_collection() != &kernel.get_collection()) {
+        throw FieldError(
+            "pointwise_scale: fields must belong to the same collection");
+    }
+    if (kernel.get_nb_components() != 1) {
+        throw FieldError(
+            "pointwise_scale: kernel must have a single component");
+    }
+    if (kernel.get_nb_entries() != x.get_nb_entries()) {
+        throw FieldError(
+            "pointwise_scale: fields must have the same number of entries");
+    }
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    const Index_t n2 = npix * ncomp * 2;
+    const bool soa =
+        (x.get_storage_order() == StorageOrder::StructureOfArrays);
+    const int num_blocks = (n2 + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::pointwise_scale_kernel,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      reinterpret_cast<Real*>(x.view().data()),
+                      kernel.view().data(), npix, ncomp, soa, n2);
+    GPU_DEVICE_SYNCHRONIZE();
 }
 
 // Complex versions would follow the same pattern but with Complex type

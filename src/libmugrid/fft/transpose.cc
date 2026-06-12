@@ -35,6 +35,8 @@
 
 #include "transpose.hh"
 #include "core/exception.hh"
+#include "memory/device_alloc.hh"
+#include "memory/gpu_runtime.hh"
 
 #include <algorithm>
 #include <numeric>
@@ -64,10 +66,12 @@ namespace muGrid {
                          const DynGridIndex & local_in,
                          const DynGridIndex & local_out, Index_t global_in,
                          Index_t global_out, Index_t axis_in, Index_t axis_out,
-                         Index_t nb_components, StorageOrder layout)
+                         Index_t nb_components, StorageOrder layout,
+                         bool on_device)
         : comm{comm}, local_in{local_in}, local_out{local_out},
           global_in{global_in}, global_out{global_out}, axis_in{axis_in},
-          axis_out{axis_out}, nb_components{nb_components}, layout{layout} {
+          axis_out{axis_out}, nb_components{nb_components}, layout{layout},
+          on_device{on_device} {
         if (local_in.get_dim() != local_out.get_dim()) {
             throw RuntimeError(
                 "Input and output must have same dimensionality");
@@ -123,8 +127,12 @@ namespace muGrid {
           recv_displs{std::move(other.recv_displs)}
 #endif
           ,
-          types_initialized{other.types_initialized} {
+          types_initialized{other.types_initialized},
+          on_device{other.on_device}, device_staging{other.device_staging},
+          device_staging_size{other.device_staging_size} {
         other.types_initialized = false;  // Prevent double-free
+        other.device_staging = {{nullptr, nullptr}};
+        other.device_staging_size = {{0, 0}};
     }
 
     Transpose & Transpose::operator=(Transpose && other) noexcept {
@@ -157,14 +165,31 @@ namespace muGrid {
 #endif
             types_initialized = other.types_initialized;
             other.types_initialized = false;
+            this->free_staging();
+            on_device = other.on_device;
+            device_staging = other.device_staging;
+            device_staging_size = other.device_staging_size;
+            other.device_staging = {{nullptr, nullptr}};
+            other.device_staging_size = {{0, 0}};
         }
         return *this;
+    }
+
+    void Transpose::free_staging() {
+        for (auto & buffer : this->device_staging) {
+            if (buffer != nullptr) {
+                device_deallocate(buffer);
+                buffer = nullptr;
+            }
+        }
+        this->device_staging_size = {{0, 0}};
     }
 
     Transpose::~Transpose() {
 #ifdef WITH_MPI
         free_datatypes();
 #endif
+        this->free_staging();
     }
 
 #ifdef WITH_MPI
@@ -427,6 +452,216 @@ namespace muGrid {
                 this->local_in, recv_block_shape, recv_block_start);
         }
     }
+
+    namespace {
+        //! Device-to-device strided 2D copy (pack/unpack building block)
+        void strided_device_copy(void * dst, const void * src,
+                                 std::size_t width_bytes, std::size_t nb_rows,
+                                 std::size_t dst_pitch_bytes,
+                                 std::size_t src_pitch_bytes) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            GPU_MEMCPY_2D_D2D(dst, dst_pitch_bytes, src, src_pitch_bytes,
+                              width_bytes, nb_rows);
+#else
+            (void)dst;
+            (void)src;
+            (void)width_bytes;
+            (void)nb_rows;
+            (void)dst_pitch_bytes;
+            (void)src_pitch_bytes;
+            throw RuntimeError("Transpose: device data requires a GPU build");
+#endif
+        }
+    }  // namespace
+
+    char * Transpose::get_device_staging(std::size_t slot,
+                                         std::size_t size) const {
+        auto & buffer{this->device_staging.at(slot)};
+        auto & current_size{this->device_staging_size.at(slot)};
+        if (current_size < size) {
+            if (buffer != nullptr) {
+                device_deallocate(buffer);
+                buffer = nullptr;
+                current_size = 0;
+            }
+            buffer = device_allocate(size);
+            current_size = size;
+        }
+        return static_cast<char *>(buffer);
+    }
+
+    void Transpose::staged_alltoall(
+        const Complex * input, Complex * output, const DynGridIndex & src_shape,
+        Index_t src_axis, const std::vector<Index_t> & src_counts,
+        const std::vector<Index_t> & src_displs, const DynGridIndex & dst_shape,
+        Index_t dst_axis, const std::vector<Index_t> & dst_counts,
+        const std::vector<Index_t> & dst_displs) const {
+        int comm_size{this->comm.size()};
+
+        // Geometry of a column-major subarray block that is full in all
+        // dimensions except `axis`: the block occupies contiguous runs of
+        // pre*count elements (pre = product of extents below `axis`),
+        // repeated post times (post = product of extents above `axis`) with
+        // a uniform stride of pre*extent(axis). Serializing it row by row
+        // reproduces exactly the canonical (column-major) subarray order
+        // that MPI_Type_create_subarray uses, so the staged exchange is
+        // wire-compatible with the datatype-based host path.
+        auto pre_post{[](const DynGridIndex & shape, Index_t axis) {
+            std::size_t pre{1}, post{1};
+            for (Dim_t d{0}; d < shape.get_dim(); ++d) {
+                if (d < axis) {
+                    pre *= shape[d];
+                } else if (d > axis) {
+                    post *= shape[d];
+                }
+            }
+            return std::make_pair(pre, post);
+        }};
+        auto [src_pre, src_post] = pre_post(src_shape, src_axis);
+        auto [dst_pre, dst_post] = pre_post(dst_shape, dst_axis);
+        std::size_t src_spatial{src_pre * src_shape[src_axis] * src_post};
+        std::size_t dst_spatial{dst_pre * dst_shape[dst_axis] * dst_post};
+        auto ncomp{static_cast<std::size_t>(this->nb_components)};
+        bool aos{this->layout == StorageOrder::ArrayOfStructures};
+
+        // Per-peer element counts (in units of Complex) and displacements
+        std::vector<int> send_counts_el(comm_size), send_displs_el(comm_size);
+        std::vector<int> recv_counts_el(comm_size), recv_displs_el(comm_size);
+        std::size_t send_total{0}, recv_total{0};
+        for (int r{0}; r < comm_size; ++r) {
+            std::size_t s{src_pre * src_counts[r] * src_post * ncomp};
+            std::size_t d{dst_pre * dst_counts[r] * dst_post * ncomp};
+            send_counts_el[r] = static_cast<int>(s);
+            send_displs_el[r] = static_cast<int>(send_total);
+            recv_counts_el[r] = static_cast<int>(d);
+            recv_displs_el[r] = static_cast<int>(recv_total);
+            send_total += s;
+            recv_total += d;
+        }
+
+        char * send_staging{
+            this->get_device_staging(0, send_total * sizeof(Complex))};
+        char * recv_staging{
+            this->get_device_staging(1, recv_total * sizeof(Complex))};
+
+        // Pack: gather each peer's block into the contiguous send buffer
+        for (int r{0}; r < comm_size; ++r) {
+            if (src_counts[r] == 0) {
+                continue;
+            }
+            auto * staging{send_staging +
+                           static_cast<std::size_t>(send_displs_el[r]) *
+                               sizeof(Complex)};
+            if (aos) {
+                std::size_t width{src_pre * src_counts[r] * ncomp *
+                                  sizeof(Complex)};
+                std::size_t pitch{src_pre * src_shape[src_axis] * ncomp *
+                                  sizeof(Complex)};
+                const Complex * field{input +
+                                      src_displs[r] * src_pre * ncomp};
+                strided_device_copy(staging, field, width, src_post, width,
+                                    pitch);
+            } else {
+                std::size_t width{src_pre * src_counts[r] * sizeof(Complex)};
+                std::size_t pitch{src_pre * src_shape[src_axis] *
+                                  sizeof(Complex)};
+                std::size_t comp_block{src_pre * src_counts[r] * src_post};
+                for (std::size_t c{0}; c < ncomp; ++c) {
+                    const Complex * field{input + c * src_spatial +
+                                          src_displs[r] * src_pre};
+                    strided_device_copy(staging +
+                                            c * comp_block * sizeof(Complex),
+                                        field, width, src_post, width, pitch);
+                }
+            }
+        }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // Device-to-device 2D copies are asynchronous with respect to the
+        // host; MPI must not read the staging buffer before the gather is
+        // complete.
+        GPU_DEVICE_SYNCHRONIZE();
+#endif
+        // Pairwise ring exchange instead of MPI_Alltoallv: collective
+        // components are not reliably GPU-aware, while point-to-point on
+        // contiguous device buffers is the well-trodden CUDA/ROCm-aware
+        // path. At step s, rank r sends to r+s and receives from r-s; the
+        // partners match up at the same step on both sides, so the
+        // schedule is deadlock-free for any communicator size. (Sending
+        // to and receiving from the SAME peer each step deadlocks for
+        // size > 2: everyone would wait on a partner that sends to them
+        // only at a later step.)
+        {
+            MPI_Comm mpi_comm{this->comm.get_mpi_comm()};
+            int my_rank{this->comm.rank()};
+            for (int step{0}; step < comm_size; ++step) {
+                if (step == 0) {
+                    auto bytes{static_cast<std::size_t>(
+                                   send_counts_el[my_rank]) *
+                               sizeof(Complex)};
+                    if (bytes > 0) {
+                        strided_device_copy(
+                            recv_staging + static_cast<std::size_t>(
+                                               recv_displs_el[my_rank]) *
+                                               sizeof(Complex),
+                            send_staging + static_cast<std::size_t>(
+                                               send_displs_el[my_rank]) *
+                                               sizeof(Complex),
+                            bytes, 1, bytes, bytes);
+                    }
+                    continue;
+                }
+                int send_peer{(my_rank + step) % comm_size};
+                int recv_peer{(my_rank - step + comm_size) % comm_size};
+                MPI_Status status;
+                MPI_Sendrecv(send_staging +
+                                 static_cast<std::size_t>(
+                                     send_displs_el[send_peer]) *
+                                     sizeof(Complex),
+                             send_counts_el[send_peer], mpi_type<Complex>(),
+                             send_peer, 0,
+                             recv_staging +
+                                 static_cast<std::size_t>(
+                                     recv_displs_el[recv_peer]) *
+                                     sizeof(Complex),
+                             recv_counts_el[recv_peer], mpi_type<Complex>(),
+                             recv_peer, 0, mpi_comm, &status);
+            }
+        }
+
+        // Unpack: scatter each peer's block from the contiguous receive
+        // buffer into the output field. Runs on the default stream, so
+        // subsequent kernels are ordered after it.
+        for (int r{0}; r < comm_size; ++r) {
+            if (dst_counts[r] == 0) {
+                continue;
+            }
+            auto * staging{recv_staging +
+                           static_cast<std::size_t>(recv_displs_el[r]) *
+                               sizeof(Complex)};
+            if (aos) {
+                std::size_t width{dst_pre * dst_counts[r] * ncomp *
+                                  sizeof(Complex)};
+                std::size_t pitch{dst_pre * dst_shape[dst_axis] * ncomp *
+                                  sizeof(Complex)};
+                Complex * field{output + dst_displs[r] * dst_pre * ncomp};
+                strided_device_copy(field, staging, width, dst_post, pitch,
+                                    width);
+            } else {
+                std::size_t width{dst_pre * dst_counts[r] * sizeof(Complex)};
+                std::size_t pitch{dst_pre * dst_shape[dst_axis] *
+                                  sizeof(Complex)};
+                std::size_t comp_block{dst_pre * dst_counts[r] * dst_post};
+                for (std::size_t c{0}; c < ncomp; ++c) {
+                    Complex * field{output + c * dst_spatial +
+                                    dst_displs[r] * dst_pre};
+                    strided_device_copy(field,
+                                        staging +
+                                            c * comp_block * sizeof(Complex),
+                                        width, dst_post, pitch, width);
+                }
+            }
+        }
+    }
 #endif  // WITH_MPI
 
     void Transpose::forward(const Complex * input, Complex * output) const {
@@ -442,6 +677,17 @@ namespace muGrid {
             }
             total_size *= this->nb_components;
             std::copy(input, input + total_size, output);
+            return;
+        }
+
+        if (this->on_device) {
+            // Contiguous staging instead of derived datatypes on device
+            // pointers (see constructor documentation)
+            this->staged_alltoall(input, output, this->local_in,
+                                  this->axis_out, this->out_counts,
+                                  this->out_displs, this->local_out,
+                                  this->axis_in, this->in_counts,
+                                  this->in_displs);
             return;
         }
 
@@ -474,6 +720,17 @@ namespace muGrid {
             }
             total_size *= this->nb_components;
             std::copy(input, input + total_size, output);
+            return;
+        }
+
+        if (this->on_device) {
+            // Contiguous staging instead of derived datatypes on device
+            // pointers (see constructor documentation)
+            this->staged_alltoall(input, output, this->local_out,
+                                  this->axis_in, this->in_counts,
+                                  this->in_displs, this->local_in,
+                                  this->axis_out, this->out_counts,
+                                  this->out_displs);
             return;
         }
 

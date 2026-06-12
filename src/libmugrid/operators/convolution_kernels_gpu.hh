@@ -45,18 +45,7 @@
 #include "core/types.hh"
 #include "convolution_kernels_cpu.hh"  // For GridTraversalParams
 
-// Unified GPU abstraction
-#if defined(MUGRID_ENABLE_CUDA)
-    #include <cuda_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, stream, ...) \
-        kernel<<<grid, block, 0, stream>>>(__VA_ARGS__)
-    using gpuStream_t = cudaStream_t;
-#elif defined(MUGRID_ENABLE_HIP)
-    #include <hip/hip_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, stream, ...) \
-        hipLaunchKernelGGL(kernel, grid, block, 0, stream, __VA_ARGS__)
-    using gpuStream_t = hipStream_t;
-#endif
+#include "memory/gpu_runtime.hh"
 
 namespace muGrid {
 
@@ -182,7 +171,7 @@ namespace gpu {
             (params.nz + block.z - 1) / block.z
         );
 
-        GPU_LAUNCH_KERNEL(apply_convolution_kernel_impl, grid, block, stream,
+        GPU_LAUNCH_KERNEL_STREAM(apply_convolution_kernel_impl, grid, block, stream,
             nodal_data, quad_data, alpha,
             params.nx, params.ny, params.nz,
             nodal_base, quad_base,
@@ -223,7 +212,7 @@ namespace gpu {
             (params.nz + block.z - 1) / block.z
         );
 
-        GPU_LAUNCH_KERNEL(transpose_convolution_kernel_impl, grid, block, stream,
+        GPU_LAUNCH_KERNEL_STREAM(transpose_convolution_kernel_impl, grid, block, stream,
             quad_data, nodal_data, alpha,
             params.nx, params.ny, params.nz,
             nodal_base, quad_base,

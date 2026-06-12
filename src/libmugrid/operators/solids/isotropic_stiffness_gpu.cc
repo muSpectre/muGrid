@@ -38,11 +38,7 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
-#if defined(MUGRID_ENABLE_CUDA)
-#include <cuda_runtime.h>
-#elif defined(MUGRID_ENABLE_HIP)
-#include <hip/hip_runtime.h>
-#endif
+#include "memory/gpu_runtime.hh"
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 
@@ -298,9 +294,7 @@ __global__ void isotropic_stiffness_3d_kernel(
 
 namespace isotropic_stiffness_kernels {
 
-#if defined(MUGRID_ENABLE_CUDA)
-
-void isotropic_stiffness_2d_cuda(
+void isotropic_stiffness_2d_gpu(
     const Real* displacement, const Real* lambda, const Real* mu,
     Real* force,
     Index_t nnx, Index_t nny,
@@ -316,14 +310,14 @@ void isotropic_stiffness_2d_cuda(
     // would make a second operator with a different spacing silently use the
     // first one's matrices. The default-stream ordering makes the copy safe
     // (the kernel below runs after it).
-    cudaMemcpyToSymbol(d_G_2D, G, 64 * sizeof(Real));
-    cudaMemcpyToSymbol(d_V_2D, V, 64 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_G_2D, G, 64 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_V_2D, V, 64 * sizeof(Real));
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
     dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
 
-    isotropic_stiffness_2d_kernel<<<grid, block>>>(
+    GPU_LAUNCH_KERNEL(isotropic_stiffness_2d_kernel, grid, block,
         displacement, lambda, mu, force,
         nnx, nny, nelx, nely,
         disp_stride_x, disp_stride_y, disp_stride_d,
@@ -332,14 +326,13 @@ void isotropic_stiffness_2d_cuda(
         alpha, increment);
 
     // Check for errors
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        throw RuntimeError("CUDA kernel launch failed: " +
-                          std::string(cudaGetErrorString(err)));
+    const char * err{gpu_last_error()};
+    if (err != nullptr) {
+        throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
 }
 
-void isotropic_stiffness_3d_cuda(
+void isotropic_stiffness_3d_gpu(
     const Real* displacement, const Real* lambda, const Real* mu,
     Real* force,
     Index_t nnx, Index_t nny, Index_t nnz,
@@ -355,8 +348,8 @@ void isotropic_stiffness_3d_cuda(
     // Copy this instance's G and V to constant memory before every launch (see
     // the 2D variant: the matrices depend on grid_spacing, so a one-shot upload
     // would let a second operator silently reuse the first one's matrices).
-    cudaMemcpyToSymbol(d_G_3D, G, 576 * sizeof(Real));
-    cudaMemcpyToSymbol(d_V_3D, V, 576 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_G_3D, G, 576 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_V_3D, V, 576 * sizeof(Real));
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
@@ -364,7 +357,7 @@ void isotropic_stiffness_3d_cuda(
               (nny + block.y - 1) / block.y,
               (nnz + block.z - 1) / block.z);
 
-    isotropic_stiffness_3d_kernel<<<grid, block>>>(
+    GPU_LAUNCH_KERNEL(isotropic_stiffness_3d_kernel, grid, block,
         displacement, lambda, mu, force,
         nnx, nny, nnz, nelx, nely, nelz,
         disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
@@ -373,102 +366,17 @@ void isotropic_stiffness_3d_cuda(
         alpha, increment);
 
     // Check for errors
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        throw RuntimeError("CUDA kernel launch failed: " +
-                          std::string(cudaGetErrorString(err)));
+    const char * err{gpu_last_error()};
+    if (err != nullptr) {
+        throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
 }
-
-#endif  // MUGRID_ENABLE_CUDA
-
-#if defined(MUGRID_ENABLE_HIP)
-
-void isotropic_stiffness_2d_hip(
-    const Real* displacement, const Real* lambda, const Real* mu,
-    Real* force,
-    Index_t nnx, Index_t nny,
-    Index_t nelx, Index_t nely,
-    Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-    Index_t mat_stride_x, Index_t mat_stride_y,
-    Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_d,
-    const Real* G, const Real* V,
-    Real alpha, bool increment) {
-
-    // Copy this instance's G and V before every launch (the matrices depend on
-    // grid_spacing; a one-shot upload would let a second operator silently
-    // reuse the first one's matrices). Default-stream ordering makes this safe.
-    hipMemcpyToSymbol(d_G_2D, G, 64 * sizeof(Real));
-    hipMemcpyToSymbol(d_V_2D, V, 64 * sizeof(Real));
-
-    // Launch stiffness kernel - one thread per interior NODE
-    dim3 block(16, 16);
-    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
-
-    hipLaunchKernelGGL(isotropic_stiffness_2d_kernel, grid, block, 0, 0,
-        displacement, lambda, mu, force,
-        nnx, nny, nelx, nely,
-        disp_stride_x, disp_stride_y, disp_stride_d,
-        mat_stride_x, mat_stride_y,
-        force_stride_x, force_stride_y, force_stride_d,
-        alpha, increment);
-
-    // Check for errors
-    hipError_t err = hipGetLastError();
-    if (err != hipSuccess) {
-        throw RuntimeError("HIP kernel launch failed: " +
-                          std::string(hipGetErrorString(err)));
-    }
-}
-
-void isotropic_stiffness_3d_hip(
-    const Real* displacement, const Real* lambda, const Real* mu,
-    Real* force,
-    Index_t nnx, Index_t nny, Index_t nnz,
-    Index_t nelx, Index_t nely, Index_t nelz,
-    Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_z,
-    Index_t disp_stride_d,
-    Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
-    Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
-    Index_t force_stride_d,
-    const Real* G, const Real* V,
-    Real alpha, bool increment) {
-
-    // Copy this instance's G and V before every launch (see the 2D variant).
-    hipMemcpyToSymbol(d_G_3D, G, 576 * sizeof(Real));
-    hipMemcpyToSymbol(d_V_3D, V, 576 * sizeof(Real));
-
-    // Launch stiffness kernel - one thread per interior NODE
-    dim3 block(8, 8, 4);
-    dim3 grid((nnx + block.x - 1) / block.x,
-              (nny + block.y - 1) / block.y,
-              (nnz + block.z - 1) / block.z);
-
-    hipLaunchKernelGGL(isotropic_stiffness_3d_kernel, grid, block, 0, 0,
-        displacement, lambda, mu, force,
-        nnx, nny, nnz, nelx, nely, nelz,
-        disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
-        mat_stride_x, mat_stride_y, mat_stride_z,
-        force_stride_x, force_stride_y, force_stride_z, force_stride_d,
-        alpha, increment);
-
-    // Check for errors
-    hipError_t err = hipGetLastError();
-    if (err != hipSuccess) {
-        throw RuntimeError("HIP kernel launch failed: " +
-                          std::string(hipGetErrorString(err)));
-    }
-}
-
-#endif  // MUGRID_ENABLE_HIP
 
 }  // namespace isotropic_stiffness_kernels
 
 // ============================================================================
 // Class Method Implementations for GPU
 // ============================================================================
-
-#if defined(MUGRID_ENABLE_CUDA)
 
 void IsotropicStiffnessOperator2D::apply(
     const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
@@ -591,7 +499,7 @@ void IsotropicStiffnessOperator2D::apply_impl(
     Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
                          mat_ghost_offset_y * mat_stride_y;
 
-    isotropic_stiffness_kernels::isotropic_stiffness_2d_cuda(
+    isotropic_stiffness_kernels::isotropic_stiffness_2d_gpu(
         displacement.view().data() + disp_offset,
         lambda.view().data() + mat_offset,
         mu.view().data() + mat_offset,
@@ -739,7 +647,7 @@ void IsotropicStiffnessOperator3D::apply_impl(
                          mat_ghost_offset_y * mat_stride_y +
                          mat_ghost_offset_z * mat_stride_z;
 
-    isotropic_stiffness_kernels::isotropic_stiffness_3d_cuda(
+    isotropic_stiffness_kernels::isotropic_stiffness_3d_gpu(
         displacement.view().data() + disp_offset,
         lambda.view().data() + mat_offset,
         mu.view().data() + mat_offset,
@@ -752,293 +660,6 @@ void IsotropicStiffnessOperator3D::apply_impl(
         G_matrix.data(), V_matrix.data(),
         alpha, increment);
 }
-
-#elif defined(MUGRID_ENABLE_HIP)
-
-void IsotropicStiffnessOperator2D::apply(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, 1.0, force, false);
-}
-
-void IsotropicStiffnessOperator2D::apply_increment(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    Real alpha,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, alpha, force, true);
-}
-
-void IsotropicStiffnessOperator2D::apply_impl(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    Real alpha,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force,
-    bool increment) const {
-
-    auto& disp_coll = displacement.get_collection();
-    auto* disp_global_fc = dynamic_cast<const GlobalFieldCollection*>(&disp_coll);
-    if (!disp_global_fc) {
-        throw RuntimeError("IsotropicStiffnessOperator2D requires GlobalFieldCollection");
-    }
-
-    // Get dimensions from material field collection
-    auto& mat_coll = lambda.get_collection();
-    auto* mat_global_fc = dynamic_cast<const GlobalFieldCollection*>(&mat_coll);
-    if (!mat_global_fc) {
-        throw RuntimeError("IsotropicStiffnessOperator2D material fields require GlobalFieldCollection");
-    }
-
-    // Validate ghost configuration for displacement/force fields
-    auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
-    auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
-    if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
-            "left side of displacement/force fields");
-    }
-    if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator2D requires at least 1 ghost cell on the "
-            "right side of displacement/force fields");
-    }
-
-    // Stencil requirements: 1 left, 1 right ghost needed
-    constexpr Index_t STENCIL_LEFT = 1;
-    constexpr Index_t STENCIL_RIGHT = 1;
-
-    // Compute computable region: total with ghosts minus stencil requirements
-    auto nb_with_ghosts = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
-    Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
-
-    // Material field dimensions (computable region)
-    auto mat_nb_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
-    Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
-
-    // Validate material field computable region matches node field
-    if (nelx != nnx || nely != nny) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator2D: material field computable region (" +
-            std::to_string(nelx) + ", " + std::to_string(nely) +
-            ") must match node field computable region (" +
-            std::to_string(nnx) + ", " + std::to_string(nny) + ")");
-    }
-
-    // Validate material field ghost configuration
-    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
-    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
-    if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1) {
-        throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
-                           "1 ghost cell on the left side of material fields");
-    }
-    if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1) {
-        throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
-                           "1 ghost cell on the right side of material fields");
-    }
-
-    // Node dimensions (for displacement/force fields with ghosts)
-    Index_t nx = nb_with_ghosts[0];
-    Index_t ny = nb_with_ghosts[1];
-
-    // Material field dimensions with ghosts
-    Index_t mat_nx = mat_nb_with_ghosts[0];
-    Index_t mat_ny = mat_nb_with_ghosts[1];
-
-    // Offset to first computable node (based on stencil requirements)
-    Index_t ghost_offset_x = STENCIL_LEFT;
-    Index_t ghost_offset_y = STENCIL_LEFT;
-    Index_t mat_ghost_offset_x = STENCIL_LEFT;
-    Index_t mat_ghost_offset_y = STENCIL_LEFT;
-
-    // GPU uses SoA layout: [d, x, y]
-    Index_t disp_stride_d = nx * ny;
-    Index_t disp_stride_x = 1;
-    Index_t disp_stride_y = nx;
-
-    Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = mat_nx;
-
-    Index_t force_stride_d = nx * ny;
-    Index_t force_stride_x = 1;
-    Index_t force_stride_y = nx;
-
-    // Offset data pointers to account for left ghosts
-    Index_t disp_offset = ghost_offset_x * disp_stride_x +
-                          ghost_offset_y * disp_stride_y;
-    Index_t force_offset = ghost_offset_x * force_stride_x +
-                           ghost_offset_y * force_stride_y;
-    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
-                         mat_ghost_offset_y * mat_stride_y;
-
-    isotropic_stiffness_kernels::isotropic_stiffness_2d_hip(
-        displacement.view().data() + disp_offset,
-        lambda.view().data() + mat_offset,
-        mu.view().data() + mat_offset,
-        force.view().data() + force_offset,
-        nnx, nny,  // Number of interior nodes
-        nelx, nely,  // Number of elements (same as nodes)
-        disp_stride_x, disp_stride_y, disp_stride_d,
-        mat_stride_x, mat_stride_y,
-        force_stride_x, force_stride_y, force_stride_d,
-        G_matrix.data(), V_matrix.data(),
-        alpha, increment);
-}
-
-void IsotropicStiffnessOperator3D::apply(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, 1.0, force, false);
-}
-
-void IsotropicStiffnessOperator3D::apply_increment(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    Real alpha,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, alpha, force, true);
-}
-
-void IsotropicStiffnessOperator3D::apply_impl(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    Real alpha,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force,
-    bool increment) const {
-
-    auto& disp_coll = displacement.get_collection();
-    auto* disp_global_fc = dynamic_cast<const GlobalFieldCollection*>(&disp_coll);
-    if (!disp_global_fc) {
-        throw RuntimeError("IsotropicStiffnessOperator3D requires GlobalFieldCollection");
-    }
-
-    // Get dimensions from material field collection
-    auto& mat_coll = lambda.get_collection();
-    auto* mat_global_fc = dynamic_cast<const GlobalFieldCollection*>(&mat_coll);
-    if (!mat_global_fc) {
-        throw RuntimeError("IsotropicStiffnessOperator3D material fields require GlobalFieldCollection");
-    }
-
-    // Validate ghost configuration for displacement/force fields
-    auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
-    auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
-    if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 || nb_ghosts_left[2] < 1) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
-            "left side of displacement/force fields");
-    }
-    if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 || nb_ghosts_right[2] < 1) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator3D requires at least 1 ghost cell on the "
-            "right side of displacement/force fields");
-    }
-
-    // Stencil requirements: 1 left, 1 right ghost needed
-    constexpr Index_t STENCIL_LEFT = 1;
-    constexpr Index_t STENCIL_RIGHT = 1;
-
-    // Compute computable region: total with ghosts minus stencil requirements
-    auto nb_with_ghosts = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
-    Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
-    Index_t nnz = nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
-
-    // Material field dimensions (computable region)
-    auto mat_nb_with_ghosts = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-    Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
-    Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
-    Index_t nelz = mat_nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
-
-    // Validate material field computable region matches node field
-    if (nelx != nnx || nely != nny || nelz != nnz) {
-        throw RuntimeError(
-            "IsotropicStiffnessOperator3D: material field computable region (" +
-            std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
-            std::to_string(nelz) + ") must match node field computable region (" +
-            std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
-            std::to_string(nnz) + ")");
-    }
-
-    // Validate material field ghost configuration
-    auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
-    auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
-    if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 || mat_nb_ghosts_left[2] < 1) {
-        throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                           "1 ghost cell on the left side of material fields");
-    }
-    if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1 || mat_nb_ghosts_right[2] < 1) {
-        throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                           "1 ghost cell on the right side of material fields");
-    }
-
-    // Node dimensions (for displacement/force fields with ghosts)
-    Index_t nx = nb_with_ghosts[0];
-    Index_t ny = nb_with_ghosts[1];
-    Index_t nz = nb_with_ghosts[2];
-
-    // Material field dimensions with ghosts
-    Index_t mat_nx = mat_nb_with_ghosts[0];
-    Index_t mat_ny = mat_nb_with_ghosts[1];
-    Index_t mat_nz = mat_nb_with_ghosts[2];
-
-    // Offset to first computable node (based on stencil requirements)
-    Index_t ghost_offset_x = STENCIL_LEFT;
-    Index_t ghost_offset_y = STENCIL_LEFT;
-    Index_t ghost_offset_z = STENCIL_LEFT;
-    Index_t mat_ghost_offset_x = STENCIL_LEFT;
-    Index_t mat_ghost_offset_y = STENCIL_LEFT;
-    Index_t mat_ghost_offset_z = STENCIL_LEFT;
-
-    // GPU uses SoA layout: [d, x, y, z]
-    Index_t disp_stride_d = nx * ny * nz;
-    Index_t disp_stride_x = 1;
-    Index_t disp_stride_y = nx;
-    Index_t disp_stride_z = nx * ny;
-
-    Index_t mat_stride_x = 1;
-    Index_t mat_stride_y = mat_nx;
-    Index_t mat_stride_z = mat_nx * mat_ny;
-
-    Index_t force_stride_d = nx * ny * nz;
-    Index_t force_stride_x = 1;
-    Index_t force_stride_y = nx;
-    Index_t force_stride_z = nx * ny;
-
-    // Offset data pointers to account for left ghosts
-    Index_t disp_offset = ghost_offset_x * disp_stride_x +
-                          ghost_offset_y * disp_stride_y +
-                          ghost_offset_z * disp_stride_z;
-    Index_t force_offset = ghost_offset_x * force_stride_x +
-                           ghost_offset_y * force_stride_y +
-                           ghost_offset_z * force_stride_z;
-    Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
-                         mat_ghost_offset_y * mat_stride_y +
-                         mat_ghost_offset_z * mat_stride_z;
-
-    isotropic_stiffness_kernels::isotropic_stiffness_3d_hip(
-        displacement.view().data() + disp_offset,
-        lambda.view().data() + mat_offset,
-        mu.view().data() + mat_offset,
-        force.view().data() + force_offset,
-        nnx, nny, nnz,  // Number of interior nodes
-        nelx, nely, nelz,  // Number of elements (same as nodes)
-        disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
-        mat_stride_x, mat_stride_y, mat_stride_z,
-        force_stride_x, force_stride_y, force_stride_z, force_stride_d,
-        G_matrix.data(), V_matrix.data(),
-        alpha, increment);
-}
-
-#endif  // HIP
 
 }  // namespace muGrid
 
