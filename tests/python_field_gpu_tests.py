@@ -314,5 +314,49 @@ class MixedHostDeviceTests(unittest.TestCase):
         self.assertIsInstance(device_arr, cp.ndarray)
 
 
+@unittest.skipUnless(GPU_AVAILABLE and HAS_CUPY, "GPU backend or CuPy not available")
+class CupyAllocatorTests(unittest.TestCase):
+    """muGrid device allocations routed through cupy's memory pool."""
+
+    def tearDown(self):
+        muGrid.clear_device_allocator()
+
+    def test_field_memory_from_cupy_pool(self):
+        muGrid.use_cupy_allocator()
+        # Drop garbage from earlier tests so the pool baseline is stable
+        import gc
+
+        gc.collect()
+        pool = cp.get_default_memory_pool()
+        used_before = pool.used_bytes()
+
+        fc = muGrid.GlobalFieldCollection([16, 16], device=muGrid.Device.gpu())
+        field = fc.real_field("pooled")
+        # The field's buffer must have been drawn from cupy's pool
+        self.assertGreaterEqual(
+            pool.used_bytes() - used_before, 16 * 16 * 8
+        )
+
+        # The field is fully functional
+        field.s[...] = 3.0
+        self.assertAlmostEqual(float(cp.sum(field.s)), 3.0 * 16 * 16)
+
+        # Destroying the collection returns the memory to the pool
+        del field, fc
+        gc.collect()
+        self.assertEqual(pool.used_bytes(), used_before)
+
+    def test_clear_restores_default_allocator(self):
+        muGrid.use_cupy_allocator()
+        pool = cp.get_default_memory_pool()
+        muGrid.clear_device_allocator()
+
+        used_before = pool.used_bytes()
+        fc = muGrid.GlobalFieldCollection([8, 8], device=muGrid.Device.gpu())
+        fc.real_field("unpooled")
+        # Allocation no longer comes from the pool
+        self.assertEqual(pool.used_bytes(), used_before)
+
+
 if __name__ == "__main__":
     unittest.main()

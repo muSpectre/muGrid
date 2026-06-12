@@ -1,14 +1,17 @@
 Change log for µGrid
 ====================
 
-0.107.0 (11Jun26)
+0.107.0 (12Jun26)
 -----------------
 
-- API: `conjugate_gradients` now converges on a relative criterion by
-  default, ``||b - Ax|| <= max(rtol * ||b||, atol)`` with ``rtol=1e-6``,
-  ``atol=0``; the old absolute `tol` is deprecated (it maps to `atol` with
-  ``rtol=0``). An absolute criterion is unreachable in double precision
-  when ``||b||`` is large and was the cause of erratic CG termination
+- ENH: Multi-GPU halo exchange and FFT transposes now scale: contiguous
+  staging buffers (with a host bounce when MPI is not GPU-aware)
+  instead of strided MPI datatypes; FFT scratch is cached across transforms
+- ENH: Solvers run entirely on the device
+- API: `conjugate_gradients` now converges on a relative criterion
+- BUG: Fixed device `reduce_ghosts` silently dropping all contributions
+  received from MPI neighbors (the host receive buffer was treated as device
+  memory during accumulation); found by a new device-vs-host equivalence test
 - BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and
   GPU now sum the interior region directly instead of subtracting the ghost
   contribution from a full-buffer reduction (minimizing floating point overflows)
@@ -56,8 +59,9 @@ Change log for µGrid
   silently producing a wrong reduction
 - ENH: The 3D MPI FFT now uses a true pencil decomposition; per-rank memory
   scales as O(N³/P) and Fourier space distributes X across P2, Y across P1
-- ENH: MPI transposes are pure derived-datatype `MPI_Alltoallw` operations
-  (no pack/unpack), running directly on device buffers with a GPU-aware MPI
+- ENH: MPI transposes use pure derived-datatype `MPI_Alltoallw` operations
+  (no pack/unpack) on host buffers; device buffers use contiguous staging
+  (see above)
 - ENH: The FFT engine verifies at construction that its real- and
   Fourier-space collections use the same storage order
 - ENH: CMake now probes for C++20 standard-library support at configure time

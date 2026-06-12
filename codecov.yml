@@ -4,3 +4,21 @@
 ignore:
   - src/libmugrid/fft/rocfft_backend.cc
   - src/libmugrid/fft/rocfft_backend.hh
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        # Tolerate small fluctuations from test reordering and merge timing
+        threshold: 1%
+    patch:
+      default:
+        # A fixed target instead of the "auto" (= project average) default:
+        # GPU code can structurally not reach project-average coverage with
+        # host-only gcov, which cannot instrument CUDA __global__ kernel
+        # bodies, and the device communication code carries per-backend
+        # (CUDA/HIP) and per-MPI-capability (GPU-aware vs host-staged)
+        # branches of which each CI leg can only execute one side.
+        target: 80%
+        threshold: 2%

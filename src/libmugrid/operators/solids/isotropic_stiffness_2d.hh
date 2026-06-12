@@ -235,18 +235,8 @@ namespace muGrid {
             Index_t force_stride_y, Index_t force_stride_d, const Real * G,
             const Real * V, Real alpha, bool increment);
 
-#if defined(MUGRID_ENABLE_CUDA)
-        void isotropic_stiffness_2d_cuda(
-            const Real * displacement, const Real * lambda, const Real * mu,
-            Real * force, Index_t nnx, Index_t nny, Index_t nelx, Index_t nely,
-            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment);
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-        void isotropic_stiffness_2d_hip(
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        void isotropic_stiffness_2d_gpu(
             const Real * displacement, const Real * lambda, const Real * mu,
             Real * force, Index_t nnx, Index_t nny, Index_t nelx, Index_t nely,
             Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,

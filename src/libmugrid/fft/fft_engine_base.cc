@@ -334,7 +334,8 @@ Transpose * FFTEngineBase::get_transpose_xy(Index_t nb_components,
 
   auto transpose = std::make_unique<Transpose>(
       comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
-      cfg.axis_in, cfg.axis_out, nb_components, layout);
+      cfg.axis_in, cfg.axis_out, nb_components, layout,
+      this->get_device().is_device());
 
   auto * ptr = transpose.get();
   this->transpose_xy_cache[key] = std::move(transpose);
@@ -359,7 +360,8 @@ Transpose * FFTEngineBase::get_transpose_yz(Index_t nb_components,
 
   auto transpose = std::make_unique<Transpose>(
       comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
-      cfg.axis_in, cfg.axis_out, nb_components, layout);
+      cfg.axis_in, cfg.axis_out, nb_components, layout,
+      this->get_device().is_device());
 
   auto * ptr = transpose.get();
   this->transpose_yz_cache[key] = std::move(transpose);

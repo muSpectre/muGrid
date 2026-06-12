@@ -33,9 +33,12 @@
  *
  */
 
+#include <cstdint>
+
 #include <pybind11/pybind11.h>
 
 #include "memory/device.hh"
+#include "memory/device_alloc.hh"
 
 using muGrid::Device;
 using muGrid::DeviceType;
@@ -43,7 +46,90 @@ using pybind11::literals::operator""_a;
 
 namespace py = pybind11;
 
+namespace {
+
+    // Python-callable device allocator hook. The C++ hook is a plain
+    // function pointer, so the Python callables live in statics and the
+    // trampolines re-acquire the GIL (muGrid may allocate from code that
+    // runs without it). The holders are heap-allocated and intentionally
+    // leaked so that no py::object destructor runs after interpreter
+    // finalization.
+    py::object & py_device_allocate() {
+        static py::object * holder{new py::object{}};
+        return *holder;
+    }
+
+    py::object & py_device_deallocate() {
+        static py::object * holder{new py::object{}};
+        return *holder;
+    }
+
+    void * device_allocate_trampoline(std::size_t bytes) {
+        if (!Py_IsInitialized()) {
+            return nullptr;
+        }
+        py::gil_scoped_acquire gil{};
+        try {
+            return reinterpret_cast<void *>(
+                py_device_allocate()(bytes).cast<std::uintptr_t>());
+        } catch (py::error_already_set &) {
+            // Out of memory (or any other failure) in the external
+            // allocator; device_allocate() turns nullptr into a
+            // RuntimeError.
+            return nullptr;
+        }
+    }
+
+    void device_deallocate_trampoline(void * ptr) {
+        if (!Py_IsInitialized()) {
+            // Interpreter is gone; the pool it would return to no longer
+            // exists. Intentional leak at shutdown.
+            return;
+        }
+        py::gil_scoped_acquire gil{};
+        try {
+            py_device_deallocate()(reinterpret_cast<std::uintptr_t>(ptr));
+        } catch (py::error_already_set & e) {
+            e.discard_as_unraisable("muGrid device deallocate hook");
+        }
+    }
+
+}  // namespace
+
 void add_device_classes(py::module & mod) {
+    mod.def(
+        "set_device_allocator",
+        [](py::object allocate, py::object deallocate) {
+            py_device_allocate() = std::move(allocate);
+            py_device_deallocate() = std::move(deallocate);
+            muGrid::set_device_allocator(device_allocate_trampoline,
+                                         device_deallocate_trampoline);
+        },
+        "allocate"_a, "deallocate"_a,
+        R"pbdoc(
+        Register an external device allocator for all muGrid device memory.
+
+        ``allocate(nbytes) -> int`` must return a device pointer (as an
+        integer) to at least ``nbytes`` bytes and keep the underlying
+        allocation alive until ``deallocate(ptr)`` is called with the same
+        integer. Use :func:`muGrid.use_cupy_allocator` for the common case
+        of routing through cupy's memory pool, so that one allocator owns
+        the GPU and muGrid allocations cannot be starved by pool caching.
+        )pbdoc");
+    mod.def(
+        "clear_device_allocator",
+        []() {
+            muGrid::set_device_allocator(nullptr, nullptr);
+            py_device_allocate() = py::object{};
+            py_device_deallocate() = py::object{};
+        },
+        R"pbdoc(
+        Restore the default (raw cudaMalloc/hipMalloc) device allocator.
+
+        Allocations made through a previously registered allocator are
+        still freed through it; only new allocations use the default.
+        )pbdoc");
+
     // Device type enumeration
     py::enum_<DeviceType>(mod, "DeviceType",
         R"pbdoc(

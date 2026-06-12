@@ -40,18 +40,7 @@
 #include "fem_gradient_2d.hh"
 #include "fem_gradient_3d.hh"
 
-// Unified GPU abstraction macros
-#if defined(MUGRID_ENABLE_CUDA)
-    #include <cuda_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-        kernel<<<grid, block>>>(__VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
-#elif defined(MUGRID_ENABLE_HIP)
-    #include <hip/hip_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-        hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
-#endif
+#include "memory/gpu_runtime.hh"
 
 namespace muGrid {
 namespace fem_gradient_kernels {

@@ -42,28 +42,11 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
-// Unified GPU abstraction macros
+#include "memory/gpu_runtime.hh"
+
 #if defined(MUGRID_ENABLE_CUDA)
-    #include <cuda_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-        kernel<<<grid, block>>>(__VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
-    #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
-    #define GPU_FREE(ptr) (void)cudaFree(ptr)
-    #define GPU_MEMCPY_D2H(dst, src, size) \
-        (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
-    #define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
     using DeviceSpace = muGrid::CUDASpace;
 #elif defined(MUGRID_ENABLE_HIP)
-    #include <hip/hip_runtime.h>
-    #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-        hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
-    #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
-    #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
-    #define GPU_FREE(ptr) (void)hipFree(ptr)
-    #define GPU_MEMCPY_D2H(dst, src, size) \
-        (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
-    #define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
     using DeviceSpace = muGrid::ROCmSpace;
 #endif
 
@@ -318,6 +301,38 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
     // Write final result
     if (tid == 0) {
         data[0] = shared_data[0];
+    }
+}
+
+// Scale complex x by a real per-pixel field alpha; alpha is either
+// broadcast over the components of x (alpha_per_comp == false) or
+// applied elementwise (alpha has x's components). Operates on the
+// doubles of the complex buffer to avoid complex arithmetic in device
+// code.
+__global__ void field_scal_complex_kernel(Real* x2, const Real* a,
+                                          Index_t npix, Index_t ncomp,
+                                          bool soa, bool alpha_per_comp,
+                                          Index_t n2) {
+    Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (j < n2) {
+        Index_t elem = j >> 1;  // complex element index
+        Index_t i = alpha_per_comp
+                        ? elem
+                        : (soa ? (elem % npix) : (elem / ncomp));
+        x2[j] *= a[i];
+    }
+}
+
+// Real variant of the kernel above
+__global__ void field_scal_real_kernel(Real* x, const Real* a,
+                                       Index_t npix, Index_t ncomp,
+                                       bool soa, bool alpha_per_comp,
+                                       Index_t n) {
+    Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (j < n) {
+        Index_t i =
+            alpha_per_comp ? j : (soa ? (j % npix) : (j / ncomp));
+        x[j] *= a[i];
     }
 }
 
@@ -628,6 +643,53 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
     GPU_FREE(d_partial);
     return result;
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
+                       TypedField<Complex, DeviceSpace>& x) {
+    internal::check_field_alpha(alpha, x);
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    const Index_t n2 = npix * ncomp * 2;
+    const bool soa =
+        (x.get_storage_order() == StorageOrder::StructureOfArrays);
+    const bool alpha_per_comp = (alpha.get_nb_components() == ncomp &&
+                                 ncomp != 1);
+    const int num_blocks = (n2 + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::field_scal_complex_kernel,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      reinterpret_cast<Real*>(x.view().data()),
+                      alpha.view().data(), npix, ncomp, soa,
+                      alpha_per_comp, n2);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
+                       TypedField<Real, DeviceSpace>& x) {
+    internal::check_field_alpha(alpha, x);
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    const Index_t n = npix * ncomp;
+    const bool soa =
+        (x.get_storage_order() == StorageOrder::StructureOfArrays);
+    const bool alpha_per_comp = (alpha.get_nb_components() == ncomp &&
+                                 ncomp != 1);
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::field_scal_real_kernel,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      x.view().data(), alpha.view().data(), npix, ncomp,
+                      soa, alpha_per_comp, n);
+    GPU_DEVICE_SYNCHRONIZE();
 }
 
 // Complex versions would follow the same pattern but with Complex type

@@ -20,6 +20,20 @@ from contextlib import nullcontext
 import numpy as np
 
 from . import linalg
+from .Field import wrap_field
+
+
+def _fill_field(field, values):
+    """Assign host values to the interior view of a host or device field."""
+    s = field.s
+    try:
+        s[...] = values
+    except (TypeError, ValueError):
+        # Device view: cupy's __setitem__ does not accept numpy sources;
+        # convert once (setup time only).
+        import cupy
+
+        s[...] = cupy.asarray(values)
 
 
 class Preconditioner:
@@ -65,16 +79,23 @@ class JacobiPreconditioner(Preconditioner):
     Laplacian, Jacobi only rescales the system and does not change the CG
     iteration.)
 
+    The preconditioner runs wherever the solver fields live: the inverse
+    diagonal is stored in a field on the residual's collection (created on
+    first application) and applied with the fused ``linalg.copy`` +
+    ``linalg.scal`` kernels, on host and device alike.
+
     Parameters
     ----------
     diagonal : muGrid.Field, array-like or scalar
         Diagonal entries of the system operator on the local subdomain.
-        Either a field created on the same collection as the solver fields,
-        an array broadcastable against the interior field values (shape
-        ``(*spatial,)`` to share one diagonal across components, or
+        Either a field created on the same collection as the solver fields
+        (host or device), an array matching the interior field values
+        (shape ``(*spatial,)`` to share one diagonal across components, or
         ``(*components, *spatial)`` for per-component entries), or a
         scalar. The entries are inverted once at construction; the values
         are copied, later modification of the source has no effect.
+    name : str, optional
+        Prefix for the field holding the inverse diagonal.
 
     Raises
     ------
@@ -82,19 +103,57 @@ class JacobiPreconditioner(Preconditioner):
         If any diagonal entry is zero.
     """
 
-    def __init__(self, diagonal):
+    def __init__(self, diagonal, name="jacobi-preconditioner"):
+        self._name = name
         values = getattr(diagonal, "s", None)  # muGrid field?
-        if values is None:
+        if values is not None:
+            # Device fields expose cupy views; pull a host copy
+            values = values.get() if hasattr(values, "get") else np.array(values)
+        else:
             values = np.asarray(diagonal, dtype=float)
-        if not (abs(values) > 0).all():
+        if not (np.abs(values) > 0).all():
             raise ValueError(
                 "Jacobi preconditioner requires a non-singular diagonal "
                 "(got entries equal to zero)"
             )
-        self._inverse_diagonal = 1.0 / values
+        self._is_scalar = values.ndim == 0
+        self._inverse_diagonal = (
+            1.0 / float(values) if self._is_scalar else 1.0 / values
+        )
+        self._field = None
+
+    def _inverse_diagonal_field(self, z):
+        """Field holding D⁻¹ on z's collection (created on first use)."""
+        if self._field is None:
+            values = self._inverse_diagonal
+            # Spatial-only diagonals go into a single-component field that
+            # linalg.scal broadcasts over z's components; values that do
+            # not fit the spatial shape are per-component diagonals.
+            nb_component_axes = len(tuple(z.components_shape))
+            spatial_shape = tuple(z.s.shape)[nb_component_axes:]
+            try:
+                np.broadcast_to(values, spatial_shape)
+                components = ()
+            except ValueError:
+                components = tuple(z.components_shape)
+            field = wrap_field(
+                z.collection.real_field(
+                    f"{self._name}-inverse-diagonal", components
+                )
+            )
+            # scal operates on the full buffer; zero ghost entries keep
+            # the (later overwritten) ghost values of z finite.
+            field.set_zero()
+            _fill_field(field, np.broadcast_to(values, field.s.shape))
+            self._field = field
+        return self._field
 
     def apply(self, r, z):
-        z.s[...] = r.s * self._inverse_diagonal
+        linalg.copy(r, z)
+        if self._is_scalar:
+            linalg.scal(self._inverse_diagonal, z)
+        else:
+            linalg.scal(self._inverse_diagonal_field(z), z)
 
 
 class FourierPreconditioner(Preconditioner):
@@ -168,9 +227,24 @@ class FourierPreconditioner(Preconditioner):
                 f"Fourier subdomain {expected} of the FFT engine"
             )
 
-        # Fold the inverse-transform normalisation into the kernel so apply()
-        # is a single pointwise multiplication.
-        self._kernel = kernel * engine.normalisation
+        # Store the kernel in a real field on the engine's Fourier
+        # collection (host or device, matching the work fields) and fold
+        # the inverse-transform normalisation in, so apply() is a single
+        # linalg.scal with no array-library dependence in the
+        # hot loop.
+        self._kernel_field = engine.fourier_space_collection.real_field(
+            f"{name}-kernel"
+        )
+        values = kernel * engine.normalisation
+        s = self._kernel_field.s
+        try:
+            s[...] = values
+        except (TypeError, ValueError):
+            # Device view: cupy's __setitem__ does not accept numpy
+            # sources; convert once at setup.
+            import cupy
+
+            s[...] = cupy.asarray(values)
 
     def _work_field(self, components_shape):
         key = tuple(components_shape)
@@ -195,19 +269,9 @@ class FourierPreconditioner(Preconditioner):
         engine = self._engine
         with self._timed("fft"):
             engine.fft(r, work)
-        s = work.s
-        kernel = self._kernel
-        if type(s).__module__.partition(".")[0] == "cupy":
-            # Device fields: move the kernel over once, lazily.
-            import cupy
-
-            kernel = cupy.asarray(kernel)
-            self._kernel = kernel
-        # Broadcasts over leading component axes; normalisation is folded in.
-        # In-place multiply on the view, NOT `s[...] *= kernel`: cupy's
-        # __setitem__ materialises a contiguous copy of the whole strided
-        # field (1 GiB at 512^3).
+        # Fused C++ kernel, host or device; broadcasts over components and
+        # has the inverse-transform normalisation folded in.
         with self._timed("scale"):
-            s *= kernel
+            linalg.scal(self._kernel_field, work)
         with self._timed("ifft"):
             engine.ifft(work, z)

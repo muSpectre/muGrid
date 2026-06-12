@@ -267,6 +267,45 @@ void add_linalg_functions(py::module &mod) {
         "alpha"_a, "x"_a, "y"_a,
         "Fused AXPY + norm_sq for complex fields: y = alpha * x + y, returns ||y||².");
 
+    linalg.def("scal",
+        static_cast<void (*)(const RealFieldHost&, ComplexFieldHost&)>(
+            &muGrid::linalg::scal<HostSpace>),
+        "alpha"_a, "x"_a,
+        R"pbdoc(
+        Scale operation with per-pixel multiplier: x[c, i] *= alpha[c, i].
+
+        Overload of scal() where alpha is a real field on the same
+        collection. A single-component alpha is broadcast over the
+        components of x (e.g. the inverse symbol of an operator in a
+        Fourier-space preconditioner); an alpha with x's number of
+        components is applied elementwise.
+
+        Parameters
+        ----------
+        alpha : RealField
+            Real field of multipliers (1 or x's number of components)
+        x : ComplexField
+            Complex input/output field (modified in place)
+        )pbdoc");
+
+    linalg.def("scal",
+        static_cast<void (*)(const RealFieldHost&, RealFieldHost&)>(
+            &muGrid::linalg::scal<HostSpace>),
+        "alpha"_a, "x"_a,
+        R"pbdoc(
+        Scale operation with per-pixel multiplier: x[c, i] *= alpha[c, i].
+
+        Real-field variant; together with copy() this runs a Jacobi
+        preconditioner (z = D^-1 r) without leaving the field's device.
+
+        Parameters
+        ----------
+        alpha : RealField
+            Real field of multipliers (1 or x's number of components)
+        x : RealField
+            Real input/output field (modified in place)
+        )pbdoc");
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---
 
@@ -311,6 +350,20 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::axpy_norm_sq<Real, DeviceSpace>),
         "alpha"_a, "x"_a, "y"_a,
         "Fused AXPY + norm_sq on device (GPU): y = alpha * x + y, returns ||y||².");
+
+    linalg.def("scal",
+        static_cast<void (*)(const RealFieldDevice&, ComplexFieldDevice&)>(
+            &muGrid::linalg::scal<DeviceSpace>),
+        "alpha"_a, "x"_a,
+        "Scale by a per-pixel real field on device (GPU): "
+        "x[c, i] *= alpha[c, i].");
+
+    linalg.def("scal",
+        static_cast<void (*)(const RealFieldDevice&, RealFieldDevice&)>(
+            &muGrid::linalg::scal<DeviceSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a real field by a per-pixel real field on device (GPU): "
+        "x[c, i] *= alpha[c, i].");
 
     // --- Complex field operations (device) ---
 

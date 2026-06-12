@@ -41,6 +41,7 @@
 #include "collection/field_collection.hh"
 #include "collection/field_collection_global.hh"
 #include "field/mapped_field.hh"
+#include "memory/gpu_runtime.hh"
 
 #include <dlpack/dlpack.h>
 
@@ -401,7 +402,15 @@ void add_typed_field_device(py::module &mod, std::string name) {
             .def(
                 "__dlpack__",
                 [](py::object self_obj, py::object stream) {
-                    (void)stream;  // TODO: support CUDA stream for async transfers
+                    // muGrid issues all device work on the legacy default
+                    // stream. If the consumer passes a different stream
+                    // (anything but None or the legacy default handle 1),
+                    // make the data visible to it by synchronizing the
+                    // device. Conservative but correct; consumers on the
+                    // default stream pay nothing.
+                    if (!stream.is_none() && py::cast<long long>(stream) != 1) {
+                        GPU_DEVICE_SYNCHRONIZE();
+                    }
                     auto &self = self_obj.cast<TypedFieldBase<T, DeviceSpace> &>();
                     return create_dlpack_capsule(self, self_obj);
                 },

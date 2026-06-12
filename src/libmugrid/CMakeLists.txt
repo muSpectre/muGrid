@@ -53,6 +53,8 @@ set(MUGRID_SOURCES
     io/file_io_base.cc
     # memory/
     memory/device.cc
+    memory/device_alloc.cc
+    mpi/gpu_aware_mpi.cc
     # util/
     # linalg/
     linalg/linalg_host.cc

@@ -424,5 +424,69 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
     return y.eigen_vec().squaredNorm();
 }
 
+/* ---------------------------------------------------------------------- */
+template <>
+void scal<HostSpace>(const TypedField<Real, HostSpace>& alpha,
+                     TypedField<Complex, HostSpace>& x) {
+    internal::check_field_alpha(alpha, x);
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    Complex* xd = x.view().data();
+    const Real* ad = alpha.view().data();
+
+    if (alpha.get_nb_components() == ncomp) {
+        // Elementwise: alpha and x share the same buffer layout
+        for (Index_t i{0}; i < npix * ncomp; ++i) {
+            xd[i] *= ad[i];
+        }
+    } else if (x.get_storage_order() == StorageOrder::StructureOfArrays) {
+        for (Index_t c{0}; c < ncomp; ++c) {
+            Complex* xc = xd + c * npix;
+            for (Index_t i{0}; i < npix; ++i) {
+                xc[i] *= ad[i];
+            }
+        }
+    } else {
+        for (Index_t i{0}; i < npix; ++i) {
+            for (Index_t c{0}; c < ncomp; ++c) {
+                xd[i * ncomp + c] *= ad[i];
+            }
+        }
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void scal<HostSpace>(const TypedField<Real, HostSpace>& alpha,
+                     TypedField<Real, HostSpace>& x) {
+    internal::check_field_alpha(alpha, x);
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    Real* xd = x.view().data();
+    const Real* ad = alpha.view().data();
+
+    if (alpha.get_nb_components() == ncomp) {
+        // Elementwise: alpha and x share the same buffer layout
+        for (Index_t i{0}; i < npix * ncomp; ++i) {
+            xd[i] *= ad[i];
+        }
+    } else if (x.get_storage_order() == StorageOrder::StructureOfArrays) {
+        for (Index_t c{0}; c < ncomp; ++c) {
+            Real* xc = xd + c * npix;
+            for (Index_t i{0}; i < npix; ++i) {
+                xc[i] *= ad[i];
+            }
+        }
+    } else {
+        for (Index_t i{0}; i < npix; ++i) {
+            for (Index_t c{0}; c < ncomp; ++c) {
+                xd[i * ncomp + c] *= ad[i];
+            }
+        }
+    }
+}
+
 }  // namespace linalg
 }  // namespace muGrid

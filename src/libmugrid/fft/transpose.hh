@@ -5,16 +5,18 @@
  *
  * @date   21 Dec 2024
  *
- * @brief  MPI transpose using derived datatypes (no explicit pack/unpack)
+ * @brief  MPI transpose: derived datatypes on host, contiguous staging on
+ *         device
  *
- * This implementation uses MPI derived datatypes (MPI_Type_create_subarray,
- * MPI_Type_vector, MPI_Type_create_hvector) with MPI_Alltoallw to perform
- * transpose operations without explicit pack/unpack buffers. This approach:
- *
- * - Eliminates memory overhead from temporary buffers
- * - Allows MPI to optimize non-contiguous memory access
- * - Works seamlessly with GPU-aware MPI implementations
- * - Supports multi-component fields (AoS and SoA layouts)
+ * Host transposes use MPI derived datatypes (MPI_Type_create_subarray,
+ * MPI_Type_create_hvector) with MPI_Alltoallw, avoiding explicit
+ * pack/unpack buffers and letting MPI optimize the non-contiguous access.
+ * Device transposes instead gather each peer's block into a contiguous
+ * staging buffer, exchange flat messages pairwise, and scatter on the
+ * receiver: MPI implementations pack strided datatypes on device memory
+ * block by block, which is orders of magnitude slower than a device-side
+ * gather. Both paths support multi-component fields (AoS and SoA layouts)
+ * and are wire-compatible with each other's block serialization.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -50,6 +52,8 @@
 #include "core/coordinates.hh"
 #include "mpi/communicator.hh"
 
+#include <array>
+#include <cstddef>
 #include <vector>
 
 #ifdef WITH_MPI
@@ -59,11 +63,12 @@
 namespace muGrid {
 
     /**
-     * Handles MPI transpose operations using derived datatypes.
+     * Handles MPI transpose operations.
      *
-     * This class uses MPI derived datatypes instead of explicit pack/unpack
-     * buffers. The MPI library handles the non-contiguous memory access
-     * patterns, which can be more efficient and works with GPU-aware MPI.
+     * Host data is exchanged with MPI derived datatypes (no explicit
+     * pack/unpack; the MPI library handles the non-contiguous access).
+     * Device data is staged through cached contiguous device buffers (see
+     * the constructor's on_device parameter).
      *
      * For pencil decomposition, data needs to be redistributed between ranks to
      * switch which dimension is "local" (not distributed). The transpose
@@ -74,9 +79,7 @@ namespace muGrid {
      * The transpose is a genuine scatter-gather: every rank sends a disjoint
      * block to every peer and receives into a disjoint block of the output.
      * All send and receive buffers are non-overlapping, as required by the
-     * MPI standard for MPI_Alltoallw. Because only MPI intrinsics operate on
-     * the data buffers (no manual pack/unpack), the same code path works on
-     * device memory with a GPU-aware MPI implementation.
+     * MPI standard for MPI_Alltoallw.
      */
     class Transpose {
        public:
@@ -97,20 +100,31 @@ namespace muGrid {
          * distributed)
          * @param nb_components  Number of field components (default: 1)
          * @param layout         Memory layout for multi-component fields
+         * @param on_device      True if the data pointers passed to
+         *                       forward()/backward() are device memory. Device
+         *                       transposes are staged through contiguous
+         *                       buffers instead of derived datatypes: MPI
+         *                       implementations pack strided datatypes on
+         *                       device memory block by block, which is orders
+         *                       of magnitude slower than a device-side gather
+         *                       followed by a contiguous all-to-all.
          */
         Transpose(const Communicator & comm, const DynGridIndex & local_in,
                   const DynGridIndex & local_out, Index_t global_in,
                   Index_t global_out, Index_t axis_in, Index_t axis_out,
                   Index_t nb_components = 1,
-                  StorageOrder layout = StorageOrder::ArrayOfStructures);
+                  StorageOrder layout = StorageOrder::ArrayOfStructures,
+                  bool on_device = false);
 
         Transpose() = delete;
         Transpose(const Transpose & other) = delete;
-        Transpose(Transpose && other) noexcept;
+        // Transposes live behind unique_ptr in the engine's cache and are
+        // never moved or copied
+        Transpose(Transpose && other) = delete;
         ~Transpose();
 
         Transpose & operator=(const Transpose & other) = delete;
-        Transpose & operator=(Transpose && other) noexcept;
+        Transpose & operator=(Transpose && other) = delete;
 
         /**
          * Perform forward transpose (gather axis_in, scatter axis_out).
@@ -186,7 +200,29 @@ namespace muGrid {
          * Initialize datatypes for backward transpose.
          */
         void init_backward_types();
+
+        /**
+         * All-to-all through contiguous device staging buffers: gather each
+         * peer's subarray block of `input` into a flat send buffer
+         * (one strided 2D copy per block), MPI_Alltoallv, scatter the flat
+         * receive buffer into `output`. Block geometry: full extent in all
+         * dimensions except `src_axis`/`dst_axis`, where peer r owns
+         * `src_counts[r]` slices starting at `src_displs[r]`.
+         */
+        void staged_alltoall(const Complex * input, Complex * output,
+                             const DynGridIndex & src_shape, Index_t src_axis,
+                             const std::vector<Index_t> & src_counts,
+                             const std::vector<Index_t> & src_displs,
+                             const DynGridIndex & dst_shape, Index_t dst_axis,
+                             const std::vector<Index_t> & dst_counts,
+                             const std::vector<Index_t> & dst_displs) const;
+
+        //! Cached contiguous device staging buffer (slot 0: send, 1: recv)
+        char * get_device_staging(std::size_t slot, std::size_t size) const;
 #endif
+
+        //! Release the device staging buffers
+        void free_staging();
 
         /**
          * Compute how a dimension is distributed across ranks.
@@ -263,6 +299,17 @@ namespace muGrid {
 
         //! Flag indicating if datatypes have been initialized
         bool types_initialized{false};
+
+        //! True if forward()/backward() receive device pointers
+        bool on_device{false};
+
+        //! Contiguous device staging buffers (send, recv), grown on demand
+        mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
+        //! Sizes of the staging buffers in bytes
+        mutable std::array<std::size_t, 2> device_staging_size{{0, 0}};
+        //! Host bounce buffers (send, recv) used when the MPI library is
+        //! not GPU-aware (see mpi/gpu_aware_mpi.hh)
+        mutable std::array<std::vector<char>, 2> host_staging{};
     };
 
 }  // namespace muGrid

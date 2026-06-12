@@ -13,13 +13,9 @@
 #include <vector>
 #include "mpi/cartesian_communicator.hh"
 
-#if defined(MUGRID_ENABLE_CUDA)
-#include <cuda_runtime.h>
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-#include <hip/hip_runtime.h>
-#endif
+#include "memory/device_alloc.hh"
+#include "memory/gpu_runtime.hh"
+#include "mpi/gpu_aware_mpi.hh"
 
 namespace muGrid {
 
@@ -28,7 +24,10 @@ namespace muGrid {
          * @brief Copy strided memory blocks using appropriate method.
          *
          * Copies nb_blocks blocks of data, each of size block_len bytes,
-         * with blocks separated by pitch bytes in both source and destination.
+         * with blocks separated by dst_pitch bytes in the destination and
+         * src_pitch bytes in the source. Different pitches allow packing a
+         * strided layout into a contiguous buffer (dst_pitch == block_len)
+         * and unpacking it again.
          *
          * For GPU memory, uses hipMemcpy2D/cudaMemcpy2D for efficiency.
          * For host memory, falls back to individual memcpy calls.
@@ -37,32 +36,25 @@ namespace muGrid {
          * @param src Source address
          * @param block_len Size of each block in bytes (width)
          * @param nb_blocks Number of blocks to copy (height)
-         * @param pitch Stride between blocks in bytes
+         * @param dst_pitch Stride between blocks in the destination, bytes
+         * @param src_pitch Stride between blocks in the source, bytes
          * @param is_device_memory If true, use GPU device copy
          */
         void device_memcpy_strided(void * dst, const void * src,
                                    size_t block_len, size_t nb_blocks,
-                                   size_t pitch, bool is_device_memory) {
+                                   size_t dst_pitch, size_t src_pitch,
+                                   bool is_device_memory) {
             if (is_device_memory) {
-#if defined(MUGRID_ENABLE_CUDA)
-                // Use cudaMemcpy2D for efficient strided copy
-                // cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
-                (void)cudaMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
-                                   cudaMemcpyDeviceToDevice);
-#elif defined(MUGRID_ENABLE_HIP)
-                // Use hipMemcpy2D for efficient strided copy
-                // hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
-                (void)hipMemcpy2D(dst, pitch, src, pitch, block_len, nb_blocks,
-                                  hipMemcpyDeviceToDevice);
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                GPU_MEMCPY_2D_D2D(dst, dst_pitch, src, src_pitch, block_len,
+                                  nb_blocks);
 #else
-                // Fallback to loop if no GPU backend
-                auto * dst_ptr = static_cast<char *>(dst);
-                auto * src_ptr = static_cast<const char *>(src);
-                for (size_t i{0}; i < nb_blocks; ++i) {
-                    std::memcpy(dst_ptr, src_ptr, block_len);
-                    dst_ptr += pitch;
-                    src_ptr += pitch;
-                }
+                // GCOVR_EXCL_START -- unreachable: device fields cannot be
+                // created in a build without a GPU backend
+                throw RuntimeError(
+                    "device_memcpy_strided: muGrid was compiled without GPU "
+                    "support");
+                // GCOVR_EXCL_STOP
 #endif
             } else {
                 // Host memory: use loop of memcpy
@@ -70,8 +62,8 @@ namespace muGrid {
                 auto * src_ptr = static_cast<const char *>(src);
                 for (size_t i{0}; i < nb_blocks; ++i) {
                     std::memcpy(dst_ptr, src_ptr, block_len);
-                    dst_ptr += pitch;
-                    src_ptr += pitch;
+                    dst_ptr += dst_pitch;
+                    src_ptr += src_pitch;
                 }
             }
         }
@@ -90,40 +82,34 @@ namespace muGrid {
          */
         template <typename T>
         void device_accumulate_typed(T * dst, const T * src, size_t nb_elements,
-                                     bool is_device_memory) {
-            if (is_device_memory) {
+                                     bool dst_on_device, bool src_on_device) {
+            if (dst_on_device) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-                // For device memory, copy to host, accumulate, copy back
+                // For device memory, copy to host, accumulate, copy back.
                 // This is not optimal but works for correctness.
                 // A proper implementation would use a GPU kernel.
                 std::vector<T> host_dst(nb_elements);
-                std::vector<T> host_src(nb_elements);
-#if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(host_dst.data(), dst, nb_elements * sizeof(T),
-                           cudaMemcpyDeviceToHost);
-                cudaMemcpy(host_src.data(), src, nb_elements * sizeof(T),
-                           cudaMemcpyDeviceToHost);
-#elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(host_dst.data(), dst, nb_elements * sizeof(T),
-                                hipMemcpyDeviceToHost);
-                (void)hipMemcpy(host_src.data(), src, nb_elements * sizeof(T),
-                                hipMemcpyDeviceToHost);
-#endif
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    host_dst[i] += host_src[i];
+                GPU_MEMCPY_D2H(host_dst.data(), dst, nb_elements * sizeof(T));
+                const T * src_values{src};
+                std::vector<T> host_src{};
+                if (src_on_device) {
+                    host_src.resize(nb_elements);
+                    GPU_MEMCPY_D2H(host_src.data(), src,
+                                   nb_elements * sizeof(T));
+                    src_values = host_src.data();
                 }
-#if defined(MUGRID_ENABLE_CUDA)
-                cudaMemcpy(dst, host_dst.data(), nb_elements * sizeof(T),
-                           cudaMemcpyHostToDevice);
-#elif defined(MUGRID_ENABLE_HIP)
-                (void)hipMemcpy(dst, host_dst.data(), nb_elements * sizeof(T),
-                                hipMemcpyHostToDevice);
-#endif
+                for (size_t i{0}; i < nb_elements; ++i) {
+                    host_dst[i] += src_values[i];
+                }
+                GPU_MEMCPY_H2D(dst, host_dst.data(), nb_elements * sizeof(T));
 #else
-                // Fallback: should not happen
+                // GCOVR_EXCL_START -- unreachable: device fields cannot be
+                // created in a build without a GPU backend
+                (void)src_on_device;
                 for (size_t i{0}; i < nb_elements; ++i) {
                     dst[i] += src[i];
                 }
+                // GCOVR_EXCL_STOP
 #endif
             } else {
                 for (size_t i{0}; i < nb_elements; ++i) {
@@ -144,32 +130,37 @@ namespace muGrid {
          */
         void accumulate_elements(char * dst, const char * src,
                                  size_t nb_elements, TypeDescriptor type_desc,
-                                 bool is_device_memory) {
+                                 bool dst_on_device, bool src_on_device) {
             switch (type_desc) {
             case TypeDescriptor::Real:
                 device_accumulate_typed(reinterpret_cast<Real *>(dst),
                                         reinterpret_cast<const Real *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Complex:
                 device_accumulate_typed(reinterpret_cast<Complex *>(dst),
                                         reinterpret_cast<const Complex *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Int:
                 device_accumulate_typed(reinterpret_cast<Int *>(dst),
                                         reinterpret_cast<const Int *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Uint:
                 device_accumulate_typed(reinterpret_cast<Uint *>(dst),
                                         reinterpret_cast<const Uint *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             case TypeDescriptor::Index:
                 device_accumulate_typed(reinterpret_cast<Index_t *>(dst),
                                         reinterpret_cast<const Index_t *>(src),
-                                        nb_elements, is_device_memory);
+                                        nb_elements, dst_on_device,
+                                        src_on_device);
                 break;
             default:
                 throw std::runtime_error(
@@ -203,7 +194,8 @@ namespace muGrid {
                                  elem_size_in_bytes};
             auto pitch_bytes{static_cast<size_t>(block_stride) * elem_size_in_bytes};
             device_memcpy_strided(recv_addr, send_addr, block_len_bytes,
-                                  nb_send_blocks, pitch_bytes, is_device_memory);
+                                  nb_send_blocks, pitch_bytes, pitch_bytes,
+                                  is_device_memory);
         }
 
         /**
@@ -234,7 +226,8 @@ namespace muGrid {
                     base_data +
                     send_offset * stride_in_direction * elem_size_in_bytes};
                 accumulate_elements(recv_addr, send_addr, send_block_len,
-                                    type_desc, is_device_memory);
+                                    type_desc, is_device_memory,
+                                    is_device_memory);
                 base_data += block_stride * elem_size_in_bytes;
             }
         }
@@ -323,6 +316,100 @@ namespace muGrid {
                 MPI_Comm_free(&this->comm);
             }
         }
+        for (auto & buffer : this->device_staging) {
+            if (buffer != nullptr) {
+                device_deallocate(buffer);
+            }
+        }
+    }
+
+    char * CartesianCommunicator::get_device_staging(std::size_t slot,
+                                                     std::size_t size) const {
+        auto & buffer{this->device_staging.at(slot)};
+        auto & current_size{this->device_staging_size.at(slot)};
+        if (current_size < size) {
+            if (buffer != nullptr) {
+                device_deallocate(buffer);
+                buffer = nullptr;
+                current_size = 0;
+            }
+            buffer = device_allocate(size);
+            current_size = size;
+        }
+        return static_cast<char *>(buffer);
+    }
+
+    void CartesianCommunicator::sendrecv_staged(
+        int block_stride, int nb_send_blocks, int send_block_len,
+        int nb_recv_blocks, int recv_block_len, void * send_addr,
+        void * recv_addr, int elem_size_in_bytes, MPI_Datatype mpi_datatype,
+        int dest_rank, int src_rank) const {
+        auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
+                            elem_size_in_bytes};
+        auto recv_row_bytes{static_cast<std::size_t>(recv_block_len) *
+                            elem_size_in_bytes};
+        auto send_bytes{send_row_bytes * nb_send_blocks};
+        auto recv_bytes{recv_row_bytes * nb_recv_blocks};
+        auto pitch_bytes{static_cast<std::size_t>(block_stride) *
+                         elem_size_in_bytes};
+
+        char * send_staging{
+            send_bytes > 0 ? this->get_device_staging(0, send_bytes) : nullptr};
+        char * recv_staging{
+            recv_bytes > 0 ? this->get_device_staging(1, recv_bytes) : nullptr};
+
+        if (send_bytes > 0) {
+            // Gather the strided halo into the contiguous send buffer
+            device_memcpy_strided(send_staging, send_addr, send_row_bytes,
+                                  nb_send_blocks, send_row_bytes, pitch_bytes,
+                                  true);
+        }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // Device-to-device 2D copies are asynchronous with respect to the
+        // host; MPI must not read the staging buffer before the gather has
+        // completed.
+        GPU_DEVICE_SYNCHRONIZE();
+#endif
+        // Without GPU-aware MPI, bounce the contiguous staging buffers
+        // through host memory (correct with any MPI library).
+        const bool bounce{!mpi_is_gpu_aware()};
+        char * send_buffer{send_staging};
+        char * recv_buffer{recv_staging};
+        if (bounce) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            auto & host_send{this->host_staging[0]};
+            auto & host_recv{this->host_staging[1]};
+            if (host_send.size() < send_bytes) {
+                host_send.resize(send_bytes);
+            }
+            if (host_recv.size() < recv_bytes) {
+                host_recv.resize(recv_bytes);
+            }
+            if (send_bytes > 0) {
+                GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
+            }
+            send_buffer = host_send.data();
+            recv_buffer = host_recv.data();
+#endif
+        }
+        MPI_Status status;
+        MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
+                     mpi_datatype, dest_rank, 0, recv_buffer,
+                     nb_recv_blocks * recv_block_len, mpi_datatype, src_rank, 0,
+                     this->comm, &status);
+        if (bounce && recv_bytes > 0) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            GPU_MEMCPY_H2D(recv_staging, recv_buffer, recv_bytes);
+#endif
+        }
+        if (recv_bytes > 0) {
+            // Scatter the contiguous receive buffer into the strided halo.
+            // This runs on the default stream, so subsequent kernels and the
+            // next pack are ordered after it.
+            device_memcpy_strided(recv_addr, recv_staging, recv_row_bytes,
+                                  nb_recv_blocks, pitch_bytes, recv_row_bytes,
+                                  true);
+        }
     }
 
     CartesianCommunicator &
@@ -367,10 +454,26 @@ namespace muGrid {
                             elem_size_in_bytes, is_device_memory);
             return;
         }
-        // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
-        // handles device pointers directly.
-        // Convert TypeDescriptor to MPI_Datatype
+        auto recv_addr{static_cast<void *>(
+            data + recv_offset * stride_in_direction * elem_size_in_bytes)};
+        auto send_addr{static_cast<void *>(
+            data + send_offset * stride_in_direction * elem_size_in_bytes)};
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
+        MPI_Status status;
+
+        if (is_device_memory) {
+            // Strided derived datatypes on device pointers are packed block
+            // by block by the MPI implementation (orders of magnitude
+            // slower than a bulk copy); GPU-aware fast paths only apply to
+            // contiguous messages. Pack into contiguous device staging
+            // buffers, communicate flat, unpack.
+            this->sendrecv_staged(block_stride, nb_send_blocks, send_block_len,
+                                  nb_recv_blocks, recv_block_len, send_addr,
+                                  recv_addr, elem_size_in_bytes, mpi_datatype,
+                                  this->right_ranks[direction],
+                                  this->left_ranks[direction]);
+            return;
+        }
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
         MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
                         mpi_datatype, &send_buffer_mpi_t);
@@ -378,12 +481,7 @@ namespace muGrid {
         MPI_Type_vector(nb_recv_blocks, recv_block_len, block_stride,
                         mpi_datatype, &recv_buffer_mpi_t);
         MPI_Type_commit(&recv_buffer_mpi_t);
-        auto recv_addr{static_cast<void *>(
-            data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-        auto send_addr{static_cast<void *>(
-            data + send_offset * stride_in_direction * elem_size_in_bytes)};
 
-        MPI_Status status;
         MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
                      this->right_ranks[direction], 0, recv_addr, 1,
                      recv_buffer_mpi_t, this->left_ranks[direction], 0,
@@ -409,10 +507,23 @@ namespace muGrid {
                             elem_size_in_bytes, is_device_memory);
             return;
         }
-        // Note: is_device_memory is not used in MPI mode - CUDA-aware MPI
-        // handles device pointers directly.
-        // Convert TypeDescriptor to MPI_Datatype
+        auto recv_addr{static_cast<void *>(
+            data + recv_offset * stride_in_direction * elem_size_in_bytes)};
+        auto send_addr{static_cast<void *>(
+            data + send_offset * stride_in_direction * elem_size_in_bytes)};
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
+        MPI_Status status;
+
+        if (is_device_memory) {
+            // Contiguous staging for strided device halos (see
+            // sendrecv_right).
+            this->sendrecv_staged(block_stride, nb_send_blocks, send_block_len,
+                                  nb_recv_blocks, recv_block_len, send_addr,
+                                  recv_addr, elem_size_in_bytes, mpi_datatype,
+                                  this->left_ranks[direction],
+                                  this->right_ranks[direction]);
+            return;
+        }
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
         MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
                         mpi_datatype, &send_buffer_mpi_t);
@@ -420,12 +531,7 @@ namespace muGrid {
         MPI_Type_vector(nb_recv_blocks, recv_block_len, block_stride,
                         mpi_datatype, &recv_buffer_mpi_t);
         MPI_Type_commit(&recv_buffer_mpi_t);
-        auto recv_addr{static_cast<void *>(
-            data + recv_offset * stride_in_direction * elem_size_in_bytes)};
-        auto send_addr{static_cast<void *>(
-            data + send_offset * stride_in_direction * elem_size_in_bytes)};
 
-        MPI_Status status;
         MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
                      this->left_ranks[direction], 0, recv_addr, 1,
                      recv_buffer_mpi_t, this->right_ranks[direction], 0,
@@ -455,12 +561,6 @@ namespace muGrid {
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
-        // Create send type
-        MPI_Datatype send_buffer_mpi_t;
-        MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
-                        mpi_datatype, &send_buffer_mpi_t);
-        MPI_Type_commit(&send_buffer_mpi_t);
-
         // Calculate total receive size for temporary buffer
         auto total_recv_elems{static_cast<size_t>(nb_recv_blocks) *
                               static_cast<size_t>(recv_block_len)};
@@ -472,13 +572,61 @@ namespace muGrid {
             data + send_offset * stride_in_direction * elem_size_in_bytes)};
 
         MPI_Status status;
-        MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
-                     this->right_ranks[direction], 0,
-                     recv_buffer.data(), total_recv_elems, mpi_datatype,
-                     this->left_ranks[direction], 0,
-                     this->comm, &status);
+        if (is_device_memory) {
+            // Gather the strided device send data into a contiguous device
+            // staging buffer (strided datatypes on device pointers are
+            // packed block by block by MPI, see sendrecv_staged). The
+            // receive side is already a contiguous host buffer.
+            auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
+                                elem_size_in_bytes};
+            auto send_bytes{send_row_bytes * nb_send_blocks};
+            auto pitch_bytes{static_cast<std::size_t>(block_stride) *
+                             elem_size_in_bytes};
+            char * send_staging{
+                send_bytes > 0 ? this->get_device_staging(0, send_bytes)
+                               : nullptr};
+            if (send_bytes > 0) {
+                device_memcpy_strided(send_staging, send_addr, send_row_bytes,
+                                      nb_send_blocks, send_row_bytes,
+                                      pitch_bytes, true);
+            }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            GPU_DEVICE_SYNCHRONIZE();
+#endif
+            // Without GPU-aware MPI, bounce the contiguous send staging
+            // through host memory (the receive buffer is host already).
+            char * send_buffer{send_staging};
+            if (!mpi_is_gpu_aware()) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                auto & host_send{this->host_staging[0]};
+                if (host_send.size() < send_bytes) {
+                    host_send.resize(send_bytes);
+                }
+                if (send_bytes > 0) {
+                    GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
+                }
+                send_buffer = host_send.data();
+#endif
+            }
+            MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
+                         mpi_datatype, this->right_ranks[direction], 0,
+                         recv_buffer.data(), total_recv_elems, mpi_datatype,
+                         this->left_ranks[direction], 0, this->comm, &status);
+        } else {
+            // Create send type
+            MPI_Datatype send_buffer_mpi_t;
+            MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
+                            mpi_datatype, &send_buffer_mpi_t);
+            MPI_Type_commit(&send_buffer_mpi_t);
 
-        MPI_Type_free(&send_buffer_mpi_t);
+            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
+                         this->right_ranks[direction], 0,
+                         recv_buffer.data(), total_recv_elems, mpi_datatype,
+                         this->left_ranks[direction], 0,
+                         this->comm, &status);
+
+            MPI_Type_free(&send_buffer_mpi_t);
+        }
 
         // Accumulate received data into destination. The receive buffer is
         // contiguous (host memory); scatter it to the (possibly device) strided
@@ -490,7 +638,7 @@ namespace muGrid {
                                      block * block_stride) * elem_size_in_bytes};
             accumulate_elements(dest_addr, recv_ptr,
                                 static_cast<size_t>(recv_block_len), type_desc,
-                                is_device_memory);
+                                is_device_memory, false);
             recv_ptr += recv_block_len * elem_size_in_bytes;
         }
     }
@@ -516,12 +664,6 @@ namespace muGrid {
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
-        // Create send type
-        MPI_Datatype send_buffer_mpi_t;
-        MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
-                        mpi_datatype, &send_buffer_mpi_t);
-        MPI_Type_commit(&send_buffer_mpi_t);
-
         // Calculate total receive size for temporary buffer
         auto total_recv_elems{static_cast<size_t>(nb_recv_blocks) *
                               static_cast<size_t>(recv_block_len)};
@@ -533,13 +675,59 @@ namespace muGrid {
             data + send_offset * stride_in_direction * elem_size_in_bytes)};
 
         MPI_Status status;
-        MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
-                     this->left_ranks[direction], 0,
-                     recv_buffer.data(), total_recv_elems, mpi_datatype,
-                     this->right_ranks[direction], 0,
-                     this->comm, &status);
+        if (is_device_memory) {
+            // Contiguous device staging for the strided send side (see
+            // sendrecv_right_accumulate).
+            auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
+                                elem_size_in_bytes};
+            auto send_bytes{send_row_bytes * nb_send_blocks};
+            auto pitch_bytes{static_cast<std::size_t>(block_stride) *
+                             elem_size_in_bytes};
+            char * send_staging{
+                send_bytes > 0 ? this->get_device_staging(0, send_bytes)
+                               : nullptr};
+            if (send_bytes > 0) {
+                device_memcpy_strided(send_staging, send_addr, send_row_bytes,
+                                      nb_send_blocks, send_row_bytes,
+                                      pitch_bytes, true);
+            }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            GPU_DEVICE_SYNCHRONIZE();
+#endif
+            // Without GPU-aware MPI, bounce the contiguous send staging
+            // through host memory (the receive buffer is host already).
+            char * send_buffer{send_staging};
+            if (!mpi_is_gpu_aware()) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                auto & host_send{this->host_staging[0]};
+                if (host_send.size() < send_bytes) {
+                    host_send.resize(send_bytes);
+                }
+                if (send_bytes > 0) {
+                    GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
+                }
+                send_buffer = host_send.data();
+#endif
+            }
+            MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
+                         mpi_datatype, this->left_ranks[direction], 0,
+                         recv_buffer.data(), total_recv_elems, mpi_datatype,
+                         this->right_ranks[direction], 0, this->comm, &status);
+        } else {
+            // Create send type
+            MPI_Datatype send_buffer_mpi_t;
+            MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
+                            mpi_datatype, &send_buffer_mpi_t);
+            MPI_Type_commit(&send_buffer_mpi_t);
 
-        MPI_Type_free(&send_buffer_mpi_t);
+            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
+                         this->left_ranks[direction], 0,
+                         recv_buffer.data(), total_recv_elems, mpi_datatype,
+                         this->right_ranks[direction], 0,
+                         this->comm, &status);
+
+            MPI_Type_free(&send_buffer_mpi_t);
+        }
 
         // Accumulate received data into destination using a type- and
         // device-aware accumulation (the previous loop hard-coded Real and
@@ -550,7 +738,7 @@ namespace muGrid {
                                      block * block_stride) * elem_size_in_bytes};
             accumulate_elements(dest_addr, recv_ptr,
                                 static_cast<size_t>(recv_block_len), type_desc,
-                                is_device_memory);
+                                is_device_memory, false);
             recv_ptr += recv_block_len * elem_size_in_bytes;
         }
     }

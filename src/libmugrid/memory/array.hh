@@ -42,6 +42,7 @@
 #include <string>
 #include <stdexcept>
 
+#include "device_alloc.hh"
 #include "memory_space.hh"
 
 #if defined(MUGRID_ENABLE_CUDA)
@@ -84,22 +85,18 @@ namespace muGrid {
          */
         template <typename T>
         struct CudaAllocator {
+            // Allocation goes through device_allocate() so that an
+            // externally registered allocator (e.g. cupy's memory pool)
+            // owns every device byte; see memory/device_alloc.hh.
             static T * allocate(std::size_t n) {
                 if (n == 0)
                     return nullptr;
-                T * ptr = nullptr;
-                cudaError_t err = cudaMalloc(&ptr, n * sizeof(T));
-                if (err != cudaSuccess) {
-                    throw std::runtime_error(
-                        std::string("CUDA allocation failed: ") +
-                        cudaGetErrorString(err));
-                }
-                return ptr;
+                return static_cast<T *>(device_allocate(n * sizeof(T)));
             }
 
             static void deallocate(T * ptr) {
                 if (ptr)
-                    (void)cudaFree(ptr);
+                    device_deallocate(ptr);
             }
 
             static void memset(T * ptr, int value, std::size_t n) {
@@ -115,22 +112,18 @@ namespace muGrid {
          */
         template <typename T>
         struct HIPAllocator {
+            // Allocation goes through device_allocate() so that an
+            // externally registered allocator (e.g. cupy's memory pool)
+            // owns every device byte; see memory/device_alloc.hh.
             static T * allocate(std::size_t n) {
                 if (n == 0)
                     return nullptr;
-                T * ptr = nullptr;
-                hipError_t err = hipMalloc(&ptr, n * sizeof(T));
-                if (err != hipSuccess) {
-                    throw std::runtime_error(
-                        std::string("HIP allocation failed: ") +
-                        hipGetErrorString(err));
-                }
-                return ptr;
+                return static_cast<T *>(device_allocate(n * sizeof(T)));
             }
 
             static void deallocate(T * ptr) {
                 if (ptr)
-                    (void)hipFree(ptr);
+                    device_deallocate(ptr);
             }
 
             static void memset(T * ptr, int value, std::size_t n) {

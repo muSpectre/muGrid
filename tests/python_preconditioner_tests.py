@@ -5,6 +5,12 @@ FFT (spectral) preconditioning of a finite-difference Laplace solve.
 
 import numpy as np
 import pytest
+from conftest import (
+    create_device,
+    get_array_module,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 
 import muGrid
 from muGrid.Preconditioners import (
@@ -286,6 +292,205 @@ def test_jacobi_preconditioned_screened_poisson(comm):
     np.testing.assert_allclose(solution_jacobi.p, solution_plain, atol=1e-7)
     # ... but Jacobi equilibrates the heterogeneous coefficient
     assert iterations_jacobi < iterations_plain / 2
+
+
+def to_host(array):
+    """Return a host copy of a numpy or cupy array."""
+    return array.get() if hasattr(array, "get") else np.array(array)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_jacobi_apply_devices(comm, device):
+    """JacobiPreconditioner applies D^-1 through field kernels on the
+    device the solver fields live on (this exercises the field-valued
+    linalg.scal on host and GPU)."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    engine = muGrid.FFTEngine((16, 16), comm, device=create_device(device))
+    x, y = engine.coords
+
+    diag = 1 + x + 2 * y  # spatial-only diagonal, host values
+
+    r = engine.real_space_field("residual")
+    z = engine.real_space_field("preconditioned")
+    r_values = np.sin(2 * np.pi * x)
+    r.p[...] = xp.asarray(r_values)
+
+    prec = JacobiPreconditioner(diag)
+    prec(r, z)
+    np.testing.assert_allclose(to_host(z.p), r_values / diag, atol=1e-15)
+
+    # Scalar diagonal stays on the device, too
+    JacobiPreconditioner(2.0)(r, z)
+    np.testing.assert_allclose(to_host(z.p), r_values / 2, atol=1e-15)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_jacobi_apply_per_component(comm, device):
+    """A per-component diagonal is applied elementwise (no broadcast)."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    engine = muGrid.FFTEngine((16, 16), comm, device=create_device(device))
+    x, y = engine.coords
+
+    r = engine.real_space_field("residual", components=(2,))
+    z = engine.real_space_field("preconditioned", components=(2,))
+    r_values = np.stack([np.sin(2 * np.pi * x), np.cos(2 * np.pi * y)])
+    r.p[...] = xp.asarray(r_values)
+
+    diag = np.stack([1 + x, 2 + y]).reshape(r.s.shape)
+    prec = JacobiPreconditioner(diag)
+    prec(r, z)
+    np.testing.assert_allclose(
+        to_host(z.s), r_values.reshape(r.s.shape) / diag, atol=1e-15
+    )
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_jacobi_screened_poisson_devices(comm, device):
+    """Jacobi-preconditioned CG for the heterogeneous screened Poisson
+    problem runs end-to-end on the device and reduces iterations."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    nb_grid_pts = (32, 32)
+    grid_spacing = 1 / nb_grid_pts[0]
+
+    # Positive-definite -Laplacian/h^2 via the hardcoded stencil operator
+    laplace = muGrid.LaplaceOperator(2, -1.0 / grid_spacing**2)
+
+    def make_device_engine():
+        return muGrid.FFTEngine(
+            nb_grid_pts, comm, ghosts=laplace, device=create_device(device)
+        )
+
+    def solve(prec):
+        engine = make_device_engine()
+        x, y = engine.coords
+        c = xp.asarray(
+            1 + 1e6 * (np.sin(2 * np.pi * x) * np.sin(2 * np.pi * y)) ** 2
+        )
+
+        def hessp(x_field, Ax_field):
+            engine.communicate_ghosts(x_field)
+            laplace.apply(x_field, Ax_field)
+            Ax_field.s[...] += c * x_field.s
+
+        rhs = engine.real_space_field("rhs")
+        solution = engine.real_space_field("solution")
+        ox, oy = engine.subdomain_locations
+        lx, ly = engine.nb_subdomain_grid_pts
+        rhs.p[...] = xp.asarray(
+            global_rhs(nb_grid_pts)[ox : ox + lx, oy : oy + ly]
+        )
+        iterations = []
+        conjugate_gradients(
+            comm,
+            engine.real_space_collection,
+            rhs,
+            solution,
+            hessp=hessp,
+            prec=prec,
+            rtol=1e-8,
+            maxiter=1000,
+            callback=lambda it, state: iterations.append(it),
+        )
+        return to_host(solution.p), max(iterations), engine
+
+    solution_plain, iterations_plain, _ = solve(prec=None)
+
+    engine = make_device_engine()
+    x, y = engine.coords
+    diag = (
+        4 / grid_spacing**2
+        + 1
+        + 1e6 * (np.sin(2 * np.pi * x) * np.sin(2 * np.pi * y)) ** 2
+    )
+    solution_jacobi, iterations_jacobi, _ = solve(
+        prec=JacobiPreconditioner(diag)
+    )
+
+    np.testing.assert_allclose(solution_jacobi, solution_plain, atol=1e-7)
+    assert iterations_jacobi < iterations_plain / 2
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_fourier_preconditioned_poisson_devices(comm, device):
+    """The spectral preconditioner runs on the device the solver fields
+    live on (exercises the complex field-valued linalg.scal and the
+    device FFT path) and still acts as a direct solve."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    nb_grid_pts = (32, 32)
+    grid_spacing = 1 / nb_grid_pts[0]
+
+    laplace = muGrid.LaplaceOperator(2, -1.0 / grid_spacing**2)
+    engine = muGrid.FFTEngine(
+        nb_grid_pts, comm, ghosts=laplace, device=create_device(device)
+    )
+    prec = FourierPreconditioner(
+        engine, inverse_fd_laplace_kernel(grid_spacing)
+    )
+
+    def hessp(x_field, Ax_field):
+        engine.communicate_ghosts(x_field)
+        laplace.apply(x_field, Ax_field)
+
+    rhs = engine.real_space_field("rhs")
+    solution = engine.real_space_field("solution")
+    ox, oy = engine.subdomain_locations
+    lx, ly = engine.nb_subdomain_grid_pts
+    rhs.p[...] = xp.asarray(global_rhs(nb_grid_pts)[ox : ox + lx, oy : oy + ly])
+
+    iterations = []
+    conjugate_gradients(
+        comm,
+        engine.real_space_collection,
+        rhs,
+        solution,
+        hessp=hessp,
+        prec=prec,
+        rtol=1e-8,
+        maxiter=200,
+        callback=lambda it, state: iterations.append(it),
+    )
+    assert max(iterations) <= 3
+    np.testing.assert_allclose(
+        to_host(solution.p), local_reference(engine), atol=1e-10
+    )
+
+    # The spectral kernel broadcasts over components on the device, too:
+    # identical per-component inputs give identical per-component outputs.
+    r1 = engine.real_space_field("residual")
+    z1 = engine.real_space_field("preconditioned")
+    r2 = engine.real_space_field("residual2", components=(2,))
+    z2 = engine.real_space_field("preconditioned2", components=(2,))
+    r1.p[...] = xp.asarray(np.sin(2 * np.pi * np.array(engine.coords)[0]))
+    r2.p[0] = r1.p
+    r2.p[1] = r1.p
+    prec(r1, z1)
+    prec(r2, z2)
+    np.testing.assert_allclose(to_host(z2.p[0]), to_host(z1.p), atol=1e-12)
+    np.testing.assert_allclose(to_host(z2.p[1]), to_host(z1.p), atol=1e-12)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_jacobi_broadcast_multicomponent(comm, device):
+    """A spatial-only diagonal broadcasts over the components of a
+    multi-component residual."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    engine = muGrid.FFTEngine((16, 16), comm, device=create_device(device))
+    x, y = engine.coords
+
+    r = engine.real_space_field("residual", components=(2,))
+    z = engine.real_space_field("preconditioned", components=(2,))
+    r_values = np.stack([np.sin(2 * np.pi * x), np.cos(2 * np.pi * y)])
+    r.p[...] = xp.asarray(r_values)
+
+    diag = 1 + x + 2 * y  # spatial-only: shared across components
+    prec = JacobiPreconditioner(diag)
+    prec(r, z)
+    np.testing.assert_allclose(to_host(z.p), r_values / diag, atol=1e-15)
 
 
 if __name__ == "__main__":
