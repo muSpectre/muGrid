@@ -5,7 +5,8 @@
  *
  * @date   21 Dec 2025
  *
- * @brief  MPI transpose using derived datatypes (no explicit pack/unpack)
+ * @brief  MPI transpose: derived datatypes on host, contiguous staging
+ *         on device
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -104,75 +105,6 @@ namespace muGrid {
             this->types_initialized = true;
         }
 #endif
-    }
-
-    Transpose::Transpose(Transpose && other) noexcept
-        : comm{std::move(other.comm)}, local_in{std::move(other.local_in)},
-          local_out{std::move(other.local_out)}, global_in{other.global_in},
-          global_out{other.global_out}, axis_in{other.axis_in},
-          axis_out{other.axis_out}, nb_components{other.nb_components},
-          layout{other.layout}, in_counts{std::move(other.in_counts)},
-          in_displs{std::move(other.in_displs)},
-          out_counts{std::move(other.out_counts)},
-          out_displs{std::move(other.out_displs)}
-#ifdef WITH_MPI
-          ,
-          send_types_fwd{std::move(other.send_types_fwd)},
-          recv_types_fwd{std::move(other.recv_types_fwd)},
-          send_types_bwd{std::move(other.send_types_bwd)},
-          recv_types_bwd{std::move(other.recv_types_bwd)},
-          send_counts{std::move(other.send_counts)},
-          recv_counts{std::move(other.recv_counts)},
-          send_displs{std::move(other.send_displs)},
-          recv_displs{std::move(other.recv_displs)}
-#endif
-          ,
-          types_initialized{other.types_initialized},
-          on_device{other.on_device}, device_staging{other.device_staging},
-          device_staging_size{other.device_staging_size} {
-        other.types_initialized = false;  // Prevent double-free
-        other.device_staging = {{nullptr, nullptr}};
-        other.device_staging_size = {{0, 0}};
-    }
-
-    Transpose & Transpose::operator=(Transpose && other) noexcept {
-        if (this != &other) {
-#ifdef WITH_MPI
-            free_datatypes();
-#endif
-            comm = std::move(other.comm);
-            local_in = std::move(other.local_in);
-            local_out = std::move(other.local_out);
-            global_in = other.global_in;
-            global_out = other.global_out;
-            axis_in = other.axis_in;
-            axis_out = other.axis_out;
-            nb_components = other.nb_components;
-            layout = other.layout;
-            in_counts = std::move(other.in_counts);
-            in_displs = std::move(other.in_displs);
-            out_counts = std::move(other.out_counts);
-            out_displs = std::move(other.out_displs);
-#ifdef WITH_MPI
-            send_types_fwd = std::move(other.send_types_fwd);
-            recv_types_fwd = std::move(other.recv_types_fwd);
-            send_types_bwd = std::move(other.send_types_bwd);
-            recv_types_bwd = std::move(other.recv_types_bwd);
-            send_counts = std::move(other.send_counts);
-            recv_counts = std::move(other.recv_counts);
-            send_displs = std::move(other.send_displs);
-            recv_displs = std::move(other.recv_displs);
-#endif
-            types_initialized = other.types_initialized;
-            other.types_initialized = false;
-            this->free_staging();
-            on_device = other.on_device;
-            device_staging = other.device_staging;
-            device_staging_size = other.device_staging_size;
-            other.device_staging = {{nullptr, nullptr}};
-            other.device_staging_size = {{0, 0}};
-        }
-        return *this;
     }
 
     void Transpose::free_staging() {

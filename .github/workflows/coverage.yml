@@ -14,10 +14,12 @@ on:
 # wrapper layer (pytest-cov). The `coverage` job runs a serial and an
 # MPI-enabled build on CPU runners so MPI-only code (e.g. fft/transpose.cc, the
 # cartesian communicator/decomposition) is exercised rather than reported as a
-# false 0%. The `coverage-gpu` job runs on the GPU-equipped runner and measures
-# the host-side CUDA dispatch code. All legs upload to Codecov, which merges
-# them. The only remaining gap is CUDA __global__ kernel bodies, which gcov
-# (host-only) cannot instrument.
+# false 0%. The `coverage-gpu` job runs on the GPU-equipped runner with MPI
+# enabled, so the device communication paths (contiguous staging in the
+# transposes and the halo exchange) are exercised by the multi-rank ctest runs
+# sharing the single GPU. All legs upload to Codecov, which merges them. The
+# only remaining gap is CUDA __global__ kernel bodies, which gcov (host-only)
+# cannot instrument.
 
 jobs:
   coverage:
@@ -168,7 +170,9 @@ jobs:
           sudo apt-get install -y \
             cmake \
             ninja-build \
-            libboost-test-dev
+            libboost-test-dev \
+            openmpi-bin \
+            libopenmpi-dev
 
       - name: Install Python dependencies
         run: |
@@ -177,15 +181,19 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install numpy pytest pytest-cov gcovr \
             "NuMPI[test]" cupy-cuda12x muTimer
+          CC=mpicc python3 -m pip install -v --no-binary mpi4py "mpi4py==4.0.3"
 
-      - name: Configure (coverage-instrumented, CUDA, Debug)
+      # MPI is enabled so the multi-rank ctest runs (which oversubscribe the
+      # single GPU) exercise the device communication paths: staged halo
+      # exchange and the staged FFT transposes.
+      - name: Configure (coverage-instrumented, CUDA + MPI, Debug)
         run: |
           source venv/bin/activate
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DMUGRID_ENABLE_COVERAGE=ON \
             -DMUGRID_ENABLE_CUDA=ON \
-            -DMUGRID_ENABLE_MPI=OFF \
+            -DMUGRID_ENABLE_MPI=ON \
             -DMUGRID_ENABLE_NETCDF=OFF \
             -DMUGRID_ENABLE_PYTHON=ON \
             -DMUGRID_ENABLE_TESTS=ON \

@@ -5,16 +5,18 @@
  *
  * @date   21 Dec 2024
  *
- * @brief  MPI transpose using derived datatypes (no explicit pack/unpack)
+ * @brief  MPI transpose: derived datatypes on host, contiguous staging on
+ *         device
  *
- * This implementation uses MPI derived datatypes (MPI_Type_create_subarray,
- * MPI_Type_vector, MPI_Type_create_hvector) with MPI_Alltoallw to perform
- * transpose operations without explicit pack/unpack buffers. This approach:
- *
- * - Eliminates memory overhead from temporary buffers
- * - Allows MPI to optimize non-contiguous memory access
- * - Works seamlessly with GPU-aware MPI implementations
- * - Supports multi-component fields (AoS and SoA layouts)
+ * Host transposes use MPI derived datatypes (MPI_Type_create_subarray,
+ * MPI_Type_create_hvector) with MPI_Alltoallw, avoiding explicit
+ * pack/unpack buffers and letting MPI optimize the non-contiguous access.
+ * Device transposes instead gather each peer's block into a contiguous
+ * staging buffer, exchange flat messages pairwise, and scatter on the
+ * receiver: MPI implementations pack strided datatypes on device memory
+ * block by block, which is orders of magnitude slower than a device-side
+ * gather. Both paths support multi-component fields (AoS and SoA layouts)
+ * and are wire-compatible with each other's block serialization.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -61,11 +63,12 @@
 namespace muGrid {
 
     /**
-     * Handles MPI transpose operations using derived datatypes.
+     * Handles MPI transpose operations.
      *
-     * This class uses MPI derived datatypes instead of explicit pack/unpack
-     * buffers. The MPI library handles the non-contiguous memory access
-     * patterns, which can be more efficient and works with GPU-aware MPI.
+     * Host data is exchanged with MPI derived datatypes (no explicit
+     * pack/unpack; the MPI library handles the non-contiguous access).
+     * Device data is staged through cached contiguous device buffers (see
+     * the constructor's on_device parameter).
      *
      * For pencil decomposition, data needs to be redistributed between ranks to
      * switch which dimension is "local" (not distributed). The transpose
@@ -76,9 +79,7 @@ namespace muGrid {
      * The transpose is a genuine scatter-gather: every rank sends a disjoint
      * block to every peer and receives into a disjoint block of the output.
      * All send and receive buffers are non-overlapping, as required by the
-     * MPI standard for MPI_Alltoallw. Because only MPI intrinsics operate on
-     * the data buffers (no manual pack/unpack), the same code path works on
-     * device memory with a GPU-aware MPI implementation.
+     * MPI standard for MPI_Alltoallw.
      */
     class Transpose {
        public:
@@ -117,11 +118,13 @@ namespace muGrid {
 
         Transpose() = delete;
         Transpose(const Transpose & other) = delete;
-        Transpose(Transpose && other) noexcept;
+        // Transposes live behind unique_ptr in the engine's cache and are
+        // never moved or copied
+        Transpose(Transpose && other) = delete;
         ~Transpose();
 
         Transpose & operator=(const Transpose & other) = delete;
-        Transpose & operator=(Transpose && other) noexcept;
+        Transpose & operator=(Transpose && other) = delete;
 
         /**
          * Perform forward transpose (gather axis_in, scatter axis_out).
