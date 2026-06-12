@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Linear Algebra" href="LinAlg.html"><link rel="prev" title="Fast Fourier Transform" href="FFT.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>GPU Computing - µGrid 0.106.0-37-g75fdb63c documentation</title>
+        <title>GPU Computing - µGrid 0.106.0-44-g7b33cf2c documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.106.0-37-g75fdb63c
+      <a href="index.html"><div class="brand">µGrid 0.106.0-44-g7b33cf2c
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.106.0-37-g75fdb63c
+  <span class="sidebar-brand-text">µGrid 0.106.0-44-g7b33cf2c
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -455,18 +455,11 @@ between the NVIDIA (CUDA/cuFFT) and AMD (ROCm/rocFFT) backends.</p>
 <div><p><em>“Strides on the real part of real-to-complex and complex-to-real transforms
 are not supported.”</em></p>
 </div></blockquote>
-<p>This limitation affects <strong>3D MPI-parallel FFTs</strong> on NVIDIA GPUs. In the pencil
-decomposition used for distributed FFTs, the data layout after transpose
-operations results in non-unit strides for the R2C/C2R transforms along the
-X-direction.</p>
-<p><strong>Consequence</strong>: 3D MPI-parallel FFTs on NVIDIA GPUs will raise a <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code>
-with a clear explanation of the limitation.</p>
-<p><strong>Workarounds</strong>:</p>
-<ol class="arabic simple">
-<li><p>Use the CPU FFT backend (PocketFFT) for 3D MPI-parallel transforms</p></li>
-<li><p>Use 2D grids, which support batched transforms with unit stride</p></li>
-<li><p>Use single-GPU (non-MPI) execution where the data layout is contiguous</p></li>
-</ol>
+<p><em>µ</em>Grid arranges its transform work buffers so that the real-to-complex
+and complex-to-real passes always operate with unit stride (the
+real-space ghost buffers are padded accordingly), so 2D and 3D
+transforms — serial and MPI-parallel — run on cuFFT. The MPI FFT test
+suite exercises these paths on the GPU.</p>
 </section>
 <section id="amd-gpus-rocfft">
 <h3>AMD GPUs (rocFFT)<a class="headerlink" href="#amd-gpus-rocfft" title="Link to this heading">¶</a></h3>
@@ -503,6 +496,90 @@ specific ROCm installation. Please report any issues.</p>
 <span class="n">engine</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">FFTEngine</span><span class="p">(</span><span class="n">nb_grid_pts</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+</section>
+<section id="gpu-data-and-mpi">
+<h2>GPU data and MPI<a class="headerlink" href="#gpu-data-and-mpi" title="Link to this heading">¶</a></h2>
+<section id="technical-background">
+<h3>Technical background<a class="headerlink" href="#technical-background" title="Link to this heading">¶</a></h3>
+<p>In MPI-parallel runs, <em>µ</em>Grid has to communicate data that lives in GPU
+memory: ghost (halo) layers of the domain decomposition and the global
+transposes of the distributed FFT. Two properties of MPI implementations
+shape how this is done:</p>
+<ol class="arabic simple">
+<li><p><strong>Strided datatypes are slow on device memory.</strong> MPI derived datatypes
+(<code class="docutils literal notranslate"><span class="pre">MPI_Type_vector</span></code>, subarrays) describe non-contiguous data
+declaratively, and on host memory implementations handle them well. On
+device memory, however, common MPI stacks pack such datatypes block by
+block with one small device copy each — for a halo slice this can mean
+tens of thousands of 8-byte copies and a slowdown of several orders of
+magnitude. <em>µ</em>Grid therefore never hands strided device data to MPI:
+halos and transpose blocks are first gathered into contiguous device
+staging buffers, sent as flat messages, and scattered on the receiving
+side.</p></li>
+<li><p><strong>Not every MPI can read device pointers at all.</strong> Passing a GPU
+pointer to MPI requires a <em>GPU-aware</em> build of the MPI library (e.g.
+Open MPI/UCX with CUDA support, HPC-X, MVAPICH2-GDR, Cray MPICH with
+GTL). A plain MPI build — including the stock packages of most Linux
+distributions — dereferences the pointer on the host and crashes.</p></li>
+</ol>
+</section>
+<section id="runtime-detection-and-host-fallback">
+<h3>Runtime detection and host fallback<a class="headerlink" href="#runtime-detection-and-host-fallback" title="Link to this heading">¶</a></h3>
+<p><em>µ</em>Grid detects GPU-aware MPI at runtime. With Open MPI (and derivatives
+such as HPC-X), the official <code class="docutils literal notranslate"><span class="pre">MPIX_Query_cuda_support()</span></code> /
+<code class="docutils literal notranslate"><span class="pre">MPIX_Query_rocm_support()</span></code> extensions are queried. For MPI stacks that
+cannot be queried, the conservative answer is <em>not GPU-aware</em>.</p>
+<p>When MPI is not GPU-aware, the contiguous staging buffers are bounced
+through host memory: pack on the device, copy once to a pinned-size host
+buffer, communicate, copy back, unpack on the device. This is correct
+with any MPI library and, because only flat buffers are copied, costs a
+single device-host round trip per message (measured at roughly 30-40 %
+on the total time of an FFT-preconditioned solve across two GPUs,
+compared to a GPU-aware MPI taking the device pointers directly).</p>
+</section>
+<section id="the-mugrid-gpu-aware-mpi-environment-variable">
+<h3>The <code class="docutils literal notranslate"><span class="pre">MUGRID_GPU_AWARE_MPI</span></code> environment variable<a class="headerlink" href="#the-mugrid-gpu-aware-mpi-environment-variable" title="Link to this heading">¶</a></h3>
+<p>The environment variable <code class="docutils literal notranslate"><span class="pre">MUGRID_GPU_AWARE_MPI</span></code> overrides the
+detection in both directions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">MUGRID_GPU_AWARE_MPI=1</span></code> forces direct device pointers. Use this for
+MPI stacks that are GPU-aware but cannot be queried (e.g. some MPICH
+derivatives), where detection would needlessly fall back to host
+staging.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MUGRID_GPU_AWARE_MPI=0</span></code> forces the host bounce — a kill switch for
+<em>broken</em> GPU-aware stacks. GPU support in MPI is a complex, layered
+feature (UCX transports, IPC, GPUDirect), and real installations have
+been observed to <em>silently corrupt</em> device messages in specific size
+windows (e.g. UCX’s <code class="docutils literal notranslate"><span class="pre">cuda_ipc</span></code> transport between consumer GPUs).
+Forcing the host path trades some bandwidth for transfers that only
+use plain <code class="docutils literal notranslate"><span class="pre">cudaMemcpy</span></code>/<code class="docutils literal notranslate"><span class="pre">hipMemcpy</span></code>.</p></li>
+</ul>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Force the host-staging fallback (kill switch)</span>
+<span class="nv">MUGRID_GPU_AWARE_MPI</span><span class="o">=</span><span class="m">0</span><span class="w"> </span>mpiexec<span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>python3<span class="w"> </span>my_solver.py
+
+<span class="c1"># Assert that the MPI stack is GPU-aware</span>
+<span class="nv">MUGRID_GPU_AWARE_MPI</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>mpiexec<span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>python3<span class="w"> </span>my_solver.py
+</pre></div>
+</div>
+</section>
+<section id="validating-an-installation">
+<h3>Validating an installation<a class="headerlink" href="#validating-an-installation" title="Link to this heading">¶</a></h3>
+<p>If you suspect the MPI/GPU stack, two quick checks help:</p>
+<ul>
+<li><p>Run the MPI test suite on the GPU device:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">mpiexec</span><span class="w"> </span><span class="o">-</span><span class="n">n</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="n">python3</span><span class="w"> </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="n">pytest</span><span class="w"> </span><span class="n">tests</span><span class="o">/</span><span class="n">python_mpi_fft_tests</span><span class="p">.</span><span class="n">py</span><span class="w"> </span><span class="o">-</span><span class="n">k</span><span class="w"> </span><span class="n">gpu</span>
+</pre></div>
+</div>
+<p>with and without <code class="docutils literal notranslate"><span class="pre">MUGRID_GPU_AWARE_MPI=0</span></code>. If results differ, the
+GPU-aware path of your MPI installation is broken; keep the kill
+switch on and report the issue to your MPI/UCX vendor.</p>
+</li>
+<li><p>Time the communication primitives with
+<code class="docutils literal notranslate"><span class="pre">benchmarks/communication_benchmark.py</span></code> (per-axis halo exchange and
+FFT/transpose timings). Per-call halo times should be milliseconds;
+much larger values indicate that messages take a slow path.</p></li>
+</ul>
 </section>
 </section>
 <section id="performance-considerations">
@@ -588,6 +665,13 @@ outweigh the benefits of GPU computation.</p>
 <li><a class="reference internal" href="#example-gpu-fft-with-fallback">Example: GPU FFT with fallback</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#gpu-data-and-mpi">GPU data and MPI</a><ul>
+<li><a class="reference internal" href="#technical-background">Technical background</a></li>
+<li><a class="reference internal" href="#runtime-detection-and-host-fallback">Runtime detection and host fallback</a></li>
+<li><a class="reference internal" href="#the-mugrid-gpu-aware-mpi-environment-variable">The <code class="docutils literal notranslate"><span class="pre">MUGRID_GPU_AWARE_MPI</span></code> environment variable</a></li>
+<li><a class="reference internal" href="#validating-an-installation">Validating an installation</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#performance-considerations">Performance considerations</a></li>
 </ul>
 </li>
@@ -600,7 +684,7 @@ outweigh the benefits of GPU computation.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=2f63eb2a"></script>
+</div><script src="_static/documentation_options.js?v=d86a9fee"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

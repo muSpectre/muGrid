@@ -176,7 +176,8 @@ implementing this contract:
 - ``JacobiPreconditioner(diagonal)`` — divides by the operator diagonal.
   Useful for strongly heterogeneous coefficients, where it equilibrates the
   spectrum (for a constant diagonal it merely rescales the system and does
-  not change the iteration);
+  not change the iteration). The diagonal may be spatial-only (shared across
+  field components) or per-component;
 - ``FourierPreconditioner(engine, kernel)`` — applies a spectral kernel,
   ``z = F⁻¹[k(q) · F r]``, using a muGrid ``FFTEngine``. With the inverse
   symbol of (an approximation to) the operator as the kernel, this is the
@@ -269,6 +270,12 @@ In the test suite (``tests/python_preconditioner_tests.py``), this reduces
 the iteration count on a 32×32 problem with ``c`` spanning six orders of
 magnitude from 164 to 21; the FFT-preconditioned Poisson solve converges in
 a single iteration.
+
+Both preconditioners run wherever the solver fields live: the Fourier
+kernel and the inverse diagonal are stored in fields on the engine's
+collections and applied with muGrid's fused linear-algebra kernels
+(``linalg.scal`` with a field-valued ``alpha``), so a solve on a GPU
+device stays on the device with no host transfers in the iteration loop.
 
 Linear Elasticity Solver
 ************************

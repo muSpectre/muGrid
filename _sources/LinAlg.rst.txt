@@ -43,6 +43,11 @@ The following operations are available in the ``muGrid.linalg`` namespace
    * - ``scal(alpha, x)``
      - :math:`x \leftarrow \alpha x`
      - SSCAL / DSCAL
+   * - ``scal(alpha_field, x)``
+     - :math:`x_{c,i} \leftarrow \alpha_{c,i}\, x_{c,i}` (per-pixel
+       multiplier; single-component :math:`\alpha` broadcasts over the
+       components of :math:`x`)
+     - (extended BLAS)
    * - ``axpby(alpha, x, beta, y)``
      - :math:`y \leftarrow \alpha x + \beta y`
      - (extended BLAS)
@@ -135,6 +140,15 @@ module:
 
     # Scale: x = 2.0 * x
     la.scal(2.0, x)
+
+    # Scale by a per-pixel multiplier (e.g. an inverse operator diagonal
+    # or a spectral kernel); alpha is a real field on the same collection.
+    # A single-component alpha broadcasts over the components of x; an
+    # alpha with x's number of components is applied elementwise. x may
+    # be real or complex.
+    alpha = fc.real_field("alpha")
+    alpha.p[...] = 0.5
+    la.scal(alpha, x)
 
     # Squared norm
     norm2 = la.norm_sq(x)
