@@ -4,35 +4,9 @@ Change log for µGrid
 0.108.0 (not yet released)
 --------------------------
 
-- ENH: The FFT transpose all-to-all uses non-blocking point-to-point
-  (`MPI_Irecv`/`MPI_Isend` + `MPI_Waitall`) instead of a blocking pairwise
-  ring, so the per-peer transfers overlap rather than running one at a time.
-  This matters as the peer count grows (multi-node distributed FFT). NOTE:
-  the concurrent device-to-device transfers are more likely to hit a broken
-  GPU-aware transport than the previous serialized ring -- on stacks with a
-  faulty UCX ``cuda_ipc`` (see the GPU docs), disable it with
-  ``UCX_TLS=^cuda_ipc`` or ``MUGRID_GPU_AWARE_MPI=0``
-- ENH: `reduce_ghosts` on the device is no longer dominated by per-block
-  device calls: the ghost accumulation uses a single strided GPU kernel
-  (`mpi/ghost_accumulate_gpu.cc`) instead of a copy-to-host/accumulate/
-  copy-back per block, and the post-reduction ghost zeroing uses one
-  `cudaMemset2D`/`hipMemset2D` per side instead of one `cudaMemset` per
-  (block, slice). With GPU-aware MPI the contributions are received straight
-  into device staging (no host transfer); otherwise they bounce through host
-  memory once. At 128³ on two GPUs this took device `reduce_ghosts` from
-  ~67 ms to ~0.3 ms (on par with `communicate_ghosts`)
-- TST: New GPU+MPI CI job runs the device-vs-host equivalence tests
-  (ghost exchange, `reduce_ghosts`, FFT transpose, preconditioners) multi-rank.
-  These exercise the device communication staging/accumulation paths, which
-  are `WITH_MPI`-only and so were never compiled by the MPI-off GPU CI job;
-  the new job is the regression guard for that code
+- ENH: FFT transpose all-to-all uses non-blocking communication
+- ENH: `reduce_ghosts` without intermediate host buffer
 - BUG: NetCDF I/O of local field collections now works with empty MPI ranks
-  and for multi-component / multi-sub-point local fields. The path uses the
-  collective `ncmu_*_varm_all` (which applies the field's index map and lets
-  empty/uneven ranks participate via zero-size requests); the previous
-  collective `varn` had no index map and corrupted/failed multi-component
-  local fields (`NC_EIOMISMATCH`). The local-field round-trip test is
-  re-enabled with a multi-component, multi-sub-point integer field
 
 0.107.0 (12Jun26)
 -----------------
