@@ -40,6 +40,7 @@
 #include "mpi_context.hh"
 
 #include "io_mpi_test_file_io.hh"
+#include "mpi_field_test_fixtures.hh"
 
 #include "io/file_io_netcdf.hh"
 #include "collection/field_collection_global.hh"
@@ -113,6 +114,7 @@ namespace muGrid {
     MPI_Barrier(this->comm.get_mpi_comm());
     */
 
+    remove(file_name.c_str());
     auto open_mode_w = muGrid::FileIOBase::OpenMode::Write;
     FileIONetCDF file_io_netcdf_w(file_name, open_mode_w, this->comm);
     file_io_netcdf_w.register_field_collection(this->global_fc);
@@ -300,7 +302,8 @@ namespace muGrid {
 
       const std::string file_name{"test_varying_num_procs.nc"};
       remove(file_name.c_str());  // remove test file if it already exists
-      auto open_mode_w = muGrid::FileIOBase::OpenMode::Write;
+      remove(file_name.c_str());
+    auto open_mode_w = muGrid::FileIOBase::OpenMode::Write;
       auto open_mode_r = muGrid::FileIOBase::OpenMode::Read;
       auto open_mode_a = muGrid::FileIOBase::OpenMode::Append;
 
@@ -590,4 +593,45 @@ namespace muGrid {
 #endif
 
   BOOST_AUTO_TEST_SUITE_END();
+
+  
+  /* ---------------------------------------------------------------------- */
+  struct FileIOFixtureEmptyRank : public MpiFieldMapFixtureEmptyProcs {
+    FileIOFixtureEmptyRank() : MpiFieldMapFixtureEmptyProcs() {
+       names = {"pixel_field", "quad_pt_field"};
+    }
+    std::vector<std::string> names;
+  };
+
+  BOOST_FIXTURE_TEST_CASE(FileIONetCDFEmptyRankWriteRead, FileIOFixtureEmptyRank) {
+    const std::string file_name{"test_empty_rank_np" + 
+                                std::to_string(this->comm.size()) + ".nc"};
+    remove(file_name.c_str());
+    auto open_mode_w = muGrid::FileIOBase::OpenMode::Write;
+    
+    // Write
+    {
+      FileIONetCDF file_io_w(file_name, open_mode_w, this->comm);
+      file_io_w.register_field_collection(this->fc);
+      file_io_w.append_frame().write(this->names);
+      file_io_w.close();
+    }
+    
+    // Read and verify
+    {
+      auto open_mode_r = muGrid::FileIOBase::OpenMode::Read;
+      FileIONetCDF file_io_r(file_name, open_mode_r, this->comm);
+      file_io_r.register_field_collection(this->fc);
+      
+      // Initialize with different values to ensure read actually happens
+      this->pixel_field.eigen_vec().setConstant(-123.45);
+      
+      file_io_r.read(0, this->names);
+      
+      // Verification
+      if (this->pixel_map.size() > 0) {
+          BOOST_CHECK(this->pixel_field.eigen_vec().mean() != -123.45);
+      }
+    }
+  }
 }  // namespace muGrid
