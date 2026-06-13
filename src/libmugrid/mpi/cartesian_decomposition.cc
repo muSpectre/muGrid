@@ -6,12 +6,8 @@
 #include <mpi.h>
 #endif
 
-#if defined(MUGRID_ENABLE_CUDA)
-#include <cuda_runtime.h>
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-#include <hip/hip_runtime.h>
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/gpu_runtime.hh"
 #endif
 
 #include "core/coordinates.hh"
@@ -533,46 +529,38 @@ namespace muGrid {
                     is_device_memory);
             }
 
-            // Zero out the ghost buffers after reduction
-            // Left ghost region
-            for (Index_t block{0}; block < nb_blocks; ++block) {
-                for (Index_t slice{0}; slice < nb_ghosts_left; ++slice) {
-                    auto offset{block * block_stride + slice * block_len};
-                    if (is_device_memory) {
-#if defined(MUGRID_ENABLE_CUDA)
-                        cudaMemset(data + offset * element_size, 0,
-                                   block_len * element_size);
-#elif defined(MUGRID_ENABLE_HIP)
-                        (void)hipMemset(data + offset * element_size, 0,
-                                        block_len * element_size);
+            // Zero out the ghost buffers after reduction. Within a block the
+            // ghost slices are contiguous (slice s at s * block_len), so each
+            // side's ghost region is one contiguous run of
+            // nb_ghosts * block_len elements per block, repeated nb_blocks
+            // times with stride block_stride -- i.e. a single 2D memset
+            // (device) instead of one call per (block, slice), which on the
+            // device is otherwise thousands of tiny cudaMemset calls.
+            auto right_ghost_start{nb_ghosts_left +
+                                   nb_subdomain_grid_pts_without_ghosts};
+            auto zero_region{[&](Index_t first_slice, Index_t nb_slices) {
+                if (nb_slices == 0 || nb_blocks == 0) {
+                    return;
+                }
+                Index_t base_offset{first_slice * block_len};
+                std::size_t width{static_cast<std::size_t>(nb_slices) *
+                                  block_len * element_size};
+                std::size_t pitch{static_cast<std::size_t>(block_stride) *
+                                  element_size};
+                char * region{data + base_offset * element_size};
+                if (is_device_memory) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                    GPU_MEMSET_2D(region, pitch, 0, width,
+                                  static_cast<std::size_t>(nb_blocks));
 #endif
-                    } else {
-                        std::memset(data + offset * element_size, 0,
-                                    block_len * element_size);
+                } else {
+                    for (Index_t block{0}; block < nb_blocks; ++block) {
+                        std::memset(region + block * pitch, 0, width);
                     }
                 }
-            }
-
-            // Right ghost region
-            auto right_ghost_start{nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts};
-            for (Index_t block{0}; block < nb_blocks; ++block) {
-                for (Index_t slice{0}; slice < nb_ghosts_right; ++slice) {
-                    auto offset{block * block_stride +
-                                (right_ghost_start + slice) * block_len};
-                    if (is_device_memory) {
-#if defined(MUGRID_ENABLE_CUDA)
-                        cudaMemset(data + offset * element_size, 0,
-                                   block_len * element_size);
-#elif defined(MUGRID_ENABLE_HIP)
-                        (void)hipMemset(data + offset * element_size, 0,
-                                        block_len * element_size);
-#endif
-                    } else {
-                        std::memset(data + offset * element_size, 0,
-                                    block_len * element_size);
-                    }
-                }
-            }
+            }};
+            zero_region(0, nb_ghosts_left);                 // left ghost region
+            zero_region(right_ghost_start, nb_ghosts_right);  // right ghost
         }
     }
 

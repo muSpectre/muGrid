@@ -801,13 +801,15 @@ namespace muGrid {
     //! NetCDF file
     virtual void write(const int netcdf_id, const Index_t & tot_nb_frames,
                        GlobalFieldCollection & GFC_local_pixels,
-                       const Index_t & frame_index);
+                       const Index_t & frame_index,
+                       const Communicator & comm);
 
     //! actual call of NetCDF functions to read in the data of a single
     //! NetCDFVar from a NetCDF file
     virtual void read(const int netcdf_id, const Index_t & tot_nb_frames,
                       GlobalFieldCollection & GFC_local_pixels,
-                      const Index_t & frame_index);
+                      const Index_t & frame_index,
+                      const Communicator & comm);
 
    protected:
     std::string name;  // Variable name. Must be a legal netCDF identifier.
@@ -894,13 +896,15 @@ namespace muGrid {
     //! NetCDF file
     void write(const int netcdf_id, const Index_t & tot_nb_frames,
                GlobalFieldCollection & GFC_local_pixels,
-               const Index_t & frame_index) override;
+               const Index_t & frame_index,
+               const Communicator & comm) override;
 
     //! actual call of NetCDF functions to read in the data of a single
     //! NetCDFVar from a NetCDF file
     void read(const int netcdf_id, const Index_t & tot_nb_frames,
               GlobalFieldCollection & GFC_local_pixels,
-              const Index_t & frame_index) override;
+              const Index_t & frame_index,
+              const Communicator & comm) override;
 
    protected:
     muGrid::Field &
@@ -983,13 +987,15 @@ namespace muGrid {
     //! NetCDF file
     void write(const int netcdf_id, const Index_t & tot_nb_frames,
                GlobalFieldCollection & GFC_local_pixels,
-               const Index_t & frame_index) override;
+               const Index_t & frame_index,
+               const Communicator & comm) override;
 
     //! actual call of NetCDF functions to read in the data of a single
     //! NetCDFVar from a NetCDF file
     void read(const int netcdf_id, const Index_t & tot_nb_frames,
               GlobalFieldCollection & GFC_local_pixels,
-              const Index_t & frame_index) override;
+              const Index_t & frame_index,
+              const Communicator & comm) override;
 
    protected:
     muGrid::StateField &

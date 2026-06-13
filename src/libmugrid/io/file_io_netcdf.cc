@@ -333,12 +333,13 @@ namespace muGrid {
                       local_field_name) == read_local_pixel_fields.end()) {
           variables.get_variable(local_field_name)
               .read(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
-                    0);
+                    0, this->comm);
           this->read_local_pixel_fields.push_back(local_field_name);
         }
       }
       // read the variable
-      var.read(this->netcdf_id, this->nb_frames, this->GFC_local_pixels, frame);
+      var.read(this->netcdf_id, this->nb_frames, this->GFC_local_pixels, frame,
+               this->comm);
     }
   }
 
@@ -371,7 +372,7 @@ namespace muGrid {
             // write the corresponding hidden field
             variables.get_variable(local_field_name)
                 .write(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
-                       0);
+                       0, this->comm);
             this->written_local_pixel_fields.push_back(local_field_name);
           }
         } else if (this->open_mode == FileIOBase::OpenMode::Append) {
@@ -382,14 +383,14 @@ namespace muGrid {
             NetCDFVarBase & local_field_var{
                 variables.get_variable(local_field_name)};
             local_field_var.read(this->netcdf_id, this->nb_frames,
-                                 this->GFC_local_pixels, frame);
+                                 this->GFC_local_pixels, frame, this->comm);
             this->read_local_pixel_fields.push_back(local_field_name);
           }
         }
       }
       // write the variable
       var.write(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
-                frame);
+                frame, this->comm);
     }
     this->netcdf_file_changes();  // update flag for bookkeeping
   }
@@ -424,7 +425,7 @@ namespace muGrid {
     for (auto & f_name : field_names) {
       NetCDFVarBase & var{variables.get_variable(f_name)};
       var.write(this->netcdf_id, this->nb_frames, this->GFC_local_pixels,
-                frame);
+                frame, this->comm);
     }
   }
 
@@ -2356,6 +2357,17 @@ namespace muGrid {
     size_t stride_size{this->get_nc_stride().size()};
     size_t imap_size{this->get_nc_imap_local().size()};
 
+    // A rank with no local pixels (empty in this decomposition) moves no
+    // data for this variable, so the start/count vectors are empty and the
+    // start/count/stride/imap relation is vacuous. Skip the check: the index
+    // map of an empty field carries a spurious extra entry, which is
+    // harmless (it is never used -- the I/O loop makes zero, or only
+    // zero-size, requests on an empty rank) but would otherwise trip the
+    // relation below and break local I/O whenever some ranks are empty.
+    if (start_size == 0 && count_size == 0) {
+      return;
+    }
+
     // check the relations between the four vectors, if the relations are not
     // fulfilled there is probably something wrong and there might occure errors
     // during read and write also the code is running.
@@ -2384,7 +2396,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void NetCDFVarBase::write(const int netcdf_id, const Index_t & tot_nb_frames,
                             GlobalFieldCollection & GFC_local_pixels,
-                            const Index_t & frame_index) {
+                            const Index_t & frame_index,
+                            [[maybe_unused]] const Communicator & comm) {
     // check if frame is correct and compute positive frame value
     Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
 
@@ -2412,53 +2425,81 @@ namespace muGrid {
     } else if (this->get_validity_domain() ==
                muGrid::FieldCollection::ValidityDomain::Local) {
       /**
-       * Write local field with ncmu_put_varn_all
+       * Write local field with ncmu_put_varm_all (one subarray per pixel)
        **/
       IOSize_t ndims{this->get_ndims()};  // number of dimensions
       std::vector<IOSize_t> starts_vec{this->get_start_local(
           frame, GFC_local_pixels.get_field(this->get_local_field_name()))};
       std::vector<IOSize_t> counts_vec{this->get_count_local(
           GFC_local_pixels.get_field(this->get_local_field_name()))};
-      size_t num_requests{
-          starts_vec.size() /
-          ndims};  // number of subarray requests in ncmu_put_varn_all
+      size_t num_requests{starts_vec.size() /
+                          ndims};  // one subarray request per local pixel
 
       void * buf_ptr{this->get_buf()};
-      IOSize_t nb_points{0};
       std::vector<IODiff_t> stride{this->get_nc_stride()};
       std::vector<IODiff_t> imap{this->get_nc_imap_local()};
 #ifdef WITH_MPI
       IOSize_t buf_count{this->get_bufcount_mpi_local()};
       Datatype_t buf_type{this->get_buftype()};
-      ncmu_begin_indep_data(netcdf_id);
-#endif  // WITH_MPI
 
+      // Collective I/O that preserves the field's in-memory layout. Each
+      // local pixel is a separate subarray (scattered in the global pixel
+      // index space) sharing the same per-pixel buffer count and index map.
+      // The index map reconciles the (component, sub-point, pixel) memory
+      // layout with the NetCDF variable's dimension order -- it must be
+      // applied, which collective varm_all does but the (single-call,
+      // index-map-free) varn_all cannot. Because varm_all is collective,
+      // every rank issues the same number of calls; ranks with fewer pixels
+      // (including empty ones) pad with zero-size requests, which keeps the
+      // path correct for empty/uneven ranks. NB: this is one collective call
+      // per global-maximum pixel count -- adequate for the typically small
+      // local field collections; a manual pack to NetCDF dimension order
+      // plus a single varn_all would scale better at the cost of
+      // re-implementing the index map.
+      size_t global_max_requests{
+          static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
+      std::vector<IOSize_t> empty_start(ndims, 0);
+      std::vector<IOSize_t> empty_count(ndims, 0);
+      for (size_t i = 0; i < global_max_requests; i++) {
+        if (i < num_requests) {
+          std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
+                                       starts_vec.begin() + (i + 1) * ndims);
+          std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
+                                       counts_vec.begin() + (i + 1) * ndims);
+          status = ncmu_put_varm_all(netcdf_id, this->get_id(), starts.data(),
+                                     counts.data(), stride.data(), imap.data(),
+                                     buf_ptr, buf_count, buf_type);
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
+          buf_ptr = this->increment_buf_ptr(buf_ptr, get_nb_from_shape(counts));
+        } else {
+          // zero-size request: participate in the collective, write nothing
+          status = ncmu_put_varm_all(netcdf_id, this->get_id(),
+                                     empty_start.data(), empty_count.data(),
+                                     stride.data(), imap.data(), buf_ptr,
+                                     IOSize_t{0}, buf_type);
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
+        }
+      }
+#else   // WITH_MPI
+      IOSize_t nb_points{0};
       for (size_t i = 0; i < num_requests; i++) {
         std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
                                      starts_vec.begin() + (i + 1) * ndims);
         std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
                                      counts_vec.begin() + (i + 1) * ndims);
-#ifdef WITH_MPI
-        status = ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
-                               counts.data(), stride.data(), imap.data(),
-                               buf_ptr, buf_count, buf_type);
-#else   // WITH_MPI
         status =
             ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
                           counts.data(), stride.data(), imap.data(), buf_ptr);
-#endif  // WITH_MPI
         if (status != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status));
         }
-        // number of written points in loop step
-        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
-        // storage order... I have to fix this for at least C storage order or
-        // better an arbitrary case
         nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
-#ifdef WITH_MPI
-      ncmu_end_indep_data(netcdf_id);
 #endif  // WITH_MPI
     }
   }
@@ -2466,7 +2507,8 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void NetCDFVarBase::read(const int netcdf_id, const Index_t & tot_nb_frames,
                            GlobalFieldCollection & GFC_local_pixels,
-                           const Index_t & frame_index) {
+                           const Index_t & frame_index,
+                           [[maybe_unused]] const Communicator & comm) {
     // check if frame is correct and compute positive frame value
     Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
 
@@ -2495,55 +2537,71 @@ namespace muGrid {
     } else if (this->get_validity_domain() ==
                muGrid::FieldCollection::ValidityDomain::Local) {
       /**
-       * Read local field with ncmu_get_varn_all
+       * Read local field with ncmu_get_varm_all (one subarray per pixel)
        **/
-#ifdef WITH_MPI
-      ncmu_begin_indep_data(netcdf_id);
-#endif                                    // WITH_MPI
       IOSize_t ndims{this->get_ndims()};  // number of dimensions
       std::vector<IOSize_t> starts_vec{this->get_start_local(
           frame, GFC_local_pixels.get_field(this->get_local_field_name()))};
       std::vector<IOSize_t> counts_vec{this->get_count_local(
           GFC_local_pixels.get_field(this->get_local_field_name()))};
-      size_t num_requests{
-          starts_vec.size() /
-          ndims};  // number of subarray requests in ncmu_put_varn_all
+      size_t num_requests{starts_vec.size() /
+                          ndims};  // one subarray request per local pixel
 
       void * buf_ptr{this->get_buf()};
-      IOSize_t nb_points{0};
       std::vector<IODiff_t> stride{this->get_nc_stride()};
       std::vector<IODiff_t> imap{this->get_nc_imap_local()};
 #ifdef WITH_MPI
       IOSize_t buf_count{this->get_bufcount_mpi_local()};
       Datatype_t buf_type{this->get_buftype()};
-#endif  // WITH_MPI
 
+      // Collective read mirroring the write path: one varm_all per pixel
+      // (applies the index map), with every rank issuing the same number of
+      // calls and shorter/empty ranks padding with zero-size requests. See
+      // NetCDFVarBase::write() for the rationale.
+      size_t global_max_requests{
+          static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
+      std::vector<IOSize_t> empty_start(ndims, 0);
+      std::vector<IOSize_t> empty_count(ndims, 0);
+      for (size_t i = 0; i < global_max_requests; i++) {
+        if (i < num_requests) {
+          std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
+                                       starts_vec.begin() + (i + 1) * ndims);
+          std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
+                                       counts_vec.begin() + (i + 1) * ndims);
+          status = ncmu_get_varm_all(netcdf_id, this->get_id(), starts.data(),
+                                     counts.data(), stride.data(), imap.data(),
+                                     buf_ptr, buf_count, buf_type);
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
+          buf_ptr = this->increment_buf_ptr(buf_ptr, get_nb_from_shape(counts));
+        } else {
+          // zero-size request: participate in the collective, read nothing
+          status = ncmu_get_varm_all(netcdf_id, this->get_id(),
+                                     empty_start.data(), empty_count.data(),
+                                     stride.data(), imap.data(), buf_ptr,
+                                     IOSize_t{0}, buf_type);
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
+        }
+      }
+#else   // WITH_MPI
+      IOSize_t nb_points{0};
       for (size_t i = 0; i < num_requests; i++) {
         std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
                                      starts_vec.begin() + (i + 1) * ndims);
         std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
                                      counts_vec.begin() + (i + 1) * ndims);
-#ifdef WITH_MPI
-        status = ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
-                               counts.data(), stride.data(), imap.data(),
-                               buf_ptr, buf_count, buf_type);
-#else   // WITH_MPI
         status =
             ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
                           counts.data(), stride.data(), imap.data(), buf_ptr);
-#endif  // WITH_MPI
         if (status != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status));
         }
-        // number of written points in loop step
-        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
-        // storage order... I have to fix this for at least C storage order or
-        // better an arbitrary case
         nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
-#ifdef WITH_MPI
-      ncmu_end_indep_data(netcdf_id);
 #endif  // WITH_MPI
     }
   }
@@ -2788,17 +2846,19 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   void NetCDFVarField::write(const int netcdf_id, const Index_t & tot_nb_frames,
                              GlobalFieldCollection & GFC_local_pixels,
-                             const Index_t & frame_index) {
+                             const Index_t & frame_index,
+                             const Communicator & comm) {
     NetCDFVarBase::write(netcdf_id, tot_nb_frames, GFC_local_pixels,
-                         frame_index);
+                         frame_index, comm);
   }
 
   /* ---------------------------------------------------------------------- */
   void NetCDFVarField::read(const int netcdf_id, const Index_t & tot_nb_frames,
                             GlobalFieldCollection & GFC_local_pixels,
-                            const Index_t & frame_index) {
+                            const Index_t & frame_index,
+                            const Communicator & comm) {
     NetCDFVarBase::read(netcdf_id, tot_nb_frames, GFC_local_pixels,
-                        frame_index);
+                        frame_index, comm);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -3003,14 +3063,15 @@ namespace muGrid {
   void NetCDFVarStateField::write(const int netcdf_id,
                                   const Index_t & tot_nb_frames,
                                   GlobalFieldCollection & GFC_local_pixels,
-                                  const Index_t & frame_index) {
+                                  const Index_t & frame_index,
+                                  const Communicator & comm) {
     for (size_t new_state_field_index = 0;
          new_state_field_index < this->get_nb_fields();
          new_state_field_index++) {
       // bring the state_field into the right state (set the state_field_index)
       this->state_field_index = new_state_field_index;
       NetCDFVarBase::write(netcdf_id, tot_nb_frames, GFC_local_pixels,
-                           frame_index);
+                           frame_index, comm);
     }
   }
 
@@ -3018,14 +3079,15 @@ namespace muGrid {
   void NetCDFVarStateField::read(const int netcdf_id,
                                  const Index_t & tot_nb_frames,
                                  GlobalFieldCollection & GFC_local_pixels,
-                                 const Index_t & frame_index) {
+                                 const Index_t & frame_index,
+                                 const Communicator & comm) {
     for (size_t new_state_field_index = 0;
          new_state_field_index < this->get_nb_fields();
          new_state_field_index++) {
       // bring the state_field into the right state (set the state_field_index)
       this->state_field_index = new_state_field_index;
       NetCDFVarBase::read(netcdf_id, tot_nb_frames, GFC_local_pixels,
-                          frame_index);
+                          frame_index, comm);
     }
   }
 

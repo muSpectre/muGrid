@@ -70,7 +70,7 @@ namespace muGrid {
                     subdomain_locations, nb_sub_pts),
           nb_sub_pts_local{{quad, 3}},
           local_fc(spatial_dimension, "local_FC", nb_sub_pts_local),
-          names{"T4_test_field", "T2_test_field"}, //, "T1_int_field"},
+          names{"T4_test_field", "T2_test_field", "T1_int_field"},
           t4_field(dynamic_cast<muGrid::RealField &>(
               global_fc.register_real_field(
                   names[0], muGrid::ipow(spatial_dimension, 4), quad))),
@@ -78,11 +78,17 @@ namespace muGrid {
           t2_field(dynamic_cast<muGrid::RealField &>(
               global_fc.register_real_field(
                   names[1], muGrid::ipow(spatial_dimension, 2)))),
-          t2_field_map(t2_field)
-          /*,
-          t1_field{this->local_fc.register_field<muGrid::Int>(
-              names[2], muGrid::ipow(this->spatial_dimension, 1), this->quad)},
-          t1_field_map{this->t1_field}*/ {
+          t2_field_map(t2_field),
+          // A local, multi-component (2), multi-sub-point (3 quad points)
+          // integer field. The local-field I/O path applies a non-trivial
+          // index map (the in-memory component/sub-point/pixel layout differs
+          // from the NetCDF variable's dimension order), so a correct
+          // round-trip proves the layout is preserved -- the regression guard
+          // for the collective varm_all local I/O path.
+          t1_field(dynamic_cast<muGrid::TypedField<muGrid::Int> &>(
+              local_fc.register_field<muGrid::Int>(
+                  names[2], muGrid::ipow(spatial_dimension, 1), quad))),
+          t1_field_map(t1_field) {
       // add some pixels to the local field collection
       if (this->comm.size() == 1) {
         for (size_t index = 2; index < 6; index++) {
@@ -130,12 +136,11 @@ namespace muGrid {
                        muGrid::IterUnit::SubPt>
         t2_field_map;
 
-    // A local T1 test field
-    /*
-    muGrid::TypedField<int> & t1_field;
-    muGrid::T1FieldMap<int, Mapping::Mut, FileIOFixture::spatial_dimension,
-                       muGrid::IterUnit::SubPt>
-        t1_field_map;*/
+    // A local T1 test field (2 components, 3 quad sub-points)
+    muGrid::TypedField<muGrid::Int> & t1_field;
+    muGrid::T1FieldMap<muGrid::Int, Mapping::Mut,
+                       FileIOFixture::spatial_dimension, muGrid::IterUnit::SubPt>
+        t1_field_map;
   };
   constexpr Index_t FileIOFixture::spatial_dimension;
 }  // namespace muGrid

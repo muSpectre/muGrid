@@ -59,6 +59,8 @@ using gpuStream_t = cudaStream_t;
 #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
 #define GPU_FREE(ptr) (void)cudaFree(ptr)
 #define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
+#define GPU_MEMSET_2D(ptr, pitch, value, width, height) \
+    (void)cudaMemset2D(ptr, pitch, value, width, height)
 #define GPU_MEMCPY_D2H(dst, src, size) \
     (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
 #define GPU_MEMCPY_H2D(dst, src, size) \
@@ -96,6 +98,8 @@ using gpuStream_t = hipStream_t;
 #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
 #define GPU_FREE(ptr) (void)hipFree(ptr)
 #define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
+#define GPU_MEMSET_2D(ptr, pitch, value, width, height) \
+    (void)hipMemset2D(ptr, pitch, value, width, height)
 #define GPU_MEMCPY_D2H(dst, src, size) \
     (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
 #define GPU_MEMCPY_H2D(dst, src, size) \
