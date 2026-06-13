@@ -342,7 +342,12 @@ detection in both directions:
   been observed to *silently corrupt* device messages in specific size
   windows (e.g. UCX's ``cuda_ipc`` transport between consumer GPUs).
   Forcing the host path trades some bandwidth for transfers that only
-  use plain ``cudaMemcpy``/``hipMemcpy``.
+  use plain ``cudaMemcpy``/``hipMemcpy``. The distributed-FFT transpose
+  posts several device-to-device transfers concurrently (non-blocking
+  all-to-all), which is more likely to expose such a transport bug than a
+  serialized exchange would; if an FFT-based solve produces wrong results
+  only with GPU-aware MPI, this kill switch (or ``UCX_TLS=^cuda_ipc``) is
+  the first thing to try.
 
 .. code-block:: sh
 

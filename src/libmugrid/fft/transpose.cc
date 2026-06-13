@@ -540,51 +540,61 @@ namespace muGrid {
                            send_total * sizeof(Complex));
         }
 #endif
-        // Pairwise ring exchange instead of MPI_Alltoallv: collective
+        // Non-blocking all-to-all instead of MPI_Alltoallv: collective
         // components are not reliably GPU-aware, while point-to-point on
-        // contiguous device buffers is the well-trodden CUDA/ROCm-aware
-        // path. At step s, rank r sends to r+s and receives from r-s; the
-        // partners match up at the same step on both sides, so the
-        // schedule is deadlock-free for any communicator size. (Sending
-        // to and receiving from the SAME peer each step deadlocks for
-        // size > 2: everyone would wait on a partner that sends to them
-        // only at a later step.)
+        // contiguous device buffers is the well-trodden CUDA/ROCm-aware path.
+        // Posting every peer's receive and send up front and waiting once
+        // lets the per-peer transfers overlap (the previous blocking pairwise
+        // ring fully serialized them, one Sendrecv per step). The self block
+        // never enters MPI: it is copied on the device. Each peer reads and
+        // writes a disjoint slice of the contiguous staging buffers, so the
+        // outstanding requests do not alias.
         {
             MPI_Comm mpi_comm{this->comm.get_mpi_comm()};
             int my_rank{this->comm.rank()};
-            for (int step{0}; step < comm_size; ++step) {
-                if (step == 0) {
-                    auto bytes{static_cast<std::size_t>(
-                                   send_counts_el[my_rank]) *
-                               sizeof(Complex)};
-                    if (bytes > 0) {
-                        // The self block never leaves the device
-                        strided_device_copy(
-                            recv_staging + static_cast<std::size_t>(
-                                               recv_displs_el[my_rank]) *
-                                               sizeof(Complex),
-                            send_staging + static_cast<std::size_t>(
-                                               send_displs_el[my_rank]) *
-                                               sizeof(Complex),
-                            bytes, 1, bytes, bytes);
-                    }
+
+            // The self block never leaves the device.
+            auto self_bytes{static_cast<std::size_t>(send_counts_el[my_rank]) *
+                            sizeof(Complex)};
+            if (self_bytes > 0) {
+                strided_device_copy(
+                    recv_staging +
+                        static_cast<std::size_t>(recv_displs_el[my_rank]) *
+                            sizeof(Complex),
+                    send_staging +
+                        static_cast<std::size_t>(send_displs_el[my_rank]) *
+                            sizeof(Complex),
+                    self_bytes, 1, self_bytes, self_bytes);
+            }
+
+            std::vector<MPI_Request> requests;
+            requests.reserve(2 * static_cast<std::size_t>(comm_size));
+            for (int peer{0}; peer < comm_size; ++peer) {
+                if (peer == my_rank) {
                     continue;
                 }
-                int send_peer{(my_rank + step) % comm_size};
-                int recv_peer{(my_rank - step + comm_size) % comm_size};
-                MPI_Status status;
-                MPI_Sendrecv(send_buffer +
-                                 static_cast<std::size_t>(
-                                     send_displs_el[send_peer]) *
-                                     sizeof(Complex),
-                             send_counts_el[send_peer], mpi_type<Complex>(),
-                             send_peer, 0,
-                             recv_buffer +
-                                 static_cast<std::size_t>(
-                                     recv_displs_el[recv_peer]) *
-                                     sizeof(Complex),
-                             recv_counts_el[recv_peer], mpi_type<Complex>(),
-                             recv_peer, 0, mpi_comm, &status);
+                if (recv_counts_el[peer] > 0) {
+                    requests.emplace_back();
+                    MPI_Irecv(recv_buffer +
+                                  static_cast<std::size_t>(
+                                      recv_displs_el[peer]) *
+                                      sizeof(Complex),
+                              recv_counts_el[peer], mpi_type<Complex>(), peer,
+                              0, mpi_comm, &requests.back());
+                }
+                if (send_counts_el[peer] > 0) {
+                    requests.emplace_back();
+                    MPI_Isend(send_buffer +
+                                  static_cast<std::size_t>(
+                                      send_displs_el[peer]) *
+                                      sizeof(Complex),
+                              send_counts_el[peer], mpi_type<Complex>(), peer,
+                              0, mpi_comm, &requests.back());
+                }
+            }
+            if (!requests.empty()) {
+                MPI_Waitall(static_cast<int>(requests.size()),
+                            requests.data(), MPI_STATUSES_IGNORE);
             }
         }
 

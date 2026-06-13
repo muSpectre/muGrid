@@ -4,6 +4,14 @@ Change log for µGrid
 0.108.0 (not yet released)
 --------------------------
 
+- ENH: The FFT transpose all-to-all uses non-blocking point-to-point
+  (`MPI_Irecv`/`MPI_Isend` + `MPI_Waitall`) instead of a blocking pairwise
+  ring, so the per-peer transfers overlap rather than running one at a time.
+  This matters as the peer count grows (multi-node distributed FFT). NOTE:
+  the concurrent device-to-device transfers are more likely to hit a broken
+  GPU-aware transport than the previous serialized ring -- on stacks with a
+  faulty UCX ``cuda_ipc`` (see the GPU docs), disable it with
+  ``UCX_TLS=^cuda_ipc`` or ``MUGRID_GPU_AWARE_MPI=0``
 - ENH: `reduce_ghosts` on the device is no longer dominated by per-block
   device calls: the ghost accumulation uses a single strided GPU kernel
   (`mpi/ghost_accumulate_gpu.cc`) instead of a copy-to-host/accumulate/
