@@ -75,6 +75,11 @@ before-all = [
 [tool.pytest.ini_options]
 python_files = "python_*_tests.py"
 testpaths = ["tests"]
+# Disable the pytest-flake8 plugin (pulled in transitively by some test
+# dependencies). It uses the removed pytest_collect_file(path=...) signature
+# and crashes collection on recent pytest. Style checking is done via
+# pre-commit, not pytest.
+addopts = "-p no:flake8"
 
 
 [tool.black]
