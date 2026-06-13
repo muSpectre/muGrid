@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-0.108.0 (not yet released)
---------------------------
+0.108.0 (13Jun26)
+-----------------
 
 - ENH: FFT transpose all-to-all uses non-blocking communication
 - ENH: `reduce_ghosts` without intermediate host buffer
