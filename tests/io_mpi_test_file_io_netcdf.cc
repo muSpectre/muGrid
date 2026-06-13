@@ -97,7 +97,6 @@ namespace muGrid {
     // wait until all ranks have initialised all values of the field
     MPI_Barrier(this->comm.get_mpi_comm());
 
-    /*
     int fill_value{9};
     for (auto && id_val : this->t1_field_map.enumerate_indices()) {
       auto && value{std::get<1>(id_val)};
@@ -112,7 +111,6 @@ namespace muGrid {
     }
     // wait until all ranks have initialised all values of the field
     MPI_Barrier(this->comm.get_mpi_comm());
-    */
 
     remove(file_name.c_str());
     auto open_mode_w = muGrid::FileIOBase::OpenMode::Write;
@@ -164,7 +162,6 @@ namespace muGrid {
       }
     }
 
-    /*
     int fill_value{9};
     for (auto && id_val : this->t1_field_map.enumerate_indices()) {
       auto && value{std::get<1>(id_val)};
@@ -174,7 +171,6 @@ namespace muGrid {
         BOOST_CHECK_EQUAL(value(i), reference);
       }
     }
-    */
     file_io_netcdf_r.close();  // close file
   };
 
@@ -231,20 +227,27 @@ namespace muGrid {
     // FIXME(pastewka): I/O of local field collections does not work if processors are empty
     // file_io_netcdf_a.register_field_collection(this->local_fc);
 
+    // Append only registers the global field collection, so write/read the
+    // global field names. (Append of local fields is covered by the
+    // write/read round-trip above; the append test focuses on the
+    // overwrite/append frame semantics for global fields.)
+    const std::vector<std::string> global_names{this->names[0],
+                                                this->names[1]};
+
     // does it know about all current frames
     Index_t n_frames{2};
     BOOST_CHECK_EQUAL(file_io_netcdf_a.size(), n_frames);
 
     // test overwrite and append!
     Index_t frame{0};
-    file_io_netcdf_a.append_frame().write(this->names);  // should append
-    file_io_netcdf_a.write(frame, this->names);          // should overwrite
+    file_io_netcdf_a.append_frame().write(global_names);  // should append
+    file_io_netcdf_a.write(frame, global_names);          // should overwrite
 
     // check if the fields are correct
     std::vector<Index_t> check_frames{
         frame, n_frames};  // overwritten and appended frame
     for (int frame : check_frames) {
-      file_io_netcdf_a.read(frame, this->names);
+      file_io_netcdf_a.read(frame, global_names);
       for (auto && id_val : this->t4_field_map.enumerate_indices()) {
         auto && index{std::get<0>(id_val)};
         auto && value{std::get<1>(id_val)};

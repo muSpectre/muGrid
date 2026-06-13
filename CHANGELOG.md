@@ -1,6 +1,22 @@
 Change log for µGrid
 ====================
 
+0.108.0 (not yet released)
+--------------------------
+
+- TST: New GPU+MPI CI job runs the device-vs-host equivalence tests
+  (ghost exchange, `reduce_ghosts`, FFT transpose, preconditioners) multi-rank.
+  These exercise the device communication staging/accumulation paths, which
+  are `WITH_MPI`-only and so were never compiled by the MPI-off GPU CI job;
+  the new job is the regression guard for that code
+- BUG: NetCDF I/O of local field collections now works with empty MPI ranks
+  and for multi-component / multi-sub-point local fields. The path uses the
+  collective `ncmu_*_varm_all` (which applies the field's index map and lets
+  empty/uneven ranks participate via zero-size requests); the previous
+  collective `varn` had no index map and corrupted/failed multi-component
+  local fields (`NC_EIOMISMATCH`). The local-field round-trip test is
+  re-enabled with a multi-component, multi-sub-point integer field
+
 0.107.0 (12Jun26)
 -----------------
 
