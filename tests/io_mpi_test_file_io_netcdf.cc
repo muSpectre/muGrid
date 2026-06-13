@@ -117,7 +117,7 @@ namespace muGrid {
     FileIONetCDF file_io_netcdf_w(file_name, open_mode_w, this->comm);
     file_io_netcdf_w.register_field_collection(this->global_fc);
     // FIXME(pastewka): I/O of local field collections does not work if processors are empty
-    // file_io_netcdf_w.register_field_collection(this->local_fc);
+    file_io_netcdf_w.register_field_collection(this->local_fc);
     file_io_netcdf_w.append_frame().write(this->names);  // write frame 0
     file_io_netcdf_w.append_frame().write(this->names);  // write frame 1
     file_io_netcdf_w.close();
@@ -132,7 +132,7 @@ namespace muGrid {
     FileIONetCDF file_io_netcdf_r(file_name, open_mode_r, this->comm);
     file_io_netcdf_r.register_field_collection(this->global_fc);
     // FIXME(pastewka): I/O of local field collections does not work if processors are empty
-    // file_io_netcdf_r.register_field_collection(this->local_fc);
+    file_io_netcdf_r.register_field_collection(this->local_fc);
     file_io_netcdf_r.read(frame, this->names);
 
     // check if the fields are correct

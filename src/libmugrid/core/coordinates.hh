@@ -400,26 +400,21 @@ namespace muGrid {
         //! conversion operator
         template <size_t Dim>
         operator std::array<T, Dim>() const {
-            return this->template get<Dim>();
-        }
-
-        //! cast to a reference to a statically sized array
-        template <Dim_t Dim>
-        std::array<T, Dim> & get() {
             static_assert(Dim <= MaxDim,
                           "Requested coord has more than MaxDim dimensions.");
-            char * intermediate{reinterpret_cast<char *>(&this->long_array)};
-            return reinterpret_cast<std::array<T, Dim> &>(*intermediate);
+            std::array<T, Dim> result;
+            std::copy_n(this->long_array.begin(), Dim, result.begin());
+            return result;
         }
 
-        //! cast to a const reference to a statically sized array
+        //! return a copy as a statically sized array
         template <Dim_t Dim>
-        const std::array<T, Dim> & get() const {
+        std::array<T, Dim> get() const {
             static_assert(Dim <= MaxDim,
                           "Requested coord has more than MaxDim dimensions.");
-            const char * intermediate{
-                reinterpret_cast<const char *>(&this->long_array)};
-            return reinterpret_cast<const std::array<T, Dim> &>(*intermediate);
+            std::array<T, Dim> result;
+            std::copy_n(this->long_array.begin(), Dim, result.begin());
+            return result;
         }
 
         //! return the spatial dimension of this coordinate

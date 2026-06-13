@@ -2423,42 +2423,44 @@ namespace muGrid {
           starts_vec.size() /
           ndims};  // number of subarray requests in ncmu_put_varn_all
 
+#ifdef WITH_MPI
+      IOSize_t buf_count{this->get_bufcount_mpi_local()};
+      Datatype_t buf_type{this->get_buftype()};
+      
+      // Prepare pointers for collective varn call
+      std::vector<IOSize_t*> starts_ptrs(num_requests);
+      std::vector<IOSize_t*> counts_ptrs(num_requests);
+      for (size_t i = 0; i < num_requests; i++) {
+        starts_ptrs[i] = const_cast<IOSize_t*>(starts_vec.data() + i * ndims);
+        counts_ptrs[i] = const_cast<IOSize_t*>(counts_vec.data() + i * ndims);
+      }
+      
+      status = ncmu_put_varn_all(netcdf_id, this->get_id(), 
+                                 static_cast<int>(num_requests),
+                                 starts_ptrs.data(), counts_ptrs.data(),
+                                 this->get_buf(), buf_count, buf_type);
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+#else   // WITH_MPI
       void * buf_ptr{this->get_buf()};
       IOSize_t nb_points{0};
       std::vector<IODiff_t> stride{this->get_nc_stride()};
       std::vector<IODiff_t> imap{this->get_nc_imap_local()};
-#ifdef WITH_MPI
-      IOSize_t buf_count{this->get_bufcount_mpi_local()};
-      Datatype_t buf_type{this->get_buftype()};
-      ncmu_begin_indep_data(netcdf_id);
-#endif  // WITH_MPI
-
       for (size_t i = 0; i < num_requests; i++) {
         std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
                                      starts_vec.begin() + (i + 1) * ndims);
         std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
                                      counts_vec.begin() + (i + 1) * ndims);
-#ifdef WITH_MPI
-        status = ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
-                               counts.data(), stride.data(), imap.data(),
-                               buf_ptr, buf_count, buf_type);
-#else   // WITH_MPI
         status =
             ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
                           counts.data(), stride.data(), imap.data(), buf_ptr);
-#endif  // WITH_MPI
         if (status != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status));
         }
-        // number of written points in loop step
-        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
-        // storage order... I have to fix this for at least C storage order or
-        // better an arbitrary case
         nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
-#ifdef WITH_MPI
-      ncmu_end_indep_data(netcdf_id);
 #endif  // WITH_MPI
     }
   }
@@ -2497,9 +2499,6 @@ namespace muGrid {
       /**
        * Read local field with ncmu_get_varn_all
        **/
-#ifdef WITH_MPI
-      ncmu_begin_indep_data(netcdf_id);
-#endif                                    // WITH_MPI
       IOSize_t ndims{this->get_ndims()};  // number of dimensions
       std::vector<IOSize_t> starts_vec{this->get_start_local(
           frame, GFC_local_pixels.get_field(this->get_local_field_name()))};
@@ -2509,41 +2508,44 @@ namespace muGrid {
           starts_vec.size() /
           ndims};  // number of subarray requests in ncmu_put_varn_all
 
+#ifdef WITH_MPI
+      IOSize_t buf_count{this->get_bufcount_mpi_local()};
+      Datatype_t buf_type{this->get_buftype()};
+      
+      // Prepare pointers for collective varn call
+      std::vector<IOSize_t*> starts_ptrs(num_requests);
+      std::vector<IOSize_t*> counts_ptrs(num_requests);
+      for (size_t i = 0; i < num_requests; i++) {
+        starts_ptrs[i] = const_cast<IOSize_t*>(starts_vec.data() + i * ndims);
+        counts_ptrs[i] = const_cast<IOSize_t*>(counts_vec.data() + i * ndims);
+      }
+      
+      status = ncmu_get_varn_all(netcdf_id, this->get_id(), 
+                                 static_cast<int>(num_requests),
+                                 starts_ptrs.data(), counts_ptrs.data(),
+                                 this->get_buf(), buf_count, buf_type);
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+#else   // WITH_MPI
       void * buf_ptr{this->get_buf()};
       IOSize_t nb_points{0};
       std::vector<IODiff_t> stride{this->get_nc_stride()};
       std::vector<IODiff_t> imap{this->get_nc_imap_local()};
-#ifdef WITH_MPI
-      IOSize_t buf_count{this->get_bufcount_mpi_local()};
-      Datatype_t buf_type{this->get_buftype()};
-#endif  // WITH_MPI
-
       for (size_t i = 0; i < num_requests; i++) {
         std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
                                      starts_vec.begin() + (i + 1) * ndims);
         std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
                                      counts_vec.begin() + (i + 1) * ndims);
-#ifdef WITH_MPI
-        status = ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
-                               counts.data(), stride.data(), imap.data(),
-                               buf_ptr, buf_count, buf_type);
-#else   // WITH_MPI
         status =
             ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
                           counts.data(), stride.data(), imap.data(), buf_ptr);
-#endif  // WITH_MPI
         if (status != NC_NOERR) {
           throw FileIOError(ncmu_strerror(status));
         }
-        // number of written points in loop step
-        // TODO(RLeute): nb_points is only correct if the buffer is in Fortran
-        // storage order... I have to fix this for at least C storage order or
-        // better an arbitrary case
         nb_points = get_nb_from_shape(counts);
         buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
       }
-#ifdef WITH_MPI
-      ncmu_end_indep_data(netcdf_id);
 #endif  // WITH_MPI
     }
   }
