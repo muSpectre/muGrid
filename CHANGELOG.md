@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-0.108.0 (not yet released)
---------------------------
+0.108.0 (13Jun26)
+-----------------
 
 - ENH: The FFT transpose all-to-all uses non-blocking point-to-point
   (`MPI_Irecv`/`MPI_Isend` + `MPI_Waitall`) instead of a blocking pairwise
