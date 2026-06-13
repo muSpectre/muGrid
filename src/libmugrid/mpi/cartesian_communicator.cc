@@ -16,6 +16,9 @@
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
 #include "mpi/gpu_aware_mpi.hh"
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "mpi/ghost_accumulate_gpu.hh"
+#endif
 
 namespace muGrid {
 
@@ -77,94 +80,91 @@ namespace muGrid {
          *
          * @param dst Destination address (values are added here)
          * @param src Source address
-         * @param nb_elements Number of Real elements to accumulate
-         * @param is_device_memory If true, use GPU device accumulation
          */
+        //! Host block-strided accumulation:
+        //! dst[b*dst_stride + j] += src[b*src_stride + j]
         template <typename T>
-        void device_accumulate_typed(T * dst, const T * src, size_t nb_elements,
-                                     bool dst_on_device, bool src_on_device) {
-            if (dst_on_device) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-                // For device memory, copy to host, accumulate, copy back.
-                // This is not optimal but works for correctness.
-                // A proper implementation would use a GPU kernel.
-                std::vector<T> host_dst(nb_elements);
-                GPU_MEMCPY_D2H(host_dst.data(), dst, nb_elements * sizeof(T));
-                const T * src_values{src};
-                std::vector<T> host_src{};
-                if (src_on_device) {
-                    host_src.resize(nb_elements);
-                    GPU_MEMCPY_D2H(host_src.data(), src,
-                                   nb_elements * sizeof(T));
-                    src_values = host_src.data();
-                }
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    host_dst[i] += src_values[i];
-                }
-                GPU_MEMCPY_H2D(dst, host_dst.data(), nb_elements * sizeof(T));
-#else
-                // GCOVR_EXCL_START -- unreachable: device fields cannot be
-                // created in a build without a GPU backend
-                (void)src_on_device;
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    dst[i] += src[i];
-                }
-                // GCOVR_EXCL_STOP
-#endif
-            } else {
-                for (size_t i{0}; i < nb_elements; ++i) {
-                    dst[i] += src[i];
+        void host_accumulate_strided(T * dst, const T * src, size_t nb_blocks,
+                                     size_t block_len, size_t dst_stride,
+                                     size_t src_stride) {
+            for (size_t b{0}; b < nb_blocks; ++b) {
+                for (size_t j{0}; j < block_len; ++j) {
+                    dst[b * dst_stride + j] += src[b * src_stride + j];
                 }
             }
         }
 
         /**
-         * @brief Accumulate nb_elements of the given type from src into dst,
-         * honouring device memory and the actual element type.
+         * @brief Accumulate a block-strided halo region into dst:
+         * dst[b*dst_block_stride + j] += src[b*src_block_stride + j] for
+         * b in [0, nb_blocks) and j in [0, block_len) (element units of
+         * type_desc; dst/src already point at the first block).
          *
-         * dst/src are byte pointers to (possibly device) memory; nb_elements is
-         * the number of field elements (not bytes). Dispatching on the type
-         * descriptor keeps Complex/Int reductions correct (the previous code
-         * hard-coded Real, so e.g. a Complex field only had its real part
-         * accumulated, and device pointers were dereferenced on the host).
+         * When the destination is on the device this dispatches to a single
+         * device kernel covering the whole region (one launch/sync -- a
+         * per-block launch is dominated by launch overhead); otherwise it
+         * accumulates on the host. Dispatching on the type descriptor keeps
+         * Complex/Int reductions correct.
          */
-        void accumulate_elements(char * dst, const char * src,
-                                 size_t nb_elements, TypeDescriptor type_desc,
-                                 bool dst_on_device, bool src_on_device) {
+        void accumulate_blocks(char * dst, const char * src, size_t nb_blocks,
+                               size_t block_len, size_t dst_block_stride,
+                               size_t src_block_stride,
+                               TypeDescriptor type_desc, bool dst_on_device,
+                               bool src_on_device) {
+            if (dst_on_device) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                // Native device accumulation: the destination never leaves the
+                // device. src is read directly when already on the device, or
+                // staged to the device once (inside device_accumulate) when it
+                // is a host receive buffer.
+                device_accumulate(dst, src, nb_blocks, block_len,
+                                  dst_block_stride, src_block_stride, type_desc,
+                                  src_on_device);
+                return;
+#else
+                // GCOVR_EXCL_START -- unreachable: no device fields without a
+                // GPU backend
+                throw std::runtime_error(
+                    "accumulate_blocks: device memory requires a GPU build");
+                // GCOVR_EXCL_STOP
+#endif
+            }
+            // Host destination (the source is host memory as well).
+            (void)src_on_device;
             switch (type_desc) {
             case TypeDescriptor::Real:
-                device_accumulate_typed(reinterpret_cast<Real *>(dst),
+                host_accumulate_strided(reinterpret_cast<Real *>(dst),
                                         reinterpret_cast<const Real *>(src),
-                                        nb_elements, dst_on_device,
-                                        src_on_device);
+                                        nb_blocks, block_len, dst_block_stride,
+                                        src_block_stride);
                 break;
             case TypeDescriptor::Complex:
-                device_accumulate_typed(reinterpret_cast<Complex *>(dst),
+                host_accumulate_strided(reinterpret_cast<Complex *>(dst),
                                         reinterpret_cast<const Complex *>(src),
-                                        nb_elements, dst_on_device,
-                                        src_on_device);
+                                        nb_blocks, block_len, dst_block_stride,
+                                        src_block_stride);
                 break;
             case TypeDescriptor::Int:
-                device_accumulate_typed(reinterpret_cast<Int *>(dst),
+                host_accumulate_strided(reinterpret_cast<Int *>(dst),
                                         reinterpret_cast<const Int *>(src),
-                                        nb_elements, dst_on_device,
-                                        src_on_device);
+                                        nb_blocks, block_len, dst_block_stride,
+                                        src_block_stride);
                 break;
             case TypeDescriptor::Uint:
-                device_accumulate_typed(reinterpret_cast<Uint *>(dst),
+                host_accumulate_strided(reinterpret_cast<Uint *>(dst),
                                         reinterpret_cast<const Uint *>(src),
-                                        nb_elements, dst_on_device,
-                                        src_on_device);
+                                        nb_blocks, block_len, dst_block_stride,
+                                        src_block_stride);
                 break;
             case TypeDescriptor::Index:
-                device_accumulate_typed(reinterpret_cast<Index_t *>(dst),
+                host_accumulate_strided(reinterpret_cast<Index_t *>(dst),
                                         reinterpret_cast<const Index_t *>(src),
-                                        nb_elements, dst_on_device,
-                                        src_on_device);
+                                        nb_blocks, block_len, dst_block_stride,
+                                        src_block_stride);
                 break;
             default:
                 throw std::runtime_error(
-                    "accumulate_elements: unsupported type descriptor");
+                    "accumulate_blocks: unsupported type descriptor");
             }
         }
 
@@ -217,19 +217,19 @@ namespace muGrid {
                 throw std::runtime_error(
                     "serial_sendrecv_accumulate: send_block_len != recv_block_len");
             }
-            char * base_data{data};
-            for (int count{0}; count < nb_send_blocks; ++count) {
-                auto * recv_addr{
-                    base_data +
-                    recv_offset * stride_in_direction * elem_size_in_bytes};
-                auto * send_addr{
-                    base_data +
-                    send_offset * stride_in_direction * elem_size_in_bytes};
-                accumulate_elements(recv_addr, send_addr, send_block_len,
-                                    type_desc, is_device_memory,
-                                    is_device_memory);
-                base_data += block_stride * elem_size_in_bytes;
-            }
+            // Single strided accumulate over all blocks. dst and src are both
+            // strided in the field with the same block_stride (self-neighbor
+            // wrap); src lives in the same memory space as dst.
+            char * recv_base{data + recv_offset * stride_in_direction *
+                                        elem_size_in_bytes};
+            char * send_base{data + send_offset * stride_in_direction *
+                                        elem_size_in_bytes};
+            accumulate_blocks(recv_base, send_base,
+                              static_cast<size_t>(nb_send_blocks),
+                              static_cast<size_t>(send_block_len),
+                              static_cast<size_t>(block_stride),
+                              static_cast<size_t>(block_stride), type_desc,
+                              is_device_memory, is_device_memory);
         }
     }  // anonymous namespace
 
@@ -561,22 +561,22 @@ namespace muGrid {
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
-        // Calculate total receive size for temporary buffer
+        // Number of (contiguous) elements / bytes received
         auto total_recv_elems{static_cast<size_t>(nb_recv_blocks) *
                               static_cast<size_t>(recv_block_len)};
-
-        // Allocate contiguous temporary buffer for receiving
-        std::vector<char> recv_buffer(total_recv_elems * elem_size_in_bytes);
+        auto recv_bytes{total_recv_elems * elem_size_in_bytes};
 
         auto send_addr{static_cast<void *>(
             data + send_offset * stride_in_direction * elem_size_in_bytes)};
+        char * dst_base{data +
+                        recv_offset * stride_in_direction * elem_size_in_bytes};
 
         MPI_Status status;
         if (is_device_memory) {
-            // Gather the strided device send data into a contiguous device
-            // staging buffer (strided datatypes on device pointers are
-            // packed block by block by MPI, see sendrecv_staged). The
-            // receive side is already a contiguous host buffer.
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            // Pack the strided device send region into contiguous device
+            // staging (strided datatypes on device pointers are packed block
+            // by block by MPI; see sendrecv_staged).
             auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
                                 elem_size_in_bytes};
             auto send_bytes{send_row_bytes * nb_send_blocks};
@@ -590,14 +590,20 @@ namespace muGrid {
                                       nb_send_blocks, send_row_bytes,
                                       pitch_bytes, true);
             }
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
             GPU_DEVICE_SYNCHRONIZE();
-#endif
-            // Without GPU-aware MPI, bounce the contiguous send staging
-            // through host memory (the receive buffer is host already).
+
+            // GPU-aware MPI receives straight into device staging and the
+            // accumulate kernel reads it there: no host transfer at all.
+            // Otherwise both sides bounce through host memory.
+            const bool gpu_aware{mpi_is_gpu_aware()};
             char * send_buffer{send_staging};
-            if (!mpi_is_gpu_aware()) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            char * recv_buffer_ptr{nullptr};
+            std::vector<char> host_recv{};
+            if (gpu_aware) {
+                recv_buffer_ptr =
+                    recv_bytes > 0 ? this->get_device_staging(1, recv_bytes)
+                                   : nullptr;
+            } else {
                 auto & host_send{this->host_staging[0]};
                 if (host_send.size() < send_bytes) {
                     host_send.resize(send_bytes);
@@ -606,40 +612,41 @@ namespace muGrid {
                     GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
                 }
                 send_buffer = host_send.data();
-#endif
+                host_recv.resize(recv_bytes);
+                recv_buffer_ptr = host_recv.data();
             }
             MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
-                         mpi_datatype, this->right_ranks[direction], 0,
-                         recv_buffer.data(), total_recv_elems, mpi_datatype,
-                         this->left_ranks[direction], 0, this->comm, &status);
+                         mpi_datatype, this->right_ranks[direction], 0, recv_buffer_ptr,
+                         total_recv_elems, mpi_datatype, this->left_ranks[direction], 0, this->comm,
+                         &status);
+            // Scatter-accumulate the contiguous receive buffer into the
+            // strided destination; src is device memory (gpu-aware) or the
+            // host bounce buffer.
+            accumulate_blocks(dst_base, recv_buffer_ptr,
+                              static_cast<size_t>(nb_recv_blocks),
+                              static_cast<size_t>(recv_block_len),
+                              static_cast<size_t>(block_stride),
+                              static_cast<size_t>(recv_block_len), type_desc,
+                              true, gpu_aware);
+#endif
         } else {
-            // Create send type
+            // Host: derived-datatype send into a contiguous host receive
+            // buffer.
+            std::vector<char> recv_buffer(recv_bytes);
             MPI_Datatype send_buffer_mpi_t;
             MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
                             mpi_datatype, &send_buffer_mpi_t);
             MPI_Type_commit(&send_buffer_mpi_t);
-
-            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
-                         this->right_ranks[direction], 0,
+            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t, this->right_ranks[direction], 0,
                          recv_buffer.data(), total_recv_elems, mpi_datatype,
-                         this->left_ranks[direction], 0,
-                         this->comm, &status);
-
+                         this->left_ranks[direction], 0, this->comm, &status);
             MPI_Type_free(&send_buffer_mpi_t);
-        }
-
-        // Accumulate received data into destination. The receive buffer is
-        // contiguous (host memory); scatter it to the (possibly device) strided
-        // destination using a type- and device-aware accumulation. The previous
-        // host-side loop hard-coded Real and dereferenced device pointers.
-        auto * recv_ptr{recv_buffer.data()};
-        for (int block{0}; block < nb_recv_blocks; ++block) {
-            auto * dest_addr{data + (recv_offset * stride_in_direction +
-                                     block * block_stride) * elem_size_in_bytes};
-            accumulate_elements(dest_addr, recv_ptr,
-                                static_cast<size_t>(recv_block_len), type_desc,
-                                is_device_memory, false);
-            recv_ptr += recv_block_len * elem_size_in_bytes;
+            accumulate_blocks(dst_base, recv_buffer.data(),
+                              static_cast<size_t>(nb_recv_blocks),
+                              static_cast<size_t>(recv_block_len),
+                              static_cast<size_t>(block_stride),
+                              static_cast<size_t>(recv_block_len), type_desc,
+                              false, false);
         }
     }
 
@@ -664,20 +671,22 @@ namespace muGrid {
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
-        // Calculate total receive size for temporary buffer
+        // Number of (contiguous) elements / bytes received
         auto total_recv_elems{static_cast<size_t>(nb_recv_blocks) *
                               static_cast<size_t>(recv_block_len)};
-
-        // Allocate contiguous temporary buffer for receiving
-        std::vector<char> recv_buffer(total_recv_elems * elem_size_in_bytes);
+        auto recv_bytes{total_recv_elems * elem_size_in_bytes};
 
         auto send_addr{static_cast<void *>(
             data + send_offset * stride_in_direction * elem_size_in_bytes)};
+        char * dst_base{data +
+                        recv_offset * stride_in_direction * elem_size_in_bytes};
 
         MPI_Status status;
         if (is_device_memory) {
-            // Contiguous device staging for the strided send side (see
-            // sendrecv_right_accumulate).
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            // Pack the strided device send region into contiguous device
+            // staging (strided datatypes on device pointers are packed block
+            // by block by MPI; see sendrecv_staged).
             auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
                                 elem_size_in_bytes};
             auto send_bytes{send_row_bytes * nb_send_blocks};
@@ -691,14 +700,20 @@ namespace muGrid {
                                       nb_send_blocks, send_row_bytes,
                                       pitch_bytes, true);
             }
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
             GPU_DEVICE_SYNCHRONIZE();
-#endif
-            // Without GPU-aware MPI, bounce the contiguous send staging
-            // through host memory (the receive buffer is host already).
+
+            // GPU-aware MPI receives straight into device staging and the
+            // accumulate kernel reads it there: no host transfer at all.
+            // Otherwise both sides bounce through host memory.
+            const bool gpu_aware{mpi_is_gpu_aware()};
             char * send_buffer{send_staging};
-            if (!mpi_is_gpu_aware()) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            char * recv_buffer_ptr{nullptr};
+            std::vector<char> host_recv{};
+            if (gpu_aware) {
+                recv_buffer_ptr =
+                    recv_bytes > 0 ? this->get_device_staging(1, recv_bytes)
+                                   : nullptr;
+            } else {
                 auto & host_send{this->host_staging[0]};
                 if (host_send.size() < send_bytes) {
                     host_send.resize(send_bytes);
@@ -707,39 +722,41 @@ namespace muGrid {
                     GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
                 }
                 send_buffer = host_send.data();
-#endif
+                host_recv.resize(recv_bytes);
+                recv_buffer_ptr = host_recv.data();
             }
             MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
-                         mpi_datatype, this->left_ranks[direction], 0,
-                         recv_buffer.data(), total_recv_elems, mpi_datatype,
-                         this->right_ranks[direction], 0, this->comm, &status);
+                         mpi_datatype, this->left_ranks[direction], 0, recv_buffer_ptr,
+                         total_recv_elems, mpi_datatype, this->right_ranks[direction], 0, this->comm,
+                         &status);
+            // Scatter-accumulate the contiguous receive buffer into the
+            // strided destination; src is device memory (gpu-aware) or the
+            // host bounce buffer.
+            accumulate_blocks(dst_base, recv_buffer_ptr,
+                              static_cast<size_t>(nb_recv_blocks),
+                              static_cast<size_t>(recv_block_len),
+                              static_cast<size_t>(block_stride),
+                              static_cast<size_t>(recv_block_len), type_desc,
+                              true, gpu_aware);
+#endif
         } else {
-            // Create send type
+            // Host: derived-datatype send into a contiguous host receive
+            // buffer.
+            std::vector<char> recv_buffer(recv_bytes);
             MPI_Datatype send_buffer_mpi_t;
             MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
                             mpi_datatype, &send_buffer_mpi_t);
             MPI_Type_commit(&send_buffer_mpi_t);
-
-            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
-                         this->left_ranks[direction], 0,
+            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t, this->left_ranks[direction], 0,
                          recv_buffer.data(), total_recv_elems, mpi_datatype,
-                         this->right_ranks[direction], 0,
-                         this->comm, &status);
-
+                         this->right_ranks[direction], 0, this->comm, &status);
             MPI_Type_free(&send_buffer_mpi_t);
-        }
-
-        // Accumulate received data into destination using a type- and
-        // device-aware accumulation (the previous loop hard-coded Real and
-        // dereferenced device pointers on the host).
-        auto * recv_ptr{recv_buffer.data()};
-        for (int block{0}; block < nb_recv_blocks; ++block) {
-            auto * dest_addr{data + (recv_offset * stride_in_direction +
-                                     block * block_stride) * elem_size_in_bytes};
-            accumulate_elements(dest_addr, recv_ptr,
-                                static_cast<size_t>(recv_block_len), type_desc,
-                                is_device_memory, false);
-            recv_ptr += recv_block_len * elem_size_in_bytes;
+            accumulate_blocks(dst_base, recv_buffer.data(),
+                              static_cast<size_t>(nb_recv_blocks),
+                              static_cast<size_t>(recv_block_len),
+                              static_cast<size_t>(block_stride),
+                              static_cast<size_t>(recv_block_len), type_desc,
+                              false, false);
         }
     }
 #else   // not WITH_MPI

@@ -4,6 +4,15 @@ Change log for µGrid
 0.108.0 (not yet released)
 --------------------------
 
+- ENH: `reduce_ghosts` on the device is no longer dominated by per-block
+  device calls: the ghost accumulation uses a single strided GPU kernel
+  (`mpi/ghost_accumulate_gpu.cc`) instead of a copy-to-host/accumulate/
+  copy-back per block, and the post-reduction ghost zeroing uses one
+  `cudaMemset2D`/`hipMemset2D` per side instead of one `cudaMemset` per
+  (block, slice). With GPU-aware MPI the contributions are received straight
+  into device staging (no host transfer); otherwise they bounce through host
+  memory once. At 128³ on two GPUs this took device `reduce_ghosts` from
+  ~67 ms to ~0.3 ms (on par with `communicate_ghosts`)
 - TST: New GPU+MPI CI job runs the device-vs-host equivalence tests
   (ghost exchange, `reduce_ghosts`, FFT transpose, preconditioners) multi-rank.
   These exercise the device communication staging/accumulation paths, which

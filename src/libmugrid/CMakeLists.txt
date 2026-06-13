@@ -86,6 +86,7 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
+    list(APPEND MUGRID_SOURCES mpi/ghost_accumulate_gpu.cc)
     # Mark .cc files to be compiled as CUDA
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/cufft_backend.cc
@@ -94,6 +95,7 @@ if(MUGRID_ENABLE_CUDA)
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/mpi/ghost_accumulate_gpu.cc
         PROPERTIES LANGUAGE CUDA
     )
 elseif(MUGRID_ENABLE_HIP)
@@ -103,6 +105,7 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
+    list(APPEND MUGRID_SOURCES mpi/ghost_accumulate_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/rocfft_backend.cc
@@ -111,6 +114,7 @@ elseif(MUGRID_ENABLE_HIP)
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/mpi/ghost_accumulate_gpu.cc
         PROPERTIES LANGUAGE HIP
     )
 endif()
