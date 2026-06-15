@@ -1,6 +1,11 @@
 Change log for µGrid
 ====================
 
+0.109.0 (15Jun26)
+-----------------
+
+- ENH: Helpers for reduction on GPUs
+
 0.108.0 (13Jun26)
 -----------------
 

@@ -103,6 +103,133 @@ def test_bcast_2():
     assert res == comm.size
 
 
+def _make_comm():
+    try:
+        from mpi4py import MPI
+
+        return muGrid.Communicator(MPI.COMM_WORLD)
+    except ImportError:
+        return muGrid.Communicator()
+
+
+def test_reduce_correctness_cpu():
+    # Acceptance test 1 (CPU): reduce_* match numpy on the local array for the
+    # serial communicator.
+    comm = muGrid.Communicator()
+    rng = np.random.default_rng(42)
+    a = rng.standard_normal((4, 5, 6)).astype(np.float64)
+
+    assert np.isclose(float(comm.reduce_sum(a)), a.sum(), rtol=1e-12)
+    assert np.isclose(float(comm.reduce_min(a)), a.min(), rtol=1e-12)
+    assert np.isclose(float(comm.reduce_max(a)), a.max(), rtol=1e-12)
+    assert np.isclose(float(comm.reduce_mean(a)), a.mean(), rtol=1e-12)
+
+    # 0-d input is treated as a single element.
+    s = np.asarray(3.5)
+    assert float(comm.reduce_sum(s)) == 3.5
+    assert float(comm.reduce_mean(s)) == 3.5
+
+
+def test_reduce_decomposition_invariance():
+    # Acceptance test 2: split a global array across ranks with unequal
+    # subdomains (including at least one empty rank) and check the four
+    # reductions equal the single-process result.
+    comm = _make_comm()
+    rank, size = comm.rank, comm.size
+
+    # Build the same global array on every rank from a fixed seed.
+    rng = np.random.default_rng(1234)
+    global_a = rng.standard_normal(101).astype(np.float64)
+
+    # Uneven, contiguous partition. With >=2 ranks the last rank gets an
+    # empty slice so the empty-subdomain path is exercised.
+    bounds = [0] * (size + 1)
+    if size == 1:
+        bounds = [0, len(global_a)]
+    else:
+        # Put everything in the first (size-1) ranks, leave the last empty.
+        per = len(global_a) // (size - 1)
+        for i in range(size - 1):
+            bounds[i + 1] = bounds[i] + per
+        bounds[size - 1] = len(global_a)  # absorb remainder
+        bounds[size] = len(global_a)  # last rank: empty
+    local = global_a[bounds[rank]:bounds[rank + 1]]
+
+    assert np.isclose(float(comm.reduce_sum(local)), global_a.sum(), rtol=1e-12)
+    assert np.isclose(float(comm.reduce_min(local)), global_a.min(), rtol=1e-12)
+    assert np.isclose(float(comm.reduce_max(local)), global_a.max(), rtol=1e-12)
+    assert np.isclose(float(comm.reduce_mean(local)), global_a.mean(), rtol=1e-12)
+
+
+def test_reduce_serial_no_allreduce():
+    # Acceptance test 3: with size == 1, no Allreduce is invoked.
+    comm = muGrid.Communicator()
+    assert comm.size == 1
+
+    a = np.arange(12, dtype=np.float64).reshape(3, 4)
+    # A 0-d local result is returned directly by the serial fast path.
+    local = comm._local_reduce(a, "sum")
+    assert comm._allreduce_scalar(local, "sum") is local
+
+
+def test_reduce_collective_result():
+    # Acceptance test 4: every rank returns the same value.
+    comm = _make_comm()
+    rng = np.random.default_rng(comm.rank + 7)
+    a = rng.standard_normal(comm.rank * 3 + 5).astype(np.float64)
+
+    for val in (comm.reduce_sum(a), comm.reduce_min(a),
+                comm.reduce_max(a), comm.reduce_mean(a)):
+        val = float(val)
+        assert val == comm.bcast(val, 0)
+
+
+def test_reduce_empty_and_mean_count():
+    # Empty local input returns the identity rather than raising.
+    comm = muGrid.Communicator()
+    empty = np.zeros(0, dtype=np.float64)
+    assert float(comm.reduce_sum(empty)) == 0.0
+    assert float(comm.reduce_min(empty)) == float("inf")
+    assert float(comm.reduce_max(empty)) == float("-inf")
+    # Mean with zero global count is nan, not a division error.
+    assert np.isnan(float(comm.reduce_mean(empty)))
+
+
+def test_reduction_object_nuMPI_compatible():
+    # The .reduction adapter mirrors NuMPI.Tools.Reduction's interface.
+    comm = muGrid.Communicator()
+    red = comm.reduction
+    a = np.arange(10, dtype=np.float64)
+    assert float(red.sum(a)) == a.sum()
+    assert float(red.min(a)) == a.min()
+    assert float(red.max(a)) == a.max()
+    assert float(red.mean(a)) == a.mean()
+
+
+def test_reduce_gpu_matches_numpy():
+    # Acceptance tests 1/3/5 (GPU): same results as numpy on a CuPy input,
+    # handled without CUDA-aware MPI in the serial case. Skips cleanly when
+    # CuPy / a GPU is unavailable.
+    cp = pytest.importorskip("cupy")
+    try:
+        rng = np.random.default_rng(99)
+        a_np = rng.standard_normal((4, 5)).astype(np.float64)
+        a_cp = cp.asarray(a_np)
+    except Exception as exc:  # no usable GPU
+        pytest.skip(f"CuPy present but no usable GPU: {exc}")
+
+    comm = muGrid.Communicator()
+    for name, ref in (
+        ("reduce_sum", a_np.sum()),
+        ("reduce_min", a_np.min()),
+        ("reduce_max", a_np.max()),
+        ("reduce_mean", a_np.mean()),
+    ):
+        res = getattr(comm, name)(a_cp)
+        # Result is convertible to a Python float and matches numpy.
+        assert np.isclose(float(res), ref, rtol=1e-12)
+
+
 def test_gather():
     try:
         from mpi4py import MPI
