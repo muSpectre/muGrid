@@ -375,10 +375,140 @@ class CommunicatorWrapper:
 
         return self._cpp.bcast(scalar_arg, root)
 
+    # ------------------------------------------------------------------ #
+    # Full-array global reductions (input array -> single global scalar)  #
+    # ------------------------------------------------------------------ #
+    #
+    # Note the distinction from `sum`/`max` above: those reduce *element-
+    # wise* across ranks and return an array of the same shape. The
+    # `reduce_*` methods below reduce over *all elements on all ranks* and
+    # return a single scalar (Allreduce semantics: every rank gets it).
+
+    @staticmethod
+    def _is_gpu(a):
+        """True if `a` is a GPU (CuPy) array."""
+        return hasattr(a, "__cuda_array_interface__") or _is_cupy_array(a)
+
+    @staticmethod
+    def _as_array(a):
+        """Coerce a Python scalar/sequence to a numpy array; pass arrays
+        (numpy or CuPy) through unchanged so device placement is preserved."""
+        if hasattr(a, "size"):
+            return a
+        return np.asarray(a)
+
+    def _local_reduce(self, a, op):
+        """Reduce the local array `a` to a 0-d scalar on its own device.
+
+        Empty subdomains contribute the identity for `op` (0 for sum,
+        +inf for min, -inf for max) as a 0-d array on the same device, so
+        that every rank takes the same code path in the subsequent
+        Allreduce (mixing host/device buffers would mismatch the
+        collective)."""
+        if a.size:
+            return getattr(a, op)()
+        identity = {"sum": 0.0, "min": float("inf"), "max": float("-inf")}[op]
+        dtype = a.dtype if hasattr(a, "dtype") else np.float64
+        if self._is_gpu(a):
+            return _get_cupy().asarray(identity, dtype=dtype)
+        return np.asarray(identity, dtype=dtype)
+
+    def _allreduce_scalar(self, local, op):
+        """Allreduce a per-rank scalar to a global scalar.
+
+        `op` is one of "sum", "min", "max". `local` is a Python number or
+        a 0-d numpy/CuPy array. Returns the same kind as the input (0-d
+        array on device for GPU inputs, Python/numpy scalar on CPU)."""
+        # Serial fast path: no MPI call at all (works for CuPy without
+        # CUDA-aware MPI).
+        if self.size == 1:
+            return local
+
+        if self._is_gpu(local):
+            cp = _get_cupy()
+            if self._mpi_comm is None:
+                raise RuntimeError(
+                    "MPI communicator not available for GPU reduction."
+                )
+            mpi_op = {"sum": MPI.SUM, "min": MPI.MIN, "max": MPI.MAX}[op]
+            buf = cp.asarray(local).reshape(1)
+            result = cp.empty_like(buf)
+            self._mpi_comm.Allreduce(buf, result, op=mpi_op)
+            return result.reshape(())
+
+        # CPU scalar: route through the C++ communicator (consistent with
+        # `sum`/`max`, and robust when `_mpi_comm` is None but the C++
+        # communicator is MPI-backed).
+        return getattr(self._cpp, op)(float(local))
+
+    def reduce_sum(self, a):
+        """Global sum over all elements of `a` on all ranks (scalar)."""
+        a = self._as_array(a)
+        return self._allreduce_scalar(self._local_reduce(a, "sum"), "sum")
+
+    def reduce_min(self, a):
+        """Global minimum element of `a` over all ranks (scalar).
+
+        All-empty input returns +inf."""
+        a = self._as_array(a)
+        return self._allreduce_scalar(self._local_reduce(a, "min"), "min")
+
+    def reduce_max(self, a):
+        """Global maximum element of `a` over all ranks (scalar).
+
+        All-empty input returns -inf."""
+        a = self._as_array(a)
+        return self._allreduce_scalar(self._local_reduce(a, "max"), "max")
+
+    def reduce_mean(self, a):
+        """Count-weighted global mean over all elements on all ranks.
+
+        Equals (Σ_ranks Σ_elements a) / (Σ_ranks a.size), i.e. the mean of
+        the global data, not the mean of per-rank means. Returns nan if the
+        global element count is zero."""
+        a = self._as_array(a)
+        gsum = self.reduce_sum(a)
+        # The element count is a host integer on every rank, so reduce it on
+        # the CPU regardless of where `a` lives.
+        gcount = float(self._allreduce_scalar(int(a.size), "sum"))
+        if gcount == 0:
+            return float("nan")
+        return gsum / gcount
+
+    @property
+    def reduction(self):
+        """A NuMPI-compatible reduction object with `.sum/.min/.max/.mean`.
+
+        Lets code that used ``NuMPI.Tools.Reduction(comm)`` switch to
+        ``muGrid.Communicator(comm).reduction`` with no other change. The
+        methods have full-array global-reduction semantics (see
+        `reduce_sum` etc.)."""
+        return _Reduction(self)
+
     # Delegate other attributes to the C++ communicator
     def __getattr__(self, name):
         """Delegate attribute access to the underlying C++ communicator."""
         return getattr(self._cpp, name)
+
+
+class _Reduction:
+    """NuMPI-compatible adapter exposing full-array global reductions as
+    ``.sum``/``.min``/``.max``/``.mean`` (see `CommunicatorWrapper.reduce_*`)."""
+
+    def __init__(self, comm):
+        self._comm = comm
+
+    def sum(self, a):
+        return self._comm.reduce_sum(a)
+
+    def min(self, a):
+        return self._comm.reduce_min(a)
+
+    def max(self, a):
+        return self._comm.reduce_max(a)
+
+    def mean(self, a):
+        return self._comm.reduce_mean(a)
 
 
 def Communicator(communicator=None):
