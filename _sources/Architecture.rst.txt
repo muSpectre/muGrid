@@ -244,7 +244,7 @@ FFT File Structure
     src/libmugrid/fft/
     ├── fft_engine.hh         # Template class FFTEngine<MemorySpace>
     ├── fft_engine_base.hh/cc # Base class with field collections and transpose management
-    ├── fft_1d_backend.hh     # Abstract interface for 1D FFT backends
+    ├── fft_backend.hh        # Abstract interface for FFT backends (1D primitives + ND)
     ├── pocketfft_backend.cc  # CPU backend using pocketfft
     ├── cufft_backend.cc      # NVIDIA GPU backend using cuFFT
     ├── rocfft_backend.cc     # AMD GPU backend using rocFFT

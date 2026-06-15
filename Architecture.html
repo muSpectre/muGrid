@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Python API Reference" href="PythonAPI.html"><link rel="prev" title="C++ Bindings" href="Cplusplus.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Code Architecture - µGrid 0.109.0 documentation</title>
+        <title>Code Architecture - µGrid 0.109.0-1-gd373faf0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.109.0
+      <a href="index.html"><div class="brand">µGrid 0.109.0-1-gd373faf0
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.109.0
+  <span class="sidebar-brand-text">µGrid 0.109.0-1-gd373faf0
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -486,7 +486,7 @@ explicitly normalize if needed.</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>src/libmugrid/fft/
 ├── fft_engine.hh         # Template class FFTEngine&lt;MemorySpace&gt;
 ├── fft_engine_base.hh/cc # Base class with field collections and transpose management
-├── fft_1d_backend.hh     # Abstract interface for 1D FFT backends
+├── fft_backend.hh        # Abstract interface for FFT backends (1D primitives + ND)
 ├── pocketfft_backend.cc  # CPU backend using pocketfft
 ├── cufft_backend.cc      # NVIDIA GPU backend using cuFFT
 ├── rocfft_backend.cc     # AMD GPU backend using rocFFT
@@ -1116,7 +1116,7 @@ just interior nodes.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=81a70176"></script>
+</div><script src="_static/documentation_options.js?v=89c7eea7"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
