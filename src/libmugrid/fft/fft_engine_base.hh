@@ -39,7 +39,7 @@
 #include "mpi/cartesian_decomposition.hh"
 #include "collection/field_collection_global.hh"
 #include "mpi/communicator.hh"
-#include "fft_1d_backend.hh"
+#include "fft_backend.hh"
 #include "transpose.hh"
 #include "fft_utils.hh"
 

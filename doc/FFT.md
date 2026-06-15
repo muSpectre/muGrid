@@ -208,7 +208,7 @@ Like FFTW and cuFFT, the transforms are **unnormalized**. A forward FFT followed
 
 - `fft_engine.hh`: Template class `FFTEngine<MemorySpace>` with all transform implementations
 - `fft_engine_base.hh/cc`: Base class with field collections and transpose management
-- `fft_1d_backend.hh`: Abstract interface for 1D FFT backends
+- `fft_backend.hh`: Abstract interface for FFT backends (1D primitives plus optional N-dimensional transforms)
 - `pocketfft_backend.cc`: CPU backend using pocketfft
 - `cufft_backend.cc`: NVIDIA GPU backend using cuFFT
 - `rocfft_backend.cc`: AMD GPU backend using rocFFT

@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_FFT_POCKETFFT_BACKEND_HH_
 #define SRC_LIBMUGRID_FFT_POCKETFFT_BACKEND_HH_
 
-#include "fft_1d_backend.hh"
+#include "fft_backend.hh"
 
 namespace muGrid {
 
@@ -66,6 +66,20 @@ class PocketFFTBackend : public FFT1DBackend {
   void c2c_backward(Index_t n, Index_t batch, const Complex * input,
                     Index_t in_stride, Index_t in_dist, Complex * output,
                     Index_t out_stride, Index_t out_dist) override;
+
+  // pocketfft transforms a whole multidimensional block in one call, so the
+  // serial engine can skip the axis-by-axis decomposition and the work buffer.
+  bool supports_nd() const override { return true; }
+
+  void r2c_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Real * input,
+              const std::vector<Index_t> & in_strides, Complex * output,
+              const std::vector<Index_t> & out_strides) override;
+
+  void c2r_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Complex * input,
+              const std::vector<Index_t> & in_strides, Real * output,
+              const std::vector<Index_t> & out_strides) override;
 
   bool supports_device_memory() const override { return false; }
 

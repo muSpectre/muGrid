@@ -38,7 +38,7 @@
 
 #include "memory/memory_space.hh"
 #include "memory/device.hh"
-#include "fft_1d_backend.hh"
+#include "fft_backend.hh"
 #include "pocketfft_backend.hh"
 
 #if defined(MUGRID_ENABLE_CUDA)

@@ -1,11 +1,12 @@
 /**
- * @file   fft/fft_1d_backend.hh
+ * @file   fft/fft_backend.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   18 Dec 2024
  *
- * @brief  Abstract interface for 1D FFT backends
+ * @brief  Abstract interface for FFT backends (1D primitives plus optional
+ *         N-dimensional transforms)
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -33,12 +34,14 @@
  *
  */
 
-#ifndef SRC_LIBMUGRID_FFT_FFT_1D_BACKEND_HH_
-#define SRC_LIBMUGRID_FFT_FFT_1D_BACKEND_HH_
+#ifndef SRC_LIBMUGRID_FFT_FFT_BACKEND_HH_
+#define SRC_LIBMUGRID_FFT_FFT_BACKEND_HH_
 
 #include "core/types.hh"
+#include "core/exception.hh"
 
 #include <memory>
+#include <vector>
 
 namespace muGrid {
 
@@ -119,6 +122,55 @@ class FFT1DBackend {
                             Complex * output, Index_t out_stride,
                             Index_t out_dist) = 0;
 
+  /**
+   * Returns true if this backend implements the N-dimensional `r2c_nd` /
+   * `c2r_nd` entry points below. These let a serial (non-decomposed) engine
+   * hand a whole multidimensional transform to the backend in a single planned
+   * call, instead of driving it axis-by-axis through the 1D primitives. The
+   * default is `false`; backends that do not override it keep the axis-by-axis
+   * decomposition, which is mandatory for the MPI/pencil path anyway.
+   */
+  virtual bool supports_nd() const { return false; }
+
+  /**
+   * N-dimensional real-to-complex FFT, issued as a single backend call.
+   *
+   * The arrays are described in row-major (C) order: `shape` is the logical
+   * real-space extent of each axis, `in_strides`/`out_strides` are the element
+   * strides of the corresponding axis (Reals for the input, Complex for the
+   * output), and `axes` lists the axes to transform. The half-complex (r2c)
+   * axis must be the LAST entry of `axes`; the remaining listed axes are
+   * transformed complex-to-complex. Any axis not in `axes` (e.g. a tensor
+   * component) is a non-transformed batch axis. Strides let the caller fold in
+   * ghost padding and component layout (AoS/SoA) without a repacking copy.
+   *
+   * The default throws; only backends returning true from `supports_nd()`
+   * override it.
+   */
+  virtual void r2c_nd(const std::vector<Index_t> & /*shape*/,
+                      const std::vector<Index_t> & /*axes*/,
+                      const Real * /*input*/,
+                      const std::vector<Index_t> & /*in_strides*/,
+                      Complex * /*output*/,
+                      const std::vector<Index_t> & /*out_strides*/) {
+    throw RuntimeError("r2c_nd is not supported by this FFT backend");
+  }
+
+  /**
+   * N-dimensional complex-to-real FFT, the inverse of `r2c_nd`. `shape` is the
+   * logical real-space (output) extent; `in_strides` are Complex strides of the
+   * Fourier input, `out_strides` are Real strides of the output. As in
+   * `r2c_nd`, the real (c2r) axis is the last entry of `axes`.
+   */
+  virtual void c2r_nd(const std::vector<Index_t> & /*shape*/,
+                      const std::vector<Index_t> & /*axes*/,
+                      const Complex * /*input*/,
+                      const std::vector<Index_t> & /*in_strides*/,
+                      Real * /*output*/,
+                      const std::vector<Index_t> & /*out_strides*/) {
+    throw RuntimeError("c2r_nd is not supported by this FFT backend");
+  }
+
   /** Returns true if this backend supports device (GPU) memory */
   virtual bool supports_device_memory() const = 0;
 
@@ -128,4 +180,4 @@ class FFT1DBackend {
 
 }  // namespace muGrid
 
-#endif  // SRC_LIBMUGRID_FFT_FFT_1D_BACKEND_HH_
+#endif  // SRC_LIBMUGRID_FFT_FFT_BACKEND_HH_

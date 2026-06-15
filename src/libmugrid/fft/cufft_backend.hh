@@ -36,7 +36,7 @@
 #ifndef SRC_LIBMUGRID_FFT_CUFFT_BACKEND_HH_
 #define SRC_LIBMUGRID_FFT_CUFFT_BACKEND_HH_
 
-#include "fft_1d_backend.hh"
+#include "fft_backend.hh"
 
 #include <cufft.h>
 

@@ -583,6 +583,31 @@ class FFTEngine : public FFTEngineBase {
       Index_t nb_fourier_pixels{Fx * Ny * Nz};
       Index_t work_size{nb_fourier_pixels * nb_components};
 
+      // Output (Fourier) field strides
+      StorageOrder out_storage_order{output.get_storage_order()};
+      bool out_is_soa{(out_storage_order == StorageOrder::StructureOfArrays)};
+      auto [out_comp_factor, out_x_stride, out_y_dist, out_z_dist] =
+          out_is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
+                     : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
+
+      if (backend->supports_nd()) {
+        // Fast path: one planned transform over all three axes plus the
+        // component batch, written straight into the output. No work buffer,
+        // no intermediate copy, no axis-by-axis re-dispatch. The half-complex
+        // (x) axis must be last in `axes`; the component axis (0) is a
+        // non-transformed batch axis. Strides fold in the input ghost layout
+        // and the AoS/SoA component layout, so no repacking is needed.
+        std::vector<Index_t> shape{nb_components, Nz, Ny, Nx};
+        std::vector<Index_t> axes{1, 2, 3};
+        std::vector<Index_t> in_strides{in_comp_factor, in_z_dist, in_y_dist,
+                                        in_x_stride};
+        std::vector<Index_t> out_strides{out_comp_factor, out_z_dist, out_y_dist,
+                                         out_x_stride};
+        backend->r2c_nd(shape, axes, input_ptr + in_base_offset, in_strides,
+                        output_ptr, out_strides);
+        return;
+      }
+
       // Work/output buffer strides (same storage order as input)
       auto [work_comp_factor, work_x_stride, work_y_dist, work_z_dist] =
           is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
@@ -962,6 +987,24 @@ class FFTEngine : public FFTEngineBase {
       auto [in_comp_factor, in_x_stride, in_y_dist, in_z_dist] =
           in_is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
                     : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
+
+      if (backend->supports_nd()) {
+        // Fast path: single planned inverse transform over all three axes plus
+        // the component batch (mirrors the forward fast path). `shape` is the
+        // real-space (output) extent; the c2r (x) axis is last. pocketfft's
+        // multi-axis c2r stages the non-real axes into its own temporary, so
+        // the const Fourier input is not modified and no work-buffer copy is
+        // needed. Output strides fold in the destination ghost layout.
+        std::vector<Index_t> shape{nb_components, Nz, Ny, Nx};
+        std::vector<Index_t> axes{1, 2, 3};
+        std::vector<Index_t> in_strides{in_comp_factor, in_z_dist, in_y_dist,
+                                        in_x_stride};
+        std::vector<Index_t> out_strides{out_comp_factor, out_z_dist, out_y_dist,
+                                         out_x_stride};
+        backend->c2r_nd(shape, axes, input_ptr, in_strides,
+                        output_ptr + out_base_offset, out_strides);
+        return;
+      }
 
       // Work buffer with same storage order
       Complex * work_ptr{this->get_work_buffer(0, work_size)};
