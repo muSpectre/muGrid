@@ -1,6 +1,31 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- ENH: Complex GPU linalg is now implemented. The `Complex` device
+  specialisations of `vecdot`, `norm_sq`, `axpy`, `scal`, `axpby`, `copy` and
+  `axpy_norm_sq` (previously throwing stubs) now run on CUDA/HIP, processing the
+  complex buffers through their underlying reals; the sesquilinear `vecdot`
+  reduces the real and imaginary parts of conj(a)·b separately and the
+  reductions exclude ghost regions like their host counterparts
+- ENH: Fused per-pixel vector operations `linalg.cross` (three-vector cross
+  product) and `linalg.leray_project` (Helmholtz/Leray projection
+  `out -= k (k·N)/|k|²`), each a single pass over the field with no
+  temporaries. Implemented on host and GPU for both Real and Complex (the
+  coefficients of `leray_project` are real)
+- ENH: PocketFFT backend now hands whole multidimensional blocks to pocketfft
+  in one call (batched along the transform axis, vectorized across lines)
+  instead of transforming one line at a time; the serial (non-decomposed)
+  engine performs a single N-dimensional transform via the new `r2c_nd` /
+  `c2r_nd` backend entry points, skipping the work buffer and per-axis
+  re-dispatch. Serial CPU FFT is now on par with NumPy's `rfftn`/`irfftn`
+  (roughly 5–6× faster than before)
+- API: Renamed `fft_1d_backend.hh` to `fft_backend.hh`; the `FFT1DBackend`
+  interface now also exposes optional N-dimensional transforms (`supports_nd`,
+  `r2c_nd`, `c2r_nd`)
+
 0.109.0 (15Jun26)
 -----------------
 

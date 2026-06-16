@@ -488,5 +488,117 @@ void scal<HostSpace>(const TypedField<Real, HostSpace>& alpha,
     }
 }
 
+/* ---------------------------------------------------------------------- */
+/* Fused per-pixel vector kernels                                          */
+/* ---------------------------------------------------------------------- */
+
+namespace internal {
+
+// out = a x b for the npix three-vectors held by the buffers. `soa` selects
+// the storage order: SoA keeps each component in a contiguous block of npix
+// values, AoS interleaves the three components of a pixel.
+template <typename T>
+void cross_buffers(const T* a, const T* b, T* out, Index_t npix, bool soa) {
+    if (soa) {
+        const T* a0 = a; const T* a1 = a + npix; const T* a2 = a + 2 * npix;
+        const T* b0 = b; const T* b1 = b + npix; const T* b2 = b + 2 * npix;
+        T* o0 = out; T* o1 = out + npix; T* o2 = out + 2 * npix;
+        for (Index_t i{0}; i < npix; ++i) {
+            o0[i] = a1[i] * b2[i] - a2[i] * b1[i];
+            o1[i] = a2[i] * b0[i] - a0[i] * b2[i];
+            o2[i] = a0[i] * b1[i] - a1[i] * b0[i];
+        }
+    } else {
+        for (Index_t i{0}; i < npix; ++i) {
+            const T* A = a + 3 * i; const T* B = b + 3 * i; T* O = out + 3 * i;
+            O[0] = A[1] * B[2] - A[2] * B[1];
+            O[1] = A[2] * B[0] - A[0] * B[2];
+            O[2] = A[0] * B[1] - A[1] * B[0];
+        }
+    }
+}
+
+// out[c] -= k[c] * sum_d(invk[d] * N[d]) for the npix three-vectors.
+void leray_buffers(const Real* k, const Real* invk, const Complex* N,
+                   Complex* out, Index_t npix, bool soa) {
+    if (soa) {
+        const Real* k0 = k; const Real* k1 = k + npix; const Real* k2 = k + 2 * npix;
+        const Real* i0 = invk; const Real* i1 = invk + npix; const Real* i2 = invk + 2 * npix;
+        const Complex* n0 = N; const Complex* n1 = N + npix; const Complex* n2 = N + 2 * npix;
+        Complex* o0 = out; Complex* o1 = out + npix; Complex* o2 = out + 2 * npix;
+        for (Index_t i{0}; i < npix; ++i) {
+            const Complex s = i0[i] * n0[i] + i1[i] * n1[i] + i2[i] * n2[i];
+            o0[i] -= k0[i] * s;
+            o1[i] -= k1[i] * s;
+            o2[i] -= k2[i] * s;
+        }
+    } else {
+        for (Index_t i{0}; i < npix; ++i) {
+            const Real* K = k + 3 * i; const Real* IK = invk + 3 * i;
+            const Complex* NN = N + 3 * i; Complex* O = out + 3 * i;
+            const Complex s = IK[0] * NN[0] + IK[1] * NN[1] + IK[2] * NN[2];
+            O[0] -= K[0] * s;
+            O[1] -= K[1] * s;
+            O[2] -= K[2] * s;
+        }
+    }
+}
+
+}  // namespace internal
+
+/* ---------------------------------------------------------------------- */
+template <typename T>
+static void cross_host(const TypedField<T, HostSpace>& a,
+                       const TypedField<T, HostSpace>& b,
+                       TypedField<T, HostSpace>& out) {
+    const auto& coll = a.get_collection();
+    internal::check_three_vector("cross", a, coll);
+    internal::check_three_vector("cross", b, coll);
+    internal::check_three_vector("cross", out, coll);
+    if (out.view().data() == a.view().data() ||
+        out.view().data() == b.view().data()) {
+        throw FieldError(
+            "cross: output must be a field distinct from both inputs");
+    }
+    const Index_t npix = a.get_nb_entries();
+    const bool soa =
+        (out.get_storage_order() == StorageOrder::StructureOfArrays);
+    internal::cross_buffers<T>(a.view().data(), b.view().data(),
+                               out.view().data(), npix, soa);
+}
+
+template <>
+void cross<Real, HostSpace>(const TypedField<Real, HostSpace>& a,
+                            const TypedField<Real, HostSpace>& b,
+                            TypedField<Real, HostSpace>& out) {
+    cross_host(a, b, out);
+}
+
+template <>
+void cross<Complex, HostSpace>(const TypedField<Complex, HostSpace>& a,
+                               const TypedField<Complex, HostSpace>& b,
+                               TypedField<Complex, HostSpace>& out) {
+    cross_host(a, b, out);
+}
+
+/* ---------------------------------------------------------------------- */
+template <>
+void leray_project<HostSpace>(const TypedField<Real, HostSpace>& k,
+                              const TypedField<Real, HostSpace>& invk,
+                              const TypedField<Complex, HostSpace>& N,
+                              TypedField<Complex, HostSpace>& out) {
+    const auto& coll = out.get_collection();
+    internal::check_three_vector("leray_project", k, coll);
+    internal::check_three_vector("leray_project", invk, coll);
+    internal::check_three_vector("leray_project", N, coll);
+    internal::check_three_vector("leray_project", out, coll);
+    // k, invk, N and out share a collection, hence a storage order.
+    const Index_t npix = out.get_nb_entries();
+    const bool soa =
+        (out.get_storage_order() == StorageOrder::StructureOfArrays);
+    internal::leray_buffers(k.view().data(), invk.view().data(),
+                            N.view().data(), out.view().data(), npix, soa);
+}
+
 }  // namespace linalg
 }  // namespace muGrid
