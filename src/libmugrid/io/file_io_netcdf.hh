@@ -811,7 +811,47 @@ namespace muGrid {
                       const Index_t & frame_index,
                       const Communicator & comm);
 
+    //! The field that the actual NetCDF read/write calls operate on. For
+    //! host-resident fields this is simply `get_field()`. For device-resident
+    //! (GPU) fields it is a lazily-created host-resident (AoS) staging mirror
+    //! with identical topology, so that the host-based NetCDF code path can be
+    //! reused unchanged. Buffer pointer, index map and strides must all be
+    //! taken from this field.
+    const muGrid::Field & get_io_field() const;
+
+    //! whether a host staging mirror (and host<->device copy) is required for
+    //! this variable: true only for a device-resident field that is *not*
+    //! directly host-accessible. A device-resident field on a unified-memory
+    //! device is written/read in place (zero-copy), and host-resident fields
+    //! never need a mirror. Throws for unsupported device variables (state
+    //! fields, whose contiguous multi-history buffer cannot be reproduced).
+    bool needs_mirror() const;
+
+    //! lazily build (if necessary) and return the host staging mirror for a
+    //! device-resident field. Must not be called for host-resident fields.
+    muGrid::Field & get_host_mirror() const;
+
+    //! whether this variable supports host staging of a device-resident field.
+    //! State-field variables write all history sub-fields through a single
+    //! contiguous buffer, which the (single-field) staging mirror cannot
+    //! reproduce, so they override this to return false and fail loudly.
+    virtual bool supports_device_staging() const { return true; }
+
+    //! copy device field data into the host staging mirror (before writing).
+    //! No-op for host-resident fields.
+    void stage_to_host() const;
+
+    //! copy host staging mirror data back to the device field (after reading).
+    //! No-op for host-resident fields.
+    void stage_to_device() const;
+
    protected:
+    //! host staging mirror collection, owning the mirror field. Created lazily
+    //! on first I/O of a device-resident field; null for host fields.
+    mutable std::unique_ptr<muGrid::FieldCollection> host_mirror_collection{};
+    //! the host staging mirror field, owned by host_mirror_collection.
+    mutable muGrid::Field * host_mirror_field{nullptr};
+
     std::string name;  // Variable name. Must be a legal netCDF identifier.
     nc_type data_type{NC_NAT};     // One of the predefined netCDF external data
                                    // types. NAT = Not A Type.
@@ -954,6 +994,11 @@ namespace muGrid {
 
     //! get a reference to the field represented by the NetCDF variable
     const muGrid::Field & get_field() const override;
+
+    //! State fields stream all history sub-fields through one contiguous
+    //! buffer, which the single-field host staging mirror cannot reproduce;
+    //! hence device-resident state fields are not supported (fail loudly).
+    bool supports_device_staging() const override { return false; }
 
     //! return the number of fields belonging to the state field (nb_memory + 1)
     size_t get_nb_fields() const;

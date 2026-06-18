@@ -1971,21 +1971,149 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void * NetCDFVarBase::get_buf() const {
-    // Default assert_host_memory=true ensures device fields throw an error
-    const Field & field{this->get_field()};
-    char * buf_ptr{static_cast<char *>(field.get_void_data_ptr())};
+  namespace {
+    //! Register, in `coll`, a host field matching the prototype `proto`
+    //! (same name, scalar type, component shape, sub-division tag and unit).
+    muGrid::Field & register_mirror_field(muGrid::FieldCollection & coll,
+                                          const muGrid::Field & proto) {
+      const std::string name{proto.get_name()};
+      const Shape_t shape{proto.get_components_shape()};
+      const std::string tag{proto.get_sub_division_tag()};
+      const muGrid::Unit unit{proto.get_physical_unit()};
+      switch (proto.get_type_descriptor()) {
+      case muGrid::TypeDescriptor::Real:
+        return coll.register_field<muGrid::Real>(name, shape, tag, unit);
+      case muGrid::TypeDescriptor::Complex:
+        return coll.register_field<muGrid::Complex>(name, shape, tag, unit);
+      case muGrid::TypeDescriptor::Int:
+        return coll.register_field<muGrid::Int>(name, shape, tag, unit);
+      case muGrid::TypeDescriptor::Uint:
+        return coll.register_field<muGrid::Uint>(name, shape, tag, unit);
+      case muGrid::TypeDescriptor::Index:
+        return coll.register_field<muGrid::Index_t>(name, shape, tag, unit);
+      default:
+        throw FileIOError(
+            "Cannot create a host staging mirror for field '" + name +
+            "': unsupported scalar type.");
+      }
+    }
+  }  // namespace
 
-    // Compute byte offset to skip ghost buffer and access interior data
-    // The offset is computed using pixel offsets and strides
+  /* ---------------------------------------------------------------------- */
+  bool NetCDFVarBase::needs_mirror() const {
+    const muGrid::Field & field{this->get_field()};
+    if (!field.is_on_device()) {
+      return false;
+    }
+    if (!this->supports_device_staging()) {
+      throw FileIOError(
+          "Reading or writing a device-resident state field ('" +
+          this->get_name() +
+          "') via NetCDF is not supported. Copy the state field to a "
+          "host-resident field collection before performing file I/O.");
+    }
+    // On a unified-memory device the field is dereferenceable by the host and
+    // is written/read in place; otherwise a host staging mirror is needed.
+    return !field.is_host_accessible();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::Field & NetCDFVarBase::get_host_mirror() const {
+    if (this->host_mirror_field == nullptr) {
+      const muGrid::Field & device_field{this->get_field()};
+      const muGrid::FieldCollection & device_coll{
+          device_field.get_collection()};
+
+      // Build a host-resident, array-of-structures clone of the collection so
+      // that the existing host I/O path (buffer offset, index map, strides)
+      // remains valid without modification. The subsequent deep_copy then
+      // performs the SoA->AoS conversion and the device->host transfer.
+      if (auto * gfc = dynamic_cast<const muGrid::GlobalFieldCollection *>(
+              &device_coll)) {
+        this->host_mirror_collection =
+            std::make_unique<muGrid::GlobalFieldCollection>(
+                gfc->get_empty_clone(muGrid::Device::cpu(),
+                                     muGrid::StorageOrder::ArrayOfStructures));
+      } else if (auto * lfc =
+                     dynamic_cast<const muGrid::LocalFieldCollection *>(
+                         &device_coll)) {
+        this->host_mirror_collection =
+            std::make_unique<muGrid::LocalFieldCollection>(
+                lfc->get_empty_clone(lfc->get_name(), muGrid::Device::cpu()));
+      } else {
+        throw FileIOError(
+            "Cannot create a host staging mirror: unknown field collection "
+            "type.");
+      }
+
+      this->host_mirror_field =
+          &register_mirror_field(*this->host_mirror_collection, device_field);
+    }
+    return *this->host_mirror_field;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::Field & NetCDFVarBase::get_io_field() const {
+    if (this->needs_mirror()) {
+      return this->get_host_mirror();
+    }
+    // Host-resident or host-accessible (unified-memory) device field: operate
+    // on the field directly, no staging buffer.
+    return this->get_field();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarBase::stage_to_host() const {
+    if (this->needs_mirror()) {
+      this->get_host_mirror().deep_copy_from(this->get_field());
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarBase::stage_to_device() const {
+    if (this->needs_mirror()) {
+      // get_field() is const, but the underlying field is mutable (it is held
+      // as a non-const reference by the variable); we need write access to
+      // push the data that was just read back to the device.
+      const_cast<muGrid::Field &>(this->get_field())
+          .deep_copy_from(this->get_host_mirror());
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void * NetCDFVarBase::get_buf() const {
+    // For a non-host-accessible device field this resolves to the host staging
+    // mirror; otherwise it is the field itself (a host field, or a
+    // host-accessible unified-memory device field written/read in place).
+    const Field & field{this->get_io_field()};
+    // Host-resident fields keep assert_host_memory=true as a safety net. A
+    // host-accessible device field (unified memory) is dereferenceable from
+    // the CPU, so its raw device pointer may be used directly.
+    char * buf_ptr{static_cast<char *>(
+        field.get_void_data_ptr(/*assert_host_memory=*/!field.is_on_device()))};
+
+    // Linear pixel offset (in pixels) from the buffer start to the first
+    // interior (non-ghost) pixel.
     auto pixel_offsets{field.get_pixels_offset_without_ghosts()};
     auto pixel_strides{field.get_collection().get_pixels_strides(1)};
-    Index_t byte_offset{0};
+    Index_t pixel_offset{0};
     for (size_t i = 0; i < pixel_offsets.size(); ++i) {
-      byte_offset += pixel_offsets[i] * pixel_strides[i];
+      pixel_offset += pixel_offsets[i] * pixel_strides[i];
     }
-    // Multiply by degrees of freedom per pixel and element size
-    byte_offset *= field.get_nb_dof_per_pixel() * field.get_element_size_in_bytes();
+    // Convert to a scalar offset to the first interior element. In
+    // array-of-structures storage each pixel occupies nb_dof_per_pixel
+    // contiguous scalars, so the interior begins nb_dof_per_pixel * pixel
+    // offset in. In structure-of-arrays storage consecutive pixels of a
+    // component are unit-strided, so the interior of component 0 begins just
+    // pixel_offset in (the index map's component stride, which equals the
+    // buffer pixel count, then jumps between component planes).
+    const Index_t dofs_per_pixel{
+        field.get_storage_order() == StorageOrder::ArrayOfStructures
+            ? field.get_nb_dof_per_pixel()
+            : Index_t{1}};
+    const Index_t byte_offset{
+        pixel_offset * dofs_per_pixel *
+        static_cast<Index_t>(field.get_element_size_in_bytes())};
 
     return buf_ptr + byte_offset;
   }
@@ -2401,6 +2529,10 @@ namespace muGrid {
     // check if frame is correct and compute positive frame value
     Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
 
+    // For device-resident fields, copy the data into the host staging mirror
+    // before issuing the (host-based) NetCDF write. No-op for host fields.
+    this->stage_to_host();
+
     int status{};
     if (this->get_validity_domain() ==
         muGrid::FieldCollection::ValidityDomain::Global) {
@@ -2604,6 +2736,10 @@ namespace muGrid {
       }
 #endif  // WITH_MPI
     }
+
+    // For device-resident fields, the data was read into the host staging
+    // mirror; copy it back to the device. No-op for host fields.
+    this->stage_to_device();
   }
 
   /* ---------------------------------------------------------------------- */
@@ -2788,15 +2924,18 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   std::vector<IODiff_t> NetCDFVarField::get_nc_imap_global() const {
-    // construct imap from field strides
+    // construct imap from field strides. The strides describe the in-memory
+    // layout and must therefore be taken from the field that actually backs
+    // the I/O buffer (the host staging mirror for device-resident fields).
+    const muGrid::Field & field{this->get_io_field()};
     IterUnit iter_type{muGrid::IterUnit::SubPt};
-    if (this->get_field().get_nb_components() == 1) {
+    if (field.get_nb_components() == 1) {
       iter_type = muGrid::IterUnit::Pixel;
     }
     std::vector<IODiff_t> imap_strides{
-        this->get_field().get_nb_pixels_without_ghosts() *
-        this->get_field().get_nb_dof_per_pixel()};  // imap of frame (nb_dofs)
-    auto strides_wrong_type{this->get_field().get_strides(iter_type)};
+        field.get_nb_pixels_without_ghosts() *
+        field.get_nb_dof_per_pixel()};  // imap of frame (nb_dofs)
+    auto strides_wrong_type{field.get_strides(iter_type)};
     std::vector<IODiff_t> strides(strides_wrong_type.begin(),
                                   strides_wrong_type.end());
     imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
@@ -2816,16 +2955,18 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   std::vector<IODiff_t> NetCDFVarField::get_nc_imap_local() const {
-    // construc imap from field strides
+    // construc imap from field strides. The strides describe the in-memory
+    // layout and must therefore be taken from the field that actually backs
+    // the I/O buffer (the host staging mirror for device-resident fields).
+    const muGrid::Field & field{this->get_io_field()};
     IterUnit iter_type{muGrid::IterUnit::SubPt};
-    if (this->get_field().get_nb_components() == 1) {
+    if (field.get_nb_components() == 1) {
       iter_type = muGrid::IterUnit::Pixel;
     }
     std::vector<IODiff_t> imap_strides{
-        this->get_field().get_nb_pixels_without_ghosts() *
-        this->get_field()
-            .get_nb_dof_per_pixel()};  // imap of frame (nb_pix*nb_dofs)
-    auto strides_wrong_type{this->get_field().get_strides(iter_type)};
+        field.get_nb_pixels_without_ghosts() *
+        field.get_nb_dof_per_pixel()};  // imap of frame (nb_pix*nb_dofs)
+    auto strides_wrong_type{field.get_strides(iter_type)};
     std::vector<IODiff_t> strides{strides_wrong_type.begin(),
                                   strides_wrong_type.end()};
     imap_strides.insert(imap_strides.end(), strides.begin(), strides.end());
