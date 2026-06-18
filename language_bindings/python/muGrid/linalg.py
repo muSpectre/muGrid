@@ -178,4 +178,51 @@ def axpy_norm_sq(alpha, x, y):
     return _linalg.axpy_norm_sq(alpha, _get_cpp(x), _get_cpp(y))
 
 
-__all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy", "axpy_norm_sq"]
+def cross(a, b, out):
+    """
+    Per-pixel three-vector cross product: out = a x b (full buffer).
+
+    Fused single-pass kernel for three-component fields (e.g. the vorticity
+    ``ik x u`` and the Lamb vector ``u x omega`` of a pseudo-spectral solver),
+    avoiding the temporaries of an array-expression cross product. Runs on host
+    or device. ``out`` must be a field distinct from ``a`` and ``b``.
+
+    Parameters
+    ----------
+    a : Field
+        First field (exactly 3 components)
+    b : Field
+        Second field (3 components, same collection as a)
+    out : Field
+        Output field (3 components, modified in place)
+    """
+    _linalg.cross(_get_cpp(a), _get_cpp(b), _get_cpp(out))
+
+
+def leray_project(k, invk, N, out):
+    """
+    Fused Leray projection update: ``out[c] -= k[c] * sum_d(invk[d] * N[d])``.
+
+    Removes the longitudinal (compressible) part of a Fourier-space vector
+    field in a single pass: with ``k`` the wavevector and ``invk = k/|k|**2``,
+    this subtracts ``k (k.N)/|k|**2``, projecting ``out`` onto the
+    divergence-free subspace, without the intermediate ``(invk.N)`` field of
+    the array form. Runs on host or device; ``out`` may alias ``N``.
+
+    Parameters
+    ----------
+    k : RealField
+        Wavevector field (3 components)
+    invk : RealField
+        Field k/|k|**2 (3 components; the k=0 mode regularised by the caller)
+    N : ComplexField
+        Source vector field (3 components)
+    out : ComplexField
+        Field updated in place (3 components)
+    """
+    _linalg.leray_project(_get_cpp(k), _get_cpp(invk), _get_cpp(N),
+                          _get_cpp(out))
+
+
+__all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy", "axpy_norm_sq",
+           "cross", "leray_project"]

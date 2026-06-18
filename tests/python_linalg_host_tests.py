@@ -513,5 +513,110 @@ class TestFieldScal:
             linalg.scal(alpha_bad, x)
 
 
+STORAGE_ORDERS = [
+    muGrid.StorageOrder.ArrayOfStructures,
+    muGrid.StorageOrder.StructureOfArrays,
+]
+SO_IDS = ["aos", "soa"]
+
+
+# ===========================================================================
+# Fused per-pixel vector kernels: cross / leray_project
+# ===========================================================================
+
+class TestCross:
+    @pytest.mark.parametrize("nb_grid_pts", DIMS, ids=DIM_IDS)
+    @pytest.mark.parametrize("complex_", [False, True], ids=["real", "complex"])
+    @pytest.mark.parametrize("storage_order", STORAGE_ORDERS, ids=SO_IDS)
+    def test_cross_matches_numpy(self, nb_grid_pts, complex_, storage_order,
+                                 rng):
+        # cross() operates on the FULL buffer (ghosts included), so compare
+        # against numpy on the ghost-inclusive .sg view.
+        g = (1,) * len(nb_grid_pts)
+        fc = muGrid.GlobalFieldCollection(
+            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            storage_order=storage_order,
+        )
+        a = _make(fc, "a", components=(3,), complex_=complex_)
+        b = _make(fc, "b", components=(3,), complex_=complex_)
+        out = _make(fc, "out", components=(3,), complex_=complex_)
+        a_val = _fill(a, rng, complex_)
+        b_val = _fill(b, rng, complex_)
+        _fill(out, rng, complex_)
+
+        linalg.cross(a, b, out)
+
+        ref = np.cross(a_val, b_val, axis=0)  # component axis is first
+        np.testing.assert_allclose(np.array(out.sg), ref, atol=1e-13)
+
+    def test_cross_rejects_aliasing(self, rng):
+        fc = _collection((4, 5))
+        a = _make(fc, "a", components=(3,))
+        b = _make(fc, "b", components=(3,))
+        _fill(a, rng)
+        _fill(b, rng)
+        with pytest.raises(RuntimeError, match="distinct"):
+            linalg.cross(a, b, a)
+
+    def test_cross_rejects_wrong_component_count(self, rng):
+        fc = _collection((4, 5))
+        a = _make(fc, "a", components=(2,))
+        b = _make(fc, "b", components=(2,))
+        out = _make(fc, "out", components=(2,))
+        _fill(a, rng)
+        _fill(b, rng)
+        with pytest.raises(RuntimeError, match="three components"):
+            linalg.cross(a, b, out)
+
+
+class TestLerayProject:
+    @pytest.mark.parametrize("nb_grid_pts", DIMS, ids=DIM_IDS)
+    @pytest.mark.parametrize("storage_order", STORAGE_ORDERS, ids=SO_IDS)
+    def test_leray_matches_numpy(self, nb_grid_pts, storage_order, rng):
+        g = (1,) * len(nb_grid_pts)
+        fc = muGrid.GlobalFieldCollection(
+            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            storage_order=storage_order,
+        )
+        k = _make(fc, "k", components=(3,))
+        invk = _make(fc, "invk", components=(3,))
+        N = _make(fc, "N", components=(3,), complex_=True)
+        out = _make(fc, "out", components=(3,), complex_=True)
+        k_val = _fill(k, rng)
+        invk_val = _fill(invk, rng)
+        N_val = _fill(N, rng, complex_=True)
+        out_val = _fill(out, rng, complex_=True)
+
+        linalg.leray_project(k, invk, N, out)
+
+        # out[c] -= k[c] * sum_d(invk[d] * N[d]); contraction over component 0
+        s = np.sum(invk_val * N_val, axis=0)
+        ref = out_val - k_val * s
+        np.testing.assert_allclose(np.array(out.sg), ref, atol=1e-13)
+
+    def test_leray_projects_onto_divergence_free(self, rng):
+        # With invk = k/|k|^2, applying the projection to N (out initialised to
+        # N) must leave a transverse field: k . out = 0 per pixel.
+        fc = muGrid.GlobalFieldCollection([6, 5, 4])
+        k = fc.real_field("k", (3,))
+        invk = fc.real_field("invk", (3,))
+        N = fc.complex_field("N", (3,))
+        out = fc.complex_field("out", (3,))
+
+        k_val = rng.standard_normal(k.sg.shape) + 0.5  # avoid zero wavevectors
+        k.sg[...] = k_val
+        ksq = np.sum(k_val ** 2, axis=0)
+        invk.sg[...] = k_val / ksq
+        N_val = (rng.standard_normal(N.sg.shape)
+                 + 1j * rng.standard_normal(N.sg.shape))
+        N.sg[...] = N_val
+        out.sg[...] = N_val  # out starts as N, projection makes it transverse
+
+        linalg.leray_project(k, invk, N, out)
+
+        div = np.sum(k_val * np.array(out.sg), axis=0)  # k . out
+        np.testing.assert_allclose(div, np.zeros_like(div), atol=1e-12)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

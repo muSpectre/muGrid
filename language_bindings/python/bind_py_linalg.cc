@@ -306,6 +306,41 @@ void add_linalg_functions(py::module &mod) {
             Real input/output field (modified in place)
         )pbdoc");
 
+    // --- Fused per-pixel vector operations (host) ---
+
+    linalg.def("cross",
+        static_cast<void (*)(const RealFieldHost&, const RealFieldHost&,
+                             RealFieldHost&)>(
+            &muGrid::linalg::cross<Real, HostSpace>),
+        "a"_a, "b"_a, "out"_a,
+        R"pbdoc(
+        Per-pixel three-vector cross product: out = a x b (real fields).
+
+        Single-pass kernel for three-component fields; `out` must be distinct
+        from `a` and `b` (the cross product cannot be formed in place).
+        )pbdoc");
+
+    linalg.def("cross",
+        static_cast<void (*)(const ComplexFieldHost&, const ComplexFieldHost&,
+                             ComplexFieldHost&)>(
+            &muGrid::linalg::cross<Complex, HostSpace>),
+        "a"_a, "b"_a, "out"_a,
+        "Per-pixel three-vector cross product out = a x b (complex fields).");
+
+    linalg.def("leray_project",
+        static_cast<void (*)(const RealFieldHost&, const RealFieldHost&,
+                             const ComplexFieldHost&, ComplexFieldHost&)>(
+            &muGrid::linalg::leray_project<HostSpace>),
+        "k"_a, "invk"_a, "N"_a, "out"_a,
+        R"pbdoc(
+        Fused Leray projection update: out[c] -= k[c] * sum_d(invk[d] * N[d]).
+
+        Removes the longitudinal part of a Fourier-space vector field in one
+        pass. `k` is the wavevector field and `invk = k/|k|^2`; both are real
+        three-component fields. `N` and `out` are complex three-component
+        fields; `out` may alias `N`.
+        )pbdoc");
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---
 
@@ -408,5 +443,31 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::axpy_norm_sq<Complex, DeviceSpace>),
         "alpha"_a, "x"_a, "y"_a,
         "Fused AXPY + norm_sq for complex fields on device (GPU): y = alpha * x + y, returns ||y||².");
+
+    // --- Fused per-pixel vector operations (device) ---
+
+    linalg.def("cross",
+        static_cast<void (*)(const RealFieldDevice&, const RealFieldDevice&,
+                             RealFieldDevice&)>(
+            &muGrid::linalg::cross<Real, DeviceSpace>),
+        "a"_a, "b"_a, "out"_a,
+        "Per-pixel three-vector cross product out = a x b for real fields on "
+        "device (GPU).");
+
+    linalg.def("cross",
+        static_cast<void (*)(const ComplexFieldDevice&, const ComplexFieldDevice&,
+                             ComplexFieldDevice&)>(
+            &muGrid::linalg::cross<Complex, DeviceSpace>),
+        "a"_a, "b"_a, "out"_a,
+        "Per-pixel three-vector cross product out = a x b for complex fields "
+        "on device (GPU).");
+
+    linalg.def("leray_project",
+        static_cast<void (*)(const RealFieldDevice&, const RealFieldDevice&,
+                             const ComplexFieldDevice&, ComplexFieldDevice&)>(
+            &muGrid::linalg::leray_project<DeviceSpace>),
+        "k"_a, "invk"_a, "N"_a, "out"_a,
+        "Fused Leray projection out[c] -= k[c] * sum_d(invk[d] * N[d]) for "
+        "complex fields with real coefficients on device (GPU).");
 #endif
 }

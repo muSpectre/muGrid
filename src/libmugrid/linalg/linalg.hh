@@ -43,6 +43,8 @@
 
 #include "field/field_typed.hh"
 
+#include <string>
+
 namespace muGrid {
 namespace linalg {
 
@@ -210,6 +212,60 @@ template <typename MemorySpace>
 void scal(const TypedField<Real, MemorySpace>& alpha,
           TypedField<Real, MemorySpace>& x);
 
+/**
+ * Per-pixel three-vector cross product: out = a × b.
+ *
+ * Fused, single-pass kernel for three-component fields (e.g. the vorticity
+ * `ik × û` and the Lamb vector `u × ω` of a pseudo-spectral solver). Computing
+ * the cross product this way avoids the temporaries and the several array
+ * passes that an `a[1]*b[2] - a[2]*b[1]`-style expression on field views would
+ * allocate. Operates on the FULL buffer (ghosts included), matching the other
+ * update operations. Honours both SoA and AoS storage orders.
+ *
+ * `out` must be a distinct field from `a` and `b`: a three-vector cross
+ * product cannot be computed safely in place (the first written component
+ * would be read back while forming the others).
+ *
+ * @tparam T Scalar type (Real or Complex)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ * @param a First field (exactly 3 components)
+ * @param b Second field (3 components, same collection as a)
+ * @param out Output field (3 components, modified in place)
+ * @throws FieldError on shape mismatch, wrong component count, or aliasing
+ */
+template <typename T, typename MemorySpace>
+void cross(const TypedField<T, MemorySpace>& a,
+           const TypedField<T, MemorySpace>& b,
+           TypedField<T, MemorySpace>& out);
+
+/**
+ * Fused Leray (Helmholtz) projection update: out[c] -= k[c] * Σ_d invk[d] N[d].
+ *
+ * Removes the longitudinal (compressible) part of a Fourier-space vector field
+ * in a single pass: with `k` the wavevector and `invk = k/|k|²`, subtracting
+ * `k (k·N)/|k|²` projects `out` onto the divergence-free subspace. `k` and
+ * `invk` are real per-pixel coefficient fields (three components); `N` and
+ * `out` are the complex vector fields. Because the coefficients are real, the
+ * real and imaginary parts are updated independently, so this also runs on the
+ * device by operating on the underlying reals (cf. the field-valued `scal`).
+ *
+ * Computing the contraction and the rank-1 update together avoids the
+ * intermediate `(invk·N)` scalar field and the broadcast multiply that the
+ * array form allocates. Operates on the FULL buffer; `out` may alias `N`.
+ *
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ * @param k Real wavevector field (3 components)
+ * @param invk Real field k/|k|² (3 components, k=0 mode regularised by caller)
+ * @param N Complex source vector field (3 components)
+ * @param out Complex field updated in place (3 components)
+ * @throws FieldError on shape mismatch or wrong component count
+ */
+template <typename MemorySpace>
+void leray_project(const TypedField<Real, MemorySpace>& k,
+                   const TypedField<Real, MemorySpace>& invk,
+                   const TypedField<Complex, MemorySpace>& N,
+                   TypedField<Complex, MemorySpace>& out);
+
 namespace internal {
 
     //! Validate a field-valued alpha for scal(): same collection, same
@@ -229,6 +285,21 @@ namespace internal {
             throw FieldError(
                 "scal: the field-valued alpha must have a single component "
                 "(broadcast) or the same number of components as x");
+        }
+    }
+
+    //! Validate that a field lives on `coll` and carries exactly three
+    //! components per pixel; used by cross() / leray_project().
+    template <typename AnyField>
+    void check_three_vector(const char* op, const AnyField& f,
+                            const FieldCollection& coll) {
+        if (&f.get_collection() != &coll) {
+            throw FieldError(std::string(op) +
+                             ": fields must belong to the same collection");
+        }
+        if (f.get_nb_components() != 3) {
+            throw FieldError(std::string(op) +
+                             ": fields must have exactly three components");
         }
     }
 
