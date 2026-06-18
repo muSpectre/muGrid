@@ -269,11 +269,19 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     GlobalFieldCollection GlobalFieldCollection::get_empty_clone() const {
+        return this->get_empty_clone(this->get_device(),
+                                     this->get_storage_order());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    GlobalFieldCollection
+    GlobalFieldCollection::get_empty_clone(Device device,
+                                           StorageOrder storage_order) const {
         GlobalFieldCollection ret_val{
             this->get_spatial_dim(),
             this->nb_sub_pts,
-            this->get_storage_order(),
-            this->get_device()
+            storage_order,
+            device
         };
         // Forward the ghost specification and pixel strides so the clone has
         // an identical layout (interior region, ghost counts and memory order).

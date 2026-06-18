@@ -344,6 +344,16 @@ namespace muGrid {
         Unit get_physical_unit() const;
 
         /**
+         * Deep copy the field values from another field, performing a
+         * host<->device transfer and a storage-order (AoS<->SoA) conversion as
+         * needed. The source field must have the same scalar type and a
+         * compatible logical layout (same number of buffer entries). This is a
+         * type-erased entry point: the concrete implementation dispatches on
+         * the source field's memory space.
+         */
+        virtual void deep_copy_from(const Field & src) = 0;
+
+        /**
          * Check if field resides on device (GPU) memory.
          * Returns true for CUDA and ROCm/HIP device memory spaces.
          */

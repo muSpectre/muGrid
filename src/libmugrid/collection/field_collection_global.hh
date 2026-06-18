@@ -253,6 +253,15 @@ namespace muGrid {
          */
         GlobalFieldCollection get_empty_clone() const;
 
+        /**
+         * obtain a new field collection with the same domain and pixels but a
+         * caller-specified memory device and component storage order. This is
+         * used, e.g., to build a host-resident (AoS) staging mirror of a
+         * device-resident collection for file I/O.
+         */
+        GlobalFieldCollection
+        get_empty_clone(Device device, StorageOrder storage_order) const;
+
         //! return shape of the pixels
         Shape_t get_pixels_shape() const override;
 

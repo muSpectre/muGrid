@@ -80,9 +80,15 @@ namespace muGrid {
     /* ---------------------------------------------------------------------- */
     LocalFieldCollection
     LocalFieldCollection::get_empty_clone(const std::string & new_name) const {
+        return this->get_empty_clone(new_name, this->get_device());
+    }
+
+    /* ---------------------------------------------------------------------- */
+    LocalFieldCollection
+    LocalFieldCollection::get_empty_clone(const std::string & new_name,
+                                          Device device) const {
         LocalFieldCollection ret_val{this->get_spatial_dim(), new_name,
-                                     this->nb_sub_pts,
-                                     this->get_device()};
+                                     this->nb_sub_pts, device};
         for (const auto & pixel_id : this->get_pixel_indices()) {
             ret_val.add_pixel(pixel_id);
         }

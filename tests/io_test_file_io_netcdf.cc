@@ -46,6 +46,7 @@
 #include "field/field_map_static.hh"
 #include "collection/field_collection.hh"
 #include "field/state_field.hh"
+#include "memory/device.hh"
 
 #include "mpi_context.hh"
 
@@ -850,6 +851,209 @@ namespace muGrid {
     muGrid::NetCDFAtt att_d("d", d);
     BOOST_CHECK_EQUAL(att_d.get_data_type(), muGrid::MU_NC_REAL);
   }
+
+  // An AoS field with row-major pixel strides (the layout of the host staging
+  // mirror used for SoA device fields) must write a *canonical* NetCDF file,
+  // i.e. one that a standard col-major AoS field reads back correctly. Both
+  // fields are filled by coordinate so the comparison is purely about the
+  // on-disk layout, not the in-memory layout.
+  BOOST_AUTO_TEST_CASE(RowMajorPixelCanonical) {
+    auto & comm{MPIContext::get_context().comm};
+    const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
+    const DynGridIndex nb_domain_grid_pts{3, 4};
+    const DynGridIndex nb_subdomain_grid_pts{3, 4};
+    const DynGridIndex subdomain_locations{0, 0};
+    const std::string quad{"quad"};
+    const Index_t nb_components{4};
+    const Index_t nb_dof{nb_components * 2};  // 2 sub-points
+    const std::vector<std::string> field_names{"f"};
+
+    auto value{[](Index_t ix, Index_t iy, Index_t d) {
+      return static_cast<Real>(ix * 1000 + iy * 100 + d);
+    }};
+
+    // standard col-major AoS field, filled by coordinate
+    muGrid::GlobalFieldCollection col_fc{nb_domain_grid_pts,
+                                         nb_subdomain_grid_pts,
+                                         subdomain_locations, nb_sub_pts};
+    auto & col_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        col_fc.register_real_field(field_names[0], nb_components, quad))};
+    auto col_vec{col_field.eigen_vec()};
+    for (Index_t iy{0}; iy < 4; ++iy) {
+      for (Index_t ix{0}; ix < 3; ++ix) {
+        Index_t p{col_fc.get_index(DynGridIndex{ix, iy})};
+        for (Index_t d{0}; d < nb_dof; ++d) {
+          col_vec(p * nb_dof + d) = value(ix, iy, d);
+        }
+      }
+    }
+
+    // AoS field but with row-major pixel strides (as the SoA-device mirror
+    // would have), filled identically by coordinate
+    muGrid::GlobalFieldCollection row_fc{
+        nb_domain_grid_pts,    nb_subdomain_grid_pts,
+        subdomain_locations,   muGrid::StorageOrder::StructureOfArrays,
+        nb_sub_pts,            muGrid::StorageOrder::ArrayOfStructures};
+    auto & row_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        row_fc.register_real_field(field_names[0], nb_components, quad))};
+    auto row_vec{row_field.eigen_vec()};
+    for (Index_t iy{0}; iy < 4; ++iy) {
+      for (Index_t ix{0}; ix < 3; ++ix) {
+        Index_t p{row_fc.get_index(DynGridIndex{ix, iy})};
+        for (Index_t d{0}; d < nb_dof; ++d) {
+          row_vec(p * nb_dof + d) = value(ix, iy, d);
+        }
+      }
+    }
+
+    const std::string file_name{"test_rowmajor_io.nc"};
+    {
+      muGrid::FileIONetCDF w(file_name,
+                             muGrid::FileIOBase::OpenMode::Overwrite, comm);
+      w.register_field_collection(row_fc, field_names);
+      w.append_frame().write(field_names);
+    }
+    muGrid::GlobalFieldCollection chk_fc{nb_domain_grid_pts,
+                                         nb_subdomain_grid_pts,
+                                         subdomain_locations, nb_sub_pts};
+    auto & chk_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        chk_fc.register_real_field(field_names[0], nb_components, quad))};
+    {
+      muGrid::FileIONetCDF r(file_name, muGrid::FileIOBase::OpenMode::Read,
+                             comm);
+      r.register_field_collection(chk_fc, field_names);
+      r.read(0, field_names);
+    }
+    auto chk_vec{chk_field.eigen_vec()};
+    for (Index_t i{0}; i < col_vec.size(); ++i) {
+      BOOST_CHECK_EQUAL(chk_vec(i), col_vec(i));
+    }
+  }
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+  // Round-trip a device-resident field through NetCDF. On write the device
+  // data is staged through a temporary host (AoS) mirror; on read it is staged
+  // back to the device. A multi-component field with sub-points and a SoA
+  // device collection is used so a wrong AoS<->SoA component permutation or a
+  // wrong pixel ordering during staging would be detected. Data is filled and
+  // checked by coordinate so the comparison is independent of memory layout.
+  BOOST_AUTO_TEST_CASE(DeviceFieldRoundTrip) {
+    auto & comm{MPIContext::get_context().comm};
+    const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
+    const DynGridIndex nb_domain_grid_pts{3, 4};
+    const DynGridIndex nb_subdomain_grid_pts{3, 4};
+    const DynGridIndex subdomain_locations{0, 0};
+    const std::string quad{"quad"};
+    const Index_t nb_components{4};       // T2 tensor in 2d
+    const Index_t nb_dof{nb_components * 2};  // 2 sub-points
+    const std::vector<std::string> field_names{"device_field"};
+
+    auto value{[](Index_t ix, Index_t iy, Index_t d) {
+      return static_cast<Real>(ix * 1000 + iy * 100 + d) + 0.5;
+    }};
+
+#if defined(MUGRID_ENABLE_CUDA)
+    auto device{muGrid::Device::cuda()};
+#else
+    auto device{muGrid::Device::rocm()};
+#endif
+
+    // Build a device collection with structure-of-arrays storage (the typical
+    // GPU layout) and populate it by coordinate. The data is staged in via a
+    // host source whose pixel ordering matches the device's (row-major), so
+    // deep_copy only converts the within-pixel component order.
+    muGrid::GlobalFieldCollection device_fc{
+        nb_domain_grid_pts,    nb_subdomain_grid_pts,
+        subdomain_locations,   nb_sub_pts,
+        muGrid::StorageOrder::StructureOfArrays,
+        DynGridIndex{},        DynGridIndex{},        device};
+    auto & device_field{device_fc.register_real_field(field_names[0],
+                                                      nb_components, quad)};
+    {
+      muGrid::GlobalFieldCollection src_fc{
+          nb_domain_grid_pts,    nb_subdomain_grid_pts,
+          subdomain_locations,   muGrid::StorageOrder::StructureOfArrays,
+          nb_sub_pts,            muGrid::StorageOrder::ArrayOfStructures};
+      auto & src_field{dynamic_cast<muGrid::TypedField<Real> &>(
+          src_fc.register_real_field(field_names[0], nb_components, quad))};
+      auto src_vec{src_field.eigen_vec()};
+      for (Index_t iy{0}; iy < 4; ++iy) {
+        for (Index_t ix{0}; ix < 3; ++ix) {
+          Index_t p{src_fc.get_index(DynGridIndex{ix, iy})};
+          for (Index_t d{0}; d < nb_dof; ++d) {
+            src_vec(p * nb_dof + d) = value(ix, iy, d);
+          }
+        }
+      }
+      device_field.deep_copy_from(src_field);
+    }
+
+    // write the device field to a NetCDF file
+    const std::string file_name{"test_device_io.nc"};
+    {
+      muGrid::FileIONetCDF file_io_w(
+          file_name, muGrid::FileIOBase::OpenMode::Overwrite, comm);
+      file_io_w.register_field_collection(device_fc, field_names);
+      file_io_w.append_frame().write(field_names);
+    }
+
+    // read it into a standard (col-major AoS) host field; values must match
+    // the reference by coordinate
+    muGrid::GlobalFieldCollection check_fc{nb_domain_grid_pts,
+                                           nb_subdomain_grid_pts,
+                                           subdomain_locations, nb_sub_pts};
+    auto & check_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        check_fc.register_real_field(field_names[0], nb_components, quad))};
+    {
+      muGrid::FileIONetCDF file_io_r(
+          file_name, muGrid::FileIOBase::OpenMode::Read, comm);
+      file_io_r.register_field_collection(check_fc, field_names);
+      file_io_r.read(0, field_names);
+    }
+    auto check_vec{check_field.eigen_vec()};
+    for (Index_t iy{0}; iy < 4; ++iy) {
+      for (Index_t ix{0}; ix < 3; ++ix) {
+        Index_t p{check_fc.get_index(DynGridIndex{ix, iy})};
+        for (Index_t d{0}; d < nb_dof; ++d) {
+          BOOST_CHECK_EQUAL(check_vec(p * nb_dof + d), value(ix, iy, d));
+        }
+      }
+    }
+
+    // read it back into a device field, copy to host; must match as well
+    muGrid::GlobalFieldCollection device_fc_r{
+        nb_domain_grid_pts,    nb_subdomain_grid_pts,
+        subdomain_locations,   nb_sub_pts,
+        muGrid::StorageOrder::StructureOfArrays,
+        DynGridIndex{},        DynGridIndex{},        device};
+    auto & device_field_r{device_fc_r.register_real_field(field_names[0],
+                                                          nb_components, quad)};
+    {
+      muGrid::FileIONetCDF file_io_r2(
+          file_name, muGrid::FileIOBase::OpenMode::Read, comm);
+      file_io_r2.register_field_collection(device_fc_r, field_names);
+      file_io_r2.read(0, field_names);
+    }
+    // copy the device result back to a host field with matching (row-major)
+    // pixel order so the comparison is by coordinate
+    muGrid::GlobalFieldCollection back_fc{
+        nb_domain_grid_pts,    nb_subdomain_grid_pts,
+        subdomain_locations,   muGrid::StorageOrder::StructureOfArrays,
+        nb_sub_pts,            muGrid::StorageOrder::ArrayOfStructures};
+    auto & back_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        back_fc.register_real_field(field_names[0], nb_components, quad))};
+    back_field.deep_copy_from(device_field_r);
+    auto back_vec{back_field.eigen_vec()};
+    for (Index_t iy{0}; iy < 4; ++iy) {
+      for (Index_t ix{0}; ix < 3; ++ix) {
+        Index_t p{back_fc.get_index(DynGridIndex{ix, iy})};
+        for (Index_t d{0}; d < nb_dof; ++d) {
+          BOOST_CHECK_EQUAL(back_vec(p * nb_dof + d), value(ix, iy, d));
+        }
+      }
+    }
+  }
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 
   BOOST_AUTO_TEST_SUITE_END();
 }  // namespace muGrid
