@@ -4,27 +4,17 @@ Change log for µGrid
 Unreleased
 ----------
 
-- ENH: NetCDF I/O now supports device-resident (GPU) fields directly. On
-  discrete GPUs the field is staged through a temporary host buffer: a host
-  (array-of-structures) mirror collection with identical topology, populated
-  via `deep_copy` (host<->device transfer plus AoS<->SoA conversion) before a
-  write and after a read, so the existing host I/O path is reused unchanged.
-  Device-resident state fields are unsupported and fail loudly.
+- ENH: NetCDF I/O now supports device-resident (GPU) fields directly, staging
+  through a temporary host (AoS) mirror with `deep_copy` before a write and
+  after a read. Device-resident state fields are unsupported and fail loudly.
 - ENH: On unified-memory devices (integrated APUs such as the AMD MI300A) the
-  staging buffer is skipped entirely: the host-coherent device allocation is
-  written and read in place (zero-copy). Eligibility is detected at runtime via
-  `Device::is_host_accessible()` (cached `cudaDeviceProp`/`hipDeviceProp`
-  `integrated` query) and exposed through `Field::is_host_accessible()`;
-  discrete GPUs keep using the host mirror.
-- API: New type-erased `Field::deep_copy_from(const Field &)` dispatches on the
-  source field's memory space; new `Field::is_host_accessible()`; new
-  `GlobalFieldCollection::get_empty_clone(Device, StorageOrder)` and
-  `LocalFieldCollection::get_empty_clone(name, Device)` for cloning a
-  collection onto a different device / storage order
-- BUG: `NetCDFVarField::get_buf` now computes the ghost-skip offset from the
-  field's storage order (array-of-structures vs structure-of-arrays) instead of
-  assuming array-of-structures, so structure-of-arrays fields with ghosts are
-  written and read at the correct offset
+  staging buffer is skipped and the host-coherent allocation is read/written in
+  place (zero-copy), detected at runtime via `Device::is_host_accessible()`.
+- API: New `Field::deep_copy_from(const Field &)` and
+  `Field::is_host_accessible()`; new device/storage-order `get_empty_clone`
+  overloads on `GlobalFieldCollection` and `LocalFieldCollection`.
+- BUG: `NetCDFVarField::get_buf` now derives the ghost-skip offset from the
+  field's storage order, fixing structure-of-arrays fields with ghosts.
 - ENH: Complex GPU linalg is now implemented. The `Complex` device
   specialisations of `vecdot`, `norm_sq`, `axpy`, `scal`, `axpby`, `copy` and
   `axpy_norm_sq` (previously throwing stubs) now run on CUDA/HIP, processing the
