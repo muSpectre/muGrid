@@ -2111,8 +2111,9 @@ namespace muGrid {
         field.get_storage_order() == StorageOrder::ArrayOfStructures
             ? field.get_nb_dof_per_pixel()
             : Index_t{1}};
-    const Index_t byte_offset{pixel_offset * dofs_per_pixel *
-                              field.get_element_size_in_bytes()};
+    const Index_t byte_offset{
+        pixel_offset * dofs_per_pixel *
+        static_cast<Index_t>(field.get_element_size_in_bytes())};
 
     return buf_ptr + byte_offset;
   }
