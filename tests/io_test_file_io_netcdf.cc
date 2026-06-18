@@ -930,6 +930,83 @@ namespace muGrid {
     }
   }
 
+  // Exercise the zero-copy direct path's layout handling on the CPU: a host
+  // SoA field is host-accessible, so the NetCDF code reads/writes it in place
+  // (no mirror), using the structure-of-arrays index map and the
+  // storage-order-aware buffer offset -- exactly the path a unified-memory
+  // (APU) device field takes. Data round-trips AoS -> file -> SoA -> file ->
+  // AoS and must be preserved.
+  BOOST_AUTO_TEST_CASE(SoADirectRoundTrip) {
+    auto & comm{MPIContext::get_context().comm};
+    const muGrid::FieldCollection::SubPtMap_t nb_sub_pts{{"quad", 2}};
+    const DynGridIndex nb_domain_grid_pts{3, 4};
+    const DynGridIndex nb_subdomain_grid_pts{3, 4};
+    const DynGridIndex subdomain_locations{0, 0};
+    const std::string quad{"quad"};
+    const Index_t nb_components{4};
+    const std::vector<std::string> field_names{"f"};
+
+    // AoS reference, filled in buffer order
+    muGrid::GlobalFieldCollection aos_fc{nb_domain_grid_pts,
+                                         nb_subdomain_grid_pts,
+                                         subdomain_locations, nb_sub_pts};
+    auto & aos_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        aos_fc.register_real_field(field_names[0], nb_components, quad))};
+    auto aos_vec{aos_field.eigen_vec()};
+    for (Index_t i{0}; i < aos_vec.size(); ++i) {
+      aos_vec(i) = static_cast<Real>(i) + 0.5;
+    }
+    const std::string file_aos{"test_soa_direct_a.nc"};
+    {
+      muGrid::FileIONetCDF w(file_aos, muGrid::FileIOBase::OpenMode::Overwrite,
+                             comm);
+      w.register_field_collection(aos_fc, field_names);
+      w.append_frame().write(field_names);
+    }
+
+    // host SoA field: host-accessible, so written/read directly (no mirror)
+    muGrid::GlobalFieldCollection soa_fc{
+        nb_domain_grid_pts,    nb_subdomain_grid_pts, subdomain_locations,
+        nb_sub_pts,            muGrid::StorageOrder::StructureOfArrays};
+    auto & soa_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        soa_fc.register_real_field(field_names[0], nb_components, quad))};
+    BOOST_CHECK(soa_field.is_host_accessible());
+    BOOST_CHECK(!soa_field.is_on_device());
+    // read the AoS file into the SoA field (SoA index map on read) ...
+    {
+      muGrid::FileIONetCDF r(file_aos, muGrid::FileIOBase::OpenMode::Read,
+                             comm);
+      r.register_field_collection(soa_fc, field_names);
+      r.read(0, field_names);
+    }
+    // ... and write it back out (SoA index map on write)
+    const std::string file_soa{"test_soa_direct_b.nc"};
+    {
+      muGrid::FileIONetCDF w(file_soa, muGrid::FileIOBase::OpenMode::Overwrite,
+                             comm);
+      w.register_field_collection(soa_fc, field_names);
+      w.append_frame().write(field_names);
+    }
+
+    // read the SoA-written file back into a standard AoS field; must match the
+    // original reference exactly
+    muGrid::GlobalFieldCollection chk_fc{nb_domain_grid_pts,
+                                         nb_subdomain_grid_pts,
+                                         subdomain_locations, nb_sub_pts};
+    auto & chk_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        chk_fc.register_real_field(field_names[0], nb_components, quad))};
+    {
+      muGrid::FileIONetCDF r(file_soa, muGrid::FileIOBase::OpenMode::Read,
+                             comm);
+      r.register_field_collection(chk_fc, field_names);
+      r.read(0, field_names);
+    }
+    auto chk_vec{chk_field.eigen_vec()};
+    for (Index_t i{0}; i < aos_vec.size(); ++i) {
+      BOOST_CHECK_EQUAL(chk_vec(i), aos_vec(i));
+    }
+  }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
   // Round-trip a device-resident field through NetCDF. On write the device
   // data is staged through a temporary host (AoS) mirror; on read it is staged

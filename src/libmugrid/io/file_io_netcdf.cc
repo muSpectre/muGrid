@@ -2000,7 +2000,11 @@ namespace muGrid {
   }  // namespace
 
   /* ---------------------------------------------------------------------- */
-  muGrid::Field & NetCDFVarBase::get_host_mirror() const {
+  bool NetCDFVarBase::needs_mirror() const {
+    const muGrid::Field & field{this->get_field()};
+    if (!field.is_on_device()) {
+      return false;
+    }
     if (!this->supports_device_staging()) {
       throw FileIOError(
           "Reading or writing a device-resident state field ('" +
@@ -2008,6 +2012,13 @@ namespace muGrid {
           "') via NetCDF is not supported. Copy the state field to a "
           "host-resident field collection before performing file I/O.");
     }
+    // On a unified-memory device the field is dereferenceable by the host and
+    // is written/read in place; otherwise a host staging mirror is needed.
+    return !field.is_host_accessible();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  muGrid::Field & NetCDFVarBase::get_host_mirror() const {
     if (this->host_mirror_field == nullptr) {
       const muGrid::Field & device_field{this->get_field()};
       const muGrid::FieldCollection & device_coll{
@@ -2043,51 +2054,65 @@ namespace muGrid {
 
   /* ---------------------------------------------------------------------- */
   const muGrid::Field & NetCDFVarBase::get_io_field() const {
-    const muGrid::Field & field{this->get_field()};
-    if (field.is_on_device()) {
+    if (this->needs_mirror()) {
       return this->get_host_mirror();
     }
-    return field;
+    // Host-resident or host-accessible (unified-memory) device field: operate
+    // on the field directly, no staging buffer.
+    return this->get_field();
   }
 
   /* ---------------------------------------------------------------------- */
   void NetCDFVarBase::stage_to_host() const {
-    const muGrid::Field & field{this->get_field()};
-    if (field.is_on_device()) {
-      this->get_host_mirror().deep_copy_from(field);
+    if (this->needs_mirror()) {
+      this->get_host_mirror().deep_copy_from(this->get_field());
     }
   }
 
   /* ---------------------------------------------------------------------- */
   void NetCDFVarBase::stage_to_device() const {
-    const muGrid::Field & field{this->get_field()};
-    if (field.is_on_device()) {
+    if (this->needs_mirror()) {
       // get_field() is const, but the underlying field is mutable (it is held
       // as a non-const reference by the variable); we need write access to
       // push the data that was just read back to the device.
-      const_cast<muGrid::Field &>(field).deep_copy_from(
-          this->get_host_mirror());
+      const_cast<muGrid::Field &>(this->get_field())
+          .deep_copy_from(this->get_host_mirror());
     }
   }
 
   /* ---------------------------------------------------------------------- */
   void * NetCDFVarBase::get_buf() const {
-    // For device-resident fields this resolves to the host staging mirror; for
-    // host-resident fields it is the field itself (assert_host_memory=true
-    // still guards against any unexpected device pointer).
+    // For a non-host-accessible device field this resolves to the host staging
+    // mirror; otherwise it is the field itself (a host field, or a
+    // host-accessible unified-memory device field written/read in place).
     const Field & field{this->get_io_field()};
-    char * buf_ptr{static_cast<char *>(field.get_void_data_ptr())};
+    // Host-resident fields keep assert_host_memory=true as a safety net. A
+    // host-accessible device field (unified memory) is dereferenceable from
+    // the CPU, so its raw device pointer may be used directly.
+    char * buf_ptr{static_cast<char *>(
+        field.get_void_data_ptr(/*assert_host_memory=*/!field.is_on_device()))};
 
-    // Compute byte offset to skip ghost buffer and access interior data
-    // The offset is computed using pixel offsets and strides
+    // Linear pixel offset (in pixels) from the buffer start to the first
+    // interior (non-ghost) pixel.
     auto pixel_offsets{field.get_pixels_offset_without_ghosts()};
     auto pixel_strides{field.get_collection().get_pixels_strides(1)};
-    Index_t byte_offset{0};
+    Index_t pixel_offset{0};
     for (size_t i = 0; i < pixel_offsets.size(); ++i) {
-      byte_offset += pixel_offsets[i] * pixel_strides[i];
+      pixel_offset += pixel_offsets[i] * pixel_strides[i];
     }
-    // Multiply by degrees of freedom per pixel and element size
-    byte_offset *= field.get_nb_dof_per_pixel() * field.get_element_size_in_bytes();
+    // Convert to a scalar offset to the first interior element. In
+    // array-of-structures storage each pixel occupies nb_dof_per_pixel
+    // contiguous scalars, so the interior begins nb_dof_per_pixel * pixel
+    // offset in. In structure-of-arrays storage consecutive pixels of a
+    // component are unit-strided, so the interior of component 0 begins just
+    // pixel_offset in (the index map's component stride, which equals the
+    // buffer pixel count, then jumps between component planes).
+    const Index_t dofs_per_pixel{
+        field.get_storage_order() == StorageOrder::ArrayOfStructures
+            ? field.get_nb_dof_per_pixel()
+            : Index_t{1}};
+    const Index_t byte_offset{pixel_offset * dofs_per_pixel *
+                              field.get_element_size_in_bytes()};
 
     return buf_ptr + byte_offset;
   }

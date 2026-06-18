@@ -360,6 +360,16 @@ namespace muGrid {
         virtual bool is_on_device() const = 0;
 
         /**
+         * Check whether this field's data can be dereferenced directly by the
+         * host CPU. Always true for host-resident fields; true for
+         * device-resident fields only on unified-memory / integrated devices
+         * (e.g. an APU), where the device allocation is host-coherent. When
+         * true, the raw pointer from get_void_data_ptr(false) may be passed to
+         * host-side libraries (such as NetCDF) without a staging copy.
+         */
+        virtual bool is_host_accessible() const = 0;
+
+        /**
          * Get DLPack device type for this field's memory space.
          * Returns kDLCPU=1, kDLCUDA=2, kDLROCm=10, etc.
          */

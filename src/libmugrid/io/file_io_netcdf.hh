@@ -819,6 +819,14 @@ namespace muGrid {
     //! taken from this field.
     const muGrid::Field & get_io_field() const;
 
+    //! whether a host staging mirror (and host<->device copy) is required for
+    //! this variable: true only for a device-resident field that is *not*
+    //! directly host-accessible. A device-resident field on a unified-memory
+    //! device is written/read in place (zero-copy), and host-resident fields
+    //! never need a mirror. Throws for unsupported device variables (state
+    //! fields, whose contiguous multi-history buffer cannot be reproduced).
+    bool needs_mirror() const;
+
     //! lazily build (if necessary) and return the host staging mirror for a
     //! device-resident field. Must not be called for host-resident fields.
     muGrid::Field & get_host_mirror() const;

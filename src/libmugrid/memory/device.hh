@@ -97,6 +97,14 @@ class Device {
         return this->device_type == DeviceType::CPU;
     }
 
+    //! Check whether memory on this device can be dereferenced directly by the
+    //! host CPU. True for plain host memory and pinned host memory, and true
+    //! for device memory on a unified-memory / integrated device (e.g. an APU
+    //! such as the AMD MI300A), where the GPU allocation is host-coherent.
+    //! False for discrete GPUs. The result is queried from the runtime once
+    //! per device and cached. (Not constexpr: requires a runtime probe.)
+    bool is_host_accessible() const;
+
     //! Get the device type
     constexpr DeviceType get_type() const { return this->device_type; }
 
