@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Linear Operators" href="Operators.html"><link rel="prev" title="GPU Computing" href="GPU.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Linear Algebra - µGrid 0.109.0-1-gd373faf0 documentation</title>
+        <title>Linear Algebra - µGrid 0.109.0-3-ge85ebf0b documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">µGrid 0.109.0-1-gd373faf0
+      <a href="index.html"><div class="brand">µGrid 0.109.0-3-ge85ebf0b
  documentation</div></a>
     </div>
     <div class="header-right">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">µGrid 0.109.0-1-gd373faf0
+  <span class="sidebar-brand-text">µGrid 0.109.0-3-ge85ebf0b
  documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
@@ -270,9 +270,9 @@ subsequent ghost communication anyway.</p></li>
 <h2>Available Operations<a class="headerlink" href="#available-operations" title="Link to this heading">¶</a></h2>
 <p>The following operations are available in the <code class="docutils literal notranslate"><span class="pre">muGrid.linalg</span></code> namespace
 (C++) or as functions in the Python bindings:</p>
-<div class="table-wrapper colwidths-given docutils container" id="id1">
-<table class="docutils align-default" id="id1">
-<caption><span class="caption-text">Linear Algebra Operations</span><a class="headerlink" href="#id1" title="Link to this table">¶</a></caption>
+<div class="table-wrapper colwidths-given docutils container" id="id2">
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Linear Algebra Operations</span><a class="headerlink" href="#id2" title="Link to this table">¶</a></caption>
 <colgroup>
 <col style="width: 25.0%" />
 <col style="width: 35.0%" />
@@ -319,9 +319,23 @@ components of <span class="math notranslate nohighlight">\(x\)</span>)</p></td>
 <td><p>Fused: <span class="math notranslate nohighlight">\(y \leftarrow \alpha x + y\)</span>, returns <span class="math notranslate nohighlight">\(\|y\|^2\)</span></p></td>
 <td><p>(fused operation)</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cross(a,</span> <span class="pre">b,</span> <span class="pre">out)</span></code></p></td>
+<td><p>Per-pixel three-vector cross product:
+<span class="math notranslate nohighlight">\(\text{out} = a \times b\)</span></p></td>
+<td><p>(extended BLAS)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">leray_project(k,</span> <span class="pre">invk,</span> <span class="pre">N,</span> <span class="pre">out)</span></code></p></td>
+<td><p>Fused Helmholtz/Leray projection update:
+<span class="math notranslate nohighlight">\(\text{out}_c \mathrel{-}= k_c \sum_d \text{invk}_d\, N_d\)</span></p></td>
+<td><p>(extended BLAS)</p></td>
+</tr>
 </tbody>
 </table>
 </div>
+<p>The first group (<code class="docutils literal notranslate"><span class="pre">vecdot</span></code> through <code class="docutils literal notranslate"><span class="pre">axpy_norm_sq</span></code>) are the Level-1 BLAS-style
+primitives. <code class="docutils literal notranslate"><span class="pre">cross</span></code> and <code class="docutils literal notranslate"><span class="pre">leray_project</span></code> are <em>fused per-pixel vector kernels</em>
+that operate on three-component fields; they are described in
+<a class="reference internal" href="#per-pixel-vector-kernels"><span class="std std-ref">Per-pixel Vector Kernels</span></a> below.</p>
 </section>
 <section id="ghost-region-handling">
 <h2>Ghost Region Handling<a class="headerlink" href="#ghost-region-handling" title="Link to this heading">¶</a></h2>
@@ -331,11 +345,14 @@ components of <span class="math notranslate nohighlight">\(x\)</span>)</p></td>
 they are duplicates of values owned by neighboring MPI ranks. The returned
 scalar is a local result that must be MPI-reduced if a global result is needed.</p>
 </dd>
-<dt><strong>Field-modifying operations</strong> (<code class="docutils literal notranslate"><span class="pre">axpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scal</span></code>, <code class="docutils literal notranslate"><span class="pre">axpby</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>):</dt><dd><p>These operate on the full buffer including ghost regions. This is more
+</dl>
+<p><strong>Field-modifying operations</strong> (<code class="docutils literal notranslate"><span class="pre">axpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scal</span></code>, <code class="docutils literal notranslate"><span class="pre">axpby</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>,
+<code class="docutils literal notranslate"><span class="pre">cross</span></code>, <code class="docutils literal notranslate"><span class="pre">leray_project</span></code>):</p>
+<blockquote>
+<div><p>These operate on the full buffer including ghost regions. This is more
 efficient than iterating only over interior pixels, and ghost values will
 be overwritten by subsequent <code class="docutils literal notranslate"><span class="pre">communicate_ghosts()</span></code> calls anyway.</p>
-</dd>
-</dl>
+</div></blockquote>
 </section>
 <section id="usage-examples">
 <h2>Usage Examples<a class="headerlink" href="#usage-examples" title="Link to this heading">¶</a></h2>
@@ -458,6 +475,68 @@ memory. This is more efficient than separate <code class="docutils literal notra
 <p>This optimization is particularly valuable in iterative solvers where
 memory bandwidth is often the limiting factor.</p>
 </section>
+<section id="per-pixel-vector-kernels">
+<span id="id1"></span><h2>Per-pixel Vector Kernels<a class="headerlink" href="#per-pixel-vector-kernels" title="Link to this heading">¶</a></h2>
+<p>Beyond the BLAS-style primitives, <code class="docutils literal notranslate"><span class="pre">linalg</span></code> provides two fused kernels that
+act on <strong>three-component</strong> fields a single pixel at a time. They exist for the
+same reason as <code class="docutils literal notranslate"><span class="pre">axpy_norm_sq</span></code>: expressing them as arithmetic on field views
+would allocate temporaries and traverse memory several times, whereas the fused
+kernels compute the whole result in one pass and run unchanged on host and
+device. Both operate on the full buffer (ghosts included). They were introduced
+for pseudo-spectral fluid solvers but are not specific to them.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">cross(a,</span> <span class="pre">b,</span> <span class="pre">out)</span></code></dt><dd><p>Per-pixel three-vector cross product <span class="math notranslate nohighlight">\(\text{out} = a \times b\)</span>, i.e.</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\text{out}_0 = a_1 b_2 - a_2 b_1, \quad
+\text{out}_1 = a_2 b_0 - a_0 b_2, \quad
+\text{out}_2 = a_0 b_1 - a_1 b_0 .\]</div>
+</div>
+<p>All three fields must have exactly three components and share a collection.
+<code class="docutils literal notranslate"><span class="pre">out</span></code> must be <strong>distinct</strong> from both <code class="docutils literal notranslate"><span class="pre">a</span></code> and <code class="docutils literal notranslate"><span class="pre">b</span></code>: a cross product
+cannot be formed in place, because the first component written would be read
+back while forming the others. Available for both real and complex fields
+(e.g. the Fourier-space vorticity <span class="math notranslate nohighlight">\(i\mathbf{k}\times\hat{\mathbf{u}}\)</span>
+with complex fields, and the real-space Lamb vector
+<span class="math notranslate nohighlight">\(\mathbf{u}\times\boldsymbol{\omega}\)</span>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">leray_project(k,</span> <span class="pre">invk,</span> <span class="pre">N,</span> <span class="pre">out)</span></code></dt><dd><p>Fused Helmholtz/Leray projection <em>update</em>:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\text{out}_c \mathrel{-}= k_c \sum_d \text{invk}_d\, N_d .\]</div>
+</div>
+<p>With the wavevector <span class="math notranslate nohighlight">\(\mathbf{k}\)</span> in <code class="docutils literal notranslate"><span class="pre">k</span></code> and
+<span class="math notranslate nohighlight">\(\mathbf{k}/|\mathbf{k}|^2\)</span> in <code class="docutils literal notranslate"><span class="pre">invk</span></code> (the <span class="math notranslate nohighlight">\(\mathbf{k}=0\)</span> mode
+regularised to zero by the caller), this subtracts
+<span class="math notranslate nohighlight">\(\mathbf{k}\,(\mathbf{k}\cdot\mathbf{N})/|\mathbf{k}|^2\)</span> from <code class="docutils literal notranslate"><span class="pre">out</span></code>,
+removing its longitudinal (compressible) part. <code class="docutils literal notranslate"><span class="pre">k</span></code> and <code class="docutils literal notranslate"><span class="pre">invk</span></code> are <strong>real</strong>
+three-component coefficient fields; <code class="docutils literal notranslate"><span class="pre">N</span></code> and <code class="docutils literal notranslate"><span class="pre">out</span></code> are the <strong>complex</strong>
+vector fields. Because the coefficients are real, the real and imaginary
+parts are updated independently. <code class="docutils literal notranslate"><span class="pre">out</span></code> may alias <code class="docutils literal notranslate"><span class="pre">N</span></code>; all four fields
+share a collection and have three components.</p>
+</dd>
+</dl>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">muGrid</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">muGrid.linalg</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">la</span>
+
+<span class="n">fc</span> <span class="o">=</span> <span class="n">muGrid</span><span class="o">.</span><span class="n">GlobalFieldCollection</span><span class="p">([</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">])</span>
+<span class="n">a</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+<span class="n">omega</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;omega&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+
+<span class="c1"># omega = a x b, in a single fused pass (out distinct from inputs)</span>
+<span class="n">la</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">omega</span><span class="p">)</span>
+
+<span class="c1"># Leray projection of a complex Fourier-space field onto div-free modes</span>
+<span class="n">k</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>         <span class="c1"># wavevector</span>
+<span class="n">invk</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">real_field</span><span class="p">(</span><span class="s2">&quot;invk&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>   <span class="c1"># k / |k|^2, k=0 mode zeroed</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">complex_field</span><span class="p">(</span><span class="s2">&quot;N&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">fc</span><span class="o">.</span><span class="n">complex_field</span><span class="p">(</span><span class="s2">&quot;out&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,))</span>
+<span class="n">la</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>                       <span class="c1"># start from out = N</span>
+<span class="n">la</span><span class="o">.</span><span class="n">leray_project</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">invk</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>     <span class="c1"># out &lt;- out - k (k.N)/|k|^2</span>
+</pre></div>
+</div>
+</section>
 <section id="gpu-support">
 <h2>GPU Support<a class="headerlink" href="#gpu-support" title="Link to this heading">¶</a></h2>
 <p>All linear algebra operations support GPU fields (CUDA and ROCm). The
@@ -480,6 +559,13 @@ reside in device memory:</p>
 </div>
 <p>The GPU kernels are optimized for coalesced memory access and use
 efficient parallel reduction algorithms for scalar-producing operations.</p>
+<p>All operations — including the complex specialisations (<code class="docutils literal notranslate"><span class="pre">vecdot</span></code>,
+<code class="docutils literal notranslate"><span class="pre">norm_sq</span></code>, <code class="docutils literal notranslate"><span class="pre">axpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scal</span></code>, <code class="docutils literal notranslate"><span class="pre">axpby</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>, <code class="docutils literal notranslate"><span class="pre">axpy_norm_sq</span></code>) and the
+per-pixel vector kernels (<code class="docutils literal notranslate"><span class="pre">cross</span></code> for real and complex fields,
+<code class="docutils literal notranslate"><span class="pre">leray_project</span></code>) — run on the device. Complex buffers are processed through
+their underlying real/imaginary components, so the kernels need no device
+complex type; the sesquilinear <code class="docutils literal notranslate"><span class="pre">vecdot</span></code> accumulates the real and imaginary
+parts of <span class="math notranslate nohighlight">\(\overline{a}\,b\)</span> separately.</p>
 </section>
 <section id="integration-with-solvers">
 <h2>Integration with Solvers<a class="headerlink" href="#integration-with-solvers" title="Link to this heading">¶</a></h2>
@@ -564,6 +650,7 @@ handling of ghost regions for MPI parallelism.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#fused-operations">Fused Operations</a></li>
+<li><a class="reference internal" href="#per-pixel-vector-kernels">Per-pixel Vector Kernels</a></li>
 <li><a class="reference internal" href="#gpu-support">GPU Support</a></li>
 <li><a class="reference internal" href="#integration-with-solvers">Integration with Solvers</a></li>
 </ul>
@@ -577,7 +664,7 @@ handling of ghost regions for MPI parallelism.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=89c7eea7"></script>
+</div><script src="_static/documentation_options.js?v=54a8c6ed"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

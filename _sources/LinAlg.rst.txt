@@ -60,6 +60,19 @@ The following operations are available in the ``muGrid.linalg`` namespace
    * - ``axpy_norm_sq(alpha, x, y)``
      - Fused: :math:`y \leftarrow \alpha x + y`, returns :math:`\|y\|^2`
      - (fused operation)
+   * - ``cross(a, b, out)``
+     - Per-pixel three-vector cross product:
+       :math:`\text{out} = a \times b`
+     - (extended BLAS)
+   * - ``leray_project(k, invk, N, out)``
+     - Fused Helmholtz/Leray projection update:
+       :math:`\text{out}_c \mathrel{-}= k_c \sum_d \text{invk}_d\, N_d`
+     - (extended BLAS)
+
+The first group (``vecdot`` through ``axpy_norm_sq``) are the Level-1 BLAS-style
+primitives. ``cross`` and ``leray_project`` are *fused per-pixel vector kernels*
+that operate on three-component fields; they are described in
+:ref:`per-pixel-vector-kernels` below.
 
 Ghost Region Handling
 *********************
@@ -71,7 +84,8 @@ Understanding how ghost regions are handled is important for MPI-parallel codes:
   they are duplicates of values owned by neighboring MPI ranks. The returned
   scalar is a local result that must be MPI-reduced if a global result is needed.
 
-**Field-modifying operations** (``axpy``, ``scal``, ``axpby``, ``copy``):
+**Field-modifying operations** (``axpy``, ``scal``, ``axpby``, ``copy``,
+``cross``, ``leray_project``):
   These operate on the full buffer including ghost regions. This is more
   efficient than iterating only over interior pixels, and ghost values will
   be overwritten by subsequent ``communicate_ghosts()`` calls anyway.
@@ -205,6 +219,74 @@ memory. This is more efficient than separate ``axpy`` + ``norm_sq`` calls:
 This optimization is particularly valuable in iterative solvers where
 memory bandwidth is often the limiting factor.
 
+.. _per-pixel-vector-kernels:
+
+Per-pixel Vector Kernels
+************************
+
+Beyond the BLAS-style primitives, ``linalg`` provides two fused kernels that
+act on **three-component** fields a single pixel at a time. They exist for the
+same reason as ``axpy_norm_sq``: expressing them as arithmetic on field views
+would allocate temporaries and traverse memory several times, whereas the fused
+kernels compute the whole result in one pass and run unchanged on host and
+device. Both operate on the full buffer (ghosts included). They were introduced
+for pseudo-spectral fluid solvers but are not specific to them.
+
+``cross(a, b, out)``
+  Per-pixel three-vector cross product :math:`\text{out} = a \times b`, i.e.
+
+  .. math::
+
+     \text{out}_0 = a_1 b_2 - a_2 b_1, \quad
+     \text{out}_1 = a_2 b_0 - a_0 b_2, \quad
+     \text{out}_2 = a_0 b_1 - a_1 b_0 .
+
+  All three fields must have exactly three components and share a collection.
+  ``out`` must be **distinct** from both ``a`` and ``b``: a cross product
+  cannot be formed in place, because the first component written would be read
+  back while forming the others. Available for both real and complex fields
+  (e.g. the Fourier-space vorticity :math:`i\mathbf{k}\times\hat{\mathbf{u}}`
+  with complex fields, and the real-space Lamb vector
+  :math:`\mathbf{u}\times\boldsymbol{\omega}`).
+
+``leray_project(k, invk, N, out)``
+  Fused Helmholtz/Leray projection *update*:
+
+  .. math::
+
+     \text{out}_c \mathrel{-}= k_c \sum_d \text{invk}_d\, N_d .
+
+  With the wavevector :math:`\mathbf{k}` in ``k`` and
+  :math:`\mathbf{k}/|\mathbf{k}|^2` in ``invk`` (the :math:`\mathbf{k}=0` mode
+  regularised to zero by the caller), this subtracts
+  :math:`\mathbf{k}\,(\mathbf{k}\cdot\mathbf{N})/|\mathbf{k}|^2` from ``out``,
+  removing its longitudinal (compressible) part. ``k`` and ``invk`` are **real**
+  three-component coefficient fields; ``N`` and ``out`` are the **complex**
+  vector fields. Because the coefficients are real, the real and imaginary
+  parts are updated independently. ``out`` may alias ``N``; all four fields
+  share a collection and have three components.
+
+.. code-block:: python
+
+    import muGrid
+    import muGrid.linalg as la
+
+    fc = muGrid.GlobalFieldCollection([64, 64, 64])
+    a = fc.real_field("a", (3,))
+    b = fc.real_field("b", (3,))
+    omega = fc.real_field("omega", (3,))
+
+    # omega = a x b, in a single fused pass (out distinct from inputs)
+    la.cross(a, b, omega)
+
+    # Leray projection of a complex Fourier-space field onto div-free modes
+    k = fc.real_field("k", (3,))         # wavevector
+    invk = fc.real_field("invk", (3,))   # k / |k|^2, k=0 mode zeroed
+    N = fc.complex_field("N", (3,))
+    out = fc.complex_field("out", (3,))
+    la.copy(N, out)                       # start from out = N
+    la.leray_project(k, invk, N, out)     # out <- out - k (k.N)/|k|^2
+
 GPU Support
 ***********
 
@@ -230,6 +312,14 @@ reside in device memory:
 
 The GPU kernels are optimized for coalesced memory access and use
 efficient parallel reduction algorithms for scalar-producing operations.
+
+All operations — including the complex specialisations (``vecdot``,
+``norm_sq``, ``axpy``, ``scal``, ``axpby``, ``copy``, ``axpy_norm_sq``) and the
+per-pixel vector kernels (``cross`` for real and complex fields,
+``leray_project``) — run on the device. Complex buffers are processed through
+their underlying real/imaginary components, so the kernels need no device
+complex type; the sesquilinear ``vecdot`` accumulates the real and imaginary
+parts of :math:`\overline{a}\,b` separately.
 
 Integration with Solvers
 ************************
