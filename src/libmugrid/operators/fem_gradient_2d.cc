@@ -460,7 +460,10 @@ namespace muGrid {
 #if defined(_MSC_VER)
 #pragma loop(ivdep)
 #elif defined(__clang__)
-#pragma clang loop vectorize(enable) interleave(enable)
+                // clang auto-vectorizes via -O and MUGRID_RESTRICT; we do not
+                // force vectorize(enable) here because this heavy body (strided
+                // scatter over quad points) cannot be vectorized profitably and
+                // forcing it only emits -Wpass-failed.
 #elif defined(__GNUC__)
 #pragma GCC ivdep
 #endif

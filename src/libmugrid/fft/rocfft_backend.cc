@@ -88,7 +88,7 @@ rocFFTBackend::~rocFFTBackend() {
   for (auto & entry : this->plan_cache) {
     CachedPlan & cached = entry.second;
     if (cached.work_buffer != nullptr) {
-      hipFree(cached.work_buffer);
+      (void)hipFree(cached.work_buffer);
     }
     if (cached.info != nullptr) {
       rocfft_execution_info_destroy(cached.info);
@@ -284,7 +284,7 @@ void rocFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
   check_rocfft_result(status, "R2C execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 void rocFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
@@ -311,7 +311,7 @@ void rocFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
   check_rocfft_result(status, "C2R execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 void rocFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
@@ -335,7 +335,7 @@ void rocFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
   check_rocfft_result(status, "C2C forward execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 void rocFFTBackend::c2c_backward(Index_t n, Index_t batch,
@@ -359,7 +359,7 @@ void rocFFTBackend::c2c_backward(Index_t n, Index_t batch,
   check_rocfft_result(status, "C2C backward execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 }  // namespace muGrid

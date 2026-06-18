@@ -596,8 +596,9 @@ namespace muGrid {
         const muGrid::FieldCollection::ValidityDomain & validity_domain,
         bool hidden = false);
 
-    //! Copy constructor
-    NetCDFVarBase(const NetCDFVarBase & other) = default;
+    //! Copy constructor (deleted: the host staging mirror is held by a
+    //! unique_ptr, and instances are always managed through shared_ptr)
+    NetCDFVarBase(const NetCDFVarBase & other) = delete;
 
     //! Move constructor
     NetCDFVarBase(NetCDFVarBase && other) = delete;
@@ -893,8 +894,8 @@ namespace muGrid {
         const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
         muGrid::Field & var_field, bool hidden = false);
 
-    //! Copy constructor
-    NetCDFVarField(const NetCDFVarField & other) = default;
+    //! Copy constructor (deleted: see NetCDFVarBase)
+    NetCDFVarField(const NetCDFVarField & other) = delete;
 
     //! Move constructor
     NetCDFVarField(NetCDFVarField && other) = delete;
@@ -977,8 +978,8 @@ namespace muGrid {
         const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
         muGrid::StateField & var_state_field);
 
-    //! Copy constructor
-    NetCDFVarStateField(const NetCDFVarStateField & other) = default;
+    //! Copy constructor (deleted: see NetCDFVarBase)
+    NetCDFVarStateField(const NetCDFVarStateField & other) = delete;
 
     //! Move constructor
     NetCDFVarStateField(NetCDFVarStateField && other) = delete;
