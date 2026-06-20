@@ -58,7 +58,8 @@ nav:
   - Linear algebra: linalg.md
   - GPU: gpu.md
   - Examples: examples.md
-  - Benchmark: benchmark.md
+  - Benchmark (Poisson): benchmark.md
+  - Benchmark (homogenization): benchmark_homogenization.md
   - Architecture: architecture.md
 
 exclude_docs: |
