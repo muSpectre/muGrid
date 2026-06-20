@@ -179,8 +179,9 @@ core at roughly 24³ and reaches ~7× by 96³.
 !!! warning "GPU memory wall at 128³"
     A 128³ run needs about 5.85 GB of field storage, which nearly fills this
     GPU's 6 GB. The working set no longer fits comfortably, the allocator
-    oversubscribes to host memory, and GPU throughput collapses to roughly the
-    single-core CPU level. On a 6 GB card, ~96³ is the largest 3D problem that
+    oversubscribes to host memory, and the GPU's effective throughput collapses
+    (here to ~6 GB/s), so the speedup falls from ~7× at 96³ to under 2×. On a
+    6 GB card, ~96³ is the largest 3D problem that
     stays on the fast path; larger grids need a bigger-memory GPU or MPI domain
     decomposition across several GPUs.
 
