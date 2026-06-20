@@ -119,15 +119,21 @@ void cuFFTBackend::check_cufft_result(cufftResult result,
     case CUFFT_UNALIGNED_DATA:
       error << "CUFFT_UNALIGNED_DATA";
       break;
+// CUFFT_INCOMPLETE_PARAMETER_LIST and CUFFT_PARSE_ERROR were removed from the
+// cufftResult enum in cuFFT 12 (CUDA 13, CUFFT_VERSION 12300).
+#if !defined(CUFFT_VERSION) || CUFFT_VERSION < 12300
     case CUFFT_INCOMPLETE_PARAMETER_LIST:
       error << "CUFFT_INCOMPLETE_PARAMETER_LIST";
       break;
+#endif
     case CUFFT_INVALID_DEVICE:
       error << "CUFFT_INVALID_DEVICE";
       break;
+#if !defined(CUFFT_VERSION) || CUFFT_VERSION < 12300
     case CUFFT_PARSE_ERROR:
       error << "CUFFT_PARSE_ERROR";
       break;
+#endif
     case CUFFT_NO_WORKSPACE:
       error << "CUFFT_NO_WORKSPACE";
       break;

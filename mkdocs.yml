@@ -1,0 +1,65 @@
+site_name: µGrid
+site_description: MPI-parallel regular grids in C++20 with Python bindings — fields, FFT, operators, and a CUDA/HIP GPU backend
+site_url: https://muGrid.github.io/muGrid/
+repo_url: https://github.com/muSpectre/muGrid
+repo_name: muSpectre/muGrid
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: logo_flat.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
+  - tables
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Python API: python.md
+  - C++ API: cpp.md
+  - FFT: fft.md
+  - Operators: operators.md
+  - Linear algebra: linalg.md
+  - GPU: gpu.md
+  - Examples: examples.md
+  - Benchmark: benchmark.md
+  - Architecture: architecture.md
+
+exclude_docs: |
+  requirements.txt

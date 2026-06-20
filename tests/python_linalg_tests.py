@@ -422,6 +422,71 @@ class TestCPUGPULinalgComparison:
 
 
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not available")
+class TestGPUKernelLaunchNotSilent:
+    """Regression tests: GPU linalg kernels must actually execute.
+
+    If the library is built for a GPU architecture the runtime device does not
+    support (e.g. compiled for sm_75 but running on an sm_120 Blackwell GPU),
+    the ``<<<>>>`` kernel launches fail with cudaErrorNoKernelImageForDevice /
+    "the provided PTX was compiled with an unsupported toolchain". Runtime-API
+    calls such as cudaMemcpy/cudaMemset (and therefore set_zero/deep_copy) keep
+    working, so the field buffer looks fine from Python while every hand-written
+    kernel silently does nothing.
+
+    Because the linalg launches did not check cudaGetLastError, that failure was
+    swallowed: scal/axpy became no-ops and the reductions returned 0. A CG solve
+    then "converged" in 0 iterations on a non-trivial right-hand side.
+
+    These tests assert that the element-wise kernels modify the buffer and that
+    the reductions return the correct non-zero value. With the launch-error
+    check in place a wrong-architecture build now raises a clear RuntimeError
+    instead of silently returning garbage.
+    """
+
+    def setup_method(self, method):
+        if not muGrid.is_gpu_available():
+            pytest.skip("No GPU device available at runtime")
+        if not HAS_CUPY:
+            pytest.skip("CuPy not available for GPU tests")
+
+    def _gpu_field(self):
+        comm = muGrid.Communicator()
+        decomp = muGrid.CartesianDecomposition(
+            comm,
+            [8, 8, 8],
+            nb_subdivisions=(1, 1, 1),
+            nb_ghosts_left=(0, 0, 0),
+            nb_ghosts_right=(0, 0, 0),
+            device=muGrid.Device.gpu(),
+        )
+        return comm, decomp
+
+    def test_scal_executes_on_gpu(self):
+        """scal must actually scale the device buffer (catches no-op launch)."""
+        import cupy as cp
+
+        comm, decomp = self._gpu_field()
+        f = decomp.real_field("f")
+        f.p[...] = cp.asarray(np.ones(f.p.shape))
+
+        linalg.scal(3.0, f)
+
+        # If the kernel launch silently failed, the buffer is unchanged (1.0).
+        assert float(cp.asarray(f.p).sum()) == pytest.approx(3.0 * f.p.size)
+
+    def test_norm_sq_nonzero_on_gpu(self):
+        """norm_sq of a non-zero field must be non-zero on the GPU."""
+        import cupy as cp
+
+        comm, decomp = self._gpu_field()
+        f = decomp.real_field("f")
+        f.p[...] = cp.asarray(np.ones(f.p.shape))
+
+        result = float(comm.sum(linalg.norm_sq(f)))
+        assert result == pytest.approx(float(f.p.size))
+
+
+@pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU backend not available")
 class TestAsymmetricGhosts:
     """Test linalg with asymmetric ghost sizes."""
 

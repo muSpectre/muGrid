@@ -40,19 +40,40 @@
 #ifndef SRC_LIBMUGRID_MEMORY_GPU_RUNTIME_HH_
 #define SRC_LIBMUGRID_MEMORY_GPU_RUNTIME_HH_
 
+#include <string>
+
+#include "core/exception.hh"
+
 #if defined(MUGRID_ENABLE_CUDA)
 
 #include <cuda_runtime.h>
 
 using gpuStream_t = cudaStream_t;
 
-// Kernel launches (only valid in CUDA/HIP translation units)
-#define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-    kernel<<<grid, block>>>(__VA_ARGS__)
+// Kernel launches (only valid in CUDA/HIP translation units).
+//
+// Every launch is immediately followed by a check of the pending runtime
+// error: a `<<<>>>` launch reports configuration and "no kernel image for
+// device" failures synchronously through cudaGetLastError(). Without this
+// check those failures are swallowed — e.g. a library built for the wrong
+// GPU architecture launches nothing, runtime-API calls (cudaMemcpy/memset)
+// keep working, and reductions silently return 0. Mirrors the manual check
+// already used by the stiffness operators; see gpu_assert_last_error below.
+#define GPU_LAUNCH_KERNEL(kernel, grid, block, ...)         \
+    do {                                                    \
+        kernel<<<grid, block>>>(__VA_ARGS__);               \
+        ::muGrid::gpu_assert_last_error(#kernel);           \
+    } while (0)
 #define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...) \
-    kernel<<<grid, block, shmem>>>(__VA_ARGS__)
+    do {                                                         \
+        kernel<<<grid, block, shmem>>>(__VA_ARGS__);             \
+        ::muGrid::gpu_assert_last_error(#kernel);                \
+    } while (0)
 #define GPU_LAUNCH_KERNEL_STREAM(kernel, grid, block, stream, ...) \
-    kernel<<<grid, block, 0, stream>>>(__VA_ARGS__)
+    do {                                                           \
+        kernel<<<grid, block, 0, stream>>>(__VA_ARGS__);           \
+        ::muGrid::gpu_assert_last_error(#kernel);                  \
+    } while (0)
 
 // Host-callable runtime API (valid in any translation unit)
 #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
@@ -87,12 +108,24 @@ namespace muGrid {
 
 using gpuStream_t = hipStream_t;
 
-#define GPU_LAUNCH_KERNEL(kernel, grid, block, ...) \
-    hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__)
-#define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...) \
-    hipLaunchKernelGGL(kernel, grid, block, shmem, 0, __VA_ARGS__)
-#define GPU_LAUNCH_KERNEL_STREAM(kernel, grid, block, stream, ...) \
-    hipLaunchKernelGGL(kernel, grid, block, 0, stream, __VA_ARGS__)
+// See the CUDA branch above: each launch is checked immediately so that a
+// wrong-architecture build (or a bad launch configuration) raises instead of
+// silently doing nothing.
+#define GPU_LAUNCH_KERNEL(kernel, grid, block, ...)                  \
+    do {                                                             \
+        hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__);  \
+        ::muGrid::gpu_assert_last_error(#kernel);                    \
+    } while (0)
+#define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...)         \
+    do {                                                                \
+        hipLaunchKernelGGL(kernel, grid, block, shmem, 0, __VA_ARGS__); \
+        ::muGrid::gpu_assert_last_error(#kernel);                       \
+    } while (0)
+#define GPU_LAUNCH_KERNEL_STREAM(kernel, grid, block, stream, ...)        \
+    do {                                                                 \
+        hipLaunchKernelGGL(kernel, grid, block, 0, stream, __VA_ARGS__); \
+        ::muGrid::gpu_assert_last_error(#kernel);                        \
+    } while (0)
 
 #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
 #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
@@ -120,6 +153,27 @@ namespace muGrid {
     }
 }  // namespace muGrid
 
+#endif  // MUGRID_ENABLE_CUDA / MUGRID_ENABLE_HIP
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+namespace muGrid {
+    /**
+     * Throw a RuntimeError if a GPU kernel launch left a pending runtime error.
+     *
+     * `context` is typically the launched kernel's name (the launch macros pass
+     * it automatically). This converts an otherwise silent launch failure —
+     * most commonly "no kernel image for device" / "the provided PTX was
+     * compiled with an unsupported toolchain" when the library is built for a
+     * GPU architecture the device does not support — into an actionable error.
+     */
+    inline void gpu_assert_last_error(const char * context) {
+        const char * err{gpu_last_error()};
+        if (err != nullptr) {
+            throw RuntimeError(std::string("GPU kernel launch failed (") +
+                               context + "): " + err);
+        }
+    }
+}  // namespace muGrid
 #endif  // MUGRID_ENABLE_CUDA / MUGRID_ENABLE_HIP
 
 #endif  // SRC_LIBMUGRID_MEMORY_GPU_RUNTIME_HH_
