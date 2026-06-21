@@ -304,6 +304,94 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
     }
 }
 
+/**
+ * Fused interior reduction for pipelined CG (first pass). Reads r, u, w once
+ * over the interior and writes three per-block partial sums into a single
+ * buffer laid out as [ru(0..nb) | wu(nb..2nb) | rr(2nb..3nb)].
+ */
+__global__ void interior_three_dots_kernel(
+    const Real* r, const Real* u, const Real* w, Real* partial,
+    Index_t nx, Index_t ny, Index_t nz,
+    Index_t x0, Index_t y0, Index_t z0,
+    Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
+    Index_t nb_components, Index_t num_blocks) {
+    __shared__ Real s_ru[REDUCE_BLOCK_SIZE];
+    __shared__ Real s_wu[REDUCE_BLOCK_SIZE];
+    __shared__ Real s_rr[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t nb_pixels = nx * ny * nz;
+
+    Real ru = 0.0, wu = 0.0, rr = 0.0;
+    for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
+         pixel_idx += blockDim.x * gridDim.x) {
+        Index_t ix = x0 + pixel_idx % nx;
+        Index_t rem = pixel_idx / nx;
+        Index_t iy = y0 + rem % ny;
+        Index_t iz = z0 + rem / ny;
+        Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
+        for (Index_t c = 0; c < nb_components; ++c) {
+            const Index_t e = offset + c * stride_c;
+            const Real rv = r[e], uv = u[e], wv = w[e];
+            ru += rv * uv;
+            wu += wv * uv;
+            rr += rv * rv;
+        }
+    }
+    s_ru[tid] = ru;
+    s_wu[tid] = wu;
+    s_rr[tid] = rr;
+    __syncthreads();
+
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            s_ru[tid] += s_ru[tid + stride];
+            s_wu[tid] += s_wu[tid + stride];
+            s_rr[tid] += s_rr[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        partial[blockIdx.x] = s_ru[0];
+        partial[num_blocks + blockIdx.x] = s_wu[0];
+        partial[2 * num_blocks + blockIdx.x] = s_rr[0];
+    }
+}
+
+/**
+ * Final pass for the fused three-dot reduction: reduces the three length-`nb`
+ * segments of `partial` into out[0..2], so the result is one contiguous
+ * three-element copy back to the host.
+ */
+__global__ void final_reduce3_kernel(const Real* partial, Real* out,
+                                     Index_t nb) {
+    __shared__ Real s[3][REDUCE_BLOCK_SIZE];
+    Index_t tid = threadIdx.x;
+    for (int seg = 0; seg < 3; ++seg) {
+        Real sum = 0.0;
+        for (Index_t i = tid; i < nb; i += blockDim.x) {
+            sum += partial[seg * nb + i];
+        }
+        s[seg][tid] = sum;
+    }
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            for (int seg = 0; seg < 3; ++seg) {
+                s[seg][tid] += s[seg][tid + stride];
+            }
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        out[0] = s[0][0];
+        out[1] = s[1][0];
+        out[2] = s[2][0];
+    }
+}
+
 // Scale complex x by a real per-pixel field alpha; alpha is either
 // broadcast over the components of x (alpha_per_comp == false) or
 // applied elementwise (alpha has x's components). Operates on the
@@ -617,6 +705,36 @@ bool has_ghosts(const GlobalFieldCollection& coll) {
 }
 
 /**
+ * Grow-only device scratch buffer for reduction partial sums.
+ *
+ * The reductions used to cudaMalloc/cudaFree a `d_partial` buffer on every
+ * call. That allocation pair has a large fixed cost (~100 us measured) that
+ * dominates the reduction itself for small/medium fields, and a CG solve issues
+ * several reductions per iteration. The reductions are called serially from the
+ * host and each ends in a blocking device->host copy, so by the time one
+ * reduction returns its scratch is free for the next to reuse: a single cached,
+ * grow-only buffer per slot backs every reduction with no per-call allocation.
+ *
+ * Slot 0 backs real reductions and the real part of complex reductions; slot 1
+ * backs the imaginary part. Buffers are intentionally never freed (process-
+ * lifetime cache; the driver reclaims them at teardown). Not thread-safe, which
+ * matches muGrid's single-threaded host call sites (MPI ranks are separate
+ * processes).
+ */
+Real* reduction_scratch(int slot, Index_t n_reals) {
+    static Real* ptr[2]{nullptr, nullptr};
+    static Index_t cap[2]{0, 0};
+    if (n_reals > cap[slot]) {
+        if (ptr[slot]) {
+            GPU_FREE(ptr[slot]);
+        }
+        GPU_MALLOC(&ptr[slot], n_reals * sizeof(Real));
+        cap[slot] = n_reals;
+    }
+    return ptr[slot];
+}
+
+/**
  * Launch the interior dot-product reduction for two fields of `coll` and
  * return the result. Strides are taken from `a`; the caller guarantees that
  * `b` shares the same layout (fields of the same collection with the same
@@ -655,8 +773,7 @@ Real interior_dot(const TypedField<Real, DeviceSpace>& a,
     const int num_blocks =
         (nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
         gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -672,7 +789,6 @@ Real interior_dot(const TypedField<Real, DeviceSpace>& a,
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return result;
 }
 
@@ -727,10 +843,8 @@ Complex interior_dot_complex(const TypedField<Complex, DeviceSpace>& a,
     const int num_blocks =
         (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
         gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_re;
-    Real* d_im;
-    GPU_MALLOC(&d_re, num_blocks * sizeof(Real));
-    GPU_MALLOC(&d_im, num_blocks * sizeof(Real));
+    Real* d_re = reduction_scratch(0, num_blocks);
+    Real* d_im = reduction_scratch(1, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_complex_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -748,8 +862,6 @@ Complex interior_dot_complex(const TypedField<Complex, DeviceSpace>& a,
     Real re, im;
     GPU_MEMCPY_D2H(&re, d_re, sizeof(Real));
     GPU_MEMCPY_D2H(&im, d_im, sizeof(Real));
-    GPU_FREE(d_re);
-    GPU_FREE(d_im);
     return Complex{re, im};
 }
 
@@ -765,8 +877,7 @@ Real interior_norm_sq_complex(const TypedField<Complex, DeviceSpace>& x,
     const int num_blocks =
         (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
         gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::interior_norm_sq_complex_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -780,7 +891,6 @@ Real interior_norm_sq_complex(const TypedField<Complex, DeviceSpace>& x,
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return result;
 }
 
@@ -821,8 +931,7 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
     const Index_t n = a.get_nb_entries() * a.get_nb_components();
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -834,7 +943,6 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return result;
 }
 
@@ -857,8 +965,7 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::norm_sq_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -870,8 +977,51 @@ Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return result;
+}
+
+template <>
+std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
+    const TypedField<Real, DeviceSpace>& r,
+    const TypedField<Real, DeviceSpace>& u,
+    const TypedField<Real, DeviceSpace>& w) {
+    const auto& coll = r.get_collection();
+
+    // The pipelined CG fields live on a decomposition (Global collection). For
+    // anything else, fall back to three separate reductions (correctness over
+    // the single-sync fast path).
+    if (coll.get_domain() != FieldCollection::ValidityDomain::Global) {
+        return {vecdot<Real, DeviceSpace>(r, u), vecdot<Real, DeviceSpace>(w, u),
+                norm_sq<Real, DeviceSpace>(r)};
+    }
+    const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+    const InteriorBox box = interior_box(r, global_coll);
+    if (box.nb_interior_pixels <= 0) {
+        return {0.0, 0.0, 0.0};
+    }
+
+    const int num_blocks =
+        (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+        gpu_kernels::REDUCE_BLOCK_SIZE;
+    // Slot 0: 3*num_blocks partial sums; slot 1: the 3 packed results.
+    Real* d_partial = reduction_scratch(0, 3 * num_blocks);
+    Real* d_out = reduction_scratch(1, 3);
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::interior_three_dots_kernel,
+                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      r.view().data(), u.view().data(), w.view().data(),
+                      d_partial, box.extent[0], box.extent[1], box.extent[2],
+                      box.start[0], box.start[1], box.start[2], box.stride_c,
+                      box.stride[0], box.stride[1], box.stride[2],
+                      box.nb_components_per_pixel,
+                      static_cast<Index_t>(num_blocks));
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce3_kernel, 1,
+                      gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, d_out,
+                      static_cast<Index_t>(num_blocks));
+
+    Real h[3];
+    GPU_MEMCPY_D2H(h, d_out, 3 * sizeof(Real));
+    return {h[0], h[1], h[2]};
 }
 
 template <>
@@ -998,8 +1148,7 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
     // No ghosts: fused single-pass AXPY + norm_sq
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -1011,7 +1160,6 @@ Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return result;
 }
 
@@ -1145,10 +1293,8 @@ Complex vecdot<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
     const Index_t n = a.get_nb_entries() * a.get_nb_components();
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_re;
-    Real* d_im;
-    GPU_MALLOC(&d_re, num_blocks * sizeof(Real));
-    GPU_MALLOC(&d_im, num_blocks * sizeof(Real));
+    Real* d_re = reduction_scratch(0, num_blocks);
+    Real* d_im = reduction_scratch(1, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_complex_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -1163,8 +1309,6 @@ Complex vecdot<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
     Real re, im;
     GPU_MEMCPY_D2H(&re, d_re, sizeof(Real));
     GPU_MEMCPY_D2H(&im, d_im, sizeof(Real));
-    GPU_FREE(d_re);
-    GPU_FREE(d_im);
     return Complex{re, im};
 }
 
@@ -1183,8 +1327,7 @@ Complex norm_sq<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& x)
     const Index_t n2 = x.get_nb_entries() * x.get_nb_components() * 2;
     const int num_blocks = (n2 + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::norm_sq_reduce_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -1195,7 +1338,6 @@ Complex norm_sq<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& x)
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return Complex{result, 0.0};
 }
 
@@ -1312,8 +1454,7 @@ Complex axpy_norm_sq<Complex, DeviceSpace>(Complex alpha,
     // No ghosts: fused single-pass complex AXPY + squared norm.
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial;
-    GPU_MALLOC(&d_partial, num_blocks * sizeof(Real));
+    Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_complex_kernel,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -1325,7 +1466,6 @@ Complex axpy_norm_sq<Complex, DeviceSpace>(Complex alpha,
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    GPU_FREE(d_partial);
     return Complex{result, 0.0};
 }
 

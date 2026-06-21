@@ -4,6 +4,8 @@ Collection of simple parallel solvers
 
 import warnings
 
+import numpy as np
+
 from . import linalg
 
 
@@ -224,4 +226,160 @@ def conjugate_gradients(
 
     raise ConvergenceError(
         "Preconditioned conjugate gradient algorithm did not converge"
+    )
+
+
+def conjugate_gradients_pipelined(
+    comm,
+    fc,
+    b,
+    x,
+    hessp: callable,
+    prec: callable = None,
+    tol: float = None,
+    maxiter: int = 1000,
+    callback: callable = None,
+    timer=None,
+    rtol: float = None,
+    atol: float = 0.0,
+):
+    """
+    Pipelined preconditioned conjugate gradients (Ghysels & Vanroose, 2014).
+
+    PROTOTYPE. Drop-in replacement for :func:`conjugate_gradients` with the same
+    signature and semantics, but reorganised so that the per-iteration inner
+    products are merged into a **single global reduction**, instead of the three
+    (``dot_pAp``, ``dot_rr``, ``dot_rz``) that standard PCG performs.
+
+    Standard PCG has the dot products on the critical path: you must finish one
+    reduction to form a scalar before the next vector/reduction can be computed.
+    The pipelined formulation introduces auxiliary recurrences (``z, q, s, p``)
+    so that the two coupling inner products ``(r, u)`` and ``(w, u)`` — plus the
+    residual norm used for convergence — can be computed together, and the
+    matrix-vector product ``n = A m`` and preconditioner apply ``m = M⁻¹ w`` of
+    the *next* step no longer depend on that reduction's result.
+
+    Cost per iteration vs. standard PCG:
+      - reductions:        1 (combined)        vs. 3
+      - operator applies:  1 (``A m``)         vs. 1
+      - preconditioner:    1 (``M⁻¹ w``)       vs. 1
+      - vector updates:    8 axpy/axpby        vs. ~4
+
+    i.e. it trades a few extra cheap vector updates for two fewer
+    synchronisations — a win when reductions are latency-bound (MPI allreduce at
+    high rank counts, or the blocking device->host copy on the GPU once the
+    inner products are fused into one kernel).
+
+    Reference: P. Ghysels and W. Vanroose, *Hiding global synchronization
+    latency in the preconditioned Conjugate Gradient algorithm*, Parallel
+    Computing 40 (2014) 224-238.
+
+    .. note::
+        The residual, preconditioned residual and operator image are advanced by
+        recurrence rather than recomputed, so this variant is slightly more
+        susceptible to rounding than standard CG. For ill-conditioned systems a
+        residual-replacement strategy may be needed; this prototype omits it.
+    """
+    if tol is not None:
+        warnings.warn(
+            "`tol` is deprecated; use `atol` for an absolute or `rtol` for "
+            "a relative convergence criterion",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        atol = tol
+        if rtol is None:
+            rtol = 0.0
+    if rtol is None:
+        rtol = 1e-6
+
+    from contextlib import nullcontext
+
+    def timed(name):
+        return timer(name) if timer is not None else nullcontext()
+
+    if prec is None:
+        prec = linalg.copy
+
+    with timed("startup"):
+        # Work fields (zero-initialised by the collection)
+        r = fc.real_field("pcg-residual", b.components_shape)
+        u = fc.real_field("pcg-prec-residual", b.components_shape)
+        w = fc.real_field("pcg-w", b.components_shape)
+        m = fc.real_field("pcg-m", b.components_shape)
+        n = fc.real_field("pcg-n", b.components_shape)
+        p = fc.real_field("pcg-p", b.components_shape)
+        s = fc.real_field("pcg-s", b.components_shape)
+        q = fc.real_field("pcg-q", b.components_shape)
+        z = fc.real_field("pcg-z", b.components_shape)
+
+        # r = b - A x
+        hessp(x, r)
+        linalg.axpby(1.0, b, -1.0, r)
+        # u = M^{-1} r ; w = A u
+        with timed("prec"):
+            prec(r, u)
+        hessp(u, w)
+        # Recurrence accumulators start at zero
+        for f in (p, s, q, z):
+            linalg.scal(0.0, f)
+
+        bb = comm.sum(linalg.norm_sq(b))
+        tol_sq = max(rtol * rtol * float(bb), atol * atol)
+
+        gamma_prev = None
+        alpha_prev = None
+
+    with timed("iteration"):
+        for iteration in range(maxiter):
+            # Single combined reduction: (r,u), (w,u), (r,r). The three inner
+            # products are computed by one fused kernel (one device->host copy)
+            # and reduced across ranks in a single allreduce.
+            with timed("reduce"):
+                local = np.array(linalg.pipelined_cg_dots(r, u, w))
+                gamma, delta, rr = (float(v) for v in comm.sum(local).ravel())
+
+            if callback:
+                with timed("callback"):
+                    callback(
+                        iteration,
+                        {"x": x, "r": r, "p": p, "rr": rr, "rz": gamma},
+                    )
+
+            if rr != rr:  # NaN
+                raise ConvergenceError(
+                    "Residual became NaN - Hessian may not be positive definite"
+                )
+            if rr <= tol_sq:
+                return x
+
+            # Apply preconditioner and operator for this step
+            with timed("prec"):
+                prec(w, m)
+            with timed("hessp"):
+                hessp(m, n)
+
+            if iteration == 0:
+                beta = 0.0
+                alpha = gamma / delta
+            else:
+                beta = gamma / gamma_prev
+                alpha = gamma / (delta - beta * gamma / alpha_prev)
+            gamma_prev = gamma
+            alpha_prev = alpha
+
+            with timed("update"):
+                # z = n + beta z ; q = m + beta q ; s = w + beta s ; p = u + beta p
+                linalg.axpby(1.0, n, beta, z)
+                linalg.axpby(1.0, m, beta, q)
+                linalg.axpby(1.0, w, beta, s)
+                linalg.axpby(1.0, u, beta, p)
+                # x += alpha p ; r -= alpha s ; u -= alpha q ; w -= alpha z
+                linalg.axpy(alpha, p, x)
+                linalg.axpy(-alpha, s, r)
+                linalg.axpy(-alpha, q, u)
+                linalg.axpy(-alpha, z, w)
+
+    raise ConvergenceError(
+        "Pipelined preconditioned conjugate gradient algorithm did not converge"
     )
