@@ -60,6 +60,7 @@ nav:
   - Examples: examples.md
   - Benchmark (Poisson): benchmark.md
   - Benchmark (homogenization): benchmark_homogenization.md
+  - Benchmark (preconditioner): benchmark_homogenization_preconditioner.md
   - Architecture: architecture.md
 
 exclude_docs: |

@@ -26,7 +26,8 @@ Unreleased
   being reallocated (`cudaMalloc`/`cudaFree`) on every reduction
 - DOC: Documentation converted from Sphinx to MkDocs (Material theme); added
   CPU/GPU scaling benchmark pages for the Poisson and homogenization examples,
-  including an MPI strong-scaling study
+  including an MPI strong-scaling study and a preconditioner benchmark (iteration
+  count and wall time, preconditioned vs. unpreconditioned)
 - ENH: NetCDF I/O now supports device-resident (GPU) fields directly, staging
   through a temporary host (AoS) mirror with `deep_copy` before a write and
   after a read. Device-resident state fields are unsupported and fail loudly.
