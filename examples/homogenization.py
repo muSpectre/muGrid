@@ -323,17 +323,12 @@ nb_nodes = 2**dim
 # Quadrature weights (area/volume of each element)
 quad_weights = np.array(gradient_op.quadrature_weights)
 
-# The reference-material preconditioner is applied in Fourier space and needs
-# the discretized Dᵀ W Cʳᵉᶠ D operator, i.e. the generic gradient/stress/
-# divergence kernel. Force it (the fused isotropic kernel takes a different
-# path that the preconditioner assembly below does not hook into).
-if args.preconditioner == "reference" and args.kernel != "generic":
-    parprint(
-        "Note: preconditioner 'reference' requires the 'generic' kernel; "
-        "switching -k to 'generic'.",
-        comm=comm,
-    )
-    args.kernel = "generic"
+# The reference-material preconditioner pairs with either matvec kernel: it is
+# applied in Fourier space and is assembled (once) from the generic Dᵀ W Cʳᵉᶠ D
+# operator, independently of the kernel used for the CG matvec. The fused
+# isotropic kernel's material fields are placed on the same collection as the
+# solver fields (below), so the fast fused matvec runs together with the
+# preconditioner.
 
 # Determine MPI decomposition using NuMPI's suggest_subdivisions
 s = suggest_subdivisions(dim, comm.size)
@@ -446,19 +441,15 @@ if args.kernel == "fused":
     lam_inclusion = args.E_inclusion * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
     mu_inclusion = args.E_inclusion / (2 * (1 + args.nu))
 
-    # Create element-based CartesianDecomposition with ghost cells
-    element_decomposition = muGrid.CartesianDecomposition(
-        comm,
-        args.nb_grid_pts,
-        nb_subdivisions=s,  # Use same MPI decomposition
-        nb_ghosts_left=(1,) * dim,
-        nb_ghosts_right=(1,) * dim,
-        device=device,
-    )
-
-    # Create lambda and mu fields
-    lambda_field = element_decomposition.real_field("lambda")
-    mu_field = element_decomposition.real_field("mu")
+    # Create the Lamé (element/pixel) fields on the *same* collection as the
+    # solver fields (`fc`). This keeps the fused operator's material aligned
+    # with the displacement field for both the plain CartesianDecomposition
+    # (no preconditioner) and the FFTEngine (reference preconditioner) paths,
+    # so the fast fused matvec works together with the preconditioner — and it
+    # stays consistent under MPI, where the FFTEngine's decomposition would not
+    # match a separately constructed CartesianDecomposition.
+    lambda_field = fc.real_field("lambda")
+    mu_field = fc.real_field("mu")
 
     # Set spatially varying material properties based on phase
     # Phase is defined at grid points, element properties taken at grid points
@@ -468,8 +459,8 @@ if args.kernel == "fused":
     mu_field.p[...] = arr.asarray(mu_matrix * (1 - phase) + mu_inclusion * phase)
 
     # Fill ghost cells for material fields (only needs to be done once)
-    element_decomposition.communicate_ghosts(lambda_field)
-    element_decomposition.communicate_ghosts(mu_field)
+    decomposition.communicate_ghosts(lambda_field)
+    decomposition.communicate_ghosts(mu_field)
 
     # Create the fused isotropic stiffness operator
     if dim == 2:
