@@ -34,7 +34,7 @@ import numpy as np
 
 import muGrid
 from muGrid import parprint
-from muGrid.Preconditioners import BlockFourierPreconditioner
+from muGrid.Preconditioners import make_reference_stiffness_preconditioner
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -768,62 +768,12 @@ if args.preconditioner == "reference":
         compute_divergence(stress_arr, f_out)
 
     with timer("preconditioner_setup"):
-        # Assemble the per-mode dim×dim symbol K̂(q) by the impulse-response
-        # method (paper Algorithm 2): apply Kʳᵉᶠ to a unit nodal impulse in each
-        # displacement direction β at the global origin pixel; the FFT of the
-        # resulting column gives K̂[:, β](q).
-        fourier_shape = tuple(decomposition.nb_fourier_subdomain_grid_pts)
-
-        # Locate the global-origin pixel in this rank's interior (integer grid
-        # coordinate 0 in every direction); only the owning rank sets the impulse.
-        nb = np.array(args.nb_grid_pts)
-        origin_mask = np.ones(local_grid_shape, dtype=bool)
-        for d in range(dim):
-            idx = np.rint(np.asarray(local_coords[d]) * nb[d]).astype(int) % nb[d]
-            origin_mask &= idx == 0
-
-        impulse = fc.real_field("prec-impulse", (dim,))
-        column = fc.real_field("prec-column", (dim,))
-        column_hat = decomposition.fourier_space_field(
-            "prec-column-hat", components=(dim,)
+        # The generic assembly (impulse response -> per-mode symbol -> block
+        # inverse, zero mode projected) lives in muGrid.Preconditioners; here we
+        # only supply the action of the reference stiffness Kʳᵉᶠ.
+        prec = make_reference_stiffness_preconditioner(
+            decomposition, apply_reference_stiffness, dim, timer=timer
         )
-
-        K_hat = np.zeros((dim, dim) + fourier_shape, dtype=complex)
-        for beta in range(dim):
-            # Unit impulse e_beta at the origin pixel (built on host, assigned).
-            # The field view is (components, sub_pt=1, *grid); set the single
-            # sub-point of component beta at the origin pixel.
-            host_impulse = np.zeros(impulse.s.shape)
-            host_impulse[beta, 0][origin_mask] = 1.0
-            try:
-                impulse.s[...] = host_impulse
-            except (TypeError, ValueError):
-                impulse.s[...] = arr.asarray(host_impulse)
-
-            apply_reference_stiffness(impulse, column)
-            decomposition.fft(column, column_hat)
-
-            # column_hat.s is (components, sub_pt=1, *fourier); drop the sub axis.
-            ch = column_hat.s[:, 0]
-            ch = ch.get() if hasattr(ch, "get") else np.asarray(ch)
-            K_hat[:, beta] = ch  # K̂[alpha, beta] = (FFT of column)[alpha]
-
-        # Invert each dim×dim block. The zero-frequency block is singular (the
-        # rigid-body modes); replace it with its pseudo-inverse (zero), which
-        # projects those modes out — the RHS is rigid-body-free by construction.
-        K_blocks = np.moveaxis(K_hat, (0, 1), (-2, -1))  # [*fourier, dim, dim]
-        K_inv = np.zeros_like(K_blocks)
-        q = np.asarray(decomposition.fftfreq)  # [dim, *fourier]
-        zero_mode = np.ones(fourier_shape, dtype=bool)
-        for d in range(dim):
-            zero_mode &= q[d] == 0.0
-        nonzero = ~zero_mode
-        K_inv[nonzero] = np.linalg.inv(K_blocks[nonzero])
-        K_inv = np.moveaxis(K_inv, (-2, -1), (0, 1))  # [dim, dim, *fourier]
-        # Fold in the inverse-transform normalisation (cf. FourierPreconditioner).
-        K_inv = K_inv * decomposition.normalisation
-
-        prec = BlockFourierPreconditioner(decomposition, K_inv, timer=timer)
 
     if not args.quiet:
         parprint("Using reference-material Fourier preconditioner", comm=comm)
