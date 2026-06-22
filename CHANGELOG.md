@@ -4,6 +4,29 @@ Change log for µGrid
 Unreleased
 ----------
 
+- ENH: Reference-material (Green's-function) preconditioner for FFT-accelerated
+  FE homogenization (Ladecký et al., Appl. Math. Comput. 446 (2023) 127835),
+  exposed in the homogenization example via `-P reference`. It makes the PCG
+  iteration count nearly independent of grid size (e.g. 2D: ~40 iterations from
+  32² to 256², versus ~900–7500 unpreconditioned). Backed by the new
+  `Preconditioners.BlockFourierPreconditioner`, a matrix-valued spectral
+  preconditioner that applies a per-Fourier-mode `n×n` block inverse — the
+  matrix generalization of the scalar `FourierPreconditioner`
+- ENH: Pipelined (Ghysels–Vanroose) preconditioned conjugate gradients,
+  `Solvers.conjugate_gradients_pipelined`, which issues a single global
+  reduction per iteration instead of the three of standard PCG. Backed by a
+  fused `linalg.pipelined_cg_dots` (host and GPU) returning the three CG inner
+  products `(r·u, w·u, r·r)` in one pass / one device-to-host copy
+- BUG: GPU kernel launches are now checked and raise `RuntimeError` instead of
+  failing silently. A library built for a GPU architecture the device does not
+  support (e.g. `sm_75` SASS on an `sm_120` device) previously left every
+  hand-written kernel a no-op while runtime-API calls (memcpy/memset) kept
+  working, so reductions returned zero and CG "converged" in 0 iterations
+- MAINT: The linalg reduction scratch buffer is cached across calls instead of
+  being reallocated (`cudaMalloc`/`cudaFree`) on every reduction
+- DOC: Documentation converted from Sphinx to MkDocs (Material theme); added
+  CPU/GPU scaling benchmark pages for the Poisson and homogenization examples,
+  including an MPI strong-scaling study
 - ENH: NetCDF I/O now supports device-resident (GPU) fields directly, staging
   through a temporary host (AoS) mirror with `deep_copy` before a write and
   after a read. Device-resident state fields are unsupported and fail loudly.

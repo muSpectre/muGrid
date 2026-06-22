@@ -275,3 +275,98 @@ class FourierPreconditioner(Preconditioner):
             linalg.scal(self._kernel_field, work)
         with self._timed("ifft"):
             engine.ifft(work, z)
+
+
+class BlockFourierPreconditioner(Preconditioner):
+    """
+    Block spectral preconditioner ``z = F⁻¹ [ K⁻¹(q) · F r ]`` for an
+    ``n``-component vector field.
+
+    The matrix-valued generalization of :class:`FourierPreconditioner`: where
+    that class multiplies each Fourier mode by a scalar, this one multiplies the
+    ``n``-vector of component amplitudes at each mode ``q`` by an ``n × n``
+    matrix ``K⁻¹(q)``. This is exactly what the reference-material (Green's
+    function) preconditioner of an FE homogenization problem needs (Ladecký et
+    al., Appl. Math. Comput. 446 (2023) 127835): the reference stiffness
+    ``Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D`` built from spatially uniform data is block-circulant,
+    hence block-diagonal in Fourier space with one ``n × n`` block per mode
+    (``n = d·Nn`` degrees of freedom per stencil), and its (pseudo-)inverse is
+    applied mode by mode between a forward and an inverse FFT.
+
+    The blocks are supplied pre-assembled and pre-inverted (the singular
+    zero-frequency block, corresponding to the rigid-body modes, must already be
+    set to its pseudo-inverse — typically zero — to project those modes out).
+    The inverse-transform normalisation should be folded into the blocks by the
+    caller, mirroring :class:`FourierPreconditioner`.
+
+    Parameters
+    ----------
+    engine : muGrid.FFTEngine
+        FFT engine defining grid, parallel decomposition and transforms.
+    blocks : ndarray
+        Per-mode inverse blocks of shape ``(n, n, *nb_fourier_subdomain_grid_pts)``
+        (generally complex), already including ``engine.normalisation``. ``z[i] =
+        Σ_j blocks[i, j] · F r[j]`` at every Fourier mode.
+    name : str, optional
+        Prefix for the engine-managed Fourier work field.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records the forward transform ("fft"), the
+        per-mode block multiply ("scale") and the inverse transform ("ifft").
+    """
+
+    def __init__(self, engine, blocks, name="block-fourier-preconditioner",
+                 timer=None):
+        self._engine = engine
+        self._name = name
+        self._timer = timer
+
+        blocks = np.asarray(blocks)
+        n = blocks.shape[0]
+        if blocks.ndim < 2 or blocks.shape[1] != n:
+            raise ValueError(
+                f"blocks must have shape (n, n, *fourier_shape); got "
+                f"{blocks.shape}"
+            )
+        expected = tuple(engine.nb_fourier_subdomain_grid_pts)
+        if tuple(blocks.shape[2:]) != expected:
+            raise ValueError(
+                f"blocks Fourier shape {tuple(blocks.shape[2:])} does not match "
+                f"the local Fourier subdomain {expected} of the FFT engine"
+            )
+
+        self._n = n
+        self._work = engine.fourier_space_field(f"{name}-work", components=(n,))
+        # Match the array library of the work field's view (numpy or cupy) so
+        # the per-mode multiply runs where the fields live.
+        sample = self._work.s
+        if type(sample).__module__.startswith("cupy"):
+            import cupy
+
+            self._xp = cupy
+            self._blocks = cupy.asarray(blocks)
+        else:
+            self._xp = np
+            self._blocks = np.asarray(blocks)
+
+    def _timed(self, name):
+        return self._timer(name) if self._timer is not None else nullcontext()
+
+    def apply(self, r, z):
+        """
+        Compute ``z = F⁻¹ [ K⁻¹(q) · F r ]``.
+
+        ``r`` and ``z`` must be real-valued ``n``-component fields of the
+        engine's real-space collection.
+        """
+        engine = self._engine
+        work = self._work
+        with self._timed("fft"):
+            engine.fft(r, work)
+        with self._timed("scale"):
+            s = work.s
+            # z_i(q) = Σ_j K⁻¹_ij(q) r_j(q), per Fourier mode. The field view
+            # carries a (size-1) sub-point axis between the component axis and
+            # the Fourier axes ("s"); the blocks broadcast over it.
+            s[...] = self._xp.einsum("ij...,js...->is...", self._blocks, s)
+        with self._timed("ifft"):
+            engine.ifft(work, z)

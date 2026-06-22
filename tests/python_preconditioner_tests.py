@@ -14,6 +14,7 @@ from conftest import (
 
 import muGrid
 from muGrid.Preconditioners import (
+    BlockFourierPreconditioner,
     FourierPreconditioner,
     IdentityPreconditioner,
     JacobiPreconditioner,
@@ -192,6 +193,48 @@ def test_fourier_preconditioner_multicomponent(comm):
     np.testing.assert_allclose(
         z.p[1], np.cos(4 * np.pi * y) / lam(0, 2 / 16), atol=1e-12
     )
+
+
+def test_block_fourier_matches_scalar(comm):
+    """Diagonal blocks reproduce the scalar FourierPreconditioner.
+
+    BlockFourierPreconditioner with blocks ``k(q)·I`` must act identically to
+    FourierPreconditioner with the scalar kernel ``k(q)`` on every component.
+    (FourierPreconditioner folds the inverse-transform normalisation in itself,
+    so the block version is given ``k(q)·normalisation`` on the diagonal.)
+    """
+    engine = make_engine(comm, (16, 16))
+    grid_spacing = 1 / 16
+    n = 2
+    kernel = inverse_fd_laplace_kernel(grid_spacing)(engine)
+
+    scalar = FourierPreconditioner(engine, kernel)
+
+    fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+    blocks = np.zeros((n, n) + fourier_shape, dtype=complex)
+    for i in range(n):
+        blocks[i, i] = kernel * engine.normalisation
+    block = BlockFourierPreconditioner(engine, blocks)
+
+    r = engine.real_space_field("r", components=(n,))
+    z_scalar = engine.real_space_field("z_scalar", components=(n,))
+    z_block = engine.real_space_field("z_block", components=(n,))
+    x, y = engine.coords
+    r.p[0] = np.sin(2 * np.pi * x) + 0.5 * np.cos(4 * np.pi * y)
+    r.p[1] = np.cos(2 * np.pi * y)
+
+    scalar(r, z_scalar)
+    block(r, z_block)
+    np.testing.assert_allclose(
+        np.asarray(z_block.p), np.asarray(z_scalar.p), atol=1e-12
+    )
+
+
+def test_block_fourier_shape_validation(comm):
+    """Blocks whose Fourier shape mismatches the engine are rejected."""
+    engine = make_engine(comm, (16, 16))
+    with pytest.raises(ValueError):
+        BlockFourierPreconditioner(engine, np.ones((2, 2, 3, 3)))
 
 
 def test_kernel_shape_validation(comm):
