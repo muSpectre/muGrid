@@ -4,6 +4,15 @@ Change log for µGrid
 Unreleased
 ----------
 
+- ENH: The cuFFT backend now performs whole multidimensional r2c/c2r transforms
+  natively (`cufftPlanMany`, `supports_nd`/`r2c_nd`/`c2r_nd`), so a serial
+  (non-decomposed) GPU engine issues one planned transform instead of driving it
+  axis-by-axis with a per-plane loop, a work buffer and a final device copy. This
+  brings the serial 3D GPU FFT to within ~10% of native cuFFT (previously
+  6.5–31× slower, launch-overhead-bound) and roughly halves the wall time of the
+  GPU FFT-preconditioned homogenization solve. Mirrors the existing pocketFFT
+  (CPU) N-D path. The rocFFT (HIP/AMD) backend implements the same native N-D
+  transforms (via `rocfft_plan_create` with multi-dimensional lengths/strides)
 - ENH: Reference-material (Green's-function) preconditioner for FFT-accelerated
   FE homogenization (Ladecký et al., Appl. Math. Comput. 446 (2023) 127835),
   exposed in the homogenization example via `-P reference`. It makes the PCG
