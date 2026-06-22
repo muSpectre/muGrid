@@ -466,67 +466,82 @@ class FFTEngine : public FFTEngineBase {
     Index_t in_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components};
 
     if (need_mpi_path) {
-      // MPI path with transposes
-      Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
-      Index_t zpencil_size{nb_zpencil_pixels * nb_components};
-
-      // Z-pencil work buffer strides
-      auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist, work_z_z_dist] =
-          is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
-                 : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
-
-      Complex * work_z_ptr{this->get_work_buffer(0, zpencil_size)};
-
-      // Step 1: r2c FFT along X for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
-        Index_t in_comp_offset{comp * in_comp_factor};
-        Index_t work_comp_offset{comp * work_z_comp_factor};
-
-        for (Index_t iz{0}; iz < local_real[2]; ++iz) {
-          Index_t in_idx{in_base_offset + in_comp_offset + iz * in_z_dist};
-          Index_t out_idx{work_comp_offset + iz * work_z_z_dist};
-          backend->r2c(Nx, local_real[1], input_ptr + in_idx,
-                       in_x_stride, in_y_dist,
-                       work_z_ptr + out_idx,
-                       work_z_x_stride, work_z_y_dist);
-        }
-      }
-
-      // Step 2a: Transpose X<->Y (scatter X across P2, gather Y) into
-      // Y-pencils [Fx/P2, Ny, Nz/P1]
+      // MPI path with transposes. Set up the Y-pencil layout [Fx/P2, Ny, Nz/P1]
+      // and its work buffer (target of the X<->Y stage) first, so the slab fast
+      // path can write straight into it.
       const DynGridIndex & ypencil_shape =
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
       Index_t local_yfx{ypencil_shape[0]};
       Index_t nb_ypencil_pixels{local_yfx * Ny * ypencil_shape[2]};
       Index_t ypencil_size{nb_ypencil_pixels * nb_components};
 
-      // Y-pencil work buffer strides
       auto [work_y_comp_factor, work_y_x_stride, work_y_y_dist, work_y_z_dist] =
           is_soa ? get_soa_strides_3d(nb_ypencil_pixels, local_yfx, Ny)
                  : get_aos_strides_3d(nb_ypencil_pixels, local_yfx, Ny);
 
       Complex * work_y_ptr{this->get_work_buffer(1, ypencil_size)};
 
-      if (transpose_xy != nullptr) {
-        transpose_xy->forward(work_z_ptr, work_y_ptr);
+      if (transpose_xy == nullptr && backend->supports_nd()) {
+        // Slab fast path (P2 == 1: X and Y are both local). Transform the two
+        // local axes (Y, and the half-complex X last) in a single planned
+        // rank-2 r2c per component, batched over the local Z planes, written
+        // straight into the Y-pencil layout. This replaces the per-Z-plane
+        // r2c-X loop, the X<->Y copy and the per-Z-plane c2c-Y loop with one
+        // native cuFFT/rocFFT/pocketFFT N-D transform per component.
+        std::vector<Index_t> shape{local_real[2], Ny, Nx};
+        std::vector<Index_t> axes{1, 2};
+        std::vector<Index_t> in_strides{in_z_dist, in_y_dist, in_x_stride};
+        std::vector<Index_t> out_strides{work_y_z_dist, work_y_y_dist,
+                                         work_y_x_stride};
+        for (Index_t comp{0}; comp < nb_components; ++comp) {
+          backend->r2c_nd(
+              shape, axes,
+              input_ptr + in_base_offset + comp * in_comp_factor, in_strides,
+              work_y_ptr + comp * work_y_comp_factor, out_strides);
+        }
       } else {
-        // No X<->Y redistribution needed (P2 == 1): Y is already local and
-        // the Y-pencil has the same shape as the Z-pencil, so copy the data
-        // through. Without this the Y-FFT below would run on an
-        // uninitialised work_y, silently dropping the Y transform.
-        deep_copy<Complex, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
-      }
+        // General pencil path: r2c along X into a Z-pencil, redistribute X<->Y,
+        // then c2c along Y, axis-by-axis.
+        Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
+        Index_t zpencil_size{nb_zpencil_pixels * nb_components};
+        auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist,
+              work_z_z_dist] =
+            is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
+                   : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
+        Complex * work_z_ptr{this->get_work_buffer(0, zpencil_size)};
 
-      // Step 2b: c2c FFT along Y for each component
-      // Batch local_yfx transforms per Z plane
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
-        Index_t comp_offset{comp * work_y_comp_factor};
-        for (Index_t iz{0}; iz < ypencil_shape[2]; ++iz) {
-          Index_t idx{comp_offset + iz * work_y_z_dist};
-          backend->c2c_forward(Ny, local_yfx, work_y_ptr + idx,
-                               work_y_y_dist, work_y_x_stride,
-                               work_y_ptr + idx,
-                               work_y_y_dist, work_y_x_stride);
+        // Step 1: r2c FFT along X for each component
+        for (Index_t comp{0}; comp < nb_components; ++comp) {
+          Index_t in_comp_offset{comp * in_comp_factor};
+          Index_t work_comp_offset{comp * work_z_comp_factor};
+          for (Index_t iz{0}; iz < local_real[2]; ++iz) {
+            Index_t in_idx{in_base_offset + in_comp_offset + iz * in_z_dist};
+            Index_t out_idx{work_comp_offset + iz * work_z_z_dist};
+            backend->r2c(Nx, local_real[1], input_ptr + in_idx,
+                         in_x_stride, in_y_dist,
+                         work_z_ptr + out_idx,
+                         work_z_x_stride, work_z_y_dist);
+          }
+        }
+
+        // Step 2a: Transpose X<->Y (scatter X across P2, gather Y)
+        if (transpose_xy != nullptr) {
+          transpose_xy->forward(work_z_ptr, work_y_ptr);
+        } else {
+          // No X<->Y redistribution (P2 == 1): same shape, copy through.
+          deep_copy<Complex, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
+        }
+
+        // Step 2b: c2c FFT along Y for each component
+        for (Index_t comp{0}; comp < nb_components; ++comp) {
+          Index_t comp_offset{comp * work_y_comp_factor};
+          for (Index_t iz{0}; iz < ypencil_shape[2]; ++iz) {
+            Index_t idx{comp_offset + iz * work_y_z_dist};
+            backend->c2c_forward(Ny, local_yfx, work_y_ptr + idx,
+                                 work_y_y_dist, work_y_x_stride,
+                                 work_y_ptr + idx,
+                                 work_y_y_dist, work_y_x_stride);
+          }
         }
       }
 
@@ -932,50 +947,65 @@ class FFTEngine : public FFTEngineBase {
         deep_copy<Complex, MemorySpace>(work_y_ptr, temp_ptr, ypencil_size);
       }
 
-      // Step 3: c2c IFFT along Y for each component
-      // Batch local_yfx transforms per Z plane
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
-        Index_t comp_offset{comp * work_y_comp_factor};
-        for (Index_t iz{0}; iz < ypencil_shape[2]; ++iz) {
-          Index_t idx{comp_offset + iz * work_y_z_dist};
-          backend->c2c_backward(Ny, local_yfx, work_y_ptr + idx,
-                                work_y_y_dist, work_y_x_stride,
-                                work_y_ptr + idx,
-                                work_y_y_dist, work_y_x_stride);
+      if (transpose_xy == nullptr && backend->supports_nd()) {
+        // Slab fast path (P2 == 1: X and Y both local). Fuse the inverse Y
+        // (c2c) and X (c2r, half-complex) transforms into one planned rank-2
+        // c2r per component, batched over the local Z planes, reading the
+        // Y-pencil and writing the real output directly. Replaces the c2c-Y
+        // loop, the X<->Y copy and the c2r-X loop (mirrors the forward path).
+        std::vector<Index_t> shape{local_real[2], Ny, Nx};
+        std::vector<Index_t> axes{1, 2};
+        std::vector<Index_t> in_strides{work_y_z_dist, work_y_y_dist,
+                                        work_y_x_stride};
+        std::vector<Index_t> out_strides{out_z_dist, out_y_dist, out_x_stride};
+        for (Index_t comp{0}; comp < nb_components; ++comp) {
+          backend->c2r_nd(
+              shape, axes,
+              work_y_ptr + comp * work_y_comp_factor, in_strides,
+              output_ptr + out_base_offset + comp * out_comp_factor,
+              out_strides);
         }
-      }
-
-      // Z-pencil work buffer [Fx, Ny/P2, Nz/P1]
-      Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
-      Index_t zpencil_size{nb_zpencil_pixels * nb_components};
-
-      // Z-pencil strides
-      auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist, work_z_z_dist] =
-          is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
-                 : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
-
-      Complex * work_z_ptr{this->get_work_buffer(2, zpencil_size)};
-
-      // Step 4: Transpose X<->Y backward (gather X, scatter Y across P2)
-      if (transpose_xy != nullptr) {
-        transpose_xy->backward(work_y_ptr, work_z_ptr);
       } else {
-        // No X<->Y redistribution needed (P2 == 1): the Y-pencil has the
-        // same shape as the Z-pencil.
-        deep_copy<Complex, MemorySpace>(work_z_ptr, work_y_ptr, zpencil_size);
-      }
+        // Step 3: c2c IFFT along Y for each component
+        for (Index_t comp{0}; comp < nb_components; ++comp) {
+          Index_t comp_offset{comp * work_y_comp_factor};
+          for (Index_t iz{0}; iz < ypencil_shape[2]; ++iz) {
+            Index_t idx{comp_offset + iz * work_y_z_dist};
+            backend->c2c_backward(Ny, local_yfx, work_y_ptr + idx,
+                                  work_y_y_dist, work_y_x_stride,
+                                  work_y_ptr + idx,
+                                  work_y_y_dist, work_y_x_stride);
+          }
+        }
 
-      // Step 4: c2r IFFT along X for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
-        Index_t work_comp_offset{comp * work_z_comp_factor};
-        Index_t out_comp_offset{comp * out_comp_factor};
+        // Z-pencil work buffer [Fx, Ny/P2, Nz/P1]
+        Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
+        Index_t zpencil_size{nb_zpencil_pixels * nb_components};
+        auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist,
+              work_z_z_dist] =
+            is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
+                   : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
+        Complex * work_z_ptr{this->get_work_buffer(2, zpencil_size)};
 
-        for (Index_t iz{0}; iz < local_real[2]; ++iz) {
-          Index_t in_idx{work_comp_offset + iz * work_z_z_dist};
-          Index_t out_idx{out_base_offset + out_comp_offset + iz * out_z_dist};
-          backend->c2r(Nx, local_real[1], work_z_ptr + in_idx,
-                       work_z_x_stride, work_z_y_dist,
-                       output_ptr + out_idx, out_x_stride, out_y_dist);
+        // Step 4a: Transpose X<->Y backward (gather X, scatter Y across P2)
+        if (transpose_xy != nullptr) {
+          transpose_xy->backward(work_y_ptr, work_z_ptr);
+        } else {
+          deep_copy<Complex, MemorySpace>(work_z_ptr, work_y_ptr, zpencil_size);
+        }
+
+        // Step 4b: c2r IFFT along X for each component
+        for (Index_t comp{0}; comp < nb_components; ++comp) {
+          Index_t work_comp_offset{comp * work_z_comp_factor};
+          Index_t out_comp_offset{comp * out_comp_factor};
+          for (Index_t iz{0}; iz < local_real[2]; ++iz) {
+            Index_t in_idx{work_comp_offset + iz * work_z_z_dist};
+            Index_t out_idx{out_base_offset + out_comp_offset +
+                            iz * out_z_dist};
+            backend->c2r(Nx, local_real[1], work_z_ptr + in_idx,
+                         work_z_x_stride, work_z_y_dist,
+                         output_ptr + out_idx, out_x_stride, out_y_dist);
+          }
         }
       }
     } else {

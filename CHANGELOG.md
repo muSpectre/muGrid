@@ -13,6 +13,13 @@ Unreleased
   GPU FFT-preconditioned homogenization solve. Mirrors the existing pocketFFT
   (CPU) N-D path. The rocFFT (HIP/AMD) backend implements the same native N-D
   transforms (via `rocfft_plan_create` with multi-dimensional lengths/strides)
+- ENH: The MPI/decomposed 3D FFT also uses the native N-D backend for *slab*
+  decompositions (a single split axis, `P2 == 1`): the two locally-complete
+  axes — the half-complex X and Y — are transformed together as one planned
+  rank-2 r2c/c2r per component, batched over the local Z planes, replacing the
+  per-Z-plane axis-by-axis loops and the redundant X<->Y copy. Pencil (two-axis)
+  decompositions stay axis-by-axis, since no rank holds two full axes. Validated
+  on CPU-MPI and on a single GPU oversubscribed by multiple MPI ranks
 - ENH: Reference-material (Green's-function) preconditioner for FFT-accelerated
   FE homogenization (Ladecký et al., Appl. Math. Comput. 446 (2023) 127835),
   exposed in the homogenization example via `-P reference`. It makes the PCG
