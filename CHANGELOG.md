@@ -20,6 +20,24 @@ Unreleased
   per-Z-plane axis-by-axis loops and the redundant X<->Y copy. Pencil (two-axis)
   decompositions stay axis-by-axis, since no rank holds two full axes. Validated
   on CPU-MPI and on a single GPU oversubscribed by multiple MPI ranks
+- ENH: `FFTEngine` accepts a `decomposition` argument (`"auto"` (default),
+  `"pencil"` or `"slab"`) selecting the MPI process grid. `"slab"` splits only
+  the last axis (`P2 == 1`, requires `num_ranks <= Nz`) so the slab N-D fast
+  path above applies; `"pencil"` forces the balanced two-axis factorization.
+  `"auto"` now *prefers slab whenever it fits* and falls back to pencil only
+  when more ranks are requested than Z-planes — slab does one fused N-D
+  transform plus a single Y<->Z transpose (vs two), moving less data. Measured
+  fft+ifft speedup of slab over pencil at 128³: ~1.3–1.4× on CPU-MPI (2–4
+  ranks) and ~8–9× on a GPU (the pencil path's per-axis transforms and extra
+  transpose roundtrip through device memory dominate there)
+- ENH: Optional contiguous-staging host FFT transpose (opt-in via
+  `MUGRID_STAGED_TRANSPOSE=1`): packs each peer's block into a contiguous buffer
+  and exchanges with `MPI_Alltoallv`, unifying the host path with the device
+  path, instead of `MPI_Alltoallw` with derived datatypes. Off by default —
+  on shared-memory (single node) `Alltoallw` is faster, since the explicit
+  staging adds a copy the in-place collective avoids; the staged path targets
+  multi-node networks where a single tuned collective on contiguous buffers can
+  amortize that copy against link latency
 - ENH: Reference-material (Green's-function) preconditioner for FFT-accelerated
   FE homogenization (Ladecký et al., Appl. Math. Comput. 446 (2023) 127835),
   exposed in the homogenization example via `-P reference`. It makes the PCG
@@ -32,7 +50,16 @@ Unreleased
   `Solvers.conjugate_gradients_pipelined`, which issues a single global
   reduction per iteration instead of the three of standard PCG. Backed by a
   fused `linalg.pipelined_cg_dots` (host and GPU) returning the three CG inner
-  products `(r·u, w·u, r·r)` in one pass / one device-to-host copy
+  products `(r·u, w·u, r·r)` in one pass / one device-to-host copy. The combined
+  reduction is now issued *non-blocking* (`MPI_Iallreduce` via the new
+  `Communicator.isum`/`isum_wait`) and overlapped with the preconditioner and
+  operator applies of the same iteration, hiding the global-synchronization
+  latency. On a single node this is a small net loss (the extra vector updates
+  outweigh the negligible shared-memory reduction latency), so it is opt-in; the
+  payoff grows with reduction latency — in a synthetic-latency model it crosses
+  over to a net win at ~100 µs per reduction (1.7× at 500 µs), the regime of a
+  multi-node allreduce. Verified bit-comparable to standard PCG (identical
+  iteration counts; solution agreement ~1e-15) at serial/2/4 ranks
 - BUG: GPU kernel launches are now checked and raise `RuntimeError` instead of
   failing silently. A library built for a GPU architecture the device does not
   support (e.g. `sm_75` SASS on an `sm_120` device) previously left every

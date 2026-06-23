@@ -334,10 +334,27 @@ def conjugate_gradients_pipelined(
         for iteration in range(maxiter):
             # Single combined reduction: (r,u), (w,u), (r,r). The three inner
             # products are computed by one fused kernel (one device->host copy)
-            # and reduced across ranks in a single allreduce.
-            with timed("reduce"):
+            # and reduced across ranks in a *non-blocking* allreduce. The
+            # preconditioner apply m = M^{-1} w and operator apply n = A m below
+            # do not depend on gamma/delta/rr, so they run while the reduction
+            # is in flight, hiding the global synchronisation latency (the
+            # multi-node payoff of the pipelined formulation).
+            with timed("reduce-begin"):
                 local = np.array(linalg.pipelined_cg_dots(r, u, w))
-                gamma, delta, rr = (float(v) for v in comm.sum(local).ravel())
+                reduce_handle = comm.isum(local)
+
+            # Apply preconditioner and operator for this step (overlaps the
+            # in-flight reduction).
+            with timed("prec"):
+                prec(w, m)
+            with timed("hessp"):
+                hessp(m, n)
+
+            # Complete the overlapped reduction.
+            with timed("reduce-wait"):
+                gamma, delta, rr = (
+                    float(v) for v in comm.isum_wait(reduce_handle).ravel()
+                )
 
             if callback:
                 with timed("callback"):
@@ -352,12 +369,6 @@ def conjugate_gradients_pipelined(
                 )
             if rr <= tol_sq:
                 return x
-
-            # Apply preconditioner and operator for this step
-            with timed("prec"):
-                prec(w, m)
-            with timed("hessp"):
-                hessp(m, n)
 
             if iteration == 0:
                 beta = 0.0
