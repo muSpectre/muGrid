@@ -11,89 +11,49 @@ page, which has two parts:
    that curve is skipped here.
 2. **MPI strong scaling** — speedup vs. rank count at fixed problem size.
 
-Every data point runs `homogenization.py` as its own subprocess (under `mpiexec`
-for the MPI configurations) with a fixed CG-iteration budget, so all
-configurations perform identical arithmetic, and the machine-readable `--json`
-output is parsed for the solve wall time.
+Data collection and page generation are separate. A run executes
+`homogenization.py` as a subprocess for each data point (under `mpiexec` for the
+MPI configurations) and **appends** the results — with date, code version, and
+machine — to the shared benchmark database (`benchmarks/results.csv`, see
+`examples/benchmark_db.py`). Tables and plots are then rendered *from the
+database*, so the page can be regenerated at any time, and historical runs stay
+reproducible.
 
-Example
--------
+Examples
+--------
+    # run benchmarks, append to the DB, and (re)generate the page:
     python examples/benchmark_homogenization.py \
         --doc-out docs/benchmark_homogenization.md \
         --plot-out docs/benchmark_homogenization.png
 
-Needs an MPI-enabled muGrid build and `mpi4py` for the MPI configurations. Point
-`PYTHONPATH` at an MPI (and, for the GPU curves, GPU-enabled) build tree, e.g.
+    # just re-render the page from the latest run already in the DB:
+    python examples/benchmark_homogenization.py --render-only \
+        --doc-out docs/benchmark_homogenization.md
 
-    export PYTHONPATH=$PWD/build-mpi/language_bindings/python:$PWD/language_bindings/python
-
-Use `--from-json results.json` to re-render the page from a previous run.
+Needs an MPI-enabled muGrid build and `mpi4py` for the MPI configurations; point
+`PYTHONPATH` at an MPI (and, for the GPU curves, GPU-enabled) build tree.
 """
 
 import argparse
-import json
 import os
-import platform
 import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import benchmark_db as db  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOMOG = os.path.join(HERE, "homogenization.py")
-
-
-# --------------------------------------------------------------------------- #
-# Machine detection
-# --------------------------------------------------------------------------- #
-def detect_cpu():
-    """Human-readable CPU description (model + logical core count)."""
-    model = platform.processor() or "unknown CPU"
-    try:
-        with open("/proc/cpuinfo") as fh:
-            for line in fh:
-                if line.startswith("model name"):
-                    model = line.split(":", 1)[1].strip()
-                    break
-    except OSError:
-        pass
-    return f"{model} ({os.cpu_count()} logical cores)"
-
-
-def gpu_names():
-    """List of GPU name strings from nvidia-smi (empty if none)."""
-    try:
-        out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total",
-             "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=30)
-        return [r.strip() for r in out.stdout.splitlines() if r.strip()]
-    except (OSError, subprocess.SubprocessError):
-        return []
-
-
-def detect_gpu():
-    """Human-readable GPU description, or a fallback note."""
-    rows = gpu_names()
-    if not rows:
-        return "no NVIDIA GPU detected", 0
-    names = [r.split(",")[0].strip() for r in rows]
-    uniq = sorted(set(names))
-    label = (f"{len(names)}x {uniq[0]}" if len(names) > 1 and len(uniq) == 1
-             else ", ".join(names))
-    mem = rows[0].split(",")[1].strip() if "," in rows[0] else ""
-    return (f"{label} ({mem})" if mem else label), len(names)
+BENCHMARK = "homogenization"
+CONFIG_META = db.CONFIG_META
 
 
 # --------------------------------------------------------------------------- #
 # Running homogenization.py
 # --------------------------------------------------------------------------- #
 def run(device, n, maxiter, nranks=1):
-    """Run one homogenization solve; return a dict of metrics or None.
-
-    nranks == 1 runs the process directly; nranks > 1 launches it under
-    ``mpiexec`` (one rank per core for CPU, one rank per GPU for GPU — the
-    example binds ranks to GPUs round-robin).
-    """
+    """Run one homogenization solve; return a dict of metrics or None."""
     base = [HOMOG, "-n", f"{n},{n},{n}", "-d", device, "-k", "fused",
             "-i", str(maxiter), "--inclusion-type", "single", "--json"]
     if nranks == 1:
@@ -101,7 +61,6 @@ def run(device, n, maxiter, nranks=1):
         env = os.environ
     else:
         cmd = ["mpiexec", "-n", str(nranks), sys.executable] + base
-        # Allow more ranks than physical slots on a laptop / single node.
         env = dict(os.environ, OMPI_MCA_rmaps_base_oversubscribe="1")
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=7200,
@@ -113,6 +72,7 @@ def run(device, n, maxiter, nranks=1):
         sys.stderr.write(f"  [{device} n={n} ranks={nranks}] no JSON\n"
                          f"{out.stderr[-400:]}\n")
         return None
+    import json
     try:
         d = json.loads(m.group(0))
     except json.JSONDecodeError:
@@ -120,48 +80,95 @@ def run(device, n, maxiter, nranks=1):
     r, c = d["results"], d["config"]
     return dict(npts=c["nb_grid_pts_total"], iters=r["total_cg_iterations"],
                 secs=r["total_time_seconds"],
-                gbps=r.get("memory_throughput_GBps"),
-                E=r.get("E_effective_approx"))
+                gbps=r.get("memory_throughput_GBps"))
 
 
+def collect(args, prov):
+    """Run all data points and return DB rows (does not write)."""
+    _, nb_gpus = db.detect_gpu()
+    want_gpu = not args.no_gpu and nb_gpus >= 1
+    configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
+    rows = []
+
+    # Time vs. size, one curve per device/MPI config.
+    for n in args.sizes:
+        for key, device, nranks in configs:
+            r = run(device, n, args.maxiter, nranks)
+            label = CONFIG_META[key]["label"](nranks)
+            if r is None:
+                sys.stderr.write(f"  {label} {n}^3: skipped (failed / OOM)\n")
+                continue
+            rows.append({**prov, "benchmark": BENCHMARK, "study": "time_vs_size",
+                         "label": key, "device": device, "nranks": nranks,
+                         "dim": 3, "n": n, "npts": r["npts"],
+                         "maxiter": args.maxiter, "iters": r["iters"],
+                         "secs": r["secs"], "gbps": r["gbps"]})
+            sys.stderr.write(f"  {label} {n}^3 ({r['npts']} pts): "
+                             f"{r['secs']:.3f} s, {r['iters']} it, "
+                             f"{r['gbps']:.1f} GB/s\n")
+
+    # MPI strong scaling (CPU).
+    for n in args.scaling_sizes:
+        for R in args.scaling_ranks:
+            r = run("cpu", n, args.maxiter, R)
+            if r is None:
+                continue
+            rows.append({**prov, "benchmark": BENCHMARK, "study": "mpi_scaling",
+                         "label": str(R), "device": "cpu", "nranks": R,
+                         "dim": 3, "n": n, "npts": r["npts"],
+                         "maxiter": args.maxiter, "iters": r["iters"],
+                         "secs": r["secs"], "gbps": r["gbps"]})
+            sys.stderr.write(f"  scaling {n}^3 ranks={R}: {r['secs']:.3f} s, "
+                             f"{r['gbps']:.1f} GB/s\n")
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Re-shaping DB rows for rendering
+# --------------------------------------------------------------------------- #
 def fmt_points(npts):
     if npts >= 1e6:
         return f"{npts / 1e6:.1f}M"
     if npts >= 1e3:
         return f"{npts / 1e3:.0f}k"
-    return str(npts)
+    return str(int(npts))
+
+
+def merged_from_rows(rows):
+    """{config_key: {n: {secs, iters, gbps, npts}}}."""
+    d = {}
+    for r in rows:
+        if r["study"] != "time_vs_size":
+            continue
+        d.setdefault(r["label"], {})[r["n"]] = r
+    return d
+
+
+def scaling_from_rows(rows):
+    """{n: {ranks: row}}."""
+    d = {}
+    for r in rows:
+        if r["study"] != "mpi_scaling":
+            continue
+        d.setdefault(r["n"], {})[int(r["nranks"])] = r
+    return d
+
+
+def sizes_in(rows, study):
+    return sorted({r["n"] for r in rows if r["study"] == study})
 
 
 # --------------------------------------------------------------------------- #
-# Configurations for the merged "time vs. size" plot
+# Tables
 # --------------------------------------------------------------------------- #
-def build_configs(ncores, nb_gpus, want_gpu):
-    """Ordered list of configs: (key, label, device, nranks, style)."""
-    cfgs = [
-        ("cpu1", "CPU (1 core)", "cpu", 1,
-         dict(marker="o", color="#5e35b1")),
-        ("cpuN", f"CPU ({ncores} cores, MPI)", "cpu", ncores,
-         dict(marker="D", color="#3949ab")),
-    ]
-    if want_gpu and nb_gpus >= 1:
-        cfgs.append(("gpu1", "GPU (1 device)", "gpu", 1,
-                     dict(marker="s", color="#00897b")))
-    # Multi-GPU curve only when the machine actually has >1 GPU.
-    if want_gpu and nb_gpus > 1:
-        cfgs.append(("gpuN", f"GPU ({nb_gpus} devices, MPI)", "gpu", nb_gpus,
-                     dict(marker="^", color="#f4511e")))
-    return cfgs
-
-
-def table_markdown(sizes, configs, results):
-    """Rows = configuration, columns = grid size; values = solve time (s)."""
-    cols = [n for n in sizes if any(n in results.get(k, {}) for k, *_ in configs)]
+def table_markdown(sizes, configs, merged):
+    cols = [n for n in sizes if any(n in merged.get(k, {}) for k, *_ in configs)]
     header = ("| Configuration | "
               + " | ".join(f"{n}³ ({fmt_points(n ** 3)})" for n in cols) + " |")
     sep = "|" + "---|" * (len(cols) + 1)
     lines = [header, sep]
-    for key, label, *_ in configs:
-        res = results.get(key)
+    for key, label, _style in configs:
+        res = merged.get(key)
         if not res:
             continue
         cells = " | ".join(
@@ -170,15 +177,36 @@ def table_markdown(sizes, configs, results):
     return "\n".join(lines)
 
 
-def make_merged_plot(sizes, configs, results, path):
+def scaling_tables_markdown(scaling, ranks):
+    out = []
+    for n in sorted(scaling):
+        rows = scaling[n]
+        t1 = rows.get(1, {}).get("secs")
+        out.append(f"**{n}³ ({n ** 3:,} points)**\n")
+        out.append("| Ranks | Time (s) | Speedup | Parallel eff. | Agg. GB/s |")
+        out.append("|---|---|---|---|---|")
+        for R in ranks:
+            if R not in rows:
+                continue
+            t = rows[R]["secs"]
+            sp = t1 / t if t1 else float("nan")
+            out.append(f"| {R} | {t:.2f} | {sp:.2f}× | {sp / R * 100:.0f}% | "
+                       f"{rows[R]['gbps']:.1f} |")
+        out.append("")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# Plots
+# --------------------------------------------------------------------------- #
+def make_merged_plot(configs, merged, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
-    for key, label, _dev, _nr, style in configs:
-        pts = sorted((n ** 3, results[key][n]["secs"])
-                     for n in results.get(key, {}))
+    for key, label, style in configs:
+        pts = sorted((n ** 3, merged[key][n]["secs"]) for n in merged.get(key, {}))
         if not pts:
             continue
         xs, ys = zip(*pts)
@@ -193,53 +221,31 @@ def make_merged_plot(sizes, configs, results, path):
     plt.close(fig)
 
 
-# --------------------------------------------------------------------------- #
-# MPI strong scaling
-# --------------------------------------------------------------------------- #
-def scaling_tables_markdown(sizes, ranks, res):
-    out = []
-    for n in sizes:
-        rows = res.get(str(n))
-        if not rows:
-            continue
-        t1 = rows.get("1", {}).get("secs")
-        out.append(f"**{n}³ ({n ** 3:,} points)**\n")
-        out.append("| Ranks | Time (s) | Speedup | Parallel eff. | Agg. GB/s |")
-        out.append("|---|---|---|---|---|")
-        for R in ranks:
-            if str(R) not in rows:
-                continue
-            t = rows[str(R)]["secs"]
-            sp = t1 / t if t1 else float("nan")
-            out.append(f"| {R} | {t:.2f} | {sp:.2f}× | {sp / R * 100:.0f}% | "
-                       f"{rows[str(R)]['gbps']:.1f} |")
-        out.append("")
-    return "\n".join(out)
-
-
-def make_scaling_plot(sizes, ranks, res, path):
+def make_scaling_plot(scaling, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
-    rmax = max(ranks)
+    all_ranks = sorted({R for rows in scaling.values() for R in rows})
+    rmax = max(all_ranks) if all_ranks else 1
     ax.plot([1, rmax], [1, rmax], ls="--", color="0.6", label="ideal (linear)")
     markers = {32: "v", 64: "o", 96: "s", 128: "^"}
-    for n in sizes:
-        rows = res.get(str(n), {})
-        t1 = rows.get("1", {}).get("secs")
+    for n in sorted(scaling):
+        rows = scaling[n]
+        t1 = rows.get(1, {}).get("secs")
         if not t1:
             continue
-        xs = [R for R in ranks if str(R) in rows]
-        ys = [t1 / rows[str(R)]["secs"] for R in xs]
+        xs = sorted(rows)
+        ys = [t1 / rows[R]["secs"] for R in xs]
         ax.plot(xs, ys, marker=markers.get(n, "o"), label=f"{n}³")
     ax.set_xscale("log", base=2)
     ax.set_yscale("log", base=2)
-    ax.set_xticks(ranks)
-    ax.set_xticklabels([str(R) for R in ranks])
-    ax.set_yticks(ranks)
-    ax.set_yticklabels([str(R) for R in ranks])
+    if all_ranks:
+        ax.set_xticks(all_ranks)
+        ax.set_xticklabels([str(R) for R in all_ranks])
+        ax.set_yticks(all_ranks)
+        ax.set_yticklabels([str(R) for R in all_ranks])
     ax.set_xlabel("MPI ranks (CPU cores)")
     ax.set_ylabel("Speedup vs. 1 rank")
     ax.set_title("Homogenization (3D, fused): MPI strong scaling")
@@ -259,9 +265,10 @@ Wall time of the FEM elasticity [homogenization example](examples.md)
 (`examples/homogenization.py`, fused stiffness kernel), across log-spaced **3D**
 grid sizes. Lower is better.
 
-!!! info "Test machine"
+!!! info "Test machine & code version"
     - **CPU:** {cpu}
     - **GPU:** {gpu}
+    - **muGrid:** `{version}` — run {timestamp}
 
 Run configuration: 3D single spherical inclusion, fused stiffness kernel,
 6 load cases, fixed `{maxiter}` CG iterations per load case — i.e. a **fixed work
@@ -308,9 +315,7 @@ reverses where it does not.
     `homogenization.py` binds each MPI rank to a distinct GPU (round-robin over
     the visible devices), so `mpiexec -n <#GPUs> python homogenization.py -d gpu`
     runs one rank per GPU. This benchmark adds a *GPU (N devices, MPI)* curve
-    automatically when more than one GPU is present. **This machine has a single
-    GPU**, so only the single-GPU curve is shown; the script is ready to produce
-    the multi-GPU curve on a multi-GPU host with no changes.
+    automatically when more than one GPU is present. **{gpu_count_note}**
 
 ## MPI strong scaling (CPU)
 
@@ -327,9 +332,11 @@ small, ghost exchange and CG dot-product reductions dominate — at 64³, 16 ran
 *regresses* (only ~16k points/rank; the sweet spot is 8 ranks), whereas the
 larger 96³ problem keeps scaling out to 16 cores.
 
-This page is generated by `examples/benchmark_homogenization.py`. Regenerate it
-on your own machine (MPI-enabled build + `mpi4py`, GPU build for the GPU curves)
-with:
+All data points live in the shared benchmark database `benchmarks/results.csv`
+(date, code version, machine, parameters, results). This page is generated by
+`examples/benchmark_homogenization.py`; re-render it from the database (no
+recompute) with `--render-only`, or run a fresh measurement that appends a new
+dated row set:
 
 ```bash
 python examples/benchmark_homogenization.py \\
@@ -340,18 +347,22 @@ python examples/benchmark_homogenization.py \\
 
 
 def write_doc_page(path, plot_path, scaling_plot_path, table, scaling_tables,
-                   maxiter, ncores, nb_gpus):
-    gpu, _ = detect_gpu()
-    if nb_gpus > 1:
-        gpu_mpi_bullet = (
-            f"- **GPU ({nb_gpus} devices, MPI)** — all GPUs, one rank per "
-            f"device.\n")
+                   meta, ncores, multi_gpu):
+    if multi_gpu:
+        gpu_mpi_bullet = "- **GPU (N devices, MPI)** — all GPUs, one rank per " \
+                         "device.\n"
+        gpu_count_note = "Runs with more than one GPU show the multi-GPU curve."
     else:
         gpu_mpi_bullet = ""
+        gpu_count_note = ("This run used a single GPU, so only the single-GPU "
+                          "curve is shown; the script is ready to produce the "
+                          "multi-GPU curve on a multi-GPU host with no changes.")
     with open(path, "w") as fh:
         fh.write(DOC_TEMPLATE.format(
-            cpu=detect_cpu(), gpu=gpu, table=table, maxiter=maxiter,
+            cpu=meta["cpu"], gpu=meta["gpu"], version=meta["version"],
+            timestamp=meta["timestamp"], table=table, maxiter=meta["maxiter"],
             ncores=ncores, gpu_mpi_bullet=gpu_mpi_bullet,
+            gpu_count_note=gpu_count_note,
             plot_name=os.path.basename(plot_path),
             scaling_tables=scaling_tables,
             scaling_plot_name=os.path.basename(scaling_plot_path)))
@@ -365,26 +376,21 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sizes", type=int, nargs="+",
-                    default=[16, 24, 32, 48, 64, 96, 128],
-                    help="Per-axis grid sizes n for the time-vs-size plot")
+                    default=[16, 24, 32, 48, 64, 96, 128])
     ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count(),
-                    help="Ranks for the full-machine MPI CPU curve "
-                         "(default: all logical cores)")
-    ap.add_argument("--no-gpu", action="store_true",
-                    help="Skip the GPU curves")
-    ap.add_argument("--scaling-sizes", type=int, nargs="+", default=[64, 96],
-                    help="Grid sizes for the MPI strong-scaling study")
+                    help="Ranks for the full-machine MPI CPU curve")
+    ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
+    ap.add_argument("--scaling-sizes", type=int, nargs="+", default=[64, 96])
     ap.add_argument("--scaling-ranks", type=int, nargs="+",
-                    default=[1, 2, 4, 8, 16],
-                    help="Rank counts for the MPI strong-scaling study")
-    ap.add_argument("--maxiter", type=int, default=100,
-                    help="CG iterations per load case (fixed work budget)")
-    ap.add_argument("--from-json", default=None,
-                    help="Render the page from a saved results JSON")
-    ap.add_argument("--json-out", default=None,
-                    help="Save raw results to this JSON")
-    ap.add_argument("--doc-out", default=None,
-                    help="Write the Markdown benchmark page here")
+                    default=[1, 2, 4, 8, 16])
+    ap.add_argument("--maxiter", type=int, default=100)
+    ap.add_argument("--render-only", action="store_true",
+                    help="Skip running; render from the database")
+    ap.add_argument("--timestamp", default=None,
+                    help="Render this run (timestamp prefix / date) instead of "
+                         "the latest")
+    ap.add_argument("--db", default=db.DB_PATH, help="Benchmark CSV path")
+    ap.add_argument("--doc-out", default=None)
     ap.add_argument("--plot-out",
                     default=os.path.join(HERE, "..", "docs",
                                          "benchmark_homogenization.png"))
@@ -393,73 +399,47 @@ def main():
                                          "benchmark_homogenization_mpi.png"))
     args = ap.parse_args()
 
-    _, nb_gpus = detect_gpu()
-    want_gpu = not args.no_gpu and nb_gpus >= 1
-    ncores = args.mpi_cpu_ranks
-    configs = build_configs(ncores, nb_gpus, want_gpu)
-
-    if args.from_json:
-        with open(args.from_json) as fh:
-            blob = json.load(fh)
-        merged = blob["merged"]
-        scaling = blob["scaling"]
+    if not args.render_only:
+        prov = db.run_provenance()
+        rows = collect(args, prov)
+        if not rows:
+            sys.exit("No successful runs — nothing to record.")
+        db.append_rows(rows, args.db)
+        sys.stderr.write(f"appended {len(rows)} rows to {args.db}\n")
+        select_ts = prov["timestamp"]
     else:
-        # --- time vs. size ---
-        merged = {key: {} for key, *_ in configs}
-        for n in args.sizes:
-            for key, label, device, nranks, _style in configs:
-                res = run(device, n, args.maxiter, nranks)
-                if res is None:
-                    sys.stderr.write(f"  {label} {n}^3: skipped "
-                                     f"(failed / OOM)\n")
-                    continue
-                merged[key][n] = res
-                sys.stderr.write(
-                    f"  {label} {n}^3 ({res['npts']} pts): "
-                    f"{res['secs']:.3f} s, {res['iters']} it, "
-                    f"{res['gbps']:.1f} GB/s\n")
+        select_ts = args.timestamp
 
-        # --- MPI strong scaling (CPU) ---
-        scaling = {str(n): {} for n in args.scaling_sizes}
-        for n in args.scaling_sizes:
-            for R in args.scaling_ranks:
-                res = run("cpu", n, args.maxiter, R)
-                if res is None:
-                    continue
-                scaling[str(n)][str(R)] = res
-                sys.stderr.write(f"  scaling {n}^3 ranks={R}: "
-                                 f"{res['secs']:.3f} s, "
-                                 f"{res['gbps']:.1f} GB/s\n")
+    rows = db.select(db.load(args.db), BENCHMARK, select_ts)
+    if not rows:
+        sys.exit("No matching rows in the database.")
 
-        # JSON keys must be strings; remap merged size keys.
-        if args.json_out:
-            blob = {
-                "merged": {k: {str(n): v for n, v in d.items()}
-                           for k, d in merged.items()},
-                "scaling": scaling,
-            }
-            with open(args.json_out, "w") as fh:
-                json.dump(blob, fh, indent=2)
+    meta = {k: rows[0][k] for k in ("cpu", "gpu", "version", "timestamp")}
+    meta["maxiter"] = next((r["maxiter"] for r in rows
+                            if r["study"] == "time_vs_size"), args.maxiter)
+    configs = db.render_configs(rows, "time_vs_size")
+    merged = merged_from_rows(rows)
+    scaling = scaling_from_rows(rows)
+    ncores = next((r["nranks"] for r in rows if r["label"] == "cpuN"),
+                  args.mpi_cpu_ranks)
+    multi_gpu = any(r["label"] == "gpuN" for r in rows)
 
-    # from-json stores size keys as strings; normalise back to int.
-    merged = {k: {int(n): v for n, v in d.items()} for k, d in merged.items()}
-
-    table = table_markdown(args.sizes, configs, merged)
-    scaling_tables = scaling_tables_markdown(
-        args.scaling_sizes, args.scaling_ranks, scaling)
-    print("\n" + table + "\n\n(values are solve time in seconds)\n")
-    print(scaling_tables)
+    sizes = sizes_in(rows, "time_vs_size")
+    table = table_markdown(sizes, configs, merged)
+    scaling_ranks = sorted({int(r["nranks"]) for r in rows
+                            if r["study"] == "mpi_scaling"})
+    scaling_tables = scaling_tables_markdown(scaling, scaling_ranks)
+    print("\n" + table + "\n\n" + scaling_tables)
 
     plot_out = os.path.abspath(args.plot_out)
     scaling_plot_out = os.path.abspath(args.scaling_plot_out)
-    make_merged_plot(args.sizes, configs, merged, plot_out)
-    make_scaling_plot(args.scaling_sizes, args.scaling_ranks, scaling,
-                      scaling_plot_out)
+    make_merged_plot(configs, merged, plot_out)
+    make_scaling_plot(scaling, scaling_plot_out)
     sys.stderr.write(f"wrote {plot_out}\nwrote {scaling_plot_out}\n")
 
     if args.doc_out:
         write_doc_page(args.doc_out, plot_out, scaling_plot_out, table,
-                       scaling_tables, args.maxiter, ncores, nb_gpus)
+                       scaling_tables, meta, ncores, multi_gpu)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
 

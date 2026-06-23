@@ -2,89 +2,55 @@
 """Preconditioner benchmark for the homogenization example (3D by default).
 
 Two studies on the FEM elasticity [homogenization example](examples.md), both
-with the **same fused matvec kernel** and run **to convergence** (relative
+with the **same fused matvec kernel**, run **to convergence** (relative
 tolerance), `-P reference` (Ladecký et al., 2023 Green's-function preconditioner)
 vs. `-P none`:
 
-1. **CG iterations vs. grid size** — unpreconditioned vs. reference. The
-   iteration count is device- and decomposition-independent, so this runs on one
-   CPU core. It is the central result: the preconditioner makes the count nearly
-   grid-independent.
+1. **CG iterations vs. grid size** — unpreconditioned vs. reference. Device- and
+   decomposition-independent, so it runs on one CPU core. The central result:
+   the preconditioner makes the count nearly grid-independent.
 2. **Reference-solve time vs. grid size, by device / MPI config** — the *same*
    CPU-1-core / full-machine-MPI-CPU / GPU variation as the (unpreconditioned)
    [homogenization benchmark](benchmark_homogenization.md). The reference
    preconditioner applies a forward/inverse FFT every iteration, so this is where
-   the FFT-engine paths show up: the native cuFFT/rocFFT N-D transform on the
-   GPU, and the slab MPI decomposition on multi-rank runs. A *GPU (N devices,
-   MPI)* curve is added automatically on a multi-GPU host (one rank per GPU,
-   round-robin).
+   the FFT-engine paths show up (native cuFFT/rocFFT N-D transform on the GPU,
+   slab MPI decomposition on multi-rank runs). A *GPU (N devices, MPI)* curve is
+   added automatically on a multi-GPU host (one rank per GPU, round-robin).
 
-Every data point runs `homogenization.py` as a subprocess (under `mpiexec` for
-the MPI configs) and parses its `--json` output.
+Data collection and page generation are separate: a run executes
+`homogenization.py` per data point (under `mpiexec` for the MPI configs) and
+**appends** results — with date, code version, and machine — to the shared
+benchmark database (`benchmarks/results.csv`, see `examples/benchmark_db.py`).
+Tables and plots are rendered *from the database*.
 
-Example
--------
+Examples
+--------
     python examples/benchmark_homogenization_preconditioner.py \
         --doc-out docs/benchmark_homogenization_preconditioner.md
 
-Needs an MPI-enabled (and, for the GPU curves, GPU-enabled) muGrid build and
-`mpi4py`. Use `--from-json results.json` to re-render without recomputing.
+    # re-render from the latest run in the DB, no recompute:
+    python examples/benchmark_homogenization_preconditioner.py --render-only \
+        --doc-out docs/benchmark_homogenization_preconditioner.md
 """
 
 import argparse
-import json
 import os
-import platform
 import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import benchmark_db as db  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOMOG = os.path.join(HERE, "homogenization.py")
-
-
-# --------------------------------------------------------------------------- #
-# Machine detection
-# --------------------------------------------------------------------------- #
-def detect_cpu():
-    model = platform.processor() or "unknown CPU"
-    try:
-        with open("/proc/cpuinfo") as fh:
-            for line in fh:
-                if line.startswith("model name"):
-                    model = line.split(":", 1)[1].strip()
-                    break
-    except OSError:
-        pass
-    return f"{model} ({os.cpu_count()} logical cores)"
-
-
-def detect_gpu():
-    """(human-readable description, device count)."""
-    try:
-        out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=30)
-        names = [n.strip() for n in out.stdout.splitlines() if n.strip()]
-    except (OSError, subprocess.SubprocessError):
-        names = []
-    if not names:
-        return "no NVIDIA GPU detected", 0
-    uniq = sorted(set(names))
-    label = (f"{len(names)}x {uniq[0]}" if len(names) > 1 and len(uniq) == 1
-             else ", ".join(names))
-    return label, len(names)
+BENCHMARK = "homogenization_preconditioner"
 
 
 # --------------------------------------------------------------------------- #
 # Running homogenization.py
 # --------------------------------------------------------------------------- #
 def run(device, precond, n, dim, maxiter, tol, nranks=1):
-    """One homogenization solve; dict of metrics or None.
-
-    nranks > 1 launches under ``mpiexec`` (one rank per core for CPU; the example
-    binds ranks to GPUs round-robin for GPU runs).
-    """
     grid = ",".join([str(n)] * dim)
     base = [HOMOG, "-n", grid, "-d", device, "-k", "fused", "-P", precond,
             "-i", str(maxiter), "--tol", str(tol), "--inclusion-type", "single",
@@ -105,84 +71,128 @@ def run(device, precond, n, dim, maxiter, tol, nranks=1):
         sys.stderr.write(f"  [{device} {precond} n={n} ranks={nranks}] no JSON\n"
                          f"{out.stderr[-400:]}\n")
         return None
+    import json
     try:
         d = json.loads(m.group(0))
     except json.JSONDecodeError:
         return None
     r, c = d["results"], d["config"]
     return dict(npts=c["nb_grid_pts_total"], iters=r["total_cg_iterations"],
-                secs=r["total_time_seconds"], E=r.get("E_effective_approx"))
+                secs=r["total_time_seconds"])
 
 
+def collect(args, prov):
+    """Run both studies; return DB rows (does not write)."""
+    _, nb_gpus = db.detect_gpu()
+    want_gpu = not args.no_gpu and nb_gpus >= 1
+    configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
+    rows = []
+    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim)
+
+    # Study 1: iterations (none vs reference), serial CPU.
+    for n in args.iter_sizes:
+        for P in ("none", "reference"):
+            r = run("cpu", P, n, args.dim, args.maxiter, args.tol)
+            if r is None:
+                sys.stderr.write(f"  iter {P} {n}^{args.dim}: skipped\n")
+                continue
+            rows.append({**prov, **common, "benchmark": BENCHMARK,
+                         "study": "iterations", "label": P, "device": "cpu",
+                         "nranks": 1, "n": n, "npts": r["npts"], "precond": P,
+                         "iters": r["iters"], "secs": r["secs"]})
+            sys.stderr.write(f"  iter {P:9s} {n}^{args.dim} ({r['npts']} pts): "
+                             f"{r['iters']:5d} it, {r['secs']:.3f} s\n")
+
+    # Study 2: reference-solve time across device/MPI configs.
+    for n in args.sizes:
+        for key, device, nranks in configs:
+            r = run(device, "reference", n, args.dim, args.maxiter, args.tol,
+                    nranks)
+            label = db.CONFIG_META[key]["label"](nranks)
+            if r is None:
+                sys.stderr.write(f"  time {label} {n}^{args.dim}: skipped\n")
+                continue
+            rows.append({**prov, **common, "benchmark": BENCHMARK,
+                         "study": "reference_timing", "label": key,
+                         "device": device, "nranks": nranks, "n": n,
+                         "npts": r["npts"], "precond": "reference",
+                         "iters": r["iters"], "secs": r["secs"]})
+            sys.stderr.write(f"  time {label} {n}^{args.dim} ({r['npts']} pts): "
+                             f"{r['iters']} it, {r['secs']:.3f} s\n")
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Re-shaping DB rows for rendering
+# --------------------------------------------------------------------------- #
 def fmt_points(npts):
     if npts >= 1e6:
         return f"{npts / 1e6:.1f}M"
     if npts >= 1e3:
         return f"{npts / 1e3:.0f}k"
-    return str(npts)
+    return str(int(npts))
 
 
 def sup(dim):
     return "²" if dim == 2 else "³"
 
 
-# --------------------------------------------------------------------------- #
-# Device / MPI configurations for the reference-solve timing study
-# --------------------------------------------------------------------------- #
-def build_configs(ncores, nb_gpus, want_gpu):
-    """Ordered list: (key, label, device, nranks, style) — mirrors the main
-    homogenization benchmark."""
-    cfgs = [
-        ("cpu1", "CPU (1 core)", "cpu", 1, dict(marker="o", color="#5e35b1")),
-        ("cpuN", f"CPU ({ncores} cores, MPI)", "cpu", ncores,
-         dict(marker="D", color="#3949ab")),
-    ]
-    if want_gpu and nb_gpus >= 1:
-        cfgs.append(("gpu1", "GPU (1 device)", "gpu", 1,
-                     dict(marker="s", color="#00897b")))
-    if want_gpu and nb_gpus > 1:
-        cfgs.append(("gpuN", f"GPU ({nb_gpus} devices, MPI)", "gpu", nb_gpus,
-                     dict(marker="^", color="#f4511e")))
-    return cfgs
+def iters_from_rows(rows):
+    """{precond: {n: row}} from the iterations study."""
+    d = {}
+    for r in rows:
+        if r["study"] == "iterations":
+            d.setdefault(r["label"], {})[r["n"]] = r
+    return d
+
+
+def timing_from_rows(rows):
+    """{config_key: {n: row}} from the reference_timing study."""
+    d = {}
+    for r in rows:
+        if r["study"] == "reference_timing":
+            d.setdefault(r["label"], {})[r["n"]] = r
+    return d
+
+
+def sizes_in(rows, study):
+    return sorted({r["n"] for r in rows if r["study"] == study})
 
 
 # --------------------------------------------------------------------------- #
 # Tables
 # --------------------------------------------------------------------------- #
-def iteration_table(sizes, iters_res, dim):
-    """CG iterations vs grid size: none vs reference (device-independent)."""
-    cols = [n for n in sizes if ("none", n) in iters_res]
+def iteration_table(sizes, iters, dim):
+    cols = [n for n in sizes if n in iters.get("none", {})]
     head = "| Preconditioner | " + " | ".join(
         f"{n}{sup(dim)} ({fmt_points(n ** dim)})" for n in cols) + " |"
     lines = [head, "|" + "---|" * (len(cols) + 1)]
     for P in ("none", "reference"):
         cells = " | ".join(
-            (str(iters_res[(P, n)]["iters"]) if (P, n) in iters_res else "—")
+            (str(iters[P][n]["iters"]) if n in iters.get(P, {}) else "—")
             for n in cols)
         lines.append(f"| {P} | {cells} |")
-    # Wall-time speedup (none / reference) on the single CPU core.
     cells = []
     for n in cols:
-        a, b = iters_res.get(("none", n)), iters_res.get(("reference", n))
+        a = iters.get("none", {}).get(n)
+        b = iters.get("reference", {}).get(n)
         cells.append(f"{a['secs'] / b['secs']:.0f}×" if a and b else "—")
     lines.append("| **CPU-core wall-time speedup** | " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
 
-def timing_table(sizes, configs, time_res, dim):
-    """Reference-solve time (s): rows = config, columns = grid size."""
-    cols = [n for n in sizes
-            if any((key, n) in time_res for key, *_ in configs)]
+def timing_table(sizes, configs, timing, dim):
+    cols = [n for n in sizes if any(n in timing.get(k, {}) for k, *_ in configs)]
     head = ("| Configuration | "
             + " | ".join(f"{n}{sup(dim)} ({fmt_points(n ** dim)})" for n in cols)
             + " |")
     lines = [head, "|" + "---|" * (len(cols) + 1)]
-    for key, label, *_ in configs:
-        if not any((key, n) in time_res for n in cols):
+    for key, label, _style in configs:
+        res = timing.get(key)
+        if not res:
             continue
         cells = " | ".join(
-            (f"{time_res[(key, n)]['secs']:.3g}" if (key, n) in time_res else "—")
-            for n in cols)
+            (f"{res[n]['secs']:.3g}" if n in res else "—") for n in cols)
         lines.append(f"| {label} | {cells} |")
     return "\n".join(lines)
 
@@ -190,7 +200,7 @@ def timing_table(sizes, configs, time_res, dim):
 # --------------------------------------------------------------------------- #
 # Plots
 # --------------------------------------------------------------------------- #
-def make_iter_plot(sizes, iters_res, dim, path):
+def make_iter_plot(iters, dim, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -201,10 +211,9 @@ def make_iter_plot(sizes, iters_res, dim, path):
                           label="unpreconditioned")),
             ("reference", dict(marker="s", color="#00897b",
                                label="reference preconditioner"))):
-        p = sorted((n ** dim, iters_res[(P, n)]["iters"])
-                   for n in sizes if (P, n) in iters_res)
-        if p:
-            xs, ys = zip(*p)
+        pts = sorted((n ** dim, r["iters"]) for n, r in iters.get(P, {}).items())
+        if pts:
+            xs, ys = zip(*pts)
             ax.loglog(xs, ys, **sty)
     ax.set_xlabel("Number of grid points")
     ax.set_ylabel("CG iterations to converge")
@@ -216,18 +225,17 @@ def make_iter_plot(sizes, iters_res, dim, path):
     plt.close(fig)
 
 
-def make_timing_plot(sizes, configs, time_res, dim, path):
+def make_timing_plot(configs, timing, dim, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
-    for key, label, _dev, _nr, style in configs:
-        p = sorted((n ** dim, time_res[(key, n)]["secs"])
-                   for n in sizes if (key, n) in time_res)
-        if not p:
+    for key, label, style in configs:
+        pts = sorted((n ** dim, r["secs"]) for n, r in timing.get(key, {}).items())
+        if not pts:
             continue
-        xs, ys = zip(*p)
+        xs, ys = zip(*pts)
         ax.loglog(xs, ys, label=label, **style)
     ax.set_xlabel("Number of grid points")
     ax.set_ylabel("Reference-preconditioned solve time (s)")
@@ -250,9 +258,10 @@ al., Appl. Math. Comput. 446 (2023) 127835, on the [homogenization
 example](examples.md) — `-P reference` vs. `-P none`. Both use the **same fused
 matvec kernel** and are run **to convergence** (relative tolerance `{tol}`).
 
-!!! info "Test machine"
+!!! info "Test machine & code version"
     - **CPU:** {cpu}
     - **GPU:** {gpu}
+    - **muGrid:** `{version}` — run {timestamp}
 
 Run configuration: {dim}D, single spherical inclusion, fused stiffness kernel,
 {ncases} load cases (iterations summed over all cases).
@@ -276,8 +285,8 @@ single CPU core.
 This mirrors the (unpreconditioned) [homogenization
 benchmark](benchmark_homogenization.md), but for the **reference-preconditioned**
 solve: the same single-CPU-core / full-machine-MPI-CPU / GPU comparison, across
-3D grid sizes. Because the iteration count is grid-independent, this isolates the
-**per-iteration** cost — and each preconditioned iteration applies a
+{dim}D grid sizes. Because the iteration count is grid-independent, this isolates
+the **per-iteration** cost — and each preconditioned iteration applies a
 forward/inverse **FFT pair**, so it is where the FFT-engine paths matter: the
 native cuFFT N-D transform on the GPU, and the slab MPI decomposition on
 multi-rank runs.
@@ -305,12 +314,13 @@ apply, shifted toward the CPU by the extra per-iteration FFT.
     `mpiexec -n <#GPUs> python homogenization.py -d gpu -P reference` runs one
     rank per GPU and the FFT preconditioner is applied in the engine's GPU MPI
     decomposition. This benchmark adds a *GPU (N devices, MPI)* curve
-    automatically when more than one GPU is present. **This machine has a single
-    GPU**, so only the single-GPU curve is shown; the script needs no changes on
-    a multi-GPU host.
+    automatically when more than one GPU is present. **{gpu_count_note}**
 
-This page is generated by `examples/benchmark_homogenization_preconditioner.py`
-(MPI-enabled build + `mpi4py`, GPU build for the GPU curves):
+All data points live in the shared benchmark database `benchmarks/results.csv`
+(date, code version, machine, parameters, results). This page is generated by
+`examples/benchmark_homogenization_preconditioner.py`; re-render from the
+database with `--render-only`, or run a fresh measurement that appends a new
+dated row set:
 
 ```bash
 python examples/benchmark_homogenization_preconditioner.py \\
@@ -319,13 +329,19 @@ python examples/benchmark_homogenization_preconditioner.py \\
 """
 
 
-def write_doc_page(args, configs, nb_gpus, iter_table, timing_table,
-                   iter_plot, timing_plot):
-    gpu, _ = detect_gpu()
-    with open(args.doc_out, "w") as fh:
+def write_doc_page(path, meta, dim, tol, ncases, multi_gpu, iter_table,
+                   timing_table, iter_plot, timing_plot):
+    if multi_gpu:
+        gpu_count_note = "Runs with more than one GPU show the multi-GPU curve."
+    else:
+        gpu_count_note = ("This run used a single GPU, so only the single-GPU "
+                          "curve is shown; the script needs no changes on a "
+                          "multi-GPU host.")
+    with open(path, "w") as fh:
         fh.write(DOC_TEMPLATE.format(
-            cpu=detect_cpu(), gpu=gpu, dim=args.dim, tol=args.tol,
-            ncases=3 if args.dim == 2 else 6,
+            cpu=meta["cpu"], gpu=meta["gpu"], version=meta["version"],
+            timestamp=meta["timestamp"], dim=dim, tol=tol, ncases=ncases,
+            gpu_count_note=gpu_count_note,
             iter_table=iter_table, timing_table=timing_table,
             iter_plot=os.path.basename(iter_plot),
             timing_plot=os.path.basename(timing_plot)))
@@ -344,16 +360,16 @@ def main():
                     help="Grid sizes for the reference-solve timing study")
     ap.add_argument("--iter-sizes", type=int, nargs="+",
                     default=[16, 24, 32, 48],
-                    help="Grid sizes for the none-vs-reference iteration study "
-                         "(kept modest: unpreconditioned 3D is expensive)")
-    ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count(),
-                    help="Ranks for the full-machine MPI CPU curve")
+                    help="Grid sizes for the none-vs-reference iteration study")
+    ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count())
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
     ap.add_argument("--maxiter", type=int, default=20000)
     ap.add_argument("--tol", type=float, default=1e-6)
-    ap.add_argument("--from-json", default=None,
-                    help="Render the page from a saved results JSON")
-    ap.add_argument("--json-out", default=None)
+    ap.add_argument("--render-only", action="store_true",
+                    help="Skip running; render from the database")
+    ap.add_argument("--timestamp", default=None,
+                    help="Render this run (timestamp prefix / date)")
+    ap.add_argument("--db", default=db.DB_PATH, help="Benchmark CSV path")
     ap.add_argument("--doc-out", default=None)
     ap.add_argument("--iter-plot", default=os.path.join(
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_iters.png"))
@@ -361,71 +377,43 @@ def main():
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_time.png"))
     args = ap.parse_args()
 
-    _, nb_gpus = detect_gpu()
-    want_gpu = not args.no_gpu and nb_gpus >= 1
-    ncores = args.mpi_cpu_ranks
-    configs = build_configs(ncores, nb_gpus, want_gpu)
-
-    if args.from_json:
-        with open(args.from_json) as fh:
-            blob = json.load(fh)
-        # Keys are "precond|n" (iterations) and "configkey|n" (timing).
-        iters_res = {(k.rsplit("|", 1)[0], int(k.rsplit("|", 1)[1])): v
-                     for k, v in blob["iters"].items()}
-        time_res = {(k.rsplit("|", 1)[0], int(k.rsplit("|", 1)[1])): v
-                    for k, v in blob["time"].items()}
+    if not args.render_only:
+        prov = db.run_provenance()
+        rows = collect(args, prov)
+        if not rows:
+            sys.exit("No successful runs — nothing to record.")
+        db.append_rows(rows, args.db)
+        sys.stderr.write(f"appended {len(rows)} rows to {args.db}\n")
+        select_ts = prov["timestamp"]
     else:
-        # Study 1: iterations (none vs reference), serial CPU.
-        iters_res = {}
-        for n in args.iter_sizes:
-            for P in ("none", "reference"):
-                r = run("cpu", P, n, args.dim, args.maxiter, args.tol)
-                if r is None:
-                    sys.stderr.write(f"  iter {P} {n}^{args.dim}: skipped\n")
-                    continue
-                iters_res[(P, n)] = r
-                sys.stderr.write(f"  iter {P:9s} {n}^{args.dim} "
-                                 f"({r['npts']} pts): {r['iters']:5d} it, "
-                                 f"{r['secs']:.3f} s\n")
+        select_ts = args.timestamp
 
-        # Study 2: reference-solve time across device/MPI configs.
-        time_res = {}
-        for n in args.sizes:
-            for key, label, device, nranks, _style in configs:
-                r = run(device, "reference", n, args.dim, args.maxiter,
-                        args.tol, nranks)
-                if r is None:
-                    sys.stderr.write(f"  time {label} {n}^{args.dim}: "
-                                     f"skipped\n")
-                    continue
-                time_res[(key, n)] = r
-                sys.stderr.write(f"  time {label} {n}^{args.dim} "
-                                 f"({r['npts']} pts): {r['iters']} it, "
-                                 f"{r['secs']:.3f} s\n")
+    rows = db.select(db.load(args.db), BENCHMARK, select_ts)
+    if not rows:
+        sys.exit("No matching rows in the database.")
 
-        if args.json_out:
-            blob = {
-                "iters": {f"{P}|{n}": v for (P, n), v in iters_res.items()},
-                "time": {f"{k}|{n}": v for (k, n), v in time_res.items()},
-            }
-            with open(args.json_out, "w") as fh:
-                json.dump(blob, fh, indent=2)
+    meta = {k: rows[0][k] for k in ("cpu", "gpu", "version", "timestamp")}
+    dim = next((r["dim"] for r in rows), args.dim)
+    tol = next((r["tol"] for r in rows if r["study"] == "iterations"), args.tol)
+    configs = db.render_configs(rows, "reference_timing")
+    iters = iters_from_rows(rows)
+    timing = timing_from_rows(rows)
+    multi_gpu = any(r["label"] == "gpuN" for r in rows)
 
-    if not iters_res and not time_res:
-        sys.exit("No successful runs.")
-
-    it_tab = iteration_table(args.iter_sizes, iters_res, args.dim)
-    t_tab = timing_table(args.sizes, configs, time_res, args.dim)
+    it_tab = iteration_table(sizes_in(rows, "iterations"), iters, dim)
+    t_tab = timing_table(sizes_in(rows, "reference_timing"), configs, timing,
+                         dim)
     print("\n" + it_tab + "\n\n" + t_tab)
 
     iters_path = os.path.abspath(args.iter_plot)
     time_path = os.path.abspath(args.time_plot)
-    make_iter_plot(args.iter_sizes, iters_res, args.dim, iters_path)
-    make_timing_plot(args.sizes, configs, time_res, args.dim, time_path)
+    make_iter_plot(iters, dim, iters_path)
+    make_timing_plot(configs, timing, dim, time_path)
     sys.stderr.write(f"wrote {iters_path}\nwrote {time_path}\n")
 
     if args.doc_out:
-        write_doc_page(args, configs, nb_gpus, it_tab, t_tab,
+        write_doc_page(args.doc_out, meta, dim, tol,
+                       3 if dim == 2 else 6, multi_gpu, it_tab, t_tab,
                        iters_path, time_path)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
