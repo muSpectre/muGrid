@@ -14,8 +14,8 @@ with MPI parallelization and GPU acceleration.
 - **Domain decomposition.** Cartesian decomposition with ghost-cell
   communication for stencil operations, parallelised with MPI.
 - **FFT engine.** A built-in FFT using [PocketFFT](https://github.com/mreineck/pocketfft)
-  on the CPU, with MPI-parallel pencil decomposition, and a cuFFT/hipFFT
-  backend on the GPU.
+  on the CPU and native cuFFT/rocFFT N-D transforms on the GPU, with
+  MPI-parallel slab or pencil decomposition (auto-selected).
 - **Operators.** Discrete differential operators — convolution stencils, a
   hard-coded Laplacian, and FEM gradient operators for spectral methods.
 - **Linear algebra.** Ghost-aware reductions and vector updates (`vecdot`,

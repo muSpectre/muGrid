@@ -26,6 +26,15 @@ cmake -DMUGRID_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="70;80;90" ..
 cmake -DMUGRID_ENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES="gfx906;gfx90a" ..
 ```
 
+!!! warning "Match the architecture to your device"
+    The architecture list must include your device's compute capability, or use
+    `-DCMAKE_CUDA_ARCHITECTURES=native` to target the build host's GPU. A binary
+    built only for an architecture the device cannot run **raises a
+    `RuntimeError` on the first kernel launch**: µGrid checks every launch, so a
+    mismatch fails loudly rather than leaving hand-written kernels as silent
+    no-ops (which previously let runtime-API calls keep working and reductions
+    silently return zero).
+
 ## Installing CuPy
 
 To work with GPU fields from Python, you need to install [CuPy](https://cupy.dev/).
@@ -219,16 +228,27 @@ between the NVIDIA (CUDA/cuFFT) and AMD (ROCm/rocFFT) backends.
 
 ### NVIDIA GPUs (cuFFT)
 
-On NVIDIA GPUs, µGrid uses the cuFFT library. cuFFT has a **documented limitation**:
+On NVIDIA GPUs µGrid uses the cuFFT library and issues **whole multidimensional
+transforms** natively (`cufftPlanMany`): a serial 2D or 3D real-to-complex /
+complex-to-real transform is planned and executed in a single call rather than
+driven axis by axis with a work buffer and per-plane loops. This brings the
+serial 3D GPU FFT to within ~10 % of raw cuFFT.
+
+cuFFT has one **documented restriction** —
 
 > *"Strides on the real part of real-to-complex and complex-to-real transforms
 > are not supported."*
 
-µGrid arranges its transform work buffers so that the real-to-complex and
-complex-to-real passes always operate with unit stride (the real-space ghost
-buffers are padded accordingly), so 2D and 3D transforms — serial and
-MPI-parallel — run on cuFFT. The MPI FFT test suite exercises these paths on
-the GPU.
+— so µGrid lays out its buffers with the real (innermost) axis at unit stride
+(the real-space ghost buffers are padded accordingly). With that arrangement:
+
+- **Serial** 2D and 3D transforms run as a single planned N-D cuFFT transform.
+- **MPI-parallel** transforms also run on cuFFT. In a *slab* decomposition the
+  two locally complete axes are transformed together as one planned 2D transform
+  (per component, batched over the local planes); a *pencil* decomposition
+  transforms one axis at a time between transposes (see [FFT](fft.md)).
+
+The MPI FFT test suite exercises these paths on the GPU.
 
 ### AMD GPUs (rocFFT)
 
@@ -243,29 +263,24 @@ arbitrary strides for all transform types including R2C and C2R.
     The rocFFT backend is a new implementation and may require testing on your
     specific ROCm installation. Please report any issues.
 
-### Example: GPU FFT with fallback
+### Example: GPU FFT
 
-For code that needs to handle both 2D and 3D cases on GPU:
+Creating a GPU FFT engine is the same for any dimension — 2D and 3D both run
+natively on cuFFT / rocFFT, serial or MPI-parallel:
 
 ```python
 import muGrid
 
-nb_grid_pts = [64, 64, 64]  # 3D grid
-dim = len(nb_grid_pts)
-
-# Determine device based on dimension and GPU availability
-if dim == 3 and muGrid.has_cuda and not muGrid.has_rocm:
-    # 3D on CUDA: must use CPU for FFT due to cuFFT limitation
-    print("Warning: Using CPU for 3D FFT (cuFFT stride limitation)")
-    device = "cpu"
-elif muGrid.has_gpu:
-    device = "gpu"
-else:
-    device = "cpu"
-
-# Create FFT engine
+nb_grid_pts = [64, 64, 64]  # 2D or 3D — both run on the GPU
+device = "gpu" if muGrid.has_gpu else "cpu"
 engine = muGrid.FFTEngine(nb_grid_pts, device=device)
 ```
+
+!!! note "No more 3D CPU fallback"
+    Earlier releases routed 3D transforms on CUDA back to the CPU because the
+    FFT was driven axis by axis and could not satisfy cuFFT's unit-stride
+    requirement on the real axis. µGrid now issues whole N-D transforms, so 3D
+    runs natively on cuFFT; no dimension-dependent fallback is needed.
 
 ## GPU data and MPI
 

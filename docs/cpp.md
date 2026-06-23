@@ -197,9 +197,9 @@ See the Doxygen reference for the member-level API.
 
 ## FFT engine
 
-Distributed FFT operations use a pencil decomposition. See [fft.md](fft.md) for
-the conceptual overview and [linalg.md](linalg.md) for the linear-algebra
-context.
+Distributed FFT operations use an auto-selected slab or pencil decomposition.
+See [fft.md](fft.md) for the conceptual overview and [linalg.md](linalg.md) for
+the linear-algebra context.
 
 - `muGrid::FFTEngineBase` — abstract interface to an FFT engine.
 - `muGrid::FFTEngine` — concrete engine performing forward/inverse transforms on

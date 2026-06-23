@@ -111,6 +111,14 @@ conjugate_gradients(
 print(f"Solution range: [{solution.p.min():.6f}, {solution.p.max():.6f}]")
 ```
 
+`muGrid.Solvers` also provides `conjugate_gradients_pipelined`, a drop-in
+pipelined (Ghysels–Vanroose) variant with the same signature. It fuses the three
+per-iteration inner products into a single, *non-blocking* global reduction that
+is overlapped with the operator and preconditioner applies, hiding the
+allreduce latency on many-rank runs. The extra vector work makes it a small net
+loss on a single node, so it is opt-in; prefer it when the global reduction is on
+the critical path (high rank counts across a network).
+
 ### Complete Poisson solver
 
 Here is the complete, minimal Poisson solver (`examples/poisson.py`):
@@ -170,10 +178,17 @@ this contract:
   constant diagonal it merely rescales the system and does not change the
   iteration). The diagonal may be spatial-only (shared across field components)
   or per-component;
-- `FourierPreconditioner(engine, kernel)` — applies a spectral kernel,
+- `FourierPreconditioner(engine, kernel)` — applies a *scalar* spectral kernel,
   `z = F⁻¹[k(q) · F r]`, using a muGrid `FFTEngine`. With the inverse symbol of
   (an approximation to) the operator as the kernel, this is the classic FFT
-  preconditioner.
+  preconditioner;
+- `BlockFourierPreconditioner(engine, blocks)` — the matrix-valued generalization,
+  applying a per-Fourier-mode `n×n` block inverse (for vector/tensor unknowns).
+  `make_reference_stiffness_preconditioner(...)` builds one from a homogeneous
+  reference stiffness — the reference-material (Green's-function) preconditioner
+  of Ladecký et al. (2023) used by the homogenization example (`-P reference`),
+  which makes the CG iteration count nearly independent of grid size (see the
+  [preconditioner benchmark](benchmark_homogenization_preconditioner.md)).
 
 #### Spectral (FFT) preconditioning of the Poisson problem
 
@@ -186,7 +201,7 @@ still yields mesh-independent iteration counts.
 
 One detail is essential for MPI runs: the solver fields and the FFT must share a
 single domain decomposition. A stand-alone `CartesianDecomposition` would in
-general split the domain differently than the FFT's pencil decomposition. Since
+general split the domain differently than the FFT's own decomposition. Since
 the `FFTEngine` *is* a `CartesianDecomposition` (it supports ghost buffers in
 real space), the engine itself serves as the decomposition for everything — the
 stencil operator, the solver work fields, and the transforms:

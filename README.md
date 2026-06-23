@@ -14,7 +14,8 @@ with support for MPI parallelization and GPU acceleration.
 - **Linear operators**: Discrete differential operators including Laplacian
   and FEM gradient operators for spectral methods
 - **FFT engine**: Built-in Fast Fourier Transform with MPI-parallel support
-  using pencil decomposition
+  (auto-selected slab or pencil decomposition) and native cuFFT/rocFFT N-D
+  transforms on the GPU
 - **GPU support**: Optional CUDA and HIP backends for GPU-accelerated computation
 - **NetCDF I/O**: Serial and parallel file I/O for checkpointing and analysis
 

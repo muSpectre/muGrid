@@ -6,8 +6,9 @@ FFT engine and the discrete differential operators.
 ## FFT Engine Design
 
 The FFT engine provides distributed Fast Fourier Transform operations on
-structured grids with MPI parallelization. It uses pencil decomposition for
-efficient scaling to large numbers of MPI ranks.
+structured grids with MPI parallelization. It supports both slab and pencil
+decomposition (auto-selected): a faster single-transpose slab path, falling back
+to pencil for scaling to large numbers of MPI ranks.
 
 ### Storage Order
 
@@ -71,11 +72,17 @@ order conversions, µGrid uses the same SoA approach on AMD GPUs.
 
 ### MPI Parallel FFT Design
 
-For 3D distributed FFT the engine uses **pencil decomposition**:
+For 3D distributed FFT in a **pencil decomposition** the engine transforms one
+axis at a time between two transposes:
 
 1. **Z-pencil**: data distributed in Y and Z, FFT along X (r2c)
 2. **Y-pencil**: transpose Y↔Z, FFT along Y (c2c)
 3. **X-pencil**: transpose X↔Z, FFT along Z (c2c)
+
+A **slab decomposition** (a single distributed axis, the default when
+`num_ranks ≤ Nz`) keeps X and Y local, so it transforms those two axes with one
+planned N-D transform and needs only the Y↔Z transpose — one transpose instead of
+two.
 
 The `Transpose` class handles the MPI all-to-all communication that
 redistributes data between pencil orientations.

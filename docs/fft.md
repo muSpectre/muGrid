@@ -323,8 +323,11 @@ engine.ifft(velocity_hat, velocity)
 
 ## MPI-parallel FFT
 
-The `FFTEngine` class supports MPI parallelization using pencil (2D)
-decomposition, which allows efficient scaling to large numbers of ranks.
+The `FFTEngine` class supports MPI parallelization in 2D and 3D. The grid is
+split across the ranks either as a **slab** (one distributed axis) or a **pencil**
+(a 2D process grid), selected with the `decomposition` argument (see
+[Choosing the decomposition](#choosing-the-decomposition) below); the default
+picks one automatically.
 
 ### Basic parallel usage
 
@@ -347,8 +350,32 @@ print(f"  Process grid: {engine.process_grid}")
 print(f"  Process coords: {engine.process_coords}")
 ```
 
-The engine uses pencil decomposition, distributing the grid across a 2D process
-grid for efficient scaling.
+### Choosing the decomposition
+
+The `decomposition` argument selects how the grid is distributed:
+
+```python
+engine = muGrid.FFTEngine(nb_grid_pts, comm, decomposition="auto")
+```
+
+- `"slab"` — split only the last axis (process grid `P1 × 1`). Each rank holds
+  full `X` and `Y` planes, so the forward and inverse transforms do the two local
+  axes as **one planned N-D transform** and need only a single `Y↔Z` transpose
+  (instead of two). This is faster — markedly so on the GPU, where it avoids a
+  transpose round trip through device memory — but cannot use more ranks than the
+  last grid dimension (`num_ranks ≤ Nz`).
+- `"pencil"` — split two axes over a balanced 2D process grid. It transforms one
+  axis at a time between two transposes, so it scales to many more ranks than slab
+  but moves more data.
+- `"auto"` (default) — use slab when it fits (`num_ranks ≤ Nz`) and fall back to
+  pencil otherwise. This gives the faster slab path on typical single-node and
+  moderate-rank runs while still scaling to large rank counts.
+
+The chosen process grid is reported by `engine.process_grid` (`(P1, P2)`; slab
+has `P2 == 1`). The [homogenization preconditioner
+benchmark](benchmark_homogenization_preconditioner.md) exercises the FFT under
+MPI; on the GPU the slab N-D path is several times faster than pencil for the
+same rank count.
 
 ### FFT with ghost regions
 

@@ -383,7 +383,8 @@ apply_increment(displacement, lam, mu, alpha, force)   # force += alpha * K @ u
 ## FFT engine
 
 `FFTEngine` provides distributed FFTs on structured grids, MPI-parallelized with
-pencil decomposition. See [FFT](fft.md) for details.
+an auto-selected slab or pencil decomposition (`decomposition=` argument). See
+[FFT](fft.md) for details.
 
 ### FFTEngine
 
