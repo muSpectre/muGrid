@@ -3,59 +3,77 @@
 Effect of the reference-material (Green's-function) preconditioner of Ladecký et
 al., Appl. Math. Comput. 446 (2023) 127835, on the [homogenization
 example](examples.md) — `-P reference` vs. `-P none`. Both use the **same fused
-matvec kernel** and are run **to convergence** (relative tolerance `1e-06`), so
-the comparison isolates the preconditioner.
+matvec kernel** and are run **to convergence** (relative tolerance `1e-06`).
 
 !!! info "Test machine"
     - **CPU:** Intel(R) Core(TM) Ultra 7 356H (16 logical cores)
     - **GPU:** NVIDIA RTX PRO 500 Blackwell Generation Laptop GPU
 
-Run configuration: 2D, single spherical inclusion, fused stiffness kernel,
-3 load cases (iterations summed over all cases).
+Run configuration: 3D, single spherical inclusion, fused stiffness kernel,
+6 load cases (iterations summed over all cases).
 
 ## CG iterations vs. grid size
 
-This is the central result: unpreconditioned CG iterations grow with the grid
-(the condition number is `O(h⁻²)`), while the reference preconditioner makes the
-count **nearly independent of grid size**. Iterations depend only on the
-operator and preconditioner, not the device.
+The central result: unpreconditioned CG iterations grow with the grid (the
+condition number is `O(h⁻²)`), while the reference preconditioner makes the count
+**nearly independent of grid size**. The count depends only on the operator and
+preconditioner, not the device or the MPI decomposition, so this is measured on a
+single CPU core.
 
-| Preconditioner | 32² (1k) | 64² (4k) | 128² (16k) | 256² (66k) |
+| Preconditioner | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) |
 |---|---|---|---|---|
-| none | 941 | 2007 | 3771 | 7457 |
-| reference | 38 | 41 | 39 | 41 |
+| none | 765 | 1290 | 1593 | 2418 |
+| reference | 105 | 105 | 105 | 102 |
+| **CPU-core wall-time speedup** | 4× | 7× | 9× | 12× |
+
+(last row: unpreconditioned ÷ reference **wall time** on one CPU core)
 
 ![Iterations vs. number of grid points](benchmark_homogenization_preconditioner_iters.png)
 
-## Solve wall time
+## Reference solve: device & MPI scaling
 
-Each preconditioned iteration costs more (a forward/inverse FFT pair plus the
-per-mode block solve), so the wall-time win is smaller than the iteration-count
-ratio — but still large, and it grows with problem size.
+This mirrors the (unpreconditioned) [homogenization
+benchmark](benchmark_homogenization.md), but for the **reference-preconditioned**
+solve: the same single-CPU-core / full-machine-MPI-CPU / GPU comparison, across
+3D grid sizes. Because the iteration count is grid-independent, this isolates the
+**per-iteration** cost — and each preconditioned iteration applies a
+forward/inverse **FFT pair**, so it is where the FFT-engine paths matter: the
+native cuFFT N-D transform on the GPU, and the slab MPI decomposition on
+multi-rank runs.
 
-| Run | 32² | 64² | 128² | 256² |
-|---|---|---|---|---|
-| CPU, none | 0.043 | 0.277 | 2.02 | 14.1 |
-| CPU, reference | 0.00389 | 0.0121 | 0.046 | 0.181 |
-| GPU, none | 0.861 | 1.36 | 2.54 | 6 |
-| GPU, reference | 0.37 | 0.402 | 0.448 | 0.454 |
-| **CPU speedup** | 11.1× | 22.8× | 44.0× | 78.0× |
-| **GPU speedup** | 2.3× | 3.4× | 5.7× | 13.2× |
+| Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) |
+|---|---|---|---|---|---|---|---|
+| CPU (1 core) | 0.133 | 0.446 | 1.09 | 4 | 10.4 | 38.8 | 97.9 |
+| CPU (16 cores, MPI) | 0.0478 | 0.105 | 0.176 | 0.618 | 1.41 | 5.13 | 18.3 |
+| GPU (1 device) | 0.39 | 0.458 | 0.573 | 1.03 | 1.92 | 6.17 | 123 |
 
-(values are **solve time in seconds**; speedup is unpreconditioned ÷
-preconditioned)
+(values are **solve time in seconds**, run to convergence)
 
-![Solve time vs. number of grid points](benchmark_homogenization_preconditioner_time.png)
+![Reference solve time vs. number of grid points](benchmark_homogenization_preconditioner_time.png)
 
-The preconditioner also parallelizes: it is applied in Fourier space by the FFT
-engine, which handles its own MPI decomposition, and the per-mode block solve is
-rank-local. `-P reference` gives identical iteration counts and homogenized
-stiffness in serial and under MPI (verified 1 vs. 4 ranks). On a single GPU the
-per-iteration cost is dominated by the preconditioner FFTs (already C++/cuFFT),
-not Python.
+The preconditioner parallelises cleanly: it is applied in Fourier space by the
+FFT engine, which owns its MPI decomposition, and the per-mode block solve is
+rank-local. `-P reference` gives identical iteration counts and homogenised
+stiffness in serial and under MPI. The single CPU core is quickly left behind;
+here the **full CPU (MPI) is the fastest option across the whole range**, with
+the GPU close behind in the mid-range (~48³–96³). At 128³ the GPU
+hits its memory wall hard — *worse* than the unpreconditioned solve, because the
+preconditioner's FFT work buffers add to an already-tight 6 GB footprint — and
+the full CPU wins by ~7× (18 s vs. 123 s). The same full-CPU-vs-GPU and
+memory-wall trade-offs from the [main benchmark](benchmark_homogenization.md)
+apply, shifted toward the CPU by the extra per-iteration FFT.
 
-This page is generated by `examples/benchmark_homogenization_preconditioner.py`.
-Regenerate it with:
+!!! note "Multi-GPU"
+    `homogenization.py` binds each MPI rank to a distinct GPU (round-robin), so
+    `mpiexec -n <#GPUs> python homogenization.py -d gpu -P reference` runs one
+    rank per GPU and the FFT preconditioner is applied in the engine's GPU MPI
+    decomposition. This benchmark adds a *GPU (N devices, MPI)* curve
+    automatically when more than one GPU is present. **This machine has a single
+    GPU**, so only the single-GPU curve is shown; the script needs no changes on
+    a multi-GPU host.
+
+This page is generated by `examples/benchmark_homogenization_preconditioner.py`
+(MPI-enabled build + `mpi4py`, GPU build for the GPU curves):
 
 ```bash
 python examples/benchmark_homogenization_preconditioner.py \

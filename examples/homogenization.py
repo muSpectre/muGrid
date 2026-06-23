@@ -289,10 +289,20 @@ if args.json:
 # Select array library based on memory location
 if args.device == "cpu":
     import numpy as arr
+
+    device = _devices["cpu"]
 else:
     import cupy as arr
 
-device = _devices[args.device]
+    # Multi-GPU MPI: bind each rank to a distinct GPU (round-robin), so that an
+    # `mpiexec -n N` GPU run spreads ranks across the available devices. With a
+    # single GPU (or a serial run) this selects device 0, matching the previous
+    # behaviour. The cupy default device and the muGrid Device must agree so the
+    # field allocations and the array library land on the same GPU.
+    nb_gpus = arr.cuda.runtime.getDeviceCount()
+    gpu_id = comm.rank % nb_gpus
+    arr.cuda.Device(gpu_id).use()
+    device = muGrid.Device.gpu(gpu_id)
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
