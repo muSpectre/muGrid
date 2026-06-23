@@ -797,6 +797,7 @@ class FFTEngine:
         nb_sub_pts: Optional[SubPtMap] = None,
         device: Optional[Union[DeviceStr, "_muGrid.Device"]] = None,
         ghosts: Any = None,
+        decomposition: str = "auto",
     ) -> None:
         from .Parallel import Communicator as CommFactory
 
@@ -828,6 +829,7 @@ class FFTEngine:
                     list(nb_ghosts_right),
                     nb_sub_pts,
                     device_id,
+                    decomposition,
                 )
             elif hasattr(_muGrid, "FFTEngineROCm"):
                 self._cpp = _muGrid.FFTEngineROCm(
@@ -837,6 +839,7 @@ class FFTEngine:
                     list(nb_ghosts_right),
                     nb_sub_pts,
                     device_id,
+                    decomposition,
                 )
             else:
                 raise RuntimeError(
@@ -851,6 +854,7 @@ class FFTEngine:
                 list(nb_ghosts_left),
                 list(nb_ghosts_right),
                 nb_sub_pts,
+                decomposition,
             )
 
     def fft(self, input_field: Field, output_field: Field) -> None:

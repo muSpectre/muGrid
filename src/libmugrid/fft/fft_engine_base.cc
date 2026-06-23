@@ -47,7 +47,8 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                              const DynGridIndex & nb_ghosts_left,
                              const DynGridIndex & nb_ghosts_right,
                              const SubPtMap_t & nb_sub_pts,
-                             Device device)
+                             Device device,
+                             const std::string & decomposition)
     : Parent_t{comm, nb_domain_grid_pts.get_dim(), nb_sub_pts, device},
       spatial_dim{nb_domain_grid_pts.get_dim()} {
   // Validate dimensions
@@ -55,10 +56,10 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
     throw RuntimeError("FFTEngine supports 1D, 2D, and 3D grids");
   }
 
-  // Set up the process grid for pencil decomposition
+  // Set up the process grid (auto / pencil / slab)
   int num_ranks{comm.size()};
   select_process_grid(num_ranks, nb_domain_grid_pts, this->proc_grid_p1,
-                      this->proc_grid_p2);
+                      this->proc_grid_p2, decomposition);
 
   // Compute this rank's position in the process grid
   // The CartesianDecomposition uses subdivisions [1, P2, P1], which means

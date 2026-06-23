@@ -236,13 +236,22 @@ void add_fft_engine(py::module & mod) {
       >>> engine.ifft(fourier_field, real_field)
       >>> real_field.s[:] *= engine.normalisation
       )")
-      .def(py::init<const DynGridIndex &, const Communicator &, const DynGridIndex &,
-                    const DynGridIndex &, const SubPtMap_t &>(),
+      .def(py::init([](const DynGridIndex & nb_domain_grid_pts,
+                       const Communicator & comm,
+                       const DynGridIndex & nb_ghosts_left,
+                       const DynGridIndex & nb_ghosts_right,
+                       const SubPtMap_t & nb_sub_pts,
+                       const std::string & decomposition) {
+             return new PyFFTEngine(nb_domain_grid_pts, comm, nb_ghosts_left,
+                                    nb_ghosts_right, nb_sub_pts,
+                                    muGrid::Device::cpu(), decomposition);
+           }),
            "nb_domain_grid_pts"_a,
            "comm"_a = Communicator(),
            "nb_ghosts_left"_a = DynGridIndex{},
            "nb_ghosts_right"_a = DynGridIndex{},
            "nb_sub_pts"_a = SubPtMap_t{},
+           "decomposition"_a = "auto",
            R"(
            Construct an FFT engine with pencil decomposition.
 
@@ -711,14 +720,14 @@ void add_fft_engine_cuda(py::module & mod) {
                        const DynGridIndex & nb_ghosts_left,
                        const DynGridIndex & nb_ghosts_right,
                        const SubPtMap_t & nb_sub_pts,
-                       int device_id) {
+                       int device_id, const std::string & decomposition) {
              // Set the CUDA device before creating the engine
              cudaSetDevice(device_id);
              // Create device object with the specified device_id
              Device device = Device::cuda(device_id);
              return new PyFFTEngineCUDA(nb_domain_grid_pts, comm,
                                         nb_ghosts_left, nb_ghosts_right,
-                                        nb_sub_pts, device);
+                                        nb_sub_pts, device, decomposition);
            }),
            "nb_domain_grid_pts"_a,
            "comm"_a = Communicator(),
@@ -726,6 +735,7 @@ void add_fft_engine_cuda(py::module & mod) {
            "nb_ghosts_right"_a = DynGridIndex{},
            "nb_sub_pts"_a = SubPtMap_t{},
            "device_id"_a = 0,
+           "decomposition"_a = "auto",
            R"(
            Construct a GPU FFT engine.
 
@@ -918,14 +928,14 @@ void add_fft_engine_hip(py::module & mod) {
                        const DynGridIndex & nb_ghosts_left,
                        const DynGridIndex & nb_ghosts_right,
                        const SubPtMap_t & nb_sub_pts,
-                       int device_id) {
+                       int device_id, const std::string & decomposition) {
              // Set the ROCm device before creating the engine
              hipSetDevice(device_id);
              // Create device object with the specified device_id
              Device device = Device::rocm(device_id);
              return new PyFFTEngineROCm(nb_domain_grid_pts, comm,
                                        nb_ghosts_left, nb_ghosts_right,
-                                       nb_sub_pts, device);
+                                       nb_sub_pts, device, decomposition);
            }),
            "nb_domain_grid_pts"_a,
            "comm"_a = Communicator(),
@@ -933,6 +943,7 @@ void add_fft_engine_hip(py::module & mod) {
            "nb_ghosts_right"_a = DynGridIndex{},
            "nb_sub_pts"_a = SubPtMap_t{},
            "device_id"_a = 0,
+           "decomposition"_a = "auto",
            R"(
            Construct a GPU FFT engine using ROCm.
 

@@ -88,9 +88,10 @@ class FFTEngine : public FFTEngineBase {
             const DynGridIndex & nb_ghosts_left = DynGridIndex{},
             const DynGridIndex & nb_ghosts_right = DynGridIndex{},
             const SubPtMap_t & nb_sub_pts = {},
-            Device device = memory_space_to_device<MemorySpace>())
+            Device device = memory_space_to_device<MemorySpace>(),
+            const std::string & decomposition = "auto")
       : Parent_t{nb_domain_grid_pts, comm, nb_ghosts_left, nb_ghosts_right,
-                 nb_sub_pts, device},
+                 nb_sub_pts, device, decomposition},
         backend{create_fft_backend<MemorySpace>()} {}
 
   FFTEngine() = delete;
