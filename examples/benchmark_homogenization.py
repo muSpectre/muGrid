@@ -107,19 +107,27 @@ def collect(args, prov):
                              f"{r['secs']:.3f} s, {r['iters']} it, "
                              f"{r['gbps']:.1f} GB/s\n")
 
-    # MPI strong scaling (CPU).
-    for n in args.scaling_sizes:
-        for R in args.scaling_ranks:
-            r = run("cpu", n, args.maxiter, R)
-            if r is None:
-                continue
-            rows.append({**prov, "benchmark": BENCHMARK, "study": "mpi_scaling",
-                         "label": str(R), "device": "cpu", "nranks": R,
-                         "dim": 3, "n": n, "npts": r["npts"],
-                         "maxiter": args.maxiter, "iters": r["iters"],
-                         "secs": r["secs"], "gbps": r["gbps"]})
-            sys.stderr.write(f"  scaling {n}^3 ranks={R}: {r['secs']:.3f} s, "
-                             f"{r['gbps']:.1f} GB/s\n")
+    # MPI strong scaling, on CPU cores and (when present) GPUs. The GPU sweep is
+    # capped at the number of visible devices — homogenization.py round-robins
+    # one rank per GPU, so more ranks than GPUs would oversubscribe.
+    scaling_plan = [("cpu", args.scaling_ranks, "cores")]
+    if want_gpu:
+        gpu_ranks = [R for R in args.scaling_gpu_ranks if R <= nb_gpus]
+        scaling_plan.append(("gpu", gpu_ranks, "GPUs"))
+    for dev, ranks, unit in scaling_plan:
+        for n in args.scaling_sizes:
+            for R in ranks:
+                r = run(dev, n, args.maxiter, R)
+                if r is None:
+                    continue
+                rows.append({**prov, "benchmark": BENCHMARK,
+                             "study": "mpi_scaling", "label": str(R),
+                             "device": dev, "nranks": R, "dim": 3, "n": n,
+                             "npts": r["npts"], "maxiter": args.maxiter,
+                             "iters": r["iters"], "secs": r["secs"],
+                             "gbps": r["gbps"]})
+                sys.stderr.write(f"  scaling[{dev}] {n}^3 {R} {unit}: "
+                                 f"{r['secs']:.3f} s, {r['gbps']:.1f} GB/s\n")
     return rows
 
 
@@ -145,12 +153,12 @@ def merged_from_rows(rows):
 
 
 def scaling_from_rows(rows):
-    """{n: {ranks: row}}."""
+    """{device: {n: {ranks: row}}}."""
     d = {}
     for r in rows:
         if r["study"] != "mpi_scaling":
             continue
-        d.setdefault(r["n"], {})[int(r["nranks"])] = r
+        d.setdefault(r["device"], {}).setdefault(r["n"], {})[int(r["nranks"])] = r
     return d
 
 
@@ -177,22 +185,36 @@ def table_markdown(sizes, configs, merged):
     return "\n".join(lines)
 
 
-def scaling_tables_markdown(scaling, ranks):
+# device -> (section title, per-rank column header)
+SCALING_DEVICE_META = {
+    "cpu": ("Strong scaling on the CPU", "Cores"),
+    "gpu": ("Strong scaling on the GPU(s)", "GPUs"),
+}
+
+
+def scaling_tables_markdown(scaling):
     out = []
-    for n in sorted(scaling):
-        rows = scaling[n]
-        t1 = rows.get(1, {}).get("secs")
-        out.append(f"**{n}³ ({n ** 3:,} points)**\n")
-        out.append("| Ranks | Time (s) | Speedup | Parallel eff. | Agg. GB/s |")
-        out.append("|---|---|---|---|---|")
-        for R in ranks:
-            if R not in rows:
-                continue
-            t = rows[R]["secs"]
-            sp = t1 / t if t1 else float("nan")
-            out.append(f"| {R} | {t:.2f} | {sp:.2f}× | {sp / R * 100:.0f}% | "
-                       f"{rows[R]['gbps']:.1f} |")
-        out.append("")
+    for dev in ("cpu", "gpu"):
+        per_n = scaling.get(dev)
+        if not per_n:
+            continue
+        title, unit = SCALING_DEVICE_META[dev]
+        out.append(f"### {title}\n")
+        for n in sorted(per_n):
+            rows = per_n[n]
+            t1 = rows.get(1, {}).get("secs")
+            out.append(f"**{n}³ ({n ** 3:,} points)**\n")
+            out.append(f"| {unit} | Time (s) | Speedup | Parallel eff. | "
+                       "Agg. GB/s |")
+            out.append("|---|---|---|---|---|")
+            for R in sorted(rows):
+                t = rows[R]["secs"]
+                sp = t1 / t if t1 else float("nan")
+                gbps = rows[R].get("gbps")
+                gbps_s = f"{gbps:.1f}" if isinstance(gbps, (int, float)) else "—"
+                out.append(f"| {R} | {t:.2f} | {sp:.2f}× | {sp / R * 100:.0f}% | "
+                           f"{gbps_s} |")
+            out.append("")
     return "\n".join(out)
 
 
@@ -226,31 +248,38 @@ def make_scaling_plot(scaling, path):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(6.4, 4.4))
-    all_ranks = sorted({R for rows in scaling.values() for R in rows})
-    rmax = max(all_ranks) if all_ranks else 1
-    ax.plot([1, rmax], [1, rmax], ls="--", color="0.6", label="ideal (linear)")
     markers = {32: "v", 64: "o", 96: "s", 128: "^"}
-    for n in sorted(scaling):
-        rows = scaling[n]
-        t1 = rows.get(1, {}).get("secs")
-        if not t1:
-            continue
-        xs = sorted(rows)
-        ys = [t1 / rows[R]["secs"] for R in xs]
-        ax.plot(xs, ys, marker=markers.get(n, "o"), label=f"{n}³")
-    ax.set_xscale("log", base=2)
-    ax.set_yscale("log", base=2)
-    if all_ranks:
-        ax.set_xticks(all_ranks)
-        ax.set_xticklabels([str(R) for R in all_ranks])
-        ax.set_yticks(all_ranks)
-        ax.set_yticklabels([str(R) for R in all_ranks])
-    ax.set_xlabel("MPI ranks (CPU cores)")
-    ax.set_ylabel("Speedup vs. 1 rank")
-    ax.set_title("Homogenization (3D, fused): MPI strong scaling")
-    ax.grid(True, which="both", ls=":", alpha=0.5)
-    ax.legend()
+    devs = [d for d in ("cpu", "gpu") if scaling.get(d)] or ["cpu"]
+    fig, axes = plt.subplots(1, len(devs), figsize=(6.4 * len(devs), 4.4),
+                             squeeze=False)
+    for ax, dev in zip(axes[0], devs):
+        per_n = scaling.get(dev, {})
+        unit = "CPU cores" if dev == "cpu" else "GPUs"
+        all_ranks = sorted({R for rows in per_n.values() for R in rows})
+        rmax = max(all_ranks) if all_ranks else 1
+        ax.plot([1, rmax], [1, rmax], ls="--", color="0.6",
+                label="ideal (linear)")
+        for n in sorted(per_n):
+            rows = per_n[n]
+            t1 = rows.get(1, {}).get("secs")
+            if not t1:
+                continue
+            xs = sorted(rows)
+            ys = [t1 / rows[R]["secs"] for R in xs]
+            ax.plot(xs, ys, marker=markers.get(n, "o"), label=f"{n}³")
+        ax.set_xscale("log", base=2)
+        ax.set_yscale("log", base=2)
+        if all_ranks:
+            ax.set_xticks(all_ranks)
+            ax.set_xticklabels([str(R) for R in all_ranks])
+            ax.set_yticks(all_ranks)
+            ax.set_yticklabels([str(R) for R in all_ranks])
+        ax.set_xlabel(f"MPI ranks ({unit})")
+        ax.set_ylabel("Speedup vs. 1 rank")
+        ax.set_title(f"strong scaling on {unit}")
+        ax.grid(True, which="both", ls=":", alpha=0.5)
+        ax.legend()
+    fig.suptitle("Homogenization (3D, fused): MPI strong scaling")
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)
@@ -317,20 +346,22 @@ reverses where it does not.
     runs one rank per GPU. This benchmark adds a *GPU (N devices, MPI)* curve
     automatically when more than one GPU is present. **{gpu_count_note}**
 
-## MPI strong scaling (CPU)
+## MPI strong scaling
 
 Strong scaling of the same 3D fused solve (fixed problem size, increasing MPI
-ranks) on the {ncores}-core CPU, with `E_eff` identical across all rank counts.
+ranks), with `E_eff` identical across all rank counts. The grid is split into
+per-rank subdomains that exchange ghost layers each iteration. Two decompositions
+are measured: across the {ncores}-core CPU (one rank per core), and — on a
+multi-GPU host — across the GPUs (one rank per device, round-robin).
 
 {scaling_tables}
 ![Homogenization MPI strong scaling]({scaling_plot_name})
 
-Scaling is near-ideal to 4 ranks, then tapers: the solve is
-memory-bandwidth-bound, so aggregate throughput keeps climbing as cores are added
-(toward ~20 GB/s) but parallel efficiency falls. Once per-rank subdomains get
-small, ghost exchange and CG dot-product reductions dominate — at 64³, 16 ranks
-*regresses* (only ~16k points/rank; the sweet spot is 8 ranks), whereas the
-larger 96³ problem keeps scaling out to 16 cores.
+The solve is memory-bandwidth-bound, so aggregate throughput keeps climbing as
+ranks are added but parallel efficiency falls once per-rank subdomains get small
+and ghost exchange plus CG dot-product reductions start to dominate. On the GPU
+side, the per-device working set must stay large enough to hide the
+inter-device communication, so the larger grids scale best.
 
 All data points live in the shared benchmark database `benchmarks/results.csv`
 (date, code version, machine, parameters, results). This page is generated by
@@ -383,6 +414,10 @@ def main():
     ap.add_argument("--scaling-sizes", type=int, nargs="+", default=[64, 96])
     ap.add_argument("--scaling-ranks", type=int, nargs="+",
                     default=[1, 2, 4, 8, 16])
+    ap.add_argument("--scaling-gpu-ranks", type=int, nargs="+",
+                    default=[1, 2, 4],
+                    help="GPU counts for the GPU strong-scaling sweep (capped at "
+                         "the number of visible devices)")
     ap.add_argument("--maxiter", type=int, default=100)
     ap.add_argument("--render-only", action="store_true",
                     help="Skip running; render from the database")
@@ -426,9 +461,7 @@ def main():
 
     sizes = sizes_in(rows, "time_vs_size")
     table = table_markdown(sizes, configs, merged)
-    scaling_ranks = sorted({int(r["nranks"]) for r in rows
-                            if r["study"] == "mpi_scaling"})
-    scaling_tables = scaling_tables_markdown(scaling, scaling_ranks)
+    scaling_tables = scaling_tables_markdown(scaling)
     print("\n" + table + "\n\n" + scaling_tables)
 
     plot_out = os.path.abspath(args.plot_out)

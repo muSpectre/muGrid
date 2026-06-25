@@ -38,6 +38,7 @@ import csv
 import datetime
 import os
 import platform
+import re
 import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -93,21 +94,80 @@ def detect_cpu():
     return f"{model} ({os.cpu_count()} logical cores)"
 
 
-def detect_gpu():
-    """(human-readable description, device count)."""
+def _label_from_names(names):
+    uniq = sorted(set(names))
+    return (f"{len(names)}x {uniq[0]}" if len(names) > 1 and len(uniq) == 1
+            else ", ".join(names))
+
+
+def _nvidia_gpu_names():
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True, text=True, timeout=30)
-        names = [n.strip() for n in out.stdout.splitlines() if n.strip()]
+        if out.returncode != 0:  # stub nvidia-smi on a non-NVIDIA host prints
+            return []             # its error to stdout, so check the exit code
+        return [n.strip() for n in out.stdout.splitlines() if n.strip()]
     except (OSError, subprocess.SubprocessError):
-        names = []
+        return []
+
+
+def _rocm_gpu_names():
+    """AMD/ROCm device names (one per GPU), best-effort across tool versions."""
+    # rocm-smi: lines look like "GPU[0]\t\t: Card series: Instinct MI300A".
+    try:
+        out = subprocess.run(["rocm-smi", "--showproductname"],
+                             capture_output=True, text=True, timeout=30)
+        by_idx = {}
+        for line in out.stdout.splitlines():
+            m = re.match(r"\s*GPU\[(\d+)\]", line)
+            if not m:
+                continue
+            idx = int(m.group(1))
+            if ":" in line and any(k in line for k in
+                                   ("series", "model", "name", "Name")):
+                by_idx[idx] = line.rsplit(":", 1)[1].strip()
+            else:
+                by_idx.setdefault(idx, "AMD GPU")
+        if by_idx:
+            return [by_idx[i] for i in sorted(by_idx)]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    # amd-smi fallback: count "GPU: <n>" stanzas.
+    try:
+        out = subprocess.run(["amd-smi", "list"],
+                             capture_output=True, text=True, timeout=30)
+        n = len(re.findall(r"^\s*GPU:\s*\d+", out.stdout, re.MULTILINE))
+        if n:
+            return ["AMD GPU"] * n
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return []
+
+
+def detect_gpu():
+    """(human-readable description, device count).
+
+    Detection order: an explicit ``MUGRID_BENCH_GPU_COUNT`` override (set by batch
+    scripts on hosts where the vendor CLI is unreliable — e.g. an AMD node that
+    still has a stub ``nvidia-smi``), then NVIDIA (``nvidia-smi``), then AMD/ROCm
+    (``rocm-smi`` / ``amd-smi``).
+    """
+    env_n = os.environ.get("MUGRID_BENCH_GPU_COUNT")
+    if env_n is not None:
+        try:
+            n = int(env_n)
+        except ValueError:
+            n = 0
+        if n <= 0:
+            return "none", 0
+        name = os.environ.get("MUGRID_BENCH_GPU_NAME", "GPU")
+        return (f"{n}x {name}" if n > 1 else name), n
+
+    names = _nvidia_gpu_names() or _rocm_gpu_names()
     if not names:
         return "none", 0
-    uniq = sorted(set(names))
-    label = (f"{len(names)}x {uniq[0]}" if len(names) > 1 and len(uniq) == 1
-             else ", ".join(names))
-    return label, len(names)
+    return _label_from_names(names), len(names)
 
 
 def now_iso():

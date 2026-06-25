@@ -119,6 +119,29 @@ def collect(args, prov):
                          "iters": r["iters"], "secs": r["secs"]})
             sys.stderr.write(f"  time {label} {n}^{args.dim} ({r['npts']} pts): "
                              f"{r['iters']} it, {r['secs']:.3f} s\n")
+
+    # Study 3: MPI strong scaling of the reference-preconditioned solve, on the
+    # CPU cores and (on a multi-GPU host) across the GPUs. The GPU sweep is
+    # capped at the visible-device count (one rank per GPU, round-robin).
+    scaling_plan = [("cpu", args.scaling_ranks, "cores")]
+    if want_gpu:
+        gpu_ranks = [R for R in args.scaling_gpu_ranks if R <= nb_gpus]
+        scaling_plan.append(("gpu", gpu_ranks, "GPUs"))
+    for dev, ranks, unit in scaling_plan:
+        for n in args.scaling_sizes:
+            for R in ranks:
+                r = run(dev, "reference", n, args.dim, args.maxiter, args.tol, R)
+                if r is None:
+                    sys.stderr.write(f"  scaling[{dev}] {n}^{args.dim} "
+                                     f"{R} {unit}: skipped\n")
+                    continue
+                rows.append({**prov, **common, "benchmark": BENCHMARK,
+                             "study": "mpi_scaling", "label": str(R),
+                             "device": dev, "nranks": R, "n": n,
+                             "npts": r["npts"], "precond": "reference",
+                             "iters": r["iters"], "secs": r["secs"]})
+                sys.stderr.write(f"  scaling[{dev}] {n}^{args.dim} {R} {unit}: "
+                                 f"{r['iters']} it, {r['secs']:.3f} s\n")
     return rows
 
 
@@ -155,6 +178,16 @@ def timing_from_rows(rows):
     return d
 
 
+def scaling_from_rows(rows):
+    """{device: {n: {ranks: row}}} from the mpi_scaling study."""
+    d = {}
+    for r in rows:
+        if r["study"] == "mpi_scaling":
+            (d.setdefault(r["device"], {}).setdefault(r["n"], {})
+             [int(r["nranks"])]) = r
+    return d
+
+
 def sizes_in(rows, study):
     return sorted({r["n"] for r in rows if r["study"] == study})
 
@@ -179,6 +212,36 @@ def iteration_table(sizes, iters, dim):
         cells.append(f"{a['secs'] / b['secs']:.0f}×" if a and b else "—")
     lines.append("| **CPU-core wall-time speedup** | " + " | ".join(cells) + " |")
     return "\n".join(lines)
+
+
+# device -> (section title, per-rank column header)
+SCALING_DEVICE_META = {
+    "cpu": ("Strong scaling on the CPU", "Cores"),
+    "gpu": ("Strong scaling on the GPU(s)", "GPUs"),
+}
+
+
+def scaling_tables_markdown(scaling, dim):
+    out = []
+    for dev in ("cpu", "gpu"):
+        per_n = scaling.get(dev)
+        if not per_n:
+            continue
+        title, unit = SCALING_DEVICE_META[dev]
+        out.append(f"### {title}\n")
+        for n in sorted(per_n):
+            rows = per_n[n]
+            t1 = rows.get(1, {}).get("secs")
+            out.append(f"**{n}{sup(dim)} ({n ** dim:,} points)**\n")
+            out.append(f"| {unit} | Iters | Time (s) | Speedup | Parallel eff. |")
+            out.append("|---|---|---|---|---|")
+            for R in sorted(rows):
+                t = rows[R]["secs"]
+                sp = t1 / t if t1 else float("nan")
+                out.append(f"| {R} | {rows[R]['iters']} | {t:.2f} | "
+                           f"{sp:.2f}× | {sp / R * 100:.0f}% |")
+            out.append("")
+    return "\n".join(out)
 
 
 def timing_table(sizes, configs, timing, dim):
@@ -243,6 +306,49 @@ def make_timing_plot(configs, timing, dim, path):
                  f"time vs. grid size")
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
+def make_scaling_plot(scaling, dim, path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    markers = {32: "v", 64: "o", 96: "s", 128: "^"}
+    devs = [d for d in ("cpu", "gpu") if scaling.get(d)] or ["cpu"]
+    fig, axes = plt.subplots(1, len(devs), figsize=(6.4 * len(devs), 4.4),
+                             squeeze=False)
+    for ax, dev in zip(axes[0], devs):
+        per_n = scaling.get(dev, {})
+        unit = "CPU cores" if dev == "cpu" else "GPUs"
+        all_ranks = sorted({R for rows in per_n.values() for R in rows})
+        rmax = max(all_ranks) if all_ranks else 1
+        ax.plot([1, rmax], [1, rmax], ls="--", color="0.6",
+                label="ideal (linear)")
+        for n in sorted(per_n):
+            rows = per_n[n]
+            t1 = rows.get(1, {}).get("secs")
+            if not t1:
+                continue
+            xs = sorted(rows)
+            ys = [t1 / rows[R]["secs"] for R in xs]
+            ax.plot(xs, ys, marker=markers.get(n, "o"), label=f"{n}{sup(dim)}")
+        ax.set_xscale("log", base=2)
+        ax.set_yscale("log", base=2)
+        if all_ranks:
+            ax.set_xticks(all_ranks)
+            ax.set_xticklabels([str(R) for R in all_ranks])
+            ax.set_yticks(all_ranks)
+            ax.set_yticklabels([str(R) for R in all_ranks])
+        ax.set_xlabel(f"MPI ranks ({unit})")
+        ax.set_ylabel("Speedup vs. 1 rank")
+        ax.set_title(f"strong scaling on {unit}")
+        ax.grid(True, which="both", ls=":", alpha=0.5)
+        ax.legend()
+    fig.suptitle(f"Homogenization ({dim}D, fused, reference prec.): "
+                 "MPI strong scaling")
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)
@@ -316,6 +422,18 @@ apply, shifted toward the CPU by the extra per-iteration FFT.
     decomposition. This benchmark adds a *GPU (N devices, MPI)* curve
     automatically when more than one GPU is present. **{gpu_count_note}**
 
+## MPI strong scaling
+
+Strong scaling of the reference-preconditioned solve (fixed problem size,
+increasing MPI ranks, run to convergence), with `E_eff` and the iteration count
+identical across all rank counts. Two decompositions are measured: across the
+CPU cores (one rank per core), and — on a multi-GPU host — across the GPUs (one
+rank per device, round-robin). Each iteration applies a forward/inverse FFT pair,
+so the FFT engine's MPI (slab) decomposition is exercised every iteration.
+
+{scaling_tables}
+![Preconditioned MPI strong scaling]({scaling_plot})
+
 All data points live in the shared benchmark database `benchmarks/results.csv`
 (date, code version, machine, parameters, results). This page is generated by
 `examples/benchmark_homogenization_preconditioner.py`; re-render from the
@@ -330,7 +448,8 @@ python examples/benchmark_homogenization_preconditioner.py \\
 
 
 def write_doc_page(path, meta, dim, tol, ncases, multi_gpu, iter_table,
-                   timing_table, iter_plot, timing_plot):
+                   timing_table, scaling_tables, iter_plot, timing_plot,
+                   scaling_plot):
     if multi_gpu:
         gpu_count_note = "Runs with more than one GPU show the multi-GPU curve."
     else:
@@ -343,8 +462,10 @@ def write_doc_page(path, meta, dim, tol, ncases, multi_gpu, iter_table,
             timestamp=meta["timestamp"], dim=dim, tol=tol, ncases=ncases,
             gpu_count_note=gpu_count_note,
             iter_table=iter_table, timing_table=timing_table,
+            scaling_tables=scaling_tables,
             iter_plot=os.path.basename(iter_plot),
-            timing_plot=os.path.basename(timing_plot)))
+            timing_plot=os.path.basename(timing_plot),
+            scaling_plot=os.path.basename(scaling_plot)))
 
 
 # --------------------------------------------------------------------------- #
@@ -361,6 +482,15 @@ def main():
     ap.add_argument("--iter-sizes", type=int, nargs="+",
                     default=[16, 24, 32, 48],
                     help="Grid sizes for the none-vs-reference iteration study")
+    ap.add_argument("--scaling-sizes", type=int, nargs="+", default=[64, 96],
+                    help="Grid sizes for the MPI strong-scaling study")
+    ap.add_argument("--scaling-ranks", type=int, nargs="+",
+                    default=[1, 2, 4, 8, 16],
+                    help="CPU rank counts for the strong-scaling study")
+    ap.add_argument("--scaling-gpu-ranks", type=int, nargs="+",
+                    default=[1, 2, 4],
+                    help="GPU counts for the GPU strong-scaling sweep (capped at "
+                         "the number of visible devices)")
     ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count())
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
     ap.add_argument("--maxiter", type=int, default=20000)
@@ -375,6 +505,8 @@ def main():
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_iters.png"))
     ap.add_argument("--time-plot", default=os.path.join(
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_time.png"))
+    ap.add_argument("--scaling-plot", default=os.path.join(
+        HERE, "..", "docs", "benchmark_homogenization_preconditioner_mpi.png"))
     args = ap.parse_args()
 
     if not args.render_only:
@@ -398,23 +530,28 @@ def main():
     configs = db.render_configs(rows, "reference_timing")
     iters = iters_from_rows(rows)
     timing = timing_from_rows(rows)
+    scaling = scaling_from_rows(rows)
     multi_gpu = any(r["label"] == "gpuN" for r in rows)
 
     it_tab = iteration_table(sizes_in(rows, "iterations"), iters, dim)
     t_tab = timing_table(sizes_in(rows, "reference_timing"), configs, timing,
                          dim)
-    print("\n" + it_tab + "\n\n" + t_tab)
+    s_tab = scaling_tables_markdown(scaling, dim)
+    print("\n" + it_tab + "\n\n" + t_tab + "\n\n" + s_tab)
 
     iters_path = os.path.abspath(args.iter_plot)
     time_path = os.path.abspath(args.time_plot)
+    scaling_path = os.path.abspath(args.scaling_plot)
     make_iter_plot(iters, dim, iters_path)
     make_timing_plot(configs, timing, dim, time_path)
-    sys.stderr.write(f"wrote {iters_path}\nwrote {time_path}\n")
+    make_scaling_plot(scaling, dim, scaling_path)
+    sys.stderr.write(f"wrote {iters_path}\nwrote {time_path}\n"
+                     f"wrote {scaling_path}\n")
 
     if args.doc_out:
         write_doc_page(args.doc_out, meta, dim, tol,
-                       3 if dim == 2 else 6, multi_gpu, it_tab, t_tab,
-                       iters_path, time_path)
+                       3 if dim == 2 else 6, multi_gpu, it_tab, t_tab, s_tab,
+                       iters_path, time_path, scaling_path)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
 
