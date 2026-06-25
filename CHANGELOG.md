@@ -4,105 +4,62 @@ Change log for µGrid
 Unreleased
 ----------
 
-- ENH: The cuFFT backend now performs whole multidimensional r2c/c2r transforms
-  natively (`cufftPlanMany`, `supports_nd`/`r2c_nd`/`c2r_nd`), so a serial
-  (non-decomposed) GPU engine issues one planned transform instead of driving it
-  axis-by-axis with a per-plane loop, a work buffer and a final device copy. This
-  brings the serial 3D GPU FFT to within ~10% of native cuFFT (previously
-  6.5–31× slower, launch-overhead-bound) and roughly halves the wall time of the
-  GPU FFT-preconditioned homogenization solve. Mirrors the existing pocketFFT
-  (CPU) N-D path. The rocFFT (HIP/AMD) backend implements the same native N-D
-  transforms (via `rocfft_plan_create` with multi-dimensional lengths/strides)
-- ENH: The MPI/decomposed 3D FFT also uses the native N-D backend for *slab*
-  decompositions (a single split axis, `P2 == 1`): the two locally-complete
-  axes — the half-complex X and Y — are transformed together as one planned
-  rank-2 r2c/c2r per component, batched over the local Z planes, replacing the
-  per-Z-plane axis-by-axis loops and the redundant X<->Y copy. Pencil (two-axis)
-  decompositions stay axis-by-axis, since no rank holds two full axes. Validated
-  on CPU-MPI and on a single GPU oversubscribed by multiple MPI ranks
-- ENH: `FFTEngine` accepts a `decomposition` argument (`"auto"` (default),
-  `"pencil"` or `"slab"`) selecting the MPI process grid. `"slab"` splits only
-  the last axis (`P2 == 1`, requires `num_ranks <= Nz`) so the slab N-D fast
-  path above applies; `"pencil"` forces the balanced two-axis factorization.
-  `"auto"` now *prefers slab whenever it fits* and falls back to pencil only
-  when more ranks are requested than Z-planes — slab does one fused N-D
-  transform plus a single Y<->Z transpose (vs two), moving less data. Measured
-  fft+ifft speedup of slab over pencil at 128³: ~1.3–1.4× on CPU-MPI (2–4
-  ranks) and ~8–9× on a GPU (the pencil path's per-axis transforms and extra
-  transpose roundtrip through device memory dominate there)
+- ENH: The cuFFT and rocFFT backends now perform whole multidimensional r2c/c2r
+  transforms natively, so a serial GPU engine issues one planned transform
+  instead of an axis-by-axis loop. Brings serial 3D GPU FFT to within ~10% of
+  native cuFFT and roughly halves the GPU FFT-preconditioned homogenization solve.
+- ENH: The MPI/decomposed 3D FFT uses the native N-D backend for slab
+  decompositions, transforming the two locally-complete axes together as one
+  batched rank-2 transform. Pencil decompositions stay axis-by-axis. Validated on
+  CPU-MPI and on a single oversubscribed GPU.
+- ENH: `FFTEngine` accepts a `decomposition` argument (`"auto"`, `"pencil"`,
+  `"slab"`) selecting the MPI process grid; `"auto"` now prefers slab whenever it
+  fits and falls back to pencil otherwise. Measured fft+ifft speedup of slab over
+  pencil at 128³: ~1.3–1.4× on CPU-MPI and ~8–9× on a GPU.
 - ENH: Optional contiguous-staging host FFT transpose (opt-in via
-  `MUGRID_STAGED_TRANSPOSE=1`): packs each peer's block into a contiguous buffer
-  and exchanges with `MPI_Alltoallv`, unifying the host path with the device
-  path, instead of `MPI_Alltoallw` with derived datatypes. Off by default —
-  on shared-memory (single node) `Alltoallw` is faster, since the explicit
-  staging adds a copy the in-place collective avoids; the staged path targets
-  multi-node networks where a single tuned collective on contiguous buffers can
-  amortize that copy against link latency
+  `MUGRID_STAGED_TRANSPOSE=1`) that packs each peer's block into a contiguous
+  buffer, unifying the host and device paths. Off by default since the in-place
+  collective is faster on a single node; the staged path targets multi-node networks.
 - ENH: Reference-material (Green's-function) preconditioner for FFT-accelerated
   FE homogenization (Ladecký et al., Appl. Math. Comput. 446 (2023) 127835),
-  exposed in the homogenization example via `-P reference`. It makes the PCG
-  iteration count nearly independent of grid size (e.g. 2D: ~40 iterations from
-  32² to 256², versus ~900–7500 unpreconditioned). Backed by the new
-  `Preconditioners.BlockFourierPreconditioner`, a matrix-valued spectral
-  preconditioner that applies a per-Fourier-mode `n×n` block inverse — the
-  matrix generalization of the scalar `FourierPreconditioner`
-- ENH: Pipelined (Ghysels–Vanroose) preconditioned conjugate gradients,
-  `Solvers.conjugate_gradients_pipelined`, which issues a single global
-  reduction per iteration instead of the three of standard PCG. Backed by a
-  fused `linalg.pipelined_cg_dots` (host and GPU) returning the three CG inner
-  products `(r·u, w·u, r·r)` in one pass / one device-to-host copy. The combined
-  reduction is now issued *non-blocking* (`MPI_Iallreduce` via the new
-  `Communicator.isum`/`isum_wait`) and overlapped with the preconditioner and
-  operator applies of the same iteration, hiding the global-synchronization
-  latency. On a single node this is a small net loss (the extra vector updates
-  outweigh the negligible shared-memory reduction latency), so it is opt-in; the
-  payoff grows with reduction latency — in a synthetic-latency model it crosses
-  over to a net win at ~100 µs per reduction (1.7× at 500 µs), the regime of a
-  multi-node allreduce. Verified bit-comparable to standard PCG (identical
-  iteration counts; solution agreement ~1e-15) at serial/2/4 ranks
+  exposed via `-P reference`. Makes PCG iteration count nearly grid-size
+  independent (2D: ~40 iterations from 32² to 256² vs ~900–7500 unpreconditioned).
+- ENH: Pipelined (Ghysels–Vanroose) preconditioned conjugate gradients, issuing a
+  single non-blocking global reduction per iteration (overlapped with the
+  preconditioner and operator applies) instead of three. A net loss on a single
+  node (opt-in); the payoff grows with reduction latency, as in a multi-node allreduce.
 - BUG: GPU kernel launches are now checked and raise `RuntimeError` instead of
-  failing silently. A library built for a GPU architecture the device does not
-  support (e.g. `sm_75` SASS on an `sm_120` device) previously left every
-  hand-written kernel a no-op while runtime-API calls (memcpy/memset) kept
-  working, so reductions returned zero and CG "converged" in 0 iterations
+  failing silently. A library built for an unsupported GPU architecture previously
+  left hand-written kernels no-ops while runtime-API calls kept working, so
+  reductions returned zero and CG "converged" in 0 iterations.
 - MAINT: The linalg reduction scratch buffer is cached across calls instead of
-  being reallocated (`cudaMalloc`/`cudaFree`) on every reduction
+  being reallocated on every reduction.
 - DOC: Documentation converted from Sphinx to MkDocs (Material theme); added
   CPU/GPU scaling benchmark pages for the Poisson and homogenization examples,
-  including an MPI strong-scaling study and a preconditioner benchmark (iteration
-  count and wall time, preconditioned vs. unpreconditioned)
+  including an MPI strong-scaling study and a preconditioner benchmark.
 - ENH: NetCDF I/O now supports device-resident (GPU) fields directly, staging
-  through a temporary host (AoS) mirror with `deep_copy` before a write and
-  after a read. Device-resident state fields are unsupported and fail loudly.
+  through a temporary host mirror before a write and after a read. Device-resident
+  state fields are unsupported and fail loudly.
 - ENH: On unified-memory devices (integrated APUs such as the AMD MI300A) the
   staging buffer is skipped and the host-coherent allocation is read/written in
-  place (zero-copy), detected at runtime via `Device::is_host_accessible()`.
-- API: New `Field::deep_copy_from(const Field &)` and
-  `Field::is_host_accessible()`; new device/storage-order `get_empty_clone`
-  overloads on `GlobalFieldCollection` and `LocalFieldCollection`.
-- BUG: `NetCDFVarField::get_buf` now derives the ghost-skip offset from the
+  place (zero-copy), detected at runtime.
+- API: New field deep-copy and host-accessibility queries; new device/storage-order
+  empty-clone overloads on the global and local field collections.
+- BUG: NetCDF variable-field reads now derive the ghost-skip offset from the
   field's storage order, fixing structure-of-arrays fields with ghosts.
-- ENH: Complex GPU linalg is now implemented. The `Complex` device
-  specialisations of `vecdot`, `norm_sq`, `axpy`, `scal`, `axpby`, `copy` and
-  `axpy_norm_sq` (previously throwing stubs) now run on CUDA/HIP, processing the
-  complex buffers through their underlying reals; the sesquilinear `vecdot`
-  reduces the real and imaginary parts of conj(a)·b separately and the
-  reductions exclude ghost regions like their host counterparts
-- ENH: Fused per-pixel vector operations `linalg.cross` (three-vector cross
-  product) and `linalg.leray_project` (Helmholtz/Leray projection
-  `out -= k (k·N)/|k|²`), each a single pass over the field with no
-  temporaries. Implemented on host and GPU for both Real and Complex (the
-  coefficients of `leray_project` are real)
-- ENH: PocketFFT backend now hands whole multidimensional blocks to pocketfft
-  in one call (batched along the transform axis, vectorized across lines)
-  instead of transforming one line at a time; the serial (non-decomposed)
-  engine performs a single N-dimensional transform via the new `r2c_nd` /
-  `c2r_nd` backend entry points, skipping the work buffer and per-axis
-  re-dispatch. Serial CPU FFT is now on par with NumPy's `rfftn`/`irfftn`
-  (roughly 5–6× faster than before)
-- API: Renamed `fft_1d_backend.hh` to `fft_backend.hh`; the `FFT1DBackend`
-  interface now also exposes optional N-dimensional transforms (`supports_nd`,
-  `r2c_nd`, `c2r_nd`)
+- ENH: Complex GPU linalg is now implemented. The complex device specialisations
+  of the vector operations (previously throwing stubs) now run on CUDA/HIP through
+  their underlying reals, with reductions excluding ghost regions like their host
+  counterparts.
+- ENH: Fused per-pixel vector operations for the three-vector cross product and
+  the Helmholtz/Leray projection, each a single pass over the field with no
+  temporaries. Implemented on host and GPU for both Real and Complex.
+- ENH: PocketFFT backend now hands whole multidimensional blocks to pocketfft in
+  one call instead of transforming one line at a time; the serial engine performs
+  a single N-dimensional transform. Serial CPU FFT is now on par with NumPy's
+  `rfftn`/`irfftn` (roughly 5–6× faster than before).
+- API: Renamed the FFT backend header; the backend interface now also exposes
+  optional N-dimensional transforms.
 
 0.109.0 (15Jun26)
 -----------------
