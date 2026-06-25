@@ -622,12 +622,18 @@ static void cross_host(const TypedField<T, HostSpace>& a,
     internal::check_three_vector("cross", a, coll);
     internal::check_three_vector("cross", b, coll);
     internal::check_three_vector("cross", out, coll);
+    const Index_t npix = a.get_nb_entries();
+    // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
+    // compute. Skip it, including the aliasing check below: empty fields share a
+    // null data pointer, so that check would otherwise fire spuriously.
+    if (npix == 0) {
+        return;
+    }
     if (out.view().data() == a.view().data() ||
         out.view().data() == b.view().data()) {
         throw FieldError(
             "cross: output must be a field distinct from both inputs");
     }
-    const Index_t npix = a.get_nb_entries();
     const bool soa =
         (out.get_storage_order() == StorageOrder::StructureOfArrays);
     internal::cross_buffers<T>(a.view().data(), b.view().data(),
