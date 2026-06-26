@@ -37,8 +37,7 @@
  *
  */
 
-#include "fem_gradient_2d.hh"
-#include "fem_gradient_3d.hh"
+#include "fem_gradient.hh"
 
 #include "memory/gpu_runtime.hh"
 
