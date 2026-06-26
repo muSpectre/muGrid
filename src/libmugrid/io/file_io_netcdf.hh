@@ -71,12 +71,10 @@ const auto ncmu_inq_attname = ncmpi_inq_attname;
 const auto ncmu_inq_att = ncmpi_inq_att;
 const auto ncmu_get_vara_all = ncmpi_get_vara_all;
 const auto ncmu_get_varm_all = ncmpi_get_varm_all;
-const auto ncmu_get_varm = ncmpi_get_varm;
 const auto ncmu_get_varn_all = ncmpi_get_varn_all;
 const auto ncmu_get_att = ncmpi_get_att;
 const auto ncmu_put_vara_all = ncmpi_put_vara_all;
 const auto ncmu_put_varm_all = ncmpi_put_varm_all;
-const auto ncmu_put_varm = ncmpi_put_varm;
 const auto ncmu_put_varn_all = ncmpi_put_varn_all;
 const auto ncmu_put_att_text = ncmpi_put_att_text;
 const auto ncmu_put_att = ncmpi_put_att;
@@ -103,12 +101,10 @@ const auto ncmu_inq_attname = nc_inq_attname;
 const auto ncmu_inq_att = nc_inq_att;
 const auto ncmu_get_vara_all = nc_get_vara;
 const auto ncmu_get_varm_all = nc_get_varm;
-const auto ncmu_get_varm = nc_get_varm;
 const auto ncmu_get_varn_all = nc_get_vara;
 const auto ncmu_get_att = nc_get_att;
 const auto ncmu_put_vara_all = nc_put_vara;
 const auto ncmu_put_varm_all = nc_put_varm;
-const auto ncmu_put_varm = nc_put_varm;
 const auto ncmu_put_varn_all = nc_put_vara;
 const auto ncmu_put_att_text = nc_put_att_text;
 const auto ncmu_put_att = nc_put_att;
@@ -117,6 +113,40 @@ using Datatype_t = nc_type;
 using IOSize_t = size_t;
 using IODiff_t = ptrdiff_t;
 #endif  // WITH_MPI
+
+// Uniform varm wrappers. They confine the only behavioural difference between
+// the serial and the MPI/PnetCDF backends -- whether the transfer is
+// collective and carries an MPI buffer count and datatype -- to this single
+// location, so the read/write paths in file_io_netcdf.cc carry no #ifdef. The
+// `bufcount`/`buftype` arguments are honoured by PnetCDF's collective
+// `*_varm_all` and ignored by serial NetCDF's `*_varm`; callers always supply
+// them (computed via the existing Datatype_t abstraction, valid in both
+// builds).
+inline int ncmu_put_varm_unified(int ncid, int varid, const IOSize_t * start,
+                                 const IOSize_t * count, const IODiff_t * stride,
+                                 const IODiff_t * imap, const void * buf,
+                                 [[maybe_unused]] IOSize_t bufcount,
+                                 [[maybe_unused]] Datatype_t buftype) {
+#ifdef WITH_MPI
+  return ncmu_put_varm_all(ncid, varid, start, count, stride, imap, buf,
+                           bufcount, buftype);
+#else   // WITH_MPI
+  return ncmu_put_varm_all(ncid, varid, start, count, stride, imap, buf);
+#endif  // WITH_MPI
+}
+
+inline int ncmu_get_varm_unified(int ncid, int varid, const IOSize_t * start,
+                                 const IOSize_t * count, const IODiff_t * stride,
+                                 const IODiff_t * imap, void * buf,
+                                 [[maybe_unused]] IOSize_t bufcount,
+                                 [[maybe_unused]] Datatype_t buftype) {
+#ifdef WITH_MPI
+  return ncmu_get_varm_all(ncid, varid, start, count, stride, imap, buf,
+                           bufcount, buftype);
+#else   // WITH_MPI
+  return ncmu_get_varm_all(ncid, varid, start, count, stride, imap, buf);
+#endif  // WITH_MPI
+}
 
 namespace muGrid {
 
