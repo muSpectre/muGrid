@@ -170,6 +170,19 @@ class Device {
 #endif
     }
 
+    /**
+     * Factory for the GPU currently selected in the runtime.
+     *
+     * Unlike gpu(), which defaults to device 0, this queries the active
+     * device id from the GPU runtime (cudaGetDevice / hipGetDevice) — the
+     * device the calling rank/thread actually operates on. Use it when the
+     * correct device id is not otherwise known (e.g. deciding whether a
+     * device buffer is host-accessible inside FFT/MPI routines). Returns the
+     * CPU device on a build without a GPU backend. Not constexpr: it performs
+     * a runtime query.
+     */
+    static Device current_gpu();
+
    protected:
     DeviceType device_type;  //!< Type of device (CPU, CUDA, ROCm, etc.)
     int device_id;           //!< Device ID for multi-GPU systems

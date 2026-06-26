@@ -4,6 +4,20 @@ Change log for µGrid
 Unreleased
 ----------
 
+- ENH: Field allocation profiling, always compiled in and off by default
+  (recording is gated by an atomic flag, so when disabled the per-allocation
+  cost is a single relaxed atomic load). Enable from code or by setting
+  `MUGRID_PROFILE_ALLOCATIONS=1`. Reports, on demand, the time-weighted average
+  and peak memory footprint per memory pool together with the names of the
+  allocated buffers and the physical capacity of each pool. Host and device are
+  reported separately, or jointly on a unified memory architecture. Exposed in
+  Python as `enable_allocation_profiling()`, `allocation_profile()` and
+  `format_allocation_profile()`
+- ENH: On unified-memory devices, the non-GPU-aware MPI host-staging bounce in
+  ghost exchange and the FFT pencil transpose is also skipped, reading and
+  writing the host-coherent device staging in place (building on
+  `Device::is_host_accessible`). The `MUGRID_UNIFIED_MEMORY` environment
+  variable overrides the integrated-device probe.
 - ENH: The cuFFT and rocFFT backends now perform whole multidimensional r2c/c2r
   transforms natively, so a serial GPU engine issues one planned transform
   instead of an axis-by-axis loop. Brings serial 3D GPU FFT to within ~10% of

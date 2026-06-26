@@ -13,6 +13,7 @@
 #include <vector>
 #include "mpi/cartesian_communicator.hh"
 
+#include "memory/device.hh"
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
 #include "mpi/gpu_aware_mpi.hh"
@@ -371,8 +372,12 @@ namespace muGrid {
         GPU_DEVICE_SYNCHRONIZE();
 #endif
         // Without GPU-aware MPI, bounce the contiguous staging buffers
-        // through host memory (correct with any MPI library).
-        const bool bounce{!mpi_is_gpu_aware()};
+        // through host memory (correct with any MPI library). On a unified-
+        // memory / integrated device the staging buffer is already
+        // host-addressable, so any MPI can read it directly and no bounce is
+        // needed.
+        const bool bounce{!mpi_is_gpu_aware() &&
+                          !Device::current_gpu().is_host_accessible()};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {

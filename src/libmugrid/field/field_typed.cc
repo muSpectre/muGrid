@@ -219,6 +219,10 @@ namespace muGrid {
 #endif
       }
 
+      // Tag the buffer with the field name and device so the allocation
+      // profiler can attribute it (no-op unless MUGRID_PROFILE_ALLOCATIONS).
+      this->values.set_label(this->get_name(), this->get_device_string());
+
       // Use our resize function
       muGrid::resize(this->values, expected_size);
       // Zero-initialize the new memory

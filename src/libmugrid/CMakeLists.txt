@@ -54,6 +54,8 @@ set(MUGRID_SOURCES
     # memory/
     memory/device.cc
     memory/device_alloc.cc
+    memory/memory_info.cc
+    memory/allocation_profiler.cc
     mpi/gpu_aware_mpi.cc
     # util/
     # linalg/

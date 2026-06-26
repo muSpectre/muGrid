@@ -35,6 +35,8 @@
 
 #include "device.hh"
 
+#include <cstdlib>
+#include <cstring>
 #include <map>
 
 #if defined(MUGRID_ENABLE_CUDA)
@@ -44,6 +46,22 @@
 #endif
 
 namespace muGrid {
+
+namespace {
+    //! Parse MUGRID_UNIFIED_MEMORY. Returns -1 if unset, 0/1 otherwise. The
+    //! variable forces the integrated/host-accessible answer for platforms
+    //! where the runtime probe is unreliable (e.g. APUs needing a particular
+    //! unified/XNACK mode) or to force the conservative host-staging path.
+    int unified_memory_env_override() {
+        const char * env{std::getenv("MUGRID_UNIFIED_MEMORY")};
+        if (env == nullptr || std::strlen(env) == 0) {
+            return -1;
+        }
+        const char c{env[0]};
+        return (c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T') ? 1
+                                                                          : 0;
+    }
+}  // namespace
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace {
@@ -56,22 +74,45 @@ namespace {
             return it->second;
         }
         bool integrated{false};
+        const int override{unified_memory_env_override()};
+        if (override >= 0) {
+            integrated = (override == 1);
+        } else {
 #if defined(MUGRID_ENABLE_CUDA)
-        cudaDeviceProp prop{};
-        if (cudaGetDeviceProperties(&prop, device_id) == cudaSuccess) {
-            integrated = (prop.integrated != 0);
-        }
+            cudaDeviceProp prop{};
+            if (cudaGetDeviceProperties(&prop, device_id) == cudaSuccess) {
+                integrated = (prop.integrated != 0);
+            }
 #else   // MUGRID_ENABLE_HIP
-        hipDeviceProp_t prop{};
-        if (hipGetDeviceProperties(&prop, device_id) == hipSuccess) {
-            integrated = (prop.integrated != 0);
-        }
+            hipDeviceProp_t prop{};
+            if (hipGetDeviceProperties(&prop, device_id) == hipSuccess) {
+                integrated = (prop.integrated != 0);
+            }
 #endif
+        }
         cache[device_id] = integrated;
         return integrated;
     }
 }  // namespace
 #endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
+
+Device Device::current_gpu() {
+#if defined(MUGRID_ENABLE_CUDA)
+    int id{0};
+    if (cudaGetDevice(&id) != cudaSuccess) {
+        id = 0;
+    }
+    return Device{DeviceType::CUDA, id};
+#elif defined(MUGRID_ENABLE_HIP)
+    int id{0};
+    if (hipGetDevice(&id) != hipSuccess) {
+        id = 0;
+    }
+    return Device{DeviceType::ROCm, id};
+#else
+    return Device::cpu();
+#endif
+}
 
 bool Device::is_host_accessible() const {
     switch (this->device_type) {

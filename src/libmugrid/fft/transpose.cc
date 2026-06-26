@@ -38,6 +38,7 @@
 #include "core/exception.hh"
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
+#include "memory/device.hh"
 #include "mpi/gpu_aware_mpi.hh"
 
 #include <algorithm>
@@ -541,8 +542,11 @@ namespace muGrid {
         // Without GPU-aware MPI, the flat exchange below operates on host
         // bounce buffers instead of the device staging (correct with any
         // MPI library); the pack/unpack stays on the device either way. The
-        // host path never bounces (the staging is already host memory).
-        const bool bounce{dev && !mpi_is_gpu_aware()};
+        // host path never bounces (the staging is already host memory), and
+        // neither does a unified-memory / integrated device, whose staging is
+        // already host-addressable (so any MPI can read it directly).
+        const bool bounce{dev && !mpi_is_gpu_aware() &&
+                          !Device::current_gpu().is_host_accessible()};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {
