@@ -65,35 +65,11 @@ namespace muGrid {
                                            const Field & gradient_field,
                                            Index_t & nb_components) const {
 
-        // Get field collections
-        auto & nodal_collection = nodal_field.get_collection();
-        auto & gradient_collection = gradient_field.get_collection();
-
-        // Must be the same collection
-        if (&nodal_collection != &gradient_collection) {
-            throw RuntimeError("Nodal and gradient fields must belong to the "
-                               "same field collection");
-        }
-
-        // Must be global field collection
-        auto * global_fc =
-            dynamic_cast<const GlobalFieldCollection *>(&nodal_collection);
-        if (!global_fc) {
-            throw RuntimeError(
-                "FEMGradientOperator2D requires GlobalFieldCollection");
-        }
-
-        // Check dimension matches
-        if (global_fc->get_spatial_dim() != DIM) {
-            throw RuntimeError("Field collection dimension (" +
-                               std::to_string(global_fc->get_spatial_dim()) +
-                               ") does not match operator dimension (2)");
-        }
-
-        // Check ghost layers against the reported stencil requirement; the
-        // scatter-style transpose has the same requirement as apply
-        this->check_ghost_requirement(*global_fc, false,
-                                      "FEMGradientOperator2D");
+        // Common checks: same collection, global, matching dimension, and
+        // ghost layers (the scatter-style transpose has the same requirement
+        // as apply).
+        const auto & global_fc = this->check_fields(
+            nodal_field, gradient_field, "FEMGradientOperator2D");
 
         // Get and validate component counts
         Index_t nb_nodal_components = nodal_field.get_nb_components();
@@ -112,7 +88,7 @@ namespace muGrid {
         }
 
         nb_components = nb_nodal_components;
-        return *global_fc;
+        return global_fc;
     }
 
     std::vector<Real> FEMGradientOperator2D::get_quadrature_weights() const {

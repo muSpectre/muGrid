@@ -43,8 +43,7 @@ set(MUGRID_SOURCES
     mpi/cartesian_decomposition.cc
     # operators/
         operators/generic.cc
-        operators/laplace_2d.cc
-        operators/laplace_3d.cc
+        operators/laplace.cc
         operators/fem_gradient_2d.cc
         operators/fem_gradient_3d.cc
         operators/solids/isotropic_stiffness_2d.cc

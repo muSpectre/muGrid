@@ -111,31 +111,11 @@ namespace muGrid {
                                            const Field & gradient_field,
                                            Index_t & nb_components) const {
 
-        auto & nodal_collection = nodal_field.get_collection();
-        auto & gradient_collection = gradient_field.get_collection();
-
-        if (&nodal_collection != &gradient_collection) {
-            throw RuntimeError("Nodal and gradient fields must belong to the "
-                               "same field collection");
-        }
-
-        auto * global_fc =
-            dynamic_cast<const GlobalFieldCollection *>(&nodal_collection);
-        if (!global_fc) {
-            throw RuntimeError(
-                "FEMGradientOperator3D requires GlobalFieldCollection");
-        }
-
-        if (global_fc->get_spatial_dim() != DIM) {
-            throw RuntimeError("Field collection dimension (" +
-                               std::to_string(global_fc->get_spatial_dim()) +
-                               ") does not match operator dimension (3)");
-        }
-
-        // Check ghost layers against the reported stencil requirement; the
-        // scatter-style transpose has the same requirement as apply
-        this->check_ghost_requirement(*global_fc, false,
-                                      "FEMGradientOperator3D");
+        // Common checks: same collection, global, matching dimension, and
+        // ghost layers (the scatter-style transpose has the same requirement
+        // as apply).
+        const auto & global_fc = this->check_fields(
+            nodal_field, gradient_field, "FEMGradientOperator3D");
 
         Index_t nb_nodal_components = nodal_field.get_nb_components();
         Index_t nb_grad_components = gradient_field.get_nb_components();
@@ -153,7 +133,7 @@ namespace muGrid {
         }
 
         nb_components = nb_nodal_components;
-        return *global_fc;
+        return global_fc;
     }
 
     std::vector<Real> FEMGradientOperator3D::get_quadrature_weights() const {
