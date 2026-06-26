@@ -96,6 +96,24 @@ namespace {
 }  // namespace
 #endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 
+Device Device::current_gpu() {
+#if defined(MUGRID_ENABLE_CUDA)
+    int id{0};
+    if (cudaGetDevice(&id) != cudaSuccess) {
+        id = 0;
+    }
+    return Device{DeviceType::CUDA, id};
+#elif defined(MUGRID_ENABLE_HIP)
+    int id{0};
+    if (hipGetDevice(&id) != hipSuccess) {
+        id = 0;
+    }
+    return Device{DeviceType::ROCm, id};
+#else
+    return Device::cpu();
+#endif
+}
+
 bool Device::is_host_accessible() const {
     switch (this->device_type) {
         case DeviceType::CPU:

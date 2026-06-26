@@ -377,7 +377,7 @@ namespace muGrid {
         // host-addressable, so any MPI can read it directly and no bounce is
         // needed.
         const bool bounce{!mpi_is_gpu_aware() &&
-                          !Device::gpu().is_host_accessible()};
+                          !Device::current_gpu().is_host_accessible()};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {

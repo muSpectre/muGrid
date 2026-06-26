@@ -546,7 +546,7 @@ namespace muGrid {
         // neither does a unified-memory / integrated device, whose staging is
         // already host-addressable (so any MPI can read it directly).
         const bool bounce{dev && !mpi_is_gpu_aware() &&
-                          !Device::gpu().is_host_accessible()};
+                          !Device::current_gpu().is_host_accessible()};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {
