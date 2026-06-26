@@ -44,12 +44,7 @@
 #include <unistd.h>
 #endif
 
-#if defined(MUGRID_ENABLE_CUDA)
-#include <cuda_runtime.h>
-#endif
-#if defined(MUGRID_ENABLE_HIP)
-#include <hip/hip_runtime.h>
-#endif
+#include "memory/gpu_runtime.hh"
 
 namespace muGrid {
 
@@ -97,35 +92,20 @@ namespace muGrid {
 
     MemoryCapacity device_memory_capacity(int device_id) {
         MemoryCapacity cap{};
-#if defined(MUGRID_ENABLE_CUDA)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         int previous{-1};
         if (device_id >= 0) {
-            cudaGetDevice(&previous);
-            cudaSetDevice(device_id);
+            previous = gpu_get_device();
+            gpu_set_device(device_id);
         }
         std::size_t free_bytes{0}, total_bytes{0};
-        if (cudaMemGetInfo(&free_bytes, &total_bytes) == cudaSuccess) {
+        if (gpu_mem_get_info(free_bytes, total_bytes)) {
             cap.total = total_bytes;
             cap.available = free_bytes;
             cap.valid = true;
         }
         if (previous >= 0) {
-            cudaSetDevice(previous);
-        }
-#elif defined(MUGRID_ENABLE_HIP)
-        int previous{-1};
-        if (device_id >= 0) {
-            hipGetDevice(&previous);
-            hipSetDevice(device_id);
-        }
-        std::size_t free_bytes{0}, total_bytes{0};
-        if (hipMemGetInfo(&free_bytes, &total_bytes) == hipSuccess) {
-            cap.total = total_bytes;
-            cap.available = free_bytes;
-            cap.valid = true;
-        }
-        if (previous >= 0) {
-            hipSetDevice(previous);
+            gpu_set_device(previous);
         }
 #else
         (void)device_id;
