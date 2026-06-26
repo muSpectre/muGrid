@@ -167,8 +167,8 @@ namespace muGrid {
             Index_t nodal_stride_z, Index_t nodal_stride_n, Real hx, Real hy,
             Real hz, const Real * quad_weights, Real alpha, bool increment);
 
-#if defined(MUGRID_ENABLE_CUDA)
-        void fem_gradient_2d_cuda(const Real * nodal_input,
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        void fem_gradient_2d_gpu(const Real * nodal_input,
                                   Real * gradient_output, Index_t nx,
                                   Index_t ny, Index_t nodal_stride_x,
                                   Index_t nodal_stride_y,
@@ -177,7 +177,7 @@ namespace muGrid {
                                   Index_t grad_stride_d, Real hx, Real hy,
                                   Real alpha, bool increment);
         void
-        fem_divergence_2d_cuda(const Real * gradient_input, Real * nodal_output,
+        fem_divergence_2d_gpu(const Real * gradient_input, Real * nodal_output,
                                Index_t nx, Index_t ny, Index_t grad_stride_x,
                                Index_t grad_stride_y, Index_t grad_stride_q,
                                Index_t grad_stride_d, Index_t nodal_stride_x,
@@ -185,7 +185,7 @@ namespace muGrid {
                                Real hx, Real hy, const Real * quad_weights,
                                Real alpha, bool increment);
         void
-        fem_gradient_3d_cuda(const Real * nodal_input, Real * gradient_output,
+        fem_gradient_3d_gpu(const Real * nodal_input, Real * gradient_output,
                              Index_t nx, Index_t ny, Index_t nz,
                              Index_t nodal_stride_x, Index_t nodal_stride_y,
                              Index_t nodal_stride_z, Index_t nodal_stride_n,
@@ -193,42 +193,7 @@ namespace muGrid {
                              Index_t grad_stride_z, Index_t grad_stride_q,
                              Index_t grad_stride_d, Real hx, Real hy, Real hz,
                              Real alpha, bool increment);
-        void fem_divergence_3d_cuda(
-            const Real * gradient_input, Real * nodal_output, Index_t nx,
-            Index_t ny, Index_t nz, Index_t grad_stride_x,
-            Index_t grad_stride_y, Index_t grad_stride_z, Index_t grad_stride_q,
-            Index_t grad_stride_d, Index_t nodal_stride_x,
-            Index_t nodal_stride_y, Index_t nodal_stride_z,
-            Index_t nodal_stride_n, Real hx, Real hy, Real hz,
-            const Real * quad_weights, Real alpha, bool increment);
-#endif
-#if defined(MUGRID_ENABLE_HIP)
-        void fem_gradient_2d_hip(const Real * nodal_input,
-                                 Real * gradient_output, Index_t nx, Index_t ny,
-                                 Index_t nodal_stride_x, Index_t nodal_stride_y,
-                                 Index_t nodal_stride_n, Index_t grad_stride_x,
-                                 Index_t grad_stride_y, Index_t grad_stride_q,
-                                 Index_t grad_stride_d, Real hx, Real hy,
-                                 Real alpha, bool increment);
-        void fem_divergence_2d_hip(const Real * gradient_input,
-                                   Real * nodal_output, Index_t nx, Index_t ny,
-                                   Index_t grad_stride_x, Index_t grad_stride_y,
-                                   Index_t grad_stride_q, Index_t grad_stride_d,
-                                   Index_t nodal_stride_x,
-                                   Index_t nodal_stride_y,
-                                   Index_t nodal_stride_n, Real hx, Real hy,
-                                   const Real * quad_weights, Real alpha,
-                                   bool increment);
-        void fem_gradient_3d_hip(const Real * nodal_input,
-                                 Real * gradient_output, Index_t nx, Index_t ny,
-                                 Index_t nz, Index_t nodal_stride_x,
-                                 Index_t nodal_stride_y, Index_t nodal_stride_z,
-                                 Index_t nodal_stride_n, Index_t grad_stride_x,
-                                 Index_t grad_stride_y, Index_t grad_stride_z,
-                                 Index_t grad_stride_q, Index_t grad_stride_d,
-                                 Real hx, Real hy, Real hz, Real alpha,
-                                 bool increment);
-        void fem_divergence_3d_hip(
+        void fem_divergence_3d_gpu(
             const Real * gradient_input, Real * nodal_output, Index_t nx,
             Index_t ny, Index_t nz, Index_t grad_stride_x,
             Index_t grad_stride_y, Index_t grad_stride_z, Index_t grad_stride_q,
@@ -651,11 +616,7 @@ namespace muGrid {
                 for (Index_t comp = 0; comp < nb_components; ++comp) {
                     const Real * nodal_comp = nodal + comp * nodal_stride_c;
                     Real * gradient_comp = gradient + comp * grad_stride_c;
-#if defined(MUGRID_ENABLE_CUDA)
-                    fem_gradient_kernels::fem_gradient_2d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-                    fem_gradient_kernels::fem_gradient_2d_hip(
-#endif
+                    fem_gradient_kernels::fem_gradient_2d_gpu(
                         nodal_comp, gradient_comp, nx, ny, nodal_stride_x,
                         nodal_stride_y, nodal_stride_n, grad_stride_x,
                         grad_stride_y, grad_stride_q, grad_stride_d,
@@ -678,11 +639,7 @@ namespace muGrid {
                 for (Index_t comp = 0; comp < nb_components; ++comp) {
                     const Real * nodal_comp = nodal + comp * nodal_stride_c;
                     Real * gradient_comp = gradient + comp * grad_stride_c;
-#if defined(MUGRID_ENABLE_CUDA)
-                    fem_gradient_kernels::fem_gradient_3d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-                    fem_gradient_kernels::fem_gradient_3d_hip(
-#endif
+                    fem_gradient_kernels::fem_gradient_3d_gpu(
                         nodal_comp, gradient_comp, nx, ny, nz, nodal_stride_x,
                         nodal_stride_y, nodal_stride_z, nodal_stride_n,
                         grad_stride_x, grad_stride_y, grad_stride_z,
@@ -724,11 +681,7 @@ namespace muGrid {
                 for (Index_t comp = 0; comp < nb_components; ++comp) {
                     const Real * gradient_comp = gradient + comp * grad_stride_c;
                     Real * nodal_comp = nodal + comp * nodal_stride_c;
-#if defined(MUGRID_ENABLE_CUDA)
-                    fem_gradient_kernels::fem_divergence_2d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-                    fem_gradient_kernels::fem_divergence_2d_hip(
-#endif
+                    fem_gradient_kernels::fem_divergence_2d_gpu(
                         gradient_comp, nodal_comp, nx, ny, grad_stride_x,
                         grad_stride_y, grad_stride_q, grad_stride_d,
                         nodal_stride_x, nodal_stride_y, nodal_stride_n,
@@ -759,11 +712,7 @@ namespace muGrid {
                 for (Index_t comp = 0; comp < nb_components; ++comp) {
                     const Real * gradient_comp = gradient + comp * grad_stride_c;
                     Real * nodal_comp = nodal + comp * nodal_stride_c;
-#if defined(MUGRID_ENABLE_CUDA)
-                    fem_gradient_kernels::fem_divergence_3d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-                    fem_gradient_kernels::fem_divergence_3d_hip(
-#endif
+                    fem_gradient_kernels::fem_divergence_3d_gpu(
                         gradient_comp, nodal_comp, nx, ny, nz, grad_stride_x,
                         grad_stride_y, grad_stride_z, grad_stride_q,
                         grad_stride_d, nodal_stride_x, nodal_stride_y,

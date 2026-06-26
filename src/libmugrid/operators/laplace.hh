@@ -87,22 +87,15 @@ namespace muGrid {
             Real scale,
             bool increment = false);
 
-#if defined(MUGRID_ENABLE_CUDA)
-        void laplace_2d_cuda(
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // Single GPU launcher per stencil (the CUDA/HIP backend split lives
+        // inside gpu_runtime.hh, not in the operator), matching the generic and
+        // stiffness operators' *_gpu convention.
+        void laplace_2d_gpu(
             const Real* input, Real* output, Index_t nx, Index_t ny,
             Index_t stride_x, Index_t stride_y, Real scale,
             bool increment = false);
-        void laplace_3d_cuda(
-            const Real* input, Real* output, Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z, Real scale,
-            bool increment = false);
-#endif
-#if defined(MUGRID_ENABLE_HIP)
-        void laplace_2d_hip(
-            const Real* input, Real* output, Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y, Real scale,
-            bool increment = false);
-        void laplace_3d_hip(
+        void laplace_3d_gpu(
             const Real* input, Real* output, Index_t nx, Index_t ny, Index_t nz,
             Index_t stride_x, Index_t stride_y, Index_t stride_z, Real scale,
             bool increment = false);
@@ -350,27 +343,14 @@ namespace muGrid {
             const Real effective_scale = alpha * this->scale;
 
             if constexpr (Dim == 2) {
-#if defined(MUGRID_ENABLE_CUDA)
-                laplace_kernels::laplace_2d_cuda(
+                laplace_kernels::laplace_2d_gpu(
                     input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
                     nb_grid_pts[0], effective_scale, increment);
-#elif defined(MUGRID_ENABLE_HIP)
-                laplace_kernels::laplace_2d_hip(
-                    input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
-                    nb_grid_pts[0], effective_scale, increment);
-#endif
             } else {
-#if defined(MUGRID_ENABLE_CUDA)
-                laplace_kernels::laplace_3d_cuda(
+                laplace_kernels::laplace_3d_gpu(
                     input, output, nb_grid_pts[0], nb_grid_pts[1],
                     nb_grid_pts[2], 1, nb_grid_pts[0],
                     nb_grid_pts[0] * nb_grid_pts[1], effective_scale, increment);
-#elif defined(MUGRID_ENABLE_HIP)
-                laplace_kernels::laplace_3d_hip(
-                    input, output, nb_grid_pts[0], nb_grid_pts[1],
-                    nb_grid_pts[2], 1, nb_grid_pts[0],
-                    nb_grid_pts[0] * nb_grid_pts[1], effective_scale, increment);
-#endif
             }
         }
 #endif

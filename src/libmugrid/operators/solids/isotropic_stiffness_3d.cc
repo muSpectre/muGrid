@@ -33,7 +33,7 @@
  *
  */
 
-#include "isotropic_stiffness_3d.hh"
+#include "isotropic_stiffness.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
@@ -74,16 +74,8 @@ namespace muGrid {
     static const Real W_3D[5] = {1.0 / 3.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0,
                                  1.0 / 6.0};
 
-    IsotropicStiffnessOperator3D::IsotropicStiffnessOperator3D(
-        const std::vector<Real> & grid_spacing)
-        : grid_spacing{grid_spacing} {
-        if (grid_spacing.size() != 3) {
-            throw RuntimeError("3D operator requires 3D grid spacing");
-        }
-        this->precompute_matrices();
-    }
-
-    void IsotropicStiffnessOperator3D::precompute_matrices() {
+    template <>
+    void IsotropicStiffnessOperator<3>::precompute_matrices() {
         // Initialize matrices to zero
         std::fill(G_matrix.begin(), G_matrix.end(), 0.0);
         std::fill(V_matrix.begin(), V_matrix.end(), 0.0);
@@ -202,21 +194,8 @@ namespace muGrid {
         }
     }
 
-    void IsotropicStiffnessOperator3D::apply(
-        const TypedFieldBase<Real> & displacement,
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
-        TypedFieldBase<Real> & force) const {
-        apply_impl(displacement, lambda, mu, 1.0, force, false);
-    }
-
-    void IsotropicStiffnessOperator3D::apply_increment(
-        const TypedFieldBase<Real> & displacement,
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
-        Real alpha, TypedFieldBase<Real> & force) const {
-        apply_impl(displacement, lambda, mu, alpha, force, true);
-    }
-
-    void IsotropicStiffnessOperator3D::apply_impl(
+    template <>
+    void IsotropicStiffnessOperator<3>::apply_impl(
         const TypedFieldBase<Real> & displacement,
         const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
         Real alpha, TypedFieldBase<Real> & force, bool increment) const {
