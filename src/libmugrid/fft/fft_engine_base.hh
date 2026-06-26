@@ -79,7 +79,8 @@ class FFTEngineBase : public CartesianDecomposition {
                 const DynGridIndex & nb_ghosts_left = DynGridIndex{},
                 const DynGridIndex & nb_ghosts_right = DynGridIndex{},
                 const SubPtMap_t & nb_sub_pts = {},
-                Device device = Device::cpu());
+                Device device = Device::cpu(),
+                const std::string & decomposition = "auto");
 
   FFTEngineBase() = delete;
   FFTEngineBase(const FFTEngineBase &) = delete;

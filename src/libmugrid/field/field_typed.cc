@@ -209,12 +209,12 @@ namespace muGrid {
         const int device_id = this->get_device_id();
 #if defined(MUGRID_ENABLE_CUDA)
         if constexpr (std::is_same_v<MemorySpace, CUDASpace>) {
-          cudaSetDevice(device_id);
+          (void)cudaSetDevice(device_id);
         }
 #endif
 #if defined(MUGRID_ENABLE_HIP)
         if constexpr (std::is_same_v<MemorySpace, ROCmSpace>) {
-          hipSetDevice(device_id);
+          (void)hipSetDevice(device_id);
         }
 #endif
       }

@@ -39,6 +39,7 @@
 #include "core/types.hh"
 #include "core/coordinates.hh"
 
+#include <string>
 #include <vector>
 
 namespace muGrid {
@@ -166,9 +167,14 @@ void distribute_dimension(Index_t global_size, int comm_size, int rank,
  * @param nb_grid_pts  Grid dimensions (used to prefer certain factorizations)
  * @param p1           Output: first dimension of process grid
  * @param p2           Output: second dimension of process grid
+ * @param decomposition  "auto" (heuristic, default), "pencil" (force the
+ *                       most-square 2D split) or "slab" (force a single split
+ *                       axis: P2=1, P1=num_ranks in 3D, so X and Y stay local
+ *                       and the FFT uses the native N-D transform). "slab"
+ *                       requires num_ranks <= Nz in 3D.
  */
 void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & p1,
-                         int & p2);
+                         int & p2, const std::string & decomposition = "auto");
 
 }  // namespace muGrid
 

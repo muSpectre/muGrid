@@ -40,8 +40,11 @@
 
 #include <rocfft/rocfft.h>
 
-#include <unordered_map>
+#include <cstddef>
+#include <string>
 #include <tuple>
+#include <unordered_map>
+#include <vector>
 
 namespace muGrid {
 
@@ -79,6 +82,21 @@ class rocFFTBackend : public FFT1DBackend {
   void c2c_backward(Index_t n, Index_t batch, const Complex * input,
                     Index_t in_stride, Index_t in_dist, Complex * output,
                     Index_t out_stride, Index_t out_dist) override;
+
+  //! rocFFT performs whole multidimensional r2c/c2r transforms natively, so the
+  //! serial engine hands the entire transform over in one planned call instead
+  //! of driving it axis-by-axis (mirrors the cuFFT backend).
+  bool supports_nd() const override { return true; }
+
+  void r2c_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Real * input,
+              const std::vector<Index_t> & in_strides, Complex * output,
+              const std::vector<Index_t> & out_strides) override;
+
+  void c2r_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Complex * input,
+              const std::vector<Index_t> & in_strides, Real * output,
+              const std::vector<Index_t> & out_strides) override;
 
   bool supports_device_memory() const override { return true; }
 
@@ -156,12 +174,38 @@ class rocFFTBackend : public FFT1DBackend {
                         Index_t out_stride, Index_t out_dist);
 
   /**
+   * Get or create a cached N-dimensional plan (R2C or C2R). `lengths` and the
+   * stride arrays are in rocFFT order (fastest-varying dimension first); the
+   * `*_dist` are the batch (component) strides. Cached by a string signature.
+   */
+  CachedPlan & get_nd_plan(TransformType type,
+                           const std::vector<size_t> & lengths,
+                           const std::vector<size_t> & in_strides,
+                           size_t in_dist,
+                           const std::vector<size_t> & out_strides,
+                           size_t out_dist, size_t batch);
+
+  /**
+   * Device scratch buffer of at least `bytes` (grow-only). Used to stage the
+   * Fourier input of `c2r_nd`, since rocFFT's real-inverse transform may
+   * overwrite its input but the engine requires it preserved.
+   */
+  void * ensure_nd_scratch(size_t bytes);
+
+  /**
    * Check rocFFT result and throw on error.
    */
   static void check_rocfft_result(rocfft_status result, const char * operation);
 
-  //! Plan cache
+  //! Plan cache (1D batched transforms)
   std::unordered_map<PlanKey, CachedPlan, PlanKeyHash> plan_cache;
+
+  //! Plan cache for N-dimensional transforms, keyed by a string signature
+  std::unordered_map<std::string, CachedPlan> nd_plan_cache;
+
+  //! Grow-only scratch for c2r_nd input preservation
+  void * nd_scratch{nullptr};
+  size_t nd_scratch_bytes{0};
 
   //! Flag to track if rocfft_setup has been called
   static bool rocfft_initialized;

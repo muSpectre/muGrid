@@ -10,7 +10,8 @@
  * Used by the allocation profiler to report how much of a memory pool is in
  * use relative to what physically exists. On a unified-memory architecture
  * host and device draw on the same pool, so only the device query is used
- * (it already reports the shared capacity); see memory/unified_memory.hh.
+ * (it already reports the shared capacity); see Device::is_host_accessible()
+ * in memory/device.hh.
  *
  * Copyright © 2026 Lars Pastewka
  *

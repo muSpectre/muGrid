@@ -75,6 +75,48 @@ void check_complex_aligned(const void * ptr, const char * operation) {
   }
   // GCOVR_EXCL_STOP
 }
+
+// cuFFT advanced-data-layout parameters for one side (input or output) of an
+// N-D transform, derived from the per-axis element strides the engine passes.
+struct NdLayout {
+  std::vector<int> n;       // logical transform sizes, slowest-varying first
+  std::vector<int> embed;   // physical padded extents (handles ghost padding)
+  int stride;               // innermost-element stride
+  int dist;                 // batch (component) stride
+};
+
+// Build the layout from `shape` (full extent incl. the component/batch axis),
+// `axes` (transformed axes, half-complex axis last) and `strides` (element
+// stride of every axis). cuFFT addresses element (i_0,…,i_{r-1}) within a batch
+// at offset (((i_0·embed[1]+i_1)·embed[2]+…)+i_{r-1})·stride; matching that to
+// the requested per-axis strides s[k] gives embed[j]=s[j-1]/s[j] and
+// stride=s[r-1]. The non-transformed axis 0 is the batch (dist = strides[0]).
+NdLayout derive_nd_layout(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes,
+                          const std::vector<Index_t> & strides) {
+  const std::size_t rank{axes.size()};
+  NdLayout L;
+  L.n.resize(rank);
+  L.embed.resize(rank);
+  std::vector<Index_t> s(rank);
+  for (std::size_t k{0}; k < rank; ++k) {
+    L.n[k] = static_cast<int>(shape[axes[k]]);
+    s[k] = strides[axes[k]];
+  }
+  L.stride = static_cast<int>(s[rank - 1]);
+  L.embed[0] = L.n[0];
+  for (std::size_t j{1}; j < rank; ++j) {
+    if (s[j] == 0 || s[j - 1] % s[j] != 0) {
+      throw RuntimeError(
+          "cuFFT N-D transform requires a nested (row-major) field layout; "
+          "the per-axis strides are not multiples of the inner stride. This "
+          "should not happen for muGrid FFT-engine fields.");
+    }
+    L.embed[j] = static_cast<int>(s[j - 1] / s[j]);
+  }
+  L.dist = static_cast<int>(strides[0]);
+  return L;
+}
 }  // namespace
 
 cuFFTBackend::cuFFTBackend() : plan_cache{} {}
@@ -83,6 +125,12 @@ cuFFTBackend::~cuFFTBackend() {
   // Destroy all cached plans
   for (auto & entry : this->plan_cache) {
     cufftDestroy(entry.second);
+  }
+  for (auto & entry : this->nd_plan_cache) {
+    cufftDestroy(entry.second);
+  }
+  if (this->nd_scratch != nullptr) {
+    cudaFree(this->nd_scratch);
   }
 }
 
@@ -119,15 +167,21 @@ void cuFFTBackend::check_cufft_result(cufftResult result,
     case CUFFT_UNALIGNED_DATA:
       error << "CUFFT_UNALIGNED_DATA";
       break;
+// CUFFT_INCOMPLETE_PARAMETER_LIST and CUFFT_PARSE_ERROR were removed from the
+// cufftResult enum in cuFFT 12 (CUDA 13, CUFFT_VERSION 12300).
+#if !defined(CUFFT_VERSION) || CUFFT_VERSION < 12300
     case CUFFT_INCOMPLETE_PARAMETER_LIST:
       error << "CUFFT_INCOMPLETE_PARAMETER_LIST";
       break;
+#endif
     case CUFFT_INVALID_DEVICE:
       error << "CUFFT_INVALID_DEVICE";
       break;
+#if !defined(CUFFT_VERSION) || CUFFT_VERSION < 12300
     case CUFFT_PARSE_ERROR:
       error << "CUFFT_PARSE_ERROR";
       break;
+#endif
     case CUFFT_NO_WORKSPACE:
       error << "CUFFT_NO_WORKSPACE";
       break;
@@ -340,6 +394,124 @@ void cuFFTBackend::c2c_backward(Index_t n, Index_t batch, const Complex * input,
   check_cufft_result(result, "Z2Z backward execution");
   // Synchronize so the result is complete before the caller hands the buffer
   // to GPU-aware MPI (which is not ordered against the cuFFT stream).
+  cudaDeviceSynchronize();
+}
+
+cufftHandle cuFFTBackend::get_nd_plan(cufftType type, const std::vector<int> & n,
+                                      const std::vector<int> & inembed,
+                                      int istride, int idist,
+                                      const std::vector<int> & onembed,
+                                      int ostride, int odist, int batch) {
+  // String signature over every parameter that defines the plan.
+  std::stringstream ss;
+  ss << type << '|' << batch << '|' << istride << ',' << idist << '|' << ostride
+     << ',' << odist << "|n:";
+  for (int v : n) ss << v << ',';
+  ss << "|in:";
+  for (int v : inembed) ss << v << ',';
+  ss << "|on:";
+  for (int v : onembed) ss << v << ',';
+  const std::string key{ss.str()};
+
+  auto it = this->nd_plan_cache.find(key);
+  if (it != this->nd_plan_cache.end()) {
+    return it->second;
+  }
+
+  cufftHandle plan;
+  cufftResult result = cufftPlanMany(
+      &plan, static_cast<int>(n.size()), const_cast<int *>(n.data()),
+      const_cast<int *>(inembed.data()), istride, idist,
+      const_cast<int *>(onembed.data()), ostride, odist, type, batch);
+  check_cufft_result(result, "N-D plan creation");
+
+  this->nd_plan_cache[key] = plan;
+  return plan;
+}
+
+cufftDoubleComplex * cuFFTBackend::ensure_nd_scratch(std::size_t count) {
+  if (count > this->nd_scratch_count) {
+    if (this->nd_scratch != nullptr) {
+      cudaFree(this->nd_scratch);
+    }
+    cudaError_t err =
+        cudaMalloc(&this->nd_scratch, count * sizeof(cufftDoubleComplex));
+    if (err != cudaSuccess) {
+      this->nd_scratch = nullptr;
+      this->nd_scratch_count = 0;
+      throw RuntimeError("cudaMalloc failed for cuFFT N-D scratch buffer");
+    }
+    this->nd_scratch_count = count;
+  }
+  return this->nd_scratch;
+}
+
+void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes, const Real * input,
+                          const std::vector<Index_t> & in_strides,
+                          Complex * output,
+                          const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;  // empty component batch: nothing to do
+  }
+  NdLayout in{derive_nd_layout(shape, axes, in_strides)};
+  NdLayout out{derive_nd_layout(shape, axes, out_strides)};
+
+  // cuFFT requires unit innermost stride on the real side of r2c/c2r.
+  if (in.stride != 1) {
+    throw RuntimeError(
+        "cuFFT N-D r2c requires unit innermost stride on the real input "
+        "(got " +
+        std::to_string(in.stride) + "); the GPU field layout must be SoA.");
+  }
+  check_complex_aligned(input, "D2Z (N-D)");
+
+  cufftHandle plan =
+      get_nd_plan(CUFFT_D2Z, in.n, in.embed, in.stride, in.dist, out.embed,
+                  out.stride, out.dist, static_cast<int>(shape[0]));
+  cufftResult result = cufftExecD2Z(
+      plan, const_cast<cufftDoubleReal *>(input),
+      reinterpret_cast<cufftDoubleComplex *>(output));
+  check_cufft_result(result, "D2Z (N-D) execution");
+  cudaDeviceSynchronize();
+}
+
+void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes,
+                          const Complex * input,
+                          const std::vector<Index_t> & in_strides, Real * output,
+                          const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  NdLayout in{derive_nd_layout(shape, axes, in_strides)};
+  NdLayout out{derive_nd_layout(shape, axes, out_strides)};
+
+  if (out.stride != 1) {
+    throw RuntimeError(
+        "cuFFT N-D c2r requires unit innermost stride on the real output "
+        "(got " +
+        std::to_string(out.stride) + "); the GPU field layout must be SoA.");
+  }
+  check_complex_aligned(output, "Z2D (N-D)");
+
+  // cuFFT's multidimensional Z2D overwrites its input, but the engine requires
+  // the const Fourier input preserved (cf. the per-axis path, which copies it
+  // into a work buffer). Stage through a scratch copy. The input spans
+  // batch * idist complex elements (the per-component Fourier buffer is
+  // contiguous, so idist is the full component stride).
+  const std::size_t span{static_cast<std::size_t>(shape[0]) *
+                         static_cast<std::size_t>(in.dist)};
+  cufftDoubleComplex * scratch = ensure_nd_scratch(span);
+  cudaMemcpy(scratch, reinterpret_cast<const cufftDoubleComplex *>(input),
+             span * sizeof(cufftDoubleComplex), cudaMemcpyDeviceToDevice);
+
+  cufftHandle plan =
+      get_nd_plan(CUFFT_Z2D, in.n, in.embed, in.stride, in.dist, out.embed,
+                  out.stride, out.dist, static_cast<int>(shape[0]));
+  cufftResult result = cufftExecZ2D(
+      plan, scratch, reinterpret_cast<cufftDoubleReal *>(output));
+  check_cufft_result(result, "Z2D (N-D) execution");
   cudaDeviceSynchronize();
 }
 

@@ -40,8 +40,11 @@
 
 #include <cufft.h>
 
-#include <unordered_map>
+#include <cstddef>
+#include <string>
 #include <tuple>
+#include <unordered_map>
+#include <vector>
 
 namespace muGrid {
 
@@ -75,6 +78,21 @@ class cuFFTBackend : public FFT1DBackend {
   void c2c_backward(Index_t n, Index_t batch, const Complex * input,
                     Index_t in_stride, Index_t in_dist, Complex * output,
                     Index_t out_stride, Index_t out_dist) override;
+
+  //! cuFFT performs whole multidimensional r2c/c2r transforms natively
+  //! (cufftPlanMany), so the serial engine hands the entire transform over in
+  //! one planned call instead of driving it axis-by-axis.
+  bool supports_nd() const override { return true; }
+
+  void r2c_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Real * input,
+              const std::vector<Index_t> & in_strides, Complex * output,
+              const std::vector<Index_t> & out_strides) override;
+
+  void c2r_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Complex * input,
+              const std::vector<Index_t> & in_strides, Real * output,
+              const std::vector<Index_t> & out_strides) override;
 
   bool supports_device_memory() const override { return true; }
 
@@ -134,12 +152,38 @@ class cuFFTBackend : public FFT1DBackend {
                        Index_t out_dist);
 
   /**
+   * Get or create a cached N-dimensional cuFFT plan (cufftPlanMany). The
+   * arguments are the cuFFT advanced-data-layout parameters: `n` are the
+   * logical (real-space) transform sizes, `inembed`/`onembed` the physical
+   * padded extents, the strides the innermost-element strides, and the dists
+   * the batch (component) strides. Cached by the full parameter signature.
+   */
+  cufftHandle get_nd_plan(cufftType type, const std::vector<int> & n,
+                          const std::vector<int> & inembed, int istride,
+                          int idist, const std::vector<int> & onembed,
+                          int ostride, int odist, int batch);
+
+  /**
+   * Device scratch buffer of at least `count` complex elements (grow-only).
+   * Used to stage the Fourier input of `c2r_nd`, since cuFFT's multidimensional
+   * Z2D overwrites its input but the engine requires it preserved.
+   */
+  cufftDoubleComplex * ensure_nd_scratch(std::size_t count);
+
+  /**
    * Check cuFFT result and throw on error.
    */
   static void check_cufft_result(cufftResult result, const char * operation);
 
-  //! Plan cache
+  //! Plan cache (1D batched transforms)
   std::unordered_map<PlanKey, cufftHandle, PlanKeyHash> plan_cache;
+
+  //! Plan cache for N-dimensional transforms, keyed by a string signature
+  std::unordered_map<std::string, cufftHandle> nd_plan_cache;
+
+  //! Grow-only scratch for c2r_nd input preservation
+  cufftDoubleComplex * nd_scratch{nullptr};
+  std::size_t nd_scratch_count{0};
 };
 
 }  // namespace muGrid

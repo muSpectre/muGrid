@@ -67,6 +67,20 @@ void check_complex_aligned(const void * ptr, const char * operation) {
   }
   // GCOVR_EXCL_STOP
 }
+
+// rocFFT specifies lengths and strides fastest-varying dimension first, whereas
+// the engine lists the transformed axes slowest-first with the half-complex
+// (r2c/c2r) axis last. Re-order a per-axis quantity into rocFFT order by
+// reversing the transformed-axis list.
+std::vector<size_t> rocfft_order(const std::vector<Index_t> & by_axis,
+                                 const std::vector<Index_t> & axes) {
+  const std::size_t rank{axes.size()};
+  std::vector<size_t> out(rank);
+  for (std::size_t d{0}; d < rank; ++d) {
+    out[d] = static_cast<size_t>(by_axis[axes[rank - 1 - d]]);
+  }
+  return out;
+}
 }  // namespace
 
 // Static member initialization
@@ -88,7 +102,7 @@ rocFFTBackend::~rocFFTBackend() {
   for (auto & entry : this->plan_cache) {
     CachedPlan & cached = entry.second;
     if (cached.work_buffer != nullptr) {
-      hipFree(cached.work_buffer);
+      (void)hipFree(cached.work_buffer);
     }
     if (cached.info != nullptr) {
       rocfft_execution_info_destroy(cached.info);
@@ -96,6 +110,21 @@ rocFFTBackend::~rocFFTBackend() {
     if (cached.plan != nullptr) {
       rocfft_plan_destroy(cached.plan);
     }
+  }
+  for (auto & entry : this->nd_plan_cache) {
+    CachedPlan & cached = entry.second;
+    if (cached.work_buffer != nullptr) {
+      (void)hipFree(cached.work_buffer);
+    }
+    if (cached.info != nullptr) {
+      rocfft_execution_info_destroy(cached.info);
+    }
+    if (cached.plan != nullptr) {
+      rocfft_plan_destroy(cached.plan);
+    }
+  }
+  if (this->nd_scratch != nullptr) {
+    (void)hipFree(this->nd_scratch);
   }
   // Note: We don't call rocfft_cleanup() here because other instances
   // might still be using rocFFT. In practice, cleanup happens at program exit.
@@ -284,7 +313,7 @@ void rocFFTBackend::r2c(Index_t n, Index_t batch, const Real * input,
   check_rocfft_result(status, "R2C execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 void rocFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
@@ -311,7 +340,7 @@ void rocFFTBackend::c2r(Index_t n, Index_t batch, const Complex * input,
   check_rocfft_result(status, "C2R execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 void rocFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
@@ -335,7 +364,7 @@ void rocFFTBackend::c2c_forward(Index_t n, Index_t batch, const Complex * input,
   check_rocfft_result(status, "C2C forward execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
 }
 
 void rocFFTBackend::c2c_backward(Index_t n, Index_t batch,
@@ -359,7 +388,174 @@ void rocFFTBackend::c2c_backward(Index_t n, Index_t batch,
   check_rocfft_result(status, "C2C backward execution");
 
   // Synchronize to ensure completion
-  hipDeviceSynchronize();
+  (void)hipDeviceSynchronize();
+}
+
+rocFFTBackend::CachedPlan &
+rocFFTBackend::get_nd_plan(TransformType type,
+                           const std::vector<size_t> & lengths,
+                           const std::vector<size_t> & in_strides,
+                           size_t in_dist,
+                           const std::vector<size_t> & out_strides,
+                           size_t out_dist, size_t batch) {
+  // String signature over every parameter that defines the plan.
+  std::stringstream ss;
+  ss << type << "|b:" << batch << "|id:" << in_dist << "|od:" << out_dist
+     << "|l:";
+  for (size_t v : lengths) ss << v << ',';
+  ss << "|is:";
+  for (size_t v : in_strides) ss << v << ',';
+  ss << "|os:";
+  for (size_t v : out_strides) ss << v << ',';
+  const std::string key{ss.str()};
+
+  auto it = this->nd_plan_cache.find(key);
+  if (it != this->nd_plan_cache.end()) {
+    return it->second;
+  }
+
+  CachedPlan cached{};
+  cached.plan = nullptr;
+  cached.info = nullptr;
+  cached.work_buffer = nullptr;
+  cached.work_buffer_size = 0;
+
+  rocfft_transform_type transform_type;
+  rocfft_array_type in_array_type, out_array_type;
+  switch (type) {
+  case R2C:
+    transform_type = rocfft_transform_type_real_forward;
+    in_array_type = rocfft_array_type_real;
+    out_array_type = rocfft_array_type_hermitian_interleaved;
+    break;
+  case C2R:
+    transform_type = rocfft_transform_type_real_inverse;
+    in_array_type = rocfft_array_type_hermitian_interleaved;
+    out_array_type = rocfft_array_type_real;
+    break;
+  default:
+    throw RuntimeError("get_nd_plan supports only R2C and C2R transforms");
+  }
+  rocfft_result_placement placement = rocfft_placement_notinplace;
+
+  rocfft_plan_description description = nullptr;
+  rocfft_status status = rocfft_plan_description_create(&description);
+  check_rocfft_result(status, "N-D plan description creation");
+
+  status = rocfft_plan_description_set_data_layout(
+      description, in_array_type, out_array_type,
+      nullptr,  // input offsets (base pointer is pre-offset by the engine)
+      nullptr,  // output offsets
+      in_strides.size(), in_strides.data(), in_dist,
+      out_strides.size(), out_strides.data(), out_dist);
+  check_rocfft_result(status, "setting N-D data layout");
+
+  status = rocfft_plan_create(&cached.plan, placement, transform_type,
+                              rocfft_precision_double, lengths.size(),
+                              lengths.data(), batch, description);
+  check_rocfft_result(status, "N-D plan creation");
+  rocfft_plan_description_destroy(description);
+
+  status = rocfft_plan_get_work_buffer_size(cached.plan,
+                                            &cached.work_buffer_size);
+  check_rocfft_result(status, "querying N-D work buffer size");
+
+  status = rocfft_execution_info_create(&cached.info);
+  check_rocfft_result(status, "N-D execution info creation");
+
+  if (cached.work_buffer_size > 0) {
+    hipError_t hip_status =
+        hipMalloc(&cached.work_buffer, cached.work_buffer_size);
+    if (hip_status != hipSuccess) {
+      throw RuntimeError("Failed to allocate rocFFT N-D work buffer");
+    }
+    status = rocfft_execution_info_set_work_buffer(
+        cached.info, cached.work_buffer, cached.work_buffer_size);
+    check_rocfft_result(status, "setting N-D work buffer");
+  }
+
+  this->nd_plan_cache[key] = cached;
+  return this->nd_plan_cache[key];
+}
+
+void * rocFFTBackend::ensure_nd_scratch(size_t bytes) {
+  if (bytes > this->nd_scratch_bytes) {
+    if (this->nd_scratch != nullptr) {
+      (void)hipFree(this->nd_scratch);
+    }
+    hipError_t err = hipMalloc(&this->nd_scratch, bytes);
+    if (err != hipSuccess) {
+      this->nd_scratch = nullptr;
+      this->nd_scratch_bytes = 0;
+      throw RuntimeError("hipMalloc failed for rocFFT N-D scratch buffer");
+    }
+    this->nd_scratch_bytes = bytes;
+  }
+  return this->nd_scratch;
+}
+
+void rocFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
+                           const std::vector<Index_t> & axes, const Real * input,
+                           const std::vector<Index_t> & in_strides,
+                           Complex * output,
+                           const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;  // empty component batch
+  }
+  check_complex_aligned(input, "R2C (N-D)");
+
+  std::vector<size_t> lengths{rocfft_order(shape, axes)};
+  std::vector<size_t> in_str{rocfft_order(in_strides, axes)};
+  std::vector<size_t> out_str{rocfft_order(out_strides, axes)};
+
+  CachedPlan & cached = get_nd_plan(
+      R2C, lengths, in_str, static_cast<size_t>(in_strides[0]), out_str,
+      static_cast<size_t>(out_strides[0]), static_cast<size_t>(shape[0]));
+
+  void * in_buffer[1] = {const_cast<Real *>(input)};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "R2C (N-D) execution");
+  (void)hipDeviceSynchronize();
+}
+
+void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
+                           const std::vector<Index_t> & axes,
+                           const Complex * input,
+                           const std::vector<Index_t> & in_strides,
+                           Real * output,
+                           const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  check_complex_aligned(output, "C2R (N-D)");
+
+  std::vector<size_t> lengths{rocfft_order(shape, axes)};
+  std::vector<size_t> in_str{rocfft_order(in_strides, axes)};
+  std::vector<size_t> out_str{rocfft_order(out_strides, axes)};
+
+  // rocFFT's real-inverse transform may overwrite its input, but the engine
+  // requires the const Fourier input preserved (the per-axis fallback copies it
+  // into a work buffer). Stage through a scratch copy. The input spans
+  // batch * in_dist complex elements (the per-component Fourier buffer is
+  // contiguous, so in_dist is the full component stride).
+  const size_t in_dist{static_cast<size_t>(in_strides[0])};
+  const size_t span{static_cast<size_t>(shape[0]) * in_dist};
+  void * scratch = ensure_nd_scratch(span * sizeof(Complex));
+  (void)hipMemcpy(scratch, input, span * sizeof(Complex),
+                  hipMemcpyDeviceToDevice);
+
+  CachedPlan & cached = get_nd_plan(C2R, lengths, in_str, in_dist, out_str,
+                                    static_cast<size_t>(out_strides[0]),
+                                    static_cast<size_t>(shape[0]));
+
+  void * in_buffer[1] = {scratch};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "C2R (N-D) execution");
+  (void)hipDeviceSynchronize();
 }
 
 }  // namespace muGrid

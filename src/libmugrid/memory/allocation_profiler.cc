@@ -40,7 +40,7 @@
 #include <cstring>
 #include <sstream>
 
-#include "memory/unified_memory.hh"
+#include "memory/device.hh"
 
 namespace muGrid {
 
@@ -62,6 +62,15 @@ namespace muGrid {
         bool is_host_space_string(const std::string & space) {
             return space.rfind("cpu", 0) == 0 || space.rfind("host", 0) == 0 ||
                    space.rfind("Host", 0) == 0;
+        }
+
+        //! True if device @p device_id shares one physical memory pool with
+        //! the host (integrated GPU / APU) — i.e. it is a device whose memory
+        //! is host-accessible. On a host-only build Device::gpu() is the CPU,
+        //! which is not a device, so this is false.
+        bool device_is_unified(int device_id) {
+            const Device dev{Device::gpu(device_id)};
+            return dev.is_device() && dev.is_host_accessible();
         }
 
         //! Format a byte count with binary units.
@@ -135,14 +144,14 @@ namespace muGrid {
             // is physically unified with the host. We probe device 0, the
             // common single-APU case. (Multiple distinct unified devices would
             // each be their own physical pool; that rare case is not split.)
-            if (device_has_unified_memory(0)) {
+            if (device_is_unified(0)) {
                 unified_out = true;
                 return "unified";
             }
             return "host";
         }
         const int id{device_id_from_space(space)};
-        if (device_has_unified_memory(id)) {
+        if (device_is_unified(id)) {
             unified_out = true;
             return "unified";
         }

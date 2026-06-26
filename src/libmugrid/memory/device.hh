@@ -97,6 +97,14 @@ class Device {
         return this->device_type == DeviceType::CPU;
     }
 
+    //! Check whether memory on this device can be dereferenced directly by the
+    //! host CPU. True for plain host memory and pinned host memory, and true
+    //! for device memory on a unified-memory / integrated device (e.g. an APU
+    //! such as the AMD MI300A), where the GPU allocation is host-coherent.
+    //! False for discrete GPUs. The result is queried from the runtime once
+    //! per device and cached. (Not constexpr: requires a runtime probe.)
+    bool is_host_accessible() const;
+
     //! Get the device type
     constexpr DeviceType get_type() const { return this->device_type; }
 
@@ -110,15 +118,6 @@ class Device {
 
     //! Get device string for Python interoperability ("cpu", "cuda:0", "rocm:0")
     std::string get_device_string() const;
-
-    /**
-     * True if this is a device whose memory is physically unified with the
-     * host (integrated GPU / APU such as MI300A), so device allocations are
-     * directly host-addressable with no copy. Always false for host devices.
-     * See memory/unified_memory.hh; the result is cached and can be overridden
-     * with the ``MUGRID_UNIFIED_MEMORY`` environment variable.
-     */
-    bool is_unified() const;
 
     //! Get device type name ("CPU", "CUDA", "ROCm", etc.)
     const char * get_type_name() const;

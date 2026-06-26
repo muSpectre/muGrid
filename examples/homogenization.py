@@ -34,6 +34,7 @@ import numpy as np
 
 import muGrid
 from muGrid import parprint
+from muGrid.Preconditioners import make_reference_stiffness_preconditioner
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -267,6 +268,18 @@ parser.add_argument(
     "'generic' (gradient/stress/divergence) (default: fused)",
 )
 
+parser.add_argument(
+    "-P",
+    "--preconditioner",
+    choices=["none", "reference"],
+    default="none",
+    help="Preconditioner for the PCG solver: 'none' or 'reference' "
+    "(reference-material Green's-function preconditioner of Ladecky et al. "
+    "2023, applied in Fourier space; makes the iteration count nearly "
+    "independent of grid size). 'reference' requires the 'generic' kernel "
+    "(default: none)",
+)
+
 args = parser.parse_args()
 
 # JSON implies quiet mode
@@ -276,10 +289,20 @@ if args.json:
 # Select array library based on memory location
 if args.device == "cpu":
     import numpy as arr
+
+    device = _devices["cpu"]
 else:
     import cupy as arr
 
-device = _devices[args.device]
+    # Multi-GPU MPI: bind each rank to a distinct GPU (round-robin), so that an
+    # `mpiexec -n N` GPU run spreads ranks across the available devices. With a
+    # single GPU (or a serial run) this selects device 0, matching the previous
+    # behaviour. The cupy default device and the muGrid Device must agree so the
+    # field allocations and the array library land on the same GPU.
+    nb_gpus = arr.cuda.runtime.getDeviceCount()
+    gpu_id = comm.rank % nb_gpus
+    arr.cuda.Device(gpu_id).use()
+    device = muGrid.Device.gpu(gpu_id)
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
@@ -310,31 +333,47 @@ nb_nodes = 2**dim
 # Quadrature weights (area/volume of each element)
 quad_weights = np.array(gradient_op.quadrature_weights)
 
+# The reference-material preconditioner pairs with either matvec kernel: it is
+# applied in Fourier space and is assembled (once) from the generic Dᵀ W Cʳᵉᶠ D
+# operator, independently of the kernel used for the CG matvec. The fused
+# isotropic kernel's material fields are placed on the same collection as the
+# solver fields (below), so the fast fused matvec runs together with the
+# preconditioner.
+
 # Determine MPI decomposition using NuMPI's suggest_subdivisions
 s = suggest_subdivisions(dim, comm.size)
 
-# Create Cartesian decomposition for ghost handling.
-# The FEM gradient kernel requires ghosts for accessing neighbor nodes.
-# CartesianDecomposition handles ghost communication for both serial and
-# MPI parallel execution.
+# Create the decomposition for ghost handling. The FEM gradient kernel requires
+# ghosts on BOTH sides (left and right) for accessing neighbour nodes, so that
+# interior nodes receive all element contributions directly (no ghost reduction).
 #
-# We use ghosts on BOTH sides (left and right). This approach means:
-# - Ghost elements on the left boundary provide contributions to interior nodes
-#   directly
-# - Ghost elements on the right boundary provide contributions to interior nodes
-#   directly
-# - No ghost reduction is needed since interior nodes receive all contributions
-#   directly
-# - The trade-off is slightly more memory and computation in ghost regions
-decomposition = muGrid.CartesianDecomposition(
-    comm,
-    args.nb_grid_pts,
-    nb_subdivisions=s,  # MPI-aware domain decomposition
-    nb_ghosts_left=(1,) * dim,
-    nb_ghosts_right=(1,) * dim,
-    nb_sub_pts={"quad": nb_quad},  # Use actual quad count from operator
-    device=device,
-)
+# Without a preconditioner we use a plain CartesianDecomposition. With the
+# reference-material preconditioner the solver fields must be FFT-transformable,
+# so we use an FFTEngine instead: it *is* a CartesianDecomposition (same
+# communicate_ghosts / coords / ghosts), but additionally provides the forward
+# and inverse transforms the preconditioner applies. The solver work fields are
+# then created on the engine's real-space collection (`fc`).
+if args.preconditioner == "reference":
+    decomposition = muGrid.FFTEngine(
+        args.nb_grid_pts,
+        comm,
+        nb_ghosts_left=(1,) * dim,
+        nb_ghosts_right=(1,) * dim,
+        nb_sub_pts={"quad": nb_quad},
+        device=device,
+    )
+    fc = decomposition.real_space_collection
+else:
+    decomposition = muGrid.CartesianDecomposition(
+        comm,
+        args.nb_grid_pts,
+        nb_subdivisions=s,  # MPI-aware domain decomposition
+        nb_ghosts_left=(1,) * dim,
+        nb_ghosts_right=(1,) * dim,
+        nb_sub_pts={"quad": nb_quad},  # Use actual quad count from operator
+        device=device,
+    )
+    fc = decomposition
 
 # Get local grid dimensions from the decomposition
 # For MPI runs, this is the local subdomain shape, not the global grid
@@ -377,17 +416,17 @@ if not args.quiet:
 #   (dim input components × dim operators)
 #
 # Tensor fields for gradient/stress at quadrature points:
-grad_u = decomposition.real_field(
+grad_u = fc.real_field(
     "grad_u", (dim, dim), "quad"
 )  # displacement gradient tensor
-stress_field = decomposition.real_field(
+stress_field = fc.real_field(
     "stress_field", (dim, dim), "quad"
 )  # stress tensor
 
 # Vector fields for CG solver (displacement and force vectors)
-u_field = decomposition.real_field("u_field", (dim,))
-f_field = decomposition.real_field("f_field", (dim,))
-rhs_field = decomposition.real_field("rhs_field", (dim,))
+u_field = fc.real_field("u_field", (dim,))
+f_field = fc.real_field("f_field", (dim,))
+rhs_field = fc.real_field("rhs_field", (dim,))
 
 # Material stiffness at each quadrature point [voigt, voigt, quad, *local_grid_shape]
 # Create on host first, then convert to device array if needed
@@ -412,19 +451,15 @@ if args.kernel == "fused":
     lam_inclusion = args.E_inclusion * args.nu / ((1 + args.nu) * (1 - 2 * args.nu))
     mu_inclusion = args.E_inclusion / (2 * (1 + args.nu))
 
-    # Create element-based CartesianDecomposition with ghost cells
-    element_decomposition = muGrid.CartesianDecomposition(
-        comm,
-        args.nb_grid_pts,
-        nb_subdivisions=s,  # Use same MPI decomposition
-        nb_ghosts_left=(1,) * dim,
-        nb_ghosts_right=(1,) * dim,
-        device=device,
-    )
-
-    # Create lambda and mu fields
-    lambda_field = element_decomposition.real_field("lambda")
-    mu_field = element_decomposition.real_field("mu")
+    # Create the Lamé (element/pixel) fields on the *same* collection as the
+    # solver fields (`fc`). This keeps the fused operator's material aligned
+    # with the displacement field for both the plain CartesianDecomposition
+    # (no preconditioner) and the FFTEngine (reference preconditioner) paths,
+    # so the fast fused matvec works together with the preconditioner — and it
+    # stays consistent under MPI, where the FFTEngine's decomposition would not
+    # match a separately constructed CartesianDecomposition.
+    lambda_field = fc.real_field("lambda")
+    mu_field = fc.real_field("mu")
 
     # Set spatially varying material properties based on phase
     # Phase is defined at grid points, element properties taken at grid points
@@ -434,8 +469,8 @@ if args.kernel == "fused":
     mu_field.p[...] = arr.asarray(mu_matrix * (1 - phase) + mu_inclusion * phase)
 
     # Fill ghost cells for material fields (only needs to be done once)
-    element_decomposition.communicate_ghosts(lambda_field)
-    element_decomposition.communicate_ghosts(mu_field)
+    decomposition.communicate_ghosts(lambda_field)
+    decomposition.communicate_ghosts(mu_field)
 
     # Create the fused isotropic stiffness operator
     if dim == 2:
@@ -698,6 +733,55 @@ def compute_rhs(E_macro, rhs_out):
     rhs_out.s[...] *= -1.0
 
 
+# ---------------------------------------------------------------------------
+# Reference-material (Green's function) preconditioner of Ladecky et al. (2023)
+# ---------------------------------------------------------------------------
+#
+# The preconditioner is M = Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D, built from a *spatially uniform*
+# reference stiffness Cʳᵉᶠ. Because every pixel carries the same FE stencil, Kʳᵉᶠ
+# is block-circulant, hence block-diagonal in Fourier space: at each Fourier mode
+# q it is a small dim×dim block K̂(q). Applying M⁻¹ is therefore FFT → per-mode
+# dim×dim solve → inverse FFT. This is the matrix-valued generalization of the
+# scalar 1/symbol Fourier preconditioner used in the Poisson example.
+prec = None
+if args.preconditioner == "reference":
+    # Reference material: the volume-averaged (mean) stiffness, which the paper
+    # reports as the best-performing choice (Section 7.2).
+    C_ref = comm.sum(
+        np.asfortranarray(C_field_np.reshape(nb_voigt, nb_voigt, -1).sum(axis=2))
+    )
+    C_ref = np.ascontiguousarray(C_ref) / comm.sum(C_field_np[0, 0].size)
+    C_ref_dev = arr.asarray(C_ref)
+
+    # Uniform-stiffness stress: sig = Cʳᵉᶠ : eps (Voigt), constant in space.
+    def reference_stress(strain, stress):
+        eps_voigt = strain_to_voigt(strain)
+        if device.is_host:
+            sig_voigt = np.einsum("ij,jq...->iq...", C_ref, eps_voigt)
+        else:
+            sig_voigt = arr.einsum("ij,jq...->iq...", C_ref_dev, eps_voigt)
+        voigt_to_stress(sig_voigt, stress)
+
+    # Apply the reference stiffness Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D to a displacement field.
+    def apply_reference_stiffness(u_in, f_out):
+        compute_strain(u_in, strain_arr)
+        reference_stress(strain_arr, stress_arr)
+        compute_divergence(stress_arr, f_out)
+
+    with timer("preconditioner_setup"):
+        # The generic assembly (impulse response -> per-mode symbol -> block
+        # inverse, zero mode projected) lives in muGrid.Preconditioners; here we
+        # only supply the action of the reference stiffness Kʳᵉᶠ.
+        prec = make_reference_stiffness_preconditioner(
+            decomposition, apply_reference_stiffness, dim, timer=timer
+        )
+
+    if not args.quiet:
+        parprint("Using reference-material Fourier preconditioner", comm=comm)
+        parprint(f"  Reference stiffness Cʳᵉᶠ (mean): diag = "
+                 f"{np.diag(C_ref)}", comm=comm)
+
+
 # Storage for homogenized stiffness
 C_eff = np.zeros((nb_voigt, nb_voigt))
 
@@ -757,10 +841,11 @@ with timer("total_solve"):
         try:
             conjugate_gradients(
                 comm,
-                decomposition,
+                fc,
                 rhs_field,
                 u_field,
                 hessp=apply_stiffness,
+                prec=prec,
                 rtol=args.tol,
                 callback=callback,
                 maxiter=args.maxiter,
@@ -911,6 +996,7 @@ if args.json:
             "inclusion_radius": float(args.inclusion_radius),
             "volume_fraction": float(v_f),
             "kernel": args.kernel,
+            "preconditioner": args.preconditioner,
         },
         "results": {
             "total_cg_iterations": int(total_iterations),

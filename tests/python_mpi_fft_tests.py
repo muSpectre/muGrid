@@ -41,7 +41,7 @@ import pytest
 from conftest import get_array_module, get_test_devices, skip_if_gpu_unavailable
 from numpy.testing import assert_allclose
 
-from muGrid import FFTEngine, GlobalFieldCollection
+from muGrid import FFTEngine, GlobalFieldCollection, linalg
 
 
 def get_device_for_rank(device, comm):
@@ -892,6 +892,70 @@ class TestMPIFFTCollectionWrappers:
         if device == "gpu":
             result = result.get()
         assert_allclose(result, original, atol=1e-14)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestMPIEmptySubdomainKernels:
+    """Per-pixel fused kernels must tolerate empty (zero-pixel) MPI subdomains.
+
+    With more ranks than grid planes along the decomposed axis, the pencil
+    decomposition leaves some ranks owning no local pixels. The fused kernels
+    have to be a no-op on those ranks rather than erroring, otherwise the empty
+    ranks die and the ranks that do own data deadlock in the next collective.
+    """
+
+    def test_cross_on_empty_fourier_subdomain(self, comm, device):
+        """``linalg.cross`` must be a no-op, not raise, on a rank with no pixels.
+
+        Regression test for the pseudo-spectral ``cross(ik, u)`` call on the
+        Fourier-space velocity. On an empty subdomain the three fields share a
+        null data buffer, so ``cross``'s output-aliasing guard ("output must be
+        a field distinct from both inputs") used to fire on CPU (and the kernel
+        launch failed on GPU). The empty ranks then died while the ranks that
+        owned data hung in the following collective.
+
+        The engine decomposes Fourier space along its first axis, so a first
+        grid axis of 1 gives a Fourier extent of ``1 // 2 + 1 == 1`` there:
+        every pixel lands on rank 0 and all other ranks get an empty Fourier
+        subdomain. Fourier fields are complex, exactly as in the solver.
+        """
+        skip_if_gpu_unavailable(device)
+        if comm.size < 2:
+            pytest.skip("needs >= 2 ranks to produce an empty subdomain")
+        xp = get_array_module(device)
+        dev = get_device_for_rank(device, comm)
+
+        nb_grid_pts = [1, 4 * comm.size]  # Fourier first axis 1 -> empties
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        a = engine.fourier_space_field("a", components=(3,))
+        b = engine.fourier_space_field("b", components=(3,))
+        out = engine.fourier_space_field("out", components=(3,))
+
+        # Distinct complex per-component data; empty ranks fill a zero-size
+        # array (a no-op), non-empty ranks get reproducible values. Component
+        # axis is first.
+        idx = np.arange(a.p.size, dtype=float)
+        a_val = (idx + 1j * (idx + 1)).reshape(a.p.shape)
+        b_val = (idx + 0.5 - 1j * (idx + 2)).reshape(b.p.shape)
+        a.p[...] = xp.asarray(a_val)
+        b.p[...] = xp.asarray(b_val)
+
+        # Guard against the decomposition silently making this test vacuous: at
+        # least one rank must have an empty Fourier subdomain. This collective
+        # runs *before* cross() so that, on a buggy build where cross() raises
+        # on the empty ranks, the failure is immediate rather than a deadlock.
+        local = int(np.prod(engine.nb_fourier_subdomain_grid_pts))
+        assert comm.sum(1 if local == 0 else 0) >= 1
+
+        # The regression: this call must not raise on the empty ranks.
+        linalg.cross(a, b, out)
+
+        # Where there is data, the result is the per-pixel cross product.
+        result = out.p
+        if device == "gpu":
+            result = result.get()
+        assert_allclose(result, np.cross(a_val, b_val, axis=0), atol=1e-13)
 
 
 if __name__ == "__main__":

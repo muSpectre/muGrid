@@ -38,16 +38,15 @@
 #include "memory/allocation_profiler.hh"
 #include "memory/device.hh"
 #include "memory/memory_info.hh"
-#include "memory/unified_memory.hh"
 
 namespace muGrid {
 
     BOOST_AUTO_TEST_SUITE(allocation_profiler_test);
 
     /* ---------------------------------------------------------------------- */
-    BOOST_AUTO_TEST_CASE(host_is_never_unified) {
-        // A host device shares nothing to detect; it is never "unified".
-        BOOST_CHECK(!Device::cpu().is_unified());
+    BOOST_AUTO_TEST_CASE(host_is_host_accessible) {
+        // Host memory is trivially dereferenceable by the host CPU.
+        BOOST_CHECK(Device::cpu().is_host_accessible());
     }
 
     /* ---------------------------------------------------------------------- */

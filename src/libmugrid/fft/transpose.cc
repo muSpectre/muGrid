@@ -38,10 +38,12 @@
 #include "core/exception.hh"
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
-#include "memory/unified_memory.hh"
+#include "memory/device.hh"
 #include "mpi/gpu_aware_mpi.hh"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <numeric>
 
 namespace muGrid {
@@ -81,6 +83,12 @@ namespace muGrid {
         }
 
         int comm_size{comm.size()};
+
+        // Opt-in: use the contiguous-staging Alltoallv exchange on the host.
+        if (!this->on_device) {
+            const char * env{std::getenv("MUGRID_STAGED_TRANSPOSE")};
+            this->staged_host = (env != nullptr && env[0] == '1');
+        }
 
         // Compute how the distributed dimensions are split across ranks
         compute_distribution(global_in, comm_size, this->in_counts,
@@ -388,6 +396,24 @@ namespace muGrid {
     }
 
     namespace {
+        //! Host strided 2D copy (pack/unpack building block). One contiguous
+        //! run (width_bytes) per row, nb_rows rows, with independent source and
+        //! destination pitches. Each row is a contiguous memcpy, so the access
+        //! pattern is already cache-friendly: the only strided axis is the row
+        //! stride, walked sequentially. This mirrors strided_device_copy and
+        //! lets the contiguous-staging Alltoallv path run on the host.
+        void strided_host_copy(void * dst, const void * src,
+                               std::size_t width_bytes, std::size_t nb_rows,
+                               std::size_t dst_pitch_bytes,
+                               std::size_t src_pitch_bytes) {
+            auto * d{static_cast<char *>(dst)};
+            const auto * s{static_cast<const char *>(src)};
+            for (std::size_t row{0}; row < nb_rows; ++row) {
+                std::memcpy(d + row * dst_pitch_bytes,
+                            s + row * src_pitch_bytes, width_bytes);
+            }
+        }
+
         //! Device-to-device strided 2D copy (pack/unpack building block)
         void strided_device_copy(void * dst, const void * src,
                                  std::size_t width_bytes, std::size_t nb_rows,
@@ -476,17 +502,51 @@ namespace muGrid {
             recv_total += d;
         }
 
-        char * send_staging{
-            this->get_device_staging(0, send_total * sizeof(Complex))};
-        char * recv_staging{
-            this->get_device_staging(1, recv_total * sizeof(Complex))};
+        const bool dev{this->on_device};
+
+        // Pack/unpack building block: device 2D copy on the GPU, plain host
+        // memcpy-per-row on the CPU (both cache-friendly: one contiguous run
+        // per row).
+        auto copy2d{[dev](void * d, const void * s, std::size_t w,
+                          std::size_t rows, std::size_t dp, std::size_t sp) {
+            if (dev) {
+                strided_device_copy(d, s, w, rows, dp, sp);
+            } else {
+                strided_host_copy(d, s, w, rows, dp, sp);
+            }
+        }};
+
+        // Staging buffers hold the per-peer blocks contiguously. On the device
+        // they live in cached device memory; on the host they are the cached
+        // host_staging vectors and double as the MPI exchange buffers.
+        char * send_staging;
+        char * recv_staging;
+        if (dev) {
+            send_staging = this->get_device_staging(0,
+                                                    send_total * sizeof(Complex));
+            recv_staging = this->get_device_staging(1,
+                                                    recv_total * sizeof(Complex));
+        } else {
+            auto & hs{this->host_staging[0]};
+            auto & hr{this->host_staging[1]};
+            if (hs.size() < send_total * sizeof(Complex)) {
+                hs.resize(send_total * sizeof(Complex));
+            }
+            if (hr.size() < recv_total * sizeof(Complex)) {
+                hr.resize(recv_total * sizeof(Complex));
+            }
+            send_staging = hs.data();
+            recv_staging = hr.data();
+        }
 
         // Without GPU-aware MPI, the flat exchange below operates on host
         // bounce buffers instead of the device staging (correct with any
-        // MPI library); the pack/unpack stays on the device either way. On a
-        // physically unified-memory device the staging is already
-        // host-addressable, so no bounce is needed regardless of MPI.
-        const bool bounce{!mpi_is_gpu_aware() && !device_has_unified_memory()};
+        // MPI library); the pack/unpack stays on the device either way. The
+        // host path never bounces (the staging is already host memory), and
+        // neither does a unified-memory / integrated device, whose staging is
+        // already host-addressable (so any MPI can read it directly).
+        const bool bounce{dev && !mpi_is_gpu_aware() &&
+                          !Device::gpu().is_host_accessible()};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {
@@ -517,8 +577,7 @@ namespace muGrid {
                                   sizeof(Complex)};
                 const Complex * field{input +
                                       src_displs[r] * src_pre * ncomp};
-                strided_device_copy(staging, field, width, src_post, width,
-                                    pitch);
+                copy2d(staging, field, width, src_post, width, pitch);
             } else {
                 std::size_t width{src_pre * src_counts[r] * sizeof(Complex)};
                 std::size_t pitch{src_pre * src_shape[src_axis] *
@@ -527,20 +586,21 @@ namespace muGrid {
                 for (std::size_t c{0}; c < ncomp; ++c) {
                     const Complex * field{input + c * src_spatial +
                                           src_displs[r] * src_pre};
-                    strided_device_copy(staging +
-                                            c * comp_block * sizeof(Complex),
-                                        field, width, src_post, width, pitch);
+                    copy2d(staging + c * comp_block * sizeof(Complex), field,
+                           width, src_post, width, pitch);
                 }
             }
         }
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // Device-to-device 2D copies are asynchronous with respect to the
         // host; MPI must not read the staging buffer before the gather is
-        // complete.
-        GPU_DEVICE_SYNCHRONIZE();
-        if (bounce && send_total > 0) {
-            GPU_MEMCPY_D2H(send_buffer, send_staging,
-                           send_total * sizeof(Complex));
+        // complete. (Host pack via memcpy is already synchronous.)
+        if (dev) {
+            GPU_DEVICE_SYNCHRONIZE();
+            if (bounce && send_total > 0) {
+                GPU_MEMCPY_D2H(send_buffer, send_staging,
+                               send_total * sizeof(Complex));
+            }
         }
 #endif
         // Non-blocking all-to-all instead of MPI_Alltoallv: collective
@@ -560,14 +620,13 @@ namespace muGrid {
             auto self_bytes{static_cast<std::size_t>(send_counts_el[my_rank]) *
                             sizeof(Complex)};
             if (self_bytes > 0) {
-                strided_device_copy(
-                    recv_staging +
-                        static_cast<std::size_t>(recv_displs_el[my_rank]) *
-                            sizeof(Complex),
-                    send_staging +
-                        static_cast<std::size_t>(send_displs_el[my_rank]) *
-                            sizeof(Complex),
-                    self_bytes, 1, self_bytes, self_bytes);
+                copy2d(recv_staging +
+                           static_cast<std::size_t>(recv_displs_el[my_rank]) *
+                               sizeof(Complex),
+                       send_staging +
+                           static_cast<std::size_t>(send_displs_el[my_rank]) *
+                               sizeof(Complex),
+                       self_bytes, 1, self_bytes, self_bytes);
             }
 
             std::vector<MPI_Request> requests;
@@ -602,7 +661,7 @@ namespace muGrid {
         }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        if (bounce && recv_total > 0) {
+        if (dev && bounce && recv_total > 0) {
             // The self block (still on the device) occupies its slice of
             // recv_staging; copying the bounced host data must not clobber
             // it, so copy the two surrounding extents.
@@ -640,8 +699,7 @@ namespace muGrid {
                 std::size_t pitch{dst_pre * dst_shape[dst_axis] * ncomp *
                                   sizeof(Complex)};
                 Complex * field{output + dst_displs[r] * dst_pre * ncomp};
-                strided_device_copy(field, staging, width, dst_post, pitch,
-                                    width);
+                copy2d(field, staging, width, dst_post, pitch, width);
             } else {
                 std::size_t width{dst_pre * dst_counts[r] * sizeof(Complex)};
                 std::size_t pitch{dst_pre * dst_shape[dst_axis] *
@@ -650,10 +708,8 @@ namespace muGrid {
                 for (std::size_t c{0}; c < ncomp; ++c) {
                     Complex * field{output + c * dst_spatial +
                                     dst_displs[r] * dst_pre};
-                    strided_device_copy(field,
-                                        staging +
-                                            c * comp_block * sizeof(Complex),
-                                        width, dst_post, pitch, width);
+                    copy2d(field, staging + c * comp_block * sizeof(Complex),
+                           width, dst_post, pitch, width);
                 }
             }
         }
@@ -676,9 +732,10 @@ namespace muGrid {
             return;
         }
 
-        if (this->on_device) {
-            // Contiguous staging instead of derived datatypes on device
-            // pointers (see constructor documentation)
+        if (this->on_device || this->staged_host) {
+            // Contiguous staging instead of derived datatypes (see constructor
+            // documentation). Used unconditionally on the device, and on the
+            // host when MUGRID_STAGED_TRANSPOSE=1.
             this->staged_alltoall(input, output, this->local_in,
                                   this->axis_out, this->out_counts,
                                   this->out_displs, this->local_out,
@@ -719,9 +776,10 @@ namespace muGrid {
             return;
         }
 
-        if (this->on_device) {
-            // Contiguous staging instead of derived datatypes on device
-            // pointers (see constructor documentation)
+        if (this->on_device || this->staged_host) {
+            // Contiguous staging instead of derived datatypes (see constructor
+            // documentation). Used unconditionally on the device, and on the
+            // host when MUGRID_STAGED_TRANSPOSE=1.
             this->staged_alltoall(input, output, this->local_out,
                                   this->axis_in, this->in_counts,
                                   this->in_displs, this->local_in,

@@ -173,6 +173,51 @@ class CommunicatorWrapper:
         # For CPU scalars and arrays, use the C++ implementation
         return self._cpp.sum(arg)
 
+    def isum(self, arg):
+        """Begin a non-blocking sum reduction across all processes.
+
+        Returns an opaque handle to pass to :meth:`isum_wait`. Between the two
+        calls the caller can perform work that does not depend on the reduced
+        value, so the global synchronisation latency is hidden behind that work
+        (the key to pipelined CG; Ghysels & Vanroose 2014).
+
+        Only small host arrays are supported (the use case is fusing a handful
+        of inner products into one reduction). When non-blocking MPI is
+        unavailable — serial runs, or a communicator without an mpi4py handle —
+        this falls back to an immediate blocking reduction so callers need no
+        special-casing.
+
+        Parameters
+        ----------
+        arg : numpy array
+            Local contribution to reduce (small, host-resident).
+
+        Returns
+        -------
+        handle
+            Pass to :meth:`isum_wait` to obtain the global sum.
+        """
+        if self.size == 1 or self._mpi_comm is None or MPI is None:
+            # Nothing to overlap: emulate a non-blocking op with a ready result.
+            return ("ready", self.sum(arg))
+
+        import numpy as np
+
+        sendbuf = np.ascontiguousarray(arg)
+        recvbuf = np.empty_like(sendbuf)
+        request = self._mpi_comm.Iallreduce(sendbuf, recvbuf, op=MPI.SUM)
+        # Keep sendbuf alive in the handle: MPI reads it until the request
+        # completes.
+        return ("pending", request, recvbuf, sendbuf)
+
+    def isum_wait(self, handle):
+        """Complete a reduction started with :meth:`isum` and return its sum."""
+        if handle[0] == "ready":
+            return handle[1]
+        _, request, recvbuf, _sendbuf = handle
+        request.Wait()
+        return recvbuf
+
     def _sum_gpu(self, arg):
         """GPU-aware sum reduction."""
         cp = _get_cupy()

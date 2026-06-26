@@ -39,6 +39,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/complex.h>
+#include <pybind11/stl.h>
 
 using muGrid::Real;
 using muGrid::Complex;
@@ -126,6 +127,17 @@ void add_linalg_functions(py::module &mod) {
         -------
         float
             Local squared norm (not MPI-reduced)
+        )pbdoc");
+
+    linalg.def("pipelined_cg_dots",
+        static_cast<std::array<Real, 3> (*)(
+            const RealFieldHost&, const RealFieldHost&, const RealFieldHost&)>(
+            &muGrid::linalg::pipelined_cg_dots<Real, HostSpace>),
+        "r"_a, "u"_a, "w"_a,
+        R"pbdoc(
+        Fused interior reduction for pipelined CG: returns [(r,u), (w,u), (r,r)]
+        in a single pass (one device->host copy on the GPU). Local, not
+        MPI-reduced.
         )pbdoc");
 
     linalg.def("axpy",
@@ -355,6 +367,15 @@ void add_linalg_functions(py::module &mod) {
             &muGrid::linalg::norm_sq<Real, DeviceSpace>),
         "x"_a,
         "Compute squared L2 norm of a real field on device (GPU).");
+
+    linalg.def("pipelined_cg_dots",
+        static_cast<std::array<Real, 3> (*)(const RealFieldDevice&,
+                                            const RealFieldDevice&,
+                                            const RealFieldDevice&)>(
+            &muGrid::linalg::pipelined_cg_dots<Real, DeviceSpace>),
+        "r"_a, "u"_a, "w"_a,
+        "Fused interior reduction for pipelined CG on device (GPU): one kernel "
+        "and one device->host copy returning [(r,u), (w,u), (r,r)].");
 
     linalg.def("axpy",
         static_cast<void (*)(Real, const RealFieldDevice&, RealFieldDevice&)>(

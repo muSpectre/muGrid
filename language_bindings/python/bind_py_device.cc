@@ -42,7 +42,6 @@
 #include "memory/device.hh"
 #include "memory/device_alloc.hh"
 #include "memory/memory_info.hh"
-#include "memory/unified_memory.hh"
 
 using muGrid::Device;
 using muGrid::DeviceType;
@@ -132,17 +131,6 @@ void add_device_classes(py::module & mod) {
 
         Allocations made through a previously registered allocator are
         still freed through it; only new allocations use the default.
-        )pbdoc");
-
-    mod.def("device_has_unified_memory", &muGrid::device_has_unified_memory,
-            "device_id"_a = -1,
-            R"pbdoc(
-        True if device memory on ``device_id`` is physically unified with the
-        host (integrated GPU / APU such as MI300A), so device pointers are
-        directly host-addressable with no copy. ``device_id=-1`` queries the
-        currently selected device. Detects physically unified memory only,
-        NOT NVIDIA managed/UVM memory. Override with the
-        ``MUGRID_UNIFIED_MEMORY`` environment variable.
         )pbdoc");
 
     // --- Field allocation profiling --------------------------------------
@@ -296,10 +284,11 @@ void add_device_classes(py::module & mod) {
              "Device string (e.g., 'cpu', 'cuda:0')")
         .def_property_readonly("type_name", &Device::get_type_name,
              "Device type name (e.g., 'CPU', 'CUDA')")
-        .def_property_readonly("is_unified", &Device::is_unified,
-             "True if this device's memory is physically unified with the "
-             "host (integrated GPU / APU), so its buffers are directly "
-             "host-addressable without a staging copy")
+        .def_property_readonly("is_host_accessible", &Device::is_host_accessible,
+             "True if memory on this device can be dereferenced directly by "
+             "the host CPU: host and pinned-host memory, and device memory on "
+             "a unified-memory / integrated device (e.g. an MI300A APU). "
+             "False for discrete GPUs")
         // Special methods
         .def("__repr__", [](const Device & d) {
             return "<Device: " + d.get_device_string() + ">";

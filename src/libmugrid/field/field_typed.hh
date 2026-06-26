@@ -318,11 +318,51 @@ namespace muGrid {
     void deep_copy_from(const TypedFieldBase<T, OtherSpace> & src);
 
     /**
+     * Type-erased deep copy: dispatches on the source field's memory space
+     * and forwards to the typed `deep_copy_from` above. Performs a
+     * host<->device transfer and an AoS<->SoA conversion as required.
+     */
+    void deep_copy_from(const Field & src) final {
+      if (src.get_type_descriptor() != this->get_type_descriptor()) {
+        throw FieldError(
+            "deep_copy_from: scalar type mismatch between source and "
+            "destination fields");
+      }
+      if (src.is_on_device()) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        this->deep_copy_from(
+            dynamic_cast<const TypedFieldBase<T, DefaultDeviceSpace> &>(src));
+#else
+        throw FieldError(
+            "deep_copy_from: source field reports device residency but this "
+            "build has no GPU support");
+#endif
+      } else {
+        this->deep_copy_from(
+            dynamic_cast<const TypedFieldBase<T, HostSpace> &>(src));
+      }
+    }
+
+    /**
      * Check if field resides on device (GPU) memory.
      * Implementation uses compile-time type trait.
      */
     bool is_on_device() const final {
       return is_device_space_v<MemorySpace>;
+    }
+
+    /**
+     * Check whether this field's data is directly host-accessible. Host-space
+     * fields always are; device-space fields are only on unified-memory /
+     * integrated devices, which is queried at runtime from the collection's
+     * Device.
+     */
+    bool is_host_accessible() const final {
+      if constexpr (is_host_space_v<MemorySpace>) {
+        return true;
+      } else {
+        return this->get_collection().get_device().is_host_accessible();
+      }
     }
 
     /**

@@ -275,3 +275,207 @@ class FourierPreconditioner(Preconditioner):
             linalg.scal(self._kernel_field, work)
         with self._timed("ifft"):
             engine.ifft(work, z)
+
+
+class BlockFourierPreconditioner(Preconditioner):
+    """
+    Block spectral preconditioner ``z = F⁻¹ [ K⁻¹(q) · F r ]`` for an
+    ``n``-component vector field.
+
+    The matrix-valued generalization of :class:`FourierPreconditioner`: where
+    that class multiplies each Fourier mode by a scalar, this one multiplies the
+    ``n``-vector of component amplitudes at each mode ``q`` by an ``n × n``
+    matrix ``K⁻¹(q)``. This is exactly what the reference-material (Green's
+    function) preconditioner of an FE homogenization problem needs (Ladecký et
+    al., Appl. Math. Comput. 446 (2023) 127835): the reference stiffness
+    ``Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D`` built from spatially uniform data is block-circulant,
+    hence block-diagonal in Fourier space with one ``n × n`` block per mode
+    (``n = d·Nn`` degrees of freedom per stencil), and its (pseudo-)inverse is
+    applied mode by mode between a forward and an inverse FFT.
+
+    The blocks are supplied pre-assembled and pre-inverted (the singular
+    zero-frequency block, corresponding to the rigid-body modes, must already be
+    set to its pseudo-inverse — typically zero — to project those modes out).
+    The inverse-transform normalisation should be folded into the blocks by the
+    caller, mirroring :class:`FourierPreconditioner`.
+
+    Parameters
+    ----------
+    engine : muGrid.FFTEngine
+        FFT engine defining grid, parallel decomposition and transforms.
+    blocks : ndarray
+        Per-mode inverse blocks of shape ``(n, n, *nb_fourier_subdomain_grid_pts)``
+        (generally complex), already including ``engine.normalisation``. ``z[i] =
+        Σ_j blocks[i, j] · F r[j]`` at every Fourier mode.
+    name : str, optional
+        Prefix for the engine-managed Fourier work field.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records the forward transform ("fft"), the
+        per-mode block multiply ("scale") and the inverse transform ("ifft").
+    """
+
+    def __init__(self, engine, blocks, name="block-fourier-preconditioner",
+                 timer=None):
+        self._engine = engine
+        self._name = name
+        self._timer = timer
+
+        blocks = np.asarray(blocks)
+        n = blocks.shape[0]
+        if blocks.ndim < 2 or blocks.shape[1] != n:
+            raise ValueError(
+                f"blocks must have shape (n, n, *fourier_shape); got "
+                f"{blocks.shape}"
+            )
+        expected = tuple(engine.nb_fourier_subdomain_grid_pts)
+        if tuple(blocks.shape[2:]) != expected:
+            raise ValueError(
+                f"blocks Fourier shape {tuple(blocks.shape[2:])} does not match "
+                f"the local Fourier subdomain {expected} of the FFT engine"
+            )
+
+        self._n = n
+        self._work = engine.fourier_space_field(f"{name}-work", components=(n,))
+        # Match the array library of the work field's view (numpy or cupy) so
+        # the per-mode multiply runs where the fields live.
+        sample = self._work.s
+        if type(sample).__module__.startswith("cupy"):
+            import cupy
+
+            self._xp = cupy
+            self._blocks = cupy.asarray(blocks)
+        else:
+            self._xp = np
+            self._blocks = np.asarray(blocks)
+
+    def _timed(self, name):
+        return self._timer(name) if self._timer is not None else nullcontext()
+
+    def apply(self, r, z):
+        """
+        Compute ``z = F⁻¹ [ K⁻¹(q) · F r ]``.
+
+        ``r`` and ``z`` must be real-valued ``n``-component fields of the
+        engine's real-space collection.
+        """
+        engine = self._engine
+        work = self._work
+        with self._timed("fft"):
+            engine.fft(r, work)
+        with self._timed("scale"):
+            s = work.s
+            # z_i(q) = Σ_j K⁻¹_ij(q) r_j(q), per Fourier mode. The field view
+            # carries a (size-1) sub-point axis between the component axis and
+            # the Fourier axes ("s"); the blocks broadcast over it.
+            s[...] = self._xp.einsum("ij...,js...->is...", self._blocks, s)
+        with self._timed("ifft"):
+            engine.ifft(work, z)
+
+
+def make_reference_stiffness_preconditioner(
+    engine,
+    apply_reference_stiffness,
+    nb_components,
+    name="reference-stiffness-preconditioner",
+    timer=None,
+):
+    """
+    Build the reference-material (Green's-function) preconditioner of Ladecký et
+    al., Appl. Math. Comput. 446 (2023) 127835.
+
+    For an FE problem on a regular periodic grid, the reference-material
+    stiffness ``Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D`` built from spatially *uniform* data is
+    block-circulant — every pixel carries the same stencil — hence
+    block-diagonal in Fourier space, with one ``n × n`` block ``K̂(q)`` per mode
+    (``n`` degrees of freedom per stencil). This routine assembles ``K̂(q)`` by
+    the impulse-response method (paper Algorithm 2): it applies ``Kʳᵉᶠ`` to a
+    unit nodal impulse in each of the ``n`` directions placed at the global
+    origin pixel, and the FFT of the response is the ``β``-th column of the
+    symbol. Each block is inverted; the singular zero-frequency block (the
+    rigid-body modes) is replaced by its pseudo-inverse (zero), which projects
+    those modes out — consistent with a rigid-body-free right-hand side. The
+    inverse-transform normalisation is folded in, and a
+    :class:`BlockFourierPreconditioner` applying ``F⁻¹ K̂⁻¹(q) F`` is returned.
+
+    The routine is FE-agnostic: it only needs the action of ``Kʳᵉᶠ``. The caller
+    supplies that as ``apply_reference_stiffness`` (e.g. built from a uniform
+    reference stiffness and the discrete gradient/divergence operators).
+
+    Parameters
+    ----------
+    engine : muGrid.FFTEngine
+        FFT engine; its real-space collection holds the fields, and it provides
+        the transforms and the parallel (MPI) decomposition. The impulse
+        assembly and the per-mode inverse are computed on the rank-local Fourier
+        subdomain, so this is MPI-transparent.
+    apply_reference_stiffness : callable
+        ``apply_reference_stiffness(u, f)`` computing ``f = Kʳᵉᶠ u`` for
+        ``n``-component real fields ``u``, ``f`` on the engine's real-space
+        collection (it may use ghost communication internally).
+    nb_components : int
+        Degrees of freedom per stencil ``n`` (e.g. ``dim`` for one node per
+        pixel).
+    name : str, optional
+        Prefix for the engine-managed work fields and the preconditioner.
+    timer : muTimer.Timer, optional
+        Forwarded to the returned preconditioner (records "fft"/"scale"/"ifft").
+
+    Returns
+    -------
+    BlockFourierPreconditioner
+        The assembled preconditioner, ready to pass as ``prec=`` to
+        :func:`muGrid.Solvers.conjugate_gradients`.
+    """
+    fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+    dim = len(fourier_shape)
+    n = int(nb_components)
+
+    # Global-origin pixel(s) in this rank's interior: the nodal coordinate is
+    # exactly 0 in every direction only at global index 0 (coord = index / N).
+    # In MPI only the rank owning the origin matches; the others contribute no
+    # impulse, which is correct for the global impulse response.
+    coords = np.asarray(engine.coords)  # [dim, *local_grid]
+    origin_mask = np.ones(coords.shape[1:], dtype=bool)
+    for d in range(dim):
+        origin_mask &= coords[d] == 0.0
+
+    impulse = engine.real_space_field(f"{name}-impulse", components=(n,))
+    column = engine.real_space_field(f"{name}-column", components=(n,))
+    column_hat = engine.fourier_space_field(f"{name}-column-hat", components=(n,))
+
+    # K_hat[alpha, beta, q] = (FFT of Kʳᵉᶠ applied to impulse e_beta)[alpha](q)
+    K_hat = np.zeros((n, n) + fourier_shape, dtype=complex)
+    for beta in range(n):
+        host_impulse = np.zeros(impulse.s.shape)
+        # component beta, all (single) sub-points, at the origin pixel(s)
+        host_impulse[beta][..., origin_mask] = 1.0
+        try:
+            impulse.s[...] = host_impulse
+        except (TypeError, ValueError):
+            import cupy
+
+            impulse.s[...] = cupy.asarray(host_impulse)
+
+        apply_reference_stiffness(impulse, column)
+        engine.fft(column, column_hat)
+
+        ch = column_hat.s
+        ch = ch.get() if hasattr(ch, "get") else np.asarray(ch)
+        # (n, [sub...], *fourier) -> (n, *fourier): collapse and drop the
+        # single nodal sub-point.
+        ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
+        K_hat[:, beta] = ch
+
+    # Invert each n x n block; project out the singular zero-frequency block.
+    blocks = np.moveaxis(K_hat, (0, 1), (-2, -1))  # [*fourier, n, n]
+    inv = np.zeros_like(blocks)
+    q = np.asarray(engine.fftfreq)  # [dim, *fourier]
+    zero_mode = np.ones(fourier_shape, dtype=bool)
+    for d in range(dim):
+        zero_mode &= q[d] == 0.0
+    nonzero = ~zero_mode
+    inv[nonzero] = np.linalg.inv(blocks[nonzero])
+    # [dim, dim, *fourier], with the inverse-transform normalisation folded in.
+    K_inv = np.moveaxis(inv, (-2, -1), (0, 1)) * engine.normalisation
+
+    return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer)

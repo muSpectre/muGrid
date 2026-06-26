@@ -43,10 +43,31 @@
 
 #include "field/field_typed.hh"
 
+#include <array>
 #include <string>
 
 namespace muGrid {
 namespace linalg {
+
+/**
+ * Fused interior reduction for pipelined conjugate gradients.
+ *
+ * In a single pass over the interior region (reading r, u and w once each),
+ * returns the three inner products needed per pipelined-CG iteration:
+ *   {0} = (r, u)   {1} = (w, u)   {2} = (r, r)
+ * as local (not MPI-reduced) values. On the GPU this is one kernel launch and
+ * one device->host copy, replacing the three separate reductions (and three
+ * blocking copies) that standard preconditioned CG performs per iteration.
+ *
+ * Ghost regions are excluded, matching vecdot()/norm_sq().
+ *
+ * @tparam T Scalar type (Real)
+ * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ */
+template <typename T, typename MemorySpace>
+std::array<T, 3> pipelined_cg_dots(const TypedField<T, MemorySpace>& r,
+                                   const TypedField<T, MemorySpace>& u,
+                                   const TypedField<T, MemorySpace>& w);
 
 /**
  * Vector dot product on interior pixels only (excludes ghost regions).

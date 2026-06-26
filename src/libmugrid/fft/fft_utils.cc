@@ -124,7 +124,13 @@ void distribute_dimension(Index_t global_size, int comm_size, int rank,
 }
 
 void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & p1,
-                         int & p2) {
+                         int & p2, const std::string & decomposition) {
+  if (decomposition != "auto" && decomposition != "pencil" &&
+      decomposition != "slab") {
+    throw RuntimeError("Unknown decomposition '" + decomposition +
+                       "'; expected 'auto', 'pencil' or 'slab'");
+  }
+
   // For 1D grids: no MPI distribution supported
   if (nb_grid_pts.get_dim() == 1) {
     if (num_ranks != 1) {
@@ -135,24 +141,54 @@ void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & 
     return;
   }
 
-  // For 2D grids, we just have one distribution dimension
+  // For 2D grids, we just have one distribution dimension (Y across P2). This
+  // is already a slab, so all decomposition modes coincide.
   if (nb_grid_pts.get_dim() == 2) {
     p1 = 1;
     p2 = num_ranks;
     return;
   }
 
-  // For 3D grids, find P1 x P2 = num_ranks that minimizes communication
-  // Heuristic: prefer the most "square" factorization
-  // Also prefer factorizations where grid dimensions are evenly divisible
+  Index_t Ny{nb_grid_pts[1]};
+  Index_t Nz{nb_grid_pts[2]};
+
+  // Slab: split only Z (P1 = num_ranks, P2 = 1). Y stays local, so the forward
+  // and inverse FFTs transform the local (X, Y) plane with a single planned
+  // N-D transform and need only one transpose (Y<->Z). Requires P1 <= Nz.
+  if (decomposition == "slab") {
+    if (num_ranks > Nz) {
+      throw RuntimeError(
+          "slab decomposition requires the number of MPI ranks (" +
+          std::to_string(num_ranks) +
+          ") to not exceed the last grid dimension Nz (" +
+          std::to_string(Nz) + ")");
+    }
+    p1 = num_ranks;
+    p2 = 1;
+    return;
+  }
+
+  // "auto" prefers slab whenever it fits (num_ranks <= Nz). Slab performs a
+  // single fused N-D transform of the local (X, Y) plane and only one MPI
+  // transpose (Y<->Z) instead of two, so it moves less data overall and is
+  // measurably faster than pencil on both CPU and GPU. Only when more ranks
+  // are requested than Z-planes (slab cannot scale past Nz) do we fall back to
+  // the 2D pencil factorization below.
+  if (decomposition == "auto" && num_ranks <= Nz) {
+    p1 = num_ranks;
+    p2 = 1;
+    return;
+  }
+
+  // For 3D grids ("auto"/"pencil"), find P1 x P2 = num_ranks that minimizes
+  // communication. Heuristic: prefer the most "square" factorization, and
+  // factorizations where the grid dimensions are evenly divisible.
 
   int best_p1{1};
   int best_p2{num_ranks};
   double best_score = 0.0;
 
-  // Get grid dimensions (for 3D: Y is distributed among P2, Z among P1)
-  Index_t Ny{nb_grid_pts.get_dim() > 1 ? nb_grid_pts[1] : 1};
-  Index_t Nz{nb_grid_pts.get_dim() > 2 ? nb_grid_pts[2] : 1};
+  // (Y is distributed among P2, Z among P1; Ny, Nz declared above.)
 
   // Try all factorizations
   for (int test_p1{1}; test_p1 <= num_ranks; ++test_p1) {

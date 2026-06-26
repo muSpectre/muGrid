@@ -121,6 +121,55 @@ T interior_vecdot(const T* a_data, const T* b_data,
     return result;
 }
 
+/**
+ * Fused interior reduction: {(r,u), (w,u), (r,r)} in a single pass, reading
+ * r, u and w once each. Mirrors interior_vecdot's bounds/stride handling.
+ */
+template <typename T>
+std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
+                                     const T* w_data,
+                                     const GlobalFieldCollection& coll,
+                                     Index_t nb_components_per_pixel) {
+    const auto spatial_dim = coll.get_spatial_dim();
+    const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
+    const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
+    const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
+    const auto& strides = coll.get_pixels_with_ghosts().get_strides();
+
+    if (spatial_dim < 1 || spatial_dim > 3) {
+        throw FieldError("interior_three_dots only supports 1D, 2D and 3D fields");
+    }
+
+    Index_t start[3]{0, 0, 0};
+    Index_t end[3]{1, 1, 1};
+    Index_t stride[3]{0, 0, 0};
+    for (Dim_t d = 0; d < spatial_dim; ++d) {
+        start[d] = nb_ghosts_left[d];
+        end[d] = nb_pts[d] - nb_ghosts_right[d];
+        stride[d] = strides[d];
+    }
+
+    T ru{0}, wu{0}, rr{0};
+    for (Index_t iz = start[2]; iz < end[2]; ++iz) {
+        for (Index_t iy = start[1]; iy < end[1]; ++iy) {
+            for (Index_t ix = start[0]; ix < end[0]; ++ix) {
+                const Index_t offset =
+                    (ix * stride[0] + iy * stride[1] + iz * stride[2]) *
+                    nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    const T rv = r_data[offset + c];
+                    const T uv = u_data[offset + c];
+                    const T wv = w_data[offset + c];
+                    ru += conj_product(rv, uv);
+                    wu += conj_product(wv, uv);
+                    rr += conj_product(rv, rv);
+                }
+            }
+        }
+    }
+    return {ru, wu, rr};
+}
+
 }  // namespace internal
 
 /* ---------------------------------------------------------------------- */
@@ -327,6 +376,24 @@ Real norm_sq<Real, HostSpace>(const TypedField<Real, HostSpace>& x) {
         // LocalFieldCollection: no ghosts, use Eigen
         return x.eigen_vec().squaredNorm();
     }
+}
+
+template <>
+std::array<Real, 3> pipelined_cg_dots<Real, HostSpace>(
+    const TypedField<Real, HostSpace>& r, const TypedField<Real, HostSpace>& u,
+    const TypedField<Real, HostSpace>& w) {
+    const auto& coll = r.get_collection();
+    const Index_t nb_components_per_pixel =
+        r.get_nb_components() * r.get_nb_sub_pts();
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        return internal::interior_three_dots(r.data(), u.data(), w.data(),
+                                             global_coll,
+                                             nb_components_per_pixel);
+    }
+    // LocalFieldCollection: no ghosts, use the per-pair Eigen reductions
+    return {r.eigen_vec().dot(u.eigen_vec()), w.eigen_vec().dot(u.eigen_vec()),
+            r.eigen_vec().squaredNorm()};
 }
 
 template <>
@@ -555,12 +622,18 @@ static void cross_host(const TypedField<T, HostSpace>& a,
     internal::check_three_vector("cross", a, coll);
     internal::check_three_vector("cross", b, coll);
     internal::check_three_vector("cross", out, coll);
+    const Index_t npix = a.get_nb_entries();
+    // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
+    // compute. Skip it, including the aliasing check below: empty fields share a
+    // null data pointer, so that check would otherwise fire spuriously.
+    if (npix == 0) {
+        return;
+    }
     if (out.view().data() == a.view().data() ||
         out.view().data() == b.view().data()) {
         throw FieldError(
             "cross: output must be a field distinct from both inputs");
     }
-    const Index_t npix = a.get_nb_entries();
     const bool soa =
         (out.get_storage_order() == StorageOrder::StructureOfArrays);
     internal::cross_buffers<T>(a.view().data(), b.view().data(),

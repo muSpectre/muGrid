@@ -124,6 +124,15 @@ namespace muGrid {
         get_empty_clone(const std::string & new_name) const;
 
         /**
+         * obtain a new field collection with the same domain and pixels, a
+         * given new name and a caller-specified memory device. This is used,
+         * e.g., to build a host-resident staging mirror of a device-resident
+         * collection for file I/O.
+         */
+        LocalFieldCollection get_empty_clone(const std::string & new_name,
+                                             Device device) const;
+
+        /**
          * obtain a new field collection with the same domain and pixels and the
          * same name
          */

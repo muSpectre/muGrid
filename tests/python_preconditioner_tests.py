@@ -14,9 +14,11 @@ from conftest import (
 
 import muGrid
 from muGrid.Preconditioners import (
+    BlockFourierPreconditioner,
     FourierPreconditioner,
     IdentityPreconditioner,
     JacobiPreconditioner,
+    make_reference_stiffness_preconditioner,
 )
 from muGrid.Solvers import conjugate_gradients
 
@@ -192,6 +194,87 @@ def test_fourier_preconditioner_multicomponent(comm):
     np.testing.assert_allclose(
         z.p[1], np.cos(4 * np.pi * y) / lam(0, 2 / 16), atol=1e-12
     )
+
+
+def test_block_fourier_matches_scalar(comm):
+    """Diagonal blocks reproduce the scalar FourierPreconditioner.
+
+    BlockFourierPreconditioner with blocks ``k(q)·I`` must act identically to
+    FourierPreconditioner with the scalar kernel ``k(q)`` on every component.
+    (FourierPreconditioner folds the inverse-transform normalisation in itself,
+    so the block version is given ``k(q)·normalisation`` on the diagonal.)
+    """
+    engine = make_engine(comm, (16, 16))
+    grid_spacing = 1 / 16
+    n = 2
+    kernel = inverse_fd_laplace_kernel(grid_spacing)(engine)
+
+    scalar = FourierPreconditioner(engine, kernel)
+
+    fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+    blocks = np.zeros((n, n) + fourier_shape, dtype=complex)
+    for i in range(n):
+        blocks[i, i] = kernel * engine.normalisation
+    block = BlockFourierPreconditioner(engine, blocks)
+
+    r = engine.real_space_field("r", components=(n,))
+    z_scalar = engine.real_space_field("z_scalar", components=(n,))
+    z_block = engine.real_space_field("z_block", components=(n,))
+    x, y = engine.coords
+    r.p[0] = np.sin(2 * np.pi * x) + 0.5 * np.cos(4 * np.pi * y)
+    r.p[1] = np.cos(2 * np.pi * y)
+
+    scalar(r, z_scalar)
+    block(r, z_block)
+    np.testing.assert_allclose(
+        np.asarray(z_block.p), np.asarray(z_scalar.p), atol=1e-12
+    )
+
+
+def test_block_fourier_shape_validation(comm):
+    """Blocks whose Fourier shape mismatches the engine are rejected."""
+    engine = make_engine(comm, (16, 16))
+    with pytest.raises(ValueError):
+        BlockFourierPreconditioner(engine, np.ones((2, 2, 3, 3)))
+
+
+def test_reference_stiffness_preconditioner_is_exact_inverse(comm):
+    """The assembled preconditioner is the exact inverse of its operator.
+
+    For a block-circulant operator A (here a componentwise minus-FD-Laplacian on
+    an n-component field), `make_reference_stiffness_preconditioner` with the
+    action of A builds M⁻¹ = A⁺. Applying it to ``b = A x`` for a zero-mean x
+    must recover x (the rigid-body / zero-frequency mode is projected out).
+    """
+    engine = make_engine(comm, (16, 16))
+    grid_spacing = 1 / 16
+    n = 2
+    laplace = muGrid.GenericLinearOperator(
+        [-1, -1], np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    )
+
+    def apply_operator(u, Au):
+        engine.communicate_ghosts(u)
+        laplace.apply(u, Au)
+        Au.s[...] /= -grid_spacing**2
+
+    prec = make_reference_stiffness_preconditioner(engine, apply_operator, n)
+
+    x = engine.real_space_field("x", components=(n,))
+    b = engine.real_space_field("b", components=(n,))
+    z = engine.real_space_field("z", components=(n,))
+    rng = np.random.default_rng(0)
+    for c in range(n):
+        xc = rng.standard_normal((16, 16))
+        x.p[c] = xc - xc.mean()  # zero-mean (orthogonal to the rigid-body mode)
+
+    apply_operator(x, b)  # b = A x
+    prec(b, z)            # z = A⁺ b = x (zero mode projected out)
+
+    for c in range(n):
+        xc = np.asarray(x.p[c])
+        zc = np.asarray(z.p[c])
+        np.testing.assert_allclose(zc, xc, atol=1e-10)
 
 
 def test_kernel_shape_validation(comm):

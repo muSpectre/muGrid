@@ -15,8 +15,8 @@
  *
  * Buffers are grouped by memory pool. Host and a given device are normally
  * separate pools, but on a physically unified-memory architecture (e.g. an
- * MI300A APU) they share one pool and are reported jointly; see
- * memory/unified_memory.hh.
+ * MI300A APU) they share one pool and are reported jointly; this is detected
+ * via Device::is_host_accessible() (see memory/device.hh).
  *
  * The instrumentation in Array (which calls record_alloc/record_free) is
  * always compiled in. Recording is off by default and gated by an atomic

@@ -303,6 +303,12 @@ namespace muGrid {
         //! True if forward()/backward() receive device pointers
         bool on_device{false};
 
+        //! On the host, route the exchange through the contiguous-staging
+        //! Alltoallv path (explicit cache-friendly pack/unpack) instead of
+        //! MPI_Alltoallw with derived datatypes. Opt-in via the environment
+        //! variable MUGRID_STAGED_TRANSPOSE=1.
+        bool staged_host{false};
+
         //! Contiguous device staging buffers (send, recv), grown on demand
         mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
         //! Sizes of the staging buffers in bytes

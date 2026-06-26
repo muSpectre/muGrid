@@ -74,6 +74,27 @@ def norm_sq(x):
     return _linalg.norm_sq(_get_cpp(x))
 
 
+def pipelined_cg_dots(r, u, w):
+    """
+    Fused interior reduction for pipelined CG.
+
+    Returns ``[(r, u), (w, u), (r, r)]`` computed in a single pass over the
+    interior region (one GPU kernel and one device-to-host copy), replacing the
+    three separate reductions of standard preconditioned CG.
+
+    Parameters
+    ----------
+    r, u, w : Field
+        Fields on the same collection.
+
+    Returns
+    -------
+    list of float
+        ``[(r, u), (w, u), (r, r)]`` (local, not MPI-reduced).
+    """
+    return _linalg.pipelined_cg_dots(_get_cpp(r), _get_cpp(u), _get_cpp(w))
+
+
 def axpy(alpha, x, y):
     """
     AXPY operation: y = alpha * x + y (full buffer).

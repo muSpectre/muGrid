@@ -344,10 +344,30 @@ namespace muGrid {
         Unit get_physical_unit() const;
 
         /**
+         * Deep copy the field values from another field, performing a
+         * host<->device transfer and a storage-order (AoS<->SoA) conversion as
+         * needed. The source field must have the same scalar type and a
+         * compatible logical layout (same number of buffer entries). This is a
+         * type-erased entry point: the concrete implementation dispatches on
+         * the source field's memory space.
+         */
+        virtual void deep_copy_from(const Field & src) = 0;
+
+        /**
          * Check if field resides on device (GPU) memory.
          * Returns true for CUDA and ROCm/HIP device memory spaces.
          */
         virtual bool is_on_device() const = 0;
+
+        /**
+         * Check whether this field's data can be dereferenced directly by the
+         * host CPU. Always true for host-resident fields; true for
+         * device-resident fields only on unified-memory / integrated devices
+         * (e.g. an APU), where the device allocation is host-coherent. When
+         * true, the raw pointer from get_void_data_ptr(false) may be passed to
+         * host-side libraries (such as NetCDF) without a staging copy.
+         */
+        virtual bool is_host_accessible() const = 0;
 
         /**
          * Get DLPack device type for this field's memory space.
@@ -366,14 +386,6 @@ namespace muGrid {
          * Returns "cpu", "cuda:N", or "rocm:N" where N is the device ID.
          */
         virtual std::string get_device_string() const = 0;
-
-        /**
-         * True if this field lives on a device whose memory is physically
-         * unified with the host (integrated GPU / APU), so its buffer is
-         * directly host-addressable without a staging copy. Always false for
-         * host fields. See memory/unified_memory.hh.
-         */
-        bool is_unified() const;
 
        protected:
         //! gives field collections the ability to resize() fields
