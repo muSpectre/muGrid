@@ -36,17 +36,27 @@
 #ifndef SRC_LIBMUGRID_FFT_ROCFFT_BACKEND_HH_
 #define SRC_LIBMUGRID_FFT_ROCFFT_BACKEND_HH_
 
-#include "fft_backend.hh"
+#include "gpu_fft_backend.hh"
 
 #include <rocfft/rocfft.h>
 
 #include <cstddef>
-#include <string>
-#include <tuple>
-#include <unordered_map>
 #include <vector>
 
 namespace muGrid {
+
+/**
+ * A cached rocFFT plan together with the execution info and work buffer it
+ * needs. This is the per-plan payload stored by the GpuFFTBackend caches (the
+ * `PlanT` template argument), so it lives at namespace scope rather than nested
+ * in the backend.
+ */
+struct RocfftCachedPlan {
+  rocfft_plan plan;
+  rocfft_execution_info info;
+  void * work_buffer;
+  std::size_t work_buffer_size;
+};
 
 /**
  * Native rocFFT implementation of FFT1DBackend for AMD GPUs.
@@ -54,39 +64,21 @@ namespace muGrid {
  * This backend uses AMD's rocFFT library directly (not via hipFFT) for
  * GPU-accelerated FFT operations. Using the native rocFFT API provides
  * better support for strided data layouts, which is essential for
- * 3D MPI-parallel FFTs.
+ * 3D MPI-parallel FFTs (rocFFT supports arbitrary strides for all transform
+ * types including R2C and C2R, which cuFFT does not).
  *
- * rocFFT plans are cached by (transform_type, n, batch, in_stride, in_dist,
- * out_stride, out_dist) signature to avoid repeated plan creation overhead.
- *
- * Key advantage over hipFFT: rocFFT's native API supports arbitrary strides
- * for all transform types including R2C and C2R, which cuFFT does not support.
+ * The backend-agnostic machinery (the batch==0 guard, plan cache and hash,
+ * alignment check, scratch buffer, synchronisation and destructor cleanup)
+ * lives in GpuFFTBackend; this class supplies only the rocFFT library calls
+ * (make_plan / destroy_plan / exec_*) and the N-D entry points.
  */
-class rocFFTBackend : public FFT1DBackend {
+class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
+  using Base = GpuFFTBackend<rocFFTBackend, RocfftCachedPlan>;
+  friend Base;
+
  public:
   rocFFTBackend();
-  ~rocFFTBackend() override;
-
-  void r2c(Index_t n, Index_t batch, const Real * input, Index_t in_stride,
-           Index_t in_dist, Complex * output, Index_t out_stride,
-           Index_t out_dist) override;
-
-  void c2r(Index_t n, Index_t batch, const Complex * input, Index_t in_stride,
-           Index_t in_dist, Real * output, Index_t out_stride,
-           Index_t out_dist) override;
-
-  void c2c_forward(Index_t n, Index_t batch, const Complex * input,
-                   Index_t in_stride, Index_t in_dist, Complex * output,
-                   Index_t out_stride, Index_t out_dist) override;
-
-  void c2c_backward(Index_t n, Index_t batch, const Complex * input,
-                    Index_t in_stride, Index_t in_dist, Complex * output,
-                    Index_t out_stride, Index_t out_dist) override;
-
-  //! rocFFT performs whole multidimensional r2c/c2r transforms natively, so the
-  //! serial engine hands the entire transform over in one planned call instead
-  //! of driving it axis-by-axis (mirrors the cuFFT backend).
-  bool supports_nd() const override { return true; }
+  ~rocFFTBackend() override { this->destroy_all_plans(); }
 
   void r2c_nd(const std::vector<Index_t> & shape,
               const std::vector<Index_t> & axes, const Real * input,
@@ -98,114 +90,57 @@ class rocFFTBackend : public FFT1DBackend {
               const std::vector<Index_t> & in_strides, Real * output,
               const std::vector<Index_t> & out_strides) override;
 
-  bool supports_device_memory() const override { return true; }
-
   const char * name() const override { return "rocfft"; }
 
  protected:
-  /**
-   * Key type for plan cache: (transform_type, direction, n, batch, in_stride,
-   * in_dist, out_stride, out_dist)
-   */
-  using PlanKey = std::tuple<int, int, Index_t, Index_t, Index_t, Index_t,
-                             Index_t, Index_t>;
-
-  /**
-   * Hash function for PlanKey.
-   */
-  struct PlanKeyHash {
-    std::size_t operator()(const PlanKey & key) const {
-      auto h1 = std::hash<int>{}(std::get<0>(key));
-      auto h2 = std::hash<int>{}(std::get<1>(key));
-      auto h3 = std::hash<Index_t>{}(std::get<2>(key));
-      auto h4 = std::hash<Index_t>{}(std::get<3>(key));
-      auto h5 = std::hash<Index_t>{}(std::get<4>(key));
-      auto h6 = std::hash<Index_t>{}(std::get<5>(key));
-      auto h7 = std::hash<Index_t>{}(std::get<6>(key));
-      auto h8 = std::hash<Index_t>{}(std::get<7>(key));
-      // Combine hashes
-      std::size_t result = h1;
-      result ^= h2 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      result ^= h3 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      result ^= h4 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      result ^= h5 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      result ^= h6 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      result ^= h7 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      result ^= h8 + 0x9e3779b9 + (result << 6) + (result >> 2);
-      return result;
-    }
-  };
-
-  /**
-   * Transform type identifiers for plan caching.
-   */
+  /** Transform kind used when building a rocFFT plan from a PlanKey. */
   enum TransformType { R2C = 0, C2R = 1, C2C = 2 };
 
-  /**
-   * Direction identifiers for C2C transforms.
-   */
-  enum Direction { FORWARD = 0, BACKWARD = 1 };
+  // ---- GpuFFTBackend hooks (rocFFT library calls) ----
+
+  RocfftCachedPlan make_plan(const PlanKey & key);
+  void destroy_plan(RocfftCachedPlan & cached);
+
+  void exec_r2c(RocfftCachedPlan & cached, const Real * input,
+                Complex * output);
+  void exec_c2r(RocfftCachedPlan & cached, const Complex * input,
+                Real * output);
+  void exec_c2c_forward(RocfftCachedPlan & cached, const Complex * input,
+                        Complex * output);
+  void exec_c2c_backward(RocfftCachedPlan & cached, const Complex * input,
+                         Complex * output);
+
+  // ---- rocFFT-specific N-D helpers ----
 
   /**
-   * Cached plan with associated execution info.
+   * Get or create a cached N-dimensional plan (R2C or C2R), via the base's
+   * nd_plan_for. `lengths` and the stride arrays are in rocFFT order
+   * (fastest-varying dimension first); the `*_dist` are the batch (component)
+   * strides.
    */
-  struct CachedPlan {
-    rocfft_plan plan;
-    rocfft_execution_info info;
-    void * work_buffer;
-    size_t work_buffer_size;
-  };
+  RocfftCachedPlan & get_nd_plan(TransformType type,
+                                 const std::vector<std::size_t> & lengths,
+                                 const std::vector<std::size_t> & in_strides,
+                                 std::size_t in_dist,
+                                 const std::vector<std::size_t> & out_strides,
+                                 std::size_t out_dist, std::size_t batch);
 
   /**
-   * Get or create a rocFFT plan for the given parameters.
-   *
-   * @param type       Transform type (R2C, C2R, or C2C)
-   * @param direction  Transform direction (FORWARD or BACKWARD, only for C2C)
-   * @param n          Transform size
-   * @param batch      Number of batched transforms
-   * @param in_stride  Input stride between elements
-   * @param in_dist    Input distance between batches
-   * @param out_stride Output stride between elements
-   * @param out_dist   Output distance between batches
-   * @return CachedPlan for the requested transform
+   * Build a rocFFT plan + execution info + work buffer for the given transform
+   * type and advanced data layout. Shared by make_plan (1D) and get_nd_plan.
    */
-  CachedPlan & get_plan(TransformType type, Direction direction, Index_t n,
-                        Index_t batch, Index_t in_stride, Index_t in_dist,
-                        Index_t out_stride, Index_t out_dist);
-
-  /**
-   * Get or create a cached N-dimensional plan (R2C or C2R). `lengths` and the
-   * stride arrays are in rocFFT order (fastest-varying dimension first); the
-   * `*_dist` are the batch (component) strides. Cached by a string signature.
-   */
-  CachedPlan & get_nd_plan(TransformType type,
-                           const std::vector<size_t> & lengths,
-                           const std::vector<size_t> & in_strides,
-                           size_t in_dist,
-                           const std::vector<size_t> & out_strides,
-                           size_t out_dist, size_t batch);
-
-  /**
-   * Device scratch buffer of at least `bytes` (grow-only). Used to stage the
-   * Fourier input of `c2r_nd`, since rocFFT's real-inverse transform may
-   * overwrite its input but the engine requires it preserved.
-   */
-  void * ensure_nd_scratch(size_t bytes);
+  RocfftCachedPlan create_plan(TransformType type,
+                               rocfft_transform_type transform_type,
+                               const std::vector<std::size_t> & lengths,
+                               const std::vector<std::size_t> & in_strides,
+                               std::size_t in_dist,
+                               const std::vector<std::size_t> & out_strides,
+                               std::size_t out_dist, std::size_t batch);
 
   /**
    * Check rocFFT result and throw on error.
    */
   static void check_rocfft_result(rocfft_status result, const char * operation);
-
-  //! Plan cache (1D batched transforms)
-  std::unordered_map<PlanKey, CachedPlan, PlanKeyHash> plan_cache;
-
-  //! Plan cache for N-dimensional transforms, keyed by a string signature
-  std::unordered_map<std::string, CachedPlan> nd_plan_cache;
-
-  //! Grow-only scratch for c2r_nd input preservation
-  void * nd_scratch{nullptr};
-  size_t nd_scratch_bytes{0};
 
   //! Flag to track if rocfft_setup has been called
   static bool rocfft_initialized;
