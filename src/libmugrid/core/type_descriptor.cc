@@ -43,41 +43,29 @@
 namespace muGrid {
 
 TypeDescriptor typeid_to_descriptor(const std::type_info & type_id) {
-    if (type_id == typeid(int)) {
-        return TypeDescriptor::Int;
-    } else if (type_id == typeid(unsigned int)) {
-        return TypeDescriptor::Uint;
-    } else if (type_id == typeid(double)) {
-        return TypeDescriptor::Real;
-    } else if (type_id == typeid(std::complex<double>)) {
-        return TypeDescriptor::Complex;
-    } else if (type_id == typeid(std::ptrdiff_t)) {
-        return TypeDescriptor::Index;
-    } else {
-        std::stringstream err{};
-        err << "Unsupported type for TypeDescriptor: " << type_id.name()
-            << ". Only Int, Uint, Real, Complex, and Index_t are supported.";
-        throw RuntimeError(err.str());
+#define MUGRID_TD_TYPEID_ROW(tag, type, name) \
+    if (type_id == typeid(type)) {            \
+        return TypeDescriptor::tag;           \
     }
+    MUGRID_SCALAR_TYPES(MUGRID_TD_TYPEID_ROW)
+#undef MUGRID_TD_TYPEID_ROW
+    std::stringstream err{};
+    err << "Unsupported type for TypeDescriptor: " << type_id.name()
+        << ". Only Int, Uint, Real, Complex, and Index_t are supported.";
+    throw RuntimeError(err.str());
 }
 
 const char * type_descriptor_name(TypeDescriptor td) {
     switch (td) {
         case TypeDescriptor::Unknown:
             return "Unknown";
-        case TypeDescriptor::Int:
-            return "Int";
-        case TypeDescriptor::Uint:
-            return "Uint";
-        case TypeDescriptor::Real:
-            return "Real";
-        case TypeDescriptor::Complex:
-            return "Complex";
-        case TypeDescriptor::Index:
-            return "Index";
-        default:
-            return "Invalid";
+#define MUGRID_TD_NAME_ROW(tag, type, name) \
+    case TypeDescriptor::tag:               \
+        return name;
+        MUGRID_SCALAR_TYPES(MUGRID_TD_NAME_ROW)
+#undef MUGRID_TD_NAME_ROW
     }
+    return "Invalid";
 }
 
 }  // namespace muGrid

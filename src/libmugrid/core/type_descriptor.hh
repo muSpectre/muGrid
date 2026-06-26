@@ -68,14 +68,51 @@ using Complex = std::complex<double>;
  * - Complex: complex double (std::complex<double>)
  * - Index: signed index type (std::ptrdiff_t)
  */
+/**
+ * @brief The single source of truth for muGrid's scalar types.
+ *
+ * Every per-type table in the code base (the enum below, the constexpr traits,
+ * the runtime name lookup, and the NetCDF/MPI backend mappings in their own
+ * translation units) is generated from this X-macro. To add a scalar type, add
+ * ONE row here, then ONE row to each backend table that can represent it
+ * (MUGRID_NC_TYPES in io/type_descriptor_netcdf.cc, MUGRID_MPI_TYPES in
+ * mpi/type_descriptor_mpi.cc). Columns: enum tag, C++ type, human-readable name.
+ */
+#define MUGRID_SCALAR_TYPES(X)                              \
+    X(Int, int, "Int")                                      \
+    X(Uint, unsigned int, "Uint")                           \
+    X(Real, double, "Real")                                 \
+    X(Complex, std::complex<double>, "Complex")             \
+    X(Index, std::ptrdiff_t, "Index")
+
 enum class TypeDescriptor : std::uint8_t {
     Unknown = 0,
-    Int,      // int (muGrid::Int)
-    Uint,     // unsigned int (muGrid::Uint)
-    Real,     // double (muGrid::Real)
-    Complex,  // std::complex<double> (muGrid::Complex)
-    Index     // std::ptrdiff_t (muGrid::Index_t)
+#define MUGRID_TD_ENUM_ROW(tag, type, name) tag,
+    MUGRID_SCALAR_TYPES(MUGRID_TD_ENUM_ROW)
+#undef MUGRID_TD_ENUM_ROW
 };
+
+namespace detail {
+    //! Trait identifying std::complex specialisations.
+    template <typename T>
+    struct is_complex_type : std::false_type {};
+    template <typename U>
+    struct is_complex_type<std::complex<U>> : std::true_type {};
+
+    //! Per-type classification used to generate the constexpr predicates
+    //! below. Complex is treated as signed (matching the historical
+    //! behaviour); std::is_signed_v is false for std::complex.
+    template <typename T>
+    inline constexpr bool td_is_signed =
+        std::is_signed<T>::value || is_complex_type<T>::value;
+    template <typename T>
+    inline constexpr bool td_is_integer = std::is_integral<T>::value;
+    template <typename T>
+    inline constexpr bool td_is_floating_point =
+        std::is_floating_point<T>::value;
+    template <typename T>
+    inline constexpr bool td_is_complex = is_complex_type<T>::value;
+}  // namespace detail
 
 /**
  * @brief Get the size in bytes for a TypeDescriptor.
@@ -85,19 +122,15 @@ enum class TypeDescriptor : std::uint8_t {
  */
 constexpr std::size_t type_descriptor_size(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Int:
-            return sizeof(int);
-        case TypeDescriptor::Uint:
-            return sizeof(unsigned int);
-        case TypeDescriptor::Real:
-            return sizeof(double);
-        case TypeDescriptor::Complex:
-            return sizeof(std::complex<double>);
-        case TypeDescriptor::Index:
-            return sizeof(std::ptrdiff_t);
-        default:
+#define MUGRID_TD_SIZE_ROW(tag, type, name) \
+    case TypeDescriptor::tag:               \
+        return sizeof(type);
+        MUGRID_SCALAR_TYPES(MUGRID_TD_SIZE_ROW)
+#undef MUGRID_TD_SIZE_ROW
+        case TypeDescriptor::Unknown:
             return 0;
     }
+    return 0;
 }
 
 /**
@@ -108,14 +141,15 @@ constexpr std::size_t type_descriptor_size(TypeDescriptor td) {
  */
 constexpr bool is_signed(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Int:
-        case TypeDescriptor::Real:
-        case TypeDescriptor::Complex:
-        case TypeDescriptor::Index:
-            return true;
-        default:
+#define MUGRID_TD_SIGNED_ROW(tag, type, name) \
+    case TypeDescriptor::tag:                 \
+        return detail::td_is_signed<type>;
+        MUGRID_SCALAR_TYPES(MUGRID_TD_SIGNED_ROW)
+#undef MUGRID_TD_SIGNED_ROW
+        case TypeDescriptor::Unknown:
             return false;
     }
+    return false;
 }
 
 /**
@@ -126,13 +160,15 @@ constexpr bool is_signed(TypeDescriptor td) {
  */
 constexpr bool is_integer(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Int:
-        case TypeDescriptor::Uint:
-        case TypeDescriptor::Index:
-            return true;
-        default:
+#define MUGRID_TD_INTEGER_ROW(tag, type, name) \
+    case TypeDescriptor::tag:                  \
+        return detail::td_is_integer<type>;
+        MUGRID_SCALAR_TYPES(MUGRID_TD_INTEGER_ROW)
+#undef MUGRID_TD_INTEGER_ROW
+        case TypeDescriptor::Unknown:
             return false;
     }
+    return false;
 }
 
 /**
@@ -142,7 +178,16 @@ constexpr bool is_integer(TypeDescriptor td) {
  * @return true if floating point, false otherwise
  */
 constexpr bool is_floating_point(TypeDescriptor td) {
-    return td == TypeDescriptor::Real;
+    switch (td) {
+#define MUGRID_TD_FLOAT_ROW(tag, type, name) \
+    case TypeDescriptor::tag:                \
+        return detail::td_is_floating_point<type>;
+        MUGRID_SCALAR_TYPES(MUGRID_TD_FLOAT_ROW)
+#undef MUGRID_TD_FLOAT_ROW
+        case TypeDescriptor::Unknown:
+            return false;
+    }
+    return false;
 }
 
 /**
@@ -152,7 +197,16 @@ constexpr bool is_floating_point(TypeDescriptor td) {
  * @return true if complex, false otherwise
  */
 constexpr bool is_complex(TypeDescriptor td) {
-    return td == TypeDescriptor::Complex;
+    switch (td) {
+#define MUGRID_TD_COMPLEX_ROW(tag, type, name) \
+    case TypeDescriptor::tag:                  \
+        return detail::td_is_complex<type>;
+        MUGRID_SCALAR_TYPES(MUGRID_TD_COMPLEX_ROW)
+#undef MUGRID_TD_COMPLEX_ROW
+        case TypeDescriptor::Unknown:
+            return false;
+    }
+    return false;
 }
 
 /**
@@ -166,17 +220,13 @@ constexpr bool is_complex(TypeDescriptor td) {
  */
 template <typename T>
 constexpr TypeDescriptor type_to_descriptor() {
-    if constexpr (std::is_same_v<T, int>) {
-        return TypeDescriptor::Int;
-    } else if constexpr (std::is_same_v<T, unsigned int>) {
-        return TypeDescriptor::Uint;
-    } else if constexpr (std::is_same_v<T, double>) {
-        return TypeDescriptor::Real;
-    } else if constexpr (std::is_same_v<T, std::complex<double>>) {
-        return TypeDescriptor::Complex;
-    } else if constexpr (std::is_same_v<T, std::ptrdiff_t>) {
-        return TypeDescriptor::Index;
-    } else {
+#define MUGRID_TD_T2D_ROW(tag, type, name)    \
+    if constexpr (std::is_same_v<T, type>) {  \
+        return TypeDescriptor::tag;           \
+    } else
+    MUGRID_SCALAR_TYPES(MUGRID_TD_T2D_ROW)
+#undef MUGRID_TD_T2D_ROW
+    {
         static_assert(sizeof(T) == 0, "Unsupported type for TypeDescriptor. "
                       "Only Int, Uint, Real, Complex, and Index_t are supported.");
         return TypeDescriptor::Unknown;
