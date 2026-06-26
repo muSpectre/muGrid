@@ -11,6 +11,17 @@
  * backends. The kernel code is identical; only the launch mechanism and
  * runtime API differ, which are abstracted via macros.
  *
+ * The Real and Complex paths share a single source. Each kernel is written
+ * once as a template over a device scalar type — `Real` for real fields and
+ * the lightweight `DeviceComplex` below for complex fields — and the
+ * sesquilinear-vs-bilinear difference is isolated in the `conj_product` trait
+ * (mirroring internal::conj_product in linalg_host.cc). The public
+ * <Real, DeviceSpace> / <Complex, DeviceSpace> entry points are thin
+ * delegators to one generic body per operation, so there is no per-type kernel
+ * copy to keep in sync. `DeviceComplex` is a tiny `__host__ __device__`
+ * aggregate (no thrust, no cuComplex) and is bit-compatible with
+ * std::complex<Real>, so complex field buffers are reinterpret_cast to it.
+ *
  * Copyright © 2024 Lars Pastewka
  *
  * µGrid is free software; you can redistribute it and/or
@@ -44,6 +55,8 @@
 
 #include "memory/gpu_runtime.hh"
 
+#include <type_traits>
+
 #if defined(MUGRID_ENABLE_CUDA)
     using DeviceSpace = muGrid::CUDASpace;
 #elif defined(MUGRID_ENABLE_HIP)
@@ -60,43 +73,97 @@ constexpr int BLOCK_SIZE = 256;
 constexpr int REDUCE_BLOCK_SIZE = 256;
 
 /* ---------------------------------------------------------------------- */
-/* Element-wise kernels (full buffer operations)                          */
+/* Device scalar abstraction                                              */
+/*                                                                        */
+/* Device code has no std::complex (its operators are not __device__) and */
+/* we deliberately avoid thrust/cuComplex so the same source compiles     */
+/* under both nvcc and hipcc. DeviceComplex is a minimal aggregate, layout-*/
+/* compatible with std::complex<Real> (two contiguous Reals), so complex   */
+/* field data is reinterpret_cast to it. conj_product carries the          */
+/* sesquilinear (complex) vs bilinear (real) choice — the single point of  */
+/* difference between the two scalar types — and sq_norm returns the real  */
+/* squared magnitude used by the fused norm reductions.                    */
 /* ---------------------------------------------------------------------- */
 
-/**
- * AXPY kernel: y = alpha * x + y
- */
-__global__ void axpy_kernel(Real alpha, const Real* x, Real* y, Index_t n) {
+struct DeviceComplex {
+    Real re, im;
+    // Defining member operators keeps DeviceComplex an aggregate in C++17
+    // (no user-provided constructors), so `DeviceComplex{}` zero-initialises
+    // and `DeviceComplex{re, im}` brace-initialises as usual.
+    __host__ __device__ DeviceComplex& operator+=(DeviceComplex o) {
+        re += o.re;
+        im += o.im;
+        return *this;
+    }
+};
+
+__host__ __device__ inline DeviceComplex operator+(DeviceComplex a,
+                                                    DeviceComplex b) {
+    return {a.re + b.re, a.im + b.im};
+}
+__host__ __device__ inline DeviceComplex operator-(DeviceComplex a,
+                                                    DeviceComplex b) {
+    return {a.re - b.re, a.im - b.im};
+}
+__host__ __device__ inline DeviceComplex operator*(DeviceComplex a,
+                                                    DeviceComplex b) {
+    return {a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re};
+}
+
+// Sesquilinear product: conj(a)*b for complex, a*b for real. Mirrors
+// internal::conj_product in linalg_host.cc.
+template <typename T>
+__host__ __device__ inline T conj_product(T a, T b) {
+    return a * b;  // real: bilinear
+}
+__host__ __device__ inline DeviceComplex conj_product(DeviceComplex a,
+                                                      DeviceComplex b) {
+    // complex: sesquilinear conj(a)*b (Array API vecdot convention)
+    return {a.re * b.re + a.im * b.im, a.re * b.im - a.im * b.re};
+}
+
+// Real squared magnitude |x|^2.
+__host__ __device__ inline Real sq_norm(Real x) { return x * x; }
+__host__ __device__ inline Real sq_norm(DeviceComplex x) {
+    return x.re * x.re + x.im * x.im;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Element-wise kernels (full buffer operations)                          */
+/*                                                                         */
+/* One template per operation serves both Real and DeviceComplex.          */
+/* ---------------------------------------------------------------------- */
+
+// AXPY kernel: y = alpha * x + y
+template <typename T>
+__global__ void axpy_kernel(T alpha, const T* x, T* y, Index_t n) {
     Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
         y[idx] += alpha * x[idx];
     }
 }
 
-/**
- * Scale kernel: x = alpha * x
- */
-__global__ void scal_kernel(Real alpha, Real* x, Index_t n) {
+// Scale kernel: x = alpha * x
+template <typename T>
+__global__ void scal_kernel(T alpha, T* x, Index_t n) {
     Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
-        x[idx] *= alpha;
+        x[idx] = alpha * x[idx];
     }
 }
 
-/**
- * Copy kernel: dst = src
- */
-__global__ void copy_kernel(const Real* src, Real* dst, Index_t n) {
+// Copy kernel: dst = src
+template <typename T>
+__global__ void copy_kernel(const T* src, T* dst, Index_t n) {
     Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
         dst[idx] = src[idx];
     }
 }
 
-/**
- * AXPBY kernel: y = alpha * x + beta * y
- */
-__global__ void axpby_kernel(Real alpha, const Real* x, Real beta, Real* y, Index_t n) {
+// AXPBY kernel: y = alpha * x + beta * y
+template <typename T>
+__global__ void axpby_kernel(T alpha, const T* x, T beta, T* y, Index_t n) {
     Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
         y[idx] = alpha * x[idx] + beta * y[idx];
@@ -106,8 +173,11 @@ __global__ void axpby_kernel(Real alpha, const Real* x, Real beta, Real* y, Inde
 /**
  * Fused AXPY + norm_sq kernel: y = alpha * x + y, returns partial ||y||²
  * Each block computes AXPY for its elements AND accumulates partial norm.
+ * The squared norm is real-valued for both scalar types (sq_norm), so the
+ * partial sums are Real regardless of T.
  */
-__global__ void axpy_norm_sq_kernel(Real alpha, const Real* x, Real* y,
+template <typename T>
+__global__ void axpy_norm_sq_kernel(T alpha, const T* x, T* y,
                                     Real* partial_sums, Index_t n) {
     __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
 
@@ -117,9 +187,9 @@ __global__ void axpy_norm_sq_kernel(Real alpha, const Real* x, Real* y,
     // Fused: update y AND accumulate squared norm
     Real sum = 0.0;
     while (idx < n) {
-        Real new_y = y[idx] + alpha * x[idx];
+        T new_y = y[idx] + alpha * x[idx];
         y[idx] = new_y;
-        sum += new_y * new_y;
+        sum += sq_norm(new_y);
         idx += blockDim.x * gridDim.x;
     }
     shared_data[tid] = sum;
@@ -144,55 +214,23 @@ __global__ void axpy_norm_sq_kernel(Real alpha, const Real* x, Real* y,
 /* ---------------------------------------------------------------------- */
 
 /**
- * Dot product reduction kernel (first pass).
- * Computes partial sums per block.
+ * Dot product reduction kernel (first pass) over the full buffer.
+ * Computes per-block partial sums of conj_product(a, b). For real T this is
+ * the bilinear a*b; for DeviceComplex it is the sesquilinear conj(a)*b, so
+ * the partial sums (and the final result) are of device-scalar type T.
  */
-__global__ void dot_reduce_kernel(const Real* a, const Real* b,
-                                  Real* partial_sums, Index_t n) {
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+template <typename T>
+__global__ void dot_reduce_kernel(const T* a, const T* b, T* partial_sums,
+                                  Index_t n) {
+    __shared__ T shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
     Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Load and multiply
-    Real sum = 0.0;
+    T sum{};
     while (idx < n) {
-        sum += a[idx] * b[idx];
-        idx += blockDim.x * gridDim.x;
-    }
-    shared_data[tid] = sum;
-    __syncthreads();
-
-    // Reduce within block
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-
-    // Write block result
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
-/**
- * Squared norm reduction kernel (first pass).
- * Computes partial sums per block.
- */
-__global__ void norm_sq_reduce_kernel(const Real* x, Real* partial_sums,
-                                      Index_t n) {
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-
-    Index_t tid = threadIdx.x;
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Load and square
-    Real sum = 0.0;
-    while (idx < n) {
-        Real val = x[idx];
-        sum += val * val;
+        sum += conj_product(a[idx], b[idx]);
         idx += blockDim.x * gridDim.x;
     }
     shared_data[tid] = sum;
@@ -228,21 +266,25 @@ __global__ void norm_sq_reduce_kernel(const Real* x, Real* partial_sums,
  * Uses field data strides directly for correct SoA layout handling:
  * field[c, x, y, z] = base + c * stride_c + x * stride_x + y * stride_y
  *                     + z * stride_z
+ *
+ * As with dot_reduce_kernel, the contraction uses conj_product so the single
+ * template serves both real (bilinear) and complex (sesquilinear) fields.
  */
+template <typename T>
 __global__ void interior_dot_kernel(
-    const Real* a, const Real* b, Real* partial_sums,
+    const T* a, const T* b, T* partial_sums,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t x0, Index_t y0, Index_t z0,
     Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
     Index_t nb_components) {
 
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+    __shared__ T shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
     Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
     Index_t nb_pixels = nx * ny * nz;
 
-    Real sum = 0.0;
+    T sum{};
     for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
          pixel_idx += blockDim.x * gridDim.x) {
         // x runs fastest (smallest stride) so consecutive threads make
@@ -254,7 +296,8 @@ __global__ void interior_dot_kernel(
 
         Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
         for (Index_t c = 0; c < nb_components; ++c) {
-            sum += a[offset + c * stride_c] * b[offset + c * stride_c];
+            const Index_t e = offset + c * stride_c;
+            sum += conj_product(a[e], b[e]);
         }
     }
 
@@ -275,15 +318,16 @@ __global__ void interior_dot_kernel(
 }
 
 /**
- * Final reduction kernel - sums partial results.
+ * Final reduction kernel - sums partial results into data[0].
  */
-__global__ void final_reduce_kernel(Real* data, Index_t n) {
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+template <typename T>
+__global__ void final_reduce_kernel(T* data, Index_t n) {
+    __shared__ T shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
 
     // Load partial sums
-    Real sum = 0.0;
+    T sum{};
     for (Index_t i = tid; i < n; i += blockDim.x) {
         sum += data[i];
     }
@@ -308,6 +352,9 @@ __global__ void final_reduce_kernel(Real* data, Index_t n) {
  * Fused interior reduction for pipelined CG (first pass). Reads r, u, w once
  * over the interior and writes three per-block partial sums into a single
  * buffer laid out as [ru(0..nb) | wu(nb..2nb) | rr(2nb..3nb)].
+ *
+ * Real-only (the pipelined CG fields are real); not templated over the scalar
+ * type because there is no complex pipelined-CG instantiation.
  */
 __global__ void interior_three_dots_kernel(
     const Real* r, const Real* u, const Real* w, Real* partial,
@@ -424,17 +471,21 @@ __global__ void field_scal_real_kernel(Real* x, const Real* a,
     }
 }
 
-// Per-pixel three-vector cross product out = a x b on real buffers. One thread
-// per pixel; `soa` selects the component stride (npix for SoA, 1 with a
-// pixel-stride of 3 for AoS), matching the host kernel.
-__global__ void cross_real_kernel(const Real* a, const Real* b, Real* out,
-                                  Index_t npix, bool soa) {
+// Per-pixel three-vector cross product out = a x b. One thread per pixel;
+// `soa` selects the component stride (npix for SoA, 1 with a pixel-stride of 3
+// for AoS). A single template serves both real and complex fields: the complex
+// multiplies are handled by DeviceComplex's operator*/operator-, so the body
+// is identical to the real case (which previously needed its own hand-unrolled
+// re/im kernel).
+template <typename T>
+__global__ void cross_kernel(const T* a, const T* b, T* out, Index_t npix,
+                             bool soa) {
     Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < npix) {
         const Index_t cs = soa ? npix : 1;        // stride between components
         const Index_t base = soa ? i : 3 * i;     // first component of pixel i
-        const Real a0 = a[base], a1 = a[base + cs], a2 = a[base + 2 * cs];
-        const Real b0 = b[base], b1 = b[base + cs], b2 = b[base + 2 * cs];
+        const T a0 = a[base], a1 = a[base + cs], a2 = a[base + 2 * cs];
+        const T b0 = b[base], b1 = b[base + cs], b2 = b[base + 2 * cs];
         out[base]          = a1 * b2 - a2 * b1;
         out[base + cs]     = a2 * b0 - a0 * b2;
         out[base + 2 * cs] = a0 * b1 - a1 * b0;
@@ -465,230 +516,67 @@ __global__ void leray_kernel(const Real* k, const Real* invk, const Real* N2,
     }
 }
 
-/* ---------------------------------------------------------------------- */
-/* Complex element-wise kernels                                            */
-/*                                                                         */
-/* The complex buffers are addressed as their underlying reals (re, im at  */
-/* 2*i and 2*i+1); scalar complex coefficients are passed as (re, im) pairs */
-/* so the kernels need no device complex type. One thread per complex      */
-/* element, `n` complex elements total.                                    */
-/* ---------------------------------------------------------------------- */
-
-// x = alpha * x
-__global__ void scal_complex_scalar_kernel(Real ar, Real ai, Real* x,
-                                           Index_t n) {
-    Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        const Real xr = x[2 * i], xi = x[2 * i + 1];
-        x[2 * i]     = ar * xr - ai * xi;
-        x[2 * i + 1] = ar * xi + ai * xr;
-    }
-}
-
-// y = alpha * x + y
-__global__ void axpy_complex_scalar_kernel(Real ar, Real ai, const Real* x,
-                                           Real* y, Index_t n) {
-    Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        const Real xr = x[2 * i], xi = x[2 * i + 1];
-        y[2 * i]     += ar * xr - ai * xi;
-        y[2 * i + 1] += ar * xi + ai * xr;
-    }
-}
-
-// y = alpha * x + beta * y
-__global__ void axpby_complex_scalar_kernel(Real ar, Real ai, const Real* x,
-                                            Real br, Real bi, Real* y,
-                                            Index_t n) {
-    Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) {
-        const Real xr = x[2 * i], xi = x[2 * i + 1];
-        const Real yr = y[2 * i], yi = y[2 * i + 1];
-        y[2 * i]     = ar * xr - ai * xi + br * yr - bi * yi;
-        y[2 * i + 1] = ar * xi + ai * xr + br * yi + bi * yr;
-    }
-}
-
-// Per-pixel three-vector cross product out = a x b for complex fields, on the
-// underlying reals (each multiply is a complex multiply). Mirrors
-// cross_real_kernel; one thread per pixel.
-__global__ void cross_complex_kernel(const Real* a, const Real* b, Real* out,
-                                     Index_t npix, bool soa) {
-    Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < npix) {
-        const Index_t cs = soa ? npix : 1;     // complex component stride
-        const Index_t base = soa ? i : 3 * i;  // first component of pixel i
-        // load the three complex components of a and b (re, im)
-        const Real a0r = a[2 * base],            a0i = a[2 * base + 1];
-        const Real a1r = a[2 * (base + cs)],     a1i = a[2 * (base + cs) + 1];
-        const Real a2r = a[2 * (base + 2 * cs)], a2i = a[2 * (base + 2 * cs) + 1];
-        const Real b0r = b[2 * base],            b0i = b[2 * base + 1];
-        const Real b1r = b[2 * (base + cs)],     b1i = b[2 * (base + cs) + 1];
-        const Real b2r = b[2 * (base + 2 * cs)], b2i = b[2 * (base + 2 * cs) + 1];
-        // out0 = a1*b2 - a2*b1
-        out[2 * base]              = (a1r * b2r - a1i * b2i) - (a2r * b1r - a2i * b1i);
-        out[2 * base + 1]          = (a1r * b2i + a1i * b2r) - (a2r * b1i + a2i * b1r);
-        // out1 = a2*b0 - a0*b2
-        out[2 * (base + cs)]       = (a2r * b0r - a2i * b0i) - (a0r * b2r - a0i * b2i);
-        out[2 * (base + cs) + 1]   = (a2r * b0i + a2i * b0r) - (a0r * b2i + a0i * b2r);
-        // out2 = a0*b1 - a1*b0
-        out[2 * (base + 2 * cs)]     = (a0r * b1r - a0i * b1i) - (a1r * b0r - a1i * b0i);
-        out[2 * (base + 2 * cs) + 1] = (a0r * b1i + a0i * b1r) - (a1r * b0i + a1i * b0r);
-    }
-}
-
-/* ---------------------------------------------------------------------- */
-/* Complex reduction kernels                                               */
-/* ---------------------------------------------------------------------- */
-
-// Full-buffer sesquilinear dot conj(a).b: separate Re/Im partial sums per
-// block. Re(conj(a)*b) = ar*br + ai*bi; Im = ar*bi - ai*br.
-__global__ void dot_reduce_complex_kernel(const Real* a, const Real* b,
-                                          Real* partial_re, Real* partial_im,
-                                          Index_t n) {
-    __shared__ Real sh_re[REDUCE_BLOCK_SIZE];
-    __shared__ Real sh_im[REDUCE_BLOCK_SIZE];
-    Index_t tid = threadIdx.x;
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    Real sre = 0.0, sim = 0.0;
-    while (idx < n) {
-        const Real ar = a[2 * idx], ai = a[2 * idx + 1];
-        const Real br = b[2 * idx], bi = b[2 * idx + 1];
-        sre += ar * br + ai * bi;
-        sim += ar * bi - ai * br;
-        idx += blockDim.x * gridDim.x;
-    }
-    sh_re[tid] = sre;
-    sh_im[tid] = sim;
-    __syncthreads();
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            sh_re[tid] += sh_re[tid + stride];
-            sh_im[tid] += sh_im[tid + stride];
-        }
-        __syncthreads();
-    }
-    if (tid == 0) {
-        partial_re[blockIdx.x] = sh_re[0];
-        partial_im[blockIdx.x] = sh_im[0];
-    }
-}
-
-// Interior (ghost-excluded) sesquilinear dot conj(a).b on complex fields.
-// Mirrors interior_dot_kernel but reads complex elements and accumulates the
-// real and imaginary parts of the contraction separately.
-__global__ void interior_dot_complex_kernel(
-    const Real* a, const Real* b, Real* partial_re, Real* partial_im,
-    Index_t nx, Index_t ny, Index_t nz, Index_t x0, Index_t y0, Index_t z0,
-    Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    Index_t nb_components) {
-    __shared__ Real sh_re[REDUCE_BLOCK_SIZE];
-    __shared__ Real sh_im[REDUCE_BLOCK_SIZE];
-    Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t nb_pixels = nx * ny * nz;
-    Real sre = 0.0, sim = 0.0;
-    for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
-         pixel_idx += blockDim.x * gridDim.x) {
-        Index_t ix = x0 + pixel_idx % nx;
-        Index_t rem = pixel_idx / nx;
-        Index_t iy = y0 + rem % ny;
-        Index_t iz = z0 + rem / ny;
-        Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
-        for (Index_t c = 0; c < nb_components; ++c) {
-            const Index_t e = offset + c * stride_c;  // complex element index
-            const Real ar = a[2 * e], ai = a[2 * e + 1];
-            const Real br = b[2 * e], bi = b[2 * e + 1];
-            sre += ar * br + ai * bi;
-            sim += ar * bi - ai * br;
-        }
-    }
-    sh_re[tid] = sre;
-    sh_im[tid] = sim;
-    __syncthreads();
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            sh_re[tid] += sh_re[tid + stride];
-            sh_im[tid] += sh_im[tid + stride];
-        }
-        __syncthreads();
-    }
-    if (tid == 0) {
-        partial_re[blockIdx.x] = sh_re[0];
-        partial_im[blockIdx.x] = sh_im[0];
-    }
-}
-
-// Interior (ghost-excluded) squared norm sum |x|^2 on a complex field.
-__global__ void interior_norm_sq_complex_kernel(
-    const Real* x, Real* partial_sums,
-    Index_t nx, Index_t ny, Index_t nz, Index_t x0, Index_t y0, Index_t z0,
-    Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    Index_t nb_components) {
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-    Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t nb_pixels = nx * ny * nz;
-    Real sum = 0.0;
-    for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
-         pixel_idx += blockDim.x * gridDim.x) {
-        Index_t ix = x0 + pixel_idx % nx;
-        Index_t rem = pixel_idx / nx;
-        Index_t iy = y0 + rem % ny;
-        Index_t iz = z0 + rem / ny;
-        Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
-        for (Index_t c = 0; c < nb_components; ++c) {
-            const Index_t e = offset + c * stride_c;
-            const Real xr = x[2 * e], xi = x[2 * e + 1];
-            sum += xr * xr + xi * xi;
-        }
-    }
-    shared_data[tid] = sum;
-    __syncthreads();
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
-// Fused complex AXPY + squared norm: y = alpha*x + y, accumulate |y|^2 (real).
-__global__ void axpy_norm_sq_complex_kernel(Real ar, Real ai, const Real* x,
-                                            Real* y, Real* partial_sums,
-                                            Index_t n) {
-    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
-    Index_t tid = threadIdx.x;
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    Real sum = 0.0;
-    while (idx < n) {
-        const Real xr = x[2 * idx], xi = x[2 * idx + 1];
-        const Real new_yr = y[2 * idx] + (ar * xr - ai * xi);
-        const Real new_yi = y[2 * idx + 1] + (ar * xi + ai * xr);
-        y[2 * idx]     = new_yr;
-        y[2 * idx + 1] = new_yi;
-        sum += new_yr * new_yr + new_yi * new_yi;
-        idx += blockDim.x * gridDim.x;
-    }
-    shared_data[tid] = sum;
-    __syncthreads();
-    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            shared_data[tid] += shared_data[tid + stride];
-        }
-        __syncthreads();
-    }
-    if (tid == 0) {
-        partial_sums[blockIdx.x] = shared_data[0];
-    }
-}
-
 }  // namespace gpu_kernels
 
 namespace {
+
+using gpu_kernels::DeviceComplex;
+
+/* ---------------------------------------------------------------------- */
+/* Public-type <-> device-scalar mapping                                   */
+/*                                                                         */
+/* The public API is templated on the field scalar (Real or Complex). On   */
+/* the device, Real maps to itself and Complex maps to the layout-          */
+/* compatible DeviceComplex; field buffers are reinterpret_cast to the      */
+/* device scalar. These helpers centralise the cast so the generic bodies   */
+/* below carry no per-type branch.                                          */
+/* ---------------------------------------------------------------------- */
+
+template <typename T>
+struct device_scalar;
+template <>
+struct device_scalar<Real> {
+    using type = Real;
+};
+template <>
+struct device_scalar<Complex> {
+    using type = DeviceComplex;
+};
+template <typename T>
+using DeviceScalar = typename device_scalar<T>::type;
+
+//! Reinterpret a field's data pointer as the device scalar type.
+template <typename T>
+const DeviceScalar<T>* device_ptr(const TypedField<T, DeviceSpace>& f) {
+    return reinterpret_cast<const DeviceScalar<T>*>(f.view().data());
+}
+template <typename T>
+DeviceScalar<T>* device_ptr(TypedField<T, DeviceSpace>& f) {
+    return reinterpret_cast<DeviceScalar<T>*>(f.view().data());
+}
+
+//! Convert a host-side scalar coefficient to the device scalar.
+inline Real to_device(Real a) { return a; }
+inline DeviceComplex to_device(Complex a) {
+    return DeviceComplex{a.real(), a.imag()};
+}
+
+//! Convert a reduced device scalar back to the public scalar type.
+inline Real to_public(Real x) { return x; }
+inline Complex to_public(DeviceComplex x) { return Complex{x.re, x.im}; }
+
+//! Lift a real squared-norm to the public scalar type (norms are real-valued;
+//! the complex API returns it as a zero-imaginary Complex, matching the host).
+template <typename T>
+T norm_to_public(Real r);
+template <>
+Real norm_to_public<Real>(Real r) {
+    return r;
+}
+template <>
+Complex norm_to_public<Complex>(Real r) {
+    return Complex{r, 0.0};
+}
 
 /**
  * True if the collection carries ghost buffers in any direction.
@@ -715,11 +603,12 @@ bool has_ghosts(const GlobalFieldCollection& coll) {
  * reduction returns its scratch is free for the next to reuse: a single cached,
  * grow-only buffer per slot backs every reduction with no per-call allocation.
  *
- * Slot 0 backs real reductions and the real part of complex reductions; slot 1
- * backs the imaginary part. Buffers are intentionally never freed (process-
- * lifetime cache; the driver reclaims them at teardown). Not thread-safe, which
- * matches muGrid's single-threaded host call sites (MPI ranks are separate
- * processes).
+ * Slot 0 backs the dot/norm reductions; slot 1 backs the packed pipelined-CG
+ * result. Buffers are sized in Reals; a complex reduction whose partial sums
+ * are DeviceComplex requests twice as many Reals (see scratch_as). Buffers are
+ * intentionally never freed (process-lifetime cache; the driver reclaims them
+ * at teardown). Not thread-safe, which matches muGrid's single-threaded host
+ * call sites (MPI ranks are separate processes).
  */
 Real* reduction_scratch(int slot, Index_t n_reals) {
     static Real* ptr[2]{nullptr, nullptr};
@@ -734,68 +623,17 @@ Real* reduction_scratch(int slot, Index_t n_reals) {
     return ptr[slot];
 }
 
-/**
- * Launch the interior dot-product reduction for two fields of `coll` and
- * return the result. Strides are taken from `a`; the caller guarantees that
- * `b` shares the same layout (fields of the same collection with the same
- * number of components and sub-points).
- */
-Real interior_dot(const TypedField<Real, DeviceSpace>& a,
-                  const TypedField<Real, DeviceSpace>& b,
-                  const GlobalFieldCollection& coll) {
-    const auto spatial_dim = coll.get_spatial_dim();
-    if (spatial_dim < 1 || spatial_dim > 3) {
-        throw FieldError("interior_dot only supports 1D, 2D and 3D fields");
-    }
-    const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
-    const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
-    const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
-    const auto field_strides = a.get_strides(IterUnit::Pixel);
-    const Index_t stride_c = field_strides[0];
-    const Index_t nb_components_per_pixel =
-        a.get_nb_components() * a.get_nb_sub_pts();
-
-    // Interior bounds; unused trailing dimensions degenerate to one pass
-    Index_t extent[3]{1, 1, 1};
-    Index_t start[3]{0, 0, 0};
-    Index_t stride[3]{0, 0, 0};
-    for (Dim_t d = 0; d < spatial_dim; ++d) {
-        start[d] = nb_ghosts_left[d];
-        extent[d] = nb_pts[d] - nb_ghosts_left[d] - nb_ghosts_right[d];
-        stride[d] = field_strides[field_strides.size() - spatial_dim + d];
-    }
-
-    const Index_t nb_interior_pixels = extent[0] * extent[1] * extent[2];
-    if (nb_interior_pixels <= 0) {
-        return 0.0;
-    }
-
-    const int num_blocks =
-        (nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-        gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial = reduction_scratch(0, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      a.view().data(), b.view().data(), d_partial,
-                      extent[0], extent[1], extent[2],
-                      start[0], start[1], start[2],
-                      stride_c, stride[0], stride[1], stride[2],
-                      nb_components_per_pixel);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                      1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      d_partial, num_blocks);
-
-    Real result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    return result;
+//! Reduction scratch typed as a device scalar (sized for `count` of them).
+template <typename DS>
+DS* scratch_as(int slot, Index_t count) {
+    constexpr Index_t reals_per = sizeof(DS) / sizeof(Real);
+    return reinterpret_cast<DS*>(reduction_scratch(slot, count * reals_per));
 }
 
 /**
- * Extract the interior box (extents, starts) and pixel strides of a field on
- * `coll`, shared by the complex interior reductions below. Strides are in
- * field-element (here: complex-element) units.
+ * Interior box (extents, starts) and pixel strides of a field on `coll`,
+ * shared by all interior reductions. Strides are in field-element units (here:
+ * device-scalar elements), so they are identical for Real and complex fields.
  */
 struct InteriorBox {
     Index_t extent[3]{1, 1, 1};
@@ -830,80 +668,67 @@ InteriorBox interior_box(const TypedField<T, DeviceSpace>& f,
     return box;
 }
 
-/**
- * Interior sesquilinear dot conj(a).b for complex fields (ghosts excluded).
- */
-Complex interior_dot_complex(const TypedField<Complex, DeviceSpace>& a,
-                             const TypedField<Complex, DeviceSpace>& b,
-                             const GlobalFieldCollection& coll) {
-    const InteriorBox box = interior_box(a, coll);
-    if (box.nb_interior_pixels <= 0) {
-        return Complex{0.0, 0.0};
-    }
-    const int num_blocks =
-        (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-        gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_re = reduction_scratch(0, num_blocks);
-    Real* d_im = reduction_scratch(1, num_blocks);
+/* ---------------------------------------------------------------------- */
+/* Generic reduction launchers                                             */
+/*                                                                         */
+/* DS is the device scalar (Real or DeviceComplex). The conj_product trait */
+/* inside the kernels picks bilinear vs sesquilinear, so a single launcher  */
+/* serves both reductions.                                                  */
+/* ---------------------------------------------------------------------- */
 
-    GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_complex_kernel,
+//! Full-buffer reduction of conj_product(a, b) over `n` device-scalar elements.
+template <typename DS>
+DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
+    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+                           gpu_kernels::REDUCE_BLOCK_SIZE;
+    DS* d_partial = scratch_as<DS>(0, num_blocks);
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel<DS>,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      reinterpret_cast<const Real*>(a.view().data()),
-                      reinterpret_cast<const Real*>(b.view().data()),
-                      d_re, d_im, box.extent[0], box.extent[1], box.extent[2],
-                      box.start[0], box.start[1], box.start[2], box.stride_c,
-                      box.stride[0], box.stride[1], box.stride[2],
-                      box.nb_components_per_pixel);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_re, num_blocks);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_im, num_blocks);
+                      a, b, d_partial, n);
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<DS>,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
 
-    Real re, im;
-    GPU_MEMCPY_D2H(&re, d_re, sizeof(Real));
-    GPU_MEMCPY_D2H(&im, d_im, sizeof(Real));
-    return Complex{re, im};
-}
-
-/**
- * Interior squared norm sum |x|^2 for a complex field (ghosts excluded).
- */
-Real interior_norm_sq_complex(const TypedField<Complex, DeviceSpace>& x,
-                              const GlobalFieldCollection& coll) {
-    const InteriorBox box = interior_box(x, coll);
-    if (box.nb_interior_pixels <= 0) {
-        return 0.0;
-    }
-    const int num_blocks =
-        (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-        gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial = reduction_scratch(0, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::interior_norm_sq_complex_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      reinterpret_cast<const Real*>(x.view().data()),
-                      d_partial, box.extent[0], box.extent[1], box.extent[2],
-                      box.start[0], box.start[1], box.start[2], box.stride_c,
-                      box.stride[0], box.stride[1], box.stride[2],
-                      box.nb_components_per_pixel);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
-
-    Real result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
+    DS result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(DS));
     return result;
 }
 
-}  // namespace
+//! Interior reduction of conj_product(a, b) (ghosts excluded). Strides come
+//! from `box`; the caller guarantees a and b share that layout.
+template <typename DS>
+DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
+    const int num_blocks =
+        (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
+        gpu_kernels::REDUCE_BLOCK_SIZE;
+    DS* d_partial = scratch_as<DS>(0, num_blocks);
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_kernel<DS>,
+                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      a, b, d_partial, box.extent[0], box.extent[1],
+                      box.extent[2], box.start[0], box.start[1], box.start[2],
+                      box.stride_c, box.stride[0], box.stride[1],
+                      box.stride[2], box.nb_components_per_pixel);
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<DS>,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
+
+    DS result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(DS));
+    return result;
+}
 
 /* ---------------------------------------------------------------------- */
-/* Public API implementations                                              */
+/* Generic operation bodies                                                */
+/*                                                                         */
+/* Each operation is written once as a function template over the field    */
+/* scalar type T (Real or Complex). The public <T, DeviceSpace> entry       */
+/* points further down are thin delegators. This mirrors the *_host<T>      */
+/* pattern in linalg_host.cc.                                               */
 /* ---------------------------------------------------------------------- */
 
-template <>
-Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
-                                const TypedField<Real, DeviceSpace>& b) {
-    // Verify fields are compatible
+template <typename T>
+T vecdot_device(const TypedField<T, DeviceSpace>& a,
+                const TypedField<T, DeviceSpace>& b) {
     if (&a.get_collection() != &b.get_collection()) {
         throw FieldError("vecdot: fields must belong to the same collection");
     }
@@ -913,72 +738,309 @@ Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
     if (a.get_nb_sub_pts() != b.get_nb_sub_pts()) {
         throw FieldError("vecdot: fields must have the same number of sub-points");
     }
-
-    const auto& coll = a.get_collection();
+    using DS = DeviceScalar<T>;
 
     // For GlobalFieldCollection with ghosts, sum the interior directly;
     // full-buffer-minus-ghosts cancels catastrophically when the interior
     // values are small
+    const auto& coll = a.get_collection();
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (has_ghosts(global_coll)) {
-            return interior_dot(a, b, global_coll);
+            return to_public(reduce_interior_dot<DS>(
+                device_ptr(a), device_ptr(b),
+                interior_box(a, global_coll)));
         }
     }
 
     // No ghosts: reduce the full buffer (get_nb_entries already counts
     // sub-points, so multiply only by the number of components)
     const Index_t n = a.get_nb_entries() * a.get_nb_components();
+    return to_public(reduce_full_dot<DS>(device_ptr(a), device_ptr(b), n));
+}
+
+template <typename T>
+T norm_sq_device(const TypedField<T, DeviceSpace>& x) {
+    // norm_sq(x) == vecdot(x, x): conj_product(x, x) = |x|^2 for complex
+    // (its imaginary part is exactly zero, x_r*x_i - x_i*x_r) and x^2 for real.
+    using DS = DeviceScalar<T>;
+    const auto& coll = x.get_collection();
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        if (has_ghosts(global_coll)) {
+            return to_public(reduce_interior_dot<DS>(
+                device_ptr(x), device_ptr(x), interior_box(x, global_coll)));
+        }
+    }
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    return to_public(reduce_full_dot<DS>(device_ptr(x), device_ptr(x), n));
+}
+
+template <typename T>
+void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
+                 TypedField<T, DeviceSpace>& y) {
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpy: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
+        throw FieldError("axpy: fields must have the same number of entries");
+    }
+    using DS = DeviceScalar<T>;
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel<DS>,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      to_device(alpha), device_ptr(x), device_ptr(y), n);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+template <typename T>
+void scal_device(T alpha, TypedField<T, DeviceSpace>& x) {
+    using DS = DeviceScalar<T>;
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::scal_kernel<DS>,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      to_device(alpha), device_ptr(x), n);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+template <typename T>
+void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
+                  TypedField<T, DeviceSpace>& y) {
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpby: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
+        throw FieldError("axpby: fields must have the same number of entries");
+    }
+    using DS = DeviceScalar<T>;
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpby_kernel<DS>,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      to_device(alpha), device_ptr(x), to_device(beta),
+                      device_ptr(y), n);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+template <typename T>
+void copy_device(const TypedField<T, DeviceSpace>& src,
+                 TypedField<T, DeviceSpace>& dst) {
+    if (&src.get_collection() != &dst.get_collection()) {
+        throw FieldError("copy: fields must belong to the same collection");
+    }
+    if (src.get_nb_entries() != dst.get_nb_entries() ||
+        src.get_nb_components() != dst.get_nb_components()) {
+        throw FieldError("copy: fields must have the same number of entries");
+    }
+    using DS = DeviceScalar<T>;
+    const Index_t n = src.get_nb_entries() * src.get_nb_components();
+    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                           gpu_kernels::BLOCK_SIZE;
+
+    GPU_LAUNCH_KERNEL(gpu_kernels::copy_kernel<DS>,
+                      num_blocks, gpu_kernels::BLOCK_SIZE,
+                      device_ptr(src), device_ptr(dst), n);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+template <typename T>
+T axpy_norm_sq_device(T alpha, const TypedField<T, DeviceSpace>& x,
+                      TypedField<T, DeviceSpace>& y) {
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
+        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
+    }
+    using DS = DeviceScalar<T>;
+    const auto& coll = x.get_collection();
+    // Total scalar elements in the full buffer (get_nb_entries already counts
+    // sub-points, so multiply only by the number of components)
+    const Index_t n = x.get_nb_entries() * x.get_nb_components();
+
+    // For GlobalFieldCollection with ghosts: update y over the full buffer
+    // (ghost pixels included, keeping the buffer consistent), then sum the
+    // interior directly. Full-buffer-minus-ghosts cancels catastrophically
+    // when the interior values are small.
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        if (has_ghosts(global_coll)) {
+            const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
+                                   gpu_kernels::BLOCK_SIZE;
+            GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel<DS>,
+                              num_blocks, gpu_kernels::BLOCK_SIZE,
+                              to_device(alpha), device_ptr(x), device_ptr(y), n);
+            // Kernels on the default stream serialize, so the interior
+            // reduction sees the updated y. norm_sq(y) == vecdot(y, y).
+            return to_public(reduce_interior_dot<DS>(
+                device_ptr(y), device_ptr(y), interior_box(y, global_coll)));
+        }
+    }
+
+    // No ghosts: fused single-pass AXPY + norm_sq (real-valued partial sums).
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
     Real* d_partial = reduction_scratch(0, num_blocks);
 
-    GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel,
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel<DS>,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      a.view().data(), b.view().data(), d_partial, n);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                      1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      d_partial, num_blocks);
+                      to_device(alpha), device_ptr(x), device_ptr(y),
+                      d_partial, n);
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<Real>,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
 
     Real result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    return result;
+    return norm_to_public<T>(result);
+}
+
+template <typename T>
+void cross_device(const TypedField<T, DeviceSpace>& a,
+                  const TypedField<T, DeviceSpace>& b,
+                  TypedField<T, DeviceSpace>& out) {
+    const auto& coll = a.get_collection();
+    internal::check_three_vector("cross", a, coll);
+    internal::check_three_vector("cross", b, coll);
+    internal::check_three_vector("cross", out, coll);
+    const Index_t npix = a.get_nb_entries();
+    // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
+    // compute. Skip it, including the aliasing check below: empty fields share a
+    // null data pointer, so that check would otherwise fire spuriously.
+    if (npix == 0) {
+        return;
+    }
+    if (out.view().data() == a.view().data() ||
+        out.view().data() == b.view().data()) {
+        throw FieldError(
+            "cross: output must be a field distinct from both inputs");
+    }
+    using DS = DeviceScalar<T>;
+    const bool soa =
+        (out.get_storage_order() == StorageOrder::StructureOfArrays);
+    const int num_blocks =
+        (npix + gpu_kernels::BLOCK_SIZE - 1) / gpu_kernels::BLOCK_SIZE;
+    GPU_LAUNCH_KERNEL(gpu_kernels::cross_kernel<DS>, num_blocks,
+                      gpu_kernels::BLOCK_SIZE, device_ptr(a), device_ptr(b),
+                      device_ptr(out), npix, soa);
+    GPU_DEVICE_SYNCHRONIZE();
+}
+
+}  // namespace
+
+/* ---------------------------------------------------------------------- */
+/* Public API: thin <T, DeviceSpace> delegators to the generic bodies.     */
+/* These specializations are the device ABI surface that linalg.hh         */
+/* declares; the Real and Complex paths share one body each.               */
+/* ---------------------------------------------------------------------- */
+
+template <>
+Real vecdot<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
+                               const TypedField<Real, DeviceSpace>& b) {
+    return vecdot_device(a, b);
+}
+template <>
+Complex vecdot<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
+                                     const TypedField<Complex, DeviceSpace>& b) {
+    return vecdot_device(a, b);
 }
 
 template <>
 Real norm_sq<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& x) {
-    const auto& coll = x.get_collection();
-
-    // For GlobalFieldCollection with ghosts, sum the interior directly;
-    // full-buffer-minus-ghosts cancels catastrophically when the interior
-    // values are small
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (has_ghosts(global_coll)) {
-            return interior_dot(x, x, global_coll);
-        }
-    }
-
-    // No ghosts: reduce the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial = reduction_scratch(0, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::norm_sq_reduce_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      x.view().data(), d_partial, n);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                      1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      d_partial, num_blocks);
-
-    Real result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    return result;
+    return norm_sq_device(x);
 }
+template <>
+Complex norm_sq<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& x) {
+    return norm_sq_device(x);
+}
+
+template <>
+void axpy<Real, DeviceSpace>(Real alpha, const TypedField<Real, DeviceSpace>& x,
+                             TypedField<Real, DeviceSpace>& y) {
+    axpy_device(alpha, x, y);
+}
+template <>
+void axpy<Complex, DeviceSpace>(Complex alpha,
+                                const TypedField<Complex, DeviceSpace>& x,
+                                TypedField<Complex, DeviceSpace>& y) {
+    axpy_device(alpha, x, y);
+}
+
+template <>
+void scal<Real, DeviceSpace>(Real alpha, TypedField<Real, DeviceSpace>& x) {
+    scal_device(alpha, x);
+}
+template <>
+void scal<Complex, DeviceSpace>(Complex alpha,
+                                TypedField<Complex, DeviceSpace>& x) {
+    scal_device(alpha, x);
+}
+
+template <>
+void axpby<Real, DeviceSpace>(Real alpha, const TypedField<Real, DeviceSpace>& x,
+                              Real beta, TypedField<Real, DeviceSpace>& y) {
+    axpby_device(alpha, x, beta, y);
+}
+template <>
+void axpby<Complex, DeviceSpace>(Complex alpha,
+                                 const TypedField<Complex, DeviceSpace>& x,
+                                 Complex beta,
+                                 TypedField<Complex, DeviceSpace>& y) {
+    axpby_device(alpha, x, beta, y);
+}
+
+template <>
+void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
+                             TypedField<Real, DeviceSpace>& dst) {
+    copy_device(src, dst);
+}
+template <>
+void copy<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& src,
+                                TypedField<Complex, DeviceSpace>& dst) {
+    copy_device(src, dst);
+}
+
+template <>
+Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
+                                     const TypedField<Real, DeviceSpace>& x,
+                                     TypedField<Real, DeviceSpace>& y) {
+    return axpy_norm_sq_device(alpha, x, y);
+}
+template <>
+Complex axpy_norm_sq<Complex, DeviceSpace>(
+    Complex alpha, const TypedField<Complex, DeviceSpace>& x,
+    TypedField<Complex, DeviceSpace>& y) {
+    return axpy_norm_sq_device(alpha, x, y);
+}
+
+template <>
+void cross<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
+                              const TypedField<Real, DeviceSpace>& b,
+                              TypedField<Real, DeviceSpace>& out) {
+    cross_device(a, b, out);
+}
+template <>
+void cross<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
+                                 const TypedField<Complex, DeviceSpace>& b,
+                                 TypedField<Complex, DeviceSpace>& out) {
+    cross_device(a, b, out);
+}
+
+/* ---------------------------------------------------------------------- */
+/* pipelined_cg_dots (Real only): fused {(r,u), (w,u), (r,r)} reduction.   */
+/* ---------------------------------------------------------------------- */
 
 template <>
 std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
@@ -1024,146 +1086,12 @@ std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
     return {h[0], h[1], h[2]};
 }
 
-template <>
-void axpy<Real, DeviceSpace>(Real alpha,
-                              const TypedField<Real, DeviceSpace>& x,
-                              TypedField<Real, DeviceSpace>& y) {
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy: fields must have the same number of entries");
-    }
-
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha, x.view().data(), y.view().data(), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-void scal<Real, DeviceSpace>(Real alpha, TypedField<Real, DeviceSpace>& x) {
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::scal_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha, x.view().data(), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-void axpby<Real, DeviceSpace>(Real alpha,
-                               const TypedField<Real, DeviceSpace>& x,
-                               Real beta,
-                               TypedField<Real, DeviceSpace>& y) {
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpby: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpby: fields must have the same number of entries");
-    }
-
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::axpby_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha, x.view().data(), beta, y.view().data(), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-void copy<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& src,
-                              TypedField<Real, DeviceSpace>& dst) {
-    if (&src.get_collection() != &dst.get_collection()) {
-        throw FieldError("copy: fields must belong to the same collection");
-    }
-    if (src.get_nb_entries() != dst.get_nb_entries() ||
-        src.get_nb_components() != dst.get_nb_components()) {
-        throw FieldError("copy: fields must have the same number of entries");
-    }
-
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t n = src.get_nb_entries() * src.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::copy_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      src.view().data(), dst.view().data(), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-Real axpy_norm_sq<Real, DeviceSpace>(Real alpha,
-                                      const TypedField<Real, DeviceSpace>& x,
-                                      TypedField<Real, DeviceSpace>& y) {
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
-    }
-
-    const auto& coll = x.get_collection();
-    // Total scalar elements in the full buffer (get_nb_entries already counts
-    // sub-points, so multiply only by the number of components)
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-
-    // For GlobalFieldCollection with ghosts: update y over the full buffer
-    // (ghost pixels included, keeping the buffer consistent), then sum the
-    // interior directly. Full-buffer-minus-ghosts cancels catastrophically
-    // when the interior values are small.
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (has_ghosts(global_coll)) {
-            const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                                   gpu_kernels::BLOCK_SIZE;
-            GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel,
-                              num_blocks, gpu_kernels::BLOCK_SIZE,
-                              alpha, x.view().data(), y.view().data(), n);
-            // Kernels on the default stream serialize, so the interior
-            // reduction sees the updated y
-            return interior_dot(y, y, global_coll);
-        }
-    }
-
-    // No ghosts: fused single-pass AXPY + norm_sq
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial = reduction_scratch(0, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      alpha, x.view().data(), y.view().data(), d_partial, n);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel,
-                      1, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      d_partial, num_blocks);
-
-    Real result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    return result;
-}
-
 /* ---------------------------------------------------------------------- */
+/* Field-valued scal: x[c, i] *= alpha[c, i] with a real coefficient field.*/
+/* alpha is real, so it scales the real and imaginary parts of a complex x  */
+/* identically; the kernels work on the underlying reals.                   */
+/* ---------------------------------------------------------------------- */
+
 template <>
 void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
                        TypedField<Complex, DeviceSpace>& x) {
@@ -1187,7 +1115,6 @@ void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
     GPU_DEVICE_SYNCHRONIZE();
 }
 
-/* ---------------------------------------------------------------------- */
 template <>
 void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
                        TypedField<Real, DeviceSpace>& x) {
@@ -1211,37 +1138,9 @@ void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
 }
 
 /* ---------------------------------------------------------------------- */
-template <>
-void cross<Real, DeviceSpace>(const TypedField<Real, DeviceSpace>& a,
-                              const TypedField<Real, DeviceSpace>& b,
-                              TypedField<Real, DeviceSpace>& out) {
-    const auto& coll = a.get_collection();
-    internal::check_three_vector("cross", a, coll);
-    internal::check_three_vector("cross", b, coll);
-    internal::check_three_vector("cross", out, coll);
-    const Index_t npix = a.get_nb_entries();
-    // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
-    // compute. Skip it, including the aliasing check below: empty fields share a
-    // null data pointer, so that check would otherwise fire spuriously.
-    if (npix == 0) {
-        return;
-    }
-    if (out.view().data() == a.view().data() ||
-        out.view().data() == b.view().data()) {
-        throw FieldError(
-            "cross: output must be a field distinct from both inputs");
-    }
-    const bool soa =
-        (out.get_storage_order() == StorageOrder::StructureOfArrays);
-    const int num_blocks =
-        (npix + gpu_kernels::BLOCK_SIZE - 1) / gpu_kernels::BLOCK_SIZE;
-    GPU_LAUNCH_KERNEL(gpu_kernels::cross_real_kernel, num_blocks,
-                      gpu_kernels::BLOCK_SIZE, a.view().data(), b.view().data(),
-                      out.view().data(), npix, soa);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
+/* Fused Leray (Helmholtz) projection (complex field, real coefficients).  */
 /* ---------------------------------------------------------------------- */
+
 template <>
 void leray_project<DeviceSpace>(const TypedField<Real, DeviceSpace>& k,
                                 const TypedField<Real, DeviceSpace>& invk,
@@ -1262,248 +1161,6 @@ void leray_project<DeviceSpace>(const TypedField<Real, DeviceSpace>& k,
         k.view().data(), invk.view().data(),
         reinterpret_cast<const Real*>(N.view().data()),
         reinterpret_cast<Real*>(out.view().data()), npix, soa);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-/* ---------------------------------------------------------------------- */
-/* Complex device operations                                               */
-/*                                                                         */
-/* The complex buffers are addressed as their underlying reals; scalar     */
-/* complex coefficients are split into (real, imag) for the kernels.       */
-/* Reductions exclude ghost regions for GlobalFieldCollections, matching   */
-/* the Real implementations and host semantics.                            */
-/* ---------------------------------------------------------------------- */
-
-template <>
-Complex vecdot<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
-                                      const TypedField<Complex, DeviceSpace>& b) {
-    if (&a.get_collection() != &b.get_collection()) {
-        throw FieldError("vecdot: fields must belong to the same collection");
-    }
-    if (a.get_nb_components() != b.get_nb_components()) {
-        throw FieldError("vecdot: fields must have the same number of components");
-    }
-    if (a.get_nb_sub_pts() != b.get_nb_sub_pts()) {
-        throw FieldError("vecdot: fields must have the same number of sub-points");
-    }
-
-    const auto& coll = a.get_collection();
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (has_ghosts(global_coll)) {
-            return interior_dot_complex(a, b, global_coll);
-        }
-    }
-
-    // No ghosts: reduce the full buffer (n complex elements)
-    const Index_t n = a.get_nb_entries() * a.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_re = reduction_scratch(0, num_blocks);
-    Real* d_im = reduction_scratch(1, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_complex_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      reinterpret_cast<const Real*>(a.view().data()),
-                      reinterpret_cast<const Real*>(b.view().data()),
-                      d_re, d_im, n);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_re, num_blocks);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_im, num_blocks);
-
-    Real re, im;
-    GPU_MEMCPY_D2H(&re, d_re, sizeof(Real));
-    GPU_MEMCPY_D2H(&im, d_im, sizeof(Real));
-    return Complex{re, im};
-}
-
-template <>
-Complex norm_sq<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& x) {
-    const auto& coll = x.get_collection();
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (has_ghosts(global_coll)) {
-            return Complex{interior_norm_sq_complex(x, global_coll), 0.0};
-        }
-    }
-
-    // No ghosts: sum |x|^2 over the full buffer. The squared magnitude sums to
-    // the squared norm of the underlying 2n reals, so reuse the real kernel.
-    const Index_t n2 = x.get_nb_entries() * x.get_nb_components() * 2;
-    const int num_blocks = (n2 + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial = reduction_scratch(0, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::norm_sq_reduce_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      reinterpret_cast<const Real*>(x.view().data()),
-                      d_partial, n2);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
-
-    Real result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    return Complex{result, 0.0};
-}
-
-template <>
-void axpy<Complex, DeviceSpace>(Complex alpha,
-                                 const TypedField<Complex, DeviceSpace>& x,
-                                 TypedField<Complex, DeviceSpace>& y) {
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy: fields must have the same number of entries");
-    }
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_complex_scalar_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha.real(), alpha.imag(),
-                      reinterpret_cast<const Real*>(x.view().data()),
-                      reinterpret_cast<Real*>(y.view().data()), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-void scal<Complex, DeviceSpace>(Complex alpha,
-                                 TypedField<Complex, DeviceSpace>& x) {
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-    GPU_LAUNCH_KERNEL(gpu_kernels::scal_complex_scalar_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha.real(), alpha.imag(),
-                      reinterpret_cast<Real*>(x.view().data()), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-void axpby<Complex, DeviceSpace>(Complex alpha,
-                                  const TypedField<Complex, DeviceSpace>& x,
-                                  Complex beta,
-                                  TypedField<Complex, DeviceSpace>& y) {
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpby: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpby: fields must have the same number of entries");
-    }
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-    GPU_LAUNCH_KERNEL(gpu_kernels::axpby_complex_scalar_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      alpha.real(), alpha.imag(),
-                      reinterpret_cast<const Real*>(x.view().data()),
-                      beta.real(), beta.imag(),
-                      reinterpret_cast<Real*>(y.view().data()), n);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-void copy<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& src,
-                                 TypedField<Complex, DeviceSpace>& dst) {
-    if (&src.get_collection() != &dst.get_collection()) {
-        throw FieldError("copy: fields must belong to the same collection");
-    }
-    if (src.get_nb_entries() != dst.get_nb_entries() ||
-        src.get_nb_components() != dst.get_nb_components()) {
-        throw FieldError("copy: fields must have the same number of entries");
-    }
-    // dst = src is a plain bitwise copy of the underlying 2n reals.
-    const Index_t n2 = src.get_nb_entries() * src.get_nb_components() * 2;
-    const int num_blocks = (n2 + gpu_kernels::BLOCK_SIZE - 1) /
-                           gpu_kernels::BLOCK_SIZE;
-    GPU_LAUNCH_KERNEL(gpu_kernels::copy_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      reinterpret_cast<const Real*>(src.view().data()),
-                      reinterpret_cast<Real*>(dst.view().data()), n2);
-    GPU_DEVICE_SYNCHRONIZE();
-}
-
-template <>
-Complex axpy_norm_sq<Complex, DeviceSpace>(Complex alpha,
-                                            const TypedField<Complex, DeviceSpace>& x,
-                                            TypedField<Complex, DeviceSpace>& y) {
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
-    }
-    const auto& coll = x.get_collection();
-    const Index_t n = x.get_nb_entries() * x.get_nb_components();
-
-    // With ghosts: update y on the full buffer, then sum |y|^2 over the
-    // interior directly (full-buffer-minus-ghosts cancels catastrophically).
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (has_ghosts(global_coll)) {
-            const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
-                                   gpu_kernels::BLOCK_SIZE;
-            GPU_LAUNCH_KERNEL(gpu_kernels::axpy_complex_scalar_kernel,
-                              num_blocks, gpu_kernels::BLOCK_SIZE,
-                              alpha.real(), alpha.imag(),
-                              reinterpret_cast<const Real*>(x.view().data()),
-                              reinterpret_cast<Real*>(y.view().data()), n);
-            return Complex{interior_norm_sq_complex(y, global_coll), 0.0};
-        }
-    }
-
-    // No ghosts: fused single-pass complex AXPY + squared norm.
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
-    Real* d_partial = reduction_scratch(0, num_blocks);
-
-    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_complex_kernel,
-                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
-                      alpha.real(), alpha.imag(),
-                      reinterpret_cast<const Real*>(x.view().data()),
-                      reinterpret_cast<Real*>(y.view().data()), d_partial, n);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel, 1,
-                      gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
-
-    Real result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
-    return Complex{result, 0.0};
-}
-
-template <>
-void cross<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
-                                 const TypedField<Complex, DeviceSpace>& b,
-                                 TypedField<Complex, DeviceSpace>& out) {
-    const auto& coll = a.get_collection();
-    internal::check_three_vector("cross", a, coll);
-    internal::check_three_vector("cross", b, coll);
-    internal::check_three_vector("cross", out, coll);
-    const Index_t npix = a.get_nb_entries();
-    // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
-    // compute. Skip it, including the aliasing check below: empty fields share a
-    // null data pointer, so that check would otherwise fire spuriously.
-    if (npix == 0) {
-        return;
-    }
-    if (out.view().data() == a.view().data() ||
-        out.view().data() == b.view().data()) {
-        throw FieldError(
-            "cross: output must be a field distinct from both inputs");
-    }
-    const bool soa =
-        (out.get_storage_order() == StorageOrder::StructureOfArrays);
-    const int num_blocks =
-        (npix + gpu_kernels::BLOCK_SIZE - 1) / gpu_kernels::BLOCK_SIZE;
-    GPU_LAUNCH_KERNEL(gpu_kernels::cross_complex_kernel, num_blocks,
-                      gpu_kernels::BLOCK_SIZE,
-                      reinterpret_cast<const Real*>(a.view().data()),
-                      reinterpret_cast<const Real*>(b.view().data()),
-                      reinterpret_cast<Real*>(out.view().data()), npix, soa);
     GPU_DEVICE_SYNCHRONIZE();
 }
 

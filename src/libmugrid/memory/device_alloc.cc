@@ -91,22 +91,8 @@ namespace muGrid {
                 return ptr;
             }
         }
-#if defined(MUGRID_ENABLE_CUDA)
-        void * ptr{nullptr};
-        cudaError_t err{cudaMalloc(&ptr, bytes)};
-        if (err != cudaSuccess) {
-            throw RuntimeError(std::string("CUDA allocation failed: ") +
-                               cudaGetErrorString(err));
-        }
-        return ptr;
-#elif defined(MUGRID_ENABLE_HIP)
-        void * ptr{nullptr};
-        hipError_t err{hipMalloc(&ptr, bytes)};
-        if (err != hipSuccess) {
-            throw RuntimeError(std::string("HIP allocation failed: ") +
-                               hipGetErrorString(err));
-        }
-        return ptr;
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        return gpu_malloc_checked(bytes);
 #else
         // GCOVR_EXCL_START -- unreachable: device fields cannot be created
         // in a build without a GPU backend
@@ -135,10 +121,8 @@ namespace muGrid {
                 return;
             }
         }
-#if defined(MUGRID_ENABLE_CUDA)
-        (void)cudaFree(ptr);
-#elif defined(MUGRID_ENABLE_HIP)
-        (void)hipFree(ptr);
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        GPU_FREE(ptr);
 #endif
     }
 

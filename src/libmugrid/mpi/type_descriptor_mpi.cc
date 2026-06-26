@@ -44,16 +44,24 @@
 
 namespace muGrid {
 
+// muGrid type <-> MPI_Datatype mapping, generated for both directions from one
+// table. Index is handled separately because its MPI type is platform-dependent
+// (LP64: MPI_LONG, LLP64: MPI_LONG_LONG_INT) and the reverse mapping must accept
+// both. To support a new scalar type over MPI, add a row here (and a row to
+// MUGRID_SCALAR_TYPES in core/type_descriptor.hh).
+#define MUGRID_MPI_TYPES(X)        \
+    X(Int, MPI_INT)                \
+    X(Uint, MPI_UNSIGNED)          \
+    X(Real, MPI_DOUBLE)            \
+    X(Complex, MPI_DOUBLE_COMPLEX)
+
 MPI_Datatype descriptor_to_mpi_type(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Int:
-            return MPI_INT;
-        case TypeDescriptor::Uint:
-            return MPI_UNSIGNED;
-        case TypeDescriptor::Real:
-            return MPI_DOUBLE;
-        case TypeDescriptor::Complex:
-            return MPI_DOUBLE_COMPLEX;
+#define MUGRID_MPI_FWD_ROW(tag, mpi) \
+    case TypeDescriptor::tag:        \
+        return mpi;
+        MUGRID_MPI_TYPES(MUGRID_MPI_FWD_ROW)
+#undef MUGRID_MPI_FWD_ROW
         case TypeDescriptor::Index:
             // Index is std::ptrdiff_t, which is platform-dependent:
             // - LP64 (Unix 64-bit): long (8 bytes) -> MPI_LONG
@@ -73,22 +81,19 @@ MPI_Datatype descriptor_to_mpi_type(TypeDescriptor td) {
 }
 
 TypeDescriptor mpi_type_to_descriptor(MPI_Datatype mpi_type) {
-    if (mpi_type == MPI_INT) {
-        return TypeDescriptor::Int;
-    } else if (mpi_type == MPI_UNSIGNED) {
-        return TypeDescriptor::Uint;
-    } else if (mpi_type == MPI_DOUBLE) {
-        return TypeDescriptor::Real;
-    } else if (mpi_type == MPI_DOUBLE_COMPLEX) {
-        return TypeDescriptor::Complex;
-    } else if (mpi_type == MPI_LONG || mpi_type == MPI_LONG_LONG_INT) {
+#define MUGRID_MPI_REV_ROW(tag, mpi)        \
+    if (mpi_type == mpi) {                  \
+        return TypeDescriptor::tag;         \
+    }
+    MUGRID_MPI_TYPES(MUGRID_MPI_REV_ROW)
+#undef MUGRID_MPI_REV_ROW
+    if (mpi_type == MPI_LONG || mpi_type == MPI_LONG_LONG_INT) {
         // Both map to Index (std::ptrdiff_t) which is platform-dependent
         return TypeDescriptor::Index;
-    } else {
-        throw RuntimeError("Unrecognized MPI_Datatype for TypeDescriptor. "
-                           "Only types corresponding to Int, Uint, Real, "
-                           "Complex, and Index are supported.");
     }
+    throw RuntimeError("Unrecognized MPI_Datatype for TypeDescriptor. "
+                       "Only types corresponding to Int, Uint, Real, "
+                       "Complex, and Index are supported.");
 }
 
 }  // namespace muGrid

@@ -171,6 +171,19 @@ class FFT1DBackend {
     throw RuntimeError("c2r_nd is not supported by this FFT backend");
   }
 
+  /**
+   * Whether the backend can transform a real-to-complex (r2c) batch whose real
+   * array has a non-unit element stride. cuFFT cannot ("Strides on the real
+   * part of real-to-complex and complex-to-real transforms are not supported")
+   * and overrides this to false; pocketfft and rocFFT can. The engine can query
+   * this to choose a layout that avoids the limitation instead of discovering
+   * it through an exception at run time.
+   */
+  virtual bool supports_strided_r2c() const { return true; }
+
+  /** As supports_strided_r2c(), for complex-to-real (c2r) transforms. */
+  virtual bool supports_strided_c2r() const { return true; }
+
   /** Returns true if this backend supports device (GPU) memory */
   virtual bool supports_device_memory() const = 0;
 

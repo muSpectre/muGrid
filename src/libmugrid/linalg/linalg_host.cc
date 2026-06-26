@@ -170,13 +170,20 @@ std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
     return {ru, wu, rr};
 }
 
-}  // namespace internal
-
 /* ---------------------------------------------------------------------- */
-template <>
-Real vecdot<Real, HostSpace>(const TypedField<Real, HostSpace>& a,
-                              const TypedField<Real, HostSpace>& b) {
-    // Verify fields are compatible
+/* Host operation bodies.                                                  */
+/*                                                                         */
+/* Each operation is written once as a function template over the scalar   */
+/* type; the public <T, HostSpace> entry points below are thin delegators.  */
+/* The Real and Complex paths differ only in the scalar type and the        */
+/* sesquilinear product (interior_vecdot/conj_product handle the latter),   */
+/* so a single body serves both — there is no per-type copy to keep in      */
+/* sync. This mirrors the cross_host<T> pattern further down.               */
+/* ---------------------------------------------------------------------- */
+
+template <typename T>
+T vecdot_host(const TypedField<T, HostSpace>& a,
+              const TypedField<T, HostSpace>& b) {
     if (&a.get_collection() != &b.get_collection()) {
         throw FieldError("vecdot: fields must belong to the same collection");
     }
@@ -188,64 +195,25 @@ Real vecdot<Real, HostSpace>(const TypedField<Real, HostSpace>& a,
     }
 
     const auto& coll = a.get_collection();
-
-    // Check if this is a GlobalFieldCollection (has ghost regions)
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (!internal::has_ghosts(global_coll)) {
+        if (!has_ghosts(global_coll)) {
             return a.eigen_vec().dot(b.eigen_vec());
         }
         const Index_t nb_components_per_pixel =
             a.get_nb_components() * a.get_nb_sub_pts();
         // Sum the interior directly; full-buffer-minus-ghosts cancels
         // catastrophically when the interior values are small
-        return internal::interior_vecdot(a.data(), b.data(), global_coll,
-                                         nb_components_per_pixel);
-    } else {
-        // LocalFieldCollection: no ghosts, use Eigen
-        return a.eigen_vec().dot(b.eigen_vec());
+        return interior_vecdot(a.data(), b.data(), global_coll,
+                               nb_components_per_pixel);
     }
+    // LocalFieldCollection: no ghosts, use Eigen
+    return a.eigen_vec().dot(b.eigen_vec());
 }
 
-template <>
-Complex vecdot<Complex, HostSpace>(const TypedField<Complex, HostSpace>& a,
-                                    const TypedField<Complex, HostSpace>& b) {
-    // Verify fields are compatible
-    if (&a.get_collection() != &b.get_collection()) {
-        throw FieldError("vecdot: fields must belong to the same collection");
-    }
-    if (a.get_nb_components() != b.get_nb_components()) {
-        throw FieldError("vecdot: fields must have the same number of components");
-    }
-    if (a.get_nb_sub_pts() != b.get_nb_sub_pts()) {
-        throw FieldError("vecdot: fields must have the same number of sub-points");
-    }
-
-    const auto& coll = a.get_collection();
-
-    // Check if this is a GlobalFieldCollection (has ghost regions)
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (!internal::has_ghosts(global_coll)) {
-            return a.eigen_vec().dot(b.eigen_vec());
-        }
-        const Index_t nb_components_per_pixel =
-            a.get_nb_components() * a.get_nb_sub_pts();
-        // Sum the interior directly; full-buffer-minus-ghosts cancels
-        // catastrophically when the interior values are small
-        return internal::interior_vecdot(a.data(), b.data(), global_coll,
-                                         nb_components_per_pixel);
-    } else {
-        // LocalFieldCollection: no ghosts, use Eigen
-        return a.eigen_vec().dot(b.eigen_vec());
-    }
-}
-
-/* ---------------------------------------------------------------------- */
-template <>
-void axpy<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
-                            TypedField<Real, HostSpace>& y) {
-    // Verify fields are compatible
+template <typename T>
+void axpy_host(T alpha, const TypedField<T, HostSpace>& x,
+               TypedField<T, HostSpace>& y) {
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy: fields must belong to the same collection");
     }
@@ -253,45 +221,19 @@ void axpy<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy: fields must have the same number of entries");
     }
-
     // Operate on full buffer using Eigen (contiguous, fast)
     y.eigen_vec() += alpha * x.eigen_vec();
 }
 
-template <>
-void axpy<Complex, HostSpace>(Complex alpha, const TypedField<Complex, HostSpace>& x,
-                               TypedField<Complex, HostSpace>& y) {
-    // Verify fields are compatible
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy: fields must have the same number of entries");
-    }
-
-    // Operate on full buffer using Eigen (contiguous, fast)
-    y.eigen_vec() += alpha * x.eigen_vec();
-}
-
-/* ---------------------------------------------------------------------- */
-template <>
-void scal<Real, HostSpace>(Real alpha, TypedField<Real, HostSpace>& x) {
+template <typename T>
+void scal_host(T alpha, TypedField<T, HostSpace>& x) {
     // Operate on full buffer using Eigen
     x.eigen_vec() *= alpha;
 }
 
-template <>
-void scal<Complex, HostSpace>(Complex alpha, TypedField<Complex, HostSpace>& x) {
-    // Operate on full buffer using Eigen
-    x.eigen_vec() *= alpha;
-}
-
-/* ---------------------------------------------------------------------- */
-template <>
-void axpby<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
-                             Real beta, TypedField<Real, HostSpace>& y) {
-    // Verify fields are compatible
+template <typename T>
+void axpby_host(T alpha, const TypedField<T, HostSpace>& x, T beta,
+                TypedField<T, HostSpace>& y) {
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpby: fields must belong to the same collection");
     }
@@ -299,34 +241,13 @@ void axpby<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpby: fields must have the same number of entries");
     }
-
-    // Operate on full buffer using Eigen (contiguous, fast)
-    // y = alpha * x + beta * y
+    // Operate on full buffer using Eigen (contiguous, fast): y = a*x + b*y
     y.eigen_vec() = alpha * x.eigen_vec() + beta * y.eigen_vec();
 }
 
-template <>
-void axpby<Complex, HostSpace>(Complex alpha, const TypedField<Complex, HostSpace>& x,
-                                Complex beta, TypedField<Complex, HostSpace>& y) {
-    // Verify fields are compatible
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpby: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpby: fields must have the same number of entries");
-    }
-
-    // Operate on full buffer using Eigen (contiguous, fast)
-    // y = alpha * x + beta * y
-    y.eigen_vec() = alpha * x.eigen_vec() + beta * y.eigen_vec();
-}
-
-/* ---------------------------------------------------------------------- */
-template <>
-void copy<Real, HostSpace>(const TypedField<Real, HostSpace>& src,
-                            TypedField<Real, HostSpace>& dst) {
-    // Verify fields are compatible
+template <typename T>
+void copy_host(const TypedField<T, HostSpace>& src,
+               TypedField<T, HostSpace>& dst) {
     if (&src.get_collection() != &dst.get_collection()) {
         throw FieldError("copy: fields must belong to the same collection");
     }
@@ -334,48 +255,163 @@ void copy<Real, HostSpace>(const TypedField<Real, HostSpace>& src,
         src.get_nb_components() != dst.get_nb_components()) {
         throw FieldError("copy: fields must have the same number of entries");
     }
-
     // Operate on full buffer using Eigen
     dst.eigen_vec() = src.eigen_vec();
 }
 
-template <>
-void copy<Complex, HostSpace>(const TypedField<Complex, HostSpace>& src,
-                               TypedField<Complex, HostSpace>& dst) {
-    // Verify fields are compatible
-    if (&src.get_collection() != &dst.get_collection()) {
-        throw FieldError("copy: fields must belong to the same collection");
-    }
-    if (src.get_nb_entries() != dst.get_nb_entries() ||
-        src.get_nb_components() != dst.get_nb_components()) {
-        throw FieldError("copy: fields must have the same number of entries");
-    }
-
-    // Operate on full buffer using Eigen
-    dst.eigen_vec() = src.eigen_vec();
-}
-
-/* ---------------------------------------------------------------------- */
-template <>
-Real norm_sq<Real, HostSpace>(const TypedField<Real, HostSpace>& x) {
+template <typename T>
+T norm_sq_host(const TypedField<T, HostSpace>& x) {
     const auto& coll = x.get_collection();
-
-    // Check if this is a GlobalFieldCollection (has ghost regions)
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (!internal::has_ghosts(global_coll)) {
+        if (!has_ghosts(global_coll)) {
             return x.eigen_vec().squaredNorm();
         }
         const Index_t nb_components_per_pixel =
             x.get_nb_components() * x.get_nb_sub_pts();
         // Sum the interior directly; full-buffer-minus-ghosts cancels
         // catastrophically when the interior values are small
-        return internal::interior_vecdot(x.data(), x.data(), global_coll,
-                                         nb_components_per_pixel);
-    } else {
-        // LocalFieldCollection: no ghosts, use Eigen
-        return x.eigen_vec().squaredNorm();
+        return interior_vecdot(x.data(), x.data(), global_coll,
+                               nb_components_per_pixel);
     }
+    // LocalFieldCollection: no ghosts, use Eigen
+    return x.eigen_vec().squaredNorm();
+}
+
+template <typename T>
+T axpy_norm_sq_host(T alpha, const TypedField<T, HostSpace>& x,
+                    TypedField<T, HostSpace>& y) {
+    if (&x.get_collection() != &y.get_collection()) {
+        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
+    }
+    if (x.get_nb_entries() != y.get_nb_entries() ||
+        x.get_nb_components() != y.get_nb_components()) {
+        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
+    }
+
+    // Use Eigen's optimized vectorized operations (two passes, but fast)
+    // A true single-pass fusion would require breaking Eigen's vectorization
+    y.eigen_vec() += alpha * x.eigen_vec();
+
+    const auto& coll = x.get_collection();
+    // For GlobalFieldCollection, sum the interior directly; computing the
+    // full-buffer norm and subtracting the ghost contribution cancels
+    // catastrophically when the interior values are small
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        if (!has_ghosts(global_coll)) {
+            return y.eigen_vec().squaredNorm();
+        }
+        const Index_t nb_components_per_pixel =
+            x.get_nb_components() * x.get_nb_sub_pts();
+        return interior_vecdot(y.data(), y.data(), global_coll,
+                               nb_components_per_pixel);
+    }
+    return y.eigen_vec().squaredNorm();
+}
+
+// Field-valued scal: x[c, i] *= alpha[c, i], templated on x's scalar type.
+// alpha is always Real; a single-component alpha broadcasts over components.
+template <typename TX>
+void scal_field_host(const TypedField<Real, HostSpace>& alpha,
+                     TypedField<TX, HostSpace>& x) {
+    check_field_alpha(alpha, x);
+
+    const Index_t npix = x.get_nb_entries();
+    const Index_t ncomp = x.get_nb_components();
+    TX* xd = x.view().data();
+    const Real* ad = alpha.view().data();
+
+    if (alpha.get_nb_components() == ncomp) {
+        // Elementwise: alpha and x share the same buffer layout
+        for (Index_t i{0}; i < npix * ncomp; ++i) {
+            xd[i] *= ad[i];
+        }
+    } else if (x.get_storage_order() == StorageOrder::StructureOfArrays) {
+        for (Index_t c{0}; c < ncomp; ++c) {
+            TX* xc = xd + c * npix;
+            for (Index_t i{0}; i < npix; ++i) {
+                xc[i] *= ad[i];
+            }
+        }
+    } else {
+        for (Index_t i{0}; i < npix; ++i) {
+            for (Index_t c{0}; c < ncomp; ++c) {
+                xd[i * ncomp + c] *= ad[i];
+            }
+        }
+    }
+}
+
+}  // namespace internal
+
+/* ---------------------------------------------------------------------- */
+/* Public entry points: thin <T, HostSpace> delegators to the bodies above.*/
+/* These specializations are the host ABI surface that linalg.hh declares. */
+/* ---------------------------------------------------------------------- */
+
+template <>
+Real vecdot<Real, HostSpace>(const TypedField<Real, HostSpace>& a,
+                             const TypedField<Real, HostSpace>& b) {
+    return internal::vecdot_host(a, b);
+}
+template <>
+Complex vecdot<Complex, HostSpace>(const TypedField<Complex, HostSpace>& a,
+                                   const TypedField<Complex, HostSpace>& b) {
+    return internal::vecdot_host(a, b);
+}
+
+template <>
+void axpy<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
+                           TypedField<Real, HostSpace>& y) {
+    internal::axpy_host(alpha, x, y);
+}
+template <>
+void axpy<Complex, HostSpace>(Complex alpha,
+                              const TypedField<Complex, HostSpace>& x,
+                              TypedField<Complex, HostSpace>& y) {
+    internal::axpy_host(alpha, x, y);
+}
+
+template <>
+void scal<Real, HostSpace>(Real alpha, TypedField<Real, HostSpace>& x) {
+    internal::scal_host(alpha, x);
+}
+template <>
+void scal<Complex, HostSpace>(Complex alpha, TypedField<Complex, HostSpace>& x) {
+    internal::scal_host(alpha, x);
+}
+
+template <>
+void axpby<Real, HostSpace>(Real alpha, const TypedField<Real, HostSpace>& x,
+                            Real beta, TypedField<Real, HostSpace>& y) {
+    internal::axpby_host(alpha, x, beta, y);
+}
+template <>
+void axpby<Complex, HostSpace>(Complex alpha,
+                               const TypedField<Complex, HostSpace>& x,
+                               Complex beta, TypedField<Complex, HostSpace>& y) {
+    internal::axpby_host(alpha, x, beta, y);
+}
+
+template <>
+void copy<Real, HostSpace>(const TypedField<Real, HostSpace>& src,
+                           TypedField<Real, HostSpace>& dst) {
+    internal::copy_host(src, dst);
+}
+template <>
+void copy<Complex, HostSpace>(const TypedField<Complex, HostSpace>& src,
+                              TypedField<Complex, HostSpace>& dst) {
+    internal::copy_host(src, dst);
+}
+
+template <>
+Real norm_sq<Real, HostSpace>(const TypedField<Real, HostSpace>& x) {
+    return internal::norm_sq_host(x);
+}
+template <>
+Complex norm_sq<Complex, HostSpace>(const TypedField<Complex, HostSpace>& x) {
+    return internal::norm_sq_host(x);
 }
 
 template <>
@@ -397,162 +433,27 @@ std::array<Real, 3> pipelined_cg_dots<Real, HostSpace>(
 }
 
 template <>
-Complex norm_sq<Complex, HostSpace>(const TypedField<Complex, HostSpace>& x) {
-    const auto& coll = x.get_collection();
-
-    // Check if this is a GlobalFieldCollection (has ghost regions)
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (!internal::has_ghosts(global_coll)) {
-            return x.eigen_vec().squaredNorm();
-        }
-        const Index_t nb_components_per_pixel =
-            x.get_nb_components() * x.get_nb_sub_pts();
-        // Sum the interior directly; full-buffer-minus-ghosts cancels
-        // catastrophically when the interior values are small
-        return internal::interior_vecdot(x.data(), x.data(), global_coll,
-                                         nb_components_per_pixel);
-    } else {
-        // LocalFieldCollection: no ghosts, use Eigen
-        return x.eigen_vec().squaredNorm();
-    }
-}
-
-/* ---------------------------------------------------------------------- */
-template <>
 Real axpy_norm_sq<Real, HostSpace>(Real alpha,
-                                    const TypedField<Real, HostSpace>& x,
-                                    TypedField<Real, HostSpace>& y) {
-    // Verify fields are compatible
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
-    }
-
-    // Use Eigen's optimized vectorized operations (two passes, but fast)
-    // A true single-pass fusion would require breaking Eigen's vectorization
-    y.eigen_vec() += alpha * x.eigen_vec();
-
-    const auto& coll = x.get_collection();
-
-    // For GlobalFieldCollection, sum the interior directly; computing the
-    // full-buffer norm and subtracting the ghost contribution cancels
-    // catastrophically when the interior values are small
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (!internal::has_ghosts(global_coll)) {
-            return y.eigen_vec().squaredNorm();
-        }
-        const Index_t nb_components_per_pixel =
-            x.get_nb_components() * x.get_nb_sub_pts();
-        return internal::interior_vecdot(y.data(), y.data(), global_coll,
-                                         nb_components_per_pixel);
-    }
-
-    return y.eigen_vec().squaredNorm();
+                                   const TypedField<Real, HostSpace>& x,
+                                   TypedField<Real, HostSpace>& y) {
+    return internal::axpy_norm_sq_host(alpha, x, y);
 }
-
 template <>
 Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
-                                          const TypedField<Complex, HostSpace>& x,
-                                          TypedField<Complex, HostSpace>& y) {
-    // Verify fields are compatible
-    if (&x.get_collection() != &y.get_collection()) {
-        throw FieldError("axpy_norm_sq: fields must belong to the same collection");
-    }
-    if (x.get_nb_entries() != y.get_nb_entries() ||
-        x.get_nb_components() != y.get_nb_components()) {
-        throw FieldError("axpy_norm_sq: fields must have the same number of entries");
-    }
-
-    // Use Eigen's optimized vectorized operations (two passes, but fast)
-    // A true single-pass fusion would require breaking Eigen's vectorization
-    y.eigen_vec() += alpha * x.eigen_vec();
-
-    const auto& coll = x.get_collection();
-
-    // For GlobalFieldCollection, sum the interior directly; computing the
-    // full-buffer norm and subtracting the ghost contribution cancels
-    // catastrophically when the interior values are small
-    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
-        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
-        if (!internal::has_ghosts(global_coll)) {
-            return y.eigen_vec().squaredNorm();
-        }
-        const Index_t nb_components_per_pixel =
-            x.get_nb_components() * x.get_nb_sub_pts();
-        return internal::interior_vecdot(y.data(), y.data(), global_coll,
-                                         nb_components_per_pixel);
-    }
-
-    return y.eigen_vec().squaredNorm();
+                                         const TypedField<Complex, HostSpace>& x,
+                                         TypedField<Complex, HostSpace>& y) {
+    return internal::axpy_norm_sq_host(alpha, x, y);
 }
 
-/* ---------------------------------------------------------------------- */
 template <>
 void scal<HostSpace>(const TypedField<Real, HostSpace>& alpha,
                      TypedField<Complex, HostSpace>& x) {
-    internal::check_field_alpha(alpha, x);
-
-    const Index_t npix = x.get_nb_entries();
-    const Index_t ncomp = x.get_nb_components();
-    Complex* xd = x.view().data();
-    const Real* ad = alpha.view().data();
-
-    if (alpha.get_nb_components() == ncomp) {
-        // Elementwise: alpha and x share the same buffer layout
-        for (Index_t i{0}; i < npix * ncomp; ++i) {
-            xd[i] *= ad[i];
-        }
-    } else if (x.get_storage_order() == StorageOrder::StructureOfArrays) {
-        for (Index_t c{0}; c < ncomp; ++c) {
-            Complex* xc = xd + c * npix;
-            for (Index_t i{0}; i < npix; ++i) {
-                xc[i] *= ad[i];
-            }
-        }
-    } else {
-        for (Index_t i{0}; i < npix; ++i) {
-            for (Index_t c{0}; c < ncomp; ++c) {
-                xd[i * ncomp + c] *= ad[i];
-            }
-        }
-    }
+    internal::scal_field_host(alpha, x);
 }
-
-/* ---------------------------------------------------------------------- */
 template <>
 void scal<HostSpace>(const TypedField<Real, HostSpace>& alpha,
                      TypedField<Real, HostSpace>& x) {
-    internal::check_field_alpha(alpha, x);
-
-    const Index_t npix = x.get_nb_entries();
-    const Index_t ncomp = x.get_nb_components();
-    Real* xd = x.view().data();
-    const Real* ad = alpha.view().data();
-
-    if (alpha.get_nb_components() == ncomp) {
-        // Elementwise: alpha and x share the same buffer layout
-        for (Index_t i{0}; i < npix * ncomp; ++i) {
-            xd[i] *= ad[i];
-        }
-    } else if (x.get_storage_order() == StorageOrder::StructureOfArrays) {
-        for (Index_t c{0}; c < ncomp; ++c) {
-            Real* xc = xd + c * npix;
-            for (Index_t i{0}; i < npix; ++i) {
-                xc[i] *= ad[i];
-            }
-        }
-    } else {
-        for (Index_t i{0}; i < npix; ++i) {
-            for (Index_t c{0}; c < ncomp; ++c) {
-                xd[i * ncomp + c] *= ad[i];
-            }
-        }
-    }
+    internal::scal_field_host(alpha, x);
 }
 
 /* ---------------------------------------------------------------------- */

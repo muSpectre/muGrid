@@ -37,8 +37,7 @@
  *
  */
 
-#include "fem_gradient_2d.hh"
-#include "fem_gradient_3d.hh"
+#include "fem_gradient.hh"
 
 #include "memory/gpu_runtime.hh"
 
@@ -644,11 +643,7 @@ __global__ void fem_divergence_3d_kernel(
 // =========================================================================
 
 // 2D Gradient - CUDA/HIP unified launch
-#if defined(MUGRID_ENABLE_CUDA)
-void fem_gradient_2d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-void fem_gradient_2d_hip(
-#endif
+void fem_gradient_2d_gpu(
     const Real* nodal_input,
     Real* gradient_output,
     Index_t nx, Index_t ny,
@@ -683,11 +678,7 @@ void fem_gradient_2d_hip(
 }
 
 // 2D Divergence - CUDA/HIP unified launch
-#if defined(MUGRID_ENABLE_CUDA)
-void fem_divergence_2d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-void fem_divergence_2d_hip(
-#endif
+void fem_divergence_2d_gpu(
     const Real* gradient_input,
     Real* nodal_output,
     Index_t nx, Index_t ny,
@@ -722,11 +713,7 @@ void fem_divergence_2d_hip(
 }
 
 // 3D Gradient - CUDA/HIP unified launch
-#if defined(MUGRID_ENABLE_CUDA)
-void fem_gradient_3d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-void fem_gradient_3d_hip(
-#endif
+void fem_gradient_3d_gpu(
     const Real* nodal_input,
     Real* gradient_output,
     Index_t nx, Index_t ny, Index_t nz,
@@ -763,11 +750,7 @@ void fem_gradient_3d_hip(
 }
 
 // 3D Divergence - CUDA/HIP unified launch
-#if defined(MUGRID_ENABLE_CUDA)
-void fem_divergence_3d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-void fem_divergence_3d_hip(
-#endif
+void fem_divergence_3d_gpu(
     const Real* gradient_input,
     Real* nodal_output,
     Index_t nx, Index_t ny, Index_t nz,

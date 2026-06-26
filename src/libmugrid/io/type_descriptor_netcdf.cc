@@ -43,30 +43,34 @@
 
 namespace muGrid {
 
+// muGrid type <-> nc_type mapping. Generated for both directions from one
+// table so they can never drift. Complex is intentionally absent: NetCDF has
+// no native complex type, so it is handled by the explicit throw below rather
+// than mapped. To support a new scalar type in NetCDF, add a row here (and a
+// row to MUGRID_SCALAR_TYPES in core/type_descriptor.hh). Types that NetCDF
+// cannot represent are simply left out and rejected at runtime.
+#define MUGRID_NC_TYPES(X) \
+    X(Int, NC_INT)         \
+    X(Uint, NC_UINT)       \
+    X(Real, NC_DOUBLE)     \
+    X(Index, NC_INT64)
+
 nc_type descriptor_to_nc_type(TypeDescriptor td) {
     switch (td) {
-        case TypeDescriptor::Int:
-            // int is always 4 bytes on common platforms
-            return NC_INT;
-        case TypeDescriptor::Uint:
-            // unsigned int is always 4 bytes on common platforms
-            return NC_UINT;
-        case TypeDescriptor::Real:
-            return NC_DOUBLE;
-        case TypeDescriptor::Complex:
-            // NetCDF doesn't have a native complex type
-            // This should be handled at a higher level by storing as
-            // two doubles or a compound type
-            {
-                std::stringstream err{};
-                err << "NetCDF does not support complex types directly. "
-                    << "Use two separate real fields for real and imaginary "
-                       "parts.";
-                throw FileIOError(err.str());
-            }
-        case TypeDescriptor::Index:
-            // Index is std::ptrdiff_t which is 64-bit on 64-bit platforms
-            return NC_INT64;
+#define MUGRID_NC_FWD_ROW(tag, nc) \
+    case TypeDescriptor::tag:      \
+        return nc;
+        MUGRID_NC_TYPES(MUGRID_NC_FWD_ROW)
+#undef MUGRID_NC_FWD_ROW
+        case TypeDescriptor::Complex: {
+            // NetCDF doesn't have a native complex type; this is handled at a
+            // higher level by storing real and imaginary parts separately.
+            std::stringstream err{};
+            err << "NetCDF does not support complex types directly. "
+                << "Use two separate real fields for real and imaginary "
+                   "parts.";
+            throw FileIOError(err.str());
+        }
         default: {
             std::stringstream err{};
             err << "Cannot convert TypeDescriptor '"
@@ -78,14 +82,11 @@ nc_type descriptor_to_nc_type(TypeDescriptor td) {
 
 TypeDescriptor nc_type_to_descriptor(nc_type nc) {
     switch (nc) {
-        case NC_INT:
-            return TypeDescriptor::Int;
-        case NC_UINT:
-            return TypeDescriptor::Uint;
-        case NC_DOUBLE:
-            return TypeDescriptor::Real;
-        case NC_INT64:
-            return TypeDescriptor::Index;
+#define MUGRID_NC_REV_ROW(tag, nc_const) \
+    case nc_const:                       \
+        return TypeDescriptor::tag;
+        MUGRID_NC_TYPES(MUGRID_NC_REV_ROW)
+#undef MUGRID_NC_REV_ROW
         default: {
             std::stringstream err{};
             err << "Unrecognized nc_type value: " << nc

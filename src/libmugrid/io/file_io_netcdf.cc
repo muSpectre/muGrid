@@ -2539,18 +2539,11 @@ namespace muGrid {
       /**
        * Write global field with ncmu_put_varm_all
        **/
-#ifdef WITH_MPI
-      status = ncmu_put_varm_all(
+      status = ncmu_put_varm_unified(
           netcdf_id, this->get_id(), this->get_start_global(frame).data(),
           this->get_count_global().data(), this->get_nc_stride().data(),
           this->get_nc_imap_global().data(), this->get_buf(),
           this->get_bufcount_mpi_global(), this->get_buftype());
-#else   // WITH_MPI
-      status = ncmu_put_varm_all(
-          netcdf_id, this->get_id(), this->get_start_global(frame).data(),
-          this->get_count_global().data(), this->get_nc_stride().data(),
-          this->get_nc_imap_global().data(), this->get_buf());
-#endif  // WITH_MPI
       if (status != NC_NOERR) {
         throw FileIOError(ncmu_strerror(status));
       }
@@ -2570,69 +2563,52 @@ namespace muGrid {
       void * buf_ptr{this->get_buf()};
       std::vector<IODiff_t> stride{this->get_nc_stride()};
       std::vector<IODiff_t> imap{this->get_nc_imap_local()};
-#ifdef WITH_MPI
-      IOSize_t buf_count{this->get_bufcount_mpi_local()};
-      Datatype_t buf_type{this->get_buftype()};
+      const IOSize_t buf_count{this->get_bufcount_mpi_local()};
+      const Datatype_t buf_type{this->get_buftype()};
 
-      // Collective I/O that preserves the field's in-memory layout. Each
-      // local pixel is a separate subarray (scattered in the global pixel
-      // index space) sharing the same per-pixel buffer count and index map.
-      // The index map reconciles the (component, sub-point, pixel) memory
-      // layout with the NetCDF variable's dimension order -- it must be
-      // applied, which collective varm_all does but the (single-call,
-      // index-map-free) varn_all cannot. Because varm_all is collective,
-      // every rank issues the same number of calls; ranks with fewer pixels
-      // (including empty ones) pad with zero-size requests, which keeps the
-      // path correct for empty/uneven ranks. NB: this is one collective call
-      // per global-maximum pixel count -- adequate for the typically small
-      // local field collections; a manual pack to NetCDF dimension order
-      // plus a single varn_all would scale better at the cost of
-      // re-implementing the index map.
-      size_t global_max_requests{
+      // Collective I/O that preserves the field's in-memory layout. Each local
+      // pixel is a separate subarray (scattered in the global pixel index
+      // space) sharing the same per-pixel buffer count and index map. The index
+      // map reconciles the (component, sub-point, pixel) memory layout with the
+      // NetCDF variable's dimension order -- it must be applied, which varm_all
+      // does but the (single-call, index-map-free) varn_all cannot.
+      //
+      // Under MPI the transfer is collective, so every rank must issue the same
+      // number of calls: each issues the global-maximum pixel count, and ranks
+      // with fewer pixels (including empty ones) pad with zero-size requests. In
+      // serial comm.max is the identity, so the loop reduces to exactly one
+      // (non-collective) call per local pixel and the padding branch is never
+      // taken. NB: one collective call per global-maximum pixel count is
+      // adequate for the typically small local field collections; a manual pack
+      // to NetCDF dimension order plus a single varn_all would scale better at
+      // the cost of re-implementing the index map.
+      const size_t nb_requests{
           static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
-      std::vector<IOSize_t> empty_start(ndims, 0);
-      std::vector<IOSize_t> empty_count(ndims, 0);
-      for (size_t i = 0; i < global_max_requests; i++) {
+      const std::vector<IOSize_t> empty_start(ndims, 0);
+      const std::vector<IOSize_t> empty_count(ndims, 0);
+      for (size_t i = 0; i < nb_requests; i++) {
         if (i < num_requests) {
           std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
                                        starts_vec.begin() + (i + 1) * ndims);
           std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
                                        counts_vec.begin() + (i + 1) * ndims);
-          status = ncmu_put_varm_all(netcdf_id, this->get_id(), starts.data(),
-                                     counts.data(), stride.data(), imap.data(),
-                                     buf_ptr, buf_count, buf_type);
+          status = ncmu_put_varm_unified(
+              netcdf_id, this->get_id(), starts.data(), counts.data(),
+              stride.data(), imap.data(), buf_ptr, buf_count, buf_type);
           if (status != NC_NOERR) {
             throw FileIOError(ncmu_strerror(status));
           }
           buf_ptr = this->increment_buf_ptr(buf_ptr, get_nb_from_shape(counts));
         } else {
           // zero-size request: participate in the collective, write nothing
-          status = ncmu_put_varm_all(netcdf_id, this->get_id(),
-                                     empty_start.data(), empty_count.data(),
-                                     stride.data(), imap.data(), buf_ptr,
-                                     IOSize_t{0}, buf_type);
+          status = ncmu_put_varm_unified(
+              netcdf_id, this->get_id(), empty_start.data(), empty_count.data(),
+              stride.data(), imap.data(), buf_ptr, IOSize_t{0}, buf_type);
           if (status != NC_NOERR) {
             throw FileIOError(ncmu_strerror(status));
           }
         }
       }
-#else   // WITH_MPI
-      IOSize_t nb_points{0};
-      for (size_t i = 0; i < num_requests; i++) {
-        std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
-                                     starts_vec.begin() + (i + 1) * ndims);
-        std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
-                                     counts_vec.begin() + (i + 1) * ndims);
-        status =
-            ncmu_put_varm(netcdf_id, this->get_id(), starts.data(),
-                          counts.data(), stride.data(), imap.data(), buf_ptr);
-        if (status != NC_NOERR) {
-          throw FileIOError(ncmu_strerror(status));
-        }
-        nb_points = get_nb_from_shape(counts);
-        buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
-      }
-#endif  // WITH_MPI
     }
   }
 
@@ -2650,18 +2626,11 @@ namespace muGrid {
       /**
        * Read global field with ncmu_get_varm_all
        **/
-#ifdef WITH_MPI
-      status = ncmu_get_varm_all(
+      status = ncmu_get_varm_unified(
           netcdf_id, this->get_id(), this->get_start_global(frame).data(),
           this->get_count_global().data(), this->get_nc_stride().data(),
           this->get_nc_imap_global().data(), this->get_buf(),
           this->get_bufcount_mpi_global(), this->get_buftype());
-#else   // WITH_MPI
-      status = ncmu_get_varm_all(
-          netcdf_id, this->get_id(), this->get_start_global(frame).data(),
-          this->get_count_global().data(), this->get_nc_stride().data(),
-          this->get_nc_imap_global().data(), this->get_buf());
-#endif  // WITH_MPI
 
       if (status != NC_NOERR) {
         throw FileIOError(ncmu_strerror(status));
@@ -2682,59 +2651,42 @@ namespace muGrid {
       void * buf_ptr{this->get_buf()};
       std::vector<IODiff_t> stride{this->get_nc_stride()};
       std::vector<IODiff_t> imap{this->get_nc_imap_local()};
-#ifdef WITH_MPI
-      IOSize_t buf_count{this->get_bufcount_mpi_local()};
-      Datatype_t buf_type{this->get_buftype()};
+      const IOSize_t buf_count{this->get_bufcount_mpi_local()};
+      const Datatype_t buf_type{this->get_buftype()};
 
       // Collective read mirroring the write path: one varm_all per pixel
-      // (applies the index map), with every rank issuing the same number of
-      // calls and shorter/empty ranks padding with zero-size requests. See
-      // NetCDFVarBase::write() for the rationale.
-      size_t global_max_requests{
+      // (applies the index map), with every rank issuing the global-maximum
+      // number of calls and shorter/empty ranks padding with zero-size
+      // requests. In serial comm.max is the identity, so this reduces to one
+      // (non-collective) call per local pixel. See NetCDFVarBase::write() for
+      // the full rationale.
+      const size_t nb_requests{
           static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
-      std::vector<IOSize_t> empty_start(ndims, 0);
-      std::vector<IOSize_t> empty_count(ndims, 0);
-      for (size_t i = 0; i < global_max_requests; i++) {
+      const std::vector<IOSize_t> empty_start(ndims, 0);
+      const std::vector<IOSize_t> empty_count(ndims, 0);
+      for (size_t i = 0; i < nb_requests; i++) {
         if (i < num_requests) {
           std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
                                        starts_vec.begin() + (i + 1) * ndims);
           std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
                                        counts_vec.begin() + (i + 1) * ndims);
-          status = ncmu_get_varm_all(netcdf_id, this->get_id(), starts.data(),
-                                     counts.data(), stride.data(), imap.data(),
-                                     buf_ptr, buf_count, buf_type);
+          status = ncmu_get_varm_unified(
+              netcdf_id, this->get_id(), starts.data(), counts.data(),
+              stride.data(), imap.data(), buf_ptr, buf_count, buf_type);
           if (status != NC_NOERR) {
             throw FileIOError(ncmu_strerror(status));
           }
           buf_ptr = this->increment_buf_ptr(buf_ptr, get_nb_from_shape(counts));
         } else {
           // zero-size request: participate in the collective, read nothing
-          status = ncmu_get_varm_all(netcdf_id, this->get_id(),
-                                     empty_start.data(), empty_count.data(),
-                                     stride.data(), imap.data(), buf_ptr,
-                                     IOSize_t{0}, buf_type);
+          status = ncmu_get_varm_unified(
+              netcdf_id, this->get_id(), empty_start.data(), empty_count.data(),
+              stride.data(), imap.data(), buf_ptr, IOSize_t{0}, buf_type);
           if (status != NC_NOERR) {
             throw FileIOError(ncmu_strerror(status));
           }
         }
       }
-#else   // WITH_MPI
-      IOSize_t nb_points{0};
-      for (size_t i = 0; i < num_requests; i++) {
-        std::vector<IOSize_t> starts(starts_vec.begin() + i * ndims,
-                                     starts_vec.begin() + (i + 1) * ndims);
-        std::vector<IOSize_t> counts(counts_vec.begin() + i * ndims,
-                                     counts_vec.begin() + (i + 1) * ndims);
-        status =
-            ncmu_get_varm(netcdf_id, this->get_id(), starts.data(),
-                          counts.data(), stride.data(), imap.data(), buf_ptr);
-        if (status != NC_NOERR) {
-          throw FileIOError(ncmu_strerror(status));
-        }
-        nb_points = get_nb_from_shape(counts);
-        buf_ptr = this->increment_buf_ptr(buf_ptr, nb_points);
-      }
-#endif  // WITH_MPI
     }
 
     // For device-resident fields, the data was read into the host staging

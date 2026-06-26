@@ -33,8 +33,7 @@
  *
  */
 
-#include "isotropic_stiffness_2d.hh"
-#include "isotropic_stiffness_3d.hh"
+#include "isotropic_stiffness.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
@@ -378,24 +377,8 @@ void isotropic_stiffness_3d_gpu(
 // Class Method Implementations for GPU
 // ============================================================================
 
-void IsotropicStiffnessOperator2D::apply(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, 1.0, force, false);
-}
-
-void IsotropicStiffnessOperator2D::apply_increment(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    Real alpha,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, alpha, force, true);
-}
-
-void IsotropicStiffnessOperator2D::apply_impl(
+template <>
+void IsotropicStiffnessOperator<2>::apply_impl(
     const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
     const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
     const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
@@ -513,24 +496,8 @@ void IsotropicStiffnessOperator2D::apply_impl(
         alpha, increment);
 }
 
-void IsotropicStiffnessOperator3D::apply(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, 1.0, force, false);
-}
-
-void IsotropicStiffnessOperator3D::apply_increment(
-    const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
-    const TypedFieldBase<Real, DefaultDeviceSpace>& mu,
-    Real alpha,
-    TypedFieldBase<Real, DefaultDeviceSpace>& force) const {
-    apply_impl(displacement, lambda, mu, alpha, force, true);
-}
-
-void IsotropicStiffnessOperator3D::apply_impl(
+template <>
+void IsotropicStiffnessOperator<3>::apply_impl(
     const TypedFieldBase<Real, DefaultDeviceSpace>& displacement,
     const TypedFieldBase<Real, DefaultDeviceSpace>& lambda,
     const TypedFieldBase<Real, DefaultDeviceSpace>& mu,

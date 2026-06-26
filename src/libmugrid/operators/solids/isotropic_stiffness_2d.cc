@@ -33,7 +33,7 @@
  *
  */
 
-#include "isotropic_stiffness_2d.hh"
+#include "isotropic_stiffness.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
@@ -60,16 +60,8 @@ namespace muGrid {
     // Quadrature weights for 2D (area of each triangle / pixel area)
     static const Real W_2D[2] = {0.5, 0.5};
 
-    IsotropicStiffnessOperator2D::IsotropicStiffnessOperator2D(
-        const std::vector<Real> & grid_spacing)
-        : grid_spacing{grid_spacing} {
-        if (grid_spacing.size() != 2) {
-            throw RuntimeError("2D operator requires 2D grid spacing");
-        }
-        this->precompute_matrices();
-    }
-
-    void IsotropicStiffnessOperator2D::precompute_matrices() {
+    template <>
+    void IsotropicStiffnessOperator<2>::precompute_matrices() {
         // Initialize matrices to zero
         std::fill(G_matrix.begin(), G_matrix.end(), 0.0);
         std::fill(V_matrix.begin(), V_matrix.end(), 0.0);
@@ -158,21 +150,8 @@ namespace muGrid {
         }
     }
 
-    void IsotropicStiffnessOperator2D::apply(
-        const TypedFieldBase<Real> & displacement,
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
-        TypedFieldBase<Real> & force) const {
-        apply_impl(displacement, lambda, mu, 1.0, force, false);
-    }
-
-    void IsotropicStiffnessOperator2D::apply_increment(
-        const TypedFieldBase<Real> & displacement,
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
-        Real alpha, TypedFieldBase<Real> & force) const {
-        apply_impl(displacement, lambda, mu, alpha, force, true);
-    }
-
-    void IsotropicStiffnessOperator2D::apply_impl(
+    template <>
+    void IsotropicStiffnessOperator<2>::apply_impl(
         const TypedFieldBase<Real> & displacement,
         const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
         Real alpha, TypedFieldBase<Real> & force, bool increment) const {

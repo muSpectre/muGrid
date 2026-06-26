@@ -338,6 +338,55 @@ namespace muGrid {
 
    protected:
     /**
+     * @brief Common field validation shared by all stencil operators.
+     *
+     * Verifies that the input and output fields share a single
+     * GlobalFieldCollection whose spatial dimension matches this operator's,
+     * and that its ghost buffers satisfy this operator's requirement. Returns
+     * the collection so callers can read its grid extents. Operators with
+     * extra requirements (e.g. component-count checks) run those after calling
+     * this.
+     *
+     * Lifting this here removes the per-operator `validate_fields` copy that
+     * each Laplace / FEM-gradient / stiffness operator carried, and keeps the
+     * runtime check tied to get_spatial_dim()/the ghost requirement so it
+     * cannot drift from what the operator reports.
+     *
+     * @param input          Operator input field.
+     * @param output         Operator output field.
+     * @param operator_name  Name used in error messages.
+     * @param is_transpose   Check the transpose ghost requirement (default:
+     *                       the apply requirement).
+     * @return The validated GlobalFieldCollection shared by both fields.
+     * @throws RuntimeError if any check fails.
+     */
+    const GlobalFieldCollection &
+    check_fields(const Field & input, const Field & output,
+                 const std::string & operator_name,
+                 const bool is_transpose = false) const {
+      const auto & input_collection = input.get_collection();
+      if (&input_collection != &output.get_collection()) {
+        throw RuntimeError(operator_name +
+                           ": input and output fields must belong to the same "
+                           "field collection");
+      }
+      const auto * global_fc =
+          dynamic_cast<const GlobalFieldCollection *>(&input_collection);
+      if (global_fc == nullptr) {
+        throw RuntimeError(operator_name + " requires GlobalFieldCollection");
+      }
+      if (global_fc->get_spatial_dim() != this->get_spatial_dim()) {
+        throw RuntimeError(
+            "Field collection dimension (" +
+            std::to_string(global_fc->get_spatial_dim()) +
+            ") does not match operator dimension (" +
+            std::to_string(this->get_spatial_dim()) + ")");
+      }
+      this->check_ghost_requirement(*global_fc, is_transpose, operator_name);
+      return *global_fc;
+    }
+
+    /**
      * @brief Throws if a field collection's ghost buffers are too small for
      *        this operator.
      *

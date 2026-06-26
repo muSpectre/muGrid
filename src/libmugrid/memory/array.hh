@@ -45,14 +45,7 @@
 #include "device_alloc.hh"
 #include "memory_space.hh"
 #include "allocation_profiler.hh"
-
-#if defined(MUGRID_ENABLE_CUDA)
-#include <cuda_runtime.h>
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-#include <hip/hip_runtime.h>
-#endif
+#include "gpu_runtime.hh"
 
 namespace muGrid {
 
@@ -80,12 +73,15 @@ namespace muGrid {
             }
         };
 
-#if defined(MUGRID_ENABLE_CUDA)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
-         * Memory allocator for CUDA device space
+         * Memory allocator for device (CUDA/HIP) space. The CUDA and HIP
+         * variants were byte-identical apart from the memset spelling, so they
+         * share a single implementation that routes through the gpu_runtime.hh
+         * shim.
          */
         template <typename T>
-        struct CudaAllocator {
+        struct DeviceAllocator {
             // Allocation goes through device_allocate() so that an
             // externally registered allocator (e.g. cupy's memory pool)
             // owns every device byte; see memory/device_alloc.hh.
@@ -101,38 +97,11 @@ namespace muGrid {
             }
 
             static void memset(T * ptr, int value, std::size_t n) {
-                (void)cudaMemset(ptr, value, n * sizeof(T));
+                GPU_MEMSET(ptr, value, n * sizeof(T));
             }
         };
 
-#endif  // MUGRID_ENABLE_CUDA
-
-#if defined(MUGRID_ENABLE_HIP)
-        /**
-         * Memory allocator for HIP device space
-         */
-        template <typename T>
-        struct HIPAllocator {
-            // Allocation goes through device_allocate() so that an
-            // externally registered allocator (e.g. cupy's memory pool)
-            // owns every device byte; see memory/device_alloc.hh.
-            static T * allocate(std::size_t n) {
-                if (n == 0)
-                    return nullptr;
-                return static_cast<T *>(device_allocate(n * sizeof(T)));
-            }
-
-            static void deallocate(T * ptr) {
-                if (ptr)
-                    device_deallocate(ptr);
-            }
-
-            static void memset(T * ptr, int value, std::size_t n) {
-                (void)hipMemset(ptr, value, n * sizeof(T));
-            }
-        };
-
-#endif  // MUGRID_ENABLE_HIP
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 
         /**
          * Type trait to select the correct allocator for a memory space
@@ -142,17 +111,12 @@ namespace muGrid {
             using type = HostAllocator<T>;
         };
 
-#if defined(MUGRID_ENABLE_CUDA)
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // DefaultDeviceSpace is the active device space (CUDASpace under CUDA,
+        // ROCmSpace under HIP), so this one specialisation serves both backends.
         template <typename T>
-        struct AllocatorSelector<T, CUDASpace> {
-            using type = CudaAllocator<T>;
-        };
-#endif
-
-#if defined(MUGRID_ENABLE_HIP)
-        template <typename T>
-        struct AllocatorSelector<T, ROCmSpace> {
-            using type = HIPAllocator<T>;
+        struct AllocatorSelector<T, DefaultDeviceSpace> {
+            using type = DeviceAllocator<T>;
         };
 #endif
 
@@ -359,44 +323,21 @@ namespace muGrid {
         if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
             std::memcpy(dst.data(), src.data(), src.size() * sizeof(T));
         }
-#if defined(MUGRID_ENABLE_CUDA)
-        // Host to CUDA
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // Host to device
         else if constexpr (is_host_space_v<SrcSpace> &&
-                           std::is_same_v<DstSpace, CUDASpace>) {
-            (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                             cudaMemcpyHostToDevice);
+                           std::is_same_v<DstSpace, DefaultDeviceSpace>) {
+            GPU_MEMCPY_H2D(dst.data(), src.data(), src.size() * sizeof(T));
         }
-        // CUDA to Host
-        else if constexpr (std::is_same_v<SrcSpace, CUDASpace> &&
+        // Device to host
+        else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
                            is_host_space_v<DstSpace>) {
-            (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                             cudaMemcpyDeviceToHost);
+            GPU_MEMCPY_D2H(dst.data(), src.data(), src.size() * sizeof(T));
         }
-        // CUDA to CUDA
-        else if constexpr (std::is_same_v<SrcSpace, CUDASpace> &&
-                           std::is_same_v<DstSpace, CUDASpace>) {
-            (void)cudaMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                             cudaMemcpyDeviceToDevice);
-        }
-#endif
-#if defined(MUGRID_ENABLE_HIP)
-        // Host to ROCm
-        else if constexpr (is_host_space_v<SrcSpace> &&
-                           std::is_same_v<DstSpace, ROCmSpace>) {
-            (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                            hipMemcpyHostToDevice);
-        }
-        // ROCm to Host
-        else if constexpr (std::is_same_v<SrcSpace, ROCmSpace> &&
-                           is_host_space_v<DstSpace>) {
-            (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                            hipMemcpyDeviceToHost);
-        }
-        // ROCm to ROCm
-        else if constexpr (std::is_same_v<SrcSpace, ROCmSpace> &&
-                           std::is_same_v<DstSpace, ROCmSpace>) {
-            (void)hipMemcpy(dst.data(), src.data(), src.size() * sizeof(T),
-                            hipMemcpyDeviceToDevice);
+        // Device to device
+        else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
+                           std::is_same_v<DstSpace, DefaultDeviceSpace>) {
+            GPU_MEMCPY_D2D(dst.data(), src.data(), src.size() * sizeof(T));
         }
 #endif
         else {
@@ -417,22 +358,10 @@ namespace muGrid {
                 dst[i] = value;
             }
         }
-#if defined(MUGRID_ENABLE_CUDA)
-        else if constexpr (std::is_same_v<MemorySpace, CUDASpace>) {
-            // For CUDA, we need a kernel (or use thrust)
-            // For now, copy via host for scalar fill
-            if (dst.size() > 0) {
-                Array<T, HostSpace> tmp(dst.size());
-                for (std::size_t i = 0; i < tmp.size(); ++i) {
-                    tmp[i] = value;
-                }
-                deep_copy(dst, tmp);
-            }
-        }
-#endif
-#if defined(MUGRID_ENABLE_HIP)
-        else if constexpr (std::is_same_v<MemorySpace, ROCmSpace>) {
-            // Same approach for ROCm
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        else if constexpr (std::is_same_v<MemorySpace, DefaultDeviceSpace>) {
+            // No device-side scalar fill yet; stage the value on the host and
+            // copy across.
             if (dst.size() > 0) {
                 Array<T, HostSpace> tmp(dst.size());
                 for (std::size_t i = 0; i < tmp.size(); ++i) {
@@ -466,73 +395,32 @@ namespace muGrid {
         if constexpr (is_host_space_v<DstSpace> && is_host_space_v<SrcSpace>) {
             std::memcpy(dst, src, count * sizeof(T));
         }
-#if defined(MUGRID_ENABLE_CUDA)
-        // Host to CUDA
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // Host to device
         else if constexpr (is_host_space_v<SrcSpace> &&
-                           std::is_same_v<DstSpace, CUDASpace>) {
-            cudaError_t err =
-                cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyHostToDevice);
-            if (err != cudaSuccess) {
+                           std::is_same_v<DstSpace, DefaultDeviceSpace>) {
+            GPU_MEMCPY_H2D(dst, src, count * sizeof(T));
+            if (const char * err{gpu_last_error()}; err != nullptr) {
                 throw std::runtime_error(
-                    std::string("CUDA memcpy H2D failed: ") +
-                    cudaGetErrorString(err));
+                    std::string("GPU memcpy H2D failed: ") + err);
             }
         }
-        // CUDA to Host
-        else if constexpr (std::is_same_v<SrcSpace, CUDASpace> &&
+        // Device to host
+        else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
                            is_host_space_v<DstSpace>) {
-            cudaError_t err =
-                cudaMemcpy(dst, src, count * sizeof(T), cudaMemcpyDeviceToHost);
-            if (err != cudaSuccess) {
+            GPU_MEMCPY_D2H(dst, src, count * sizeof(T));
+            if (const char * err{gpu_last_error()}; err != nullptr) {
                 throw std::runtime_error(
-                    std::string("CUDA memcpy D2H failed: ") +
-                    cudaGetErrorString(err));
+                    std::string("GPU memcpy D2H failed: ") + err);
             }
         }
-        // CUDA to CUDA
-        else if constexpr (std::is_same_v<SrcSpace, CUDASpace> &&
-                           std::is_same_v<DstSpace, CUDASpace>) {
-            cudaError_t err = cudaMemcpy(dst, src, count * sizeof(T),
-                                         cudaMemcpyDeviceToDevice);
-            if (err != cudaSuccess) {
+        // Device to device
+        else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
+                           std::is_same_v<DstSpace, DefaultDeviceSpace>) {
+            GPU_MEMCPY_D2D(dst, src, count * sizeof(T));
+            if (const char * err{gpu_last_error()}; err != nullptr) {
                 throw std::runtime_error(
-                    std::string("CUDA memcpy D2D failed: ") +
-                    cudaGetErrorString(err));
-            }
-        }
-#endif
-#if defined(MUGRID_ENABLE_HIP)
-        // Host to ROCm
-        else if constexpr (is_host_space_v<SrcSpace> &&
-                           std::is_same_v<DstSpace, ROCmSpace>) {
-            hipError_t err =
-                hipMemcpy(dst, src, count * sizeof(T), hipMemcpyHostToDevice);
-            if (err != hipSuccess) {
-                throw std::runtime_error(
-                    std::string("ROCm memcpy H2D failed: ") +
-                    hipGetErrorString(err));
-            }
-        }
-        // ROCm to Host
-        else if constexpr (std::is_same_v<SrcSpace, ROCmSpace> &&
-                           is_host_space_v<DstSpace>) {
-            hipError_t err =
-                hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToHost);
-            if (err != hipSuccess) {
-                throw std::runtime_error(
-                    std::string("ROCm memcpy D2H failed: ") +
-                    hipGetErrorString(err));
-            }
-        }
-        // ROCm to ROCm
-        else if constexpr (std::is_same_v<SrcSpace, ROCmSpace> &&
-                           std::is_same_v<DstSpace, ROCmSpace>) {
-            hipError_t err =
-                hipMemcpy(dst, src, count * sizeof(T), hipMemcpyDeviceToDevice);
-            if (err != hipSuccess) {
-                throw std::runtime_error(
-                    std::string("ROCm memcpy D2D failed: ") +
-                    hipGetErrorString(err));
+                    std::string("GPU memcpy D2D failed: ") + err);
             }
         }
 #endif

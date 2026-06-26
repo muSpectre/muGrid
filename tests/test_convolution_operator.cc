@@ -37,8 +37,8 @@
 #include "test_goodies.hh"
 
 #include "operators/generic.hh"
-#include "operators/laplace_2d.hh"
-#include "operators/fem_gradient_2d.hh"
+#include "operators/laplace.hh"
+#include "operators/fem_gradient.hh"
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "field/field_map.hh"

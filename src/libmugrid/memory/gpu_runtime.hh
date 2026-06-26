@@ -40,6 +40,7 @@
 #ifndef SRC_LIBMUGRID_MEMORY_GPU_RUNTIME_HH_
 #define SRC_LIBMUGRID_MEMORY_GPU_RUNTIME_HH_
 
+#include <cstddef>
 #include <string>
 
 #include "core/exception.hh"
@@ -100,6 +101,19 @@ namespace muGrid {
         cudaError_t err{cudaGetLastError()};
         return err == cudaSuccess ? nullptr : cudaGetErrorString(err);
     }
+    //! Index of the current device.
+    inline int gpu_get_device() {
+        int device{0};
+        (void)cudaGetDevice(&device);
+        return device;
+    }
+    //! Make `device` the current device.
+    inline void gpu_set_device(int device) { (void)cudaSetDevice(device); }
+    //! Free/total device memory in bytes; false if the query failed.
+    inline bool gpu_mem_get_info(std::size_t & free_bytes,
+                                 std::size_t & total_bytes) {
+        return cudaMemGetInfo(&free_bytes, &total_bytes) == cudaSuccess;
+    }
 }  // namespace muGrid
 
 #elif defined(MUGRID_ENABLE_HIP)
@@ -151,6 +165,19 @@ namespace muGrid {
         hipError_t err{hipGetLastError()};
         return err == hipSuccess ? nullptr : hipGetErrorString(err);
     }
+    //! Index of the current device.
+    inline int gpu_get_device() {
+        int device{0};
+        (void)hipGetDevice(&device);
+        return device;
+    }
+    //! Make `device` the current device.
+    inline void gpu_set_device(int device) { (void)hipSetDevice(device); }
+    //! Free/total device memory in bytes; false if the query failed.
+    inline bool gpu_mem_get_info(std::size_t & free_bytes,
+                                 std::size_t & total_bytes) {
+        return hipMemGetInfo(&free_bytes, &total_bytes) == hipSuccess;
+    }
 }  // namespace muGrid
 
 #endif  // MUGRID_ENABLE_CUDA / MUGRID_ENABLE_HIP
@@ -172,6 +199,22 @@ namespace muGrid {
             throw RuntimeError(std::string("GPU kernel launch failed (") +
                                context + "): " + err);
         }
+    }
+
+    /**
+     * Allocate `bytes` of raw device memory, throwing a RuntimeError on
+     * failure. Centralises the backend allocation path so callers carry no
+     * CUDA/HIP #ifdef; the failure is detected via the same pending-error
+     * check the launch macros use (gpu_last_error()).
+     */
+    inline void * gpu_malloc_checked(std::size_t bytes) {
+        void * ptr{nullptr};
+        GPU_MALLOC(&ptr, bytes);
+        const char * err{gpu_last_error()};
+        if (err != nullptr) {
+            throw RuntimeError(std::string("GPU allocation failed: ") + err);
+        }
+        return ptr;
     }
 }  // namespace muGrid
 #endif  // MUGRID_ENABLE_CUDA / MUGRID_ENABLE_HIP

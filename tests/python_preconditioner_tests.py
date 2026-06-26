@@ -263,10 +263,19 @@ def test_reference_stiffness_preconditioner_is_exact_inverse(comm):
     x = engine.real_space_field("x", components=(n,))
     b = engine.real_space_field("b", components=(n,))
     z = engine.real_space_field("z", components=(n,))
+    # Build a deterministic global field (identical on every rank, so the
+    # global mean below is consistent), make it zero-mean, then assign this
+    # rank's subdomain slice. Mirrors run_poisson_cg/global_rhs; assigning the
+    # whole global array would break under MPI decomposition, where x.p[c] is
+    # only the local subdomain.
+    (nx, ny) = tuple(engine.nb_domain_grid_pts)
+    ox, oy = engine.subdomain_locations
+    lx, ly = engine.nb_subdomain_grid_pts
     rng = np.random.default_rng(0)
     for c in range(n):
-        xc = rng.standard_normal((16, 16))
-        x.p[c] = xc - xc.mean()  # zero-mean (orthogonal to the rigid-body mode)
+        xc = rng.standard_normal((nx, ny))
+        xc -= xc.mean()  # zero-mean (orthogonal to the rigid-body mode)
+        x.p[c] = xc[ox : ox + lx, oy : oy + ly]
 
     apply_operator(x, b)  # b = A x
     prec(b, z)            # z = A⁺ b = x (zero mode projected out)
@@ -280,8 +289,13 @@ def test_reference_stiffness_preconditioner_is_exact_inverse(comm):
 def test_kernel_shape_validation(comm):
     """A kernel that does not match the local Fourier subdomain is rejected."""
     engine = make_engine(comm, (16, 16))
+    # Derive a shape that cannot coincide with any rank's local Fourier
+    # subdomain (one larger in every axis). A hard-coded shape such as (3, 3)
+    # can equal a real subdomain under MPI decomposition, in which case the
+    # constructor legitimately accepts it and the expected error is not raised.
+    bad_shape = tuple(s + 1 for s in engine.nb_fourier_subdomain_grid_pts)
     with pytest.raises(ValueError, match="Fourier subdomain"):
-        FourierPreconditioner(engine, np.ones((3, 3)))
+        FourierPreconditioner(engine, np.ones(bad_shape))
 
 
 def test_jacobi_apply(comm):

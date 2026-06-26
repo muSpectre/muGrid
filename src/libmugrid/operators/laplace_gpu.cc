@@ -127,11 +127,7 @@ __global__ void laplace_3d_kernel(
 }
 
 // Launch wrapper for 2D - uses unified macro
-#if defined(MUGRID_ENABLE_CUDA)
-void laplace_2d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-void laplace_2d_hip(
-#endif
+void laplace_2d_gpu(
     const Real* input,
     Real* output,
     Index_t nx, Index_t ny,
@@ -156,11 +152,7 @@ void laplace_2d_hip(
 }
 
 // Launch wrapper for 3D - uses unified macro
-#if defined(MUGRID_ENABLE_CUDA)
-void laplace_3d_cuda(
-#elif defined(MUGRID_ENABLE_HIP)
-void laplace_3d_hip(
-#endif
+void laplace_3d_gpu(
     const Real* input,
     Real* output,
     Index_t nx, Index_t ny, Index_t nz,

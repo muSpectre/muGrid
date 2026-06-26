@@ -59,6 +59,37 @@ using muGrid::FileIONetCDF;
 
 namespace py = pybind11;
 
+#ifdef WITH_NETCDF_IO
+namespace {
+  /**
+   * Convert a NetCDF global attribute to the matching Python object, selected
+   * by its stored data type. Shared by the read_global_attribute() and
+   * read_global_attributes() bindings, which otherwise duplicated this switch.
+   */
+  py::object attribute_to_py(const muGrid::NetCDFGlobalAtt & att,
+                             const std::string & att_name) {
+    switch (att.get_data_type()) {
+    case muGrid::MU_NC_CHAR: {
+      const std::vector<char> & char_vec{att.get_typed_value_c()};
+      return py::cast(std::string(char_vec.begin(), char_vec.end()));
+    }
+    case muGrid::MU_NC_INT:
+      return py::cast(att.get_typed_value_i());
+    case muGrid::MU_NC_UINT:
+      return py::cast(att.get_typed_value_ui());
+    case muGrid::MU_NC_INDEX_T:
+      return py::cast(att.get_typed_value_l());
+    case muGrid::MU_NC_REAL:
+      return py::cast(att.get_typed_value_d());
+    default:
+      throw muGrid::FileIOError(
+          "Unknown data type of global attribute '" + att_name +
+          "' value in the FileIONetCDF python bindings.");
+    }
+  }
+}  // namespace
+#endif  // WITH_NETCDF_IO
+
 /**
  * "Trampoline" class for handling the pure virtual methods, see
  * [http://pybind11.readthedocs.io/en/stable/advanced/classes.html#overriding-virtual-functions-in-python]
@@ -223,36 +254,8 @@ void add_file_io_netcdf(py::module & mod) {
       .def(
           "read_global_attribute",
           [](FileIONetCDF & file_io_object, std::string & g_att_name) {
-            switch (file_io_object.read_global_attribute(g_att_name)
-                        .get_data_type()) {
-            case muGrid::MU_NC_CHAR: {
-              const std::vector<char> & char_vec{
-                  file_io_object.read_global_attribute(g_att_name)
-                      .get_typed_value_c()};
-              return py::cast(std::string(char_vec.begin(), char_vec.end()));
-            }
-            case muGrid::MU_NC_INT: {
-              return py::cast(file_io_object.read_global_attribute(g_att_name)
-                                  .get_typed_value_i());
-            }
-            case muGrid::MU_NC_UINT: {
-              return py::cast(file_io_object.read_global_attribute(g_att_name)
-                                  .get_typed_value_ui());
-            }
-            case muGrid::MU_NC_INDEX_T: {
-              return py::cast(file_io_object.read_global_attribute(g_att_name)
-                                  .get_typed_value_l());
-            }
-            case muGrid::MU_NC_REAL: {
-              return py::cast(file_io_object.read_global_attribute(g_att_name)
-                                  .get_typed_value_d());
-            }
-            default:
-              throw muGrid::FileIOError(
-                  "Unknown data type of global attribute '" + g_att_name +
-                  "'value in the FileIONetCDF python binding "
-                  "'read_global_attribute()'.");
-            }
+            return attribute_to_py(
+                file_io_object.read_global_attribute(g_att_name), g_att_name);
           },
           "att_name"_a)
       .def("read_global_attributes",
@@ -260,48 +263,9 @@ void add_file_io_netcdf(py::module & mod) {
              auto d = py::dict();
              for (auto & g_att_name :
                   file_io_object.read_global_attribute_names()) {
-               // switch to the correct function of the family
-               // ".get_typed_value_*()"
-               switch (file_io_object.read_global_attribute(g_att_name)
-                           .get_data_type()) {
-               case muGrid::MU_NC_CHAR: {
-                 const std::vector<char> & char_vec{
-                     file_io_object.read_global_attribute(g_att_name)
-                         .get_typed_value_c()};
-                 d[py::str(g_att_name)] =
-                     std::string(char_vec.begin(), char_vec.end());
-                 break;
-               }
-               case muGrid::MU_NC_INT: {
-                 d[py::str(g_att_name)] =
-                     file_io_object.read_global_attribute(g_att_name)
-                         .get_typed_value_i();
-                 break;
-               }
-               case muGrid::MU_NC_UINT: {
-                 d[py::str(g_att_name)] =
-                     file_io_object.read_global_attribute(g_att_name)
-                         .get_typed_value_ui();
-                 break;
-               }
-               case muGrid::MU_NC_INDEX_T: {
-                 d[py::str(g_att_name)] =
-                     file_io_object.read_global_attribute(g_att_name)
-                         .get_typed_value_l();
-                 break;
-               }
-               case muGrid::MU_NC_REAL: {
-                 d[py::str(g_att_name)] =
-                     file_io_object.read_global_attribute(g_att_name)
-                         .get_typed_value_d();
-                 break;
-               }
-               default:
-                 throw muGrid::FileIOError(
-                     "Unknown data type of global attribute '" + g_att_name +
-                     "'value in the FileIONetCDF python binding "
-                     "'read_global_attributes()'.");
-               }
+               d[py::str(g_att_name)] = attribute_to_py(
+                   file_io_object.read_global_attribute(g_att_name),
+                   g_att_name);
              }
              return d;
            })
