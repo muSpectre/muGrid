@@ -20,6 +20,7 @@ if(Boost_FOUND)
         header_test_ref_array.cc
         header_test_t4_map.cc
         header_test_tensor_algebra.cc
+        test_allocation_profiler.cc
         test_ccoord_operations.cc
         test_convolution_operator.cc
         test_exception.cc

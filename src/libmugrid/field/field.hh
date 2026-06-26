@@ -367,6 +367,14 @@ namespace muGrid {
          */
         virtual std::string get_device_string() const = 0;
 
+        /**
+         * True if this field lives on a device whose memory is physically
+         * unified with the host (integrated GPU / APU), so its buffer is
+         * directly host-addressable without a staging copy. Always false for
+         * host fields. See memory/unified_memory.hh.
+         */
+        bool is_unified() const;
+
        protected:
         //! gives field collections the ability to resize() fields
         friend FieldCollection;

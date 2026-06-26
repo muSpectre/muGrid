@@ -111,6 +111,15 @@ class Device {
     //! Get device string for Python interoperability ("cpu", "cuda:0", "rocm:0")
     std::string get_device_string() const;
 
+    /**
+     * True if this is a device whose memory is physically unified with the
+     * host (integrated GPU / APU such as MI300A), so device allocations are
+     * directly host-addressable with no copy. Always false for host devices.
+     * See memory/unified_memory.hh; the result is cached and can be overridden
+     * with the ``MUGRID_UNIFIED_MEMORY`` environment variable.
+     */
+    bool is_unified() const;
+
     //! Get device type name ("CPU", "CUDA", "ROCm", etc.)
     const char * get_type_name() const;
 

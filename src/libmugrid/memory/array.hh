@@ -44,6 +44,7 @@
 
 #include "device_alloc.hh"
 #include "memory_space.hh"
+#include "allocation_profiler.hh"
 
 #if defined(MUGRID_ENABLE_CUDA)
 #include <cuda_runtime.h>
@@ -185,26 +186,31 @@ namespace muGrid {
         /**
          * Constructor with label (for debugging) - creates empty array
          */
-        explicit Array(const std::string & /* label */)
-            : data_(nullptr), size_(0) {}
+        explicit Array(const std::string & label)
+            : data_(nullptr), size_(0), label_(label) {}
 
         /**
          * Constructor that allocates n elements
          */
         explicit Array(std::size_t n)
-            : data_(allocator_type::allocate(n)), size_(n) {}
+            : data_(allocator_type::allocate(n)), size_(n) {
+            this->prof_record_alloc(data_, size_);
+        }
 
         /**
          * Constructor with label and size
          */
-        Array(const std::string & /* label */, std::size_t n)
-            : data_(allocator_type::allocate(n)), size_(n) {}
+        Array(const std::string & label, std::size_t n)
+            : data_(allocator_type::allocate(n)), size_(n), label_(label) {
+            this->prof_record_alloc(data_, size_);
+        }
 
         /**
          * Destructor - frees memory
          */
         ~Array() {
             if (data_) {
+                this->prof_record_free(data_);
                 allocator_type::deallocate(data_);
             }
         }
@@ -213,9 +219,13 @@ namespace muGrid {
         Array(const Array &) = delete;
         Array & operator=(const Array &) = delete;
 
-        // Movable
+        // Movable. A move transfers ownership of the same buffer pointer, so
+        // it is transparent to the allocation profiler (which tracks live
+        // buffers by pointer); only the label/space metadata travels along.
         Array(Array && other) noexcept
-            : data_(other.data_), size_(other.size_) {
+            : data_(other.data_), size_(other.size_),
+              label_(std::move(other.label_)),
+              space_(std::move(other.space_)) {
             other.data_ = nullptr;
             other.size_ = 0;
         }
@@ -223,10 +233,13 @@ namespace muGrid {
         Array & operator=(Array && other) noexcept {
             if (this != &other) {
                 if (data_) {
+                    this->prof_record_free(data_);
                     allocator_type::deallocate(data_);
                 }
                 data_ = other.data_;
                 size_ = other.size_;
+                label_ = std::move(other.label_);
+                space_ = std::move(other.space_);
                 other.data_ = nullptr;
                 other.size_ = 0;
             }
@@ -258,10 +271,23 @@ namespace muGrid {
                 return;
 
             if (data_) {
+                this->prof_record_free(data_);
                 allocator_type::deallocate(data_);
             }
             data_ = allocator_type::allocate(new_size);
             size_ = new_size;
+            this->prof_record_alloc(data_, size_);
+        }
+
+        /**
+         * Set the buffer's profiling label and requesting memory space (e.g.
+         * "cuda:0"). Called by the owning Field before (re)allocation so the
+         * allocation profiler can attribute the buffer to a named field. A
+         * no-op unless built with MUGRID_PROFILE_ALLOCATIONS.
+         */
+        void set_label(const std::string & label, const std::string & space) {
+            label_ = label;
+            space_ = space;
         }
 
         /**
@@ -288,8 +314,25 @@ namespace muGrid {
         }
 
        private:
+        //! Report an allocation of @p n elements at @p p to the profiler.
+        //! Cheap when profiling is disabled (one relaxed atomic load).
+        void prof_record_alloc(T * p, std::size_t n) {
+            if (p != nullptr && n > 0) {
+                AllocationProfiler::instance().record_alloc(
+                    p, label_, space_, n * sizeof(T));
+            }
+        }
+        //! Report the deallocation of @p p to the profiler.
+        static void prof_record_free(T * p) {
+            if (p != nullptr) {
+                AllocationProfiler::instance().record_free(p);
+            }
+        }
+
         T * data_;
         std::size_t size_;
+        std::string label_{"<unnamed>"};
+        std::string space_{device_name<MemorySpace>()};
     };
 
     /**

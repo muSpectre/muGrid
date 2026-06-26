@@ -36,9 +36,13 @@
 #include <cstdint>
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
+#include "memory/allocation_profiler.hh"
 #include "memory/device.hh"
 #include "memory/device_alloc.hh"
+#include "memory/memory_info.hh"
+#include "memory/unified_memory.hh"
 
 using muGrid::Device;
 using muGrid::DeviceType;
@@ -130,6 +134,80 @@ void add_device_classes(py::module & mod) {
         still freed through it; only new allocations use the default.
         )pbdoc");
 
+    mod.def("device_has_unified_memory", &muGrid::device_has_unified_memory,
+            "device_id"_a = -1,
+            R"pbdoc(
+        True if device memory on ``device_id`` is physically unified with the
+        host (integrated GPU / APU such as MI300A), so device pointers are
+        directly host-addressable with no copy. ``device_id=-1`` queries the
+        currently selected device. Detects physically unified memory only,
+        NOT NVIDIA managed/UVM memory. Override with the
+        ``MUGRID_UNIFIED_MEMORY`` environment variable.
+        )pbdoc");
+
+    // --- Field allocation profiling --------------------------------------
+    using muGrid::AllocationProfiler;
+    mod.def("enable_allocation_profiling",
+            []() { AllocationProfiler::instance().enable(); },
+            "Start recording Field buffer allocations (requires building with "
+            "-DMUGRID_PROFILE_ALLOCATIONS=ON to record any data).");
+    mod.def("disable_allocation_profiling",
+            []() { AllocationProfiler::instance().disable(); },
+            "Stop recording Field buffer allocations.");
+    mod.def("reset_allocation_profiling",
+            []() { AllocationProfiler::instance().reset(); },
+            "Discard accumulated statistics and restart the measurement "
+            "window.");
+    mod.def("allocation_profiling_enabled",
+            []() { return AllocationProfiler::instance().is_enabled(); },
+            "True if Field allocation recording is currently active.");
+    mod.def("format_allocation_profile",
+            []() { return AllocationProfiler::instance().format_report(); },
+            "Return a human-readable multi-line summary of the recorded "
+            "Field memory usage per memory pool.");
+    mod.def(
+        "allocation_profile",
+        []() {
+            const auto rep{AllocationProfiler::instance().report()};
+            py::dict out{};
+            out["elapsed_seconds"] = rep.elapsed_seconds;
+            py::dict pools{};
+            for (const auto & pool : rep.pools) {
+                py::dict p{};
+                p["unified"] = pool.unified;
+                p["current_bytes"] = pool.current;
+                p["peak_bytes"] = pool.peak;
+                p["average_bytes"] = pool.average;
+                if (pool.capacity.valid) {
+                    p["total_bytes"] = pool.capacity.total;
+                    p["available_bytes"] = pool.capacity.available;
+                }
+                py::list buffers{};
+                for (const auto & buf : pool.buffers) {
+                    py::dict b{};
+                    b["label"] = buf.label;
+                    b["space"] = buf.space;
+                    b["current_bytes"] = buf.current_bytes;
+                    b["peak_bytes"] = buf.peak_bytes;
+                    buffers.append(std::move(b));
+                }
+                p["buffers"] = std::move(buffers);
+                pools[pool.name.c_str()] = std::move(p);
+            }
+            out["pools"] = std::move(pools);
+            return out;
+        },
+        R"pbdoc(
+        Return the recorded Field memory usage as a nested dict.
+
+        The top level has ``elapsed_seconds`` and ``pools`` (keyed by pool
+        name, e.g. ``"host"``, ``"cuda:0"`` or ``"unified"``). Each pool gives
+        ``peak_bytes``, ``average_bytes`` (time-weighted), ``current_bytes``,
+        the physical ``total_bytes``/``available_bytes`` of the pool when
+        known, and a ``buffers`` list of per-field ``{label, space,
+        current_bytes, peak_bytes}`` records.
+        )pbdoc");
+
     // Device type enumeration
     py::enum_<DeviceType>(mod, "DeviceType",
         R"pbdoc(
@@ -218,6 +296,10 @@ void add_device_classes(py::module & mod) {
              "Device string (e.g., 'cpu', 'cuda:0')")
         .def_property_readonly("type_name", &Device::get_type_name,
              "Device type name (e.g., 'CPU', 'CUDA')")
+        .def_property_readonly("is_unified", &Device::is_unified,
+             "True if this device's memory is physically unified with the "
+             "host (integrated GPU / APU), so its buffers are directly "
+             "host-addressable without a staging copy")
         // Special methods
         .def("__repr__", [](const Device & d) {
             return "<Device: " + d.get_device_string() + ">";

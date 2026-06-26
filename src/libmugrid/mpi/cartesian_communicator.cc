@@ -15,6 +15,7 @@
 
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
+#include "memory/unified_memory.hh"
 #include "mpi/gpu_aware_mpi.hh"
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 #include "mpi/ghost_accumulate_gpu.hh"
@@ -371,8 +372,10 @@ namespace muGrid {
         GPU_DEVICE_SYNCHRONIZE();
 #endif
         // Without GPU-aware MPI, bounce the contiguous staging buffers
-        // through host memory (correct with any MPI library).
-        const bool bounce{!mpi_is_gpu_aware()};
+        // through host memory (correct with any MPI library). On a physically
+        // unified-memory device the staging buffer is already host-addressable,
+        // so any MPI can read it directly and no bounce is needed.
+        const bool bounce{!mpi_is_gpu_aware() && !device_has_unified_memory()};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {

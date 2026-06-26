@@ -37,6 +37,7 @@
 #include "collection/field_collection.hh"
 #include "util/math.hh"
 #include "collection/field_collection_global.hh"
+#include "memory/unified_memory.hh"
 
 namespace muGrid {
 
@@ -59,6 +60,12 @@ namespace muGrid {
         components_shape{components_shape},
         nb_sub_pts{collection.get_nb_sub_pts(sub_division_tag)},
         sub_division_tag{sub_division_tag}, unit{unit} {}
+
+  /* ---------------------------------------------------------------------- */
+  bool Field::is_unified() const {
+    return this->is_on_device() &&
+           device_has_unified_memory(this->get_device_id());
+  }
 
   /* ---------------------------------------------------------------------- */
   const std::string & Field::get_name() const { return this->name; }

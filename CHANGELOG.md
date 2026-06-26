@@ -4,6 +4,23 @@ Change log for µGrid
 Unreleased
 ----------
 
+- ENH: Runtime detection of physically unified host/device memory via
+  `device_has_unified_memory()` / `Device::is_unified()` / `Field::is_unified()`
+  (integrated GPUs and APUs such as MI300A; `cudaDevAttrIntegrated` /
+  `hipDeviceAttributeIntegrated`, overridable with the `MUGRID_UNIFIED_MEMORY`
+  environment variable). Deliberately excludes NVIDIA managed/UVM and
+  coherent-but-separate memory (Grace Hopper). On a unified device the
+  non-GPU-aware MPI host-staging bounce in ghost exchange and FFT pencil
+  transpose is now skipped, since the device buffer is directly host-addressable
+- ENH: Field allocation profiling, always compiled in and off by default
+  (recording is gated by an atomic flag, so when disabled the per-allocation
+  cost is a single relaxed atomic load). Enable from code or by setting
+  `MUGRID_PROFILE_ALLOCATIONS=1`. Reports, on demand, the time-weighted average
+  and peak memory footprint per memory pool together with the names of the
+  allocated buffers and the physical capacity of each pool. Host and device are
+  reported separately, or jointly on a unified memory architecture. Exposed in
+  Python as `enable_allocation_profiling()`, `allocation_profile()` and
+  `format_allocation_profile()`
 - ENH: Complex GPU linalg is now implemented. The `Complex` device
   specialisations of `vecdot`, `norm_sq`, `axpy`, `scal`, `axpby`, `copy` and
   `axpy_norm_sq` (previously throwing stubs) now run on CUDA/HIP, processing the

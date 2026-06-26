@@ -35,7 +35,16 @@
 
 #include "device.hh"
 
+#include "memory/unified_memory.hh"
+
 namespace muGrid {
+
+bool Device::is_unified() const {
+    if (!this->is_device()) {
+        return false;
+    }
+    return device_has_unified_memory(this->device_id);
+}
 
 std::string Device::get_device_string() const {
     switch (this->device_type) {
