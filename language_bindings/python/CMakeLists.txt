@@ -88,6 +88,7 @@ install(FILES
     muGrid/DeviceMemory.py
     muGrid/Field.py
     muGrid/linalg.py
+    muGrid/MemoryProfiler.py
     muGrid/Parallel.py
     muGrid/Preconditioners.py
     muGrid/Solvers.py
