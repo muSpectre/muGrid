@@ -39,6 +39,7 @@
 #include "fft/fft_utils.hh"
 #include "field/field.hh"
 #include "collection/field_collection.hh"
+#include "memory/gpu_runtime.hh"
 #include "util/python_helpers.hh"
 
 #include <pybind11/pybind11.h>
@@ -722,7 +723,7 @@ void add_fft_engine_cuda(py::module & mod) {
                        const SubPtMap_t & nb_sub_pts,
                        int device_id, const std::string & decomposition) {
              // Set the CUDA device before creating the engine
-             cudaSetDevice(device_id);
+             muGrid::gpu_set_device(device_id);
              // Create device object with the specified device_id
              Device device = Device::cuda(device_id);
              return new PyFFTEngineCUDA(nb_domain_grid_pts, comm,
@@ -930,7 +931,7 @@ void add_fft_engine_hip(py::module & mod) {
                        const SubPtMap_t & nb_sub_pts,
                        int device_id, const std::string & decomposition) {
              // Set the ROCm device before creating the engine
-             hipSetDevice(device_id);
+             muGrid::gpu_set_device(device_id);
              // Create device object with the specified device_id
              Device device = Device::rocm(device_id);
              return new PyFFTEngineROCm(nb_domain_grid_pts, comm,

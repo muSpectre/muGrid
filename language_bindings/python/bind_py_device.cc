@@ -132,6 +132,35 @@ void add_device_classes(py::module & mod) {
         Allocations made through a previously registered allocator are
         still freed through it; only new allocations use the default.
         )pbdoc");
+    mod.def(
+        "device_allocator_is_external",
+        []() { return static_cast<bool>(py_device_allocate()); },
+        "True if an external device allocator is currently registered (via "
+        "set_device_allocator/use_cupy_allocator).");
+
+    // Expose the device allocator chokepoint itself, so an array library
+    // (e.g. cupy) can be routed *through* muGrid -- the inverse of
+    // use_cupy_allocator -- making muGrid the single owner of device memory
+    // and recording the array library's allocations in the profiler.
+    mod.def(
+        "device_allocate",
+        [](std::size_t nbytes, const std::string & label) -> std::uintptr_t {
+            return reinterpret_cast<std::uintptr_t>(
+                muGrid::device_allocate(nbytes, label.c_str()));
+        },
+        "nbytes"_a, "label"_a = "<external>",
+        R"pbdoc(
+        Allocate ``nbytes`` of device memory through muGrid's allocator and
+        return the pointer as an integer. The allocation is recorded in the
+        allocation profiler under ``label``. Intended for wiring an external
+        array library's allocator to muGrid; ordinary code uses Fields.
+        )pbdoc");
+    mod.def(
+        "device_deallocate",
+        [](std::uintptr_t ptr) {
+            muGrid::device_deallocate(reinterpret_cast<void *>(ptr));
+        },
+        "ptr"_a, "Free a pointer previously returned by device_allocate().");
 
     // --- Field allocation profiling --------------------------------------
     using muGrid::AllocationProfiler;

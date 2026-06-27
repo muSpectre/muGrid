@@ -69,8 +69,16 @@ namespace muGrid {
      * Allocate `bytes` bytes of device memory through the registered
      * allocator (or raw cudaMalloc/hipMalloc by default). Throws
      * RuntimeError on failure or when no GPU backend is compiled in.
+     *
+     * When @p label is non-null the allocation is reported to the
+     * AllocationProfiler under that label, so library scratch buffers and
+     * externally-routed allocations (e.g. cupy) become visible at this single
+     * chokepoint. Field buffers pass null: they are recorded (with their field
+     * name) by the owning Field's Array instead, so recording each buffer
+     * exactly once. Pass a descriptive label for scratch (e.g.
+     * "fft-nd-scratch").
      */
-    void * device_allocate(std::size_t bytes);
+    void * device_allocate(std::size_t bytes, const char * label = nullptr);
 
     //! Free memory obtained from device_allocate().
     void device_deallocate(void * ptr);

@@ -54,6 +54,7 @@
 #include "core/exception.hh"
 
 #include "memory/gpu_runtime.hh"
+#include "memory/device_alloc.hh"
 
 #include <type_traits>
 
@@ -615,9 +616,12 @@ Real* reduction_scratch(int slot, Index_t n_reals) {
     static Index_t cap[2]{0, 0};
     if (n_reals > cap[slot]) {
         if (ptr[slot]) {
-            GPU_FREE(ptr[slot]);
+            device_deallocate(ptr[slot]);
         }
-        GPU_MALLOC(&ptr[slot], n_reals * sizeof(Real));
+        // Route through the device allocator chokepoint so this scratch shares
+        // the single owner/pool and is visible to the allocation profiler.
+        ptr[slot] = static_cast<Real*>(
+            device_allocate(n_reals * sizeof(Real), "linalg-reduction-scratch"));
         cap[slot] = n_reals;
     }
     return ptr[slot];
