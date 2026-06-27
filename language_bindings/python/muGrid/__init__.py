@@ -64,11 +64,15 @@ device_arch = _muGrid.device_arch
 Device = _muGrid.Device
 DeviceType = _muGrid.DeviceType
 
+# Memory profiler: the `muGrid.memory_profiler` namespace (enable/disable/reset/
+# report/summary) plus the `muGrid.memory_profile` context manager.
+from . import MemoryProfiler as memory_profiler  # noqa: F401, E402
 from .DeviceMemory import (  # noqa: F401, E402
     clear_device_allocator,
     set_device_allocator,
     use_cupy_allocator,
 )
+from .MemoryProfiler import memory_profile  # noqa: F401, E402
 
 # Cache for runtime GPU availability check
 _gpu_available_cache = None

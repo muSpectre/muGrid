@@ -260,6 +260,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--profile-memory",
+    action="store_true",
+    help="Print a GPU memory breakdown at the end: muGrid Fields (per buffer) "
+    "plus the cupy pool and physical device usage (default: off)",
+)
+
+parser.add_argument(
     "-k",
     "--kernel",
     choices=["fused", "generic"],
@@ -303,6 +310,17 @@ else:
     gpu_id = comm.rank % nb_gpus
     arr.cuda.Device(gpu_id).use()
     device = muGrid.Device.gpu(gpu_id)
+
+    # Route muGrid's device fields through cupy's memory pool so the library
+    # fields and the cupy work arrays draw from a single arena. Otherwise
+    # muGrid (raw cudaMalloc) and cupy (its caching pool) hold two disjoint
+    # reservations on the same GPU and starve each other near capacity.
+    muGrid.use_cupy_allocator()
+
+# Start recording muGrid Field allocations before anything is allocated.
+if args.profile_memory:
+    muGrid.memory_profiler.reset()
+    muGrid.memory_profiler.enable()
 
 # Parse grid dimensions
 dim = len(args.nb_grid_pts)
@@ -428,20 +446,28 @@ u_field = fc.real_field("u_field", (dim,))
 f_field = fc.real_field("f_field", (dim,))
 rhs_field = fc.real_field("rhs_field", (dim,))
 
-# Material stiffness at each quadrature point [voigt, voigt, quad, *local_grid_shape]
-# Create on host first, then convert to device array if needed
-# phase is already local (from decomposition.coords), so no slicing needed
-C_field_shape = (nb_voigt, nb_voigt, nb_quad) + local_grid_shape
-C_field_np = np.zeros(C_field_shape)
-for q in range(nb_quad):
-    for i in range(nb_voigt):
-        for j in range(nb_voigt):
-            C_field_np[i, j, q] = (
-                C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
-            )
-
-# Convert to device array if using GPU
-C_field = arr.asarray(C_field_np)
+# Material stiffness at each quadrature point [voigt, voigt, quad, *grid].
+# The full C tensor (nb_voigt² × nb_quad per pixel) is only needed for the
+# generic matvec kernel and for assembling the reference-material
+# preconditioner. The fused isotropic kernel works from the per-pixel Lamé
+# fields (lambda, mu) alone -- so skip this (largest) array, on both host and
+# device, in that case. compute_stress() derives the stress directly from the
+# Lamé fields when C is absent.
+need_C_tensor = (args.kernel == "generic") or (args.preconditioner == "reference")
+if need_C_tensor:
+    C_field_shape = (nb_voigt, nb_voigt, nb_quad) + local_grid_shape
+    C_field_np = np.zeros(C_field_shape)
+    for q in range(nb_quad):
+        for i in range(nb_voigt):
+            for j in range(nb_voigt):
+                C_field_np[i, j, q] = (
+                    C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
+                )
+    # Convert to device array if using GPU
+    C_field = arr.asarray(C_field_np)
+else:
+    C_field_np = None
+    C_field = None
 
 # For fused kernel: create Lamé parameter fields
 if args.kernel == "fused":
@@ -518,9 +544,17 @@ def compute_strain(u_vec, strain_out):
         # Compute gradient tensor: grad_u.s[i, j, ...] = ∂u_i/∂x_j
         gradient_op.apply(u_vec, grad_u)
 
-    # Compute symmetric strain: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i)
-    grad = grad_u.s
-    strain_out[...] = 0.5 * (grad + grad.swapaxes(0, 1))
+    # Symmetrise in place: ε_ij = 0.5 * (∂u_i/∂x_j + ∂u_j/∂x_i). strain_out is
+    # grad_u.s (the gradient just written above), so we cannot use a self-
+    # aliased `out=` over the transpose; instead average only the off-diagonal
+    # pairs (the diagonal ε_ii = ∂u_i/∂x_i is already symmetric). Each `t` is a
+    # tiny (quad, *grid) temporary, not a full tensor.
+    g = strain_out
+    for i in range(dim):
+        for j in range(i + 1, dim):
+            t = 0.5 * (g[i, j] + g[j, i])
+            g[i, j] = t
+            g[j, i] = t
 
 
 def strain_to_voigt(strain):
@@ -597,10 +631,25 @@ def compute_stress(strain, stress, C):
         Material stiffness in Voigt notation (nb_voigt, nb_voigt, quad, *grid_shape)
     """
     with timer("compute_stress"):
-        # Convert strain to Voigt notation
-        eps_voigt = strain_to_voigt(strain)
+        if C is None:
+            # Isotropic stress straight from the per-pixel Lamé fields (fused
+            # kernel): sigma = lam * tr(eps) * I + 2 mu * eps. This equals
+            # C : eps for an isotropic C, but needs no full C tensor and no
+            # Voigt round-trip (so no per-call eps_voigt/sig_voigt temporaries).
+            # lambda/mu are per pixel; they broadcast over the quad axis.
+            lam = lambda_field.p
+            mu = mu_field.p
+            tr = strain[0, 0]
+            for d in range(1, dim):
+                tr = tr + strain[d, d]
+            arr.multiply(strain, 2.0 * mu, out=stress)  # stress = 2 mu eps
+            diag = lam * tr
+            for d in range(dim):
+                stress[d, d] += diag  # add lam tr(eps) on the diagonal
+            return
 
-        # Compute stress in Voigt: sig = C @ eps
+        # Generic path: full Voigt einsum with the material stiffness tensor.
+        eps_voigt = strain_to_voigt(strain)
         if device.is_host:
             sig_voigt = np.einsum("ijq...,jq...->iq...", C, eps_voigt)
         else:
@@ -611,16 +660,19 @@ def compute_stress(strain, stress, C):
         voigt_to_stress(sig_voigt, stress)
 
 
-def compute_divergence(stress, f_vec):
+def compute_divergence(f_vec):
     """
-    Compute divergence of stress tensor.
+    Compute divergence of the stress tensor held in the module-level
+    ``stress_field``.
 
     The transpose of the gradient operator directly handles tensor input:
     - Input: stress tensor with (dim, dim) components
     - Output: force vector with (dim,) components
     - f_i = Σ_j ∂σ_ij/∂x_j (divergence of stress)
 
-    With two-sided ghosts:
+    The caller must have written the stress into ``stress_field`` first (the
+    ``stress_arr`` scratch *is* ``stress_field.s``, so compute_stress /
+    reference_stress already do this). With two-sided ghosts:
     1. We fill ghost pixel stresses via communicate_ghosts (periodic copies)
     2. The transpose reads stress from ALL pixels (interior + ghost)
     3. Ghost elements contribute directly to interior nodes
@@ -628,13 +680,10 @@ def compute_divergence(stress, f_vec):
 
     Parameters
     ----------
-    stress : ndarray
-        Stress tensor with shape (dim, dim, quad, *grid_shape)
     f_vec : Field
         Output vector force field with shape (dim, nb_nodes, *grid_shape)
     """
-    # Copy stress to field and fill ghost values
-    stress_field.s[...] = stress
+    # Stress already lives in stress_field (no copy); just fill ghost values.
     with timer("communicate_ghosts"):
         decomposition.communicate_ghosts(stress_field)
 
@@ -645,10 +694,14 @@ def compute_divergence(stress, f_vec):
         gradient_op.transpose(stress_field, f_vec, list(quad_weights))
 
 
-# Temporary arrays for strain and stress [dim, dim, quad, *local_grid_shape]
-strain_shape = (dim, dim, nb_quad) + local_grid_shape
-strain_arr = arr.zeros(strain_shape)
-stress_arr = arr.zeros(strain_shape)
+# Strain and stress scratch [dim, dim, quad, *local_grid_shape]. Rather than
+# allocating two more device arrays, alias them onto the Fields that already
+# hold this data: the strain is symmetrised in place inside the gradient output
+# `grad_u`, and the stress is written straight into `stress_field`, which the
+# divergence transpose consumes. This removes the strain/stress double-storage
+# (2 * dim^2 * nb_quad doubles per point: ~16/pt in 2D, ~90/pt in 3D).
+strain_arr = grad_u.s
+stress_arr = stress_field.s
 
 
 def apply_stiffness_generic(u_in, f_out):
@@ -673,7 +726,7 @@ def apply_stiffness_generic(u_in, f_out):
 
         with timer("divergence"):
             # Compute force f = B^T * sig
-            compute_divergence(stress_arr, f_out)
+            compute_divergence(f_out)
 
 
 def apply_stiffness_fused(u_in, f_out):
@@ -718,18 +771,20 @@ def compute_rhs(E_macro, rhs_out):
     rhs_out : Field
         Output field for RHS (modified in place)
     """
-    # Create uniform strain field from macroscopic strain
-    eps_macro = arr.zeros(strain_shape)
+    # Build the uniform macroscopic strain field in the strain scratch buffer
+    # (reused -- it is overwritten by the solve afterwards), and the resulting
+    # stress in the stress scratch buffer, instead of allocating two more
+    # (dim, dim, quad, *grid) arrays here.
+    strain_arr[...] = 0.0
     for i in range(dim):
         for j in range(dim):
-            eps_macro[i, j, ...] = E_macro[i, j]
+            strain_arr[i, j, ...] = E_macro[i, j]
 
     # Compute stress from macroscopic strain
-    sig_macro = arr.zeros_like(eps_macro)
-    compute_stress(eps_macro, sig_macro, C_field)
+    compute_stress(strain_arr, stress_arr, C_field)
 
     # Compute divergence (with negative sign for RHS)
-    compute_divergence(sig_macro, rhs_out)
+    compute_divergence(rhs_out)
     rhs_out.s[...] *= -1.0
 
 
@@ -766,7 +821,7 @@ if args.preconditioner == "reference":
     def apply_reference_stiffness(u_in, f_out):
         compute_strain(u_in, strain_arr)
         reference_stress(strain_arr, stress_arr)
-        compute_divergence(stress_arr, f_out)
+        compute_divergence(f_out)
 
     with timer("preconditioner_setup"):
         # The generic assembly (impulse response -> per-mode symbol -> block
@@ -1080,6 +1135,25 @@ else:
 
     # Print hierarchical timing breakdown (includes PAPI data when enabled)
     timer.print_summary()
+
+# Memory breakdown: muGrid Fields (per buffer) and, since use_cupy_allocator()
+# routes fields through cupy's pool, the cupy pool live/reserved bytes (which
+# include the fields) and the physical device usage. cupy-array bytes are thus
+# (cupy pool live − muGrid Fields peak).
+if args.profile_memory:
+    rep = muGrid.memory_profiler.report(include_cupy_pool=True)
+    parprint("\n" + "=" * 60, comm=comm)
+    parprint("Memory profile", comm=comm)
+    parprint("=" * 60, comm=comm)
+    parprint(muGrid.memory_profiler.summary(), comm=comm)
+    for name, s in rep.get("cupy_pool", {}).items():
+        used = (s["device_total_bytes"] - s["device_free_bytes"]) / 1e6
+        parprint(
+            f"cupy pool [{name}]: live {s['used_bytes'] / 1e6:.1f} MB, "
+            f"reserved {s['reserved_bytes'] / 1e6:.1f} MB  |  device used "
+            f"{used:.1f} MB of {s['device_total_bytes'] / 1e6:.0f} MB",
+            comm=comm,
+        )
 
 # Optional plotting (2D only)
 if args.plot:
