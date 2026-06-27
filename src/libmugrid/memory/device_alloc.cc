@@ -40,10 +40,24 @@
 
 #include "core/exception.hh"
 #include "memory/gpu_runtime.hh"
+#include "memory/allocation_profiler.hh"
 
 namespace muGrid {
 
     namespace {
+        //! Canonical device-pool key for the active device, matching the space
+        //! string a device Field uses (see Field::get_device_string), so
+        //! chokepoint-recorded allocations land in the same profiler pool.
+        std::string current_device_space() {
+#if defined(MUGRID_ENABLE_CUDA)
+            return "cuda:" + std::to_string(gpu_get_device());
+#elif defined(MUGRID_ENABLE_HIP)
+            return "rocm:" + std::to_string(gpu_get_device());
+#else
+            return "device";
+#endif
+        }
+
         struct DeviceAllocatorState {
             DeviceAllocateFn allocate{nullptr};
             DeviceDeallocateFn deallocate{nullptr};
@@ -73,39 +87,53 @@ namespace muGrid {
         state.deallocate = deallocate;
     }
 
-    void * device_allocate(std::size_t bytes) {
+    void * device_allocate(std::size_t bytes, const char * label) {
         if (bytes == 0) {
             return nullptr;
         }
+        void * ptr{nullptr};
         auto & state{allocator_state()};
         {
             std::lock_guard<std::mutex> lock{state.mutex};
             if (state.allocate != nullptr) {
-                void * ptr{state.allocate(bytes)};
+                ptr = state.allocate(bytes);
                 if (ptr == nullptr) {
                     throw RuntimeError(
                         "External device allocator failed to allocate " +
                         std::to_string(bytes) + " bytes");
                 }
                 state.external_ptrs.insert(ptr);
-                return ptr;
             }
         }
+        if (ptr == nullptr) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        return gpu_malloc_checked(bytes);
+            ptr = gpu_malloc_checked(bytes);
 #else
-        // GCOVR_EXCL_START -- unreachable: device fields cannot be created
-        // in a build without a GPU backend
-        throw RuntimeError(
-            "device_allocate: muGrid was compiled without GPU support");
-        // GCOVR_EXCL_STOP
+            // GCOVR_EXCL_START -- unreachable: device fields cannot be created
+            // in a build without a GPU backend
+            throw RuntimeError(
+                "device_allocate: muGrid was compiled without GPU support");
+            // GCOVR_EXCL_STOP
 #endif
+        }
+        // Record labelled allocations (library scratch, externally-routed
+        // memory like cupy) at this single chokepoint so the profiler sees
+        // them too. Field buffers pass a null label and are recorded once, by
+        // their owning Array, under the field name. The profiler lock is taken
+        // here outside the allocator-state lock to avoid nesting; recording is
+        // a cheap no-op when disabled.
+        if (label != nullptr) {
+            AllocationProfiler::instance().record_alloc(
+                ptr, label, current_device_space(), bytes);
+        }
+        return ptr;
     }
 
     void device_deallocate(void * ptr) {
         if (ptr == nullptr) {
             return;
         }
+        AllocationProfiler::instance().record_free(ptr);
         auto & state{allocator_state()};
         {
             std::lock_guard<std::mutex> lock{state.mutex};

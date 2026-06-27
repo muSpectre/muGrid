@@ -69,6 +69,8 @@ DeviceType = _muGrid.DeviceType
 from . import MemoryProfiler as memory_profiler  # noqa: F401, E402
 from .DeviceMemory import (  # noqa: F401, E402
     clear_device_allocator,
+    restore_default_cupy_allocator,
+    route_cupy_through_mugrid,
     set_device_allocator,
     use_cupy_allocator,
 )

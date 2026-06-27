@@ -311,11 +311,13 @@ else:
     arr.cuda.Device(gpu_id).use()
     device = muGrid.Device.gpu(gpu_id)
 
-    # Route muGrid's device fields through cupy's memory pool so the library
-    # fields and the cupy work arrays draw from a single arena. Otherwise
-    # muGrid (raw cudaMalloc) and cupy (its caching pool) hold two disjoint
-    # reservations on the same GPU and starve each other near capacity.
-    muGrid.use_cupy_allocator()
+    # Make muGrid the single owner of device memory: route cupy's allocations
+    # through muGrid (the inverse of use_cupy_allocator). Then the library
+    # fields, the cupy work arrays and any library scratch all draw from one
+    # allocator and appear together in the allocation profiler (cupy arrays
+    # show up under the "<cupy>" label), giving full, observable control over
+    # the device budget.
+    muGrid.route_cupy_through_mugrid()
 
 # Start recording muGrid Field allocations before anything is allocated.
 if args.profile_memory:
