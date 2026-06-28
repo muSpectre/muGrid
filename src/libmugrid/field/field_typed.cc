@@ -98,8 +98,11 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   template <typename T, typename MemorySpace>
   void TypedField<T, MemorySpace>::set_zero() {
-    // Use our deep_copy that handles scalar fill
-    muGrid::deep_copy(this->values, T{});
+    // Zero is represented by all-zero bytes for every supported field type
+    // (Real, Complex, Int, Uint), so route directly through the buffer's
+    // memset. On the GPU this is a single cudaMemset/hipMemset, avoiding the
+    // host-side staging buffer that the scalar deep_copy would allocate.
+    this->values.fill_zero();
   }
 
   /* ---------------------------------------------------------------------- */

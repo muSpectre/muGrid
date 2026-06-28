@@ -200,90 +200,23 @@ namespace muGrid {
         const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
         Real alpha, TypedFieldBase<Real> & force, bool increment) const {
 
-        // Get field collections and validate
-        auto & disp_coll = displacement.get_collection();
-        auto * disp_global_fc =
-            dynamic_cast<const GlobalFieldCollection *>(&disp_coll);
-        if (!disp_global_fc) {
-            throw RuntimeError(
-                "IsotropicStiffnessOperator3D requires GlobalFieldCollection");
-        }
+        // Validate field collections and ghosts; the dimension-generic checks
+        // live in internal::validate_stiffness_fields (isotropic_stiffness.hh).
+        const auto info = internal::validate_stiffness_fields<3>(
+            displacement.get_collection(), lambda.get_collection());
+        const auto * disp_global_fc = info.disp_fc;
+        const auto * mat_global_fc = info.mat_fc;
 
-        // Get dimensions from material field collection (defines number of
-        // elements)
-        auto & mat_coll = lambda.get_collection();
-        auto * mat_global_fc =
-            dynamic_cast<const GlobalFieldCollection *>(&mat_coll);
-        if (!mat_global_fc) {
-            throw RuntimeError("IsotropicStiffnessOperator3D material fields "
-                               "require GlobalFieldCollection");
-        }
+        // Computable region (node field == material field, guaranteed above).
+        const Index_t nnx = info.nb_computable[0];
+        const Index_t nny = info.nb_computable[1];
+        const Index_t nnz = info.nb_computable[2];
+        const Index_t nelx = nnx;
+        const Index_t nely = nny;
+        const Index_t nelz = nnz;
 
-        // Validate ghost configuration for displacement/force fields
-        // Node-based indexing: requires ghosts on both left and right
-        auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
-        auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
-        if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 ||
-            nb_ghosts_left[2] < 1) {
-            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                               "1 ghost cell on the left side of "
-                               "displacement/force fields");
-        }
-        if (nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1 ||
-            nb_ghosts_right[2] < 1) {
-            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                               "1 ghost cell on the right side of "
-                               "displacement/force fields");
-        }
-
-        // Stencil requirements: the kernel gathers from 8 neighboring elements
-        // at offsets [-1, 0] in each dimension, and each element accesses its
-        // 8 corner nodes at offsets [0, 1]. This requires:
-        // - 1 left ghost (for elements at -1 and their nodes)
-        // - 1 right ghost (for nodes at +1 in elements at offset 0)
+        // Stencil offset: one ghost cell on each side (see validation helper).
         constexpr Index_t STENCIL_LEFT = 1;
-        constexpr Index_t STENCIL_RIGHT = 1;
-
-        // Compute computable region: total with ghosts minus stencil requirements
-        auto nb_with_ghosts =
-            disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-        Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
-        Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
-        Index_t nnz = nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
-
-        // Material field dimensions (computable region)
-        // Node-based indexing: material field must have same size as node field
-        auto mat_nb_with_ghosts =
-            mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
-        Index_t nelx = mat_nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
-        Index_t nely = mat_nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
-        Index_t nelz = mat_nb_with_ghosts[2] - STENCIL_LEFT - STENCIL_RIGHT;
-
-        // Validate material field computable region matches node field
-        if (nelx != nnx || nely != nny || nelz != nnz) {
-            throw RuntimeError(
-                "IsotropicStiffnessOperator3D: material field computable region (" +
-                std::to_string(nelx) + ", " + std::to_string(nely) + ", " +
-                std::to_string(nelz) + ") must match node field computable region (" +
-                std::to_string(nnx) + ", " + std::to_string(nny) + ", " +
-                std::to_string(nnz) + ")");
-        }
-
-        // Validate material field ghost configuration matches node field
-        auto mat_nb_ghosts_left = mat_global_fc->get_nb_ghosts_left();
-        auto mat_nb_ghosts_right = mat_global_fc->get_nb_ghosts_right();
-        if (mat_nb_ghosts_left[0] < 1 || mat_nb_ghosts_left[1] < 1 ||
-            mat_nb_ghosts_left[2] < 1) {
-            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                               "1 ghost cell on the left side of material "
-                               "fields (lambda, mu)");
-        }
-        if (mat_nb_ghosts_right[0] < 1 || mat_nb_ghosts_right[1] < 1 ||
-            mat_nb_ghosts_right[2] < 1) {
-            throw RuntimeError("IsotropicStiffnessOperator3D requires at least "
-                               "1 ghost cell on the right side of material "
-                               "fields (lambda, mu)");
-        }
 
         // Node dimensions (for displacement/force fields with ghosts)
         auto nb_nodes = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();

@@ -56,8 +56,11 @@
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
 #include "operators/linear.hh"
+#include "collection/field_collection_global.hh"
 
 #include <array>
+#include <sstream>
+#include <string>
 #include <vector>
 
 namespace muGrid {
@@ -178,6 +181,115 @@ namespace muGrid {
 #endif
 
     }  // namespace isotropic_stiffness_kernels
+
+    namespace internal {
+
+        /**
+         * @brief Result of validate_stiffness_fields.
+         *
+         * Holds the two collections (already verified to be global) and the
+         * per-axis computable region (grid-with-ghosts minus the one-cell
+         * stencil on each side).
+         */
+        template <Dim_t Dim>
+        struct StiffnessFieldInfo {
+            const GlobalFieldCollection * disp_fc;
+            const GlobalFieldCollection * mat_fc;
+            std::array<Index_t, Dim> nb_computable;
+        };
+
+        /**
+         * @brief Shared validation for the isotropic stiffness operators.
+         *
+         * Used by the host and device, 2D and 3D apply implementations, which
+         * differ only in the stride bookkeeping that follows. Checks that both
+         * the displacement/force field and the material (λ, μ) field live on a
+         * GlobalFieldCollection with at least one ghost layer on every side,
+         * and that their computable regions agree. The dimension is handled by
+         * a loop over the @p Dim axes rather than hard-coded `[0], [1], [2]`
+         * index checks, so the rule lives in one place.
+         *
+         * @param disp_coll collection of the displacement/force field
+         * @param mat_coll  collection of the material (λ, μ) fields
+         * @throws RuntimeError if any check fails
+         */
+        template <Dim_t Dim>
+        StiffnessFieldInfo<Dim>
+        validate_stiffness_fields(const FieldCollection & disp_coll,
+                                  const FieldCollection & mat_coll) {
+            // The kernel gathers neighbouring elements at offset -1 and their
+            // nodes at offset +1, i.e. one ghost cell on each side per axis.
+            constexpr Index_t STENCIL = 1;
+            const std::string op{"IsotropicStiffnessOperator" +
+                                 std::to_string(Dim) + "D"};
+
+            auto * disp_fc =
+                dynamic_cast<const GlobalFieldCollection *>(&disp_coll);
+            if (!disp_fc) {
+                throw RuntimeError(op + " requires GlobalFieldCollection");
+            }
+            auto * mat_fc =
+                dynamic_cast<const GlobalFieldCollection *>(&mat_coll);
+            if (!mat_fc) {
+                throw RuntimeError(
+                    op + " material fields require GlobalFieldCollection");
+            }
+
+            // Both fields need at least one ghost on each side of every axis.
+            auto check_ghosts = [&op](const GlobalFieldCollection & fc,
+                                      const std::string & what) {
+                auto left = fc.get_nb_ghosts_left();
+                auto right = fc.get_nb_ghosts_right();
+                for (Dim_t i = 0; i < Dim; ++i) {
+                    if (left[i] < 1) {
+                        throw RuntimeError(op +
+                                           " requires at least 1 ghost cell on "
+                                           "the left side of " +
+                                           what);
+                    }
+                    if (right[i] < 1) {
+                        throw RuntimeError(op +
+                                           " requires at least 1 ghost cell on "
+                                           "the right side of " +
+                                           what);
+                    }
+                }
+            };
+            check_ghosts(*disp_fc, "displacement/force fields");
+
+            // Computable region = grid-with-ghosts minus the stencil per side.
+            auto disp_with_ghosts =
+                disp_fc->get_nb_subdomain_grid_pts_with_ghosts();
+            auto mat_with_ghosts =
+                mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+            StiffnessFieldInfo<Dim> info{disp_fc, mat_fc, {}};
+            std::array<Index_t, Dim> nb_mat{};
+            for (Dim_t i = 0; i < Dim; ++i) {
+                info.nb_computable[i] = disp_with_ghosts[i] - 2 * STENCIL;
+                nb_mat[i] = mat_with_ghosts[i] - 2 * STENCIL;
+            }
+
+            // Material and node computable regions must coincide.
+            if (nb_mat != info.nb_computable) {
+                std::stringstream err{};
+                err << op << ": material field computable region (";
+                for (Dim_t i = 0; i < Dim; ++i) {
+                    err << (i ? ", " : "") << nb_mat[i];
+                }
+                err << ") must match node field computable region (";
+                for (Dim_t i = 0; i < Dim; ++i) {
+                    err << (i ? ", " : "") << info.nb_computable[i];
+                }
+                err << ")";
+                throw RuntimeError(err.str());
+            }
+
+            check_ghosts(*mat_fc, "material fields (lambda, mu)");
+
+            return info;
+        }
+
+    }  // namespace internal
 
     /**
      * @class IsotropicStiffnessOperator
