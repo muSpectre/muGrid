@@ -157,6 +157,27 @@ namespace muGrid {
             Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
             bool increment);
 
+        // Uniform-coefficient host kernels: spatially constant Lamé scalars
+        // (λ, μ) instead of per-pixel fields, so they need neither material
+        // pointers nor material strides. K_e = 2μ G + λ V is the same constant
+        // element matrix for every voxel.
+        void isotropic_stiffness_2d_host_uniform(
+            const Real * MUGRID_RESTRICT displacement, Real lambda, Real mu,
+            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
+            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
+            bool increment);
+
+        void isotropic_stiffness_3d_host_uniform(
+            const Real * MUGRID_RESTRICT displacement, Real lambda, Real mu,
+            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny, Index_t nnz,
+            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_z,
+            Index_t disp_stride_d, Index_t force_stride_x,
+            Index_t force_stride_y, Index_t force_stride_z,
+            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
+            bool increment);
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         void isotropic_stiffness_2d_gpu(
             const Real * displacement, const Real * lambda, const Real * mu,
@@ -172,6 +193,23 @@ namespace muGrid {
             Index_t nely, Index_t nelz, Index_t disp_stride_x,
             Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
             Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_z, Index_t force_stride_d, const Real * G,
+            const Real * V, Real alpha, bool increment);
+
+        // Uniform-coefficient device kernels (see the host variants above).
+        void isotropic_stiffness_2d_gpu_uniform(
+            const Real * displacement, Real lambda, Real mu, Real * force,
+            Index_t nnx, Index_t nny, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_d,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
+            bool increment);
+
+        void isotropic_stiffness_3d_gpu_uniform(
+            const Real * displacement, Real lambda, Real mu, Real * force,
+            Index_t nnx, Index_t nny, Index_t nnz, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
             Index_t force_stride_x, Index_t force_stride_y,
             Index_t force_stride_z, Index_t force_stride_d, const Real * G,
             const Real * V, Real alpha, bool increment);
@@ -243,6 +281,24 @@ namespace muGrid {
             this->apply_impl(displacement, lambda, mu, alpha, force, true);
         }
 
+        // ---- Uniform-coefficient host interface ----
+        //! force = K(λ, μ) @ displacement for spatially uniform Lamé scalars.
+        //! Needs no material fields — the reference stiffness Kʳᵉᶠ of the
+        //! Green's-function preconditioner is exactly this operator.
+        void apply_uniform(const TypedFieldBase<Real> & displacement,
+                           Real lambda, Real mu,
+                           TypedFieldBase<Real> & force) const {
+            this->apply_uniform_impl(displacement, lambda, mu, 1.0, force,
+                                     false);
+        }
+        //! force += alpha * K(λ, μ) @ displacement, uniform λ, μ.
+        void apply_uniform_increment(const TypedFieldBase<Real> & displacement,
+                                     Real lambda, Real mu, Real alpha,
+                                     TypedFieldBase<Real> & force) const {
+            this->apply_uniform_impl(displacement, lambda, mu, alpha, force,
+                                     true);
+        }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // ---- Device interface ----
         void apply(const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
@@ -257,6 +313,22 @@ namespace muGrid {
             const TypedFieldBase<Real, DefaultDeviceSpace> & mu, Real alpha,
             TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
             this->apply_impl(displacement, lambda, mu, alpha, force, true);
+        }
+
+        // ---- Uniform-coefficient device interface ----
+        void apply_uniform(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+            Real lambda, Real mu,
+            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
+            this->apply_uniform_impl(displacement, lambda, mu, 1.0, force,
+                                     false);
+        }
+        void apply_uniform_increment(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+            Real lambda, Real mu, Real alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
+            this->apply_uniform_impl(displacement, lambda, mu, alpha, force,
+                                     true);
         }
 #endif
 
@@ -311,6 +383,13 @@ namespace muGrid {
                         const TypedFieldBase<Real> & mu, Real alpha,
                         TypedFieldBase<Real> & force, bool increment) const;
 
+        //! Host apply for uniform Lamé scalars (dimension-specific; explicit
+        //! specialization in isotropic_stiffness_{2,3}d.cc).
+        void apply_uniform_impl(const TypedFieldBase<Real> & displacement,
+                                Real lambda, Real mu, Real alpha,
+                                TypedFieldBase<Real> & force,
+                                bool increment) const;
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         //! Device apply with optional increment (dimension-specific; explicit
         //! specialization in isotropic_stiffness_gpu.cc).
@@ -318,6 +397,14 @@ namespace muGrid {
             const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
             const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
             const TypedFieldBase<Real, DefaultDeviceSpace> & mu, Real alpha,
+            TypedFieldBase<Real, DefaultDeviceSpace> & force,
+            bool increment) const;
+
+        //! Device apply for uniform Lamé scalars (explicit specialization in
+        //! isotropic_stiffness_gpu.cc).
+        void apply_uniform_impl(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+            Real lambda, Real mu, Real alpha,
             TypedFieldBase<Real, DefaultDeviceSpace> & force,
             bool increment) const;
 #endif
@@ -334,11 +421,19 @@ namespace muGrid {
         const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
         const TypedFieldBase<Real> &, Real, TypedFieldBase<Real> &, bool) const;
     template <>
+    void IsotropicStiffnessOperator<2>::apply_uniform_impl(
+        const TypedFieldBase<Real> &, Real, Real, Real, TypedFieldBase<Real> &,
+        bool) const;
+    template <>
     void IsotropicStiffnessOperator<3>::precompute_matrices();
     template <>
     void IsotropicStiffnessOperator<3>::apply_impl(
         const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
         const TypedFieldBase<Real> &, Real, TypedFieldBase<Real> &, bool) const;
+    template <>
+    void IsotropicStiffnessOperator<3>::apply_uniform_impl(
+        const TypedFieldBase<Real> &, Real, Real, Real, TypedFieldBase<Real> &,
+        bool) const;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     template <>
@@ -348,10 +443,18 @@ namespace muGrid {
         const TypedFieldBase<Real, DefaultDeviceSpace> &, Real,
         TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
     template <>
+    void IsotropicStiffnessOperator<2>::apply_uniform_impl(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &, Real, Real, Real,
+        TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
+    template <>
     void IsotropicStiffnessOperator<3>::apply_impl(
         const TypedFieldBase<Real, DefaultDeviceSpace> &,
         const TypedFieldBase<Real, DefaultDeviceSpace> &,
         const TypedFieldBase<Real, DefaultDeviceSpace> &, Real,
+        TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
+    template <>
+    void IsotropicStiffnessOperator<3>::apply_uniform_impl(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &, Real, Real, Real,
         TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
 #endif
 

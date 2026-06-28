@@ -455,7 +455,12 @@ rhs_field = fc.real_field("rhs_field", (dim,))
 # fields (lambda, mu) alone -- so skip this (largest) array, on both host and
 # device, in that case. compute_stress() derives the stress directly from the
 # Lamé fields when C is absent.
-need_C_tensor = (args.kernel == "generic") or (args.preconditioner == "reference")
+# The full per-pixel C tensor is needed only by the generic matvec kernel. The
+# fused kernel works from the per-pixel Lamé fields alone -- and the reference
+# preconditioner, when paired with the fused kernel, gets its uniform reference
+# stiffness from the Lamé *means* via apply_uniform (no full C tensor, no Voigt
+# einsum). The generic kernel still assembles the reference stress from C.
+need_C_tensor = args.kernel == "generic"
 if need_C_tensor:
     C_field_shape = (nb_voigt, nb_voigt, nb_quad) + local_grid_shape
     C_field_np = np.zeros(C_field_shape)
@@ -803,27 +808,50 @@ def compute_rhs(E_macro, rhs_out):
 prec = None
 if args.preconditioner == "reference":
     # Reference material: the volume-averaged (mean) stiffness, which the paper
-    # reports as the best-performing choice (Section 7.2).
-    C_ref = comm.sum(
-        np.asfortranarray(C_field_np.reshape(nb_voigt, nb_voigt, -1).sum(axis=2))
-    )
-    C_ref = np.ascontiguousarray(C_ref) / comm.sum(C_field_np[0, 0].size)
-    C_ref_dev = arr.asarray(C_ref)
+    # reports as the best-performing choice (Section 7.2). The reference
+    # stiffness is *spatially uniform* by construction -- that uniformity is
+    # what makes Kʳᵉᶠ block-circulant and FFT-diagonalisable -- so it needs only
+    # a single uniform material, never a per-pixel field.
+    if args.kernel == "fused":
+        # Fused path: the uniform reference stiffness is the isotropic C of the
+        # mean Lamé parameters. Because isotropic C is linear in (λ, μ),
+        # mean(C) = C(mean λ, mean μ), so the volume average reduces to two
+        # scalar reductions over the existing Lamé fields -- no C tensor, no
+        # Voigt einsum. The fused operator applies Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D directly
+        # from those two scalars via apply_uniform.
+        n_global = comm.sum(int(lambda_field.p.size))
+        lam_ref = comm.sum(float(lambda_field.p.sum())) / n_global
+        mu_ref = comm.sum(float(mu_field.p.sum())) / n_global
 
-    # Uniform-stiffness stress: sig = Cʳᵉᶠ : eps (Voigt), constant in space.
-    def reference_stress(strain, stress):
-        eps_voigt = strain_to_voigt(strain)
-        if device.is_host:
-            sig_voigt = np.einsum("ij,jq...->iq...", C_ref, eps_voigt)
-        else:
-            sig_voigt = arr.einsum("ij,jq...->iq...", C_ref_dev, eps_voigt)
-        voigt_to_stress(sig_voigt, stress)
+        def apply_reference_stiffness(u_in, f_out):
+            with timer("communicate_ghosts"):
+                decomposition.communicate_ghosts(u_in)
+            with timer("fused_kernel"):
+                fused_stiffness_op.apply_uniform(u_in, lam_ref, mu_ref, f_out)
+    else:
+        # Generic path: assemble the reference stress from the volume-averaged
+        # full C tensor (needed by the generic kernel anyway).
+        C_ref = comm.sum(
+            np.asfortranarray(
+                C_field_np.reshape(nb_voigt, nb_voigt, -1).sum(axis=2))
+        )
+        C_ref = np.ascontiguousarray(C_ref) / comm.sum(C_field_np[0, 0].size)
+        C_ref_dev = arr.asarray(C_ref)
 
-    # Apply the reference stiffness Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D to a displacement field.
-    def apply_reference_stiffness(u_in, f_out):
-        compute_strain(u_in, strain_arr)
-        reference_stress(strain_arr, stress_arr)
-        compute_divergence(f_out)
+        # Uniform-stiffness stress: sig = Cʳᵉᶠ : eps (Voigt), constant in space.
+        def reference_stress(strain, stress):
+            eps_voigt = strain_to_voigt(strain)
+            if device.is_host:
+                sig_voigt = np.einsum("ij,jq...->iq...", C_ref, eps_voigt)
+            else:
+                sig_voigt = arr.einsum("ij,jq...->iq...", C_ref_dev, eps_voigt)
+            voigt_to_stress(sig_voigt, stress)
+
+        # Apply Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D to a displacement field.
+        def apply_reference_stiffness(u_in, f_out):
+            compute_strain(u_in, strain_arr)
+            reference_stress(strain_arr, stress_arr)
+            compute_divergence(f_out)
 
     with timer("preconditioner_setup"):
         # The generic assembly (impulse response -> per-mode symbol -> block
@@ -835,8 +863,12 @@ if args.preconditioner == "reference":
 
     if not args.quiet:
         parprint("Using reference-material Fourier preconditioner", comm=comm)
-        parprint(f"  Reference stiffness Cʳᵉᶠ (mean): diag = "
-                 f"{np.diag(C_ref)}", comm=comm)
+        if args.kernel == "fused":
+            parprint(f"  Reference Lamé (mean): λ = {lam_ref:.4f}, "
+                     f"μ = {mu_ref:.4f}", comm=comm)
+        else:
+            parprint(f"  Reference stiffness Cʳᵉᶠ (mean): diag = "
+                     f"{np.diag(C_ref)}", comm=comm)
 
 
 # Storage for homogenized stiffness
