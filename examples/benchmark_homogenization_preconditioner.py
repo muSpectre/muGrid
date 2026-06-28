@@ -245,16 +245,18 @@ def make_iter_plot(iters, dim, path):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    all_n = set()
     for P, sty in (
             ("none", dict(marker="o", color="#c62828",
                           label="unpreconditioned")),
             ("reference", dict(marker="s", color="#00897b",
                                label="reference preconditioner"))):
-        pts = sorted((n ** dim, r["iters"]) for n, r in iters.get(P, {}).items())
+        pts = sorted((n, r["iters"]) for n, r in iters.get(P, {}).items())
         if pts:
             xs, ys = zip(*pts)
+            all_n.update(xs)
             ax.loglog(xs, ys, **sty)
-    ax.set_xlabel("Number of grid points")
+    db.set_grid_size_xaxis(ax, all_n, dim)
     ax.set_ylabel("CG iterations to converge")
     ax.set_title(f"Homogenization ({dim}D, fused): iterations vs. grid size")
     ax.grid(True, which="both", ls=":", alpha=0.5)
@@ -270,15 +272,17 @@ def make_timing_plot(configs, timing, dim, path):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    all_n = set()
     for key, label, style in configs:
         # Only points with a real measured time — OOM points carry no time.
-        pts = sorted((n ** dim, r["secs"]) for n, r in timing.get(key, {}).items()
+        pts = sorted((n, r["secs"]) for n, r in timing.get(key, {}).items()
                      if isinstance(r.get("secs"), (int, float)))
         if not pts:
             continue
         xs, ys = zip(*pts)
+        all_n.update(xs)
         ax.loglog(xs, ys, label=label, **style)
-    ax.set_xlabel("Number of grid points")
+    db.set_grid_size_xaxis(ax, all_n, dim)
     ax.set_ylabel("Reference-preconditioned solve time (s)")
     ax.set_title(f"Homogenization ({dim}D, fused, reference prec.): "
                  f"time vs. grid size")
@@ -319,7 +323,7 @@ single CPU core.
 
 (last row: unpreconditioned ÷ reference **wall time** on one CPU core)
 
-![Iterations vs. number of grid points]({iter_plot})
+![Iterations vs. grid size]({iter_plot})
 
 ## Reference solve: device & MPI scaling
 
@@ -341,7 +345,7 @@ dropped from the plot, and larger sizes for that configuration are not attempted
 (values are **solve time in seconds**, run to convergence; `OOM` = ran out of
 memory)
 
-![Reference solve time vs. number of grid points]({timing_plot})
+![Reference solve time vs. grid size]({timing_plot})
 
 The preconditioner parallelises cleanly: it is applied in Fourier space by the
 FFT engine, which owns its MPI decomposition, and the per-mode block solve is

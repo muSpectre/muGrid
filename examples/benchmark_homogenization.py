@@ -205,16 +205,18 @@ def make_merged_plot(configs, merged, path):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    all_n = set()
     for key, label, style in configs:
         # Only points with a real measured time — OOM points carry no time.
-        pts = sorted((n ** 3, merged[key][n]["secs"])
+        pts = sorted((n, merged[key][n]["secs"])
                      for n in merged.get(key, {})
                      if isinstance(merged[key][n].get("secs"), (int, float)))
         if not pts:
             continue
         xs, ys = zip(*pts)
+        all_n.update(xs)
         ax.loglog(xs, ys, label=label, **style)
-    ax.set_xlabel("Number of grid points")
+    db.set_grid_size_xaxis(ax, all_n, 3)
     ax.set_ylabel("Solve time (s)")
     ax.set_title("Homogenization (3D, fused): time vs. grid size")
     ax.grid(True, which="both", ls=":", alpha=0.5)
@@ -263,7 +265,7 @@ dropped from the plot, and larger sizes for that configuration are not attempted
 
 (values are **solve time in seconds**; `OOM` = the run ran out of memory)
 
-![Homogenization solve time vs. number of grid points]({plot_name})
+![Homogenization solve time vs. grid size]({plot_name})
 
 A single CPU core is quickly left behind, so the fair comparison is the full CPU
 (all {ncores} cores via MPI) against the GPU(s). The GPU leads in the mid-range,

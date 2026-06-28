@@ -219,6 +219,27 @@ def plan_configs(ncores, nb_gpus, want_gpu):
     return cfgs
 
 
+def grid_label(n, dim):
+    """Per-axis grid size formatted as geometry, e.g. 128 -> "128³" (3D)."""
+    return f"{n}{'²' if dim == 2 else '³'}"
+
+
+def set_grid_size_xaxis(ax, ns, dim):
+    """Label the (log) x-axis with grid *geometry* ticks (e.g. 128³) at the
+    measured per-axis grid sizes `ns`, instead of total grid-point counts."""
+    from matplotlib.ticker import FixedFormatter, FixedLocator, NullLocator
+
+    ns = sorted(ns)
+    ax.xaxis.set_major_locator(FixedLocator(ns))
+    ax.xaxis.set_major_formatter(
+        FixedFormatter([grid_label(n, dim) for n in ns]))
+    ax.xaxis.set_minor_locator(NullLocator())
+    for lbl in ax.get_xticklabels():
+        lbl.set_rotation(45)
+        lbl.set_horizontalalignment("right")
+    ax.set_xlabel("Grid size")
+
+
 def render_configs(rows, study):
     """Ordered (key, label, style) for the configs present in `study` rows."""
     nr = {}
