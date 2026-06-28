@@ -50,7 +50,24 @@ BENCHMARK = "homogenization_preconditioner"
 # --------------------------------------------------------------------------- #
 # Running homogenization.py
 # --------------------------------------------------------------------------- #
+# Signatures of an out-of-memory failure (host or device, any vendor / MPI).
+_OOM_PATTERNS = re.compile(
+    r"out of memory|outofmemory|bad_alloc|MemoryError|cannot allocate memory|"
+    r"cudaErrorMemoryAllocation|CUDA_ERROR_OUT_OF_MEMORY|hipErrorOutOfMemory|"
+    r"hipErrorMemoryAllocation|failed to allocate", re.IGNORECASE)
+
+# Sentinel returned by run() when a data point ran out of memory.
+OOM = "oom"
+
+
+def _looks_like_oom(out):
+    if _OOM_PATTERNS.search(out.stderr) or _OOM_PATTERNS.search(out.stdout):
+        return True
+    return out.returncode == -9  # killed by the OS OOM killer (SIGKILL)
+
+
 def run(device, precond, n, dim, maxiter, tol, nranks=1):
+    """Run one solve; dict of metrics, ``OOM`` if out of memory, else ``None``."""
     grid = ",".join([str(n)] * dim)
     base = [HOMOG, "-n", grid, "-d", device, "-k", "fused", "-P", precond,
             "-i", str(maxiter), "--tol", str(tol), "--inclusion-type", "single",
@@ -68,6 +85,8 @@ def run(device, precond, n, dim, maxiter, tol, nranks=1):
         return None
     m = re.search(r"\{.*\}", out.stdout, re.DOTALL)
     if not m:
+        if _looks_like_oom(out):
+            return OOM
         sys.stderr.write(f"  [{device} {precond} n={n} ranks={nranks}] no JSON\n"
                          f"{out.stderr[-400:]}\n")
         return None
@@ -103,45 +122,33 @@ def collect(args, prov):
             sys.stderr.write(f"  iter {P:9s} {n}^{args.dim} ({r['npts']} pts): "
                              f"{r['iters']:5d} it, {r['secs']:.3f} s\n")
 
-    # Study 2: reference-solve time across device/MPI configs.
-    for n in args.sizes:
-        for key, device, nranks in configs:
+    # Study 2: reference-solve time across device/MPI configs. Each config
+    # sweeps grid sizes up to its own cap (a single CPU core tops out far sooner
+    # than the full node / the GPUs) and stops at the first out-of-memory size,
+    # which is recorded as an "oom" point (flagged in the table, dropped from the
+    # plot); larger sizes for that config are not attempted.
+    for key, device, nranks in configs:
+        label = db.CONFIG_META[key]["label"](nranks)
+        cap = args.cpu1_max_size if key == "cpu1" else args.max_size
+        for n in [s for s in args.sizes if s <= cap]:
             r = run(device, "reference", n, args.dim, args.maxiter, args.tol,
                     nranks)
-            label = db.CONFIG_META[key]["label"](nranks)
+            base = {**prov, **common, "benchmark": BENCHMARK,
+                    "study": "reference_timing", "label": key, "device": device,
+                    "nranks": nranks, "n": n, "npts": n ** args.dim,
+                    "precond": "reference"}
             if r is None:
                 sys.stderr.write(f"  time {label} {n}^{args.dim}: skipped\n")
                 continue
-            rows.append({**prov, **common, "benchmark": BENCHMARK,
-                         "study": "reference_timing", "label": key,
-                         "device": device, "nranks": nranks, "n": n,
-                         "npts": r["npts"], "precond": "reference",
+            if r is OOM:
+                rows.append({**base, "status": "oom"})
+                sys.stderr.write(f"  time {label} {n}^{args.dim}: OUT OF "
+                                 "MEMORY — stopping this config\n")
+                break
+            rows.append({**base, "npts": r["npts"], "status": "ok",
                          "iters": r["iters"], "secs": r["secs"]})
             sys.stderr.write(f"  time {label} {n}^{args.dim} ({r['npts']} pts): "
                              f"{r['iters']} it, {r['secs']:.3f} s\n")
-
-    # Study 3: MPI strong scaling of the reference-preconditioned solve, on the
-    # CPU cores and (on a multi-GPU host) across the GPUs. The GPU sweep is
-    # capped at the visible-device count (one rank per GPU, round-robin).
-    scaling_plan = [("cpu", args.scaling_ranks, "cores")]
-    if want_gpu:
-        gpu_ranks = [R for R in args.scaling_gpu_ranks if R <= nb_gpus]
-        scaling_plan.append(("gpu", gpu_ranks, "GPUs"))
-    for dev, ranks, unit in scaling_plan:
-        for n in args.scaling_sizes:
-            for R in ranks:
-                r = run(dev, "reference", n, args.dim, args.maxiter, args.tol, R)
-                if r is None:
-                    sys.stderr.write(f"  scaling[{dev}] {n}^{args.dim} "
-                                     f"{R} {unit}: skipped\n")
-                    continue
-                rows.append({**prov, **common, "benchmark": BENCHMARK,
-                             "study": "mpi_scaling", "label": str(R),
-                             "device": dev, "nranks": R, "n": n,
-                             "npts": r["npts"], "precond": "reference",
-                             "iters": r["iters"], "secs": r["secs"]})
-                sys.stderr.write(f"  scaling[{dev}] {n}^{args.dim} {R} {unit}: "
-                                 f"{r['iters']} it, {r['secs']:.3f} s\n")
     return rows
 
 
@@ -178,16 +185,6 @@ def timing_from_rows(rows):
     return d
 
 
-def scaling_from_rows(rows):
-    """{device: {n: {ranks: row}}} from the mpi_scaling study."""
-    d = {}
-    for r in rows:
-        if r["study"] == "mpi_scaling":
-            (d.setdefault(r["device"], {}).setdefault(r["n"], {})
-             [int(r["nranks"])]) = r
-    return d
-
-
 def sizes_in(rows, study):
     return sorted({r["n"] for r in rows if r["study"] == study})
 
@@ -214,34 +211,14 @@ def iteration_table(sizes, iters, dim):
     return "\n".join(lines)
 
 
-# device -> (section title, per-rank column header)
-SCALING_DEVICE_META = {
-    "cpu": ("Strong scaling on the CPU", "Cores"),
-    "gpu": ("Strong scaling on the GPU(s)", "GPUs"),
-}
-
-
-def scaling_tables_markdown(scaling, dim):
-    out = []
-    for dev in ("cpu", "gpu"):
-        per_n = scaling.get(dev)
-        if not per_n:
-            continue
-        title, unit = SCALING_DEVICE_META[dev]
-        out.append(f"### {title}\n")
-        for n in sorted(per_n):
-            rows = per_n[n]
-            t1 = rows.get(1, {}).get("secs")
-            out.append(f"**{n}{sup(dim)} ({n ** dim:,} points)**\n")
-            out.append(f"| {unit} | Iters | Time (s) | Speedup | Parallel eff. |")
-            out.append("|---|---|---|---|---|")
-            for R in sorted(rows):
-                t = rows[R]["secs"]
-                sp = t1 / t if t1 else float("nan")
-                out.append(f"| {R} | {rows[R]['iters']} | {t:.2f} | "
-                           f"{sp:.2f}× | {sp / R * 100:.0f}% |")
-            out.append("")
-    return "\n".join(out)
+def _cell(res, n):
+    """One table cell: solve time, 'OOM' for an out-of-memory point, else '—'."""
+    if n not in res:
+        return "—"
+    secs = res[n].get("secs")
+    if isinstance(secs, (int, float)):
+        return f"{secs:.3g}"
+    return "OOM" if res[n].get("status") == "oom" else "—"
 
 
 def timing_table(sizes, configs, timing, dim):
@@ -254,8 +231,7 @@ def timing_table(sizes, configs, timing, dim):
         res = timing.get(key)
         if not res:
             continue
-        cells = " | ".join(
-            (f"{res[n]['secs']:.3g}" if n in res else "—") for n in cols)
+        cells = " | ".join(_cell(res, n) for n in cols)
         lines.append(f"| {label} | {cells} |")
     return "\n".join(lines)
 
@@ -295,7 +271,9 @@ def make_timing_plot(configs, timing, dim, path):
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
     for key, label, style in configs:
-        pts = sorted((n ** dim, r["secs"]) for n, r in timing.get(key, {}).items())
+        # Only points with a real measured time — OOM points carry no time.
+        pts = sorted((n ** dim, r["secs"]) for n, r in timing.get(key, {}).items()
+                     if isinstance(r.get("secs"), (int, float)))
         if not pts:
             continue
         xs, ys = zip(*pts)
@@ -306,49 +284,6 @@ def make_timing_plot(configs, timing, dim, path):
                  f"time vs. grid size")
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend()
-    fig.tight_layout()
-    fig.savefig(path, dpi=120)
-    plt.close(fig)
-
-
-def make_scaling_plot(scaling, dim, path):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    markers = {32: "v", 64: "o", 96: "s", 128: "^"}
-    devs = [d for d in ("cpu", "gpu") if scaling.get(d)] or ["cpu"]
-    fig, axes = plt.subplots(1, len(devs), figsize=(6.4 * len(devs), 4.4),
-                             squeeze=False)
-    for ax, dev in zip(axes[0], devs):
-        per_n = scaling.get(dev, {})
-        unit = "CPU cores" if dev == "cpu" else "GPUs"
-        all_ranks = sorted({R for rows in per_n.values() for R in rows})
-        rmax = max(all_ranks) if all_ranks else 1
-        ax.plot([1, rmax], [1, rmax], ls="--", color="0.6",
-                label="ideal (linear)")
-        for n in sorted(per_n):
-            rows = per_n[n]
-            t1 = rows.get(1, {}).get("secs")
-            if not t1:
-                continue
-            xs = sorted(rows)
-            ys = [t1 / rows[R]["secs"] for R in xs]
-            ax.plot(xs, ys, marker=markers.get(n, "o"), label=f"{n}{sup(dim)}")
-        ax.set_xscale("log", base=2)
-        ax.set_yscale("log", base=2)
-        if all_ranks:
-            ax.set_xticks(all_ranks)
-            ax.set_xticklabels([str(R) for R in all_ranks])
-            ax.set_yticks(all_ranks)
-            ax.set_yticklabels([str(R) for R in all_ranks])
-        ax.set_xlabel(f"MPI ranks ({unit})")
-        ax.set_ylabel("Speedup vs. 1 rank")
-        ax.set_title(f"strong scaling on {unit}")
-        ax.grid(True, which="both", ls=":", alpha=0.5)
-        ax.legend()
-    fig.suptitle(f"Homogenization ({dim}D, fused, reference prec.): "
-                 "MPI strong scaling")
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)
@@ -390,49 +325,30 @@ single CPU core.
 
 This mirrors the (unpreconditioned) [homogenization
 benchmark](benchmark_homogenization.md), but for the **reference-preconditioned**
-solve: the same single-CPU-core / full-machine-MPI-CPU / GPU comparison, across
-{dim}D grid sizes. Because the iteration count is grid-independent, this isolates
-the **per-iteration** cost — and each preconditioned iteration applies a
-forward/inverse **FFT pair**, so it is where the FFT-engine paths matter: the
-native cuFFT N-D transform on the GPU, and the slab MPI decomposition on
-multi-rank runs.
+solve: the same single-CPU-core / full-machine-MPI-CPU / single-GPU / multi-GPU
+comparison, across {dim}D grid sizes. Because the iteration count is
+grid-independent, this isolates the **per-iteration** cost — and each
+preconditioned iteration applies a forward/inverse **FFT pair**, so it is where
+the FFT-engine paths matter: the native N-D transform on the GPU, and the slab
+MPI decomposition on multi-rank runs.
+
+Each configuration is swept to the largest grid that still fits in memory: the
+first size that runs **out of memory** is recorded as `OOM` in the table and
+dropped from the plot, and larger sizes for that configuration are not attempted.
 
 {timing_table}
 
-(values are **solve time in seconds**, run to convergence)
+(values are **solve time in seconds**, run to convergence; `OOM` = ran out of
+memory)
 
 ![Reference solve time vs. number of grid points]({timing_plot})
 
 The preconditioner parallelises cleanly: it is applied in Fourier space by the
 FFT engine, which owns its MPI decomposition, and the per-mode block solve is
 rank-local. `-P reference` gives identical iteration counts and homogenised
-stiffness in serial and under MPI. The single CPU core is quickly left behind;
-here the **full CPU (MPI) is the fastest option across the whole range**, with
-the GPU close behind in the mid-range (~48³–96³). At 128³ the GPU
-hits its memory wall hard — *worse* than the unpreconditioned solve, because the
-preconditioner's FFT work buffers add to an already-tight 6 GB footprint — and
-the full CPU wins by ~7× (18 s vs. 123 s). The same full-CPU-vs-GPU and
-memory-wall trade-offs from the [main benchmark](benchmark_homogenization.md)
-apply, shifted toward the CPU by the extra per-iteration FFT.
-
-!!! note "Multi-GPU"
-    `homogenization.py` binds each MPI rank to a distinct GPU (round-robin), so
-    `mpiexec -n <#GPUs> python homogenization.py -d gpu -P reference` runs one
-    rank per GPU and the FFT preconditioner is applied in the engine's GPU MPI
-    decomposition. This benchmark adds a *GPU (N devices, MPI)* curve
-    automatically when more than one GPU is present. **{gpu_count_note}**
-
-## MPI strong scaling
-
-Strong scaling of the reference-preconditioned solve (fixed problem size,
-increasing MPI ranks, run to convergence), with `E_eff` and the iteration count
-identical across all rank counts. Two decompositions are measured: across the
-CPU cores (one rank per core), and — on a multi-GPU host — across the GPUs (one
-rank per device, round-robin). Each iteration applies a forward/inverse FFT pair,
-so the FFT engine's MPI (slab) decomposition is exercised every iteration.
-
-{scaling_tables}
-![Preconditioned MPI strong scaling]({scaling_plot})
+stiffness in serial and under MPI, so the single CPU core is quickly left behind
+and the largest grids are reached by MPI domain decomposition across all CPU
+cores or across several GPUs (one rank per device, round-robin).
 
 All data points live in the shared benchmark database `benchmarks/results.csv`
 (date, code version, machine, parameters, results). This page is generated by
@@ -447,25 +363,15 @@ python examples/benchmark_homogenization_preconditioner.py \\
 """
 
 
-def write_doc_page(path, meta, dim, tol, ncases, multi_gpu, iter_table,
-                   timing_table, scaling_tables, iter_plot, timing_plot,
-                   scaling_plot):
-    if multi_gpu:
-        gpu_count_note = "Runs with more than one GPU show the multi-GPU curve."
-    else:
-        gpu_count_note = ("This run used a single GPU, so only the single-GPU "
-                          "curve is shown; the script needs no changes on a "
-                          "multi-GPU host.")
+def write_doc_page(path, meta, dim, tol, ncases, iter_table, timing_table,
+                   iter_plot, timing_plot):
     with open(path, "w") as fh:
         fh.write(DOC_TEMPLATE.format(
             cpu=meta["cpu"], gpu=meta["gpu"], version=meta["version"],
             timestamp=meta["timestamp"], dim=dim, tol=tol, ncases=ncases,
-            gpu_count_note=gpu_count_note,
             iter_table=iter_table, timing_table=timing_table,
-            scaling_tables=scaling_tables,
             iter_plot=os.path.basename(iter_plot),
-            timing_plot=os.path.basename(timing_plot),
-            scaling_plot=os.path.basename(scaling_plot)))
+            timing_plot=os.path.basename(timing_plot)))
 
 
 # --------------------------------------------------------------------------- #
@@ -477,20 +383,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dim", type=int, default=3, choices=[2, 3])
     ap.add_argument("--sizes", type=int, nargs="+",
-                    default=[16, 24, 32, 48, 64, 96, 128],
-                    help="Grid sizes for the reference-solve timing study")
+                    default=[16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512,
+                             768, 1024, 1536, 2048],
+                    help="Grid sizes for the reference-solve timing study (each "
+                         "config stops at its cap or the first out-of-memory size)")
+    ap.add_argument("--max-size", type=int, default=2048,
+                    help="Largest grid size attempted for the full-CPU and GPU "
+                         "configs")
+    ap.add_argument("--cpu1-max-size", type=int, default=128,
+                    help="Largest grid size attempted for the single-CPU-core "
+                         "config")
     ap.add_argument("--iter-sizes", type=int, nargs="+",
                     default=[16, 24, 32, 48],
                     help="Grid sizes for the none-vs-reference iteration study")
-    ap.add_argument("--scaling-sizes", type=int, nargs="+", default=[64, 96],
-                    help="Grid sizes for the MPI strong-scaling study")
-    ap.add_argument("--scaling-ranks", type=int, nargs="+",
-                    default=[1, 2, 4, 8, 16],
-                    help="CPU rank counts for the strong-scaling study")
-    ap.add_argument("--scaling-gpu-ranks", type=int, nargs="+",
-                    default=[1, 2, 4],
-                    help="GPU counts for the GPU strong-scaling sweep (capped at "
-                         "the number of visible devices)")
     ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count())
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
     ap.add_argument("--maxiter", type=int, default=20000)
@@ -505,8 +410,6 @@ def main():
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_iters.png"))
     ap.add_argument("--time-plot", default=os.path.join(
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_time.png"))
-    ap.add_argument("--scaling-plot", default=os.path.join(
-        HERE, "..", "docs", "benchmark_homogenization_preconditioner_mpi.png"))
     args = ap.parse_args()
 
     if not args.render_only:
@@ -530,28 +433,22 @@ def main():
     configs = db.render_configs(rows, "reference_timing")
     iters = iters_from_rows(rows)
     timing = timing_from_rows(rows)
-    scaling = scaling_from_rows(rows)
-    multi_gpu = any(r["label"] == "gpuN" for r in rows)
 
     it_tab = iteration_table(sizes_in(rows, "iterations"), iters, dim)
     t_tab = timing_table(sizes_in(rows, "reference_timing"), configs, timing,
                          dim)
-    s_tab = scaling_tables_markdown(scaling, dim)
-    print("\n" + it_tab + "\n\n" + t_tab + "\n\n" + s_tab)
+    print("\n" + it_tab + "\n\n" + t_tab)
 
     iters_path = os.path.abspath(args.iter_plot)
     time_path = os.path.abspath(args.time_plot)
-    scaling_path = os.path.abspath(args.scaling_plot)
     make_iter_plot(iters, dim, iters_path)
     make_timing_plot(configs, timing, dim, time_path)
-    make_scaling_plot(scaling, dim, scaling_path)
-    sys.stderr.write(f"wrote {iters_path}\nwrote {time_path}\n"
-                     f"wrote {scaling_path}\n")
+    sys.stderr.write(f"wrote {iters_path}\nwrote {time_path}\n")
 
     if args.doc_out:
         write_doc_page(args.doc_out, meta, dim, tol,
-                       3 if dim == 2 else 6, multi_gpu, it_tab, t_tab, s_tab,
-                       iters_path, time_path, scaling_path)
+                       3 if dim == 2 else 6, it_tab, t_tab,
+                       iters_path, time_path)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
 

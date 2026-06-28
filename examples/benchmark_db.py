@@ -54,6 +54,9 @@ FIELDS = [
     "device", "nranks", "dim", "n", "npts", "precond", "maxiter", "tol",
     # results
     "iters", "secs", "gbps", "E",
+    # status: blank/"ok" for a normal point, "oom" for a run that ran out of
+    # memory (recorded so the tables can flag it; left out of the plots)
+    "status",
 ]
 
 
@@ -233,6 +236,27 @@ def render_configs(rows, study):
 # --------------------------------------------------------------------------- #
 # CSV I/O
 # --------------------------------------------------------------------------- #
+def _migrate_header(path):
+    """Rewrite an existing CSV in place if its header predates a FIELDS change
+    (e.g. a column was appended), so old and new rows stay column-aligned."""
+    if not os.path.exists(path):
+        return
+    with open(path, newline="") as fh:
+        reader = csv.reader(fh)
+        try:
+            header = next(reader)
+        except StopIteration:
+            return
+        if header == FIELDS:
+            return
+        old_rows = list(csv.DictReader(fh, fieldnames=header))
+    with open(path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        for r in old_rows:
+            writer.writerow({k: r.get(k, "") for k in FIELDS})
+
+
 def append_rows(rows, path=DB_PATH):
     """Append rows (list of dicts; subset of FIELDS) to the CSV, writing the
     header if the file does not exist yet."""
@@ -240,6 +264,8 @@ def append_rows(rows, path=DB_PATH):
         return
     is_new = not os.path.exists(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if not is_new:
+        _migrate_header(path)
     with open(path, "a", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
         if is_new:
