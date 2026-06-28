@@ -1789,5 +1789,72 @@ class TestGPUUnitImpulse:
                 )
 
 
+# =============================================================================
+# Uniform-coefficient apply (apply_uniform) — Parametrized on Device
+# =============================================================================
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestIsotropicStiffnessApplyUniform:
+    """apply_uniform(λ, μ scalars) must equal apply() fed uniform λ, μ fields.
+
+    The spatially uniform path takes the Lamé constants as scalars and needs
+    no material field — it is the action used by the reference-material
+    (Green's function) preconditioner.
+    """
+
+    def _run(self, dim, device):
+        skip_if_gpu_unavailable(device)
+        n = (7,) * dim
+        ghosts = (1,) * dim
+        grid_spacing = [0.25] * dim
+        lam, mu = 1.234, 0.789
+
+        op = (muGrid.IsotropicStiffnessOperator2D
+              if dim == 2 else muGrid.IsotropicStiffnessOperator3D)(grid_spacing)
+
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
+        fc = muGrid.GlobalFieldCollection(
+            n, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, **fc_kwargs)
+        fc_mat = muGrid.GlobalFieldCollection(
+            n, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, **fc_kwargs)
+
+        displacement = fc.real_field("displacement", (dim,))
+        force_field = fc.real_field("force_field", (dim,))
+        force_uniform = fc.real_field("force_uniform", (dim,))
+        lambda_field = fc_mat.real_field("lambda", (1,))
+        mu_field = fc_mat.real_field("mu", (1,))
+
+        # Random displacement (including ghosts) — exercises the full stencil.
+        rng = np.random.default_rng(0)
+        u = rng.standard_normal(displacement.pg.shape)
+        xp = cp if device == "gpu" else np
+        displacement.pg[...] = xp.asarray(u)
+        lambda_field.pg[...] = lam
+        mu_field.pg[...] = mu
+
+        # Field-based apply with uniform material vs. the scalar path.
+        op.apply(displacement, lambda_field, mu_field, force_field)
+        op.apply_uniform(displacement, lam, mu, force_uniform)
+
+        a = cp.asnumpy(force_field.p) if device == "gpu" else force_field.p
+        b = cp.asnumpy(force_uniform.p) if device == "gpu" else force_uniform.p
+        np.testing.assert_allclose(b, a, rtol=1e-12, atol=1e-14)
+
+        # apply_uniform_increment accumulates: force += alpha * K u. Seed it
+        # with the field-based result (same memory space) and add K u once more.
+        force_uniform.p[...] = force_field.p
+        op.apply_uniform_increment(displacement, lam, mu, 1.0, force_uniform)
+        c = cp.asnumpy(force_uniform.p) if device == "gpu" else force_uniform.p
+        np.testing.assert_allclose(c, 2.0 * a, rtol=1e-12, atol=1e-14)
+
+    def test_2d(self, device):
+        self._run(2, device)
+
+    def test_3d(self, device):
+        self._run(3, device)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -4,6 +4,11 @@ Change log for µGrid
 v0.110.0 (28Jun26)
 ------------------
 
+- ENH: Removed redundant device-wide synchronizations after GPU compute kernels so the
+  command queue pipelines; remaining MPI/FFT barriers scoped to the default stream
+- ENH: Added a uniform-coefficient apply to the fused isotropic stiffness operator so the
+  reference-material preconditioner runs from the Lamé means, dropping the full
+  stiffness-tensor field and its GPU memory cost
 - ENH: Added compile-time field allocation profiling with low-overhead runtime control
   and Python bindings
 - ENH: Skipped MPI host-staging bounce on unified-memory devices during ghost exchanges

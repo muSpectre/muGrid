@@ -673,8 +673,6 @@ void fem_gradient_2d_gpu(
         nodal_stride_x, nodal_stride_y, nodal_stride_n,
         grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
         inv_hx, inv_hy, increment);
-
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 // 2D Divergence - CUDA/HIP unified launch
@@ -708,8 +706,6 @@ void fem_divergence_2d_gpu(
         grad_stride_x, grad_stride_y, grad_stride_q, grad_stride_d,
         nodal_stride_x, nodal_stride_y, nodal_stride_n,
         w0_inv_hx, w0_inv_hy, w1_inv_hx, w1_inv_hy, increment);
-
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 // 3D Gradient - CUDA/HIP unified launch
@@ -745,8 +741,6 @@ void fem_gradient_3d_gpu(
         nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
         grad_stride_x, grad_stride_y, grad_stride_z, grad_stride_q, grad_stride_d,
         inv_hx, inv_hy, inv_hz, increment);
-
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 // 3D Divergence - CUDA/HIP unified launch
@@ -780,8 +774,6 @@ void fem_divergence_3d_gpu(
         grad_stride_x, grad_stride_y, grad_stride_z, grad_stride_q, grad_stride_d,
         nodal_stride_x, nodal_stride_y, nodal_stride_z, nodal_stride_n,
         inv_hx, inv_hy, inv_hz, quad_weights, increment);
-
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 }  // namespace fem_gradient_kernels

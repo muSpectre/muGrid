@@ -596,7 +596,7 @@ namespace muGrid {
         // host; MPI must not read the staging buffer before the gather is
         // complete. (Host pack via memcpy is already synchronous.)
         if (dev) {
-            GPU_DEVICE_SYNCHRONIZE();
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
             if (bounce && send_total > 0) {
                 GPU_MEMCPY_D2H(send_buffer, send_staging,
                                send_total * sizeof(Complex));

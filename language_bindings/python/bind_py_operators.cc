@@ -862,6 +862,21 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                  "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
                  "force"_a,
                  "Apply with increment: force += alpha * K @ displacement")
+            .def("apply_uniform",
+                 static_cast<void (IsotropicStiffnessOperator2D::*)(
+                     const RealFieldHost &, Real, Real, RealFieldHost &) const>(
+                     &IsotropicStiffnessOperator2D::apply_uniform),
+                 "displacement"_a, "lambda"_a, "mu"_a, "force"_a,
+                 "Apply with spatially uniform Lamé scalars (no material "
+                 "fields): force = K(lambda, mu) @ displacement")
+            .def("apply_uniform_increment",
+                 static_cast<void (IsotropicStiffnessOperator2D::*)(
+                     const RealFieldHost &, Real, Real, Real, RealFieldHost &)
+                                 const>(
+                     &IsotropicStiffnessOperator2D::apply_uniform_increment),
+                 "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
+                 "force += alpha * K(lambda, mu) @ displacement, uniform "
+                 "scalars")
             .def_property_readonly(
                 "G",
                 [](const IsotropicStiffnessOperator2D & op) {
@@ -907,7 +922,20 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
              static_cast<ApplyIncrementDeviceFn>(
                  &IsotropicStiffnessOperator2D::apply_increment),
              "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
-             "force"_a, "Apply with increment to device (GPU) fields");
+             "force"_a, "Apply with increment to device (GPU) fields")
+        .def("apply_uniform",
+             static_cast<void (IsotropicStiffnessOperator2D::*)(
+                 const RealFieldDevice &, Real, Real, RealFieldDevice &) const>(
+                 &IsotropicStiffnessOperator2D::apply_uniform),
+             "displacement"_a, "lambda"_a, "mu"_a, "force"_a,
+             "Apply with uniform Lamé scalars to device (GPU) fields")
+        .def("apply_uniform_increment",
+             static_cast<void (IsotropicStiffnessOperator2D::*)(
+                 const RealFieldDevice &, Real, Real, Real, RealFieldDevice &)
+                             const>(
+                 &IsotropicStiffnessOperator2D::apply_uniform_increment),
+             "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
+             "Uniform-scalar increment on device (GPU) fields");
 #endif
 }
 
@@ -957,6 +985,21 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                  "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
                  "force"_a,
                  "Apply with increment: force += alpha * K @ displacement")
+            .def("apply_uniform",
+                 static_cast<void (IsotropicStiffnessOperator3D::*)(
+                     const RealFieldHost &, Real, Real, RealFieldHost &) const>(
+                     &IsotropicStiffnessOperator3D::apply_uniform),
+                 "displacement"_a, "lambda"_a, "mu"_a, "force"_a,
+                 "Apply with spatially uniform Lamé scalars (no material "
+                 "fields): force = K(lambda, mu) @ displacement")
+            .def("apply_uniform_increment",
+                 static_cast<void (IsotropicStiffnessOperator3D::*)(
+                     const RealFieldHost &, Real, Real, Real, RealFieldHost &)
+                                 const>(
+                     &IsotropicStiffnessOperator3D::apply_uniform_increment),
+                 "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
+                 "force += alpha * K(lambda, mu) @ displacement, uniform "
+                 "scalars")
             .def_property_readonly(
                 "G",
                 [](const IsotropicStiffnessOperator3D & op) {
@@ -1002,7 +1045,20 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
              static_cast<ApplyIncrementDeviceFn>(
                  &IsotropicStiffnessOperator3D::apply_increment),
              "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
-             "force"_a, "Apply with increment to device (GPU) fields");
+             "force"_a, "Apply with increment to device (GPU) fields")
+        .def("apply_uniform",
+             static_cast<void (IsotropicStiffnessOperator3D::*)(
+                 const RealFieldDevice &, Real, Real, RealFieldDevice &) const>(
+                 &IsotropicStiffnessOperator3D::apply_uniform),
+             "displacement"_a, "lambda"_a, "mu"_a, "force"_a,
+             "Apply with uniform Lamé scalars to device (GPU) fields")
+        .def("apply_uniform_increment",
+             static_cast<void (IsotropicStiffnessOperator3D::*)(
+                 const RealFieldDevice &, Real, Real, Real, RealFieldDevice &)
+                             const>(
+                 &IsotropicStiffnessOperator3D::apply_uniform_increment),
+             "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
+             "Uniform-scalar increment on device (GPU) fields");
 #endif
 }
 

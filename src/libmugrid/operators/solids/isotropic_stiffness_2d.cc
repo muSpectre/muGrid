@@ -221,6 +221,59 @@ namespace muGrid {
             G_matrix.data(), V_matrix.data(), alpha, increment);
     }
 
+    template <>
+    void IsotropicStiffnessOperator<2>::apply_uniform_impl(
+        const TypedFieldBase<Real> & displacement, Real lambda, Real mu,
+        Real alpha, TypedFieldBase<Real> & force, bool increment) const {
+
+        // Uniform Lamé scalars: no material field. Mirrors apply_impl<2> minus
+        // all material-field discovery and validation.
+        auto & disp_coll = displacement.get_collection();
+        auto * disp_global_fc =
+            dynamic_cast<const GlobalFieldCollection *>(&disp_coll);
+        if (!disp_global_fc) {
+            throw RuntimeError(
+                "IsotropicStiffnessOperator2D requires GlobalFieldCollection");
+        }
+
+        auto nb_ghosts_left = disp_global_fc->get_nb_ghosts_left();
+        auto nb_ghosts_right = disp_global_fc->get_nb_ghosts_right();
+        if (nb_ghosts_left[0] < 1 || nb_ghosts_left[1] < 1 ||
+            nb_ghosts_right[0] < 1 || nb_ghosts_right[1] < 1) {
+            throw RuntimeError("IsotropicStiffnessOperator2D requires at least "
+                               "1 ghost cell on both sides of "
+                               "displacement/force fields");
+        }
+
+        constexpr Index_t STENCIL_LEFT = 1;
+        constexpr Index_t STENCIL_RIGHT = 1;
+
+        auto nb_with_ghosts =
+            disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t nnx = nb_with_ghosts[0] - STENCIL_LEFT - STENCIL_RIGHT;
+        Index_t nny = nb_with_ghosts[1] - STENCIL_LEFT - STENCIL_RIGHT;
+
+        Index_t nx = nb_with_ghosts[0];
+
+        Index_t disp_stride_d = 1;
+        Index_t disp_stride_x = NB_DOFS_PER_NODE;
+        Index_t disp_stride_y = NB_DOFS_PER_NODE * nx;
+        Index_t force_stride_d = 1;
+        Index_t force_stride_x = NB_DOFS_PER_NODE;
+        Index_t force_stride_y = NB_DOFS_PER_NODE * nx;
+
+        Index_t disp_offset =
+            STENCIL_LEFT * disp_stride_x + STENCIL_LEFT * disp_stride_y;
+        Index_t force_offset =
+            STENCIL_LEFT * force_stride_x + STENCIL_LEFT * force_stride_y;
+
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_uniform(
+            displacement.data() + disp_offset, lambda, mu,
+            force.data() + force_offset, nnx, nny, disp_stride_x, disp_stride_y,
+            disp_stride_d, force_stride_x, force_stride_y, force_stride_d,
+            G_matrix.data(), V_matrix.data(), alpha, increment);
+    }
+
     // ============================================================================
     // Host Kernel Implementations
     // ============================================================================
@@ -231,15 +284,20 @@ namespace muGrid {
         static const Index_t NODE_OFFSET_2D[4][2] = {
             {0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
-        void isotropic_stiffness_2d_host(
+        // Shared kernel body for the per-pixel (Uniform == false) and the
+        // spatially-uniform (Uniform == true) stiffness apply. See the 3D
+        // counterpart for the rationale.
+        template <bool Uniform>
+        static void isotropic_stiffness_2d_host_tmpl(
             const Real * MUGRID_RESTRICT displacement,
             const Real * MUGRID_RESTRICT lambda,
             const Real * MUGRID_RESTRICT mu, Real * MUGRID_RESTRICT force,
-            Index_t nnx, Index_t nny, Index_t nelx, Index_t nely,
-            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
+            Index_t nnx, Index_t nny, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
+            Index_t mat_stride_y, Index_t force_stride_x,
             Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment) {
+            const Real * V, Real alpha, bool increment, Real lam_u,
+            Real mu_u) {
 
             constexpr Index_t NB_NODES = 4;
             constexpr Index_t NB_DOFS = 2;
@@ -251,8 +309,10 @@ namespace muGrid {
             SIndex_t s_disp_stride_x = static_cast<SIndex_t>(disp_stride_x);
             SIndex_t s_disp_stride_y = static_cast<SIndex_t>(disp_stride_y);
             SIndex_t s_disp_stride_d = static_cast<SIndex_t>(disp_stride_d);
-            SIndex_t s_mat_stride_x = static_cast<SIndex_t>(mat_stride_x);
-            SIndex_t s_mat_stride_y = static_cast<SIndex_t>(mat_stride_y);
+            [[maybe_unused]] SIndex_t s_mat_stride_x =
+                static_cast<SIndex_t>(mat_stride_x);
+            [[maybe_unused]] SIndex_t s_mat_stride_y =
+                static_cast<SIndex_t>(mat_stride_y);
             SIndex_t s_force_stride_x = static_cast<SIndex_t>(force_stride_x);
             SIndex_t s_force_stride_y = static_cast<SIndex_t>(force_stride_y);
             SIndex_t s_force_stride_d = static_cast<SIndex_t>(force_stride_d);
@@ -296,9 +356,16 @@ namespace muGrid {
                         Index_t local_node = ELEM_OFFSETS[elem][2];
 
                         // Get material parameters for this element
-                        SIndex_t mat_idx = ex * s_mat_stride_x + ey * s_mat_stride_y;
-                        Real lam = lambda[mat_idx];
-                        Real mu_val = mu[mat_idx];
+                        Real lam, mu_val;
+                        if constexpr (Uniform) {
+                            lam = lam_u;
+                            mu_val = mu_u;
+                        } else {
+                            SIndex_t mat_idx =
+                                ex * s_mat_stride_x + ey * s_mat_stride_y;
+                            lam = lambda[mat_idx];
+                            mu_val = mu[mat_idx];
+                        }
 
                         // Gather displacements from all 4 nodes of this element
                         Real u[NB_ELEM_DOFS];
@@ -341,6 +408,38 @@ namespace muGrid {
                     }
                 }
             }
+        }
+
+        // Per-pixel material entry point (unchanged public signature).
+        void isotropic_stiffness_2d_host(
+            const Real * MUGRID_RESTRICT displacement,
+            const Real * MUGRID_RESTRICT lambda,
+            const Real * MUGRID_RESTRICT mu, Real * MUGRID_RESTRICT force,
+            Index_t nnx, Index_t nny, Index_t /*nelx*/, Index_t /*nely*/,
+            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
+            Index_t force_stride_y, Index_t force_stride_d, const Real * G,
+            const Real * V, Real alpha, bool increment) {
+            isotropic_stiffness_2d_host_tmpl<false>(
+                displacement, lambda, mu, force, nnx, nny, disp_stride_x,
+                disp_stride_y, disp_stride_d, mat_stride_x, mat_stride_y,
+                force_stride_x, force_stride_y, force_stride_d, G, V, alpha,
+                increment, 0.0, 0.0);
+        }
+
+        // Uniform Lamé scalars: no material pointers, no material strides.
+        void isotropic_stiffness_2d_host_uniform(
+            const Real * MUGRID_RESTRICT displacement, Real lambda, Real mu,
+            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
+            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
+            bool increment) {
+            isotropic_stiffness_2d_host_tmpl<true>(
+                displacement, nullptr, nullptr, force, nnx, nny, disp_stride_x,
+                disp_stride_y, disp_stride_d, 0, 0, force_stride_x,
+                force_stride_y, force_stride_d, G, V, alpha, increment, lambda,
+                mu);
         }
 
     }  // namespace isotropic_stiffness_kernels

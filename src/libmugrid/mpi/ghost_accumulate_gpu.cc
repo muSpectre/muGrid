@@ -105,7 +105,7 @@ namespace muGrid {
             GPU_LAUNCH_KERNEL(accumulate_strided_kernel<T>, nb_threads,
                               BLOCK_SIZE, dst, device_src, nb_blocks, block_len,
                               dst_stride, src_stride);
-            GPU_DEVICE_SYNCHRONIZE();
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
         }
 
     }  // namespace
