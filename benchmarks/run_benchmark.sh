@@ -5,7 +5,7 @@
 #SBATCH --ntasks=92
 #SBATCH --cpus-per-task=1
 #SBATCH --gpus=4
-#SBATCH --mem=400G
+#SBATCH --mem=480G
 #SBATCH --time=08:00:00
 #SBATCH --account=bw17d009
 #SBATCH --output=%x_%j.out
@@ -16,20 +16,22 @@
 # database (benchmarks/results.csv) and the documentation pages are regenerated:
 #
 #   1. examples/benchmark_homogenization.py
-#      WITHOUT preconditioner: time vs. grid size (cpu1 / cpuN / gpu1 / gpuN) and
-#      MPI strong scaling on CPU cores and on the GPUs.
+#      WITHOUT preconditioner: solve time vs. grid size for a single CPU core,
+#      the full node via MPI (92 ranks), a single GPU, and all 4 GPUs via MPI.
 #
 #   2. examples/benchmark_homogenization_preconditioner.py
 #      WITH the reference-material (Ladecky et al. 2023) Fourier preconditioner:
-#      iteration count vs. grid size (none vs. reference), reference-solve time
-#      across device/MPI configs, and MPI strong scaling on CPU cores and GPUs.
+#      iteration count vs. grid size (none vs. reference), and the same
+#      single-core / full-node-MPI / 1-GPU / 4-GPU solve-time comparison.
 #
-# MPI strong scaling is measured on the CPU (1,2,4,8,16,32,64,92 ranks) and on
-# the GPUs (1,2,4 devices — the node has 4 MI300A APUs; homogenization.py binds
-# one rank per GPU, round-robin).
+# Each configuration is swept in grid size up to 2048^3 (single CPU core only to
+# 128^3) and stops at the first size that runs OUT OF MEMORY, which is flagged
+# `OOM` in the table and dropped from the plot. The realistic ceiling is far
+# below 2048^3 (see the README); the large cap just lets each config run until it
+# actually exhausts memory.
 #
 # NOTE: the login/head node has no MI300A GPU, so submit this with `sbatch` to a
-# compute node. The GPU sweeps are skipped automatically wherever no GPU is
+# compute node. The GPU curves are skipped automatically wherever no GPU is
 # visible, so a CPU-only dry run on the head node still works.
 
 set -euo pipefail
@@ -63,22 +65,21 @@ fi
 cd "$REPO"
 
 # --------------------------------------------------------------------------- #
-# Scaling configuration (shared by both studies)
+# Grid-size sweep (shared by both studies)
 # --------------------------------------------------------------------------- #
-CPU_RANKS="1 2 4 8 16 32 64 92"   # CPU strong-scaling ladder (full node = 92)
-GPU_RANKS="1 2 4"                  # GPU strong-scaling sweep (4 MI300A APUs)
-SCALING_SIZES="64 96"              # grid sizes used for the scaling sweeps
+SIZES="16 24 32 48 64 96 128 192 256 384 512 768 1024 1536 2048"
+MAX_SIZE=2048        # cap for the full-CPU (MPI) and GPU configs
+CPU1_MAX_SIZE=128    # cap for the single CPU core (hopeless beyond this)
 
 # --------------------------------------------------------------------------- #
 # Study 1 — homogenization WITHOUT preconditioner
 # --------------------------------------------------------------------------- #
 echo "=== Homogenization benchmark (no preconditioner) ==="
 python3 examples/benchmark_homogenization.py \
-    --sizes 16 24 32 48 64 96 128 \
+    --sizes $SIZES \
+    --max-size $MAX_SIZE \
+    --cpu1-max-size $CPU1_MAX_SIZE \
     --mpi-cpu-ranks 92 \
-    --scaling-sizes $SCALING_SIZES \
-    --scaling-ranks $CPU_RANKS \
-    --scaling-gpu-ranks $GPU_RANKS \
     --maxiter 100 \
     --doc-out docs/benchmark_homogenization.md
 
@@ -87,12 +88,11 @@ python3 examples/benchmark_homogenization.py \
 # --------------------------------------------------------------------------- #
 echo "=== Homogenization benchmark (reference Fourier preconditioner) ==="
 python3 examples/benchmark_homogenization_preconditioner.py \
-    --sizes 16 24 32 48 64 96 128 \
+    --sizes $SIZES \
+    --max-size $MAX_SIZE \
+    --cpu1-max-size $CPU1_MAX_SIZE \
     --iter-sizes 16 24 32 48 64 \
     --mpi-cpu-ranks 92 \
-    --scaling-sizes $SCALING_SIZES \
-    --scaling-ranks $CPU_RANKS \
-    --scaling-gpu-ranks $GPU_RANKS \
     --maxiter 20000 \
     --tol 1e-6 \
     --doc-out docs/benchmark_homogenization_preconditioner.md

@@ -176,7 +176,10 @@ RocfftCachedPlan rocFFTBackend::create_plan(
 
   // Allocate work buffer if needed
   if (cached.work_buffer_size > 0) {
-    cached.work_buffer = gpu_malloc_checked(cached.work_buffer_size);
+    // Route through the device allocator chokepoint (single owner + visible
+    // to the allocation profiler).
+    cached.work_buffer =
+        device_allocate(cached.work_buffer_size, "rocfft-work-buffer");
     status = rocfft_execution_info_set_work_buffer(
         cached.info, cached.work_buffer, cached.work_buffer_size);
     check_rocfft_result(status, "setting work buffer");
@@ -232,7 +235,7 @@ RocfftCachedPlan rocFFTBackend::make_plan(const PlanKey & key) {
 
 void rocFFTBackend::destroy_plan(RocfftCachedPlan & cached) {
   if (cached.work_buffer != nullptr) {
-    GPU_FREE(cached.work_buffer);
+    device_deallocate(cached.work_buffer);
   }
   if (cached.info != nullptr) {
     rocfft_execution_info_destroy(cached.info);

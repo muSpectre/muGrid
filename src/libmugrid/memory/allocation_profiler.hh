@@ -166,6 +166,11 @@ namespace muGrid {
         //! Advance a pool's time integral up to @p now.
         void accrue(PoolStat & pool, Clock::time_point now) const;
 
+        //! Remove a live buffer's contribution from its pool/label and forget
+        //! it. The mutex must already be held. Shared by record_free and the
+        //! idempotent re-label path of record_alloc.
+        void remove_locked(const void * handle, Clock::time_point now);
+
         mutable std::mutex mutex{};
         //! Recording gate. Atomic so the per-allocation fast path can skip
         //! the mutex entirely when recording is off.

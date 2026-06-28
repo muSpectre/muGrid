@@ -57,6 +57,7 @@
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 #include "memory/gpu_runtime.hh"
+#include "memory/device_alloc.hh"
 #endif
 
 #include <sstream>
@@ -705,8 +706,10 @@ namespace muGrid {
                 // The 3D divergence kernel reads the quadrature weights on the
                 // device (unlike the 2D launch wrapper, which consumes them on
                 // the host), so stage them in device memory.
-                Real * d_quad_weights = nullptr;
-                GPU_MALLOC(&d_quad_weights, quad_weights.size() * sizeof(Real));
+                // Route through the device allocator chokepoint (single
+                // owner + visible to the allocation profiler).
+                Real * d_quad_weights = static_cast<Real *>(device_allocate(
+                    quad_weights.size() * sizeof(Real), "fem-divergence-weights"));
                 GPU_MEMCPY_H2D(d_quad_weights, quad_weights.data(),
                                quad_weights.size() * sizeof(Real));
                 for (Index_t comp = 0; comp < nb_components; ++comp) {
@@ -720,7 +723,7 @@ namespace muGrid {
                         grid_spacing[1], grid_spacing[2], d_quad_weights,
                         alpha, increment);
                 }
-                GPU_FREE(d_quad_weights);
+                device_deallocate(d_quad_weights);
             }
         }
 #endif

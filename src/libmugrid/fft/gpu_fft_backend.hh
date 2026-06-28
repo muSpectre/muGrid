@@ -55,6 +55,7 @@
 
 #include "core/exception.hh"
 #include "memory/gpu_runtime.hh"
+#include "memory/device_alloc.hh"
 
 #include <cstddef>
 #include <cstdint>
@@ -236,11 +237,13 @@ class GpuFFTBackend : public FFT1DBackend {
   void * ensure_scratch(std::size_t bytes) {
     if (bytes > this->scratch_bytes) {
       if (this->scratch != nullptr) {
-        GPU_FREE(this->scratch);
+        device_deallocate(this->scratch);
         this->scratch = nullptr;
         this->scratch_bytes = 0;
       }
-      this->scratch = gpu_malloc_checked(bytes);
+      // Route through the device allocator chokepoint (single owner + visible
+      // to the allocation profiler).
+      this->scratch = device_allocate(bytes, "fft-nd-scratch");
       this->scratch_bytes = bytes;
     }
     return this->scratch;
@@ -293,7 +296,7 @@ class GpuFFTBackend : public FFT1DBackend {
     // Plans are released by the derived destructor (destroy_all_plans); only
     // the backend-agnostic scratch remains to free here.
     if (this->scratch != nullptr) {
-      GPU_FREE(this->scratch);
+      device_deallocate(this->scratch);
     }
   }
 

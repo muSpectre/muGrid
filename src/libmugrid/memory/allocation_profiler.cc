@@ -179,6 +179,14 @@ namespace muGrid {
         }
         std::lock_guard<std::mutex> lock{this->mutex};
         const auto now{Clock::now()};
+        // Idempotent re-label: if this handle is already recorded (e.g. it was
+        // recorded generically at the device_allocate chokepoint and is now
+        // being re-recorded by the owning Field under its real name), undo the
+        // previous accounting first, so the bytes move to the new label rather
+        // than being counted twice.
+        if (this->live.find(handle) != this->live.end()) {
+            this->remove_locked(handle, now);
+        }
         bool unified{false};
         const std::string pk{pool_key_for(space, unified)};
 
@@ -210,12 +218,16 @@ namespace muGrid {
             return;
         }
         std::lock_guard<std::mutex> lock{this->mutex};
+        this->remove_locked(handle, Clock::now());
+    }
+
+    void AllocationProfiler::remove_locked(const void * handle,
+                                           Clock::time_point now) {
         auto it{this->live.find(handle)};
         if (it == this->live.end()) {
             return;
         }
         const Live & rec{it->second};
-        const auto now{Clock::now()};
         auto pit{this->pools.find(rec.pool)};
         if (pit != this->pools.end()) {
             PoolStat & pool{pit->second};
