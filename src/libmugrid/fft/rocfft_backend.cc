@@ -340,7 +340,7 @@ void rocFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "R2C (N-D) execution");
-  GPU_DEVICE_SYNCHRONIZE();
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
 }
 
 void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
@@ -378,7 +378,7 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "C2R (N-D) execution");
-  GPU_DEVICE_SYNCHRONIZE();
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
 }
 
 }  // namespace muGrid

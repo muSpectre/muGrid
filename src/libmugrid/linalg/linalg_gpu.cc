@@ -800,7 +800,6 @@ void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel<DS>,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       to_device(alpha), device_ptr(x), device_ptr(y), n);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 template <typename T>
@@ -813,7 +812,6 @@ void scal_device(T alpha, TypedField<T, DeviceSpace>& x) {
     GPU_LAUNCH_KERNEL(gpu_kernels::scal_kernel<DS>,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       to_device(alpha), device_ptr(x), n);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 template <typename T>
@@ -835,7 +833,6 @@ void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       to_device(alpha), device_ptr(x), to_device(beta),
                       device_ptr(y), n);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 template <typename T>
@@ -856,7 +853,6 @@ void copy_device(const TypedField<T, DeviceSpace>& src,
     GPU_LAUNCH_KERNEL(gpu_kernels::copy_kernel<DS>,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       device_ptr(src), device_ptr(dst), n);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 template <typename T>
@@ -939,7 +935,6 @@ void cross_device(const TypedField<T, DeviceSpace>& a,
     GPU_LAUNCH_KERNEL(gpu_kernels::cross_kernel<DS>, num_blocks,
                       gpu_kernels::BLOCK_SIZE, device_ptr(a), device_ptr(b),
                       device_ptr(out), npix, soa);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 }  // namespace
@@ -1116,7 +1111,6 @@ void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
                       reinterpret_cast<Real*>(x.view().data()),
                       alpha.view().data(), npix, ncomp, soa,
                       alpha_per_comp, n2);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 template <>
@@ -1138,7 +1132,6 @@ void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
                       num_blocks, gpu_kernels::BLOCK_SIZE,
                       x.view().data(), alpha.view().data(), npix, ncomp,
                       soa, alpha_per_comp, n);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1165,7 +1158,6 @@ void leray_project<DeviceSpace>(const TypedField<Real, DeviceSpace>& k,
         k.view().data(), invk.view().data(),
         reinterpret_cast<const Real*>(N.view().data()),
         reinterpret_cast<Real*>(out.view().data()), npix, soa);
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 }  // namespace linalg

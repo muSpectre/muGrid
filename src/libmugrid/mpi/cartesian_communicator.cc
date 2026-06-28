@@ -369,7 +369,7 @@ namespace muGrid {
         // Device-to-device 2D copies are asynchronous with respect to the
         // host; MPI must not read the staging buffer before the gather has
         // completed.
-        GPU_DEVICE_SYNCHRONIZE();
+        GPU_STREAM_SYNCHRONIZE_DEFAULT();
 #endif
         // Without GPU-aware MPI, bounce the contiguous staging buffers
         // through host memory (correct with any MPI library). On a unified-
@@ -595,7 +595,7 @@ namespace muGrid {
                                       nb_send_blocks, send_row_bytes,
                                       pitch_bytes, true);
             }
-            GPU_DEVICE_SYNCHRONIZE();
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
 
             // GPU-aware MPI receives straight into device staging and the
             // accumulate kernel reads it there: no host transfer at all.
@@ -705,7 +705,7 @@ namespace muGrid {
                                       nb_send_blocks, send_row_bytes,
                                       pitch_bytes, true);
             }
-            GPU_DEVICE_SYNCHRONIZE();
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
 
             // GPU-aware MPI receives straight into device staging and the
             // accumulate kernel reads it there: no host transfer at all.

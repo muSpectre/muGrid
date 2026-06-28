@@ -109,7 +109,7 @@ class GpuFFTBackend : public FFT1DBackend {
         PlanKey{Kind::R2C, Direction::FORWARD, n, batch, in_stride, in_dist,
                 out_stride, out_dist});
     this->derived().exec_r2c(plan, input, output);
-    GPU_DEVICE_SYNCHRONIZE();
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
 
   void c2r(Index_t n, Index_t batch, const Complex * input, Index_t in_stride,
@@ -130,7 +130,7 @@ class GpuFFTBackend : public FFT1DBackend {
     this->derived().exec_c2r(plan, input, output);
     // Synchronize so the result is complete before the caller hands the buffer
     // to GPU-aware MPI (which is not ordered against the FFT stream).
-    GPU_DEVICE_SYNCHRONIZE();
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
 
   void c2c_forward(Index_t n, Index_t batch, const Complex * input,
@@ -143,7 +143,7 @@ class GpuFFTBackend : public FFT1DBackend {
         PlanKey{Kind::C2C, Direction::FORWARD, n, batch, in_stride, in_dist,
                 out_stride, out_dist});
     this->derived().exec_c2c_forward(plan, input, output);
-    GPU_DEVICE_SYNCHRONIZE();
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
 
   void c2c_backward(Index_t n, Index_t batch, const Complex * input,
@@ -156,7 +156,7 @@ class GpuFFTBackend : public FFT1DBackend {
         PlanKey{Kind::C2C, Direction::BACKWARD, n, batch, in_stride, in_dist,
                 out_stride, out_dist});
     this->derived().exec_c2c_backward(plan, input, output);
-    GPU_DEVICE_SYNCHRONIZE();
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
 
  protected:

@@ -147,8 +147,6 @@ void laplace_2d_gpu(
 
     GPU_LAUNCH_KERNEL(laplace_2d_kernel, grid, block,
         input, output, nx, ny, stride_x, stride_y, scale, increment);
-
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 // Launch wrapper for 3D - uses unified macro
@@ -174,8 +172,6 @@ void laplace_3d_gpu(
 
     GPU_LAUNCH_KERNEL(laplace_3d_kernel, grid, block,
         input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale, increment);
-
-    GPU_DEVICE_SYNCHRONIZE();
 }
 
 }  // namespace laplace_kernels

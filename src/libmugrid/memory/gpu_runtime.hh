@@ -64,20 +64,28 @@ using gpuStream_t = cudaStream_t;
     do {                                                    \
         kernel<<<grid, block>>>(__VA_ARGS__);               \
         ::muGrid::gpu_assert_last_error(#kernel);           \
+        GPU_KERNEL_DEBUG_SYNC(#kernel);                     \
     } while (0)
 #define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...) \
     do {                                                         \
         kernel<<<grid, block, shmem>>>(__VA_ARGS__);             \
         ::muGrid::gpu_assert_last_error(#kernel);                \
+        GPU_KERNEL_DEBUG_SYNC(#kernel);                          \
     } while (0)
 #define GPU_LAUNCH_KERNEL_STREAM(kernel, grid, block, stream, ...) \
     do {                                                           \
         kernel<<<grid, block, 0, stream>>>(__VA_ARGS__);           \
         ::muGrid::gpu_assert_last_error(#kernel);                  \
+        GPU_KERNEL_DEBUG_SYNC(#kernel);                            \
     } while (0)
 
 // Host-callable runtime API (valid in any translation unit)
 #define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
+// Block the host until all work on the legacy default stream (stream 0) — the
+// only stream muGrid uses — has completed. Cheaper than a full-device
+// synchronize and the correct barrier before handing a default-stream buffer
+// to something that is not stream-ordered (GPU-aware MPI, host reads).
+#define GPU_STREAM_SYNCHRONIZE_DEFAULT() (void)cudaStreamSynchronize(0)
 #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
 #define GPU_FREE(ptr) (void)cudaFree(ptr)
 #define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
@@ -129,19 +137,23 @@ using gpuStream_t = hipStream_t;
     do {                                                             \
         hipLaunchKernelGGL(kernel, grid, block, 0, 0, __VA_ARGS__);  \
         ::muGrid::gpu_assert_last_error(#kernel);                    \
+        GPU_KERNEL_DEBUG_SYNC(#kernel);                              \
     } while (0)
 #define GPU_LAUNCH_KERNEL_SHMEM(kernel, grid, block, shmem, ...)         \
     do {                                                                \
         hipLaunchKernelGGL(kernel, grid, block, shmem, 0, __VA_ARGS__); \
         ::muGrid::gpu_assert_last_error(#kernel);                       \
+        GPU_KERNEL_DEBUG_SYNC(#kernel);                                 \
     } while (0)
 #define GPU_LAUNCH_KERNEL_STREAM(kernel, grid, block, stream, ...)        \
     do {                                                                 \
         hipLaunchKernelGGL(kernel, grid, block, 0, stream, __VA_ARGS__); \
         ::muGrid::gpu_assert_last_error(#kernel);                        \
+        GPU_KERNEL_DEBUG_SYNC(#kernel);                                  \
     } while (0)
 
 #define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
+#define GPU_STREAM_SYNCHRONIZE_DEFAULT() (void)hipStreamSynchronize(0)
 #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
 #define GPU_FREE(ptr) (void)hipFree(ptr)
 #define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
@@ -200,6 +212,38 @@ namespace muGrid {
                                context + "): " + err);
         }
     }
+
+    /**
+     * Synchronize the device and throw if a kernel left a pending error.
+     *
+     * `gpu_assert_last_error` only catches *launch* failures; asynchronous
+     * *execution* faults (e.g. an illegal memory access inside the kernel)
+     * surface later, at the next synchronization point. This helper forces
+     * them to surface at the offending launch and is wired into the launch
+     * macros via GPU_KERNEL_DEBUG_SYNC, which is active in debug builds only.
+     */
+    inline void gpu_assert_device_synchronized(const char * context) {
+        GPU_DEVICE_SYNCHRONIZE();
+        gpu_assert_last_error(context);
+    }
+}  // namespace muGrid
+
+// Per-launch synchronize-and-check, debug builds only. Release builds rely on
+// default-stream ordering (consecutive kernels run in order) and synchronize
+// only where the host actually reads device data (synchronous D2H copies in
+// the reductions) or before handing a buffer to MPI (explicit barriers there).
+// Define MUGRID_FORCE_KERNEL_SYNC to force the per-launch synchronize in a
+// release build too — useful for pinpointing an asynchronous kernel fault to
+// its launch without switching to a full debug build.
+#if defined(NDEBUG) && !defined(MUGRID_FORCE_KERNEL_SYNC)
+#define GPU_KERNEL_DEBUG_SYNC(context) ((void)0)
+#else
+#define GPU_KERNEL_DEBUG_SYNC(context) \
+    ::muGrid::gpu_assert_device_synchronized(context)
+#endif
+
+namespace muGrid {
+    // (continued)
 
     /**
      * Allocate `bytes` of raw device memory, throwing a RuntimeError on
