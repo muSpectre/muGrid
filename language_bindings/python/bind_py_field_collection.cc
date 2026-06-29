@@ -432,6 +432,17 @@ void add_field_collection(py::module & mod) {
             "unit"_a = muGrid::Unit::unitless(),
             py::return_value_policy::reference_internal)
         .def("field_exists", &FieldCollection::field_exists)
+        .def(
+            "pop_field",
+            [](FieldCollection & collection, const std::string & unique_name) {
+                // Remove the field from the collection; dropping the returned
+                // owning pointer here frees its (host or device) buffer.
+                collection.pop_field(unique_name);
+            },
+            "unique_name"_a,
+            "Remove a field from the collection and free its memory. Useful "
+            "for releasing temporary work fields once they are no longer "
+            "needed.")
         .def("state_field_exists", &FieldCollection::state_field_exists)
         .def_property_readonly("nb_pixels", &FieldCollection::get_nb_pixels)
         .def_property_readonly("nb_pixels_without_ghosts",

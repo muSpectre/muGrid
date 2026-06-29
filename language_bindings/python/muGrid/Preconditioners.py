@@ -439,9 +439,12 @@ def make_reference_stiffness_preconditioner(
     for d in range(dim):
         origin_mask &= coords[d] == 0.0
 
-    impulse = engine.real_space_field(f"{name}-impulse", components=(n,))
-    column = engine.real_space_field(f"{name}-column", components=(n,))
-    column_hat = engine.fourier_space_field(f"{name}-column-hat", components=(n,))
+    impulse_name = f"{name}-impulse"
+    column_name = f"{name}-column"
+    column_hat_name = f"{name}-column-hat"
+    impulse = engine.real_space_field(impulse_name, components=(n,))
+    column = engine.real_space_field(column_name, components=(n,))
+    column_hat = engine.fourier_space_field(column_hat_name, components=(n,))
 
     # K_hat[alpha, beta, q] = (FFT of Kʳᵉᶠ applied to impulse e_beta)[alpha](q)
     K_hat = np.zeros((n, n) + fourier_shape, dtype=complex)
@@ -477,5 +480,17 @@ def make_reference_stiffness_preconditioner(
     inv[nonzero] = np.linalg.inv(blocks[nonzero])
     # [dim, dim, *fourier], with the inverse-transform normalisation folded in.
     K_inv = np.moveaxis(inv, (-2, -1), (0, 1)) * engine.normalisation
+
+    # Release the impulse-response scratch. These three fields (two real, one
+    # Fourier) were only needed to assemble the symbol above; left in the
+    # engine's collections they would persist through the entire solve. The
+    # symbol now lives in K_inv (a plain array, copied onto the device inside
+    # the preconditioner), so the only Fourier buffer the solve then needs is
+    # the preconditioner's own work field. Freeing here drops ~3 vector-sized
+    # buffers from the resident set during the CG iteration.
+    engine.real_space_collection.pop_field(impulse_name)
+    engine.real_space_collection.pop_field(column_name)
+    engine.fourier_space_collection.pop_field(column_hat_name)
+    del impulse, column, column_hat
 
     return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer)

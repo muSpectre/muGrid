@@ -286,6 +286,36 @@ def test_reference_stiffness_preconditioner_is_exact_inverse(comm):
         np.testing.assert_allclose(zc, xc, atol=1e-10)
 
 
+def test_reference_stiffness_preconditioner_frees_scratch(comm):
+    """Regression guard: the impulse-response scratch must be released after
+    the symbol is assembled, so it does not persist (uselessly) through the
+    whole solve. Only the preconditioner's own Fourier work field should
+    remain. This is a memory optimization; if it regresses these fields would
+    silently linger in the engine's collections."""
+    name = "ref-prec-free-test"
+    engine = make_engine(comm, (16, 16))
+    grid_spacing = 1 / 16
+    n = 2
+    laplace = muGrid.GenericLinearOperator(
+        [-1, -1], np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    )
+
+    def apply_operator(u, Au):
+        engine.communicate_ghosts(u)
+        laplace.apply(u, Au)
+        Au.s[...] /= -grid_spacing**2
+
+    make_reference_stiffness_preconditioner(engine, apply_operator, n, name=name)
+
+    rsc = engine.real_space_collection
+    fsc = engine.fourier_space_collection
+    assert not rsc.field_exists(f"{name}-impulse")
+    assert not rsc.field_exists(f"{name}-column")
+    assert not fsc.field_exists(f"{name}-column-hat")
+    # the per-iteration work buffer must still be there (needed by apply)
+    assert fsc.field_exists(f"{name}-work")
+
+
 def test_kernel_shape_validation(comm):
     """A kernel that does not match the local Fourier subdomain is rejected."""
     engine = make_engine(comm, (16, 16))
