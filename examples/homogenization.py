@@ -435,13 +435,22 @@ if not args.quiet:
 # - Output: tensor field with (dim, dim) components at quad pts
 #   (dim input components × dim operators)
 #
-# Tensor fields for gradient/stress at quadrature points:
-grad_u = fc.real_field(
-    "grad_u", (dim, dim), "quad"
-)  # displacement gradient tensor
-stress_field = fc.real_field(
-    "stress_field", (dim, dim), "quad"
-)  # stress tensor
+# Tensor fields for gradient/stress at quadrature points. These are the two
+# largest arrays (dim*dim*nb_quad doubles/voxel each: ~16/pt in 2D, ~90/pt in
+# 3D) and dominate the resident memory. The fused kernel never materialises
+# them -- it computes strain/stress element-locally inside apply, the macro RHS
+# (apply_macro_rhs) and the homogenized stress (average_stress) -- so they are
+# allocated only for the generic correctness-reference kernel.
+if args.kernel == "generic":
+    grad_u = fc.real_field(
+        "grad_u", (dim, dim), "quad"
+    )  # displacement gradient tensor
+    stress_field = fc.real_field(
+        "stress_field", (dim, dim), "quad"
+    )  # stress tensor
+else:
+    grad_u = None
+    stress_field = None
 
 # Vector fields for CG solver (displacement and force vectors)
 u_field = fc.real_field("u_field", (dim,))
@@ -707,8 +716,8 @@ def compute_divergence(f_vec):
 # `grad_u`, and the stress is written straight into `stress_field`, which the
 # divergence transpose consumes. This removes the strain/stress double-storage
 # (2 * dim^2 * nb_quad doubles per point: ~16/pt in 2D, ~90/pt in 3D).
-strain_arr = grad_u.s
-stress_arr = stress_field.s
+strain_arr = grad_u.s if grad_u is not None else None
+stress_arr = stress_field.s if stress_field is not None else None
 
 
 def apply_stiffness_generic(u_in, f_out):
@@ -778,10 +787,21 @@ def compute_rhs(E_macro, rhs_out):
     rhs_out : Field
         Output field for RHS (modified in place)
     """
-    # Build the uniform macroscopic strain field in the strain scratch buffer
-    # (reused -- it is overwritten by the solve afterwards), and the resulting
-    # stress in the stress scratch buffer, instead of allocating two more
-    # (dim, dim, quad, *grid) arrays here.
+    if args.kernel == "fused":
+        # Fused, streaming RHS: assemble f = Bᵀ C(λ, μ) E_macro directly from
+        # the per-pixel Lamé fields (material ghosts already filled at setup),
+        # with no global strain/stress field. The RHS is the negative of this.
+        E_flat = [float(E_macro[i, j]) for i in range(dim) for j in range(dim)]
+        fused_stiffness_op.apply_macro_rhs(
+            lambda_field, mu_field, E_flat, rhs_out
+        )
+        rhs_out.s[...] *= -1.0
+        return
+
+    # Generic path: build the uniform macroscopic strain field in the strain
+    # scratch buffer (reused -- it is overwritten by the solve afterwards), and
+    # the resulting stress in the stress scratch buffer, instead of allocating
+    # two more (dim, dim, quad, *grid) arrays here.
     strain_arr[...] = 0.0
     for i in range(dim):
         for j in range(dim):
@@ -957,35 +977,56 @@ with timer("total_solve"):
                 parprint(f"  CG did not converge after {args.maxiter} "
                          "iterations", comm=comm)
 
-        # Compute strain from solution
-        compute_strain(u_field, strain_arr)
+        if args.kernel == "fused":
+            # Fused, streaming homogenized stress: the operator computes the
+            # local volume integral ∫ σ dV of σ = C:(E_macro + sym ∇u)
+            # element-locally, with no global strain/stress field. Fill the
+            # displacement ghosts the kernel reads, then reduce across ranks
+            # and divide by the total volume.
+            decomposition.communicate_ghosts(u_field)
+            E_flat = [
+                float(E_macro[ii, jj]) for ii in range(dim) for jj in range(dim)
+            ]
+            local_int = fused_stiffness_op.average_stress(
+                u_field, lambda_field, mu_field, E_flat
+            )
+            sig_avg = np.zeros((dim, dim))
+            for k in range(dim):
+                for L in range(dim):
+                    sig_avg[k, L] = comm.sum(local_int[k * dim + L])
+            total_volume = np.prod(domain_size)
+            sig_avg /= total_volume
+        else:
+            # Compute strain from solution
+            compute_strain(u_field, strain_arr)
 
-        # Add macroscopic strain to get total strain
-        for ii in range(dim):
-            for jj in range(dim):
-                strain_arr[ii, jj, ...] += E_macro[ii, jj]
+            # Add macroscopic strain to get total strain
+            for ii in range(dim):
+                for jj in range(dim):
+                    strain_arr[ii, jj, ...] += E_macro[ii, jj]
 
-        # Compute stress from total strain
-        compute_stress(strain_arr, stress_arr, C_field)
+            # Compute stress from total strain
+            compute_stress(strain_arr, stress_arr, C_field)
 
-        # Compute average stress (homogenized stress)
-        # Σ_kl = (1/V) ∫ σ_kl dV = (1/V) Σ_q w_q * σ_kl(q)
-        sig_avg = np.zeros((dim, dim))
-        for k in range(dim):
-            for L in range(dim):
-                local_sum = 0.0
-                for q in range(nb_quad):
-                    if device.is_host:
-                        local_sum += quad_weights[q] * np.sum(stress_arr[k, L, q, ...])
-                    else:
-                        local_sum += quad_weights[q] * float(
-                            arr.sum(stress_arr[k, L, q, ...])
-                        )
-                sig_avg[k, L] = comm.sum(local_sum)
+            # Compute average stress (homogenized stress)
+            # Σ_kl = (1/V) ∫ σ_kl dV = (1/V) Σ_q w_q * σ_kl(q)
+            sig_avg = np.zeros((dim, dim))
+            for k in range(dim):
+                for L in range(dim):
+                    local_sum = 0.0
+                    for q in range(nb_quad):
+                        if device.is_host:
+                            local_sum += quad_weights[q] * np.sum(
+                                stress_arr[k, L, q, ...])
+                        else:
+                            local_sum += quad_weights[q] * float(
+                                arr.sum(stress_arr[k, L, q, ...])
+                            )
+                    sig_avg[k, L] = comm.sum(local_sum)
 
-        # Normalize by total volume
-        total_volume = np.prod(domain_size)
-        sig_avg /= total_volume
+            # Normalize by total volume
+            total_volume = np.prod(domain_size)
+            sig_avg /= total_volume
 
         # Store in homogenized stiffness (column voigt_col)
         for k in range(dim):
@@ -1204,15 +1245,22 @@ if args.plot:
         ax.set_title("Microstructure (0=matrix, 1=inclusion)")
         plt.colorbar(im, ax=ax)
 
-        # Stress xx from last load case (convert to numpy if on device)
+        # Stress xx from last load case (convert to numpy if on device). Only
+        # the generic kernel keeps a resident stress field; the fused kernel
+        # streams stress and never stores it, so there is nothing to plot.
         ax = axes[1]
-        if device.is_host:
-            sig_xx_avg = np.mean(stress_arr[0, 0, ...], axis=0)
+        if stress_arr is not None:
+            if device.is_host:
+                sig_xx_avg = np.mean(stress_arr[0, 0, ...], axis=0)
+            else:
+                sig_xx_avg = np.mean(arr.asnumpy(stress_arr[0, 0, ...]), axis=0)
+            im = ax.imshow(sig_xx_avg.T, origin="lower", cmap="RdBu_r")
+            ax.set_title(r"$\sigma_{xx}$ (last load case)")
+            plt.colorbar(im, ax=ax)
         else:
-            sig_xx_avg = np.mean(arr.asnumpy(stress_arr[0, 0, ...]), axis=0)
-        im = ax.imshow(sig_xx_avg.T, origin="lower", cmap="RdBu_r")
-        ax.set_title(r"$\sigma_{xx}$ (last load case)")
-        plt.colorbar(im, ax=ax)
+            ax.set_title(r"$\sigma_{xx}$ unavailable (fused kernel)")
+            ax.text(0.5, 0.5, "run with -k generic\nto plot stress",
+                    ha="center", va="center", transform=ax.transAxes)
 
         # Displacement magnitude from last load case
         ax = axes[2]

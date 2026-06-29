@@ -240,6 +240,159 @@ class TestIsotropicStiffnessOperator2D:
             force_fused.p, force_generic.p, rtol=1e-10, atol=1e-10
         )
 
+    def test_macro_rhs_and_average_vs_generic(self):
+        """apply_macro_rhs and average_stress must match the generic
+        gradient/stress/divergence path for a heterogeneous material."""
+        nn = 6
+        grid_spacing = [0.25, 0.25]
+        E_macro = np.array([[0.01, 0.005], [0.005, -0.003]])
+
+        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        comm = muGrid.Communicator()
+        deco = muGrid.CartesianDecomposition(
+            comm, (nn, nn), nb_subdivisions=(1, 1),
+            nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
+        )
+        lam = deco.real_field("lambda", (1,))
+        mu = deco.real_field("mu", (1,))
+        rng = np.random.default_rng(7)
+        lam.p[...] = 1.0 + rng.random(lam.p.shape)
+        mu.p[...] = 0.5 + rng.random(mu.p.shape)
+        deco.communicate_ghosts(lam)
+        deco.communicate_ghosts(mu)
+        lam_p, mu_p = lam.p[0], mu.p[0]
+        E_flat = E_macro.reshape(-1).tolist()
+        qw = grad_op.quadrature_weights
+
+        def iso_stress(strain_s):
+            exx, eyy = strain_s[0, 0], strain_s[1, 1]
+            exy = 0.5 * (strain_s[0, 1] + strain_s[1, 0])
+            tr = exx + eyy
+            s = deco.real_field("stress_tmp", (2, 2), "quad")
+            s.s[0, 0] = lam_p * tr + 2 * mu_p * exx
+            s.s[1, 1] = lam_p * tr + 2 * mu_p * eyy
+            s.s[0, 1] = 2 * mu_p * exy
+            s.s[1, 0] = 2 * mu_p * exy
+            return s
+
+        # --- apply_macro_rhs vs generic divergence of C E_macro ---
+        rhs_fused = deco.real_field("rhs_fused", (2,))
+        fused_op.apply_macro_rhs(lam, mu, E_flat, rhs_fused)
+
+        strain_m = deco.real_field("strain_m", (2, 2), "quad")
+        for i in range(2):
+            for j in range(2):
+                strain_m.s[i, j, ...] = E_macro[i, j]
+        stress_m = iso_stress(strain_m.s)
+        deco.communicate_ghosts(stress_m)
+        rhs_generic = deco.real_field("rhs_generic", (2,))
+        rhs_generic.pg[...] = 0.0
+        grad_op.transpose(stress_m, rhs_generic, qw)
+        np.testing.assert_allclose(
+            rhs_fused.p, rhs_generic.p, rtol=1e-10, atol=1e-12
+        )
+
+        # --- average_stress vs generic volume integral of total stress ---
+        u = deco.real_field("u", (2,))
+        u.p[...] = rng.random(u.p.shape)
+        deco.communicate_ghosts(u)
+        local_int = np.array(
+            fused_op.average_stress(u, lam, mu, E_flat)
+        ).reshape(2, 2)
+
+        grad = deco.real_field("grad", (2, 2), "quad")
+        grad_op.apply(u, grad)
+        total = deco.real_field("total", (2, 2), "quad")
+        for i in range(2):
+            for j in range(2):
+                total.s[i, j] = grad.s[i, j] + E_macro[i, j]
+        stress_t = iso_stress(total.s)
+        ref = np.zeros((2, 2))
+        for i in range(2):
+            for j in range(2):
+                ref[i, j] = sum(
+                    qw[q] * np.sum(stress_t.s[i, j, q]) for q in range(len(qw))
+                )
+        np.testing.assert_allclose(local_int, ref, rtol=1e-10, atol=1e-12)
+
+    def test_average_stress_with_padded_collection(self):
+        """Regression guard: average_stress must integrate exactly the *owned*
+        pixels, not the stencil-computable region (with_ghosts - 2).
+
+        The FFTEngine real-space collection pads one axis beyond the requested
+        ghosts. If average_stress counted that stencil-computable region, it
+        would integrate the extra ghost/padding elements -- which carry nonzero
+        *periodic* material -- and overcount the stress. A plain
+        CartesianDecomposition (symmetric 1-cell ghosts) has
+        with_ghosts - 2 == owned and therefore would NOT catch this bug; the
+        padded FFT collection is what exposes it. (This was the bug behind a
+        wrong C_eff under `-P reference`.)
+        """
+        nn = 16
+        grid_spacing = [1.0 / nn, 1.0 / nn]
+        E_macro = np.array([[0.01, 0.005], [0.005, -0.003]])
+
+        comm = muGrid.Communicator()
+        fft = muGrid.FFTEngine(
+            (nn, nn), comm, nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
+            nb_sub_pts={"quad": 2}, device=muGrid.Device.cpu(),
+        )
+        fc = fft.real_space_collection
+
+        lam = fc.real_field("lambda", (1,))
+        mu = fc.real_field("mu", (1,))
+        # Guard the guard: this test is only meaningful if the collection pads
+        # beyond the requested 1+1 ghosts on at least one axis (so that the
+        # buggy "with_ghosts - 2" element count differs from the owned count).
+        pad = [g - p for g, p in zip(lam.pg.shape[1:], lam.p.shape[1:])]
+        assert any(d > 2 for d in pad), (
+            f"expected padding beyond requested ghosts to exercise the bug, "
+            f"got per-axis (with_ghosts - owned) = {pad}"
+        )
+
+        rng = np.random.default_rng(3)
+        lam.p[...] = 1.0 + rng.random(lam.p.shape)
+        mu.p[...] = 0.5 + rng.random(mu.p.shape)
+        fft.communicate_ghosts(lam)
+        fft.communicate_ghosts(mu)
+        lam_p, mu_p = lam.p[0], mu.p[0]
+
+        u = fc.real_field("u", (2,))
+        u.p[...] = rng.random(u.p.shape)
+        fft.communicate_ghosts(u)
+
+        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        E_flat = E_macro.reshape(-1).tolist()
+        qw = grad_op.quadrature_weights
+
+        local_int = np.array(
+            fused_op.average_stress(u, lam, mu, E_flat)
+        ).reshape(2, 2)
+
+        # Reference: generic gradient -> total strain -> isotropic stress, then
+        # the volume integral over the *owned* region (grad.s is the owned view,
+        # so np.sum integrates only owned pixels regardless of padding).
+        grad = fc.real_field("grad", (2, 2), "quad")
+        grad_op.apply(u, grad)
+        exx, eyy = grad.s[0, 0], grad.s[1, 1]
+        exy = 0.5 * (grad.s[0, 1] + grad.s[1, 0])
+        Exx = exx + E_macro[0, 0]
+        Eyy = eyy + E_macro[1, 1]
+        Exy = exy + E_macro[0, 1]
+        tr = Exx + Eyy
+        sxx = lam_p * tr + 2 * mu_p * Exx
+        syy = lam_p * tr + 2 * mu_p * Eyy
+        sxy = 2 * mu_p * Exy
+        comp = {(0, 0): sxx, (1, 1): syy, (0, 1): sxy, (1, 0): sxy}
+        ref = np.zeros((2, 2))
+        for (i, j), s in comp.items():
+            ref[i, j] = sum(qw[q] * np.sum(s[q]) for q in range(len(qw)))
+
+        np.testing.assert_allclose(local_int, ref, rtol=1e-10, atol=1e-12)
+
 
 # =============================================================================
 # 3D Operator Tests
@@ -418,6 +571,81 @@ class TestIsotropicStiffnessOperator3D:
         np.testing.assert_allclose(
             force_fused.p, force_generic.p, rtol=1e-10, atol=1e-10
         )
+
+    def test_macro_rhs_and_average_vs_generic(self):
+        """apply_macro_rhs and average_stress must match the generic
+        gradient/stress/divergence path for a heterogeneous 3D material."""
+        nn = 5
+        grid_spacing = [0.2, 0.2, 0.2]
+        E_macro = np.array([[0.01, 0.004, -0.002],
+                            [0.004, -0.003, 0.005],
+                            [-0.002, 0.005, 0.006]])
+
+        fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+        comm = muGrid.Communicator()
+        deco = muGrid.CartesianDecomposition(
+            comm, (nn, nn, nn), nb_subdivisions=(1, 1, 1),
+            nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1),
+            nb_sub_pts={"quad": grad_op.nb_quad_pts},
+        )
+        lam = deco.real_field("lambda", (1,))
+        mu = deco.real_field("mu", (1,))
+        rng = np.random.default_rng(11)
+        lam.p[...] = 1.0 + rng.random(lam.p.shape)
+        mu.p[...] = 0.5 + rng.random(mu.p.shape)
+        deco.communicate_ghosts(lam)
+        deco.communicate_ghosts(mu)
+        lam_p, mu_p = lam.p[0], mu.p[0]
+        E_flat = E_macro.reshape(-1).tolist()
+        qw = grad_op.quadrature_weights
+
+        def iso_stress(strain_s):
+            tr = strain_s[0, 0] + strain_s[1, 1] + strain_s[2, 2]
+            s = deco.real_field("stress_tmp", (3, 3), "quad")
+            for i in range(3):
+                for j in range(3):
+                    eij = 0.5 * (strain_s[i, j] + strain_s[j, i])
+                    s.s[i, j] = 2 * mu_p * eij + (lam_p * tr if i == j else 0.0)
+            return s
+
+        # --- apply_macro_rhs vs generic divergence of C E_macro ---
+        rhs_fused = deco.real_field("rhs_fused", (3,))
+        fused_op.apply_macro_rhs(lam, mu, E_flat, rhs_fused)
+        strain_m = deco.real_field("strain_m", (3, 3), "quad")
+        for i in range(3):
+            for j in range(3):
+                strain_m.s[i, j, ...] = E_macro[i, j]
+        stress_m = iso_stress(strain_m.s)
+        deco.communicate_ghosts(stress_m)
+        rhs_generic = deco.real_field("rhs_generic", (3,))
+        rhs_generic.pg[...] = 0.0
+        grad_op.transpose(stress_m, rhs_generic, qw)
+        np.testing.assert_allclose(
+            rhs_fused.p, rhs_generic.p, rtol=1e-10, atol=1e-12
+        )
+
+        # --- average_stress vs generic volume integral of total stress ---
+        u = deco.real_field("u", (3,))
+        u.p[...] = rng.random(u.p.shape)
+        deco.communicate_ghosts(u)
+        local_int = np.array(
+            fused_op.average_stress(u, lam, mu, E_flat)
+        ).reshape(3, 3)
+        grad = deco.real_field("grad", (3, 3), "quad")
+        grad_op.apply(u, grad)
+        total = deco.real_field("total", (3, 3), "quad")
+        for i in range(3):
+            for j in range(3):
+                total.s[i, j] = grad.s[i, j] + E_macro[i, j]
+        stress_t = iso_stress(total.s)
+        ref = np.zeros((3, 3))
+        for i in range(3):
+            for j in range(3):
+                ref[i, j] = sum(
+                    qw[q] * np.sum(stress_t.s[i, j, q]) for q in range(len(qw))
+                )
+        np.testing.assert_allclose(local_int, ref, rtol=1e-10, atol=1e-12)
 
 
 # =============================================================================

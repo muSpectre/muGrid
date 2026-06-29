@@ -877,6 +877,25 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                  "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
                  "force += alpha * K(lambda, mu) @ displacement, uniform "
                  "scalars")
+            .def("apply_macro_rhs",
+                 static_cast<void (IsotropicStiffnessOperator2D::*)(
+                     const RealFieldHost &, const RealFieldHost &,
+                     const std::array<Real, 4> &, RealFieldHost &) const>(
+                     &IsotropicStiffnessOperator2D::apply_macro_rhs),
+                 "lambda_field"_a, "mu_field"_a, "E_macro"_a, "force"_a,
+                 "Assemble force = B^T C(lambda, mu) E_macro (the divergence "
+                 "of the macro-strain stress); the homogenization RHS is the "
+                 "negative of this. E_macro is the flattened 2x2 strain.")
+            .def("average_stress",
+                 static_cast<std::array<Real, 4> (
+                     IsotropicStiffnessOperator2D::*)(
+                     const RealFieldHost &, const RealFieldHost &,
+                     const RealFieldHost &, const std::array<Real, 4> &) const>(
+                     &IsotropicStiffnessOperator2D::average_stress),
+                 "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a,
+                 "Local volume integral of sigma = C:(E_macro + sym grad u), "
+                 "returned as a flattened 2x2 tensor. Sum across ranks and "
+                 "divide by total volume for the homogenized stress.")
             .def_property_readonly(
                 "G",
                 [](const IsotropicStiffnessOperator2D & op) {
@@ -935,7 +954,21 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                              const>(
                  &IsotropicStiffnessOperator2D::apply_uniform_increment),
              "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
-             "Uniform-scalar increment on device (GPU) fields");
+             "Uniform-scalar increment on device (GPU) fields")
+        .def("apply_macro_rhs",
+             static_cast<void (IsotropicStiffnessOperator2D::*)(
+                 const RealFieldDevice &, const RealFieldDevice &,
+                 const std::array<Real, 4> &, RealFieldDevice &) const>(
+                 &IsotropicStiffnessOperator2D::apply_macro_rhs),
+             "lambda_field"_a, "mu_field"_a, "E_macro"_a, "force"_a,
+             "Assemble macro-strain RHS divergence on device (GPU) fields")
+        .def("average_stress",
+             static_cast<std::array<Real, 4> (IsotropicStiffnessOperator2D::*)(
+                 const RealFieldDevice &, const RealFieldDevice &,
+                 const RealFieldDevice &, const std::array<Real, 4> &) const>(
+                 &IsotropicStiffnessOperator2D::average_stress),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a,
+             "Local volume integral of stress on device (GPU) fields");
 #endif
 }
 
@@ -1000,6 +1033,25 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                  "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
                  "force += alpha * K(lambda, mu) @ displacement, uniform "
                  "scalars")
+            .def("apply_macro_rhs",
+                 static_cast<void (IsotropicStiffnessOperator3D::*)(
+                     const RealFieldHost &, const RealFieldHost &,
+                     const std::array<Real, 9> &, RealFieldHost &) const>(
+                     &IsotropicStiffnessOperator3D::apply_macro_rhs),
+                 "lambda_field"_a, "mu_field"_a, "E_macro"_a, "force"_a,
+                 "Assemble force = B^T C(lambda, mu) E_macro (the divergence "
+                 "of the macro-strain stress); the homogenization RHS is the "
+                 "negative of this. E_macro is the flattened 3x3 strain.")
+            .def("average_stress",
+                 static_cast<std::array<Real, 9> (
+                     IsotropicStiffnessOperator3D::*)(
+                     const RealFieldHost &, const RealFieldHost &,
+                     const RealFieldHost &, const std::array<Real, 9> &) const>(
+                     &IsotropicStiffnessOperator3D::average_stress),
+                 "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a,
+                 "Local volume integral of sigma = C:(E_macro + sym grad u), "
+                 "returned as a flattened 3x3 tensor. Sum across ranks and "
+                 "divide by total volume for the homogenized stress.")
             .def_property_readonly(
                 "G",
                 [](const IsotropicStiffnessOperator3D & op) {
@@ -1058,7 +1110,21 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                              const>(
                  &IsotropicStiffnessOperator3D::apply_uniform_increment),
              "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a,
-             "Uniform-scalar increment on device (GPU) fields");
+             "Uniform-scalar increment on device (GPU) fields")
+        .def("apply_macro_rhs",
+             static_cast<void (IsotropicStiffnessOperator3D::*)(
+                 const RealFieldDevice &, const RealFieldDevice &,
+                 const std::array<Real, 9> &, RealFieldDevice &) const>(
+                 &IsotropicStiffnessOperator3D::apply_macro_rhs),
+             "lambda_field"_a, "mu_field"_a, "E_macro"_a, "force"_a,
+             "Assemble macro-strain RHS divergence on device (GPU) fields")
+        .def("average_stress",
+             static_cast<std::array<Real, 9> (IsotropicStiffnessOperator3D::*)(
+                 const RealFieldDevice &, const RealFieldDevice &,
+                 const RealFieldDevice &, const std::array<Real, 9> &) const>(
+                 &IsotropicStiffnessOperator3D::average_stress),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a,
+             "Local volume integral of stress on device (GPU) fields");
 #endif
 }
 
