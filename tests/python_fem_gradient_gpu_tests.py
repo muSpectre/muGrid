@@ -72,7 +72,7 @@ class TestFEMGradientOperator2D_smoke:
         """Test that FEM gradient 2D can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(2)  # 2D
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)  # 2D
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -102,7 +102,7 @@ class TestFEMGradientOperator2D_smoke:
         """Test that FEM gradient 2D transpose can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -144,7 +144,7 @@ class TestFEMGradientOperator3D_smoke:
         """Test that FEM gradient 3D can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(3)  # 3D
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)  # 3D
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -171,7 +171,7 @@ class TestFEMGradientOperator3D_smoke:
         """Test that FEM gradient 3D transpose can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(3)
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -219,7 +219,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
     def test_device_fem_gradient_returns_cupy(self):
         """Test that FEM gradient on device fields returns CuPy arrays."""
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
@@ -245,7 +245,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
         Compare GPU results against CPU reference.
         """
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -287,7 +287,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
     def test_device_fem_gradient_2d_transpose_correctness(self):
         """Test that 2D device FEM transpose produces correct results."""
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -330,7 +330,7 @@ class TestFEMGradientOperatorGPUCorrectness:
     def test_device_fem_gradient_3d_correctness(self):
         """Test that 3D device FEM gradient produces correct results."""
         nb_x, nb_y, nb_z = 6, 6, 6
-        fem_grad = muGrid.FEMGradientOperator(3)
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -373,7 +373,7 @@ class TestFEMGradientOperatorGPUCorrectness:
     def test_device_fem_gradient_3d_transpose_correctness(self):
         """Test that 3D device FEM transpose produces correct results."""
         nb_x, nb_y, nb_z = 6, 6, 6
-        fem_grad = muGrid.FEMGradientOperator(3)
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -415,7 +415,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
     def test_device_fem_gradient_roundtrip(self):
         """Test round-trip: B^T * B should be symmetric positive semi-definite."""
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         # Create device collection
         fc = muGrid.GlobalFieldCollection(
@@ -450,7 +450,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
 @pytest.mark.parametrize("device", get_test_devices())
 @pytest.mark.parametrize("dim", [2, 3])
-@pytest.mark.parametrize("element", ["simplex", "q1"])
+@pytest.mark.parametrize("element", ["p1", "q1"])
 class TestFEMGradientElements:
     """The FEM gradient operator supports linear simplices and Q1 elements.
     Patch test: an affine nodal field must produce a constant gradient (equal
@@ -462,7 +462,7 @@ class TestFEMGradientElements:
         n = 6
         h = [1.0 / n] * dim
         el = (muGrid.FEMElement.q1 if element == "q1"
-              else muGrid.FEMElement.simplex)
+              else muGrid.FEMElement.p1)
         op = muGrid.FEMGradientOperator(dim, tuple(h), element=el)
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}

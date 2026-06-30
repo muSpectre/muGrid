@@ -277,10 +277,10 @@ parser.add_argument(
 
 parser.add_argument(
     "--element",
-    choices=["simplex", "q1"],
-    default="simplex",
-    help="Finite element for the fused kernel: 'simplex' (triangles/tets) or "
-    "'q1' (bilinear quad / trilinear hex) (default: simplex)",
+    choices=["p1", "q1"],
+    default="q1",
+    help="Finite element for the fused kernel: 'p1' (linear triangles/tets) or "
+    "'q1' (bilinear quad / trilinear hex) (default: q1)",
 )
 
 parser.add_argument(
@@ -525,12 +525,12 @@ if args.kernel == "fused":
     # Create the fused isotropic stiffness operator
     if dim == 2:
         _elem = (muGrid.FEMElement.q1 if args.element == "q1"
-                 else muGrid.FEMElement.simplex)
+                 else muGrid.FEMElement.p1)
         fused_stiffness_op = muGrid.IsotropicStiffnessOperator2D(
             tuple(grid_spacing), _elem)
     else:
         _elem = (muGrid.FEMElement.q1 if args.element == "q1"
-                 else muGrid.FEMElement.simplex)
+                 else muGrid.FEMElement.p1)
         fused_stiffness_op = muGrid.IsotropicStiffnessOperator3D(
             tuple(grid_spacing), _elem)
 

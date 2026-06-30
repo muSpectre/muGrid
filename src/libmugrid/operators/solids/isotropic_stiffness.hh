@@ -123,7 +123,7 @@ namespace muGrid {
      *        per-call kernels are element-agnostic, so it is selected at
      *        construction rather than as a template parameter.
      */
-    enum class FEMElementKind { LinearSimplex, Q1 };
+    enum class FEMElementKind { P1, Q1 };
 
     /**
      * @struct IsotropicStiffnessTraits
@@ -451,7 +451,7 @@ namespace muGrid {
          */
         explicit IsotropicStiffnessOperator(
             const std::vector<Real> & grid_spacing,
-            FEMElementKind element = FEMElementKind::LinearSimplex)
+            FEMElementKind element = FEMElementKind::Q1)
             : grid_spacing{grid_spacing} {
             if (static_cast<Index_t>(this->grid_spacing.size()) != Dim) {
                 throw RuntimeError(std::to_string(Dim) +
@@ -653,13 +653,13 @@ namespace muGrid {
                 if (element == FEMElementKind::Q1) {
                     load(Q1Quad2D{});
                 } else {
-                    load(LinearSimplex2D{});
+                    load(P1Tri2D{});
                 }
             } else {
                 if (element == FEMElementKind::Q1) {
                     load(Q1Hex3D{});
                 } else {
-                    load(LinearSimplex3D{});
+                    load(P1Tet3D{});
                 }
             }
         }

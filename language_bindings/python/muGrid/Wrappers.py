@@ -1255,7 +1255,7 @@ class FEMGradientOperator:
 
     def __init__(
         self, spatial_dim: int, grid_spacing: Optional[Sequence[float]] = None,
-        element=_muGrid.FEMElement.simplex
+        element=_muGrid.FEMElement.q1
     ) -> None:
         if grid_spacing is None:
             grid_spacing = []
@@ -1388,7 +1388,7 @@ class IsotropicStiffnessOperator:
     """
 
     def __init__(self, spatial_dim: int, grid_spacing: Sequence[float],
-                 element=_muGrid.FEMElement.simplex) -> None:
+                 element=_muGrid.FEMElement.q1) -> None:
         if spatial_dim == 2:
             self._cpp = _muGrid.IsotropicStiffnessOperator2D(
                 list(grid_spacing), element)
@@ -1443,7 +1443,7 @@ class IsotropicStiffnessOperator2D(IsotropicStiffnessOperator):
     """Convenience wrapper fixing the spatial dimension to 2."""
 
     def __init__(self, grid_spacing: Sequence[float],
-                 element=_muGrid.FEMElement.simplex) -> None:
+                 element=_muGrid.FEMElement.q1) -> None:
         super().__init__(2, grid_spacing, element)
 
 
@@ -1451,7 +1451,7 @@ class IsotropicStiffnessOperator3D(IsotropicStiffnessOperator):
     """Convenience wrapper fixing the spatial dimension to 3."""
 
     def __init__(self, grid_spacing: Sequence[float],
-                 element=_muGrid.FEMElement.simplex) -> None:
+                 element=_muGrid.FEMElement.q1) -> None:
         super().__init__(3, grid_spacing, element)
 
 

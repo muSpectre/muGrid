@@ -5,7 +5,8 @@ Unreleased
 ----------
 
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
-  stiffness operators (host + GPU), selected via `muGrid.FEMElement.{simplex,q1}`
+  stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
+  the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`
 - ENH: Unified FE shape-function tables into element traits (`fem_element.hh`); FEM
   gradient operator templated on element with a single generic host/GPU kernel
 - ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness

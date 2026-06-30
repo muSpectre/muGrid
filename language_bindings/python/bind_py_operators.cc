@@ -701,8 +701,8 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
     // construction; affects only the precomputed geometry, not the kernels).
     py::enum_<FEMElementKind>(mod, "FEMElement",
                               "Finite element for the fused stiffness operator")
-        .value("simplex", FEMElementKind::LinearSimplex,
-               "Linear simplices (2 triangles / 5 tetrahedra per pixel)")
+        .value("p1", FEMElementKind::P1,
+               "P1 linear simplices (2 triangles / 5 tetrahedra per pixel)")
         .value("q1", FEMElementKind::Q1,
                "Q1 (bilinear quad / trilinear hex) with Gauss quadrature");
 
@@ -744,7 +744,7 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
         )pbdoc")
             .def(py::init<const std::vector<Real> &, FEMElementKind>(),
                  "grid_spacing"_a,
-                 "element"_a = FEMElementKind::LinearSimplex,
+                 "element"_a = FEMElementKind::Q1,
                  "Construct with grid spacing [hx, hy] and element type")
             .def("apply",
                  static_cast<ApplyHostFn>(&IsotropicStiffnessOperator2D::apply),
@@ -902,7 +902,7 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
         )pbdoc")
             .def(py::init<const std::vector<Real> &, FEMElementKind>(),
                  "grid_spacing"_a,
-                 "element"_a = FEMElementKind::LinearSimplex,
+                 "element"_a = FEMElementKind::Q1,
                  "Construct with grid spacing [hx, hy, hz] and element type")
             .def("apply",
                  static_cast<ApplyHostFn>(&IsotropicStiffnessOperator3D::apply),

@@ -918,7 +918,9 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
     def test_fem_2d_properties(self):
         """Test FEM gradient operator properties in 2D."""
-        op = muGrid.FEMGradientOperator(2, grid_spacing=[2.0, 3.0])
+        op = muGrid.FEMGradientOperator(
+            2, element=muGrid.FEMElement.p1, grid_spacing=[2.0, 3.0]
+        )
 
         # Check offset and shape
         np.testing.assert_array_equal(op.offset, [0, 0])
@@ -935,7 +937,9 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
     def test_fem_3d_properties(self):
         """Test FEM gradient operator properties in 3D."""
-        op = muGrid.FEMGradientOperator(3, grid_spacing=[1.0, 1.0, 1.0])
+        op = muGrid.FEMGradientOperator(
+            3, element=muGrid.FEMElement.p1, grid_spacing=[1.0, 1.0, 1.0]
+        )
 
         # Check offset and shape
         np.testing.assert_array_equal(op.offset, [0, 0, 0])
@@ -952,7 +956,9 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
     def test_fem_consistency(self):
         """Test consistency between properties."""
-        op = muGrid.FEMGradientOperator(2, grid_spacing=[1.0, 1.0])
+        op = muGrid.FEMGradientOperator(
+            2, element=muGrid.FEMElement.p1, grid_spacing=[1.0, 1.0]
+        )
 
         # Check dimensions
         self.assertEqual(op.spatial_dim, 2)
@@ -967,8 +973,12 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
     def test_fem_grid_spacing_affects_coefficients(self):
         """Test that grid spacing affects shape function gradients."""
-        op1 = muGrid.FEMGradientOperator(2, grid_spacing=[1.0, 1.0])
-        op2 = muGrid.FEMGradientOperator(2, grid_spacing=[2.0, 2.0])
+        op1 = muGrid.FEMGradientOperator(
+            2, element=muGrid.FEMElement.p1, grid_spacing=[1.0, 1.0]
+        )
+        op2 = muGrid.FEMGradientOperator(
+            2, element=muGrid.FEMElement.p1, grid_spacing=[2.0, 2.0]
+        )
 
         coeffs1 = op1.coefficients
         coeffs2 = op2.coefficients

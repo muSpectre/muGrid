@@ -67,7 +67,7 @@ class TestIsotropicStiffnessOperator2D:
     def test_construction(self):
         """Test that the operator can be constructed."""
         grid_spacing = [0.1, 0.1]
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Check that G and V matrices have correct shape
         G = op.G
@@ -78,7 +78,7 @@ class TestIsotropicStiffnessOperator2D:
     def test_symmetry(self):
         """Test that G and V matrices are symmetric."""
         grid_spacing = [0.1, 0.2]
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         G = op.G
         V = op.V
@@ -91,7 +91,7 @@ class TestIsotropicStiffnessOperator2D:
         nx, ny = 8, 8
         grid_spacing = [1.0 / (nx - 1), 1.0 / (ny - 1)]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Create field collection with ghost cells on both sides
         fc = muGrid.GlobalFieldCollection(
@@ -161,10 +161,14 @@ class TestIsotropicStiffnessOperator2D:
         mu = 1.5
 
         # Create the fused operator
-        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator2D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
 
         # Create the generic gradient operator
-        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        grad_op = muGrid.FEMGradientOperator(
+            2, grid_spacing, element=muGrid.FEMElement.p1
+        )
 
         # Create decomposition with ghosts for periodic BC
         comm = muGrid.Communicator()
@@ -247,8 +251,12 @@ class TestIsotropicStiffnessOperator2D:
         grid_spacing = [0.25, 0.25]
         E_macro = np.array([[0.01, 0.005], [0.005, -0.003]])
 
-        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator2D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            2, grid_spacing, element=muGrid.FEMElement.p1
+        )
         comm = muGrid.Communicator()
         deco = muGrid.CartesianDecomposition(
             comm,
@@ -366,8 +374,12 @@ class TestIsotropicStiffnessOperator2D:
         u.p[...] = rng.random(u.p.shape)
         fft.communicate_ghosts(u)
 
-        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator2D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            2, grid_spacing, element=muGrid.FEMElement.p1
+        )
         E_flat = E_macro.reshape(-1).tolist()
         qw = grad_op.quadrature_weights
 
@@ -406,7 +418,7 @@ class TestIsotropicStiffnessOperator3D:
     def test_construction(self):
         """Test that the operator can be constructed."""
         grid_spacing = [0.1, 0.1, 0.1]
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # Check that G and V matrices have correct shape
         G = op.G
@@ -417,7 +429,7 @@ class TestIsotropicStiffnessOperator3D:
     def test_symmetry(self):
         """Test that G and V matrices are symmetric."""
         grid_spacing = [0.1, 0.2, 0.15]
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         G = op.G
         V = op.V
@@ -430,7 +442,7 @@ class TestIsotropicStiffnessOperator3D:
         nx, ny, nz = 6, 6, 6
         grid_spacing = [1.0 / (nx - 1), 1.0 / (ny - 1), 1.0 / (nz - 1)]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # Create field collection with ghost cells on both sides
         fc = muGrid.GlobalFieldCollection(
@@ -491,10 +503,14 @@ class TestIsotropicStiffnessOperator3D:
         mu = 1.5
 
         # Create the fused operator
-        fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator3D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
 
         # Create the generic gradient operator
-        grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+        grad_op = muGrid.FEMGradientOperator(
+            3, grid_spacing, element=muGrid.FEMElement.p1
+        )
 
         # Create decomposition with ghosts for periodic BC
         comm = muGrid.Communicator()
@@ -582,8 +598,12 @@ class TestIsotropicStiffnessOperator3D:
             [[0.01, 0.004, -0.002], [0.004, -0.003, 0.005], [-0.002, 0.005, 0.006]]
         )
 
-        fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator3D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            3, grid_spacing, element=muGrid.FEMElement.p1
+        )
         comm = muGrid.Communicator()
         deco = muGrid.CartesianDecomposition(
             comm,
@@ -661,7 +681,7 @@ class TestIsotropicStiffnessApplyIncrement:
         nx, ny = 6, 6
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Create field collections with ghosts on both sides
         fc = muGrid.GlobalFieldCollection(
@@ -705,7 +725,7 @@ class TestIsotropicStiffnessApplyIncrement:
         nx, ny, nz = 5, 5, 5
         grid_spacing = [0.25, 0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # Create field collections with ghosts on both sides
         fc = muGrid.GlobalFieldCollection(
@@ -763,7 +783,7 @@ class TestIsotropicStiffnessOperatorApply_smoke:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Create device field collections
         device_obj = create_device(device)
@@ -810,7 +830,7 @@ class TestIsotropicStiffnessOperatorApply_smoke:
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # Create device field collections
         device_obj = create_device(device)
@@ -872,7 +892,7 @@ class TestIsotropicStiffnessOperatorGPUCorrectness:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Both CPU and GPU use same ghost configuration for comparison
         fc_cpu = muGrid.GlobalFieldCollection(
@@ -938,7 +958,7 @@ class TestIsotropicStiffnessOperatorGPUCorrectness:
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # Both CPU and GPU use same ghost configuration for comparison
         fc_cpu = muGrid.GlobalFieldCollection(
@@ -1101,8 +1121,12 @@ class TestUnitImpulse2D:
         lam = 2.0
         mu = 1.5
 
-        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator2D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            2, grid_spacing, element=muGrid.FEMElement.p1
+        )
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
         conv_op = muGrid.GenericLinearOperator([0, 0], grad_op.coefficients)
@@ -1213,8 +1237,12 @@ class TestUnitImpulse2D:
         lam = 2.0
         mu = 1.5
 
-        fused_op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator2D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            2, grid_spacing, element=muGrid.FEMElement.p1
+        )
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
         conv_op = muGrid.GenericLinearOperator([0, 0], grad_op.coefficients)
@@ -1409,8 +1437,12 @@ class TestUnitImpulse3D:
         lam = 2.0
         mu = 1.5
 
-        fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator3D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            3, grid_spacing, element=muGrid.FEMElement.p1
+        )
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
         conv_op = muGrid.GenericLinearOperator([0, 0, 0], grad_op.coefficients)
@@ -1521,8 +1553,12 @@ class TestUnitImpulse3D:
         lam = 2.0
         mu = 1.5
 
-        fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
-        grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+        fused_op = muGrid.IsotropicStiffnessOperator3D(
+            grid_spacing, muGrid.FEMElement.p1
+        )
+        grad_op = muGrid.FEMGradientOperator(
+            3, grid_spacing, element=muGrid.FEMElement.p1
+        )
 
         # Create ConvolutionOperator from FEMGradientOperator coefficients
         conv_op = muGrid.GenericLinearOperator([0, 0, 0], grad_op.coefficients)
@@ -1635,7 +1671,7 @@ class TestValidationGuard2D:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Displacement field with proper ghosts
         fc = muGrid.GlobalFieldCollection(
@@ -1663,7 +1699,7 @@ class TestValidationGuard2D:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Only right ghosts for node field - this is invalid
         fc = muGrid.GlobalFieldCollection(
@@ -1691,7 +1727,7 @@ class TestValidationGuard2D:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # No right ghosts for node field
         fc = muGrid.GlobalFieldCollection(
@@ -1718,7 +1754,7 @@ class TestValidationGuard2D:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Proper node field with ghost cells
         fc = muGrid.GlobalFieldCollection(
@@ -1747,7 +1783,7 @@ class TestValidationGuard2D:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # Node field with ghost cells
         fc = muGrid.GlobalFieldCollection(
@@ -1783,7 +1819,7 @@ class TestValidationGuard3D:
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         fc = muGrid.GlobalFieldCollection(
             (nx, ny, nz), nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1)
@@ -1812,7 +1848,7 @@ class TestValidationGuard3D:
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # No ghosts at all for node field
         fc = muGrid.GlobalFieldCollection((nx, ny, nz))
@@ -1854,7 +1890,7 @@ class TestGPUUnitImpulse:
         nx, ny = 8, 8
         grid_spacing = [0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.p1)
 
         # GPU kernels require ghosts on both sides
         fc_cpu = muGrid.GlobalFieldCollection(
@@ -1932,7 +1968,7 @@ class TestGPUUnitImpulse:
         nx, ny, nz = 6, 6, 6
         grid_spacing = [0.25, 0.25, 0.25]
 
-        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
+        op = muGrid.IsotropicStiffnessOperator3D(grid_spacing, muGrid.FEMElement.p1)
 
         # GPU kernels require ghosts on both sides
         fc_cpu = muGrid.GlobalFieldCollection(
@@ -2092,7 +2128,7 @@ class TestFEMElements:
     elements, selected at construction. Both must pass the FE patch test."""
 
     @pytest.mark.parametrize("dim", [2, 3])
-    @pytest.mark.parametrize("element", ["simplex", "q1"])
+    @pytest.mark.parametrize("element", ["p1", "q1"])
     def test_patch_test(self, dim, element):
         """Patch test: for a homogeneous material and an affine displacement,
         average_stress reproduces the exact constant stress C:(E_macro+sym∇u)
@@ -2119,7 +2155,7 @@ class TestFEMElements:
         deco.communicate_ghosts(lam_f)
         deco.communicate_ghosts(mu_f)
 
-        el = muGrid.FEMElement.q1 if element == "q1" else muGrid.FEMElement.simplex
+        el = muGrid.FEMElement.q1 if element == "q1" else muGrid.FEMElement.p1
         Op = (
             muGrid.IsotropicStiffnessOperator2D
             if dim == 2
@@ -2190,7 +2226,7 @@ class TestFEMElements:
         )
         f_s = fc.real_field("f_s", (dim,))
         f_q = fc.real_field("f_q", (dim,))
-        Op(tuple(h), muGrid.FEMElement.simplex).apply(u, lam_f, mu_f, f_s)
+        Op(tuple(h), muGrid.FEMElement.p1).apply(u, lam_f, mu_f, f_s)
         Op(tuple(h), muGrid.FEMElement.q1).apply(u, lam_f, mu_f, f_q)
         assert np.abs(np.asarray(f_s.p) - np.asarray(f_q.p)).max() > 1e-6
 

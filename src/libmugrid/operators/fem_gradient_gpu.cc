@@ -308,17 +308,17 @@ namespace fem_gradient_kernels {
     }
 
     // Explicit instantiations for the supported elements.
-    template void fem_gradient_gpu<LinearSimplex2D>(
+    template void fem_gradient_gpu<P1Tri2D>(
         const Real *, Real *, const Index_t *, const Index_t *,
         const Index_t *, Index_t, Index_t, const Real *, Real, bool);
-    template void fem_gradient_gpu<LinearSimplex3D>(
+    template void fem_gradient_gpu<P1Tet3D>(
         const Real *, Real *, const Index_t *, const Index_t *,
         const Index_t *, Index_t, Index_t, const Real *, Real, bool);
-    template void fem_divergence_gpu<LinearSimplex2D>(
+    template void fem_divergence_gpu<P1Tri2D>(
         const Real *, Real *, const Index_t *, const Index_t *,
         const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
         bool);
-    template void fem_divergence_gpu<LinearSimplex3D>(
+    template void fem_divergence_gpu<P1Tet3D>(
         const Real *, Real *, const Index_t *, const Index_t *,
         const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
         bool);

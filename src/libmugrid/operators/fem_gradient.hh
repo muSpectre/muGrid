@@ -120,7 +120,7 @@ namespace muGrid {
         // These replace the per-dimension hand-written kernels above: the
         // element supplies B[q][d][n] and the node count, and the loops are
         // fully unrolled because NbQuad/NbNodes/Dim are compile-time, so for a
-        // LinearSimplex the compiler folds B's ±1 / zeros and reproduces the
+        // P1 simplex the compiler folds B's ±1 / zeros and reproduces the
         // hand-written code. Works for any element (e.g. Q1) with no new code.
 
         //! Gradient (nodal → quadrature): grad[q][d] = (Σ_n B[q][d][n] u[n])/h_d.
@@ -328,7 +328,7 @@ namespace muGrid {
      * points). The element-specific data (shape-function-gradient table B,
      * quadrature weights, node count) comes from the @p Element traits (see
      * fem_element.hh); the kernels are generic over it. Supported elements:
-     * `LinearSimplex2D/3D` (triangles/tets) and, by adding a traits struct, Q1.
+     * `P1Tri2D/3D` (triangles/tets) and, by adding a traits struct, Q1.
      */
     template <class Element>
     class FEMGradientOperator : public LinearOperator {
@@ -447,21 +447,18 @@ namespace muGrid {
             return grid_spacing;
         }
 
-        //! Quadrature weights (one per quadrature point).
+        //! Quadrature weights (one per quadrature point): the element's
+        //! fractional weights scaled by the cell volume.
         std::vector<Real> get_quadrature_weights() const {
-            if constexpr (Dim == 2) {
-                // Each triangle has area = 0.5 * hx * hy; pixel area = hx * hy.
-                Real pixel_area = grid_spacing[0] * grid_spacing[1];
-                return {0.5 * pixel_area, 0.5 * pixel_area};
-            } else {
-                // 5-tet decomposition: central tet = 1/3 voxel, four corner
-                // tets = 1/6 voxel each.
-                Real voxel_volume =
-                    grid_spacing[0] * grid_spacing[1] * grid_spacing[2];
-                return {voxel_volume / 3.0, voxel_volume / 6.0,
-                        voxel_volume / 6.0, voxel_volume / 6.0,
-                        voxel_volume / 6.0};
+            Real cell_volume = 1.0;
+            for (Dim_t d = 0; d < Dim; ++d) {
+                cell_volume *= grid_spacing[d];
             }
+            std::vector<Real> weights(NB_QUAD);
+            for (Index_t q = 0; q < NB_QUAD; ++q) {
+                weights[q] = Element::Wfrac[q] * cell_volume;
+            }
+            return weights;
         }
 
         //! Stencil offset in pixels (the element spans [0, +1] in each axis).
@@ -711,9 +708,9 @@ namespace muGrid {
     };
 
     //! 2D linear-triangle FEM gradient. Preserves the historical name.
-    using FEMGradientOperator2D = FEMGradientOperator<LinearSimplex2D>;
+    using FEMGradientOperator2D = FEMGradientOperator<P1Tri2D>;
     //! 3D linear-tetrahedra FEM gradient. Preserves the historical name.
-    using FEMGradientOperator3D = FEMGradientOperator<LinearSimplex3D>;
+    using FEMGradientOperator3D = FEMGradientOperator<P1Tet3D>;
     //! 2D bilinear-quad (Q1) FEM gradient.
     using FEMGradientOperatorQ1_2D = FEMGradientOperator<Q1Quad2D>;
     //! 3D trilinear-hex (Q1) FEM gradient.

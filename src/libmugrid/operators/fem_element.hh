@@ -70,13 +70,13 @@ namespace muGrid {
     }
 
     /**
-     * @struct LinearSimplex2D
+     * @struct P1Tri2D
      * @brief 2D pixel split into 2 linear triangles (the historical element).
      *
      * Quadrature point q is the (constant-gradient) interior of triangle q;
      * each weight is half the pixel area.
      */
-    struct LinearSimplex2D {
+    struct P1Tri2D {
         static constexpr Dim_t SpatialDim = 2;
         static constexpr Index_t NbNodes = 4;
         static constexpr Index_t NbQuad = 2;
@@ -93,13 +93,13 @@ namespace muGrid {
     };
 
     /**
-     * @struct LinearSimplex3D
+     * @struct P1Tet3D
      * @brief 3D voxel split into 5 linear tetrahedra (Kuhn triangulation).
      *
      * Quadrature point 0 is the central tetrahedron (volume fraction 1/3); the
      * four corner tetrahedra each have volume fraction 1/6.
      */
-    struct LinearSimplex3D {
+    struct P1Tet3D {
         static constexpr Dim_t SpatialDim = 3;
         static constexpr Index_t NbNodes = 8;
         static constexpr Index_t NbQuad = 5;
