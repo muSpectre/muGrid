@@ -66,12 +66,13 @@ namespace muGrid {
          *
          * Stencil: scale * [0, 1, 0; 1,-4, 1; 0, 1, 0]
          */
+        template <typename T>
         void laplace_2d_host(
-            const Real* MUGRID_RESTRICT input,
-            Real* MUGRID_RESTRICT output,
+            const T* MUGRID_RESTRICT input,
+            T* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny,
             Index_t stride_x, Index_t stride_y,
-            Real scale,
+            T scale,
             bool increment = false);
 
         /**
@@ -79,25 +80,28 @@ namespace muGrid {
          *
          * Stencil: center = -6*scale, the six face neighbours = +scale.
          */
+        template <typename T>
         void laplace_3d_host(
-            const Real* MUGRID_RESTRICT input,
-            Real* MUGRID_RESTRICT output,
+            const T* MUGRID_RESTRICT input,
+            T* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            Real scale,
+            T scale,
             bool increment = false);
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // Single GPU launcher per stencil (the CUDA/HIP backend split lives
         // inside gpu_runtime.hh, not in the operator), matching the generic and
         // stiffness operators' *_gpu convention.
+        template <typename T>
         void laplace_2d_gpu(
-            const Real* input, Real* output, Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y, Real scale,
+            const T* input, T* output, Index_t nx, Index_t ny,
+            Index_t stride_x, Index_t stride_y, T scale,
             bool increment = false);
+        template <typename T>
         void laplace_3d_gpu(
-            const Real* input, Real* output, Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z, Real scale,
+            const T* input, T* output, Index_t nx, Index_t ny, Index_t nz,
+            Index_t stride_x, Index_t stride_y, Index_t stride_z, T scale,
             bool increment = false);
 #endif
 
@@ -176,7 +180,7 @@ namespace muGrid {
          */
         void apply(const TypedFieldBase<Real> & input_field,
                    TypedFieldBase<Real> & output_field) const override {
-            this->apply_impl(input_field, output_field, 1.0, false);
+            this->apply_impl<Real>(input_field, output_field, 1.0, false);
         }
 
         /**
@@ -186,7 +190,7 @@ namespace muGrid {
                              const Real & alpha,
                              TypedFieldBase<Real> & output_field)
             const override {
-            this->apply_impl(input_field, output_field, alpha, true);
+            this->apply_impl<Real>(input_field, output_field, alpha, true);
         }
 
         /**
@@ -213,12 +217,38 @@ namespace muGrid {
             this->apply_increment(input_field, alpha, output_field);
         }
 
+        //! Single-precision (Real32) host overloads.
+        void apply(const TypedFieldBase<Real32> & input_field,
+                   TypedFieldBase<Real32> & output_field) const override {
+            this->apply_impl<Real32>(input_field, output_field, 1.0f, false);
+        }
+        void apply_increment(const TypedFieldBase<Real32> & input_field,
+                             const Real32 & alpha,
+                             TypedFieldBase<Real32> & output_field)
+            const override {
+            this->apply_impl<Real32>(input_field, output_field, alpha, true);
+        }
+        void transpose(const TypedFieldBase<Real32> & input_field,
+                       TypedFieldBase<Real32> & output_field,
+                       const std::vector<Real> & weights = {}) const override {
+            (void)weights;
+            this->apply(input_field, output_field);
+        }
+        void transpose_increment(const TypedFieldBase<Real32> & input_field,
+                                 const Real32 & alpha,
+                                 TypedFieldBase<Real32> & output_field,
+                                 const std::vector<Real> & weights = {})
+            const override {
+            (void)weights;
+            this->apply_increment(input_field, alpha, output_field);
+        }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         //! Apply the Laplace operator on device (GPU) fields.
         void apply(const TypedFieldBase<Real, DefaultDeviceSpace> & input_field,
                    TypedFieldBase<Real, DefaultDeviceSpace> & output_field)
             const {
-            this->apply_impl(input_field, output_field, 1.0, false);
+            this->apply_impl<Real>(input_field, output_field, 1.0, false);
         }
 
         //! Apply with increment on device (GPU) fields.
@@ -226,7 +256,20 @@ namespace muGrid {
             const TypedFieldBase<Real, DefaultDeviceSpace> & input_field,
             const Real & alpha,
             TypedFieldBase<Real, DefaultDeviceSpace> & output_field) const {
-            this->apply_impl(input_field, output_field, alpha, true);
+            this->apply_impl<Real>(input_field, output_field, alpha, true);
+        }
+
+        //! Single-precision (Real32) device overloads.
+        void apply(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> & input_field,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & output_field) const {
+            this->apply_impl<Real32>(input_field, output_field, 1.0f, false);
+        }
+        void apply_increment(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> & input_field,
+            const Real32 & alpha,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & output_field) const {
+            this->apply_impl<Real32>(input_field, output_field, alpha, true);
         }
 #endif
 
@@ -303,25 +346,26 @@ namespace muGrid {
          * @brief Host apply with optional increment. The Laplacian is
          *        self-adjoint, so apply and transpose share this requirement.
          */
-        void apply_impl(const TypedFieldBase<Real> & input_field,
-                        TypedFieldBase<Real> & output_field, Real alpha,
+        template <typename T>
+        void apply_impl(const TypedFieldBase<T> & input_field,
+                        TypedFieldBase<T> & output_field, T alpha,
                         bool increment) const {
             const auto & collection =
                 this->check_fields(input_field, output_field, operator_name());
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
-            const Real * input = input_field.data();
-            Real * output = output_field.data();
-            const Real effective_scale = alpha * this->scale;
+            const T * input = input_field.data();
+            T * output = output_field.data();
+            const T effective_scale = alpha * static_cast<T>(this->scale);
 
             // ArrayOfStructures layout: stride_x = 1, stride_y = nx,
             // stride_z = nx*ny.
             if constexpr (Dim == 2) {
-                laplace_kernels::laplace_2d_host(
+                laplace_kernels::laplace_2d_host<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
                     nb_grid_pts[0], effective_scale, increment);
             } else {
-                laplace_kernels::laplace_3d_host(
+                laplace_kernels::laplace_3d_host<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1],
                     nb_grid_pts[2], 1, nb_grid_pts[0],
                     nb_grid_pts[0] * nb_grid_pts[1], effective_scale, increment);
@@ -330,24 +374,25 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         //! Device apply with optional increment.
+        template <typename T>
         void apply_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & input_field,
-            TypedFieldBase<Real, DefaultDeviceSpace> & output_field, Real alpha,
+            const TypedFieldBase<T, DefaultDeviceSpace> & input_field,
+            TypedFieldBase<T, DefaultDeviceSpace> & output_field, T alpha,
             bool increment) const {
             const auto & collection =
                 this->check_fields(input_field, output_field, operator_name());
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
-            const Real * input = input_field.view().data();
-            Real * output = output_field.view().data();
-            const Real effective_scale = alpha * this->scale;
+            const T * input = input_field.view().data();
+            T * output = output_field.view().data();
+            const T effective_scale = alpha * static_cast<T>(this->scale);
 
             if constexpr (Dim == 2) {
-                laplace_kernels::laplace_2d_gpu(
+                laplace_kernels::laplace_2d_gpu<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
                     nb_grid_pts[0], effective_scale, increment);
             } else {
-                laplace_kernels::laplace_3d_gpu(
+                laplace_kernels::laplace_3d_gpu<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1],
                     nb_grid_pts[2], 1, nb_grid_pts[0],
                     nb_grid_pts[0] * nb_grid_pts[1], effective_scale, increment);

@@ -16,6 +16,9 @@ Unreleased
   also accept float32 fields, matching double to ≈1e-7 relative on both CPU and GPU. On the GPU
   the geometry matrices stay in double `__constant__` memory and are cast to the working type at
   load, so the per-element arithmetic runs in single precision
+- ENH: `LaplaceOperator{2D,3D}` and `GenericLinearOperator` templated on scalar type (host + GPU);
+  both now accept float32 fields. The Generic operator keeps its sparse-operator coefficients in
+  double (one shared cache) and casts to the working type in the kernels
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
   stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
   the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`

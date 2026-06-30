@@ -64,10 +64,13 @@ namespace gpu {
      *
      * Works with both CUDA and HIP backends.
      */
+    // Templated on the field scalar type T; the sparse-operator coefficients
+    // stay in double (op_values) and are cast to T at load.
+    template <typename T>
     __global__ void apply_convolution_kernel_impl(
-        const Real* MUGRID_RESTRICT nodal_data,
-        Real* MUGRID_RESTRICT quad_data,
-        const Real alpha,
+        const T* MUGRID_RESTRICT nodal_data,
+        T* MUGRID_RESTRICT quad_data,
+        const T alpha,
         const Index_t nx, const Index_t ny, const Index_t nz,
         const Index_t nodal_base, const Index_t quad_base,
         const Index_t nodal_stride_x, const Index_t nodal_stride_y,
@@ -92,7 +95,7 @@ namespace gpu {
             for (Index_t i = 0; i < nnz; ++i) {
                 quad_data[quad_offset + quad_indices[i]] +=
                     alpha * nodal_data[nodal_offset + nodal_indices[i]] *
-                    op_values[i];
+                    static_cast<T>(op_values[i]);
             }
         }
     }
@@ -105,10 +108,11 @@ namespace gpu {
      *
      * Works with both CUDA and HIP backends.
      */
+    template <typename T>
     __global__ void transpose_convolution_kernel_impl(
-        const Real* MUGRID_RESTRICT quad_data,
-        Real* MUGRID_RESTRICT nodal_data,
-        const Real alpha,
+        const T* MUGRID_RESTRICT quad_data,
+        T* MUGRID_RESTRICT nodal_data,
+        const T alpha,
         const Index_t nx, const Index_t ny, const Index_t nz,
         const Index_t nodal_base, const Index_t quad_base,
         const Index_t nodal_stride_x, const Index_t nodal_stride_y,
@@ -133,11 +137,12 @@ namespace gpu {
                 z * quad_stride_z + y * quad_stride_y + x * quad_stride_x;
 
             for (Index_t i = 0; i < nnz; ++i) {
-                const Real w = (weights != nullptr) ? weights[quad_pt_indices[i]]
-                                                    : Real{1};
+                const T w = (weights != nullptr)
+                                ? static_cast<T>(weights[quad_pt_indices[i]])
+                                : T{1};
                 nodal_data[nodal_offset + nodal_indices[i]] +=
                     alpha * w * quad_data[quad_offset + quad_indices[i]] *
-                    op_values[i];
+                    static_cast<T>(op_values[i]);
             }
         }
     }
@@ -147,10 +152,11 @@ namespace gpu {
      *
      * Uses unified GPU_LAUNCH_KERNEL macro that works for both CUDA and HIP.
      */
+    template <typename T>
     inline void apply_convolution_kernel(
-        const Real* nodal_data,
-        Real* quad_data,
-        const Real alpha,
+        const T* nodal_data,
+        T* quad_data,
+        const T alpha,
         const GridTraversalParams& params,
         const Index_t* quad_indices,
         const Index_t* nodal_indices,
@@ -171,7 +177,8 @@ namespace gpu {
             (params.nz + block.z - 1) / block.z
         );
 
-        GPU_LAUNCH_KERNEL_STREAM(apply_convolution_kernel_impl, grid, block, stream,
+        auto kern = apply_convolution_kernel_impl<T>;
+        GPU_LAUNCH_KERNEL_STREAM(kern, grid, block, stream,
             nodal_data, quad_data, alpha,
             params.nx, params.ny, params.nz,
             nodal_base, quad_base,
@@ -186,10 +193,11 @@ namespace gpu {
      *
      * Uses unified GPU_LAUNCH_KERNEL macro that works for both CUDA and HIP.
      */
+    template <typename T>
     inline void transpose_convolution_kernel(
-        const Real* quad_data,
-        Real* nodal_data,
-        const Real alpha,
+        const T* quad_data,
+        T* nodal_data,
+        const T alpha,
         const GridTraversalParams& params,
         const Index_t* quad_indices,
         const Index_t* nodal_indices,
@@ -212,7 +220,8 @@ namespace gpu {
             (params.nz + block.z - 1) / block.z
         );
 
-        GPU_LAUNCH_KERNEL_STREAM(transpose_convolution_kernel_impl, grid, block, stream,
+        auto kern = transpose_convolution_kernel_impl<T>;
+        GPU_LAUNCH_KERNEL_STREAM(kern, grid, block, stream,
             quad_data, nodal_data, alpha,
             params.nx, params.ny, params.nz,
             nodal_base, quad_base,

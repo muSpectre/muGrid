@@ -406,6 +406,24 @@ void add_stencil_gradient_operator(py::module & mod) {
             .def_property_readonly("nb_input_components", &GenericLinearOperator::get_nb_input_components)
             .def_property_readonly("nb_output_components", &GenericLinearOperator::get_nb_output_components);
 
+    // Single-precision (float32) host overloads.
+    {
+        using F = TypedFieldBase<Real32>;
+        conv_op
+            .def("apply",
+                 static_cast<void (GenericLinearOperator::*)(const F &, F &)
+                                 const>(&GenericLinearOperator::apply),
+                 "nodal_field"_a, "quadrature_point_field"_a,
+                 "Apply convolution to host float32 fields")
+            .def("transpose",
+                 static_cast<void (GenericLinearOperator::*)(
+                     const F &, F &, const std::vector<Real> &) const>(
+                     &GenericLinearOperator::transpose),
+                 "quadrature_point_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose convolution to host float32 fields");
+    }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device field overloads (only when GPU backend is enabled)
     using ApplyDeviceFn = void (GenericLinearOperator::*)(
@@ -425,6 +443,56 @@ void add_stencil_gradient_operator(py::module & mod) {
             "quadrature_point_field"_a, "nodal_field"_a,
             "weights"_a = std::vector<Real>{},
             "Apply transpose convolution to device (GPU) fields");
+
+    // Single-precision (float32) device overloads.
+    {
+        using FD = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+        conv_op
+            .def("apply",
+                 static_cast<void (GenericLinearOperator::*)(const FD &, FD &)
+                                 const>(&GenericLinearOperator::apply),
+                 "nodal_field"_a, "quadrature_point_field"_a,
+                 "Apply convolution to device float32 fields")
+            .def("transpose",
+                 static_cast<void (GenericLinearOperator::*)(
+                     const FD &, FD &, const std::vector<Real> &) const>(
+                     &GenericLinearOperator::transpose),
+                 "quadrature_point_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose convolution to device float32 fields");
+    }
+#endif
+}
+
+// Add the single-precision (float32) apply/transpose overloads to an
+// already-bound LaplaceOperator class (host, and device under CUDA/HIP).
+template <class Op>
+static void add_laplace_real32_overloads(py::class_<Op, LinearOperator> & cls) {
+    using F = TypedFieldBase<Real32>;
+    cls.def("apply",
+            static_cast<void (Op::*)(const F &, F &) const>(&Op::apply),
+            "input_field"_a, "output_field"_a,
+            "Single-precision (float32) apply")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const F &, const Real32 &, F &) const>(
+                 &Op::apply_increment),
+             "input_field"_a, "alpha"_a, "output_field"_a)
+        .def("transpose",
+             static_cast<void (Op::*)(const F &, F &,
+                                      const std::vector<Real> &) const>(
+                 &Op::transpose),
+             "input_field"_a, "output_field"_a,
+             "weights"_a = std::vector<Real>{});
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using FD = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    cls.def("apply",
+            static_cast<void (Op::*)(const FD &, FD &) const>(&Op::apply),
+            "input_field"_a, "output_field"_a,
+            "Single-precision (float32) apply on device fields")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const FD &, const Real32 &, FD &) const>(
+                 &Op::apply_increment),
+             "input_field"_a, "alpha"_a, "output_field"_a);
 #endif
 }
 
@@ -458,8 +526,13 @@ void add_laplace_operator_2d(py::module & mod) {
                      &LaplaceOperator2D::apply_increment),
                  "input_field"_a, "alpha"_a, "output_field"_a,
                  "Add alpha * Laplace(input) to output on host (CPU) fields")
-            .def("transpose", &LaplaceOperator2D::transpose, "input_field"_a,
-                 "output_field"_a, "weights"_a = std::vector<Real>{},
+            .def("transpose",
+                 static_cast<void (LaplaceOperator2D::*)(
+                     const RealFieldHost &, RealFieldHost &,
+                     const std::vector<Real> &) const>(
+                     &LaplaceOperator2D::transpose),
+                 "input_field"_a, "output_field"_a,
+                 "weights"_a = std::vector<Real>{},
                  "Apply the transpose; identical to apply for the self-adjoint "
                  "Laplacian (weights are ignored)")
             .def_property_readonly("nb_stencil_pts",
@@ -499,6 +572,7 @@ void add_laplace_operator_2d(py::module & mod) {
                    "input_field"_a, "output_field"_a,
                    "Apply the Laplace operator to device (GPU) fields");
 #endif
+    add_laplace_real32_overloads(laplace_op);
 }
 
 // Bind class LaplaceOperator3D (dimension-specific)
@@ -531,8 +605,13 @@ void add_laplace_operator_3d(py::module & mod) {
                      &LaplaceOperator3D::apply_increment),
                  "input_field"_a, "alpha"_a, "output_field"_a,
                  "Add alpha * Laplace(input) to output on host (CPU) fields")
-            .def("transpose", &LaplaceOperator3D::transpose, "input_field"_a,
-                 "output_field"_a, "weights"_a = std::vector<Real>{},
+            .def("transpose",
+                 static_cast<void (LaplaceOperator3D::*)(
+                     const RealFieldHost &, RealFieldHost &,
+                     const std::vector<Real> &) const>(
+                     &LaplaceOperator3D::transpose),
+                 "input_field"_a, "output_field"_a,
+                 "weights"_a = std::vector<Real>{},
                  "Apply the transpose; identical to apply for the self-adjoint "
                  "Laplacian (weights are ignored)")
             .def_property_readonly("nb_stencil_pts",
@@ -572,6 +651,7 @@ void add_laplace_operator_3d(py::module & mod) {
                    "input_field"_a, "output_field"_a,
                    "Apply the Laplace operator to device (GPU) fields");
 #endif
+    add_laplace_real32_overloads(laplace_op);
 }
 
 // Bind a FEMGradientOperator<Element> instantiation. The 2D/3D and

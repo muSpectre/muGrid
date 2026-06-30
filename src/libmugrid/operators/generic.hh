@@ -142,6 +142,10 @@ namespace muGrid {
         void apply(const TypedFieldBase<Real> & nodal_field,
                    TypedFieldBase<Real> & quadrature_point_field) const final;
 
+        //! Single-precision (Real32) overload of apply().
+        void apply(const TypedFieldBase<Real32> & nodal_field,
+                   TypedFieldBase<Real32> & quadrature_point_field) const final;
+
         /**
          * Evaluates the gradient of nodal_field and adds it to
          * quadrature_point_field
@@ -156,6 +160,11 @@ namespace muGrid {
             const TypedFieldBase<Real> & nodal_field, const Real & alpha,
             TypedFieldBase<Real> & quadrature_point_field) const override;
 
+        //! Single-precision (Real32) overload of apply_increment().
+        void apply_increment(
+            const TypedFieldBase<Real32> & nodal_field, const Real32 & alpha,
+            TypedFieldBase<Real32> & quadrature_point_field) const override;
+
         /**
          * Evaluates the discretised divergence of quadrature_point_field into
          * nodal_field, weights corresponds to Gaussian quadrature weights. If
@@ -168,6 +177,11 @@ namespace muGrid {
          */
         void transpose(const TypedFieldBase<Real> & quadrature_point_field,
                        TypedFieldBase<Real> & nodal_field,
+                       const std::vector<Real> & weights = {}) const final;
+
+        //! Single-precision (Real32) overload of transpose().
+        void transpose(const TypedFieldBase<Real32> & quadrature_point_field,
+                       TypedFieldBase<Real32> & nodal_field,
                        const std::vector<Real> & weights = {}) const final;
 
         /**
@@ -186,6 +200,12 @@ namespace muGrid {
                             const Real & alpha,
                             TypedFieldBase<Real> & nodal_field,
                             const std::vector<Real> & weights = {}) const final;
+
+        //! Single-precision (Real32) overload of transpose_increment().
+        void transpose_increment(
+            const TypedFieldBase<Real32> & quadrature_point_field,
+            const Real32 & alpha, TypedFieldBase<Real32> & nodal_field,
+            const std::vector<Real> & weights = {}) const final;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
@@ -242,6 +262,27 @@ namespace muGrid {
                 quadrature_point_field,
             const Real & alpha,
             TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const std::vector<Real> & weights = {}) const;
+
+        //! Single-precision (Real32) device overloads.
+        void apply(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field)
+            const;
+        void apply_increment(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+            const Real32 & alpha,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field)
+            const;
+        void transpose(const TypedFieldBase<Real32, DefaultDeviceSpace> &
+                           quadrature_point_field,
+                       TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+                       const std::vector<Real> & weights = {}) const;
+        void transpose_increment(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> &
+                quadrature_point_field,
+            const Real32 & alpha,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
             const std::vector<Real> & weights = {}) const;
 #endif
 
@@ -495,9 +536,36 @@ namespace muGrid {
          * @param alpha Scaling factor
          * @param params Grid traversal parameters
          */
-        template <typename DeviceSpace>
-        void apply_on_device(const Real * nodal_data, Real * quad_data,
-                             const Real alpha,
+        //! Host apply/transpose with increment, templated on the field scalar
+        //! type T (Real or Real32). The cached sparse operator stays in double
+        //! and its coefficients are cast to T inside the kernels.
+        template <typename T>
+        void apply_increment_impl(
+            const TypedFieldBase<T> & nodal_field, T alpha,
+            TypedFieldBase<T> & quadrature_point_field) const;
+        template <typename T>
+        void transpose_increment_impl(
+            const TypedFieldBase<T> & quadrature_point_field, T alpha,
+            TypedFieldBase<T> & nodal_field,
+            const std::vector<Real> & weights) const;
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        //! Device counterparts of the above (defined in generic_gpu.cc).
+        template <typename T>
+        void apply_increment_device_impl(
+            const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field, T alpha,
+            TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field)
+            const;
+        template <typename T>
+        void transpose_increment_device_impl(
+            const TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field,
+            T alpha, TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
+            const std::vector<Real> & weights) const;
+#endif
+
+        template <typename DeviceSpace, typename T>
+        void apply_on_device(const T * nodal_data, T * quad_data,
+                             const T alpha,
                              const GridTraversalParams & params) const;
 
         /**
@@ -512,9 +580,9 @@ namespace muGrid {
          * @param weights Device pointer to per-quad-point weights; nullptr for
          *   unweighted (all weights treated as 1)
          */
-        template <typename DeviceSpace>
-        void transpose_on_device(const Real * quad_data, Real * nodal_data,
-                                 const Real alpha,
+        template <typename DeviceSpace, typename T>
+        void transpose_on_device(const T * quad_data, T * nodal_data,
+                                 const T alpha,
                                  const GridTraversalParams & params,
                                  const Real * weights = nullptr) const;
 
@@ -585,27 +653,27 @@ namespace muGrid {
     /* Template method implementations for GenericLinearOperator            */
     /* ---------------------------------------------------------------------- */
 
-    template <typename DeviceSpace>
+    template <typename DeviceSpace, typename T>
     void GenericLinearOperator::apply_on_device(
-        const Real * nodal_data, Real * quad_data, const Real alpha,
+        const T * nodal_data, T * quad_data, const T alpha,
         const GridTraversalParams & params) const {
         // Get device sparse operator (lazily copies from host if needed)
         const auto & sparse_op = this->cached_device_apply_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
-        KernelDispatcher<DeviceSpace>::apply_convolution(
+        KernelDispatcher<DeviceSpace>::template apply_convolution<T>(
             nodal_data, quad_data, alpha, params, sparse_op);
     }
 
-    template <typename DeviceSpace>
+    template <typename DeviceSpace, typename T>
     void GenericLinearOperator::transpose_on_device(
-        const Real * quad_data, Real * nodal_data, const Real alpha,
+        const T * quad_data, T * nodal_data, const T alpha,
         const GridTraversalParams & params, const Real * weights) const {
         // Get device sparse operator (lazily copies from host if needed)
         const auto & sparse_op = this->cached_device_transpose_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
-        KernelDispatcher<DeviceSpace>::transpose_convolution(
+        KernelDispatcher<DeviceSpace>::template transpose_convolution<T>(
             quad_data, nodal_data, alpha, params, sparse_op, weights);
     }
 

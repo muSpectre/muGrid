@@ -53,12 +53,19 @@ namespace muGrid {
         quadrature_point_field.set_zero();
         this->apply_increment(nodal_field, 1., quadrature_point_field);
     }
+    void GenericLinearOperator::apply(
+        const TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+        TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field)
+        const {
+        quadrature_point_field.set_zero();
+        this->apply_increment(nodal_field, 1.f, quadrature_point_field);
+    }
 
     /* ---------------------------------------------------------------------- */
-    void GenericLinearOperator::apply_increment(
-        const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
-        const Real & alpha,
-        TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field) const {
+    template <typename T>
+    void GenericLinearOperator::apply_increment_device_impl(
+        const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field, T alpha,
+        TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field) const {
         // Validate fields using generic version that works with base Field
         const auto & collection = this->validate_fields_generic(nodal_field,
                                                                 quadrature_point_field);
@@ -78,12 +85,28 @@ namespace muGrid {
             nb_nodal_components);
 
         // Get raw data pointers from device fields
-        const Real* nodal_data = nodal_field.view().data();
-        Real* quad_data = quadrature_point_field.view().data();
+        const T* nodal_data = nodal_field.view().data();
+        T* quad_data = quadrature_point_field.view().data();
 
         // Use device kernel
-        this->apply_on_device<DefaultDeviceSpace>(
+        this->apply_on_device<DefaultDeviceSpace, T>(
             nodal_data, quad_data, alpha, params);
+    }
+
+    void GenericLinearOperator::apply_increment(
+        const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+        const Real & alpha,
+        TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field) const {
+        this->apply_increment_device_impl<Real>(nodal_field, alpha,
+                                                quadrature_point_field);
+    }
+    void GenericLinearOperator::apply_increment(
+        const TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+        const Real32 & alpha,
+        TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field)
+        const {
+        this->apply_increment_device_impl<Real32>(nodal_field, alpha,
+                                                  quadrature_point_field);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -95,12 +118,20 @@ namespace muGrid {
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1., nodal_field, weights);
     }
+    void GenericLinearOperator::transpose(
+        const TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field,
+        TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+        const std::vector<Real> & weights) const {
+        nodal_field.set_zero();
+        this->transpose_increment(quadrature_point_field, 1.f, nodal_field,
+                                  weights);
+    }
 
     /* ---------------------------------------------------------------------- */
-    void GenericLinearOperator::transpose_increment(
-        const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
-        const Real & alpha,
-        TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+    template <typename T>
+    void GenericLinearOperator::transpose_increment_device_impl(
+        const TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field,
+        T alpha, TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
         // Validate fields using generic version
         const auto & collection = this->validate_fields_generic(nodal_field,
@@ -122,20 +153,38 @@ namespace muGrid {
             nb_nodal_components);
 
         // Get raw data pointers from device fields
-        Real* nodal_data = nodal_field.view().data();
-        const Real* quad_data = quadrature_point_field.view().data();
+        T* nodal_data = nodal_field.view().data();
+        const T* quad_data = quadrature_point_field.view().data();
 
-        // Copy weights to device if provided, then run kernel
+        // Copy weights to device if provided, then run kernel. Weights stay in
+        // double on the device; the kernel casts them to T.
         if (weights.empty()) {
-            this->transpose_on_device<DefaultDeviceSpace>(
+            this->transpose_on_device<DefaultDeviceSpace, T>(
                 quad_data, nodal_data, alpha, params, nullptr);
         } else {
             Array<Real, DefaultDeviceSpace> d_weights(weights.size());
             deep_copy<Real, DefaultDeviceSpace, HostSpace>(
                 d_weights.data(), weights.data(), weights.size());
-            this->transpose_on_device<DefaultDeviceSpace>(
+            this->transpose_on_device<DefaultDeviceSpace, T>(
                 quad_data, nodal_data, alpha, params, d_weights.data());
         }
+    }
+
+    void GenericLinearOperator::transpose_increment(
+        const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
+        const Real & alpha,
+        TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+        const std::vector<Real> & weights) const {
+        this->transpose_increment_device_impl<Real>(quadrature_point_field,
+                                                    alpha, nodal_field, weights);
+    }
+    void GenericLinearOperator::transpose_increment(
+        const TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field,
+        const Real32 & alpha,
+        TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
+        const std::vector<Real> & weights) const {
+        this->transpose_increment_device_impl<Real32>(
+            quadrature_point_field, alpha, nodal_field, weights);
     }
 
 }  // namespace muGrid
