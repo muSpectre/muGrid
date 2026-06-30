@@ -20,13 +20,14 @@ Unreleased
   both now accept float32 fields. The Generic operator keeps its sparse-operator coefficients in
   double (one shared cache) and casts to the working type in the kernels
 - ENH: Single-precision FFT — `FFTEngine.fft`/`ifft` now accept float32 real-space (`Real32`) and
-  complex64 Fourier (`Complex32`) fields, routed through the backend N-D path; the engine picks the
-  precision from the field dtype. Works serial on host (pocketfft) and GPU (cuFFT `R2C`/`C2R`),
-  matching double to ≈1e-7; the MPI pencil-transpose fp32 path still raises a clear "not yet
-  implemented" error
-- ENH: Single-precision host linalg primitives — `vecdot`, `norm_sq`, `axpy`, `scal`, `axpby`,
-  `copy`, `axpy_norm_sq`, `pipelined_cg_dots`, `cross` now accept `Real32`/`Complex32` fields
-  (the CG building blocks for a single-precision iterative solve)
+  complex64 Fourier (`Complex32`) fields; the engine picks the precision from the field dtype.
+  Works on host (pocketfft) and GPU (cuFFT `R2C`/`C2R`) serial, and **MPI-distributed across both
+  slab and pencil decompositions** (the pencil transpose carries `MPI_COMPLEX` datatypes and
+  `Complex32` work buffers), matching double to ≈1e-7 forward / ≈1e-6 round-trip on 2 and 4 ranks
+- ENH: Single-precision linalg primitives — the CG building blocks (`vecdot`, `norm_sq`, `axpy`,
+  `scal`, `axpby`, `copy`, `axpy_norm_sq`, `cross`, plus `pipelined_cg_dots` on host) accept
+  `Real32`/`Complex32` fields on host and GPU; the field-valued `scal` and the `leray_project`
+  spectral-projection kernel also have float32 host overloads
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
   stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
   the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`

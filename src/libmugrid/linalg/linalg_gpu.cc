@@ -86,28 +86,36 @@ constexpr int REDUCE_BLOCK_SIZE = 256;
 /* squared magnitude used by the fused norm reductions.                    */
 /* ---------------------------------------------------------------------- */
 
-struct DeviceComplex {
-    Real re, im;
-    // Defining member operators keeps DeviceComplex an aggregate in C++17
-    // (no user-provided constructors), so `DeviceComplex{}` zero-initialises
-    // and `DeviceComplex{re, im}` brace-initialises as usual.
-    __host__ __device__ DeviceComplex& operator+=(DeviceComplex o) {
+// Templated on the underlying real type RT so it serves both double (Complex)
+// and single (Complex32) precision; the field buffer is reinterpret_cast to it.
+template <typename RT>
+struct DeviceComplexT {
+    RT re, im;
+    // Defining member operators keeps DeviceComplexT an aggregate in C++17
+    // (no user-provided constructors), so `DeviceComplexT{}` zero-initialises
+    // and `DeviceComplexT{re, im}` brace-initialises as usual.
+    __host__ __device__ DeviceComplexT& operator+=(DeviceComplexT o) {
         re += o.re;
         im += o.im;
         return *this;
     }
 };
+using DeviceComplex = DeviceComplexT<Real>;
+using DeviceComplex32 = DeviceComplexT<float>;
 
-__host__ __device__ inline DeviceComplex operator+(DeviceComplex a,
-                                                    DeviceComplex b) {
+template <typename RT>
+__host__ __device__ inline DeviceComplexT<RT> operator+(DeviceComplexT<RT> a,
+                                                        DeviceComplexT<RT> b) {
     return {a.re + b.re, a.im + b.im};
 }
-__host__ __device__ inline DeviceComplex operator-(DeviceComplex a,
-                                                    DeviceComplex b) {
+template <typename RT>
+__host__ __device__ inline DeviceComplexT<RT> operator-(DeviceComplexT<RT> a,
+                                                        DeviceComplexT<RT> b) {
     return {a.re - b.re, a.im - b.im};
 }
-__host__ __device__ inline DeviceComplex operator*(DeviceComplex a,
-                                                    DeviceComplex b) {
+template <typename RT>
+__host__ __device__ inline DeviceComplexT<RT> operator*(DeviceComplexT<RT> a,
+                                                        DeviceComplexT<RT> b) {
     return {a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re};
 }
 
@@ -117,15 +125,18 @@ template <typename T>
 __host__ __device__ inline T conj_product(T a, T b) {
     return a * b;  // real: bilinear
 }
-__host__ __device__ inline DeviceComplex conj_product(DeviceComplex a,
-                                                      DeviceComplex b) {
+template <typename RT>
+__host__ __device__ inline DeviceComplexT<RT>
+conj_product(DeviceComplexT<RT> a, DeviceComplexT<RT> b) {
     // complex: sesquilinear conj(a)*b (Array API vecdot convention)
     return {a.re * b.re + a.im * b.im, a.re * b.im - a.im * b.re};
 }
 
 // Real squared magnitude |x|^2.
 __host__ __device__ inline Real sq_norm(Real x) { return x * x; }
-__host__ __device__ inline Real sq_norm(DeviceComplex x) {
+__host__ __device__ inline float sq_norm(float x) { return x * x; }
+template <typename RT>
+__host__ __device__ inline RT sq_norm(DeviceComplexT<RT> x) {
     return x.re * x.re + x.im * x.im;
 }
 
@@ -522,6 +533,7 @@ __global__ void leray_kernel(const Real* k, const Real* invk, const Real* N2,
 namespace {
 
 using gpu_kernels::DeviceComplex;
+using gpu_kernels::DeviceComplex32;
 
 /* ---------------------------------------------------------------------- */
 /* Public-type <-> device-scalar mapping                                   */
@@ -543,6 +555,14 @@ template <>
 struct device_scalar<Complex> {
     using type = DeviceComplex;
 };
+template <>
+struct device_scalar<Real32> {
+    using type = float;
+};
+template <>
+struct device_scalar<Complex32> {
+    using type = DeviceComplex32;
+};
 template <typename T>
 using DeviceScalar = typename device_scalar<T>::type;
 
@@ -561,10 +581,18 @@ inline Real to_device(Real a) { return a; }
 inline DeviceComplex to_device(Complex a) {
     return DeviceComplex{a.real(), a.imag()};
 }
+inline float to_device(float a) { return a; }  // Real32
+inline DeviceComplex32 to_device(Complex32 a) {
+    return DeviceComplex32{a.real(), a.imag()};
+}
 
 //! Convert a reduced device scalar back to the public scalar type.
 inline Real to_public(Real x) { return x; }
 inline Complex to_public(DeviceComplex x) { return Complex{x.re, x.im}; }
+inline float to_public(float x) { return x; }  // Real32
+inline Complex32 to_public(DeviceComplex32 x) {
+    return Complex32{x.re, x.im};
+}
 
 //! Lift a real squared-norm to the public scalar type (norms are real-valued;
 //! the complex API returns it as a zero-imaginary Complex, matching the host).
@@ -577,6 +605,14 @@ Real norm_to_public<Real>(Real r) {
 template <>
 Complex norm_to_public<Complex>(Real r) {
     return Complex{r, 0.0};
+}
+template <>
+Real32 norm_to_public<Real32>(Real r) {
+    return static_cast<Real32>(r);
+}
+template <>
+Complex32 norm_to_public<Complex32>(Real r) {
+    return Complex32{static_cast<Real32>(r), 0.0f};
 }
 
 /**
@@ -630,7 +666,12 @@ Real* reduction_scratch(int slot, Index_t n_reals) {
 //! Reduction scratch typed as a device scalar (sized for `count` of them).
 template <typename DS>
 DS* scratch_as(int slot, Index_t count) {
-    constexpr Index_t reals_per = sizeof(DS) / sizeof(Real);
+    // Ceiling division: a single-precision DS (float / DeviceComplex32) is
+    // smaller than a Real, so the integer ratio would round down to 0 and
+    // under-allocate. Round up so the Real-backed buffer always holds `count`
+    // DS values.
+    constexpr Index_t reals_per =
+        (sizeof(DS) + sizeof(Real) - 1) / sizeof(Real);
     return reinterpret_cast<DS*>(reduction_scratch(slot, count * reals_per));
 }
 
@@ -1036,6 +1077,54 @@ void cross<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
                                  TypedField<Complex, DeviceSpace>& out) {
     cross_device(a, b, out);
 }
+
+/* -- Single-precision (Real32 / Complex32) device CG building blocks ------ */
+/* These go through the generic *_device<T> bodies + DeviceComplex32 layer.  */
+/* The field-valued scal / leray_project / pipelined_cg_dots use custom      */
+/* double kernels and are not yet provided in single precision on device.    */
+#define MUGRID_LINALG_DEVICE_SPECIALIZATIONS(T)                                \
+    template <>                                                                \
+    T vecdot<T, DeviceSpace>(const TypedField<T, DeviceSpace>& a,              \
+                             const TypedField<T, DeviceSpace>& b) {            \
+        return vecdot_device(a, b);                                            \
+    }                                                                          \
+    template <>                                                                \
+    T norm_sq<T, DeviceSpace>(const TypedField<T, DeviceSpace>& x) {           \
+        return norm_sq_device(x);                                             \
+    }                                                                          \
+    template <>                                                                \
+    void axpy<T, DeviceSpace>(T alpha, const TypedField<T, DeviceSpace>& x,    \
+                              TypedField<T, DeviceSpace>& y) {                 \
+        axpy_device(alpha, x, y);                                             \
+    }                                                                          \
+    template <>                                                                \
+    void scal<T, DeviceSpace>(T alpha, TypedField<T, DeviceSpace>& x) {        \
+        scal_device(alpha, x);                                               \
+    }                                                                          \
+    template <>                                                                \
+    void axpby<T, DeviceSpace>(T alpha, const TypedField<T, DeviceSpace>& x,   \
+                               T beta, TypedField<T, DeviceSpace>& y) {        \
+        axpby_device(alpha, x, beta, y);                                      \
+    }                                                                          \
+    template <>                                                                \
+    void copy<T, DeviceSpace>(const TypedField<T, DeviceSpace>& src,           \
+                              TypedField<T, DeviceSpace>& dst) {               \
+        copy_device(src, dst);                                               \
+    }                                                                          \
+    template <>                                                                \
+    T axpy_norm_sq<T, DeviceSpace>(T alpha, const TypedField<T, DeviceSpace>& x,\
+                                   TypedField<T, DeviceSpace>& y) {            \
+        return axpy_norm_sq_device(alpha, x, y);                              \
+    }                                                                          \
+    template <>                                                                \
+    void cross<T, DeviceSpace>(const TypedField<T, DeviceSpace>& a,            \
+                               const TypedField<T, DeviceSpace>& b,            \
+                               TypedField<T, DeviceSpace>& out) {              \
+        cross_device(a, b, out);                                             \
+    }
+MUGRID_LINALG_DEVICE_SPECIALIZATIONS(Real32)
+MUGRID_LINALG_DEVICE_SPECIALIZATIONS(Complex32)
+#undef MUGRID_LINALG_DEVICE_SPECIALIZATIONS
 
 /* ---------------------------------------------------------------------- */
 /* pipelined_cg_dots (Real only): fused {(r,u), (w,u), (r,r)} reduction.   */

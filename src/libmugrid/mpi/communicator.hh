@@ -112,6 +112,11 @@ namespace muGrid {
     inline decltype(auto) mpi_type<Complex>() {
         return MPI_DOUBLE_COMPLEX;
     }
+    template <>
+    inline decltype(auto) mpi_type<Complex32>() {
+        // 2-float layout, matching the MPI_DOUBLE_COMPLEX choice for Complex.
+        return MPI_COMPLEX;
+    }
 
     //! lightweight abstraction for the MPI communicator object
     class Communicator {
