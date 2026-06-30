@@ -52,6 +52,10 @@ namespace py = pybind11;
 // Type aliases for host fields
 using RealFieldHost = TypedField<Real, HostSpace>;
 using ComplexFieldHost = TypedField<Complex, HostSpace>;
+using muGrid::Real32;
+using muGrid::Complex32;
+using Real32FieldHost = TypedField<Real32, HostSpace>;
+using Complex32FieldHost = TypedField<Complex32, HostSpace>;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 using DeviceSpace = muGrid::DefaultDeviceSpace;
@@ -352,6 +356,47 @@ void add_linalg_functions(py::module &mod) {
         three-component fields. `N` and `out` are complex three-component
         fields; `out` may alias `N`.
         )pbdoc");
+
+    // --- Single-precision (float32) host operations ---
+    // Generic CG building blocks for Real32 and Complex32 fields. pybind
+    // dispatches by argument dtype, so these share the Python names above.
+#define MUGRID_BIND_LINALG_HOST(F, T)                                          \
+    linalg.def("vecdot",                                                       \
+        static_cast<T (*)(const F&, const F&)>(                                \
+            &muGrid::linalg::vecdot<T, HostSpace>), "a"_a, "b"_a);             \
+    linalg.def("norm_sq",                                                      \
+        static_cast<T (*)(const F&)>(&muGrid::linalg::norm_sq<T, HostSpace>),  \
+        "x"_a);                                                                \
+    linalg.def("axpy",                                                         \
+        static_cast<void (*)(T, const F&, F&)>(                                \
+            &muGrid::linalg::axpy<T, HostSpace>), "alpha"_a, "x"_a, "y"_a);    \
+    linalg.def("scal",                                                         \
+        static_cast<void (*)(T, F&)>(&muGrid::linalg::scal<T, HostSpace>),     \
+        "alpha"_a, "x"_a);                                                     \
+    linalg.def("axpby",                                                        \
+        static_cast<void (*)(T, const F&, T, F&)>(                             \
+            &muGrid::linalg::axpby<T, HostSpace>),                             \
+        "alpha"_a, "x"_a, "beta"_a, "y"_a);                                    \
+    linalg.def("copy",                                                         \
+        static_cast<void (*)(const F&, F&)>(                                   \
+            &muGrid::linalg::copy<T, HostSpace>), "src"_a, "dst"_a);           \
+    linalg.def("axpy_norm_sq",                                                 \
+        static_cast<T (*)(T, const F&, F&)>(                                   \
+            &muGrid::linalg::axpy_norm_sq<T, HostSpace>),                      \
+        "alpha"_a, "x"_a, "y"_a);                                              \
+    linalg.def("cross",                                                        \
+        static_cast<void (*)(const F&, const F&, F&)>(                         \
+            &muGrid::linalg::cross<T, HostSpace>), "a"_a, "b"_a, "out"_a);
+    MUGRID_BIND_LINALG_HOST(Real32FieldHost, Real32)
+    MUGRID_BIND_LINALG_HOST(Complex32FieldHost, Complex32)
+#undef MUGRID_BIND_LINALG_HOST
+    linalg.def("pipelined_cg_dots",
+        static_cast<std::array<Real32, 3> (*)(
+            const Real32FieldHost&, const Real32FieldHost&,
+            const Real32FieldHost&)>(
+            &muGrid::linalg::pipelined_cg_dots<Real32, HostSpace>),
+        "r"_a, "u"_a, "w"_a,
+        "Fused interior reduction for pipelined CG (float32).");
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---

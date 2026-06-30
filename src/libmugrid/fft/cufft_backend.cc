@@ -337,4 +337,76 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   GPU_STREAM_SYNCHRONIZE_DEFAULT();
 }
 
+// ---- Single-precision (Real32/Complex32) N-D transforms ----
+// Mirror the double variants with the single-precision cuFFT plan/exec
+// (CUFFT_R2C / cufftExecR2C, CUFFT_C2R / cufftExecC2R). The N-D plan cache key
+// includes the cufftType, so float and double plans never collide.
+
+void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes,
+                          const Real32 * input,
+                          const std::vector<Index_t> & in_strides,
+                          Complex32 * output,
+                          const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  NdLayout in{derive_nd_layout(shape, axes, in_strides)};
+  NdLayout out{derive_nd_layout(shape, axes, out_strides)};
+
+  if (in.stride != 1) {
+    throw RuntimeError(
+        "cuFFT N-D r2c requires unit innermost stride on the real input "
+        "(got " +
+        std::to_string(in.stride) + "); the GPU field layout must be SoA.");
+  }
+  this->check_complex_aligned(output, "r2c (N-D, fp32)");
+
+  cufftHandle plan =
+      get_nd_plan(CUFFT_R2C, in.n, in.embed, in.stride, in.dist, out.embed,
+                  out.stride, out.dist, static_cast<int>(shape[0]));
+  cufftResult result =
+      cufftExecR2C(plan, const_cast<cufftReal *>(input),
+                   reinterpret_cast<cufftComplex *>(output));
+  check_cufft_result(result, "R2C (N-D) execution");
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+}
+
+void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes,
+                          const Complex32 * input,
+                          const std::vector<Index_t> & in_strides,
+                          Real32 * output,
+                          const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  NdLayout in{derive_nd_layout(shape, axes, in_strides)};
+  NdLayout out{derive_nd_layout(shape, axes, out_strides)};
+
+  if (out.stride != 1) {
+    throw RuntimeError(
+        "cuFFT N-D c2r requires unit innermost stride on the real output "
+        "(got " +
+        std::to_string(out.stride) + "); the GPU field layout must be SoA.");
+  }
+  this->check_complex_aligned(input, "c2r (N-D, fp32)");
+
+  // C2R overwrites its input; stage through scratch (see the Z2D variant).
+  const std::size_t span{static_cast<std::size_t>(shape[0]) *
+                         static_cast<std::size_t>(in.dist)};
+  auto * scratch = static_cast<cufftComplex *>(
+      this->ensure_scratch(span * sizeof(cufftComplex)));
+  GPU_MEMCPY_D2D(scratch, reinterpret_cast<const cufftComplex *>(input),
+                 span * sizeof(cufftComplex));
+
+  cufftHandle plan =
+      get_nd_plan(CUFFT_C2R, in.n, in.embed, in.stride, in.dist, out.embed,
+                  out.stride, out.dist, static_cast<int>(shape[0]));
+  cufftResult result =
+      cufftExecC2R(plan, scratch, reinterpret_cast<cufftReal *>(output));
+  check_cufft_result(result, "C2R (N-D) execution");
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+}
+
 }  // namespace muGrid

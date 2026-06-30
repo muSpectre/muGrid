@@ -122,6 +122,37 @@ class FFT1DBackend {
                             Complex * output, Index_t out_stride,
                             Index_t out_dist) = 0;
 
+  // --- Single-precision (Real32/Complex32) 1D primitives --------------------
+  // Default to throwing so a backend that has not implemented fp32 reports a
+  // clear error rather than silently mis-transforming. Backends that support
+  // single precision (pocketfft, cuFFT, rocFFT) override these.
+  virtual void r2c(Index_t /*n*/, Index_t /*batch*/, const Real32 * /*input*/,
+                   Index_t /*in_stride*/, Index_t /*in_dist*/,
+                   Complex32 * /*output*/, Index_t /*out_stride*/,
+                   Index_t /*out_dist*/) {
+    throw RuntimeError("single-precision r2c not supported by this FFT backend");
+  }
+  virtual void c2r(Index_t /*n*/, Index_t /*batch*/,
+                   const Complex32 * /*input*/, Index_t /*in_stride*/,
+                   Index_t /*in_dist*/, Real32 * /*output*/,
+                   Index_t /*out_stride*/, Index_t /*out_dist*/) {
+    throw RuntimeError("single-precision c2r not supported by this FFT backend");
+  }
+  virtual void c2c_forward(Index_t /*n*/, Index_t /*batch*/,
+                           const Complex32 * /*input*/, Index_t /*in_stride*/,
+                           Index_t /*in_dist*/, Complex32 * /*output*/,
+                           Index_t /*out_stride*/, Index_t /*out_dist*/) {
+    throw RuntimeError(
+        "single-precision c2c_forward not supported by this FFT backend");
+  }
+  virtual void c2c_backward(Index_t /*n*/, Index_t /*batch*/,
+                            const Complex32 * /*input*/, Index_t /*in_stride*/,
+                            Index_t /*in_dist*/, Complex32 * /*output*/,
+                            Index_t /*out_stride*/, Index_t /*out_dist*/) {
+    throw RuntimeError(
+        "single-precision c2c_backward not supported by this FFT backend");
+  }
+
   /**
    * Returns true if this backend implements the N-dimensional `r2c_nd` /
    * `c2r_nd` entry points below. These let a serial (non-decomposed) engine
@@ -169,6 +200,27 @@ class FFT1DBackend {
                       Real * /*output*/,
                       const std::vector<Index_t> & /*out_strides*/) {
     throw RuntimeError("c2r_nd is not supported by this FFT backend");
+  }
+
+  //! Single-precision N-dimensional r2c (see the double overload).
+  virtual void r2c_nd(const std::vector<Index_t> & /*shape*/,
+                      const std::vector<Index_t> & /*axes*/,
+                      const Real32 * /*input*/,
+                      const std::vector<Index_t> & /*in_strides*/,
+                      Complex32 * /*output*/,
+                      const std::vector<Index_t> & /*out_strides*/) {
+    throw RuntimeError(
+        "single-precision r2c_nd is not supported by this FFT backend");
+  }
+  //! Single-precision N-dimensional c2r (see the double overload).
+  virtual void c2r_nd(const std::vector<Index_t> & /*shape*/,
+                      const std::vector<Index_t> & /*axes*/,
+                      const Complex32 * /*input*/,
+                      const std::vector<Index_t> & /*in_strides*/,
+                      Real32 * /*output*/,
+                      const std::vector<Index_t> & /*out_strides*/) {
+    throw RuntimeError(
+        "single-precision c2r_nd is not supported by this FFT backend");
   }
 
   /**

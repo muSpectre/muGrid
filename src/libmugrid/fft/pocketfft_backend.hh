@@ -81,6 +81,28 @@ class PocketFFTBackend : public FFT1DBackend {
               const std::vector<Index_t> & in_strides, Real * output,
               const std::vector<Index_t> & out_strides) override;
 
+  // --- Single-precision (Real32/Complex32) overloads ------------------------
+  void r2c(Index_t n, Index_t batch, const Real32 * input, Index_t in_stride,
+           Index_t in_dist, Complex32 * output, Index_t out_stride,
+           Index_t out_dist) override;
+  void c2r(Index_t n, Index_t batch, const Complex32 * input, Index_t in_stride,
+           Index_t in_dist, Real32 * output, Index_t out_stride,
+           Index_t out_dist) override;
+  void c2c_forward(Index_t n, Index_t batch, const Complex32 * input,
+                   Index_t in_stride, Index_t in_dist, Complex32 * output,
+                   Index_t out_stride, Index_t out_dist) override;
+  void c2c_backward(Index_t n, Index_t batch, const Complex32 * input,
+                    Index_t in_stride, Index_t in_dist, Complex32 * output,
+                    Index_t out_stride, Index_t out_dist) override;
+  void r2c_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Real32 * input,
+              const std::vector<Index_t> & in_strides, Complex32 * output,
+              const std::vector<Index_t> & out_strides) override;
+  void c2r_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Complex32 * input,
+              const std::vector<Index_t> & in_strides, Real32 * output,
+              const std::vector<Index_t> & out_strides) override;
+
   bool supports_device_memory() const override { return false; }
 
   const char * name() const override { return "pocketfft"; }

@@ -445,6 +445,64 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
     return internal::axpy_norm_sq_host(alpha, x, y);
 }
 
+/* -- Single-precision (Real32 / Complex32) generic-op specializations ------ */
+#define MUGRID_LINALG_HOST_SPECIALIZATIONS(T)                                  \
+    template <>                                                                \
+    T vecdot<T, HostSpace>(const TypedField<T, HostSpace>& a,                  \
+                           const TypedField<T, HostSpace>& b) {                \
+        return internal::vecdot_host(a, b);                                    \
+    }                                                                          \
+    template <>                                                                \
+    T norm_sq<T, HostSpace>(const TypedField<T, HostSpace>& x) {               \
+        return internal::norm_sq_host(x);                                      \
+    }                                                                          \
+    template <>                                                                \
+    void axpy<T, HostSpace>(T alpha, const TypedField<T, HostSpace>& x,        \
+                            TypedField<T, HostSpace>& y) {                     \
+        internal::axpy_host(alpha, x, y);                                      \
+    }                                                                          \
+    template <>                                                                \
+    void scal<T, HostSpace>(T alpha, TypedField<T, HostSpace>& x) {            \
+        internal::scal_host(alpha, x);                                         \
+    }                                                                          \
+    template <>                                                                \
+    void axpby<T, HostSpace>(T alpha, const TypedField<T, HostSpace>& x,       \
+                             T beta, TypedField<T, HostSpace>& y) {            \
+        internal::axpby_host(alpha, x, beta, y);                              \
+    }                                                                          \
+    template <>                                                                \
+    void copy<T, HostSpace>(const TypedField<T, HostSpace>& src,               \
+                            TypedField<T, HostSpace>& dst) {                   \
+        internal::copy_host(src, dst);                                         \
+    }                                                                          \
+    template <>                                                                \
+    T axpy_norm_sq<T, HostSpace>(T alpha, const TypedField<T, HostSpace>& x,   \
+                                 TypedField<T, HostSpace>& y) {                \
+        return internal::axpy_norm_sq_host(alpha, x, y);                       \
+    }
+MUGRID_LINALG_HOST_SPECIALIZATIONS(Real32)
+MUGRID_LINALG_HOST_SPECIALIZATIONS(Complex32)
+#undef MUGRID_LINALG_HOST_SPECIALIZATIONS
+
+// pipelined_cg_dots: single-precision real path (mirrors the Real body).
+template <>
+std::array<Real32, 3> pipelined_cg_dots<Real32, HostSpace>(
+    const TypedField<Real32, HostSpace>& r,
+    const TypedField<Real32, HostSpace>& u,
+    const TypedField<Real32, HostSpace>& w) {
+    const auto& coll = r.get_collection();
+    const Index_t nb_components_per_pixel =
+        r.get_nb_components() * r.get_nb_sub_pts();
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
+        return internal::interior_three_dots(r.data(), u.data(), w.data(),
+                                             global_coll,
+                                             nb_components_per_pixel);
+    }
+    return {r.eigen_vec().dot(u.eigen_vec()), w.eigen_vec().dot(u.eigen_vec()),
+            r.eigen_vec().squaredNorm()};
+}
+
 template <>
 void scal<HostSpace>(const TypedField<Real, HostSpace>& alpha,
                      TypedField<Complex, HostSpace>& x) {
@@ -552,6 +610,19 @@ template <>
 void cross<Complex, HostSpace>(const TypedField<Complex, HostSpace>& a,
                                const TypedField<Complex, HostSpace>& b,
                                TypedField<Complex, HostSpace>& out) {
+    cross_host(a, b, out);
+}
+
+template <>
+void cross<Real32, HostSpace>(const TypedField<Real32, HostSpace>& a,
+                              const TypedField<Real32, HostSpace>& b,
+                              TypedField<Real32, HostSpace>& out) {
+    cross_host(a, b, out);
+}
+template <>
+void cross<Complex32, HostSpace>(const TypedField<Complex32, HostSpace>& a,
+                                 const TypedField<Complex32, HostSpace>& b,
+                                 TypedField<Complex32, HostSpace>& out) {
     cross_host(a, b, out);
 }
 

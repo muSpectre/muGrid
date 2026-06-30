@@ -133,6 +133,14 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
+    // Single-precision path (real input is Real32). Routed through the
+    // backend's N-D transform on the serial (non-decomposed) layout; MPI and
+    // non-nd backends are not yet supported in fp32.
+    if (input.get_type_descriptor() == TypeDescriptor::Real32) {
+      this->transform_serial_nd<Real32, Complex32>(input, output, true);
+      return;
+    }
+
     if (this->spatial_dim == 1) {
       fft_1d(input, output);
     } else if (this->spatial_dim == 2) {
@@ -171,6 +179,12 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
+    // Single-precision path (real output is Real32).
+    if (output.get_type_descriptor() == TypeDescriptor::Real32) {
+      this->transform_serial_nd<Real32, Complex32>(input, output, false);
+      return;
+    }
+
     if (this->spatial_dim == 1) {
       ifft_1d(input, output);
     } else if (this->spatial_dim == 2) {
@@ -185,6 +199,119 @@ class FFTEngine : public FFTEngineBase {
   }
 
  protected:
+  /**
+   * Single-precision transform via the backend's N-dimensional entry point.
+   *
+   * Handles 1D/2D/3D on the serial (non-MPI-decomposed) layout only: the whole
+   * grid is local, so the transform is one planned backend call with no work
+   * buffers or pencil transposes (those remain double-only). @p forward selects
+   * r2c (real @p input → complex @p output) vs c2r. RT/CT are Real32/Complex32.
+   */
+  template <typename RT, typename CT>
+  void transform_serial_nd(const Field & input, Field & output, bool forward) {
+    if (!backend->supports_nd()) {
+      throw RuntimeError(
+          "single-precision FFT requires a backend with N-dimensional support "
+          "(pocketfft); the MPI/GPU fp32 path is not yet implemented");
+    }
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    const DynGridIndex local_real =
+        this->get_nb_subdomain_grid_pts_without_ghosts();
+    const DynGridIndex & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const Dim_t dim = this->spatial_dim;
+
+    // Serial only: this rank must hold the entire domain.
+    for (Dim_t d{0}; d < dim; ++d) {
+      if (local_real[d] != nb_grid_pts[d]) {
+        throw RuntimeError(
+            "single-precision FFT currently supports only the serial "
+            "(non-MPI-decomposed) layout");
+      }
+    }
+
+    const Index_t nb_components{input.get_nb_components()};
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
+
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Field & real_field{forward ? input : output};
+    const Field & cplx_field{forward ? output : input};
+
+    const Index_t Nx{nb_grid_pts[0]};
+    const Index_t Fx{Nx / 2 + 1};
+    const Index_t Ny{dim > 1 ? nb_grid_pts[1] : Index_t{1}};
+    const Index_t Nz{dim > 2 ? nb_grid_pts[2] : Index_t{1}};
+    const Index_t lwx{local_with_ghosts[0]};
+    const Index_t lwy{dim > 1 ? local_with_ghosts[1] : Index_t{1}};
+
+    const Index_t nb_buf_pixels{lwx * lwy *
+                                (dim > 2 ? local_with_ghosts[2] : Index_t{1})};
+    const Index_t gl0{ghosts_left[0]};
+    const Index_t gl1{dim > 1 ? ghosts_left[1] : Index_t{0}};
+    const Index_t gl2{dim > 2 ? ghosts_left[2] : Index_t{0}};
+    const Index_t ghost_pixel_offset{gl0 + gl1 * lwx + gl2 * lwx * lwy};
+    const Index_t nb_fourier_pixels{Fx * (dim > 1 ? Ny : 1) *
+                                    (dim > 2 ? Nz : 1)};
+
+    // Per-axis element strides folded from the ghost layout and AoS/SoA
+    // component layout, mirroring the double serial-nd fast path.
+    const bool r_soa{real_field.get_storage_order() ==
+                     StorageOrder::StructureOfArrays};
+    const Index_t r_comp{r_soa ? nb_buf_pixels : Index_t{1}};
+    const Index_t r_x{r_soa ? Index_t{1} : nb_components};
+    const Index_t r_y{r_soa ? lwx : nb_components * lwx};
+    const Index_t r_z{r_soa ? lwx * lwy : nb_components * lwx * lwy};
+    const Index_t r_base{r_soa ? ghost_pixel_offset
+                               : ghost_pixel_offset * nb_components};
+
+    const bool f_soa{cplx_field.get_storage_order() ==
+                     StorageOrder::StructureOfArrays};
+    const Index_t f_comp{f_soa ? nb_fourier_pixels : Index_t{1}};
+    const Index_t f_x{f_soa ? Index_t{1} : nb_components};
+    const Index_t f_y{f_soa ? Fx : nb_components * Fx};
+    const Index_t f_z{f_soa ? Fx * Ny : nb_components * Fx * Ny};
+
+    // shape/axes in row-major order: {component, [Nz,] [Ny,] Nx}; the
+    // half-complex (x) axis is last, the component axis (0) is a batch axis.
+    std::vector<Index_t> shape, axes, r_strides, f_strides;
+    shape.push_back(nb_components);
+    r_strides.push_back(r_comp);
+    f_strides.push_back(f_comp);
+    if (dim > 2) {
+      shape.push_back(Nz);
+      r_strides.push_back(r_z);
+      f_strides.push_back(f_z);
+    }
+    if (dim > 1) {
+      shape.push_back(Ny);
+      r_strides.push_back(r_y);
+      f_strides.push_back(f_y);
+    }
+    shape.push_back(Nx);
+    r_strides.push_back(r_x);
+    f_strides.push_back(f_x);
+    for (Dim_t a{1}; a <= dim; ++a) {
+      axes.push_back(a);
+    }
+
+    RT * real_ptr{static_cast<RT *>(
+        const_cast<Field &>(real_field).get_void_data_ptr(!is_device))};
+    CT * cplx_ptr{static_cast<CT *>(
+        const_cast<Field &>(cplx_field).get_void_data_ptr(!is_device))};
+
+    if (forward) {
+      backend->r2c_nd(shape, axes, static_cast<const RT *>(real_ptr) + r_base,
+                      r_strides, cplx_ptr, f_strides);
+    } else {
+      backend->c2r_nd(shape, axes, static_cast<const CT *>(cplx_ptr),
+                      f_strides, real_ptr + r_base, r_strides);
+    }
+  }
+
   void fft_1d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();

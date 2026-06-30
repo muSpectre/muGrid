@@ -81,6 +81,18 @@ class cuFFTBackend : public GpuFFTBackend<cuFFTBackend, cufftHandle> {
               const std::vector<Index_t> & in_strides, Real * output,
               const std::vector<Index_t> & out_strides) override;
 
+  // Single-precision N-D transforms (CUFFT_R2C/C2R). Used by the serial-nd
+  // engine path; the 1D fp32 primitives (MPI GPU) are not yet implemented.
+  void r2c_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Real32 * input,
+              const std::vector<Index_t> & in_strides, Complex32 * output,
+              const std::vector<Index_t> & out_strides) override;
+
+  void c2r_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Complex32 * input,
+              const std::vector<Index_t> & in_strides, Real32 * output,
+              const std::vector<Index_t> & out_strides) override;
+
   const char * name() const override { return "cufft"; }
 
  protected:
