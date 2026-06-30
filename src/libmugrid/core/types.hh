@@ -42,8 +42,14 @@
 #include <vector>
 
 // Compiler compatibility macros
+//
+// MUGRID_RESTRICT is a no-aliasing optimization hint; dropping it never
+// affects correctness. On MSVC it is defined empty: MSVC's `__restrict` on a
+// pointer to a *template-dependent* type (e.g. `const T * __restrict` in the
+// precision-generic operator kernels) triggers an internal compiler error
+// (C1001). GCC/Clang keep the hint via `__restrict__`.
 #if defined(_MSC_VER)
-    #define MUGRID_RESTRICT __restrict
+    #define MUGRID_RESTRICT
 #else
     #define MUGRID_RESTRICT __restrict__
 #endif

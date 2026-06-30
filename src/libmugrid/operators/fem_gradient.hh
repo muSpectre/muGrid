@@ -107,11 +107,22 @@ namespace muGrid {
         // folds (dropping the structural zeros / ±1 of a simplex), so the
         // element-generic kernel matches the old hand-unrolled code on every
         // compiler instead of relying on unroll heuristics.
+        //
+        // Implemented as a recursive function template with `if constexpr`
+        // rather than a C++20 templated lambda + fold expression: the latter
+        // triggers an MSVC internal compiler error (C1001) when nested inside
+        // these precision-generic (`<Element, T>`) kernels. The recursive form
+        // produces identical unrolling and constant indices on every compiler.
+        template <Index_t I, Index_t N, class F>
+        inline void static_for_impl(F && f) {
+            if constexpr (I < N) {
+                f(std::integral_constant<Index_t, I>{});
+                static_for_impl<I + 1, N>(std::forward<F>(f));
+            }
+        }
         template <Index_t N, class F>
         inline void static_for(F && f) {
-            [&]<Index_t... I>(std::integer_sequence<Index_t, I...>) {
-                (f(std::integral_constant<Index_t, I>{}), ...);
-            }(std::make_integer_sequence<Index_t, N>{});
+            static_for_impl<0, N>(std::forward<F>(f));
         }
 
         // ===================================================================
