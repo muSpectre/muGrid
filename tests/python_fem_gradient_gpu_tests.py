@@ -443,5 +443,54 @@ class TestFEMGradientOperatorGPUCorrectness:
         assert not np.any(np.isinf(result))
 
 
+# =============================================================================
+# Element type (simplex vs Q1) patch test, parametrized on device
+# =============================================================================
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+@pytest.mark.parametrize("dim", [2, 3])
+@pytest.mark.parametrize("element", ["simplex", "q1"])
+class TestFEMGradientElements:
+    """The FEM gradient operator supports linear simplices and Q1 elements.
+    Patch test: an affine nodal field must produce a constant gradient (equal
+    to the affine field's gradient) at every quadrature point, for any element.
+    """
+
+    def test_gradient_patch_test(self, device, dim, element):
+        skip_if_gpu_unavailable(device)
+        n = 6
+        h = [1.0 / n] * dim
+        el = (muGrid.FEMElement.q1 if element == "q1"
+              else muGrid.FEMElement.simplex)
+        op = muGrid.FEMGradientOperator(dim, tuple(h), element=el)
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
+        fc = muGrid.GlobalFieldCollection(
+            (n,) * dim, sub_pts={"quad": op.nb_quad_pts},
+            nb_ghosts_right=(1,) * dim, **fc_kwargs)
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (op.nb_output_components,), "quad")
+
+        # Affine nodal field u = sum_j a_j x_j -> gradient a_j (constant).
+        a = np.array([0.3, -0.7, 1.1])[:dim]
+        pg = nodal.pg
+        xp = np if device != "gpu" else __import__("cupy")
+        idx = np.indices(tuple(pg.shape[1:]))
+        field = np.zeros(tuple(pg.shape[1:]))
+        for j in range(dim):
+            field += a[j] * idx[j] * h[j]
+        pg[0, ...] = xp.asarray(field)
+
+        op.apply(nodal, gradient)
+        gs = gradient.s
+        gs = gs.get() if hasattr(gs, "get") else np.asarray(gs)
+        # interior pixels [0, n-1) per axis carry valid (constant) gradients
+        interior = tuple([slice(0, n - 1)] * dim)
+        for j in range(dim):
+            comp = gs[j][(slice(None),) + interior]  # (nq, *interior)
+            np.testing.assert_allclose(comp, a[j], atol=1e-12)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

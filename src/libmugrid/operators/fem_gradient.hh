@@ -714,6 +714,10 @@ namespace muGrid {
     using FEMGradientOperator2D = FEMGradientOperator<LinearSimplex2D>;
     //! 3D linear-tetrahedra FEM gradient. Preserves the historical name.
     using FEMGradientOperator3D = FEMGradientOperator<LinearSimplex3D>;
+    //! 2D bilinear-quad (Q1) FEM gradient.
+    using FEMGradientOperatorQ1_2D = FEMGradientOperator<Q1Quad2D>;
+    //! 3D trilinear-hex (Q1) FEM gradient.
+    using FEMGradientOperatorQ1_3D = FEMGradientOperator<Q1Hex3D>;
 
 }  // namespace muGrid
 

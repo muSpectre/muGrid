@@ -43,36 +43,8 @@ namespace muGrid {
     // 3D Implementation
     // ============================================================================
 
-    // 3D shape function gradients for 5 tetrahedra per voxel
-    // B_3D[quad][dim][node] where dim: 0=d/dx, 1=d/dy, 2=d/dz
-    // Nodes: 0=(0,0,0), 1=(1,0,0), 2=(0,1,0), 3=(1,1,0),
-    //        4=(0,0,1), 5=(1,0,1), 6=(0,1,1), 7=(1,1,1)
-    // These values match FEMGradientOperator's 5-tetrahedra decomposition
-    static const Real B_3D[5][3][8] = {
-        // Tet 0: Central tetrahedron (nodes 1,2,4,7)
-        {{0.0, 0.5, -0.5, 0.0, -0.5, 0.0, 0.0, 0.5},   // d/dx
-         {0.0, -0.5, 0.5, 0.0, -0.5, 0.0, 0.0, 0.5},   // d/dy
-         {0.0, -0.5, -0.5, 0.0, 0.5, 0.0, 0.0, 0.5}},  // d/dz
-        // Tet 1: Corner at (0,0,0) - nodes 0,1,2,4
-        {{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},    // d/dx
-         {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},    // d/dy
-         {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},   // d/dz
-        // Tet 2: Corner at (0,1,1) - nodes 2,4,6,7
-        {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0},    // d/dx
-         {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0},    // d/dy
-         {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}},   // d/dz
-        // Tet 3: Corner at (1,0,1) - nodes 1,4,5,7
-        {{0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},    // d/dx
-         {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},    // d/dy
-         {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0}},   // d/dz
-        // Tet 4: Corner at (1,1,0) - nodes 1,2,3,7
-        {{0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},    // d/dx
-         {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},    // d/dy
-         {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}}};
-
-    // Quadrature weights for 3D (volume of each tet / voxel volume)
-    static const Real W_3D[5] = {1.0 / 3.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0,
-                                 1.0 / 6.0};
+    // Shape-function gradients and quadrature weights come from the element
+    // traits (fem_element.hh) via the operator's runtime element data.
 
     template <>
     void IsotropicStiffnessOperator<3>::precompute_matrices() {
@@ -83,110 +55,67 @@ namespace muGrid {
         const Real hx = grid_spacing[0];
         const Real hy = grid_spacing[1];
         const Real hz = grid_spacing[2];
-        const Real inv_hx = 1.0 / hx;
-        const Real inv_hy = 1.0 / hy;
-        const Real inv_hz = 1.0 / hz;
+        const Real scale[3] = {1.0 / hx, 1.0 / hy, 1.0 / hz};
 
-        // Scale factors for each derivative direction
-        const Real scale[3] = {inv_hx, inv_hy, inv_hz};
+        // Selected element's reference shape-function gradient B[q][d][n].
+        auto B = [this](Index_t q, Index_t d, Index_t n) {
+            return elem_B[(q * NB_DOFS_PER_NODE + d) * NB_NODES + n];
+        };
 
-        // Compute G and V matrices
-        // G = Σ_q w_q B_q^T I B_q (for shear modulus μ)
-        // V = Σ_q w_q (B_q^T m)(m^T B_q) (for Lamé λ)
-        // where m = [1, 1, 1, 0, 0, 0]^T (Voigt trace selector)
-
-        for (Index_t q = 0; q < NB_QUAD; ++q) {
-            Real w = W_3D[q] * hx * hy * hz;  // Weight includes element volume
-
+        // G = Σ_q w_q B_q^T I_sym B_q (shear/μ); V = Σ_q w_q (B_q^T m)(m^T B_q)
+        // (volumetric/λ), m = [1,1,1,0,0,0]^T.
+        for (Index_t q = 0; q < elem_nb_quad; ++q) {
+            Real w = elem_Wfrac[q] * hx * hy * hz;  // includes element volume
             for (Index_t I = 0; I < NB_NODES; ++I) {
                 for (Index_t J = 0; J < NB_NODES; ++J) {
                     for (Index_t a = 0; a < NB_DOFS_PER_NODE; ++a) {
                         for (Index_t b = 0; b < NB_DOFS_PER_NODE; ++b) {
                             Real g_contrib = 0.0;
-                            Real v_contrib = 0.0;
-
-                            // G contribution from diagonal strains (εxx, εyy,
-                            // εzz)
                             if (a == b) {
-                                g_contrib += B_3D[q][a][I] * scale[a] *
-                                             B_3D[q][a][J] * scale[a];
+                                g_contrib += B(q, a, I) * scale[a] *
+                                             B(q, a, J) * scale[a];
                             }
-
-                            // G contribution from shear strains
-                            // 2εyz = du_z/dy + du_y/dz
-                            // 2εxz = du_z/dx + du_x/dz
-                            // 2εxy = du_y/dx + du_x/dy
-                            // For shear strain ε_ab, the B vector has:
-                            //   B[u_a] = dN/dx_b and B[u_b] = dN/dx_a
-                            // So the stiffness contribution is:
-                            //   K[u_a,I; u_a,J] += μ * dN_I/dx_b * dN_J/dx_b
-                            //   K[u_b,I; u_b,J] += μ * dN_I/dx_a * dN_J/dx_a
-                            //   K[u_a,I; u_b,J] += μ * dN_I/dx_b * dN_J/dx_a
-                            //   K[u_b,I; u_a,J] += μ * dN_I/dx_a * dN_J/dx_b
-                            // Shear strain contributions
-                            // Using single-line expressions to avoid parsing issues
-                            Real dNI_dx = B_3D[q][0][I] * scale[0];
-                            Real dNI_dy = B_3D[q][1][I] * scale[1];
-                            Real dNI_dz = B_3D[q][2][I] * scale[2];
-                            Real dNJ_dx = B_3D[q][0][J] * scale[0];
-                            Real dNJ_dy = B_3D[q][1][J] * scale[1];
-                            Real dNJ_dz = B_3D[q][2][J] * scale[2];
-
-                            // Shear strain contributions with explicit intermediate
-                            // variables to avoid potential compiler optimization issues
+                            Real dNI_dx = B(q, 0, I) * scale[0];
+                            Real dNI_dy = B(q, 1, I) * scale[1];
+                            Real dNI_dz = B(q, 2, I) * scale[2];
+                            Real dNJ_dx = B(q, 0, J) * scale[0];
+                            Real dNJ_dy = B(q, 1, J) * scale[1];
+                            Real dNJ_dz = B(q, 2, J) * scale[2];
+                            // Engineering-shear coupling (2ε), factor 1/2.
                             if (a == 0 && b == 0) {
-                                // u_x - u_x: shear εxy (dN/dy) and εxz (dN/dz)
-                                Real shear_xy = 0.5 * dNI_dy * dNJ_dy;
-                                Real shear_xz = 0.5 * dNI_dz * dNJ_dz;
-                                g_contrib += shear_xy + shear_xz;
+                                g_contrib +=
+                                    0.5 * dNI_dy * dNJ_dy + 0.5 * dNI_dz * dNJ_dz;
                             } else if (a == 1 && b == 1) {
-                                // u_y - u_y: shear εxy (dN/dx) and εyz (dN/dz)
-                                Real shear_xy = 0.5 * dNI_dx * dNJ_dx;
-                                Real shear_yz = 0.5 * dNI_dz * dNJ_dz;
-                                g_contrib += shear_xy + shear_yz;
+                                g_contrib +=
+                                    0.5 * dNI_dx * dNJ_dx + 0.5 * dNI_dz * dNJ_dz;
                             } else if (a == 2 && b == 2) {
-                                // u_z - u_z: shear εxz (dN/dx) and εyz (dN/dy)
-                                Real shear_xz = 0.5 * dNI_dx * dNJ_dx;
-                                Real shear_yz = 0.5 * dNI_dy * dNJ_dy;
-                                g_contrib += shear_xz + shear_yz;
+                                g_contrib +=
+                                    0.5 * dNI_dx * dNJ_dx + 0.5 * dNI_dy * dNJ_dy;
                             } else if (a == 0 && b == 1) {
-                                // u_x,I - u_y,J cross coupling via εxy
                                 g_contrib += 0.5 * dNI_dy * dNJ_dx;
                             } else if (a == 1 && b == 0) {
-                                // u_y,I - u_x,J cross coupling via εxy
                                 g_contrib += 0.5 * dNI_dx * dNJ_dy;
                             } else if (a == 0 && b == 2) {
-                                // u_x,I - u_z,J cross coupling via εxz
                                 g_contrib += 0.5 * dNI_dz * dNJ_dx;
                             } else if (a == 2 && b == 0) {
-                                // u_z,I - u_x,J cross coupling via εxz
                                 g_contrib += 0.5 * dNI_dx * dNJ_dz;
                             } else if (a == 1 && b == 2) {
-                                // u_y,I - u_z,J cross coupling via εyz
                                 g_contrib += 0.5 * dNI_dz * dNJ_dy;
                             } else if (a == 2 && b == 1) {
-                                // u_z,I - u_y,J cross coupling via εyz
                                 g_contrib += 0.5 * dNI_dy * dNJ_dz;
                             }
-
-                            // V contribution: (B^T m)(m^T B)
-                            // m = [1,1,1,0,0,0]^T selects trace(ε) = εxx + εyy
-                            // + εzz
-                            Real BtmI =
-                                (a == 0 ? B_3D[q][0][I] * scale[0] : 0.0) +
-                                (a == 1 ? B_3D[q][1][I] * scale[1] : 0.0) +
-                                (a == 2 ? B_3D[q][2][I] * scale[2] : 0.0);
-                            Real BtmJ =
-                                (b == 0 ? B_3D[q][0][J] * scale[0] : 0.0) +
-                                (b == 1 ? B_3D[q][1][J] * scale[1] : 0.0) +
-                                (b == 2 ? B_3D[q][2][J] * scale[2] : 0.0);
-                            v_contrib = BtmI * BtmJ;
-
+                            // V: (B^T m)(m^T B), trace(ε) = εxx + εyy + εzz.
+                            Real BtmI = (a == 0 ? dNI_dx : 0.0) +
+                                        (a == 1 ? dNI_dy : 0.0) +
+                                        (a == 2 ? dNI_dz : 0.0);
+                            Real BtmJ = (b == 0 ? dNJ_dx : 0.0) +
+                                        (b == 1 ? dNJ_dy : 0.0) +
+                                        (b == 2 ? dNJ_dz : 0.0);
                             Index_t idx =
                                 (I * NB_DOFS_PER_NODE + a) * NB_ELEMENT_DOFS +
                                 (J * NB_DOFS_PER_NODE + b);
                             G_matrix[idx] += w * g_contrib;
-                            V_matrix[idx] += w * v_contrib;
+                            V_matrix[idx] += w * BtmI * BtmJ;
                         }
                     }
                 }
@@ -194,14 +123,13 @@ namespace muGrid {
         }
 
         // Element-averaged gradient operator: Dbar[j*NB_NODES+n] =
-        // scale[j] Σ_q W_q B[q][j][n] (fractional weights W_3D, summing to 1),
-        // so ḡ_ij = Σ_n Dbar[j][n] u[n,i] is the element-averaged ∂u_i/∂x_j.
+        // scale[j] Σ_q Wfrac_q B[q][j][n] (fractional weights, summing to 1).
         std::fill(Dbar_matrix.begin(), Dbar_matrix.end(), 0.0);
         for (Index_t j = 0; j < NB_DOFS_PER_NODE; ++j) {
             for (Index_t n = 0; n < NB_NODES; ++n) {
                 Real s = 0.0;
-                for (Index_t q = 0; q < NB_QUAD; ++q) {
-                    s += W_3D[q] * B_3D[q][j][n];
+                for (Index_t q = 0; q < elem_nb_quad; ++q) {
+                    s += elem_Wfrac[q] * B(q, j, n);
                 }
                 Dbar_matrix[j * NB_NODES + n] = scale[j] * s;
             }

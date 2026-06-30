@@ -4,6 +4,10 @@ Change log for µGrid
 Unreleased
 ----------
 
+- ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
+  stiffness operators (host + GPU), selected via `muGrid.FEMElement.{simplex,q1}`
+- ENH: Unified FE shape-function tables into element traits (`fem_element.hh`); FEM
+  gradient operator templated on element with a single generic host/GPU kernel
 - ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
   operator (host + GPU), so FE homogenization needs no resident strain/stress fields
 - ENH: Aliased the CG preconditioned-residual onto the residual when unpreconditioned,

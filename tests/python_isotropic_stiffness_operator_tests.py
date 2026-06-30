@@ -251,8 +251,11 @@ class TestIsotropicStiffnessOperator2D:
         grad_op = muGrid.FEMGradientOperator(2, grid_spacing)
         comm = muGrid.Communicator()
         deco = muGrid.CartesianDecomposition(
-            comm, (nn, nn), nb_subdivisions=(1, 1),
-            nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
+            comm,
+            (nn, nn),
+            nb_subdivisions=(1, 1),
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
             nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
         lam = deco.real_field("lambda", (1,))
@@ -290,17 +293,13 @@ class TestIsotropicStiffnessOperator2D:
         rhs_generic = deco.real_field("rhs_generic", (2,))
         rhs_generic.pg[...] = 0.0
         grad_op.transpose(stress_m, rhs_generic, qw)
-        np.testing.assert_allclose(
-            rhs_fused.p, rhs_generic.p, rtol=1e-10, atol=1e-12
-        )
+        np.testing.assert_allclose(rhs_fused.p, rhs_generic.p, rtol=1e-10, atol=1e-12)
 
         # --- average_stress vs generic volume integral of total stress ---
         u = deco.real_field("u", (2,))
         u.p[...] = rng.random(u.p.shape)
         deco.communicate_ghosts(u)
-        local_int = np.array(
-            fused_op.average_stress(u, lam, mu, E_flat)
-        ).reshape(2, 2)
+        local_int = np.array(fused_op.average_stress(u, lam, mu, E_flat)).reshape(2, 2)
 
         grad = deco.real_field("grad", (2, 2), "quad")
         grad_op.apply(u, grad)
@@ -336,8 +335,12 @@ class TestIsotropicStiffnessOperator2D:
 
         comm = muGrid.Communicator()
         fft = muGrid.FFTEngine(
-            (nn, nn), comm, nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
-            nb_sub_pts={"quad": 2}, device=muGrid.Device.cpu(),
+            (nn, nn),
+            comm,
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
+            nb_sub_pts={"quad": 2},
+            device=muGrid.Device.cpu(),
         )
         fc = fft.real_space_collection
 
@@ -368,9 +371,7 @@ class TestIsotropicStiffnessOperator2D:
         E_flat = E_macro.reshape(-1).tolist()
         qw = grad_op.quadrature_weights
 
-        local_int = np.array(
-            fused_op.average_stress(u, lam, mu, E_flat)
-        ).reshape(2, 2)
+        local_int = np.array(fused_op.average_stress(u, lam, mu, E_flat)).reshape(2, 2)
 
         # Reference: generic gradient -> total strain -> isotropic stress, then
         # the volume integral over the *owned* region (grad.s is the owned view,
@@ -577,16 +578,19 @@ class TestIsotropicStiffnessOperator3D:
         gradient/stress/divergence path for a heterogeneous 3D material."""
         nn = 5
         grid_spacing = [0.2, 0.2, 0.2]
-        E_macro = np.array([[0.01, 0.004, -0.002],
-                            [0.004, -0.003, 0.005],
-                            [-0.002, 0.005, 0.006]])
+        E_macro = np.array(
+            [[0.01, 0.004, -0.002], [0.004, -0.003, 0.005], [-0.002, 0.005, 0.006]]
+        )
 
         fused_op = muGrid.IsotropicStiffnessOperator3D(grid_spacing)
         grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
         comm = muGrid.Communicator()
         deco = muGrid.CartesianDecomposition(
-            comm, (nn, nn, nn), nb_subdivisions=(1, 1, 1),
-            nb_ghosts_left=(1, 1, 1), nb_ghosts_right=(1, 1, 1),
+            comm,
+            (nn, nn, nn),
+            nb_subdivisions=(1, 1, 1),
+            nb_ghosts_left=(1, 1, 1),
+            nb_ghosts_right=(1, 1, 1),
             nb_sub_pts={"quad": grad_op.nb_quad_pts},
         )
         lam = deco.real_field("lambda", (1,))
@@ -621,17 +625,13 @@ class TestIsotropicStiffnessOperator3D:
         rhs_generic = deco.real_field("rhs_generic", (3,))
         rhs_generic.pg[...] = 0.0
         grad_op.transpose(stress_m, rhs_generic, qw)
-        np.testing.assert_allclose(
-            rhs_fused.p, rhs_generic.p, rtol=1e-10, atol=1e-12
-        )
+        np.testing.assert_allclose(rhs_fused.p, rhs_generic.p, rtol=1e-10, atol=1e-12)
 
         # --- average_stress vs generic volume integral of total stress ---
         u = deco.real_field("u", (3,))
         u.p[...] = rng.random(u.p.shape)
         deco.communicate_ghosts(u)
-        local_int = np.array(
-            fused_op.average_stress(u, lam, mu, E_flat)
-        ).reshape(3, 3)
+        local_int = np.array(fused_op.average_stress(u, lam, mu, E_flat)).reshape(3, 3)
         grad = deco.real_field("grad", (3, 3), "quad")
         grad_op.apply(u, grad)
         total = deco.real_field("total", (3, 3), "quad")
@@ -984,9 +984,7 @@ class TestIsotropicStiffnessOperatorGPUCorrectness:
         lam_cpu.pg[...] = np.pad(
             lam_cpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
         )
-        mu_cpu.pg[...] = np.pad(
-            mu_cpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
-        )
+        mu_cpu.pg[...] = np.pad(mu_cpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap")
 
         disp_gpu.pg[...] = cp.asarray(test_disp)
         lam_gpu.p[...] = cp.asarray(test_lam)
@@ -995,9 +993,7 @@ class TestIsotropicStiffnessOperatorGPUCorrectness:
         lam_gpu.pg[...] = cp.pad(
             lam_gpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
         )
-        mu_gpu.pg[...] = cp.pad(
-            mu_gpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
-        )
+        mu_gpu.pg[...] = cp.pad(mu_gpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap")
 
         # Apply
         op.apply(disp_cpu, lam_cpu, mu_cpu, force_cpu)
@@ -1742,8 +1738,9 @@ class TestValidationGuard2D:
             op.apply(displacement, lambda_field, mu_field, force)
         err_msg = str(exc_info.value).lower()
         # Error can be about ghosts or computable region mismatch
-        assert ("ghost" in err_msg or "ghosts" in err_msg or
-                "computable region" in err_msg)
+        assert (
+            "ghost" in err_msg or "ghosts" in err_msg or "computable region" in err_msg
+        )
 
     def test_valid_config(self):
         """Test that valid configuration does not raise."""
@@ -1957,9 +1954,7 @@ class TestGPUUnitImpulse:
         lam_cpu.pg[...] = np.pad(
             lam_cpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
         )
-        mu_cpu.pg[...] = np.pad(
-            mu_cpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
-        )
+        mu_cpu.pg[...] = np.pad(mu_cpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap")
 
         # GPU setup
         fc_gpu = muGrid.GlobalFieldCollection(
@@ -1986,9 +1981,7 @@ class TestGPUUnitImpulse:
         lam_gpu.pg[...] = cp.pad(
             lam_gpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
         )
-        mu_gpu.pg[...] = cp.pad(
-            mu_gpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap"
-        )
+        mu_gpu.pg[...] = cp.pad(mu_gpu.p, ((0, 0), (1, 1), (1, 1), (1, 1)), mode="wrap")
 
         # Test a few unit impulses
         test_positions = [(2, 2, 2), (3, 2, 3), (4, 3, 2)]
@@ -2038,15 +2031,20 @@ class TestIsotropicStiffnessApplyUniform:
         grid_spacing = [0.25] * dim
         lam, mu = 1.234, 0.789
 
-        op = (muGrid.IsotropicStiffnessOperator2D
-              if dim == 2 else muGrid.IsotropicStiffnessOperator3D)(grid_spacing)
+        op = (
+            muGrid.IsotropicStiffnessOperator2D
+            if dim == 2
+            else muGrid.IsotropicStiffnessOperator3D
+        )(grid_spacing)
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
         fc = muGrid.GlobalFieldCollection(
-            n, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, **fc_kwargs)
+            n, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, **fc_kwargs
+        )
         fc_mat = muGrid.GlobalFieldCollection(
-            n, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, **fc_kwargs)
+            n, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, **fc_kwargs
+        )
 
         displacement = fc.real_field("displacement", (dim,))
         force_field = fc.real_field("force_field", (dim,))
@@ -2082,6 +2080,119 @@ class TestIsotropicStiffnessApplyUniform:
 
     def test_3d(self, device):
         self._run(3, device)
+
+
+# =============================================================================
+# Element type (simplex vs Q1) tests
+# =============================================================================
+
+
+class TestFEMElements:
+    """The operator supports linear simplices and Q1 (bilinear/trilinear)
+    elements, selected at construction. Both must pass the FE patch test."""
+
+    @pytest.mark.parametrize("dim", [2, 3])
+    @pytest.mark.parametrize("element", ["simplex", "q1"])
+    def test_patch_test(self, dim, element):
+        """Patch test: for a homogeneous material and an affine displacement,
+        average_stress reproduces the exact constant stress C:(E_macro+sym∇u)
+        and the macro-strain RHS (divergence of a uniform stress) vanishes.
+        This pins the element's G/V (via macro_rhs) and D̄ (via average_stress).
+        """
+        n = 6
+        h = [1.0 / n] * dim
+        lam, mu = 1.3, 0.7
+        comm = muGrid.Communicator()
+        deco = muGrid.CartesianDecomposition(
+            comm,
+            (n,) * dim,
+            nb_subdivisions=(1,) * dim,
+            nb_ghosts_left=(1,) * dim,
+            nb_ghosts_right=(1,) * dim,
+            nb_sub_pts={"quad": 1},
+        )
+        fc = deco.collection
+        lam_f = fc.real_field("lambda")
+        mu_f = fc.real_field("mu")
+        lam_f.p[...] = lam
+        mu_f.p[...] = mu
+        deco.communicate_ghosts(lam_f)
+        deco.communicate_ghosts(mu_f)
+
+        el = muGrid.FEMElement.q1 if element == "q1" else muGrid.FEMElement.simplex
+        Op = (
+            muGrid.IsotropicStiffnessOperator2D
+            if dim == 2
+            else muGrid.IsotropicStiffnessOperator3D
+        )
+        op = Op(tuple(h), el)
+
+        E = (np.arange(dim * dim, dtype=float).reshape(dim, dim) + 1) * 0.01
+        E = 0.5 * (E + E.T)
+        # affine displacement with a constant (symmetric-ish) gradient G0
+        G0 = np.zeros((dim, dim))
+        G0[0, 0] = 0.02
+        if dim >= 2:
+            G0[0, 1] = 0.01
+            G0[1, 0] = 0.01
+        u = fc.real_field("u", (dim,))
+        pg = u.pg
+        idx = np.indices(pg.shape[1:])
+        for i in range(dim):
+            ui = np.zeros(pg.shape[1:])
+            for j in range(dim):
+                ui += G0[i, j] * idx[j] * h[j]
+            pg[i, ...] = ui
+        e_flat = [float(E[i, j]) for i in range(dim) for j in range(dim)]
+
+        # average_stress == C:(E + sym(G0)) over the unit domain.
+        Etot = E + 0.5 * (G0 + G0.T)
+        sig = lam * np.trace(Etot) * np.eye(dim) + 2 * mu * Etot
+        got = np.array(op.average_stress(u, lam_f, mu_f, e_flat)).reshape(dim, dim)
+        np.testing.assert_allclose(got, sig, atol=1e-12)
+
+        # macro RHS (divergence of uniform stress) is zero for a homogeneous
+        # material in equilibrium.
+        f = fc.real_field("f", (dim,))
+        op.apply_macro_rhs(lam_f, mu_f, e_flat, f)
+        assert np.abs(np.asarray(f.p)).max() < 1e-12
+
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_q1_and_simplex_apply_differ(self, dim):
+        """Q1 and simplex build genuinely different element stiffness matrices,
+        so applying them to the same displacement gives different forces — a
+        guard that the element selection actually reaches precompute."""
+        n = 5
+        h = [1.0 / n] * dim
+        comm = muGrid.Communicator()
+        deco = muGrid.CartesianDecomposition(
+            comm,
+            (n,) * dim,
+            nb_subdivisions=(1,) * dim,
+            nb_ghosts_left=(1,) * dim,
+            nb_ghosts_right=(1,) * dim,
+            nb_sub_pts={"quad": 1},
+        )
+        fc = deco.collection
+        lam_f = fc.real_field("lambda")
+        mu_f = fc.real_field("mu")
+        lam_f.p[...] = 1.3
+        mu_f.p[...] = 0.7
+        deco.communicate_ghosts(lam_f)
+        deco.communicate_ghosts(mu_f)
+        u = fc.real_field("u", (dim,))
+        u.p[...] = np.random.default_rng(0).random(u.p.shape)
+        deco.communicate_ghosts(u)
+        Op = (
+            muGrid.IsotropicStiffnessOperator2D
+            if dim == 2
+            else muGrid.IsotropicStiffnessOperator3D
+        )
+        f_s = fc.real_field("f_s", (dim,))
+        f_q = fc.real_field("f_q", (dim,))
+        Op(tuple(h), muGrid.FEMElement.simplex).apply(u, lam_f, mu_f, f_s)
+        Op(tuple(h), muGrid.FEMElement.q1).apply(u, lam_f, mu_f, f_q)
+        assert np.abs(np.asarray(f_s.p) - np.asarray(f_q.p)).max() > 1e-6
 
 
 if __name__ == "__main__":

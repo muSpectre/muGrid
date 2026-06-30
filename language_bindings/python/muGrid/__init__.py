@@ -170,6 +170,9 @@ Decomposition = _muGrid.Decomposition
 # wrappers imported above accept wrapped Field objects)
 _IsotropicStiffnessOperator2D = _muGrid.IsotropicStiffnessOperator2D
 _IsotropicStiffnessOperator3D = _muGrid.IsotropicStiffnessOperator3D
+
+# Finite-element selector for the fused stiffness operator (simplex / Q1).
+FEMElement = _muGrid.FEMElement
 DynCoord = _muGrid.DynCoord
 DynRcoord = _muGrid.DynRcoord
 IterUnit = _muGrid.IterUnit

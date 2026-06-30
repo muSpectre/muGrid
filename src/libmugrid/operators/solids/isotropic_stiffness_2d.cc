@@ -43,22 +43,9 @@ namespace muGrid {
     // 2D Implementation
     // ============================================================================
 
-    // 2D shape function gradients for 2 triangles per pixel
-    // B_2D[quad][dim][node] - gradient of shape function for node w.r.t. dim
-    // Nodes: 0=(0,0), 1=(1,0), 2=(0,1), 3=(1,1)
-    // Triangle 0: nodes 0,1,2 (lower-left)
-    // Triangle 1: nodes 1,2,3 (upper-right)
-    static const Real B_2D[2][2][4] = {
-        // Triangle 0 (lower-left)
-        {{-1.0, 1.0, 0.0, 0.0},   // d/dx
-         {-1.0, 0.0, 1.0, 0.0}},  // d/dy
-        // Triangle 1 (upper-right)
-        {{0.0, 0.0, -1.0, 1.0},  // d/dx
-         {0.0, -1.0, 0.0, 1.0}}  // d/dy
-    };
-
-    // Quadrature weights for 2D (area of each triangle / pixel area)
-    static const Real W_2D[2] = {0.5, 0.5};
+    // Shape-function gradients and quadrature weights now come from the element
+    // traits (fem_element.hh) via the operator's runtime element data; the
+    // precompute below reads them, so the per-element kernels are unchanged.
 
     template <>
     void IsotropicStiffnessOperator<2>::precompute_matrices() {
@@ -68,81 +55,53 @@ namespace muGrid {
 
         const Real hx = grid_spacing[0];
         const Real hy = grid_spacing[1];
-        const Real inv_hx = 1.0 / hx;
-        const Real inv_hy = 1.0 / hy;
+        const Real scale[2] = {1.0 / hx, 1.0 / hy};
 
-        // Scale factors for each derivative direction
-        const Real scale[2] = {inv_hx, inv_hy};
+        // Selected element's reference shape-function gradient B[q][d][n].
+        auto B = [this](Index_t q, Index_t d, Index_t n) {
+            return elem_B[(q * NB_DOFS_PER_NODE + d) * NB_NODES + n];
+        };
 
-        // Compute G = Σ_q w_q B_q^T I B_q
-        // and V = Σ_q w_q (B_q^T m)(m^T B_q) where m = [1,1,0]^T for 2D Voigt
-        for (Index_t q = 0; q < NB_QUAD; ++q) {
-            Real w = W_2D[q] * hx * hy;  // Weight includes element area
-
-            // For each pair of nodes (I, J) and DOFs (a, b)
-            // G[I*2+a, J*2+b] += w * Σ_d B[q,d,I] * scale[d] * B[q,d,J] *
-            // scale[d] * δ_ab Plus cross terms for shear
+        // G = Σ_q w_q B_q^T I_sym B_q (shear/μ geometry) and
+        // V = Σ_q w_q (B_q^T m)(m^T B_q) (volumetric/λ geometry), m = [1,1,0]^T.
+        for (Index_t q = 0; q < elem_nb_quad; ++q) {
+            Real w = elem_Wfrac[q] * hx * hy;  // weight includes element area
             for (Index_t I = 0; I < NB_NODES; ++I) {
                 for (Index_t J = 0; J < NB_NODES; ++J) {
-                    // G contribution: B^T I B where I is identity in strain
-                    // space For 2D: strain = [εxx, εyy, 2εxy] B maps
-                    // displacement to strain
-
-                    // Compute B^T B for this node pair
-                    // B is 3×8 (strain × DOFs), B^T B is 8×8
                     for (Index_t a = 0; a < NB_DOFS_PER_NODE; ++a) {
                         for (Index_t b = 0; b < NB_DOFS_PER_NODE; ++b) {
                             Real g_contrib = 0.0;
-                            Real v_contrib = 0.0;
-
-                            // Diagonal strain terms (εxx, εyy)
-                            // B[εxx, u_x] = dN/dx, B[εyy, u_y] = dN/dy
+                            // Normal strain terms (εxx, εyy).
                             if (a == b) {
-                                // Normal strain contribution
-                                g_contrib += B_2D[q][a][I] * scale[a] *
-                                             B_2D[q][a][J] * scale[a];
+                                g_contrib += B(q, a, I) * scale[a] *
+                                             B(q, a, J) * scale[a];
                             }
-
-                            // Shear strain term (2εxy = du_y/dx + du_x/dy)
-                            // B[2εxy, u_x] = dN/dy, B[2εxy, u_y] = dN/dx
-                            // Contributes to G but with factor 0.5 due to
-                            // engineering strain
+                            // Engineering-shear coupling (2εxy), factor 1/2.
                             if (a == 0 && b == 0) {
-                                // u_x - u_x coupling via shear
-                                g_contrib += 0.5 * B_2D[q][1][I] * scale[1] *
-                                             B_2D[q][1][J] * scale[1];
+                                g_contrib += 0.5 * B(q, 1, I) * scale[1] *
+                                             B(q, 1, J) * scale[1];
                             } else if (a == 1 && b == 1) {
-                                // u_y - u_y coupling via shear
-                                g_contrib += 0.5 * B_2D[q][0][I] * scale[0] *
-                                             B_2D[q][0][J] * scale[0];
+                                g_contrib += 0.5 * B(q, 0, I) * scale[0] *
+                                             B(q, 0, J) * scale[0];
                             } else if (a == 0 && b == 1) {
-                                // u_x - u_y coupling via shear
-                                g_contrib += 0.5 * B_2D[q][1][I] * scale[1] *
-                                             B_2D[q][0][J] * scale[0];
+                                g_contrib += 0.5 * B(q, 1, I) * scale[1] *
+                                             B(q, 0, J) * scale[0];
                             } else if (a == 1 && b == 0) {
-                                // u_y - u_x coupling via shear
-                                g_contrib += 0.5 * B_2D[q][0][I] * scale[0] *
-                                             B_2D[q][1][J] * scale[1];
+                                g_contrib += 0.5 * B(q, 0, I) * scale[0] *
+                                             B(q, 1, J) * scale[1];
                             }
-
-                            // V contribution: (B^T m)(m^T B)
-                            // m = [1, 1, 0]^T selects trace(ε) = εxx + εyy
-                            // B^T m gives displacement contributions to trace
-                            // For node I, DOF a: (B^T m)[I,a] = δ_{a,0}*dN_I/dx
-                            // + δ_{a,1}*dN_I/dy
+                            // V: (B^T m)(m^T B), trace(ε) = εxx + εyy.
                             Real BtmI =
-                                (a == 0 ? B_2D[q][0][I] * scale[0] : 0.0) +
-                                (a == 1 ? B_2D[q][1][I] * scale[1] : 0.0);
+                                (a == 0 ? B(q, 0, I) * scale[0] : 0.0) +
+                                (a == 1 ? B(q, 1, I) * scale[1] : 0.0);
                             Real BtmJ =
-                                (b == 0 ? B_2D[q][0][J] * scale[0] : 0.0) +
-                                (b == 1 ? B_2D[q][1][J] * scale[1] : 0.0);
-                            v_contrib = BtmI * BtmJ;
-
+                                (b == 0 ? B(q, 0, J) * scale[0] : 0.0) +
+                                (b == 1 ? B(q, 1, J) * scale[1] : 0.0);
                             Index_t idx =
                                 (I * NB_DOFS_PER_NODE + a) * NB_ELEMENT_DOFS +
                                 (J * NB_DOFS_PER_NODE + b);
                             G_matrix[idx] += w * g_contrib;
-                            V_matrix[idx] += w * v_contrib;
+                            V_matrix[idx] += w * BtmI * BtmJ;
                         }
                     }
                 }
@@ -150,14 +109,13 @@ namespace muGrid {
         }
 
         // Element-averaged gradient operator: Dbar[j*NB_NODES+n] =
-        // scale[j] Σ_q W_q B[q][j][n] (fractional weights W_2D, summing to 1),
-        // so ḡ_ij = Σ_n Dbar[j][n] u[n,i] is the element-averaged ∂u_i/∂x_j.
+        // scale[j] Σ_q Wfrac_q B[q][j][n] (fractional weights, summing to 1).
         std::fill(Dbar_matrix.begin(), Dbar_matrix.end(), 0.0);
         for (Index_t j = 0; j < NB_DOFS_PER_NODE; ++j) {
             for (Index_t n = 0; n < NB_NODES; ++n) {
                 Real s = 0.0;
-                for (Index_t q = 0; q < NB_QUAD; ++q) {
-                    s += W_2D[q] * B_2D[q][j][n];
+                for (Index_t q = 0; q < elem_nb_quad; ++q) {
+                    s += elem_Wfrac[q] * B(q, j, n);
                 }
                 Dbar_matrix[j * NB_NODES + n] = scale[j] * s;
             }

@@ -322,6 +322,20 @@ namespace fem_gradient_kernels {
         const Real *, Real *, const Index_t *, const Index_t *,
         const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
         bool);
+    template void fem_gradient_gpu<Q1Quad2D>(
+        const Real *, Real *, const Index_t *, const Index_t *,
+        const Index_t *, Index_t, Index_t, const Real *, Real, bool);
+    template void fem_gradient_gpu<Q1Hex3D>(
+        const Real *, Real *, const Index_t *, const Index_t *,
+        const Index_t *, Index_t, Index_t, const Real *, Real, bool);
+    template void fem_divergence_gpu<Q1Quad2D>(
+        const Real *, Real *, const Index_t *, const Index_t *,
+        const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
+        bool);
+    template void fem_divergence_gpu<Q1Hex3D>(
+        const Real *, Real *, const Index_t *, const Index_t *,
+        const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
+        bool);
 
 }  // namespace fem_gradient_kernels
 }  // namespace muGrid

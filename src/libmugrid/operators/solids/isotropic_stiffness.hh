@@ -56,6 +56,7 @@
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
 #include "operators/linear.hh"
+#include "operators/fem_element.hh"
 #include "collection/field_collection_global.hh"
 
 #include <array>
@@ -113,6 +114,16 @@ namespace muGrid {
             return this->get_apply_ghost_requirement();
         }
     };
+
+    /**
+     * @enum FEMElementKind
+     * @brief Finite element used by the fused stiffness operator. The element
+     *        only affects the one-time precomputation of the G/V/D̄ matrices
+     *        from its reference shape-function gradients (fem_element.hh); the
+     *        per-call kernels are element-agnostic, so it is selected at
+     *        construction rather than as a template parameter.
+     */
+    enum class FEMElementKind { LinearSimplex, Q1 };
 
     /**
      * @struct IsotropicStiffnessTraits
@@ -439,13 +450,15 @@ namespace muGrid {
          * @brief Construct with grid spacing (length Dim); precomputes G and V.
          */
         explicit IsotropicStiffnessOperator(
-            const std::vector<Real> & grid_spacing)
+            const std::vector<Real> & grid_spacing,
+            FEMElementKind element = FEMElementKind::LinearSimplex)
             : grid_spacing{grid_spacing} {
             if (static_cast<Index_t>(this->grid_spacing.size()) != Dim) {
                 throw RuntimeError(std::to_string(Dim) +
                                    "D operator requires " + std::to_string(Dim) +
                                    "D grid spacing");
             }
+            this->load_element(element);
             this->precompute_matrices();
         }
 
@@ -611,8 +624,49 @@ namespace muGrid {
         ElementMatrix V_matrix;  //!< λ coefficient geometry
         GradientAverage Dbar_matrix;  //!< element-averaged gradient operator
 
-        //! Compute the geometry matrices G, V and Dbar (dimension-specific;
-        //! explicit specialization in isotropic_stiffness_{2,3}d.cc).
+        //! Selected element's reference data, copied from the traits at
+        //! construction (fem_element.hh). B is flattened [q][d][n]. Only
+        //! precompute_matrices() consumes these, so runtime storage is free.
+        std::vector<Real> elem_B;
+        std::vector<Real> elem_Wfrac;
+        Index_t elem_nb_quad{0};
+
+        //! Copy the chosen element's B / Wfrac / NbQuad out of its traits.
+        void load_element(FEMElementKind element) {
+            auto load = [this](auto trait) {
+                using T = decltype(trait);
+                static_assert(T::SpatialDim == Dim,
+                              "element/operator dimension mismatch");
+                this->elem_nb_quad = T::NbQuad;
+                this->elem_Wfrac.assign(T::Wfrac, T::Wfrac + T::NbQuad);
+                this->elem_B.resize(T::NbQuad * Dim * NB_NODES);
+                for (Index_t q = 0; q < T::NbQuad; ++q) {
+                    for (Index_t d = 0; d < Dim; ++d) {
+                        for (Index_t n = 0; n < NB_NODES; ++n) {
+                            this->elem_B[(q * Dim + d) * NB_NODES + n] =
+                                T::B[q][d][n];
+                        }
+                    }
+                }
+            };
+            if constexpr (Dim == 2) {
+                if (element == FEMElementKind::Q1) {
+                    load(Q1Quad2D{});
+                } else {
+                    load(LinearSimplex2D{});
+                }
+            } else {
+                if (element == FEMElementKind::Q1) {
+                    load(Q1Hex3D{});
+                } else {
+                    load(LinearSimplex3D{});
+                }
+            }
+        }
+
+        //! Compute the geometry matrices G, V and Dbar from the selected
+        //! element's reference data (dimension-specific Voigt assembly; explicit
+        //! specialization in isotropic_stiffness_{2,3}d.cc).
         void precompute_matrices();
 
         //! Build the constant per-element vectors Gu = G u* and Vu = V u* of

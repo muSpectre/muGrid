@@ -54,8 +54,11 @@ using muGrid::LaplaceOperator2D;
 using muGrid::LaplaceOperator3D;
 using muGrid::FEMGradientOperator2D;
 using muGrid::FEMGradientOperator3D;
+using muGrid::FEMGradientOperatorQ1_2D;
+using muGrid::FEMGradientOperatorQ1_3D;
 using muGrid::IsotropicStiffnessOperator2D;
 using muGrid::IsotropicStiffnessOperator3D;
+using muGrid::FEMElementKind;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
 using muGrid::Dim_t;
@@ -567,121 +570,101 @@ void add_laplace_operator_3d(py::module & mod) {
 #endif
 }
 
-// Bind class FEMGradientOperator2D (dimension-specific)
-void add_fem_gradient_operator_2d(py::module & mod) {
-    using ApplyHostFn = void (FEMGradientOperator2D::*)(const RealFieldHost &,
-                                                        RealFieldHost &) const;
-    using TransposeHostFn =
-        void (FEMGradientOperator2D::*)(const RealFieldHost &, RealFieldHost &,
-                                        const std::vector<Real> &) const;
+// Bind a FEMGradientOperator<Element> instantiation. The 2D/3D and
+// simplex/Q1 bindings are identical apart from the type and the docstring,
+// so they share this template.
+template <class Op>
+static void bind_fem_gradient_operator(py::module & mod, const char * name,
+                                       const char * doc) {
+    using ApplyHostFn =
+        void (Op::*)(const RealFieldHost &, RealFieldHost &) const;
+    using TransposeHostFn = void (Op::*)(
+        const RealFieldHost &, RealFieldHost &, const std::vector<Real> &) const;
     using ApplyIncrementHostFn =
-        void (FEMGradientOperator2D::*)(const RealFieldHost &, const Real &,
-                                        RealFieldHost &) const;
+        void (Op::*)(const RealFieldHost &, const Real &, RealFieldHost &) const;
     using TransposeIncrementHostFn =
-        void (FEMGradientOperator2D::*)(const RealFieldHost &, const Real &,
-                                        RealFieldHost &,
-                                        const std::vector<Real> &) const;
+        void (Op::*)(const RealFieldHost &, const Real &, RealFieldHost &,
+                     const std::vector<Real> &) const;
 
     auto fem_grad_op =
-        py::class_<FEMGradientOperator2D, LinearOperator>(
-            mod, "FEMGradientOperator2D",
-            R"pbdoc(
-        Optimized 2D linear FEM gradient operator with triangular elements.
-
-        2 triangles per pixel, 2 quadrature points, 2 gradient components (d/dx, d/dy).
-
-        For new code, prefer using this class directly instead of FEMGradientOperator(2)
-        for slightly better performance (avoids virtual dispatch).
-        )pbdoc")
+        py::class_<Op, LinearOperator>(mod, name, doc)
             .def(py::init<std::vector<Real>>(),
                  "grid_spacing"_a = std::vector<Real>{},
-                 "Construct with optional grid spacing [hx, hy]")
-            .def("apply",
-                 static_cast<ApplyHostFn>(&FEMGradientOperator2D::apply),
-                 "nodal_field"_a, "gradient_field"_a,
-                 "Apply gradient operator to host fields")
+                 "Construct with optional grid spacing")
+            .def("apply", static_cast<ApplyHostFn>(&Op::apply), "nodal_field"_a,
+                 "gradient_field"_a, "Apply gradient operator to host fields")
             .def("apply_increment",
-                 static_cast<ApplyIncrementHostFn>(
-                     &FEMGradientOperator2D::apply_increment),
+                 static_cast<ApplyIncrementHostFn>(&Op::apply_increment),
                  "nodal_field"_a, "alpha"_a, "gradient_field"_a,
                  "Add alpha * grad(nodal_field) to gradient_field on host "
                  "fields")
-            .def(
-                "transpose",
-                static_cast<TransposeHostFn>(&FEMGradientOperator2D::transpose),
-                "gradient_field"_a, "nodal_field"_a,
-                "weights"_a = std::vector<Real>{},
-                "Apply transpose (divergence) to host fields")
+            .def("transpose", static_cast<TransposeHostFn>(&Op::transpose),
+                 "gradient_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose (divergence) to host fields")
             .def("transpose_increment",
-                 static_cast<TransposeIncrementHostFn>(
-                     &FEMGradientOperator2D::transpose_increment),
+                 static_cast<TransposeIncrementHostFn>(&Op::transpose_increment),
                  "gradient_field"_a, "alpha"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
                  "Add alpha * (-div(gradient_field)) to nodal_field on host "
                  "fields")
-            .def_property_readonly("grid_spacing",
-                                   &FEMGradientOperator2D::get_grid_spacing)
-            .def_property_readonly(
-                "quadrature_weights",
-                &FEMGradientOperator2D::get_quadrature_weights)
+            .def_property_readonly("grid_spacing", &Op::get_grid_spacing)
+            .def_property_readonly("quadrature_weights",
+                                   &Op::get_quadrature_weights)
             .def_property_readonly("offset",
-                                   [](const FEMGradientOperator2D & op) {
+                                   [](const Op & op) {
                                        const auto & offset = op.get_offset();
                                        return py::array_t<Index_t>(
                                            offset.size(), offset.data());
                                    })
-            .def_property_readonly(
-                "stencil_shape",
-                [](const FEMGradientOperator2D & op) {
-                    const auto & shape = op.get_stencil_shape();
-                    return py::array_t<Index_t>(shape.size(), shape.data());
-                })
-            .def_property_readonly(
-                "coefficients", [](const FEMGradientOperator2D & op) {
-                    const auto & flat_op = op.get_coefficients();
-                    const auto & stencil_shape = op.get_stencil_shape();
-                    const auto nb_output = op.get_nb_output_components();
-                    const auto nb_quad = op.get_nb_quad_pts();
-                    const auto nb_input = op.get_nb_input_components();
-                    std::vector<py::ssize_t> full_shape{nb_output, nb_quad,
-                                                        nb_input};
-                    for (const auto & dim : stencil_shape) {
-                        full_shape.push_back(dim);
-                    }
-                    py::array_t<Real, py::array::f_style> result(full_shape);
-                    std::copy(flat_op.begin(), flat_op.end(),
-                              result.mutable_data());
-                    return result;
-                });
+            .def_property_readonly("stencil_shape",
+                                   [](const Op & op) {
+                                       const auto & shape =
+                                           op.get_stencil_shape();
+                                       return py::array_t<Index_t>(
+                                           shape.size(), shape.data());
+                                   })
+            .def_property_readonly("coefficients", [](const Op & op) {
+                const auto & flat_op = op.get_coefficients();
+                const auto & stencil_shape = op.get_stencil_shape();
+                const auto nb_output = op.get_nb_output_components();
+                const auto nb_quad = op.get_nb_quad_pts();
+                const auto nb_input = op.get_nb_input_components();
+                std::vector<py::ssize_t> full_shape{nb_output, nb_quad,
+                                                    nb_input};
+                for (const auto & dim : stencil_shape) {
+                    full_shape.push_back(dim);
+                }
+                py::array_t<Real, py::array::f_style> result(full_shape);
+                std::copy(flat_op.begin(), flat_op.end(), result.mutable_data());
+                return result;
+            });
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-    using ApplyDeviceFn = void (FEMGradientOperator2D::*)(
-        const RealFieldDevice &, RealFieldDevice &) const;
-    using TransposeDeviceFn = void (FEMGradientOperator2D::*)(
+    using ApplyDeviceFn =
+        void (Op::*)(const RealFieldDevice &, RealFieldDevice &) const;
+    using TransposeDeviceFn = void (Op::*)(
         const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
         const;
-    using ApplyIncrementDeviceFn = void (FEMGradientOperator2D::*)(
-        const RealFieldDevice &, const Real &, RealFieldDevice &) const;
-    using TransposeIncrementDeviceFn = void (FEMGradientOperator2D::*)(
-        const RealFieldDevice &, const Real &, RealFieldDevice &,
-        const std::vector<Real> &) const;
+    using ApplyIncrementDeviceFn =
+        void (Op::*)(const RealFieldDevice &, const Real &, RealFieldDevice &)
+            const;
+    using TransposeIncrementDeviceFn =
+        void (Op::*)(const RealFieldDevice &, const Real &, RealFieldDevice &,
+                     const std::vector<Real> &) const;
     fem_grad_op
-        .def("apply", static_cast<ApplyDeviceFn>(&FEMGradientOperator2D::apply),
-             "nodal_field"_a, "gradient_field"_a,
-             "Apply gradient operator to device fields")
+        .def("apply", static_cast<ApplyDeviceFn>(&Op::apply), "nodal_field"_a,
+             "gradient_field"_a, "Apply gradient operator to device fields")
         .def("apply_increment",
-             static_cast<ApplyIncrementDeviceFn>(
-                 &FEMGradientOperator2D::apply_increment),
+             static_cast<ApplyIncrementDeviceFn>(&Op::apply_increment),
              "nodal_field"_a, "alpha"_a, "gradient_field"_a,
              "Add alpha * grad(nodal_field) to gradient_field on device fields")
-        .def("transpose",
-             static_cast<TransposeDeviceFn>(&FEMGradientOperator2D::transpose),
+        .def("transpose", static_cast<TransposeDeviceFn>(&Op::transpose),
              "gradient_field"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
              "Apply transpose to device fields")
         .def("transpose_increment",
-             static_cast<TransposeIncrementDeviceFn>(
-                 &FEMGradientOperator2D::transpose_increment),
+             static_cast<TransposeIncrementDeviceFn>(&Op::transpose_increment),
              "gradient_field"_a, "alpha"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
              "Add alpha * (-div(gradient_field)) to nodal_field on device "
@@ -689,131 +672,40 @@ void add_fem_gradient_operator_2d(py::module & mod) {
 #endif
 }
 
-// Bind class FEMGradientOperator3D (dimension-specific)
+// Bind the FEM gradient operators: linear simplices (historical names) and Q1.
+void add_fem_gradient_operator_2d(py::module & mod) {
+    bind_fem_gradient_operator<FEMGradientOperator2D>(
+        mod, "FEMGradientOperator2D",
+        "2D linear FEM gradient operator (2 triangles per pixel, 2 quadrature "
+        "points).");
+    bind_fem_gradient_operator<FEMGradientOperatorQ1_2D>(
+        mod, "FEMGradientOperatorQ1_2D",
+        "2D Q1 (bilinear quad) FEM gradient operator (2x2 Gauss, 4 quadrature "
+        "points).");
+}
+
 void add_fem_gradient_operator_3d(py::module & mod) {
-    using ApplyHostFn = void (FEMGradientOperator3D::*)(const RealFieldHost &,
-                                                        RealFieldHost &) const;
-    using TransposeHostFn =
-        void (FEMGradientOperator3D::*)(const RealFieldHost &, RealFieldHost &,
-                                        const std::vector<Real> &) const;
-    using ApplyIncrementHostFn =
-        void (FEMGradientOperator3D::*)(const RealFieldHost &, const Real &,
-                                        RealFieldHost &) const;
-    using TransposeIncrementHostFn =
-        void (FEMGradientOperator3D::*)(const RealFieldHost &, const Real &,
-                                        RealFieldHost &,
-                                        const std::vector<Real> &) const;
-
-    auto fem_grad_op =
-        py::class_<FEMGradientOperator3D, LinearOperator>(
-            mod, "FEMGradientOperator3D",
-            R"pbdoc(
-        Optimized 3D linear FEM gradient operator with tetrahedral elements.
-
-        5 tetrahedra per voxel (Kuhn triangulation), 5 quadrature points,
-        3 gradient components (d/dx, d/dy, d/dz).
-
-        For new code, prefer using this class directly instead of FEMGradientOperator(3)
-        for slightly better performance (avoids virtual dispatch).
-        )pbdoc")
-            .def(py::init<std::vector<Real>>(),
-                 "grid_spacing"_a = std::vector<Real>{},
-                 "Construct with optional grid spacing [hx, hy, hz]")
-            .def("apply",
-                 static_cast<ApplyHostFn>(&FEMGradientOperator3D::apply),
-                 "nodal_field"_a, "gradient_field"_a,
-                 "Apply gradient operator to host fields")
-            .def("apply_increment",
-                 static_cast<ApplyIncrementHostFn>(
-                     &FEMGradientOperator3D::apply_increment),
-                 "nodal_field"_a, "alpha"_a, "gradient_field"_a,
-                 "Add alpha * grad(nodal_field) to gradient_field on host "
-                 "fields")
-            .def(
-                "transpose",
-                static_cast<TransposeHostFn>(&FEMGradientOperator3D::transpose),
-                "gradient_field"_a, "nodal_field"_a,
-                "weights"_a = std::vector<Real>{},
-                "Apply transpose (divergence) to host fields")
-            .def("transpose_increment",
-                 static_cast<TransposeIncrementHostFn>(
-                     &FEMGradientOperator3D::transpose_increment),
-                 "gradient_field"_a, "alpha"_a, "nodal_field"_a,
-                 "weights"_a = std::vector<Real>{},
-                 "Add alpha * (-div(gradient_field)) to nodal_field on host "
-                 "fields")
-            .def_property_readonly("grid_spacing",
-                                   &FEMGradientOperator3D::get_grid_spacing)
-            .def_property_readonly(
-                "quadrature_weights",
-                &FEMGradientOperator3D::get_quadrature_weights)
-            .def_property_readonly("offset",
-                                   [](const FEMGradientOperator3D & op) {
-                                       const auto & offset = op.get_offset();
-                                       return py::array_t<Index_t>(
-                                           offset.size(), offset.data());
-                                   })
-            .def_property_readonly(
-                "stencil_shape",
-                [](const FEMGradientOperator3D & op) {
-                    const auto & shape = op.get_stencil_shape();
-                    return py::array_t<Index_t>(shape.size(), shape.data());
-                })
-            .def_property_readonly(
-                "coefficients", [](const FEMGradientOperator3D & op) {
-                    const auto & flat_op = op.get_coefficients();
-                    const auto & stencil_shape = op.get_stencil_shape();
-                    const auto nb_output = op.get_nb_output_components();
-                    const auto nb_quad = op.get_nb_quad_pts();
-                    const auto nb_input = op.get_nb_input_components();
-                    std::vector<py::ssize_t> full_shape{nb_output, nb_quad,
-                                                        nb_input};
-                    for (const auto & dim : stencil_shape) {
-                        full_shape.push_back(dim);
-                    }
-                    py::array_t<Real, py::array::f_style> result(full_shape);
-                    std::copy(flat_op.begin(), flat_op.end(),
-                              result.mutable_data());
-                    return result;
-                });
-
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-    using ApplyDeviceFn = void (FEMGradientOperator3D::*)(
-        const RealFieldDevice &, RealFieldDevice &) const;
-    using TransposeDeviceFn = void (FEMGradientOperator3D::*)(
-        const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
-        const;
-    using ApplyIncrementDeviceFn = void (FEMGradientOperator3D::*)(
-        const RealFieldDevice &, const Real &, RealFieldDevice &) const;
-    using TransposeIncrementDeviceFn = void (FEMGradientOperator3D::*)(
-        const RealFieldDevice &, const Real &, RealFieldDevice &,
-        const std::vector<Real> &) const;
-    fem_grad_op
-        .def("apply", static_cast<ApplyDeviceFn>(&FEMGradientOperator3D::apply),
-             "nodal_field"_a, "gradient_field"_a,
-             "Apply gradient operator to device fields")
-        .def("apply_increment",
-             static_cast<ApplyIncrementDeviceFn>(
-                 &FEMGradientOperator3D::apply_increment),
-             "nodal_field"_a, "alpha"_a, "gradient_field"_a,
-             "Add alpha * grad(nodal_field) to gradient_field on device fields")
-        .def("transpose",
-             static_cast<TransposeDeviceFn>(&FEMGradientOperator3D::transpose),
-             "gradient_field"_a, "nodal_field"_a,
-             "weights"_a = std::vector<Real>{},
-             "Apply transpose to device fields")
-        .def("transpose_increment",
-             static_cast<TransposeIncrementDeviceFn>(
-                 &FEMGradientOperator3D::transpose_increment),
-             "gradient_field"_a, "alpha"_a, "nodal_field"_a,
-             "weights"_a = std::vector<Real>{},
-             "Add alpha * (-div(gradient_field)) to nodal_field on device "
-             "fields");
-#endif
+    bind_fem_gradient_operator<FEMGradientOperator3D>(
+        mod, "FEMGradientOperator3D",
+        "3D linear FEM gradient operator (5 Kuhn tetrahedra per voxel, 5 "
+        "quadrature points).");
+    bind_fem_gradient_operator<FEMGradientOperatorQ1_3D>(
+        mod, "FEMGradientOperatorQ1_3D",
+        "3D Q1 (trilinear hex) FEM gradient operator (2x2x2 Gauss, 8 "
+        "quadrature points).");
 }
 
 // Bind class IsotropicStiffnessOperator2D
 void add_isotropic_stiffness_operator_2d(py::module & mod) {
+    // The finite element used by the fused stiffness operator (selected at
+    // construction; affects only the precomputed geometry, not the kernels).
+    py::enum_<FEMElementKind>(mod, "FEMElement",
+                              "Finite element for the fused stiffness operator")
+        .value("simplex", FEMElementKind::LinearSimplex,
+               "Linear simplices (2 triangles / 5 tetrahedra per pixel)")
+        .value("q1", FEMElementKind::Q1,
+               "Q1 (bilinear quad / trilinear hex) with Gauss quadrature");
+
     // Function pointer types for explicit overload selection
     using ApplyHostFn = void (IsotropicStiffnessOperator2D::*)(
         const RealFieldHost &, const RealFieldHost &, const RealFieldHost &,
@@ -850,8 +742,10 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
         - Material fields (lambda, mu) shape: [nx-1, ny-1] (one value per pixel)
         - Force field shape: [2, nx, ny] (same as displacement)
         )pbdoc")
-            .def(py::init<const std::vector<Real> &>(), "grid_spacing"_a,
-                 "Construct with grid spacing [hx, hy]")
+            .def(py::init<const std::vector<Real> &, FEMElementKind>(),
+                 "grid_spacing"_a,
+                 "element"_a = FEMElementKind::LinearSimplex,
+                 "Construct with grid spacing [hx, hy] and element type")
             .def("apply",
                  static_cast<ApplyHostFn>(&IsotropicStiffnessOperator2D::apply),
                  "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
@@ -1006,8 +900,10 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
         - Material fields (lambda, mu) shape: [nx-1, ny-1, nz-1] (one value per voxel)
         - Force field shape: [3, nx, ny, nz] (same as displacement)
         )pbdoc")
-            .def(py::init<const std::vector<Real> &>(), "grid_spacing"_a,
-                 "Construct with grid spacing [hx, hy, hz]")
+            .def(py::init<const std::vector<Real> &, FEMElementKind>(),
+                 "grid_spacing"_a,
+                 "element"_a = FEMElementKind::LinearSimplex,
+                 "Construct with grid spacing [hx, hy, hz] and element type")
             .def("apply",
                  static_cast<ApplyHostFn>(&IsotropicStiffnessOperator3D::apply),
                  "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
