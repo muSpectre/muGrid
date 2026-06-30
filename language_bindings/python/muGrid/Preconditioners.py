@@ -343,13 +343,62 @@ class BlockFourierPreconditioner(Preconditioner):
             import cupy
 
             self._xp = cupy
-            self._blocks = cupy.asarray(blocks)
         else:
             self._xp = np
-            self._blocks = np.asarray(blocks)
+        xp = self._xp
+
+        # The reference-stiffness symbol K̂(q) is Hermitian (the FE stiffness is
+        # real and self-adjoint), so its inverse is Hermitian too. When that
+        # holds, store only the upper triangle -- n real diagonals plus
+        # n(n-1)/2 complex off-diagonals, i.e. n² reals/mode instead of 2n² for
+        # the dense complex block (a 2x saving on the symbol, the largest
+        # persistent buffer of the preconditioner). A non-Hermitian operator
+        # (general use of this class) keeps the dense block. Either way apply()
+        # multiplies component-by-component (no batched einsum, hence no cuBLAS
+        # gemm path) and needs only n-1 single-component transients.
+        #
+        # The detection and triangle extraction run on the host array `blocks`,
+        # and only the compressed pieces are moved to the device -- so the
+        # device never has to hold the dense n×n complex block, even
+        # transiently, during construction.
+        herm_scale = float(np.max(np.abs(blocks))) if blocks.size else 0.0
+        herm_asym = (
+            float(np.max(np.abs(blocks - np.conj(np.swapaxes(blocks, 0, 1)))))
+            if blocks.size
+            else 0.0
+        )
+        self._hermitian = herm_scale == 0.0 or herm_asym <= 1e-10 * herm_scale
+
+        if self._hermitian:
+            diag = np.empty((n,) + blocks.shape[2:], dtype=blocks.real.dtype)
+            for i in range(n):
+                diag[i] = blocks[i, i].real
+            self._diag = xp.asarray(diag)
+            self._off = {
+                (i, j): xp.asarray(np.ascontiguousarray(blocks[i, j]))
+                for i in range(n)
+                for j in range(i + 1, n)
+            }
+            self._blocks = None
+        else:
+            self._diag = None
+            self._off = None
+            self._blocks = xp.asarray(np.ascontiguousarray(blocks))
 
     def _timed(self, name):
         return self._timer(name) if self._timer is not None else nullcontext()
+
+    def _block(self, i, j):
+        """Per-mode entry K⁻¹_ij(q) as a Fourier array, reconstructed from the
+        stored upper triangle in the Hermitian case (lower triangle is the
+        conjugate of the upper)."""
+        if not self._hermitian:
+            return self._blocks[i, j]
+        if i == j:
+            return self._diag[i]
+        if i < j:
+            return self._off[(i, j)]
+        return self._xp.conj(self._off[(j, i)])
 
     def apply(self, r, z):
         """
@@ -364,10 +413,28 @@ class BlockFourierPreconditioner(Preconditioner):
             engine.fft(r, work)
         with self._timed("scale"):
             s = work.s
-            # z_i(q) = Σ_j K⁻¹_ij(q) r_j(q), per Fourier mode. The field view
-            # carries a (size-1) sub-point axis between the component axis and
-            # the Fourier axes ("s"); the blocks broadcast over it.
-            s[...] = self._xp.einsum("ij...,js...->is...", self._blocks, s)
+            # z_i(q) = Σ_j K⁻¹_ij(q) r_j(q), per Fourier mode, evaluated as
+            # explicit component multiplies/adds (no einsum -> no cuBLAS batched
+            # gemm). Each output needs every input and the update is in place on
+            # the work buffer, so the first n-1 outputs are buffered and the
+            # last is written straight into s while its inputs are still intact
+            # -- keeping the transient to n-1 single-component buffers rather
+            # than a full n-component einsum temporary. The field view carries a
+            # size-1 sub-point axis between the component and Fourier axes; the
+            # per-mode blocks (no sub-point axis) broadcast over it.
+            n = self._n
+            new = []
+            for i in range(n - 1):
+                acc = self._block(i, 0) * s[0]
+                for j in range(1, n):
+                    acc = acc + self._block(i, j) * s[j]
+                new.append(acc)
+            last = self._block(n - 1, 0) * s[0]
+            for j in range(1, n):
+                last = last + self._block(n - 1, j) * s[j]
+            s[n - 1] = last
+            for i in range(n - 1):
+                s[i] = new[i]
         with self._timed("ifft"):
             engine.ifft(work, z)
 

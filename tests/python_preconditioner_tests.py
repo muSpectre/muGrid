@@ -316,6 +316,61 @@ def test_reference_stiffness_preconditioner_frees_scratch(comm):
     assert fsc.field_exists(f"{name}-work")
 
 
+def test_block_fourier_hermitian_compressed_storage(comm):
+    """Regression guard: a Hermitian symbol (the reference-stiffness case) is
+    stored as its triangle (n real diagonals + n(n-1)/2 complex off-diagonals),
+    not the dense n×n complex block. This halves the symbol's resident memory;
+    if the detection regresses the dense block would be kept."""
+    engine = make_engine(comm, (16, 16))
+    grid_spacing = 1 / 16
+    n = 2
+    laplace = muGrid.GenericLinearOperator(
+        [-1, -1], np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    )
+
+    def apply_operator(u, Au):
+        engine.communicate_ghosts(u)
+        laplace.apply(u, Au)
+        Au.s[...] /= -grid_spacing**2
+
+    prec = make_reference_stiffness_preconditioner(engine, apply_operator, n)
+    assert prec._hermitian is True
+    assert prec._blocks is None  # dense block not retained
+    assert sorted(prec._off.keys()) == [(0, 1)]  # only the upper triangle
+    assert prec._diag.dtype == prec._diag.real.dtype  # diagonals stored real
+
+
+def test_block_fourier_non_hermitian_keeps_dense(comm):
+    """A non-Hermitian block set must fall back to dense storage and still
+    apply correctly (z_i = Σ_j M_ij r_j), so the optimization never corrupts
+    the general case."""
+    engine = make_engine(comm, (8, 8))
+    n = 2
+    fourier = tuple(engine.nb_fourier_subdomain_grid_pts)
+    rng = np.random.default_rng(0)
+    # A deterministic, clearly non-Hermitian block field.
+    blocks = (rng.standard_normal((n, n) + fourier)
+              + 1j * rng.standard_normal((n, n) + fourier))
+    prec = BlockFourierPreconditioner(engine, blocks)
+    assert prec._hermitian is False
+    assert prec._blocks is not None
+
+    # Apply must equal the dense einsum reference, mode by mode.
+    r = engine.real_space_field("r", components=(n,))
+    z = engine.real_space_field("z", components=(n,))
+    rng2 = np.random.default_rng(1)
+    r.p[...] = rng2.standard_normal(r.p.shape)
+    # Reference: FFT, dense per-mode multiply, IFFT.
+    work = engine.fourier_space_field("ref-work", components=(n,))
+    engine.fft(r, work)
+    ref = np.einsum("ij...,js...->is...", blocks, np.asarray(work.s))
+    work.s[...] = ref
+    z_ref = engine.real_space_field("z_ref", components=(n,))
+    engine.ifft(work, z_ref)
+    prec.apply(r, z)
+    np.testing.assert_allclose(np.asarray(z.p), np.asarray(z_ref.p), atol=1e-12)
+
+
 def test_kernel_shape_validation(comm):
     """A kernel that does not match the local Fourier subdomain is rejected."""
     engine = make_engine(comm, (16, 16))
