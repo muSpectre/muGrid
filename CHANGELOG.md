@@ -25,9 +25,11 @@ Unreleased
   slab and pencil decompositions** (the pencil transpose carries `MPI_COMPLEX` datatypes and
   `Complex32` work buffers), matching double to ≈1e-7 forward / ≈1e-6 round-trip on 2 and 4 ranks
 - ENH: Single-precision linalg primitives — the CG building blocks (`vecdot`, `norm_sq`, `axpy`,
-  `scal`, `axpby`, `copy`, `axpy_norm_sq`, `cross`, plus `pipelined_cg_dots` on host) accept
-  `Real32`/`Complex32` fields on host and GPU; the field-valued `scal` and the `leray_project`
-  spectral-projection kernel also have float32 host overloads
+  `scal`, `axpby`, `copy`, `axpy_norm_sq`, `cross`), `pipelined_cg_dots`, the field-valued `scal`
+  and the `leray_project` spectral-projection kernel all accept `Real32`/`Complex32` fields on host
+  and GPU. The GPU reductions (`pipelined_cg_dots` dot products, the `leray_project` contraction)
+  accumulate in double even for float32 fields, so a single-precision CG keeps a double-accurate
+  inner product
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
   stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
   the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`

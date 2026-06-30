@@ -587,5 +587,39 @@ void add_linalg_functions(py::module &mod) {
     MUGRID_BIND_LINALG_DEVICE(Real32FieldDevice, Real32)
     MUGRID_BIND_LINALG_DEVICE(Complex32FieldDevice, Complex32)
 #undef MUGRID_BIND_LINALG_DEVICE
+
+    // Single-precision pipelined CG dots + field-valued scal + Leray
+    // projection on device (custom kernels, double-accumulated reductions).
+    linalg.def("pipelined_cg_dots",
+        static_cast<std::array<Real32, 3> (*)(const Real32FieldDevice&,
+                                              const Real32FieldDevice&,
+                                              const Real32FieldDevice&)>(
+            &muGrid::linalg::pipelined_cg_dots<Real32, DeviceSpace>),
+        "r"_a, "u"_a, "w"_a,
+        "Fused interior reduction for pipelined CG on device (GPU), float32 "
+        "fields with double-accumulated dot products: [(r,u), (w,u), (r,r)].");
+
+    linalg.def("scal",
+        static_cast<void (*)(const Real32FieldDevice&, Complex32FieldDevice&)>(
+            &muGrid::linalg::scal<DeviceSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a complex64 field by a per-pixel float32 field on device (GPU): "
+        "x[c, i] *= alpha[c, i].");
+
+    linalg.def("scal",
+        static_cast<void (*)(const Real32FieldDevice&, Real32FieldDevice&)>(
+            &muGrid::linalg::scal<DeviceSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a float32 field by a per-pixel float32 field on device (GPU): "
+        "x[c, i] *= alpha[c, i].");
+
+    linalg.def("leray_project",
+        static_cast<void (*)(const Real32FieldDevice&, const Real32FieldDevice&,
+                             const Complex32FieldDevice&,
+                             Complex32FieldDevice&)>(
+            &muGrid::linalg::leray_project<DeviceSpace>),
+        "k"_a, "invk"_a, "N"_a, "out"_a,
+        "Fused Leray projection out[c] -= k[c] * sum_d(invk[d] * N[d]) for "
+        "complex64 fields with float32 coefficients on device (GPU).");
 #endif
 }

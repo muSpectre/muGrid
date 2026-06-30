@@ -368,8 +368,12 @@ __global__ void final_reduce_kernel(T* data, Index_t n) {
  * Real-only (the pipelined CG fields are real); not templated over the scalar
  * type because there is no complex pipelined-CG instantiation.
  */
+// Templated on the field scalar type RT (Real or Real32); the reduction itself
+// accumulates in Real (double) regardless, so a single-precision CG keeps a
+// double-accurate inner product (only the field reads are fp32).
+template <typename RT>
 __global__ void interior_three_dots_kernel(
-    const Real* r, const Real* u, const Real* w, Real* partial,
+    const RT* r, const RT* u, const RT* w, Real* partial,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t x0, Index_t y0, Index_t z0,
     Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
@@ -392,6 +396,7 @@ __global__ void interior_three_dots_kernel(
         Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
         for (Index_t c = 0; c < nb_components; ++c) {
             const Index_t e = offset + c * stride_c;
+            // Promote the fp32 reads to double for the accumulation.
             const Real rv = r[e], uv = u[e], wv = w[e];
             ru += rv * uv;
             wu += wv * uv;
@@ -454,9 +459,11 @@ __global__ void final_reduce3_kernel(const Real* partial, Real* out,
 // Scale complex x by a real per-pixel field alpha; alpha is either
 // broadcast over the components of x (alpha_per_comp == false) or
 // applied elementwise (alpha has x's components). Operates on the
-// doubles of the complex buffer to avoid complex arithmetic in device
-// code.
-__global__ void field_scal_complex_kernel(Real* x2, const Real* a,
+// reals of the complex buffer to avoid complex arithmetic in device
+// code. Templated on the field real type RT (Real or Real32); the scale
+// is a plain elementwise multiply, so no double accumulation is needed.
+template <typename RT>
+__global__ void field_scal_complex_kernel(RT* x2, const RT* a,
                                           Index_t npix, Index_t ncomp,
                                           bool soa, bool alpha_per_comp,
                                           Index_t n2) {
@@ -471,7 +478,8 @@ __global__ void field_scal_complex_kernel(Real* x2, const Real* a,
 }
 
 // Real variant of the kernel above
-__global__ void field_scal_real_kernel(Real* x, const Real* a,
+template <typename RT>
+__global__ void field_scal_real_kernel(RT* x, const RT* a,
                                        Index_t npix, Index_t ncomp,
                                        bool soa, bool alpha_per_comp,
                                        Index_t n) {
@@ -508,8 +516,12 @@ __global__ void cross_kernel(const T* a, const T* b, T* out, Index_t npix,
 // fields N/out (stored as interleaved re/im doubles) with real coefficient
 // fields k/invk. Because the coefficients are real they scale the real and
 // imaginary parts identically, so the kernel does no complex arithmetic.
-__global__ void leray_kernel(const Real* k, const Real* invk, const Real* N2,
-                             Real* out2, Index_t npix, bool soa) {
+// Templated on the field real type RT (Real or Real32). The contraction sums
+// are accumulated in Real (double) regardless of RT, so an fp32 projection
+// keeps a double-accurate inner product (only the field reads/writes are fp32).
+template <typename RT>
+__global__ void leray_kernel(const RT* k, const RT* invk, const RT* N2,
+                             RT* out2, Index_t npix, bool soa) {
     Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < npix) {
         const Index_t cs = soa ? npix : 1;     // real component stride
@@ -517,13 +529,13 @@ __global__ void leray_kernel(const Real* k, const Real* invk, const Real* N2,
         Real s_re = 0.0, s_im = 0.0;
         for (Index_t c = 0; c < 3; ++c) {
             const Index_t r = base + c * cs;     // real coefficient index
-            s_re += invk[r] * N2[2 * r];
-            s_im += invk[r] * N2[2 * r + 1];
+            s_re += static_cast<Real>(invk[r]) * N2[2 * r];
+            s_im += static_cast<Real>(invk[r]) * N2[2 * r + 1];
         }
         for (Index_t c = 0; c < 3; ++c) {
             const Index_t r = base + c * cs;
-            out2[2 * r]     -= k[r] * s_re;
-            out2[2 * r + 1] -= k[r] * s_im;
+            out2[2 * r]     -= static_cast<RT>(k[r] * s_re);
+            out2[2 * r + 1] -= static_cast<RT>(k[r] * s_im);
         }
     }
 }
@@ -1080,8 +1092,9 @@ void cross<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
 
 /* -- Single-precision (Real32 / Complex32) device CG building blocks ------ */
 /* These go through the generic *_device<T> bodies + DeviceComplex32 layer.  */
-/* The field-valued scal / leray_project / pipelined_cg_dots use custom      */
-/* double kernels and are not yet provided in single precision on device.    */
+/* The field-valued scal / leray_project / pipelined_cg_dots fp32 variants    */
+/* are defined below (custom kernels templated on the field real type, with   */
+/* double-accumulated reductions).                                            */
 #define MUGRID_LINALG_DEVICE_SPECIALIZATIONS(T)                                \
     template <>                                                                \
     T vecdot<T, DeviceSpace>(const TypedField<T, DeviceSpace>& a,              \
@@ -1127,37 +1140,46 @@ MUGRID_LINALG_DEVICE_SPECIALIZATIONS(Complex32)
 #undef MUGRID_LINALG_DEVICE_SPECIALIZATIONS
 
 /* ---------------------------------------------------------------------- */
-/* pipelined_cg_dots (Real only): fused {(r,u), (w,u), (r,r)} reduction.   */
+/* pipelined_cg_dots: fused {(r,u), (w,u), (r,r)} reduction.               */
+/*                                                                         */
+/* Templated on the field real type RT (Real or Real32). The reduction     */
+/* accumulates in Real (double) regardless of RT, so the single-precision  */
+/* variant keeps a double-accurate inner product (only the field reads are */
+/* fp32). The three results are returned as RT.                            */
 /* ---------------------------------------------------------------------- */
 
-template <>
-std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
-    const TypedField<Real, DeviceSpace>& r,
-    const TypedField<Real, DeviceSpace>& u,
-    const TypedField<Real, DeviceSpace>& w) {
+template <typename RT>
+std::array<RT, 3> pipelined_cg_dots_device(
+    const TypedField<RT, DeviceSpace>& r,
+    const TypedField<RT, DeviceSpace>& u,
+    const TypedField<RT, DeviceSpace>& w) {
     const auto& coll = r.get_collection();
 
     // The pipelined CG fields live on a decomposition (Global collection). For
     // anything else, fall back to three separate reductions (correctness over
     // the single-sync fast path).
     if (coll.get_domain() != FieldCollection::ValidityDomain::Global) {
-        return {vecdot<Real, DeviceSpace>(r, u), vecdot<Real, DeviceSpace>(w, u),
-                norm_sq<Real, DeviceSpace>(r)};
+        return {vecdot<RT, DeviceSpace>(r, u), vecdot<RT, DeviceSpace>(w, u),
+                norm_sq<RT, DeviceSpace>(r)};
     }
     const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
     const InteriorBox box = interior_box(r, global_coll);
     if (box.nb_interior_pixels <= 0) {
-        return {0.0, 0.0, 0.0};
+        return {RT{0}, RT{0}, RT{0}};
     }
 
     const int num_blocks =
         (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
         gpu_kernels::REDUCE_BLOCK_SIZE;
-    // Slot 0: 3*num_blocks partial sums; slot 1: the 3 packed results.
+    // Slot 0: 3*num_blocks partial sums; slot 1: the 3 packed results. Both
+    // accumulate in double (Real) regardless of the field precision.
     Real* d_partial = reduction_scratch(0, 3 * num_blocks);
     Real* d_out = reduction_scratch(1, 3);
 
-    GPU_LAUNCH_KERNEL(gpu_kernels::interior_three_dots_kernel,
+    // Alias the templated kernel to a local first: GPU_LAUNCH_KERNEL would
+    // otherwise split the `<RT>` across the macro's comma-separated arguments.
+    auto interior_kern = gpu_kernels::interior_three_dots_kernel<RT>;
+    GPU_LAUNCH_KERNEL(interior_kern,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
                       r.view().data(), u.view().data(), w.view().data(),
                       d_partial, box.extent[0], box.extent[1], box.extent[2],
@@ -1171,7 +1193,24 @@ std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
 
     Real h[3];
     GPU_MEMCPY_D2H(h, d_out, 3 * sizeof(Real));
-    return {h[0], h[1], h[2]};
+    return {static_cast<RT>(h[0]), static_cast<RT>(h[1]),
+            static_cast<RT>(h[2])};
+}
+
+template <>
+std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
+    const TypedField<Real, DeviceSpace>& r,
+    const TypedField<Real, DeviceSpace>& u,
+    const TypedField<Real, DeviceSpace>& w) {
+    return pipelined_cg_dots_device<Real>(r, u, w);
+}
+
+template <>
+std::array<Real32, 3> pipelined_cg_dots<Real32, DeviceSpace>(
+    const TypedField<Real32, DeviceSpace>& r,
+    const TypedField<Real32, DeviceSpace>& u,
+    const TypedField<Real32, DeviceSpace>& w) {
+    return pipelined_cg_dots_device<Real32>(r, u, w);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1180,9 +1219,12 @@ std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
 /* identically; the kernels work on the underlying reals.                   */
 /* ---------------------------------------------------------------------- */
 
-template <>
-void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
-                       TypedField<Complex, DeviceSpace>& x) {
+// Templated on the field real type RT (Real or Real32). The complex field x
+// (CT = Complex or Complex32) is reinterpreted as a buffer of 2*entries RT
+// reals, since the real coefficient alpha scales re and im identically.
+template <typename RT, typename CT>
+void scal_complex_field_device(const TypedField<RT, DeviceSpace>& alpha,
+                               TypedField<CT, DeviceSpace>& x) {
     internal::check_field_alpha(alpha, x);
 
     const Index_t npix = x.get_nb_entries();
@@ -1195,16 +1237,16 @@ void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
     const int num_blocks = (n2 + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
-    GPU_LAUNCH_KERNEL(gpu_kernels::field_scal_complex_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
-                      reinterpret_cast<Real*>(x.view().data()),
+    auto kern = gpu_kernels::field_scal_complex_kernel<RT>;
+    GPU_LAUNCH_KERNEL(kern, num_blocks, gpu_kernels::BLOCK_SIZE,
+                      reinterpret_cast<RT*>(x.view().data()),
                       alpha.view().data(), npix, ncomp, soa,
                       alpha_per_comp, n2);
 }
 
-template <>
-void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
-                       TypedField<Real, DeviceSpace>& x) {
+template <typename RT>
+void scal_real_field_device(const TypedField<RT, DeviceSpace>& alpha,
+                            TypedField<RT, DeviceSpace>& x) {
     internal::check_field_alpha(alpha, x);
 
     const Index_t npix = x.get_nb_entries();
@@ -1217,21 +1259,48 @@ void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
-    GPU_LAUNCH_KERNEL(gpu_kernels::field_scal_real_kernel,
-                      num_blocks, gpu_kernels::BLOCK_SIZE,
+    auto kern = gpu_kernels::field_scal_real_kernel<RT>;
+    GPU_LAUNCH_KERNEL(kern, num_blocks, gpu_kernels::BLOCK_SIZE,
                       x.view().data(), alpha.view().data(), npix, ncomp,
                       soa, alpha_per_comp, n);
+}
+
+template <>
+void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
+                       TypedField<Complex, DeviceSpace>& x) {
+    scal_complex_field_device(alpha, x);
+}
+
+template <>
+void scal<DeviceSpace>(const TypedField<Real32, DeviceSpace>& alpha,
+                       TypedField<Complex32, DeviceSpace>& x) {
+    scal_complex_field_device(alpha, x);
+}
+
+template <>
+void scal<DeviceSpace>(const TypedField<Real, DeviceSpace>& alpha,
+                       TypedField<Real, DeviceSpace>& x) {
+    scal_real_field_device(alpha, x);
+}
+
+template <>
+void scal<DeviceSpace>(const TypedField<Real32, DeviceSpace>& alpha,
+                       TypedField<Real32, DeviceSpace>& x) {
+    scal_real_field_device(alpha, x);
 }
 
 /* ---------------------------------------------------------------------- */
 /* Fused Leray (Helmholtz) projection (complex field, real coefficients).  */
 /* ---------------------------------------------------------------------- */
 
-template <>
-void leray_project<DeviceSpace>(const TypedField<Real, DeviceSpace>& k,
-                                const TypedField<Real, DeviceSpace>& invk,
-                                const TypedField<Complex, DeviceSpace>& N,
-                                TypedField<Complex, DeviceSpace>& out) {
+// Templated on the field real type RT (Real or Real32); the complex fields
+// N/out (CT) are reinterpreted as interleaved re/im RT reals. The contraction
+// sums are accumulated in double inside the kernel regardless of RT.
+template <typename RT, typename CT>
+void leray_project_device(const TypedField<RT, DeviceSpace>& k,
+                          const TypedField<RT, DeviceSpace>& invk,
+                          const TypedField<CT, DeviceSpace>& N,
+                          TypedField<CT, DeviceSpace>& out) {
     const auto& coll = out.get_collection();
     internal::check_three_vector("leray_project", k, coll);
     internal::check_three_vector("leray_project", invk, coll);
@@ -1242,11 +1311,28 @@ void leray_project<DeviceSpace>(const TypedField<Real, DeviceSpace>& k,
         (out.get_storage_order() == StorageOrder::StructureOfArrays);
     const int num_blocks =
         (npix + gpu_kernels::BLOCK_SIZE - 1) / gpu_kernels::BLOCK_SIZE;
+    auto kern = gpu_kernels::leray_kernel<RT>;
     GPU_LAUNCH_KERNEL(
-        gpu_kernels::leray_kernel, num_blocks, gpu_kernels::BLOCK_SIZE,
+        kern, num_blocks, gpu_kernels::BLOCK_SIZE,
         k.view().data(), invk.view().data(),
-        reinterpret_cast<const Real*>(N.view().data()),
-        reinterpret_cast<Real*>(out.view().data()), npix, soa);
+        reinterpret_cast<const RT*>(N.view().data()),
+        reinterpret_cast<RT*>(out.view().data()), npix, soa);
+}
+
+template <>
+void leray_project<DeviceSpace>(const TypedField<Real, DeviceSpace>& k,
+                                const TypedField<Real, DeviceSpace>& invk,
+                                const TypedField<Complex, DeviceSpace>& N,
+                                TypedField<Complex, DeviceSpace>& out) {
+    leray_project_device(k, invk, N, out);
+}
+
+template <>
+void leray_project<DeviceSpace>(const TypedField<Real32, DeviceSpace>& k,
+                                const TypedField<Real32, DeviceSpace>& invk,
+                                const TypedField<Complex32, DeviceSpace>& N,
+                                TypedField<Complex32, DeviceSpace>& out) {
+    leray_project_device(k, invk, N, out);
 }
 
 }  // namespace linalg
