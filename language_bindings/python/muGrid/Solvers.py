@@ -125,19 +125,26 @@ def conjugate_gradients(
         def prec(src, dst):  # z is aliased to r; nothing to apply
             return None
 
+    # Match the precision of the work fields to the right-hand side, so a
+    # single-precision (float32) solve stays in single precision throughout
+    # (and a default double-precision solve is unchanged).
+    dtype = getattr(b, "dtype", np.float64)
+
     with timed("startup"):
         # Create temporary fields with matching component shape
         # r: residual field
         # p: search direction field
         # z: preconditioned search direction field (aliased to r if no prec)
         # Ap: Hessian product field
-        r = fc.real_field("cg-residual", b.components_shape)
-        p = fc.real_field("cg-search-direction", b.components_shape)
+        r = fc.real_field("cg-residual", b.components_shape, dtype=dtype)
+        p = fc.real_field("cg-search-direction", b.components_shape, dtype=dtype)
         if unpreconditioned:
             z = r
         else:
-            z = fc.real_field("cg-preconditioned-residual", b.components_shape)
-        Ap = fc.real_field("cg-hessian-product", b.components_shape)
+            z = fc.real_field(
+                "cg-preconditioned-residual", b.components_shape, dtype=dtype
+            )
+        Ap = fc.real_field("cg-hessian-product", b.components_shape, dtype=dtype)
 
         # Initial residual: r = b - A*x
         hessp(x, Ap)
@@ -310,17 +317,21 @@ def conjugate_gradients_pipelined(
     if prec is None:
         prec = linalg.copy
 
+    # Match the precision of the work fields to the right-hand side (float32
+    # rhs -> single-precision solve throughout; double rhs is unchanged).
+    dtype = getattr(b, "dtype", np.float64)
+
     with timed("startup"):
         # Work fields (zero-initialised by the collection)
-        r = fc.real_field("pcg-residual", b.components_shape)
-        u = fc.real_field("pcg-prec-residual", b.components_shape)
-        w = fc.real_field("pcg-w", b.components_shape)
-        m = fc.real_field("pcg-m", b.components_shape)
-        n = fc.real_field("pcg-n", b.components_shape)
-        p = fc.real_field("pcg-p", b.components_shape)
-        s = fc.real_field("pcg-s", b.components_shape)
-        q = fc.real_field("pcg-q", b.components_shape)
-        z = fc.real_field("pcg-z", b.components_shape)
+        r = fc.real_field("pcg-residual", b.components_shape, dtype=dtype)
+        u = fc.real_field("pcg-prec-residual", b.components_shape, dtype=dtype)
+        w = fc.real_field("pcg-w", b.components_shape, dtype=dtype)
+        m = fc.real_field("pcg-m", b.components_shape, dtype=dtype)
+        n = fc.real_field("pcg-n", b.components_shape, dtype=dtype)
+        p = fc.real_field("pcg-p", b.components_shape, dtype=dtype)
+        s = fc.real_field("pcg-s", b.components_shape, dtype=dtype)
+        q = fc.real_field("pcg-q", b.components_shape, dtype=dtype)
+        z = fc.real_field("pcg-z", b.components_shape, dtype=dtype)
 
         # r = b - A x
         hessp(x, r)

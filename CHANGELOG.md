@@ -30,6 +30,16 @@ Unreleased
   and GPU. The GPU reductions (`pipelined_cg_dots` dot products, the `leray_project` contraction)
   accumulate in double even for float32 fields, so a single-precision CG keeps a double-accurate
   inner product
+- ENH: `dtype=` field-creation API — `real_field(name, components, dtype=np.float32)` and
+  `complex_field(..., dtype=np.complex64)` (on `GlobalFieldCollection`, `LocalFieldCollection`,
+  `CartesianDecomposition`, and the `FFTEngine` real/Fourier-space field methods) select single
+  precision without a separate method name. Single-precision creation keeps the get-or-create
+  semantics of the double-precision convenience methods. Added a `Field.dtype` property, and the
+  `conjugate_gradients` / `conjugate_gradients_pipelined` solvers now allocate their work fields at
+  the right-hand side's precision, so a float32 rhs yields an end-to-end single-precision solve
+- ENH: Added `examples/precision_homogenization.py` — runs the same fused-stiffness homogenization
+  in float64 and float32 (chosen purely via `dtype=`), reporting the effective-stiffness difference
+  (≈1e-6 relative) and the halved field memory footprint
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
   stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
   the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`
