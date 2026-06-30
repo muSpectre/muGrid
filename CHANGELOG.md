@@ -1,6 +1,19 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
+  operator (host + GPU), so FE homogenization needs no resident strain/stress fields
+- ENH: Aliased the CG preconditioned-residual onto the residual when unpreconditioned,
+  saving one work vector
+- ENH: Reference preconditioner frees its impulse-response scratch after assembly and
+  stores Hermitian symbols as a triangle, halving the symbol memory
+- ENH: Reference preconditioner apply is now einsum-free (no batched cuBLAS path)
+- API: Bound `FieldCollection.pop_field` to free a field's memory from Python
+- BUG: `average_stress` integrates the owned region, not the padded one
+
 v0.110.0 (28Jun26)
 ------------------
 
