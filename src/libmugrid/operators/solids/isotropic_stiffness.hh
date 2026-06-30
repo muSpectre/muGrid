@@ -763,51 +763,52 @@ namespace muGrid {
     // a plain member specialization; the apply/transpose impls are member
     // templates on the scalar type T (instantiated for Real and Real32 in the
     // .cc files). One declaration per (Dim, space) covers both precisions.
-    // The optional trailing argument is the memory space; when present it is
-    // spliced in as `TypedFieldBase<T, DefaultDeviceSpace>` via __VA_OPT__.
-#define MUGRID_TFB(...) TypedFieldBase<T __VA_OPT__(, ) __VA_ARGS__>
-#define MUGRID_DECLARE_STIFFNESS_IMPLS(D, ...)                                 \
+    // The field-base type is passed as a single object-like macro (TFB): the
+    // host one is `TypedFieldBase<T>`, the device one carries its own comma as
+    // `TypedFieldBase<T, DefaultDeviceSpace>`. Passing it as one already-formed
+    // token avoids a conditional comma (we deliberately do not use __VA_OPT__,
+    // which MSVC's default preprocessor does not support).
+#define MUGRID_TFB_HOST TypedFieldBase<T>
+#define MUGRID_TFB_DEVICE TypedFieldBase<T, DefaultDeviceSpace>
+#define MUGRID_DECLARE_STIFFNESS_IMPLS(D, TFB)                                 \
     template <>                                                                \
     template <typename T>                                                      \
     void IsotropicStiffnessOperator<D>::apply_impl(                            \
-        const MUGRID_TFB(__VA_ARGS__) &, const MUGRID_TFB(__VA_ARGS__) &,      \
-        const MUGRID_TFB(__VA_ARGS__) &, T, MUGRID_TFB(__VA_ARGS__) &, bool)   \
-        const;                                                                 \
+        const TFB &, const TFB &, const TFB &, T, TFB &, bool) const;          \
     template <>                                                                \
     template <typename T>                                                      \
     void IsotropicStiffnessOperator<D>::apply_uniform_impl(                    \
-        const MUGRID_TFB(__VA_ARGS__) &, T, T, T, MUGRID_TFB(__VA_ARGS__) &,   \
-        bool) const;                                                           \
+        const TFB &, T, T, T, TFB &, bool) const;                             \
     template <>                                                                \
     template <typename T>                                                      \
     void IsotropicStiffnessOperator<D>::apply_macro_rhs_impl(                  \
-        const MUGRID_TFB(__VA_ARGS__) &, const MUGRID_TFB(__VA_ARGS__) &,      \
-        const std::array<Real, D * D> &, MUGRID_TFB(__VA_ARGS__) &) const;     \
+        const TFB &, const TFB &, const std::array<Real, D * D> &, TFB &)      \
+        const;                                                                 \
     template <>                                                                \
     template <typename T>                                                      \
     std::array<Real, D * D>                                                    \
     IsotropicStiffnessOperator<D>::average_stress_impl(                        \
-        const MUGRID_TFB(__VA_ARGS__) &, const MUGRID_TFB(__VA_ARGS__) &,      \
-        const MUGRID_TFB(__VA_ARGS__) &, const std::array<Real, D * D> &)      \
-        const;
+        const TFB &, const TFB &, const TFB &,                                 \
+        const std::array<Real, D * D> &) const;
 
     template <>
     void IsotropicStiffnessOperator<2>::precompute_matrices();
     template <>
     void IsotropicStiffnessOperator<3>::precompute_matrices();
 
-    MUGRID_DECLARE_STIFFNESS_IMPLS(2)
-    MUGRID_DECLARE_STIFFNESS_IMPLS(3)
+    MUGRID_DECLARE_STIFFNESS_IMPLS(2, MUGRID_TFB_HOST)
+    MUGRID_DECLARE_STIFFNESS_IMPLS(3, MUGRID_TFB_HOST)
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device impls are member templates on T too (the double __constant__
     // geometry is cast to T inside the kernels). One declaration per dim covers
     // both precisions.
-    MUGRID_DECLARE_STIFFNESS_IMPLS(2, DefaultDeviceSpace)
-    MUGRID_DECLARE_STIFFNESS_IMPLS(3, DefaultDeviceSpace)
+    MUGRID_DECLARE_STIFFNESS_IMPLS(2, MUGRID_TFB_DEVICE)
+    MUGRID_DECLARE_STIFFNESS_IMPLS(3, MUGRID_TFB_DEVICE)
 #endif
 #undef MUGRID_DECLARE_STIFFNESS_IMPLS
-#undef MUGRID_TFB
+#undef MUGRID_TFB_HOST
+#undef MUGRID_TFB_DEVICE
 
     //! 2D fused isotropic stiffness operator. Preserves the historical name.
     using IsotropicStiffnessOperator2D = IsotropicStiffnessOperator<2>;
