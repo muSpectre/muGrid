@@ -423,7 +423,7 @@ namespace muGrid {
         const Real vol_elem =
             grid_spacing[0] * grid_spacing[1] * grid_spacing[2];
 
-        std::array<T, Dim * NB_NODES> Dbar_s;
+        std::array<T, NB_DOFS_PER_NODE * NB_NODES> Dbar_s;
         std::array<T, 9> E_s;
         const T * Dbar_ptr = geometry_as<T>(Dbar_matrix, Dbar_s);
         const T * E_ptr = geometry_as<T>(E_macro, E_s);
