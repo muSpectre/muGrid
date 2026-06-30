@@ -106,8 +106,8 @@ class GpuFFTBackend : public FFT1DBackend {
     }
     this->check_complex_aligned(input, "r2c");
     PlanT & plan = this->plan_for(
-        PlanKey{Kind::R2C, Direction::FORWARD, n, batch, in_stride, in_dist,
-                out_stride, out_dist});
+        PlanKey{Kind::R2C, Direction::FORWARD, Precision::Double, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
     this->derived().exec_r2c(plan, input, output);
     GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
@@ -125,8 +125,8 @@ class GpuFFTBackend : public FFT1DBackend {
     }
     this->check_complex_aligned(output, "c2r");
     PlanT & plan = this->plan_for(
-        PlanKey{Kind::C2R, Direction::BACKWARD, n, batch, in_stride, in_dist,
-                out_stride, out_dist});
+        PlanKey{Kind::C2R, Direction::BACKWARD, Precision::Double, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
     this->derived().exec_c2r(plan, input, output);
     // Synchronize so the result is complete before the caller hands the buffer
     // to GPU-aware MPI (which is not ordered against the FFT stream).
@@ -140,8 +140,8 @@ class GpuFFTBackend : public FFT1DBackend {
       return;
     }
     PlanT & plan = this->plan_for(
-        PlanKey{Kind::C2C, Direction::FORWARD, n, batch, in_stride, in_dist,
-                out_stride, out_dist});
+        PlanKey{Kind::C2C, Direction::FORWARD, Precision::Double, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
     this->derived().exec_c2c_forward(plan, input, output);
     GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
@@ -153,8 +153,76 @@ class GpuFFTBackend : public FFT1DBackend {
       return;
     }
     PlanT & plan = this->plan_for(
-        PlanKey{Kind::C2C, Direction::BACKWARD, n, batch, in_stride, in_dist,
-                out_stride, out_dist});
+        PlanKey{Kind::C2C, Direction::BACKWARD, Precision::Double, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
+    this->derived().exec_c2c_backward(plan, input, output);
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
+
+  // --- Single-precision (Real32/Complex32) 1D primitives -------------------
+  // Mirror the double overloads above but tag the plan key Precision::Single
+  // (so float and double plans never share a cache slot) and dispatch to the
+  // backend's fp32 exec hooks. The real-side alignment guard uses the fp32
+  // complex size (8 bytes), since the engine pads fp32 real fields to that.
+
+  void r2c(Index_t n, Index_t batch, const Real32 * input, Index_t in_stride,
+           Index_t in_dist, Complex32 * output, Index_t out_stride,
+           Index_t out_dist) final {
+    if (batch == 0) {
+      return;
+    }
+    if (!this->supports_strided_r2c() && in_stride != 1) {
+      throw RuntimeError(
+          this->strided_error("real-to-complex (r2c)", in_stride));
+    }
+    this->check_complex_aligned(input, "r2c", 2 * sizeof(Real32));
+    PlanT & plan = this->plan_for(
+        PlanKey{Kind::R2C, Direction::FORWARD, Precision::Single, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
+    this->derived().exec_r2c(plan, input, output);
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
+
+  void c2r(Index_t n, Index_t batch, const Complex32 * input, Index_t in_stride,
+           Index_t in_dist, Real32 * output, Index_t out_stride,
+           Index_t out_dist) final {
+    if (batch == 0) {
+      return;
+    }
+    if (!this->supports_strided_c2r() && out_stride != 1) {
+      throw RuntimeError(
+          this->strided_error("complex-to-real (c2r)", out_stride));
+    }
+    this->check_complex_aligned(output, "c2r", 2 * sizeof(Real32));
+    PlanT & plan = this->plan_for(
+        PlanKey{Kind::C2R, Direction::BACKWARD, Precision::Single, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
+    this->derived().exec_c2r(plan, input, output);
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
+
+  void c2c_forward(Index_t n, Index_t batch, const Complex32 * input,
+                   Index_t in_stride, Index_t in_dist, Complex32 * output,
+                   Index_t out_stride, Index_t out_dist) final {
+    if (batch == 0) {
+      return;
+    }
+    PlanT & plan = this->plan_for(
+        PlanKey{Kind::C2C, Direction::FORWARD, Precision::Single, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
+    this->derived().exec_c2c_forward(plan, input, output);
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
+
+  void c2c_backward(Index_t n, Index_t batch, const Complex32 * input,
+                    Index_t in_stride, Index_t in_dist, Complex32 * output,
+                    Index_t out_stride, Index_t out_dist) final {
+    if (batch == 0) {
+      return;
+    }
+    PlanT & plan = this->plan_for(
+        PlanKey{Kind::C2C, Direction::BACKWARD, Precision::Single, n, batch,
+                in_stride, in_dist, out_stride, out_dist});
     this->derived().exec_c2c_backward(plan, input, output);
     GPU_STREAM_SYNCHRONIZE_DEFAULT();
   }
@@ -173,16 +241,24 @@ class GpuFFTBackend : public FFT1DBackend {
    */
   enum class Direction : int { FORWARD = 0, BACKWARD = 1 };
 
+  /**
+   * Floating-point precision of a transform. Double and single plans never
+   * share a cache slot, and the backend selects the matching library plan
+   * type (rocfft_precision_*, CUFFT_{R2C,D2Z}…) from it.
+   */
+  enum class Precision : int { Double = 0, Single = 1 };
+
   /** Plan-cache key: every parameter that defines a 1D batched plan. */
   struct PlanKey {
     Kind kind;
     Direction direction;
+    Precision precision;
     Index_t n, batch, in_stride, in_dist, out_stride, out_dist;
     bool operator==(const PlanKey & o) const {
-      return kind == o.kind && direction == o.direction && n == o.n &&
-             batch == o.batch && in_stride == o.in_stride &&
-             in_dist == o.in_dist && out_stride == o.out_stride &&
-             out_dist == o.out_dist;
+      return kind == o.kind && direction == o.direction &&
+             precision == o.precision && n == o.n && batch == o.batch &&
+             in_stride == o.in_stride && in_dist == o.in_dist &&
+             out_stride == o.out_stride && out_dist == o.out_dist;
     }
   };
 
@@ -194,6 +270,7 @@ class GpuFFTBackend : public FFT1DBackend {
         result ^= h + 0x9e3779b9 + (result << 6) + (result >> 2);
       };
       mix(std::hash<int>{}(static_cast<int>(k.direction)));
+      mix(std::hash<int>{}(static_cast<int>(k.precision)));
       mix(std::hash<Index_t>{}(k.n));
       mix(std::hash<Index_t>{}(k.batch));
       mix(std::hash<Index_t>{}(k.in_stride));
@@ -256,11 +333,13 @@ class GpuFFTBackend : public FFT1DBackend {
    * constructor); a violation indicates a layout-padding bug or a field not
    * allocated through a muGrid FFT engine.
    */
-  void check_complex_aligned(const void * ptr, const char * operation) const {
+  void check_complex_aligned(const void * ptr, const char * operation,
+                             std::size_t complex_align = 2 * sizeof(Real))
+      const {
     // The error branch is unreachable through the public API (the layout
     // invariant guarantees alignment), so it is excluded from coverage.
     // GCOVR_EXCL_START
-    if (reinterpret_cast<std::uintptr_t>(ptr) % (2 * sizeof(Real)) != 0) {
+    if (reinterpret_cast<std::uintptr_t>(ptr) % complex_align != 0) {
       throw RuntimeError(
           std::string("The real array passed to the ") + this->name() + " " +
           operation +

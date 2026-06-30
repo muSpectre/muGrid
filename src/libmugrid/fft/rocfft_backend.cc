@@ -115,7 +115,7 @@ void rocFFTBackend::check_rocfft_result(rocfft_status result,
 
 RocfftCachedPlan rocFFTBackend::create_plan(
     TransformType type, rocfft_transform_type transform_type,
-    const std::vector<std::size_t> & lengths,
+    rocfft_precision precision, const std::vector<std::size_t> & lengths,
     const std::vector<std::size_t> & in_strides, std::size_t in_dist,
     const std::vector<std::size_t> & out_strides, std::size_t out_dist,
     std::size_t batch) {
@@ -158,7 +158,7 @@ RocfftCachedPlan rocFFTBackend::create_plan(
   check_rocfft_result(status, "setting data layout");
 
   status = rocfft_plan_create(&cached.plan, placement, transform_type,
-                              rocfft_precision_double, lengths.size(),
+                              precision, lengths.size(),
                               lengths.data(), batch, description);
   check_rocfft_result(status, "plan creation");
 
@@ -224,12 +224,16 @@ RocfftCachedPlan rocFFTBackend::make_plan(const PlanKey & key) {
     }
   }
 
+  const rocfft_precision precision = (key.precision == Base::Precision::Single)
+                                         ? rocfft_precision_single
+                                         : rocfft_precision_double;
+
   std::vector<std::size_t> lengths{static_cast<std::size_t>(key.n)};
   std::vector<std::size_t> in_strides{static_cast<std::size_t>(key.in_stride)};
   std::vector<std::size_t> out_strides{
       static_cast<std::size_t>(key.out_stride)};
-  return create_plan(type, transform_type, lengths, in_strides, in_distance,
-                     out_strides, out_distance,
+  return create_plan(type, transform_type, precision, lengths, in_strides,
+                     in_distance, out_strides, out_distance,
                      static_cast<std::size_t>(key.batch));
 }
 
@@ -284,15 +288,57 @@ void rocFFTBackend::exec_c2c_backward(RocfftCachedPlan & cached,
   check_rocfft_result(status, "C2C backward execution");
 }
 
+// Single-precision exec hooks. rocfft_execute takes void buffers and reads the
+// precision from the plan, so the bodies mirror the double overloads exactly.
+void rocFFTBackend::exec_r2c(RocfftCachedPlan & cached, const Real32 * input,
+                             Complex32 * output) {
+  void * in_buffer[1] = {const_cast<Real32 *>(input)};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "R2C (fp32) execution");
+}
+
+void rocFFTBackend::exec_c2r(RocfftCachedPlan & cached, const Complex32 * input,
+                             Real32 * output) {
+  void * in_buffer[1] = {const_cast<Complex32 *>(input)};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "C2R (fp32) execution");
+}
+
+void rocFFTBackend::exec_c2c_forward(RocfftCachedPlan & cached,
+                                     const Complex32 * input,
+                                     Complex32 * output) {
+  void * in_buffer[1] = {const_cast<Complex32 *>(input)};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "C2C forward (fp32) execution");
+}
+
+void rocFFTBackend::exec_c2c_backward(RocfftCachedPlan & cached,
+                                      const Complex32 * input,
+                                      Complex32 * output) {
+  void * in_buffer[1] = {const_cast<Complex32 *>(input)};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "C2C backward (fp32) execution");
+}
+
 RocfftCachedPlan & rocFFTBackend::get_nd_plan(
-    TransformType type, const std::vector<std::size_t> & lengths,
+    TransformType type, rocfft_precision precision,
+    const std::vector<std::size_t> & lengths,
     const std::vector<std::size_t> & in_strides, std::size_t in_dist,
     const std::vector<std::size_t> & out_strides, std::size_t out_dist,
     std::size_t batch) {
-  // String signature over every parameter that defines the plan.
+  // String signature over every parameter that defines the plan (the precision
+  // is part of the key so single and double plans never collide).
   std::stringstream ss;
-  ss << type << "|b:" << batch << "|id:" << in_dist << "|od:" << out_dist
-     << "|l:";
+  ss << type << "|p:" << static_cast<int>(precision) << "|b:" << batch
+     << "|id:" << in_dist << "|od:" << out_dist << "|l:";
   for (std::size_t v : lengths) ss << v << ',';
   ss << "|is:";
   for (std::size_t v : in_strides) ss << v << ',';
@@ -311,8 +357,8 @@ RocfftCachedPlan & rocFFTBackend::get_nd_plan(
     default:
       throw RuntimeError("get_nd_plan supports only R2C and C2R transforms");
     }
-    return create_plan(type, transform_type, lengths, in_strides, in_dist,
-                       out_strides, out_dist, batch);
+    return create_plan(type, transform_type, precision, lengths, in_strides,
+                       in_dist, out_strides, out_dist, batch);
   });
 }
 
@@ -331,7 +377,8 @@ void rocFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
   std::vector<std::size_t> out_str{rocfft_order(out_strides, axes)};
 
   RocfftCachedPlan & cached = get_nd_plan(
-      R2C, lengths, in_str, static_cast<std::size_t>(in_strides[0]), out_str,
+      R2C, rocfft_precision_double, lengths, in_str,
+      static_cast<std::size_t>(in_strides[0]), out_str,
       static_cast<std::size_t>(out_strides[0]),
       static_cast<std::size_t>(shape[0]));
 
@@ -369,8 +416,8 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   GPU_MEMCPY_D2D(scratch, input, span * sizeof(Complex));
 
   RocfftCachedPlan & cached =
-      get_nd_plan(C2R, lengths, in_str, in_dist, out_str,
-                  static_cast<std::size_t>(out_strides[0]),
+      get_nd_plan(C2R, rocfft_precision_double, lengths, in_str, in_dist,
+                  out_str, static_cast<std::size_t>(out_strides[0]),
                   static_cast<std::size_t>(shape[0]));
 
   void * in_buffer[1] = {scratch};
@@ -378,6 +425,73 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "C2R (N-D) execution");
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+}
+
+// ---- Single-precision (Real32/Complex32) N-D transforms ----
+// Mirror the double variants with a single-precision rocFFT plan. The N-D plan
+// cache key includes the precision, so float and double plans never collide.
+
+void rocFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
+                           const std::vector<Index_t> & axes,
+                           const Real32 * input,
+                           const std::vector<Index_t> & in_strides,
+                           Complex32 * output,
+                           const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;  // empty component batch
+  }
+  this->check_complex_aligned(input, "r2c (N-D, fp32)", 2 * sizeof(Real32));
+
+  std::vector<std::size_t> lengths{rocfft_order(shape, axes)};
+  std::vector<std::size_t> in_str{rocfft_order(in_strides, axes)};
+  std::vector<std::size_t> out_str{rocfft_order(out_strides, axes)};
+
+  RocfftCachedPlan & cached = get_nd_plan(
+      R2C, rocfft_precision_single, lengths, in_str,
+      static_cast<std::size_t>(in_strides[0]), out_str,
+      static_cast<std::size_t>(out_strides[0]),
+      static_cast<std::size_t>(shape[0]));
+
+  void * in_buffer[1] = {const_cast<Real32 *>(input)};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "R2C (N-D, fp32) execution");
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+}
+
+void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
+                           const std::vector<Index_t> & axes,
+                           const Complex32 * input,
+                           const std::vector<Index_t> & in_strides,
+                           Real32 * output,
+                           const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  this->check_complex_aligned(output, "c2r (N-D, fp32)", 2 * sizeof(Real32));
+
+  std::vector<std::size_t> lengths{rocfft_order(shape, axes)};
+  std::vector<std::size_t> in_str{rocfft_order(in_strides, axes)};
+  std::vector<std::size_t> out_str{rocfft_order(out_strides, axes)};
+
+  // C2R may overwrite its input; stage through scratch (see the double variant).
+  const std::size_t in_dist{static_cast<std::size_t>(in_strides[0])};
+  const std::size_t span{static_cast<std::size_t>(shape[0]) * in_dist};
+  void * scratch = this->ensure_scratch(span * sizeof(Complex32));
+  GPU_MEMCPY_D2D(scratch, input, span * sizeof(Complex32));
+
+  RocfftCachedPlan & cached =
+      get_nd_plan(C2R, rocfft_precision_single, lengths, in_str, in_dist,
+                  out_str, static_cast<std::size_t>(out_strides[0]),
+                  static_cast<std::size_t>(shape[0]));
+
+  void * in_buffer[1] = {scratch};
+  void * out_buffer[1] = {output};
+  rocfft_status status =
+      rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
+  check_rocfft_result(status, "C2R (N-D, fp32) execution");
   GPU_STREAM_SYNCHRONIZE_DEFAULT();
 }
 

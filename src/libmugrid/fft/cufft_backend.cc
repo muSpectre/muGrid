@@ -151,17 +151,18 @@ void cuFFTBackend::check_cufft_result(cufftResult result,
 }
 
 cufftHandle cuFFTBackend::make_plan(const PlanKey & key) {
+  const bool single = (key.precision == Base::Precision::Single);
   cufftType cufft_type;
   switch (key.kind) {
   case Base::Kind::R2C:
-    cufft_type = CUFFT_D2Z;
+    cufft_type = single ? CUFFT_R2C : CUFFT_D2Z;
     break;
   case Base::Kind::C2R:
-    cufft_type = CUFFT_Z2D;
+    cufft_type = single ? CUFFT_C2R : CUFFT_Z2D;
     break;
   case Base::Kind::C2C:
     // Direction-agnostic; CUFFT_FORWARD/INVERSE is selected at execution.
-    cufft_type = CUFFT_Z2Z;
+    cufft_type = single ? CUFFT_C2C : CUFFT_Z2Z;
     break;
   default:
     throw RuntimeError("Unknown transform type");
@@ -239,6 +240,45 @@ void cuFFTBackend::exec_c2c_backward(cufftHandle & plan, const Complex * input,
           reinterpret_cast<const cufftDoubleComplex *>(input)),
       reinterpret_cast<cufftDoubleComplex *>(output), CUFFT_INVERSE);
   check_cufft_result(result, "Z2Z backward execution");
+}
+
+// ---- Single-precision exec hooks (CUFFT_R2C/C2R/C2C) ----
+
+void cuFFTBackend::exec_r2c(cufftHandle & plan, const Real32 * input,
+                            Complex32 * output) {
+  cufftResult result =
+      cufftExecR2C(plan, const_cast<cufftReal *>(input),
+                   reinterpret_cast<cufftComplex *>(output));
+  check_cufft_result(result, "R2C execution");
+}
+
+void cuFFTBackend::exec_c2r(cufftHandle & plan, const Complex32 * input,
+                            Real32 * output) {
+  // Note: cuFFT may modify the input during c2r transforms; the engine stages
+  // a copy where it needs the input preserved.
+  cufftResult result = cufftExecC2R(
+      plan,
+      const_cast<cufftComplex *>(reinterpret_cast<const cufftComplex *>(input)),
+      reinterpret_cast<cufftReal *>(output));
+  check_cufft_result(result, "C2R execution");
+}
+
+void cuFFTBackend::exec_c2c_forward(cufftHandle & plan, const Complex32 * input,
+                                    Complex32 * output) {
+  cufftResult result = cufftExecC2C(
+      plan,
+      const_cast<cufftComplex *>(reinterpret_cast<const cufftComplex *>(input)),
+      reinterpret_cast<cufftComplex *>(output), CUFFT_FORWARD);
+  check_cufft_result(result, "C2C forward execution");
+}
+
+void cuFFTBackend::exec_c2c_backward(cufftHandle & plan, const Complex32 * input,
+                                     Complex32 * output) {
+  cufftResult result = cufftExecC2C(
+      plan,
+      const_cast<cufftComplex *>(reinterpret_cast<const cufftComplex *>(input)),
+      reinterpret_cast<cufftComplex *>(output), CUFFT_INVERSE);
+  check_cufft_result(result, "C2C backward execution");
 }
 
 cufftHandle cuFFTBackend::get_nd_plan(cufftType type, const std::vector<int> & n,
