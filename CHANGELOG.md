@@ -1,6 +1,24 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
+  stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
+  the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`
+- ENH: Unified FE shape-function tables into element traits (`fem_element.hh`); FEM
+  gradient operator templated on element with a single generic host/GPU kernel
+- ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
+  operator (host + GPU), so FE homogenization needs no resident strain/stress fields
+- ENH: Aliased the CG preconditioned-residual onto the residual when unpreconditioned,
+  saving one work vector
+- ENH: Reference preconditioner frees its impulse-response scratch after assembly and
+  stores Hermitian symbols as a triangle, halving the symbol memory
+- ENH: Reference preconditioner apply is now einsum-free (no batched cuBLAS path)
+- API: Bound `FieldCollection.pop_field` to free a field's memory from Python
+- BUG: `average_stress` integrates the owned region, not the padded one
+
 v0.110.0 (28Jun26)
 ------------------
 

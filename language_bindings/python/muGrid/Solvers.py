@@ -116,18 +116,27 @@ def conjugate_gradients(
     def timed(name):
         return timer(name) if timer is not None else nullcontext()
 
-    if prec is None:
-        prec = linalg.copy
+    # Without a preconditioner, the preconditioned residual z is identically r,
+    # so alias z onto r and skip the apply instead of allocating (and copying
+    # into) a fourth full work vector. This removes dim doubles/voxel -- the
+    # largest remaining term once the strain/stress fields are gone.
+    unpreconditioned = prec is None
+    if unpreconditioned:
+        def prec(src, dst):  # z is aliased to r; nothing to apply
+            return None
 
     with timed("startup"):
         # Create temporary fields with matching component shape
         # r: residual field
         # p: search direction field
-        # z: preconditioned search direction field
+        # z: preconditioned search direction field (aliased to r if no prec)
         # Ap: Hessian product field
         r = fc.real_field("cg-residual", b.components_shape)
         p = fc.real_field("cg-search-direction", b.components_shape)
-        z = fc.real_field("cg-preconditioned-residual", b.components_shape)
+        if unpreconditioned:
+            z = r
+        else:
+            z = fc.real_field("cg-preconditioned-residual", b.components_shape)
         Ap = fc.real_field("cg-hessian-product", b.components_shape)
 
         # Initial residual: r = b - A*x

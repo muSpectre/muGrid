@@ -56,6 +56,7 @@
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
 #include "operators/linear.hh"
+#include "operators/fem_element.hh"
 #include "collection/field_collection_global.hh"
 
 #include <array>
@@ -113,6 +114,16 @@ namespace muGrid {
             return this->get_apply_ghost_requirement();
         }
     };
+
+    /**
+     * @enum FEMElementKind
+     * @brief Finite element used by the fused stiffness operator. The element
+     *        only affects the one-time precomputation of the G/V/D̄ matrices
+     *        from its reference shape-function gradients (fem_element.hh); the
+     *        per-call kernels are element-agnostic, so it is selected at
+     *        construction rather than as a template parameter.
+     */
+    enum class FEMElementKind { P1, Q1 };
 
     /**
      * @struct IsotropicStiffnessTraits
@@ -181,6 +192,49 @@ namespace muGrid {
             Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
             bool increment);
 
+        // Macro-RHS host kernels: assemble force = Bᵀ C(λ,μ) E_macro with no
+        // global strain/stress field. Because the affine displacement u* with
+        // ∇u* = E_macro satisfies B_q u* = E_macro at every quad point, the
+        // element contribution is K_e u* = 2μ_e (G u*) + λ_e (V u*); the
+        // constant per-element vectors Gu = G u* and Vu = V u* are precomputed
+        // on the host, so the kernel only gathers material and accumulates.
+        void isotropic_stiffness_2d_host_macro_rhs(
+            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
+            Index_t force_stride_y, Index_t force_stride_d, const Real * Gu,
+            const Real * Vu, Real alpha, bool increment);
+
+        void isotropic_stiffness_3d_host_macro_rhs(
+            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny, Index_t nnz,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_z, Index_t force_stride_d, const Real * Gu,
+            const Real * Vu, Real alpha, bool increment);
+
+        // Stress-average host kernels: accumulate the local volume integral
+        // ∫ σ dV of σ = C(λ,μ):(E_macro + sym(∇u)) into accum_out (length
+        // Dim*Dim, row-major), looping over local elements. Dbar[j*NB_NODES+n]
+        // = scale[j] Σ_q w_q B[q][j][n] gives the element-averaged gradient
+        // ḡ_ij = Σ_n Dbar[j][n] u[n,i] directly (no global strain field).
+        void isotropic_stiffness_2d_host_average(
+            const Real * MUGRID_RESTRICT displacement,
+            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            Index_t nelx, Index_t nely, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
+            Index_t mat_stride_y, const Real * Dbar, const Real * E_macro,
+            Real vol_elem, Real * accum_out);
+
+        void isotropic_stiffness_3d_host_average(
+            const Real * MUGRID_RESTRICT displacement,
+            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            Index_t nelx, Index_t nely, Index_t nelz, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+            const Real * Dbar, const Real * E_macro, Real vol_elem,
+            Real * accum_out);
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         void isotropic_stiffness_2d_gpu(
             const Real * displacement, const Real * lambda, const Real * mu,
@@ -216,6 +270,38 @@ namespace muGrid {
             Index_t force_stride_x, Index_t force_stride_y,
             Index_t force_stride_z, Index_t force_stride_d, const Real * G,
             const Real * V, Real alpha, bool increment);
+
+        // Macro-RHS device kernels (see the host variants above).
+        void isotropic_stiffness_2d_gpu_macro_rhs(
+            const Real * lambda, const Real * mu, Real * force, Index_t nnx,
+            Index_t nny, Index_t mat_stride_x, Index_t mat_stride_y,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_d, const Real * Gu, const Real * Vu,
+            Real alpha, bool increment);
+
+        void isotropic_stiffness_3d_gpu_macro_rhs(
+            const Real * lambda, const Real * mu, Real * force, Index_t nnx,
+            Index_t nny, Index_t nnz, Index_t mat_stride_x, Index_t mat_stride_y,
+            Index_t mat_stride_z, Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_z, Index_t force_stride_d, const Real * Gu,
+            const Real * Vu, Real alpha, bool increment);
+
+        // Stress-average device kernels (see the host variants above). The
+        // Dim*Dim local volume integral is written to accum_out (host pointer).
+        void isotropic_stiffness_2d_gpu_average(
+            const Real * displacement, const Real * lambda, const Real * mu,
+            Index_t nelx, Index_t nely, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
+            Index_t mat_stride_y, const Real * Dbar, const Real * E_macro,
+            Real vol_elem, Real * accum_out);
+
+        void isotropic_stiffness_3d_gpu_average(
+            const Real * displacement, const Real * lambda, const Real * mu,
+            Index_t nelx, Index_t nely, Index_t nelz, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+            const Real * Dbar, const Real * E_macro, Real vol_elem,
+            Real * accum_out);
 #endif
 
     }  // namespace isotropic_stiffness_kernels
@@ -364,13 +450,15 @@ namespace muGrid {
          * @brief Construct with grid spacing (length Dim); precomputes G and V.
          */
         explicit IsotropicStiffnessOperator(
-            const std::vector<Real> & grid_spacing)
+            const std::vector<Real> & grid_spacing,
+            FEMElementKind element = FEMElementKind::Q1)
             : grid_spacing{grid_spacing} {
             if (static_cast<Index_t>(this->grid_spacing.size()) != Dim) {
                 throw RuntimeError(std::to_string(Dim) +
                                    "D operator requires " + std::to_string(Dim) +
                                    "D grid spacing");
             }
+            this->load_element(element);
             this->precompute_matrices();
         }
 
@@ -411,6 +499,31 @@ namespace muGrid {
                                      true);
         }
 
+        // ---- Streaming homogenization helpers (host) ----
+        //! Assemble force = Bᵀ C(λ, μ) E_macro (the divergence of the stress of
+        //! a uniform macroscopic strain E_macro), with no global strain/stress
+        //! field. The homogenization right-hand side is the negative of this.
+        //! E_macro is the (symmetric) Dim×Dim macro strain, row-major.
+        void apply_macro_rhs(const TypedFieldBase<Real> & lambda,
+                             const TypedFieldBase<Real> & mu,
+                             const std::array<Real, Dim * Dim> & E_macro,
+                             TypedFieldBase<Real> & force) const {
+            this->apply_macro_rhs_impl(lambda, mu, E_macro, force);
+        }
+
+        //! Volume-averaged stress integral ∫ σ dV over the local subdomain,
+        //! where σ = C(λ, μ):(E_macro + sym(∇u)). Returns the Dim×Dim tensor
+        //! (row-major) as a local, un-reduced volume integral: the caller sums
+        //! across MPI ranks and divides by the total volume. Computes the
+        //! element strain locally, so no global strain/stress field is needed.
+        std::array<Real, Dim * Dim>
+        average_stress(const TypedFieldBase<Real> & displacement,
+                       const TypedFieldBase<Real> & lambda,
+                       const TypedFieldBase<Real> & mu,
+                       const std::array<Real, Dim * Dim> & E_macro) const {
+            return this->average_stress_impl(displacement, lambda, mu, E_macro);
+        }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // ---- Device interface ----
         void apply(const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
@@ -441,6 +554,25 @@ namespace muGrid {
             TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
             this->apply_uniform_impl(displacement, lambda, mu, alpha, force,
                                      true);
+        }
+
+        // ---- Streaming homogenization helpers (device) ----
+        //! Device counterpart of apply_macro_rhs (see the host overload).
+        void apply_macro_rhs(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+            const std::array<Real, Dim * Dim> & E_macro,
+            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
+            this->apply_macro_rhs_impl(lambda, mu, E_macro, force);
+        }
+
+        //! Device counterpart of average_stress (see the host overload).
+        std::array<Real, Dim * Dim> average_stress(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+            const std::array<Real, Dim * Dim> & E_macro) const {
+            return this->average_stress_impl(displacement, lambda, mu, E_macro);
         }
 #endif
 
@@ -479,14 +611,104 @@ namespace muGrid {
             }
         }
 
+       public:
+        //! Element-averaged gradient operator D̄[j*NB_NODES+n] = scale[j]
+        //! Σ_q w_q B[q][j][n], so ḡ_ij = Σ_n D̄[j][n] u[n,i]. Used by
+        //! average_stress.
+        using GradientAverage = std::array<Real, Dim * NB_NODES>;
+        const GradientAverage & get_Dbar() const { return Dbar_matrix; }
+
        private:
         std::vector<Real> grid_spacing;
         ElementMatrix G_matrix;  //!< 2μ coefficient geometry
         ElementMatrix V_matrix;  //!< λ coefficient geometry
+        GradientAverage Dbar_matrix;  //!< element-averaged gradient operator
 
-        //! Compute the geometry matrices G and V (dimension-specific; explicit
+        //! Selected element's reference data, copied from the traits at
+        //! construction (fem_element.hh). B is flattened [q][d][n]. Only
+        //! precompute_matrices() consumes these, so runtime storage is free.
+        std::vector<Real> elem_B;
+        std::vector<Real> elem_Wfrac;
+        Index_t elem_nb_quad{0};
+
+        //! Copy the chosen element's B / Wfrac / NbQuad out of its traits.
+        void load_element(FEMElementKind element) {
+            auto load = [this](auto trait) {
+                using T = decltype(trait);
+                static_assert(T::SpatialDim == Dim,
+                              "element/operator dimension mismatch");
+                this->elem_nb_quad = T::NbQuad;
+                this->elem_Wfrac.assign(T::Wfrac, T::Wfrac + T::NbQuad);
+                this->elem_B.resize(T::NbQuad * Dim * NB_NODES);
+                for (Index_t q = 0; q < T::NbQuad; ++q) {
+                    for (Index_t d = 0; d < Dim; ++d) {
+                        for (Index_t n = 0; n < NB_NODES; ++n) {
+                            this->elem_B[(q * Dim + d) * NB_NODES + n] =
+                                T::B[q][d][n];
+                        }
+                    }
+                }
+            };
+            if constexpr (Dim == 2) {
+                if (element == FEMElementKind::Q1) {
+                    load(Q1Quad2D{});
+                } else {
+                    load(P1Tri2D{});
+                }
+            } else {
+                if (element == FEMElementKind::Q1) {
+                    load(Q1Hex3D{});
+                } else {
+                    load(P1Tet3D{});
+                }
+            }
+        }
+
+        //! Compute the geometry matrices G, V and Dbar from the selected
+        //! element's reference data (dimension-specific Voigt assembly; explicit
         //! specialization in isotropic_stiffness_{2,3}d.cc).
         void precompute_matrices();
+
+        //! Build the constant per-element vectors Gu = G u* and Vu = V u* of
+        //! the affine displacement u* with ∇u* = E_macro (used by macro RHS).
+        void macro_rhs_vectors(const std::array<Real, Dim * Dim> & E_macro,
+                               ElementMatrix & Gu, ElementMatrix & Vu) const {
+            std::array<Real, NB_ELEMENT_DOFS> u_star{};
+            constexpr auto NODE_OFFSET = node_offset_table();
+            for (Index_t n = 0; n < NB_NODES; ++n) {
+                for (Index_t i = 0; i < Dim; ++i) {
+                    Real ui = 0.0;
+                    for (Index_t j = 0; j < Dim; ++j) {
+                        ui += E_macro[i * Dim + j] *
+                              static_cast<Real>(NODE_OFFSET[n][j]) *
+                              this->grid_spacing[j];
+                    }
+                    u_star[n * Dim + i] = ui;
+                }
+            }
+            for (Index_t r = 0; r < NB_ELEMENT_DOFS; ++r) {
+                Real gsum = 0.0, vsum = 0.0;
+                for (Index_t c = 0; c < NB_ELEMENT_DOFS; ++c) {
+                    gsum += G_matrix[r * NB_ELEMENT_DOFS + c] * u_star[c];
+                    vsum += V_matrix[r * NB_ELEMENT_DOFS + c] * u_star[c];
+                }
+                Gu[r] = gsum;
+                Vu[r] = vsum;
+            }
+        }
+
+        //! Node offsets within an element [node][dim] (binary indexing); shared
+        //! by the affine-displacement construction above.
+        static constexpr std::array<std::array<Index_t, Dim>, NB_NODES>
+        node_offset_table() {
+            std::array<std::array<Index_t, Dim>, NB_NODES> tbl{};
+            for (Index_t n = 0; n < NB_NODES; ++n) {
+                for (Index_t d = 0; d < Dim; ++d) {
+                    tbl[n][d] = (n >> d) & 1;
+                }
+            }
+            return tbl;
+        }
 
         //! Host apply with optional increment (dimension-specific; explicit
         //! specialization in isotropic_stiffness_{2,3}d.cc).
@@ -501,6 +723,18 @@ namespace muGrid {
                                 Real lambda, Real mu, Real alpha,
                                 TypedFieldBase<Real> & force,
                                 bool increment) const;
+
+        //! Host macro-RHS / stress-average (dimension-specific; explicit
+        //! specialization in isotropic_stiffness_{2,3}d.cc).
+        void apply_macro_rhs_impl(const TypedFieldBase<Real> & lambda,
+                                  const TypedFieldBase<Real> & mu,
+                                  const std::array<Real, Dim * Dim> & E_macro,
+                                  TypedFieldBase<Real> & force) const;
+        std::array<Real, Dim * Dim>
+        average_stress_impl(const TypedFieldBase<Real> & displacement,
+                            const TypedFieldBase<Real> & lambda,
+                            const TypedFieldBase<Real> & mu,
+                            const std::array<Real, Dim * Dim> & E_macro) const;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         //! Device apply with optional increment (dimension-specific; explicit
@@ -519,6 +753,19 @@ namespace muGrid {
             Real lambda, Real mu, Real alpha,
             TypedFieldBase<Real, DefaultDeviceSpace> & force,
             bool increment) const;
+
+        //! Device macro-RHS / stress-average (explicit specialization in
+        //! isotropic_stiffness_gpu.cc).
+        void apply_macro_rhs_impl(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+            const std::array<Real, Dim * Dim> & E_macro,
+            TypedFieldBase<Real, DefaultDeviceSpace> & force) const;
+        std::array<Real, Dim * Dim> average_stress_impl(
+            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+            const std::array<Real, Dim * Dim> & E_macro) const;
 #endif
     };
 
@@ -537,6 +784,14 @@ namespace muGrid {
         const TypedFieldBase<Real> &, Real, Real, Real, TypedFieldBase<Real> &,
         bool) const;
     template <>
+    void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
+        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
+        const std::array<Real, 4> &, TypedFieldBase<Real> &) const;
+    template <>
+    std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
+        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
+        const TypedFieldBase<Real> &, const std::array<Real, 4> &) const;
+    template <>
     void IsotropicStiffnessOperator<3>::precompute_matrices();
     template <>
     void IsotropicStiffnessOperator<3>::apply_impl(
@@ -546,6 +801,14 @@ namespace muGrid {
     void IsotropicStiffnessOperator<3>::apply_uniform_impl(
         const TypedFieldBase<Real> &, Real, Real, Real, TypedFieldBase<Real> &,
         bool) const;
+    template <>
+    void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
+        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
+        const std::array<Real, 9> &, TypedFieldBase<Real> &) const;
+    template <>
+    std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
+        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
+        const TypedFieldBase<Real> &, const std::array<Real, 9> &) const;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     template <>
@@ -568,6 +831,30 @@ namespace muGrid {
     void IsotropicStiffnessOperator<3>::apply_uniform_impl(
         const TypedFieldBase<Real, DefaultDeviceSpace> &, Real, Real, Real,
         TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
+    template <>
+    void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const std::array<Real, 4> &,
+        TypedFieldBase<Real, DefaultDeviceSpace> &) const;
+    template <>
+    std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const std::array<Real, 4> &) const;
+    template <>
+    void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const std::array<Real, 9> &,
+        TypedFieldBase<Real, DefaultDeviceSpace> &) const;
+    template <>
+    std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const TypedFieldBase<Real, DefaultDeviceSpace> &,
+        const std::array<Real, 9> &) const;
 #endif
 
     //! 2D fused isotropic stiffness operator. Preserves the historical name.

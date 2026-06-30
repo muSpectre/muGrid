@@ -43,36 +43,8 @@ namespace muGrid {
     // 3D Implementation
     // ============================================================================
 
-    // 3D shape function gradients for 5 tetrahedra per voxel
-    // B_3D[quad][dim][node] where dim: 0=d/dx, 1=d/dy, 2=d/dz
-    // Nodes: 0=(0,0,0), 1=(1,0,0), 2=(0,1,0), 3=(1,1,0),
-    //        4=(0,0,1), 5=(1,0,1), 6=(0,1,1), 7=(1,1,1)
-    // These values match FEMGradientOperator's 5-tetrahedra decomposition
-    static const Real B_3D[5][3][8] = {
-        // Tet 0: Central tetrahedron (nodes 1,2,4,7)
-        {{0.0, 0.5, -0.5, 0.0, -0.5, 0.0, 0.0, 0.5},   // d/dx
-         {0.0, -0.5, 0.5, 0.0, -0.5, 0.0, 0.0, 0.5},   // d/dy
-         {0.0, -0.5, -0.5, 0.0, 0.5, 0.0, 0.0, 0.5}},  // d/dz
-        // Tet 1: Corner at (0,0,0) - nodes 0,1,2,4
-        {{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},    // d/dx
-         {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},    // d/dy
-         {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},   // d/dz
-        // Tet 2: Corner at (0,1,1) - nodes 2,4,6,7
-        {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0},    // d/dx
-         {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0},    // d/dy
-         {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}},   // d/dz
-        // Tet 3: Corner at (1,0,1) - nodes 1,4,5,7
-        {{0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},    // d/dx
-         {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},    // d/dy
-         {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0}},   // d/dz
-        // Tet 4: Corner at (1,1,0) - nodes 1,2,3,7
-        {{0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},    // d/dx
-         {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},    // d/dy
-         {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}}};
-
-    // Quadrature weights for 3D (volume of each tet / voxel volume)
-    static const Real W_3D[5] = {1.0 / 3.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0,
-                                 1.0 / 6.0};
+    // Shape-function gradients and quadrature weights come from the element
+    // traits (fem_element.hh) via the operator's runtime element data.
 
     template <>
     void IsotropicStiffnessOperator<3>::precompute_matrices() {
@@ -83,113 +55,83 @@ namespace muGrid {
         const Real hx = grid_spacing[0];
         const Real hy = grid_spacing[1];
         const Real hz = grid_spacing[2];
-        const Real inv_hx = 1.0 / hx;
-        const Real inv_hy = 1.0 / hy;
-        const Real inv_hz = 1.0 / hz;
+        const Real scale[3] = {1.0 / hx, 1.0 / hy, 1.0 / hz};
 
-        // Scale factors for each derivative direction
-        const Real scale[3] = {inv_hx, inv_hy, inv_hz};
+        // Selected element's reference shape-function gradient B[q][d][n].
+        auto B = [this](Index_t q, Index_t d, Index_t n) {
+            return elem_B[(q * NB_DOFS_PER_NODE + d) * NB_NODES + n];
+        };
 
-        // Compute G and V matrices
-        // G = Σ_q w_q B_q^T I B_q (for shear modulus μ)
-        // V = Σ_q w_q (B_q^T m)(m^T B_q) (for Lamé λ)
-        // where m = [1, 1, 1, 0, 0, 0]^T (Voigt trace selector)
-
-        for (Index_t q = 0; q < NB_QUAD; ++q) {
-            Real w = W_3D[q] * hx * hy * hz;  // Weight includes element volume
-
+        // G = Σ_q w_q B_q^T I_sym B_q (shear/μ); V = Σ_q w_q (B_q^T m)(m^T B_q)
+        // (volumetric/λ), m = [1,1,1,0,0,0]^T.
+        for (Index_t q = 0; q < elem_nb_quad; ++q) {
+            Real w = elem_Wfrac[q] * hx * hy * hz;  // includes element volume
             for (Index_t I = 0; I < NB_NODES; ++I) {
                 for (Index_t J = 0; J < NB_NODES; ++J) {
                     for (Index_t a = 0; a < NB_DOFS_PER_NODE; ++a) {
                         for (Index_t b = 0; b < NB_DOFS_PER_NODE; ++b) {
                             Real g_contrib = 0.0;
-                            Real v_contrib = 0.0;
-
-                            // G contribution from diagonal strains (εxx, εyy,
-                            // εzz)
                             if (a == b) {
-                                g_contrib += B_3D[q][a][I] * scale[a] *
-                                             B_3D[q][a][J] * scale[a];
+                                g_contrib += B(q, a, I) * scale[a] *
+                                             B(q, a, J) * scale[a];
                             }
-
-                            // G contribution from shear strains
-                            // 2εyz = du_z/dy + du_y/dz
-                            // 2εxz = du_z/dx + du_x/dz
-                            // 2εxy = du_y/dx + du_x/dy
-                            // For shear strain ε_ab, the B vector has:
-                            //   B[u_a] = dN/dx_b and B[u_b] = dN/dx_a
-                            // So the stiffness contribution is:
-                            //   K[u_a,I; u_a,J] += μ * dN_I/dx_b * dN_J/dx_b
-                            //   K[u_b,I; u_b,J] += μ * dN_I/dx_a * dN_J/dx_a
-                            //   K[u_a,I; u_b,J] += μ * dN_I/dx_b * dN_J/dx_a
-                            //   K[u_b,I; u_a,J] += μ * dN_I/dx_a * dN_J/dx_b
-                            // Shear strain contributions
-                            // Using single-line expressions to avoid parsing issues
-                            Real dNI_dx = B_3D[q][0][I] * scale[0];
-                            Real dNI_dy = B_3D[q][1][I] * scale[1];
-                            Real dNI_dz = B_3D[q][2][I] * scale[2];
-                            Real dNJ_dx = B_3D[q][0][J] * scale[0];
-                            Real dNJ_dy = B_3D[q][1][J] * scale[1];
-                            Real dNJ_dz = B_3D[q][2][J] * scale[2];
-
-                            // Shear strain contributions with explicit intermediate
-                            // variables to avoid potential compiler optimization issues
+                            Real dNI_dx = B(q, 0, I) * scale[0];
+                            Real dNI_dy = B(q, 1, I) * scale[1];
+                            Real dNI_dz = B(q, 2, I) * scale[2];
+                            Real dNJ_dx = B(q, 0, J) * scale[0];
+                            Real dNJ_dy = B(q, 1, J) * scale[1];
+                            Real dNJ_dz = B(q, 2, J) * scale[2];
+                            // Engineering-shear coupling (2ε), factor 1/2.
                             if (a == 0 && b == 0) {
-                                // u_x - u_x: shear εxy (dN/dy) and εxz (dN/dz)
-                                Real shear_xy = 0.5 * dNI_dy * dNJ_dy;
-                                Real shear_xz = 0.5 * dNI_dz * dNJ_dz;
-                                g_contrib += shear_xy + shear_xz;
+                                g_contrib +=
+                                    0.5 * dNI_dy * dNJ_dy + 0.5 * dNI_dz * dNJ_dz;
                             } else if (a == 1 && b == 1) {
-                                // u_y - u_y: shear εxy (dN/dx) and εyz (dN/dz)
-                                Real shear_xy = 0.5 * dNI_dx * dNJ_dx;
-                                Real shear_yz = 0.5 * dNI_dz * dNJ_dz;
-                                g_contrib += shear_xy + shear_yz;
+                                g_contrib +=
+                                    0.5 * dNI_dx * dNJ_dx + 0.5 * dNI_dz * dNJ_dz;
                             } else if (a == 2 && b == 2) {
-                                // u_z - u_z: shear εxz (dN/dx) and εyz (dN/dy)
-                                Real shear_xz = 0.5 * dNI_dx * dNJ_dx;
-                                Real shear_yz = 0.5 * dNI_dy * dNJ_dy;
-                                g_contrib += shear_xz + shear_yz;
+                                g_contrib +=
+                                    0.5 * dNI_dx * dNJ_dx + 0.5 * dNI_dy * dNJ_dy;
                             } else if (a == 0 && b == 1) {
-                                // u_x,I - u_y,J cross coupling via εxy
                                 g_contrib += 0.5 * dNI_dy * dNJ_dx;
                             } else if (a == 1 && b == 0) {
-                                // u_y,I - u_x,J cross coupling via εxy
                                 g_contrib += 0.5 * dNI_dx * dNJ_dy;
                             } else if (a == 0 && b == 2) {
-                                // u_x,I - u_z,J cross coupling via εxz
                                 g_contrib += 0.5 * dNI_dz * dNJ_dx;
                             } else if (a == 2 && b == 0) {
-                                // u_z,I - u_x,J cross coupling via εxz
                                 g_contrib += 0.5 * dNI_dx * dNJ_dz;
                             } else if (a == 1 && b == 2) {
-                                // u_y,I - u_z,J cross coupling via εyz
                                 g_contrib += 0.5 * dNI_dz * dNJ_dy;
                             } else if (a == 2 && b == 1) {
-                                // u_z,I - u_y,J cross coupling via εyz
                                 g_contrib += 0.5 * dNI_dy * dNJ_dz;
                             }
-
-                            // V contribution: (B^T m)(m^T B)
-                            // m = [1,1,1,0,0,0]^T selects trace(ε) = εxx + εyy
-                            // + εzz
-                            Real BtmI =
-                                (a == 0 ? B_3D[q][0][I] * scale[0] : 0.0) +
-                                (a == 1 ? B_3D[q][1][I] * scale[1] : 0.0) +
-                                (a == 2 ? B_3D[q][2][I] * scale[2] : 0.0);
-                            Real BtmJ =
-                                (b == 0 ? B_3D[q][0][J] * scale[0] : 0.0) +
-                                (b == 1 ? B_3D[q][1][J] * scale[1] : 0.0) +
-                                (b == 2 ? B_3D[q][2][J] * scale[2] : 0.0);
-                            v_contrib = BtmI * BtmJ;
-
+                            // V: (B^T m)(m^T B), trace(ε) = εxx + εyy + εzz.
+                            Real BtmI = (a == 0 ? dNI_dx : 0.0) +
+                                        (a == 1 ? dNI_dy : 0.0) +
+                                        (a == 2 ? dNI_dz : 0.0);
+                            Real BtmJ = (b == 0 ? dNJ_dx : 0.0) +
+                                        (b == 1 ? dNJ_dy : 0.0) +
+                                        (b == 2 ? dNJ_dz : 0.0);
                             Index_t idx =
                                 (I * NB_DOFS_PER_NODE + a) * NB_ELEMENT_DOFS +
                                 (J * NB_DOFS_PER_NODE + b);
                             G_matrix[idx] += w * g_contrib;
-                            V_matrix[idx] += w * v_contrib;
+                            V_matrix[idx] += w * BtmI * BtmJ;
                         }
                     }
                 }
+            }
+        }
+
+        // Element-averaged gradient operator: Dbar[j*NB_NODES+n] =
+        // scale[j] Σ_q Wfrac_q B[q][j][n] (fractional weights, summing to 1).
+        std::fill(Dbar_matrix.begin(), Dbar_matrix.end(), 0.0);
+        for (Index_t j = 0; j < NB_DOFS_PER_NODE; ++j) {
+            for (Index_t n = 0; n < NB_NODES; ++n) {
+                Real s = 0.0;
+                for (Index_t q = 0; q < elem_nb_quad; ++q) {
+                    s += elem_Wfrac[q] * B(q, j, n);
+                }
+                Dbar_matrix[j * NB_NODES + n] = scale[j] * s;
             }
         }
     }
@@ -338,6 +280,115 @@ namespace muGrid {
             disp_stride_y, disp_stride_z, disp_stride_d, force_stride_x,
             force_stride_y, force_stride_z, force_stride_d, G_matrix.data(),
             V_matrix.data(), alpha, increment);
+    }
+
+    template <>
+    void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
+        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
+        const std::array<Real, 9> & E_macro,
+        TypedFieldBase<Real> & force) const {
+
+        // The force field plays the role of the node field for geometry; the
+        // displacement is the constant affine pattern folded into Gu, Vu.
+        const auto info = internal::validate_stiffness_fields<3>(
+            force.get_collection(), lambda.get_collection());
+        const auto * node_global_fc = info.disp_fc;
+        const auto * mat_global_fc = info.mat_fc;
+
+        const Index_t nnx = info.nb_computable[0];
+        const Index_t nny = info.nb_computable[1];
+        const Index_t nnz = info.nb_computable[2];
+        constexpr Index_t STENCIL_LEFT = 1;
+
+        auto nb_nodes = node_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t nx = nb_nodes[0];
+        Index_t ny = nb_nodes[1];
+        auto mat_nb = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t mat_nx = mat_nb[0];
+        Index_t mat_ny = mat_nb[1];
+
+        Index_t mat_stride_x = 1;
+        Index_t mat_stride_y = mat_nx;
+        Index_t mat_stride_z = mat_nx * mat_ny;
+        Index_t force_stride_d = 1;
+        Index_t force_stride_x = NB_DOFS_PER_NODE;
+        Index_t force_stride_y = NB_DOFS_PER_NODE * nx;
+        Index_t force_stride_z = NB_DOFS_PER_NODE * nx * ny;
+
+        Index_t force_offset = STENCIL_LEFT * force_stride_x +
+                               STENCIL_LEFT * force_stride_y +
+                               STENCIL_LEFT * force_stride_z;
+        Index_t mat_offset = STENCIL_LEFT * mat_stride_x +
+                             STENCIL_LEFT * mat_stride_y +
+                             STENCIL_LEFT * mat_stride_z;
+
+        ElementMatrix Gu{}, Vu{};
+        this->macro_rhs_vectors(E_macro, Gu, Vu);
+
+        isotropic_stiffness_kernels::isotropic_stiffness_3d_host_macro_rhs(
+            lambda.data() + mat_offset, mu.data() + mat_offset,
+            force.data() + force_offset, nnx, nny, nnz, mat_stride_x,
+            mat_stride_y, mat_stride_z, force_stride_x, force_stride_y,
+            force_stride_z, force_stride_d, Gu.data(), Vu.data(), 1.0, false);
+    }
+
+    template <>
+    std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
+        const TypedFieldBase<Real> & displacement,
+        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
+        const std::array<Real, 9> & E_macro) const {
+
+        const auto info = internal::validate_stiffness_fields<3>(
+            displacement.get_collection(), lambda.get_collection());
+        const auto * disp_global_fc = info.disp_fc;
+        const auto * mat_global_fc = info.mat_fc;
+
+        // Integrate over exactly the *owned* voxels (one element per voxel),
+        // not the stencil-computable region: the latter (with_ghosts - 2) can
+        // include ghost/padding elements -- e.g. the FFTEngine real-space
+        // collection pads one axis beyond the requested ghosts -- which carry
+        // nonzero periodic material and would double-count into the integral.
+        auto disp_gl = disp_global_fc->get_nb_ghosts_left();
+        auto disp_gr = disp_global_fc->get_nb_ghosts_right();
+        auto disp_wg = disp_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        auto mat_gl = mat_global_fc->get_nb_ghosts_left();
+        auto mat_wg = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+
+        const Index_t nelx = disp_wg[0] - disp_gl[0] - disp_gr[0];
+        const Index_t nely = disp_wg[1] - disp_gl[1] - disp_gr[1];
+        const Index_t nelz = disp_wg[2] - disp_gl[2] - disp_gr[2];
+
+        Index_t nx = disp_wg[0];
+        Index_t ny = disp_wg[1];
+        Index_t mat_nx = mat_wg[0];
+        Index_t mat_ny = mat_wg[1];
+
+        Index_t disp_stride_d = 1;
+        Index_t disp_stride_x = NB_DOFS_PER_NODE;
+        Index_t disp_stride_y = NB_DOFS_PER_NODE * nx;
+        Index_t disp_stride_z = NB_DOFS_PER_NODE * nx * ny;
+        Index_t mat_stride_x = 1;
+        Index_t mat_stride_y = mat_nx;
+        Index_t mat_stride_z = mat_nx * mat_ny;
+
+        Index_t disp_offset = disp_gl[0] * disp_stride_x +
+                              disp_gl[1] * disp_stride_y +
+                              disp_gl[2] * disp_stride_z;
+        Index_t mat_offset = mat_gl[0] * mat_stride_x +
+                             mat_gl[1] * mat_stride_y +
+                             mat_gl[2] * mat_stride_z;
+
+        const Real vol_elem =
+            grid_spacing[0] * grid_spacing[1] * grid_spacing[2];
+
+        std::array<Real, 9> accum{};
+        isotropic_stiffness_kernels::isotropic_stiffness_3d_host_average(
+            displacement.data() + disp_offset, lambda.data() + mat_offset,
+            mu.data() + mat_offset, nelx, nely, nelz, disp_stride_x,
+            disp_stride_y, disp_stride_z, disp_stride_d, mat_stride_x,
+            mat_stride_y, mat_stride_z, Dbar_matrix.data(), E_macro.data(),
+            vol_elem, accum.data());
+        return accum;
     }
 
     // ============================================================================
@@ -531,6 +582,157 @@ namespace muGrid {
                 disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d, 0,
                 0, 0, force_stride_x, force_stride_y, force_stride_z,
                 force_stride_d, G, V, alpha, increment, lambda, mu);
+        }
+
+        // Macro RHS: assemble force = Bᵀ C E_macro = K @ u* with the affine
+        // u* folded into the constant per-element vectors Gu = G u*, Vu = V u*.
+        void isotropic_stiffness_3d_host_macro_rhs(
+            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny, Index_t nnz,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+            Index_t force_stride_x, Index_t force_stride_y,
+            Index_t force_stride_z, Index_t force_stride_d, const Real * Gu,
+            const Real * Vu, Real alpha, bool increment) {
+
+            constexpr Index_t NB_DOFS = 3;
+            using SIndex_t = std::ptrdiff_t;
+            SIndex_t s_mat_stride_x = static_cast<SIndex_t>(mat_stride_x);
+            SIndex_t s_mat_stride_y = static_cast<SIndex_t>(mat_stride_y);
+            SIndex_t s_mat_stride_z = static_cast<SIndex_t>(mat_stride_z);
+            SIndex_t s_force_stride_x = static_cast<SIndex_t>(force_stride_x);
+            SIndex_t s_force_stride_y = static_cast<SIndex_t>(force_stride_y);
+            SIndex_t s_force_stride_z = static_cast<SIndex_t>(force_stride_z);
+            SIndex_t s_force_stride_d = static_cast<SIndex_t>(force_stride_d);
+
+            static const SIndex_t ELEM_OFFSETS[8][4] = {
+                {-1, -1, -1, 7}, {0, -1, -1, 6}, {-1, 0, -1, 5},
+                {0, 0, -1, 4},   {-1, -1, 0, 3}, {0, -1, 0, 2},
+                {-1, 0, 0, 1},   {0, 0, 0, 0}};
+
+            for (SIndex_t iz = 0; iz < static_cast<SIndex_t>(nnz); ++iz) {
+                for (SIndex_t iy = 0; iy < static_cast<SIndex_t>(nny); ++iy) {
+                    for (SIndex_t ix = 0; ix < static_cast<SIndex_t>(nnx);
+                         ++ix) {
+                        Real f[NB_DOFS] = {0.0, 0.0, 0.0};
+                        for (Index_t elem = 0; elem < 8; ++elem) {
+                            SIndex_t ex = ix + ELEM_OFFSETS[elem][0];
+                            SIndex_t ey = iy + ELEM_OFFSETS[elem][1];
+                            SIndex_t ez = iz + ELEM_OFFSETS[elem][2];
+                            Index_t local_node = ELEM_OFFSETS[elem][3];
+                            SIndex_t mat_idx = ex * s_mat_stride_x +
+                                               ey * s_mat_stride_y +
+                                               ez * s_mat_stride_z;
+                            Real lam = lambda[mat_idx];
+                            Real mu_val = mu[mat_idx];
+                            for (Index_t d = 0; d < NB_DOFS; ++d) {
+                                Index_t row = local_node * NB_DOFS + d;
+                                f[d] += 2.0 * mu_val * Gu[row] + lam * Vu[row];
+                            }
+                        }
+                        SIndex_t base = ix * s_force_stride_x +
+                                        iy * s_force_stride_y +
+                                        iz * s_force_stride_z;
+                        if (increment) {
+                            for (Index_t d = 0; d < NB_DOFS; ++d) {
+                                force[base + d * s_force_stride_d] +=
+                                    alpha * f[d];
+                            }
+                        } else {
+                            for (Index_t d = 0; d < NB_DOFS; ++d) {
+                                force[base + d * s_force_stride_d] =
+                                    alpha * f[d];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Stress average: loop over local elements, compute the element-
+        // averaged strain ḡ = Dbar u, form σ = C(λ,μ):(E_macro + sym ḡ), and
+        // accumulate the local volume integral vol_elem Σ_e σ_e into accum_out.
+        void isotropic_stiffness_3d_host_average(
+            const Real * MUGRID_RESTRICT displacement,
+            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            Index_t nelx, Index_t nely, Index_t nelz, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
+            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+            const Real * Dbar, const Real * E_macro, Real vol_elem,
+            Real * accum_out) {
+
+            constexpr Index_t NB_NODES = 8;
+            constexpr Index_t NB_DOFS = 3;
+            constexpr Index_t DIM = 3;
+            using SIndex_t = std::ptrdiff_t;
+            SIndex_t s_disp_stride_x = static_cast<SIndex_t>(disp_stride_x);
+            SIndex_t s_disp_stride_y = static_cast<SIndex_t>(disp_stride_y);
+            SIndex_t s_disp_stride_z = static_cast<SIndex_t>(disp_stride_z);
+            SIndex_t s_disp_stride_d = static_cast<SIndex_t>(disp_stride_d);
+            SIndex_t s_mat_stride_x = static_cast<SIndex_t>(mat_stride_x);
+            SIndex_t s_mat_stride_y = static_cast<SIndex_t>(mat_stride_y);
+            SIndex_t s_mat_stride_z = static_cast<SIndex_t>(mat_stride_z);
+
+            static const SIndex_t NODE_OFFSET[8][3] = {
+                {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+                {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
+
+            Real acc[DIM * DIM] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+            for (SIndex_t ez = 0; ez < static_cast<SIndex_t>(nelz); ++ez) {
+                for (SIndex_t ey = 0; ey < static_cast<SIndex_t>(nely); ++ey) {
+                    for (SIndex_t ex = 0; ex < static_cast<SIndex_t>(nelx);
+                         ++ex) {
+                        Real u[NB_NODES * NB_DOFS];
+                        for (Index_t node = 0; node < NB_NODES; ++node) {
+                            SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
+                            SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
+                            SIndex_t nz_pos = ez + NODE_OFFSET[node][2];
+                            SIndex_t disp_idx = nx_pos * s_disp_stride_x +
+                                                ny_pos * s_disp_stride_y +
+                                                nz_pos * s_disp_stride_z;
+                            for (Index_t d = 0; d < NB_DOFS; ++d) {
+                                u[node * NB_DOFS + d] =
+                                    displacement[disp_idx + d * s_disp_stride_d];
+                            }
+                        }
+                        SIndex_t mat_idx = ex * s_mat_stride_x +
+                                           ey * s_mat_stride_y +
+                                           ez * s_mat_stride_z;
+                        Real lam = lambda[mat_idx];
+                        Real mu_val = mu[mat_idx];
+
+                        Real g[DIM][DIM];
+                        for (Index_t i = 0; i < DIM; ++i) {
+                            for (Index_t j = 0; j < DIM; ++j) {
+                                Real s = 0.0;
+                                for (Index_t n = 0; n < NB_NODES; ++n) {
+                                    s += Dbar[j * NB_NODES + n] *
+                                         u[n * NB_DOFS + i];
+                                }
+                                g[i][j] = s;
+                            }
+                        }
+                        Real E[DIM][DIM];
+                        for (Index_t i = 0; i < DIM; ++i) {
+                            for (Index_t j = 0; j < DIM; ++j) {
+                                E[i][j] = E_macro[i * DIM + j] +
+                                          0.5 * (g[i][j] + g[j][i]);
+                            }
+                        }
+                        Real trE = E[0][0] + E[1][1] + E[2][2];
+                        for (Index_t i = 0; i < DIM; ++i) {
+                            for (Index_t j = 0; j < DIM; ++j) {
+                                Real sig = 2.0 * mu_val * E[i][j] +
+                                           (i == j ? lam * trE : 0.0);
+                                acc[i * DIM + j] += sig;
+                            }
+                        }
+                    }
+                }
+            }
+            for (Index_t k = 0; k < DIM * DIM; ++k) {
+                accum_out[k] = acc[k] * vol_elem;
+            }
         }
 
     }  // namespace isotropic_stiffness_kernels

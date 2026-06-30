@@ -44,8 +44,6 @@ set(MUGRID_SOURCES
     # operators/
         operators/generic.cc
         operators/laplace.cc
-        operators/fem_gradient_2d.cc
-        operators/fem_gradient_3d.cc
         operators/solids/isotropic_stiffness_2d.cc
         operators/solids/isotropic_stiffness_3d.cc
     # io/

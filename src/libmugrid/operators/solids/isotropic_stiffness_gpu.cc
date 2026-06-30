@@ -65,6 +65,41 @@ __constant__ int d_NODE_OFFSET_3D[8][3] = {
     {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}
 };
 
+// Macro-RHS constant per-element vectors Gu = G u*, Vu = V u* (uploaded per
+// call, since they depend on E_macro). 8 entries in 2D, 24 in 3D.
+__constant__ Real d_Gu_2D[8];
+__constant__ Real d_Vu_2D[8];
+__constant__ Real d_Gu_3D[24];
+__constant__ Real d_Vu_3D[24];
+
+// Stress-average constants: element-averaged gradient operator Dbar and the
+// (symmetric) macro strain E_macro (uploaded per call).
+__constant__ Real d_Dbar_2D[8];   // [dim][nb_nodes] = 2*4
+__constant__ Real d_Dbar_3D[24];  // [dim][nb_nodes] = 3*8
+__constant__ Real d_Emacro_2D[4];
+__constant__ Real d_Emacro_3D[9];
+
+// Portable double-precision atomic add. CUDA provides a native atomicAdd for
+// double only on sm_60+; the TITAN X (Maxwell, sm_52) and any HIP target use
+// the standard compare-and-swap fallback.
+__device__ inline double mugrid_atomic_add_double(double * address,
+                                                  double val) {
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 600)
+    return atomicAdd(address, val);
+#else
+    unsigned long long * addr_ull =
+        reinterpret_cast<unsigned long long *>(address);
+    unsigned long long old = *addr_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(addr_ull, assumed,
+                        __double_as_longlong(
+                            val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+#endif
+}
+
 // ============================================================================
 // 2D GPU Kernel (Gather Pattern - No Atomics)
 // ============================================================================
@@ -301,6 +336,245 @@ __global__ void isotropic_stiffness_3d_kernel(
 }
 
 // ============================================================================
+// Macro-RHS GPU Kernels (Gather Pattern - No Atomics)
+// ============================================================================
+
+// 2D: assemble force = B^T C E_macro = K @ u* with the affine u* folded into
+// the constant per-element vectors d_Gu_2D, d_Vu_2D. One thread per node.
+__global__ void isotropic_stiffness_2d_macro_rhs_kernel(
+    const Real * __restrict__ lambda, const Real * __restrict__ mu,
+    Real * __restrict__ force, Index_t nnx, Index_t nny, Index_t mat_stride_x,
+    Index_t mat_stride_y, Index_t force_stride_x, Index_t force_stride_y,
+    Index_t force_stride_d, Real alpha, bool increment) {
+
+    constexpr int NB_DOFS = 2;
+    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    if (ix >= nnx || iy >= nny) return;
+
+    const int ELEM_OFFSETS[4][3] = {
+        {-1, -1, 3}, {0, -1, 2}, {-1, 0, 1}, {0, 0, 0}};
+
+    Real f[NB_DOFS] = {0.0, 0.0};
+    #pragma unroll
+    for (int elem = 0; elem < 4; ++elem) {
+        int ex = static_cast<int>(ix) + ELEM_OFFSETS[elem][0];
+        int ey = static_cast<int>(iy) + ELEM_OFFSETS[elem][1];
+        int local_node = ELEM_OFFSETS[elem][2];
+        Real lam = lambda[ex * mat_stride_x + ey * mat_stride_y];
+        Real mu_val = mu[ex * mat_stride_x + ey * mat_stride_y];
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d) {
+            int row = local_node * NB_DOFS + d;
+            f[d] += 2.0 * mu_val * d_Gu_2D[row] + lam * d_Vu_2D[row];
+        }
+    }
+    Index_t base = ix * force_stride_x + iy * force_stride_y;
+    if (increment) {
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d)
+            force[base + d * force_stride_d] += alpha * f[d];
+    } else {
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d)
+            force[base + d * force_stride_d] = alpha * f[d];
+    }
+}
+
+// 3D macro RHS (see 2D variant).
+__global__ void isotropic_stiffness_3d_macro_rhs_kernel(
+    const Real * __restrict__ lambda, const Real * __restrict__ mu,
+    Real * __restrict__ force, Index_t nnx, Index_t nny, Index_t nnz,
+    Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+    Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_z,
+    Index_t force_stride_d, Real alpha, bool increment) {
+
+    constexpr int NB_DOFS = 3;
+    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
+    if (ix >= nnx || iy >= nny || iz >= nnz) return;
+
+    const int ELEM_OFFSETS[8][4] = {
+        {-1, -1, -1, 7}, {0, -1, -1, 6}, {-1, 0, -1, 5}, {0, 0, -1, 4},
+        {-1, -1, 0, 3},  {0, -1, 0, 2},  {-1, 0, 0, 1},  {0, 0, 0, 0}};
+
+    Real f[NB_DOFS] = {0.0, 0.0, 0.0};
+    #pragma unroll
+    for (int elem = 0; elem < 8; ++elem) {
+        int ex = static_cast<int>(ix) + ELEM_OFFSETS[elem][0];
+        int ey = static_cast<int>(iy) + ELEM_OFFSETS[elem][1];
+        int ez = static_cast<int>(iz) + ELEM_OFFSETS[elem][2];
+        int local_node = ELEM_OFFSETS[elem][3];
+        Index_t mat_idx =
+            ex * mat_stride_x + ey * mat_stride_y + ez * mat_stride_z;
+        Real lam = lambda[mat_idx];
+        Real mu_val = mu[mat_idx];
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d) {
+            int row = local_node * NB_DOFS + d;
+            f[d] += 2.0 * mu_val * d_Gu_3D[row] + lam * d_Vu_3D[row];
+        }
+    }
+    Index_t base =
+        ix * force_stride_x + iy * force_stride_y + iz * force_stride_z;
+    if (increment) {
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d)
+            force[base + d * force_stride_d] += alpha * f[d];
+    } else {
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d)
+            force[base + d * force_stride_d] = alpha * f[d];
+    }
+}
+
+// ============================================================================
+// Stress-Average GPU Kernels (grid-stride reduction into d_accum[dim*dim])
+// ============================================================================
+
+// 2D: each thread grid-strides over owned elements, accumulating the local
+// stress σ = C(λ,μ):(E_macro + sym ḡ) in registers, then atomic-adds the
+// Dim*Dim components into the global accumulator. d_accum is *not* scaled by
+// the element volume here -- the host does that after copy-back.
+__global__ void isotropic_stiffness_2d_average_kernel(
+    const Real * __restrict__ displacement, const Real * __restrict__ lambda,
+    const Real * __restrict__ mu, Index_t nelx, Index_t nely,
+    Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
+    Index_t mat_stride_x, Index_t mat_stride_y, Real * d_accum) {
+
+    constexpr int NB_NODES = 4;
+    constexpr int NB_DOFS = 2;
+    constexpr int DIM = 2;
+    const int NODE_OFFSET[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+
+    Real acc[DIM * DIM] = {0.0, 0.0, 0.0, 0.0};
+    Index_t nel = nelx * nely;
+    Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
+    for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
+         e += stride) {
+        Index_t ex = e % nelx;
+        Index_t ey = e / nelx;
+        Real u[NB_NODES * NB_DOFS];
+        #pragma unroll
+        for (int node = 0; node < NB_NODES; ++node) {
+            Index_t nx_pos = ex + NODE_OFFSET[node][0];
+            Index_t ny_pos = ey + NODE_OFFSET[node][1];
+            Index_t disp_idx = nx_pos * disp_stride_x + ny_pos * disp_stride_y;
+            #pragma unroll
+            for (int d = 0; d < NB_DOFS; ++d)
+                u[node * NB_DOFS + d] = displacement[disp_idx + d * disp_stride_d];
+        }
+        Index_t mat_idx = ex * mat_stride_x + ey * mat_stride_y;
+        Real lam = lambda[mat_idx];
+        Real mu_val = mu[mat_idx];
+
+        Real g[DIM][DIM];
+        #pragma unroll
+        for (int i = 0; i < DIM; ++i)
+            #pragma unroll
+            for (int j = 0; j < DIM; ++j) {
+                Real s = 0.0;
+                #pragma unroll
+                for (int n = 0; n < NB_NODES; ++n)
+                    s += d_Dbar_2D[j * NB_NODES + n] * u[n * NB_DOFS + i];
+                g[i][j] = s;
+            }
+        Real E[DIM][DIM];
+        #pragma unroll
+        for (int i = 0; i < DIM; ++i)
+            #pragma unroll
+            for (int j = 0; j < DIM; ++j)
+                E[i][j] = d_Emacro_2D[i * DIM + j] + 0.5 * (g[i][j] + g[j][i]);
+        Real trE = E[0][0] + E[1][1];
+        #pragma unroll
+        for (int i = 0; i < DIM; ++i)
+            #pragma unroll
+            for (int j = 0; j < DIM; ++j)
+                acc[i * DIM + j] +=
+                    2.0 * mu_val * E[i][j] + (i == j ? lam * trE : 0.0);
+    }
+    #pragma unroll
+    for (int k = 0; k < DIM * DIM; ++k)
+        mugrid_atomic_add_double(&d_accum[k], acc[k]);
+}
+
+// 3D stress average (see 2D variant).
+__global__ void isotropic_stiffness_3d_average_kernel(
+    const Real * __restrict__ displacement, const Real * __restrict__ lambda,
+    const Real * __restrict__ mu, Index_t nelx, Index_t nely, Index_t nelz,
+    Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_z,
+    Index_t disp_stride_d, Index_t mat_stride_x, Index_t mat_stride_y,
+    Index_t mat_stride_z, Real * d_accum) {
+
+    constexpr int NB_NODES = 8;
+    constexpr int NB_DOFS = 3;
+    constexpr int DIM = 3;
+    const int NODE_OFFSET[8][3] = {
+        {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+        {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
+
+    Real acc[DIM * DIM];
+    #pragma unroll
+    for (int k = 0; k < DIM * DIM; ++k) acc[k] = 0.0;
+
+    Index_t nelxy = nelx * nely;
+    Index_t nel = nelxy * nelz;
+    Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
+    for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
+         e += stride) {
+        Index_t ez = e / nelxy;
+        Index_t rem = e - ez * nelxy;
+        Index_t ey = rem / nelx;
+        Index_t ex = rem % nelx;
+        Real u[NB_NODES * NB_DOFS];
+        #pragma unroll
+        for (int node = 0; node < NB_NODES; ++node) {
+            Index_t nx_pos = ex + NODE_OFFSET[node][0];
+            Index_t ny_pos = ey + NODE_OFFSET[node][1];
+            Index_t nz_pos = ez + NODE_OFFSET[node][2];
+            Index_t disp_idx = nx_pos * disp_stride_x + ny_pos * disp_stride_y +
+                               nz_pos * disp_stride_z;
+            #pragma unroll
+            for (int d = 0; d < NB_DOFS; ++d)
+                u[node * NB_DOFS + d] = displacement[disp_idx + d * disp_stride_d];
+        }
+        Index_t mat_idx =
+            ex * mat_stride_x + ey * mat_stride_y + ez * mat_stride_z;
+        Real lam = lambda[mat_idx];
+        Real mu_val = mu[mat_idx];
+
+        Real g[DIM][DIM];
+        #pragma unroll
+        for (int i = 0; i < DIM; ++i)
+            #pragma unroll
+            for (int j = 0; j < DIM; ++j) {
+                Real s = 0.0;
+                #pragma unroll
+                for (int n = 0; n < NB_NODES; ++n)
+                    s += d_Dbar_3D[j * NB_NODES + n] * u[n * NB_DOFS + i];
+                g[i][j] = s;
+            }
+        Real E[DIM][DIM];
+        #pragma unroll
+        for (int i = 0; i < DIM; ++i)
+            #pragma unroll
+            for (int j = 0; j < DIM; ++j)
+                E[i][j] = d_Emacro_3D[i * DIM + j] + 0.5 * (g[i][j] + g[j][i]);
+        Real trE = E[0][0] + E[1][1] + E[2][2];
+        #pragma unroll
+        for (int i = 0; i < DIM; ++i)
+            #pragma unroll
+            for (int j = 0; j < DIM; ++j)
+                acc[i * DIM + j] +=
+                    2.0 * mu_val * E[i][j] + (i == j ? lam * trE : 0.0);
+    }
+    #pragma unroll
+    for (int k = 0; k < DIM * DIM; ++k)
+        mugrid_atomic_add_double(&d_accum[k], acc[k]);
+}
+
+// ============================================================================
 // Kernel Wrapper Functions
 // ============================================================================
 
@@ -442,6 +716,118 @@ void isotropic_stiffness_3d_gpu_uniform(
     if (err != nullptr) {
         throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
+}
+
+void isotropic_stiffness_2d_gpu_macro_rhs(
+    const Real * lambda, const Real * mu, Real * force, Index_t nnx,
+    Index_t nny, Index_t mat_stride_x, Index_t mat_stride_y,
+    Index_t force_stride_x, Index_t force_stride_y, Index_t force_stride_d,
+    const Real * Gu, const Real * Vu, Real alpha, bool increment) {
+
+    GPU_MEMCPY_TO_SYMBOL(d_Gu_2D, Gu, 8 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_Vu_2D, Vu, 8 * sizeof(Real));
+
+    dim3 block(16, 16);
+    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
+    GPU_LAUNCH_KERNEL(isotropic_stiffness_2d_macro_rhs_kernel, grid, block,
+                      lambda, mu, force, nnx, nny, mat_stride_x, mat_stride_y,
+                      force_stride_x, force_stride_y, force_stride_d, alpha,
+                      increment);
+    const char * err{gpu_last_error()};
+    if (err != nullptr) {
+        throw RuntimeError("GPU kernel launch failed: " + std::string(err));
+    }
+}
+
+void isotropic_stiffness_3d_gpu_macro_rhs(
+    const Real * lambda, const Real * mu, Real * force, Index_t nnx,
+    Index_t nny, Index_t nnz, Index_t mat_stride_x, Index_t mat_stride_y,
+    Index_t mat_stride_z, Index_t force_stride_x, Index_t force_stride_y,
+    Index_t force_stride_z, Index_t force_stride_d, const Real * Gu,
+    const Real * Vu, Real alpha, bool increment) {
+
+    GPU_MEMCPY_TO_SYMBOL(d_Gu_3D, Gu, 24 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_Vu_3D, Vu, 24 * sizeof(Real));
+
+    dim3 block(8, 8, 4);
+    dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y,
+              (nnz + block.z - 1) / block.z);
+    GPU_LAUNCH_KERNEL(isotropic_stiffness_3d_macro_rhs_kernel, grid, block,
+                      lambda, mu, force, nnx, nny, nnz, mat_stride_x,
+                      mat_stride_y, mat_stride_z, force_stride_x,
+                      force_stride_y, force_stride_z, force_stride_d, alpha,
+                      increment);
+    const char * err{gpu_last_error()};
+    if (err != nullptr) {
+        throw RuntimeError("GPU kernel launch failed: " + std::string(err));
+    }
+}
+
+void isotropic_stiffness_2d_gpu_average(
+    const Real * displacement, const Real * lambda, const Real * mu,
+    Index_t nelx, Index_t nely, Index_t disp_stride_x, Index_t disp_stride_y,
+    Index_t disp_stride_d, Index_t mat_stride_x, Index_t mat_stride_y,
+    const Real * Dbar, const Real * E_macro, Real vol_elem, Real * accum_out) {
+
+    constexpr int NCOMP = 4;
+    GPU_MEMCPY_TO_SYMBOL(d_Dbar_2D, Dbar, 8 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_Emacro_2D, E_macro, NCOMP * sizeof(Real));
+
+    Real * d_accum{nullptr};
+    GPU_MALLOC(reinterpret_cast<void **>(&d_accum), NCOMP * sizeof(Real));
+    GPU_MEMSET(d_accum, 0, NCOMP * sizeof(Real));
+
+    // Fixed grid-stride launch: keeps the number of atomics bounded (one set
+    // of NCOMP per thread) regardless of grid size. Sized to fill the device.
+    int block = 256;
+    int grid = 1024;
+    GPU_LAUNCH_KERNEL(isotropic_stiffness_2d_average_kernel, grid, block,
+                      displacement, lambda, mu, nelx, nely, disp_stride_x,
+                      disp_stride_y, disp_stride_d, mat_stride_x, mat_stride_y,
+                      d_accum);
+    const char * err{gpu_last_error()};
+    if (err != nullptr) {
+        GPU_FREE(d_accum);
+        throw RuntimeError("GPU kernel launch failed: " + std::string(err));
+    }
+
+    GPU_DEVICE_SYNCHRONIZE();
+    GPU_MEMCPY_D2H(accum_out, d_accum, NCOMP * sizeof(Real));
+    GPU_FREE(d_accum);
+    for (int k = 0; k < NCOMP; ++k) accum_out[k] *= vol_elem;
+}
+
+void isotropic_stiffness_3d_gpu_average(
+    const Real * displacement, const Real * lambda, const Real * mu,
+    Index_t nelx, Index_t nely, Index_t nelz, Index_t disp_stride_x,
+    Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
+    Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
+    const Real * Dbar, const Real * E_macro, Real vol_elem, Real * accum_out) {
+
+    constexpr int NCOMP = 9;
+    GPU_MEMCPY_TO_SYMBOL(d_Dbar_3D, Dbar, 24 * sizeof(Real));
+    GPU_MEMCPY_TO_SYMBOL(d_Emacro_3D, E_macro, NCOMP * sizeof(Real));
+
+    Real * d_accum{nullptr};
+    GPU_MALLOC(reinterpret_cast<void **>(&d_accum), NCOMP * sizeof(Real));
+    GPU_MEMSET(d_accum, 0, NCOMP * sizeof(Real));
+
+    int block = 256;
+    int grid = 1024;
+    GPU_LAUNCH_KERNEL(isotropic_stiffness_3d_average_kernel, grid, block,
+                      displacement, lambda, mu, nelx, nely, nelz, disp_stride_x,
+                      disp_stride_y, disp_stride_z, disp_stride_d, mat_stride_x,
+                      mat_stride_y, mat_stride_z, d_accum);
+    const char * err{gpu_last_error()};
+    if (err != nullptr) {
+        GPU_FREE(d_accum);
+        throw RuntimeError("GPU kernel launch failed: " + std::string(err));
+    }
+
+    GPU_DEVICE_SYNCHRONIZE();
+    GPU_MEMCPY_D2H(accum_out, d_accum, NCOMP * sizeof(Real));
+    GPU_FREE(d_accum);
+    for (int k = 0; k < NCOMP; ++k) accum_out[k] *= vol_elem;
 }
 
 }  // namespace isotropic_stiffness_kernels
@@ -724,6 +1110,171 @@ void IsotropicStiffnessOperator<3>::apply_uniform_impl(
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
         G_matrix.data(), V_matrix.data(),
         alpha, increment);
+}
+
+// ---- Streaming homogenization helpers (device) ----
+
+template <>
+void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
+    const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+    const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+    const std::array<Real, 4> & E_macro,
+    TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
+
+    const auto info = internal::validate_stiffness_fields<2>(
+        force.get_collection(), lambda.get_collection());
+    const auto * node_fc = info.disp_fc;
+    const auto * mat_fc = info.mat_fc;
+    const Index_t nnx = info.nb_computable[0];
+    const Index_t nny = info.nb_computable[1];
+    constexpr Index_t STENCIL_LEFT = 1;
+
+    auto wg = node_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    auto mwg = mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nx = wg[0], ny = wg[1];
+    Index_t mat_nx = mwg[0];
+
+    // SoA layout: [d, x, y]
+    Index_t force_stride_d = nx * ny, force_stride_x = 1, force_stride_y = nx;
+    Index_t mat_stride_x = 1, mat_stride_y = mat_nx;
+    Index_t force_offset =
+        STENCIL_LEFT * force_stride_x + STENCIL_LEFT * force_stride_y;
+    Index_t mat_offset =
+        STENCIL_LEFT * mat_stride_x + STENCIL_LEFT * mat_stride_y;
+
+    ElementMatrix Gu{}, Vu{};
+    this->macro_rhs_vectors(E_macro, Gu, Vu);
+
+    isotropic_stiffness_kernels::isotropic_stiffness_2d_gpu_macro_rhs(
+        lambda.view().data() + mat_offset, mu.view().data() + mat_offset,
+        force.view().data() + force_offset, nnx, nny, mat_stride_x,
+        mat_stride_y, force_stride_x, force_stride_y, force_stride_d, Gu.data(),
+        Vu.data(), 1.0, false);
+}
+
+template <>
+void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
+    const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+    const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+    const std::array<Real, 9> & E_macro,
+    TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
+
+    const auto info = internal::validate_stiffness_fields<3>(
+        force.get_collection(), lambda.get_collection());
+    const auto * node_fc = info.disp_fc;
+    const auto * mat_fc = info.mat_fc;
+    const Index_t nnx = info.nb_computable[0];
+    const Index_t nny = info.nb_computable[1];
+    const Index_t nnz = info.nb_computable[2];
+    constexpr Index_t STENCIL_LEFT = 1;
+
+    auto wg = node_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    auto mwg = mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nx = wg[0], ny = wg[1], nz = wg[2];
+    Index_t mat_nx = mwg[0], mat_ny = mwg[1];
+
+    Index_t force_stride_d = nx * ny * nz, force_stride_x = 1,
+            force_stride_y = nx, force_stride_z = nx * ny;
+    Index_t mat_stride_x = 1, mat_stride_y = mat_nx,
+            mat_stride_z = mat_nx * mat_ny;
+    Index_t force_offset = STENCIL_LEFT * force_stride_x +
+                           STENCIL_LEFT * force_stride_y +
+                           STENCIL_LEFT * force_stride_z;
+    Index_t mat_offset = STENCIL_LEFT * mat_stride_x +
+                         STENCIL_LEFT * mat_stride_y +
+                         STENCIL_LEFT * mat_stride_z;
+
+    ElementMatrix Gu{}, Vu{};
+    this->macro_rhs_vectors(E_macro, Gu, Vu);
+
+    isotropic_stiffness_kernels::isotropic_stiffness_3d_gpu_macro_rhs(
+        lambda.view().data() + mat_offset, mu.view().data() + mat_offset,
+        force.view().data() + force_offset, nnx, nny, nnz, mat_stride_x,
+        mat_stride_y, mat_stride_z, force_stride_x, force_stride_y,
+        force_stride_z, force_stride_d, Gu.data(), Vu.data(), 1.0, false);
+}
+
+template <>
+std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
+    const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+    const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+    const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+    const std::array<Real, 4> & E_macro) const {
+
+    const auto info = internal::validate_stiffness_fields<2>(
+        displacement.get_collection(), lambda.get_collection());
+    const auto * disp_fc = info.disp_fc;
+    const auto * mat_fc = info.mat_fc;
+
+    auto gl = disp_fc->get_nb_ghosts_left();
+    auto gr = disp_fc->get_nb_ghosts_right();
+    auto wg = disp_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    auto mgl = mat_fc->get_nb_ghosts_left();
+    auto mwg = mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+
+    const Index_t nelx = wg[0] - gl[0] - gr[0];
+    const Index_t nely = wg[1] - gl[1] - gr[1];
+    Index_t nx = wg[0], ny = wg[1];
+    Index_t mat_nx = mwg[0];
+
+    Index_t disp_stride_d = nx * ny, disp_stride_x = 1, disp_stride_y = nx;
+    Index_t mat_stride_x = 1, mat_stride_y = mat_nx;
+    Index_t disp_offset = gl[0] * disp_stride_x + gl[1] * disp_stride_y;
+    Index_t mat_offset = mgl[0] * mat_stride_x + mgl[1] * mat_stride_y;
+
+    const Real vol_elem = grid_spacing[0] * grid_spacing[1];
+    std::array<Real, 4> accum{};
+    isotropic_stiffness_kernels::isotropic_stiffness_2d_gpu_average(
+        displacement.view().data() + disp_offset,
+        lambda.view().data() + mat_offset, mu.view().data() + mat_offset, nelx,
+        nely, disp_stride_x, disp_stride_y, disp_stride_d, mat_stride_x,
+        mat_stride_y, Dbar_matrix.data(), E_macro.data(), vol_elem,
+        accum.data());
+    return accum;
+}
+
+template <>
+std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
+    const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
+    const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
+    const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+    const std::array<Real, 9> & E_macro) const {
+
+    const auto info = internal::validate_stiffness_fields<3>(
+        displacement.get_collection(), lambda.get_collection());
+    const auto * disp_fc = info.disp_fc;
+    const auto * mat_fc = info.mat_fc;
+
+    auto gl = disp_fc->get_nb_ghosts_left();
+    auto gr = disp_fc->get_nb_ghosts_right();
+    auto wg = disp_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    auto mgl = mat_fc->get_nb_ghosts_left();
+    auto mwg = mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+
+    const Index_t nelx = wg[0] - gl[0] - gr[0];
+    const Index_t nely = wg[1] - gl[1] - gr[1];
+    const Index_t nelz = wg[2] - gl[2] - gr[2];
+    Index_t nx = wg[0], ny = wg[1], nz = wg[2];
+    Index_t mat_nx = mwg[0], mat_ny = mwg[1];
+
+    Index_t disp_stride_d = nx * ny * nz, disp_stride_x = 1, disp_stride_y = nx,
+            disp_stride_z = nx * ny;
+    Index_t mat_stride_x = 1, mat_stride_y = mat_nx,
+            mat_stride_z = mat_nx * mat_ny;
+    Index_t disp_offset = gl[0] * disp_stride_x + gl[1] * disp_stride_y +
+                          gl[2] * disp_stride_z;
+    Index_t mat_offset = mgl[0] * mat_stride_x + mgl[1] * mat_stride_y +
+                         mgl[2] * mat_stride_z;
+
+    const Real vol_elem = grid_spacing[0] * grid_spacing[1] * grid_spacing[2];
+    std::array<Real, 9> accum{};
+    isotropic_stiffness_kernels::isotropic_stiffness_3d_gpu_average(
+        displacement.view().data() + disp_offset,
+        lambda.view().data() + mat_offset, mu.view().data() + mat_offset, nelx,
+        nely, nelz, disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
+        mat_stride_x, mat_stride_y, mat_stride_z, Dbar_matrix.data(),
+        E_macro.data(), vol_elem, accum.data());
+    return accum;
 }
 
 }  // namespace muGrid

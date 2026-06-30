@@ -72,7 +72,7 @@ class TestFEMGradientOperator2D_smoke:
         """Test that FEM gradient 2D can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(2)  # 2D
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)  # 2D
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -102,7 +102,7 @@ class TestFEMGradientOperator2D_smoke:
         """Test that FEM gradient 2D transpose can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -144,7 +144,7 @@ class TestFEMGradientOperator3D_smoke:
         """Test that FEM gradient 3D can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(3)  # 3D
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)  # 3D
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -171,7 +171,7 @@ class TestFEMGradientOperator3D_smoke:
         """Test that FEM gradient 3D transpose can be applied on device fields."""
         skip_if_gpu_unavailable(device)
 
-        fem_grad = muGrid.FEMGradientOperator(3)
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)
 
         device_obj = create_device(device)
         fc_kwargs = {"device": device_obj} if device_obj else {}
@@ -219,7 +219,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
     def test_device_fem_gradient_returns_cupy(self):
         """Test that FEM gradient on device fields returns CuPy arrays."""
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
@@ -245,7 +245,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
         Compare GPU results against CPU reference.
         """
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -287,7 +287,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
     def test_device_fem_gradient_2d_transpose_correctness(self):
         """Test that 2D device FEM transpose produces correct results."""
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -330,7 +330,7 @@ class TestFEMGradientOperatorGPUCorrectness:
     def test_device_fem_gradient_3d_correctness(self):
         """Test that 3D device FEM gradient produces correct results."""
         nb_x, nb_y, nb_z = 6, 6, 6
-        fem_grad = muGrid.FEMGradientOperator(3)
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -373,7 +373,7 @@ class TestFEMGradientOperatorGPUCorrectness:
     def test_device_fem_gradient_3d_transpose_correctness(self):
         """Test that 3D device FEM transpose produces correct results."""
         nb_x, nb_y, nb_z = 6, 6, 6
-        fem_grad = muGrid.FEMGradientOperator(3)
+        fem_grad = muGrid.FEMGradientOperator(3, element=muGrid.FEMElement.p1)
 
         # Create host reference
         fc_host = muGrid.GlobalFieldCollection(
@@ -415,7 +415,7 @@ class TestFEMGradientOperatorGPUCorrectness:
 
     def test_device_fem_gradient_roundtrip(self):
         """Test round-trip: B^T * B should be symmetric positive semi-definite."""
-        fem_grad = muGrid.FEMGradientOperator(2)
+        fem_grad = muGrid.FEMGradientOperator(2, element=muGrid.FEMElement.p1)
 
         # Create device collection
         fc = muGrid.GlobalFieldCollection(
@@ -441,6 +441,55 @@ class TestFEMGradientOperatorGPUCorrectness:
         result = cp.asnumpy(nodal_out.s)
         assert not np.any(np.isnan(result))
         assert not np.any(np.isinf(result))
+
+
+# =============================================================================
+# Element type (simplex vs Q1) patch test, parametrized on device
+# =============================================================================
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+@pytest.mark.parametrize("dim", [2, 3])
+@pytest.mark.parametrize("element", ["p1", "q1"])
+class TestFEMGradientElements:
+    """The FEM gradient operator supports linear simplices and Q1 elements.
+    Patch test: an affine nodal field must produce a constant gradient (equal
+    to the affine field's gradient) at every quadrature point, for any element.
+    """
+
+    def test_gradient_patch_test(self, device, dim, element):
+        skip_if_gpu_unavailable(device)
+        n = 6
+        h = [1.0 / n] * dim
+        el = (muGrid.FEMElement.q1 if element == "q1"
+              else muGrid.FEMElement.p1)
+        op = muGrid.FEMGradientOperator(dim, tuple(h), element=el)
+        device_obj = create_device(device)
+        fc_kwargs = {"device": device_obj} if device_obj else {}
+        fc = muGrid.GlobalFieldCollection(
+            (n,) * dim, sub_pts={"quad": op.nb_quad_pts},
+            nb_ghosts_right=(1,) * dim, **fc_kwargs)
+        nodal = fc.real_field("nodal", (1,))
+        gradient = fc.real_field("gradient", (op.nb_output_components,), "quad")
+
+        # Affine nodal field u = sum_j a_j x_j -> gradient a_j (constant).
+        a = np.array([0.3, -0.7, 1.1])[:dim]
+        pg = nodal.pg
+        xp = np if device != "gpu" else __import__("cupy")
+        idx = np.indices(tuple(pg.shape[1:]))
+        field = np.zeros(tuple(pg.shape[1:]))
+        for j in range(dim):
+            field += a[j] * idx[j] * h[j]
+        pg[0, ...] = xp.asarray(field)
+
+        op.apply(nodal, gradient)
+        gs = gradient.s
+        gs = gs.get() if hasattr(gs, "get") else np.asarray(gs)
+        # interior pixels [0, n-1) per axis carry valid (constant) gradients
+        interior = tuple([slice(0, n - 1)] * dim)
+        for j in range(dim):
+            comp = gs[j][(slice(None),) + interior]  # (nq, *interior)
+            np.testing.assert_allclose(comp, a[j], atol=1e-12)
 
 
 if __name__ == "__main__":

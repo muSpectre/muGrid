@@ -1254,14 +1254,19 @@ class FEMGradientOperator:
     """
 
     def __init__(
-        self, spatial_dim: int, grid_spacing: Optional[Sequence[float]] = None
+        self, spatial_dim: int, grid_spacing: Optional[Sequence[float]] = None,
+        element=_muGrid.FEMElement.q1
     ) -> None:
         if grid_spacing is None:
             grid_spacing = []
+        gs = list(grid_spacing)
+        q1 = element == _muGrid.FEMElement.q1
         if spatial_dim == 2:
-            self._cpp = _muGrid.FEMGradientOperator2D(list(grid_spacing))
+            self._cpp = (_muGrid.FEMGradientOperatorQ1_2D(gs) if q1
+                         else _muGrid.FEMGradientOperator2D(gs))
         elif spatial_dim == 3:
-            self._cpp = _muGrid.FEMGradientOperator3D(list(grid_spacing))
+            self._cpp = (_muGrid.FEMGradientOperatorQ1_3D(gs) if q1
+                         else _muGrid.FEMGradientOperator3D(gs))
         else:
             raise ValueError(
                 f"spatial_dim must be 2 or 3, got {spatial_dim}"
@@ -1382,11 +1387,14 @@ class IsotropicStiffnessOperator:
     >>> op.apply(displacement, lambda_field, mu_field, force)
     """
 
-    def __init__(self, spatial_dim: int, grid_spacing: Sequence[float]) -> None:
+    def __init__(self, spatial_dim: int, grid_spacing: Sequence[float],
+                 element=_muGrid.FEMElement.q1) -> None:
         if spatial_dim == 2:
-            self._cpp = _muGrid.IsotropicStiffnessOperator2D(list(grid_spacing))
+            self._cpp = _muGrid.IsotropicStiffnessOperator2D(
+                list(grid_spacing), element)
         elif spatial_dim == 3:
-            self._cpp = _muGrid.IsotropicStiffnessOperator3D(list(grid_spacing))
+            self._cpp = _muGrid.IsotropicStiffnessOperator3D(
+                list(grid_spacing), element)
         else:
             raise ValueError(f"spatial_dim must be 2 or 3, got {spatial_dim}")
         self._spatial_dim = spatial_dim
@@ -1434,15 +1442,17 @@ class IsotropicStiffnessOperator:
 class IsotropicStiffnessOperator2D(IsotropicStiffnessOperator):
     """Convenience wrapper fixing the spatial dimension to 2."""
 
-    def __init__(self, grid_spacing: Sequence[float]) -> None:
-        super().__init__(2, grid_spacing)
+    def __init__(self, grid_spacing: Sequence[float],
+                 element=_muGrid.FEMElement.q1) -> None:
+        super().__init__(2, grid_spacing, element)
 
 
 class IsotropicStiffnessOperator3D(IsotropicStiffnessOperator):
     """Convenience wrapper fixing the spatial dimension to 3."""
 
-    def __init__(self, grid_spacing: Sequence[float]) -> None:
-        super().__init__(3, grid_spacing)
+    def __init__(self, grid_spacing: Sequence[float],
+                 element=_muGrid.FEMElement.q1) -> None:
+        super().__init__(3, grid_spacing, element)
 
 
 # FileIONetCDF wrapper (only if NetCDF is available)
