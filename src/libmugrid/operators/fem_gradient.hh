@@ -100,30 +100,6 @@ namespace muGrid {
                                 bool increment);
 #endif
 
-        // Compile-time unrolled 0..N-1 loop: the body is called with an
-        // std::integral_constant, so loop-carried indices are template
-        // parameters. This is what makes the constexpr table access
-        // `Element::B[q][d][n]` a core constant expression that the compiler
-        // folds (dropping the structural zeros / ±1 of a simplex), so the
-        // element-generic kernel matches the old hand-unrolled code on every
-        // compiler instead of relying on unroll heuristics.
-        //
-        // Implemented as a recursive function template with `if constexpr`
-        // rather than a C++20 templated lambda + fold expression: the latter
-        // triggers an MSVC internal compiler error (C1001) when nested inside
-        // these precision-generic (`<Element, T>`) kernels. The recursive form
-        // produces identical unrolling and constant indices on every compiler.
-        template <Index_t I, Index_t N, class F>
-        inline void static_for_impl(F && f) {
-            if constexpr (I < N) {
-                f(std::integral_constant<Index_t, I>{});
-                static_for_impl<I + 1, N>(std::forward<F>(f));
-            }
-        }
-        template <Index_t N, class F>
-        inline void static_for(F && f) {
-            static_for_impl<0, N>(std::forward<F>(f));
-        }
 
         // ===================================================================
         // Generic, element-templated host kernels
@@ -163,44 +139,38 @@ namespace muGrid {
 
             auto pixel = [&](Index_t nodal_base, Index_t grad_base) {
                 T u[NbNodes];
-                static_for<NbNodes>([&](auto Nn) {
-                    constexpr Index_t n = decltype(Nn)::value;
+                for (Index_t n = 0; n < NbNodes; ++n) {
                     u[n] = nodal_input[nodal_base + node_lin[n]];
-                });
-                // Contract first (B folds to ±1/0 at compile time), then write
-                // with a single branch — keeps the strided stores out of the
-                // increment test, matching the hand-written kernels.
+                }
+                // Contract first, then write with a single branch — keeps the
+                // strided stores out of the increment test, matching the
+                // hand-written kernels. Trip counts are compile-time constants
+                // and Element::B is constexpr, so the optimizer unrolls these
+                // loops and folds B's structural zeros / ±1.
                 T out[NbQuad][Dim];
-                static_for<NbQuad>([&](auto Q) {
-                    constexpr Index_t q = decltype(Q)::value;
-                    static_for<Dim>([&](auto D) {
-                        constexpr Index_t d = decltype(D)::value;
+                for (Index_t q = 0; q < NbQuad; ++q) {
+                    for (Dim_t d = 0; d < Dim; ++d) {
                         T acc = T(0);
-                        static_for<NbNodes>([&](auto Nn) {
-                            constexpr Index_t n = decltype(Nn)::value;
+                        for (Index_t n = 0; n < NbNodes; ++n) {
                             acc += static_cast<T>(Element::B[q][d][n]) * u[n];
-                        });
+                        }
                         out[q][d] = acc * inv_h[d];
-                    });
-                });
+                    }
+                }
                 if (increment) {
-                    static_for<NbQuad>([&](auto Q) {
-                        constexpr Index_t q = decltype(Q)::value;
-                        static_for<Dim>([&](auto D) {
-                            constexpr Index_t d = decltype(D)::value;
+                    for (Index_t q = 0; q < NbQuad; ++q) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
                             gradient_output[grad_base + q * grad_stride_q +
                                             d * grad_stride_d] += out[q][d];
-                        });
-                    });
+                        }
+                    }
                 } else {
-                    static_for<NbQuad>([&](auto Q) {
-                        constexpr Index_t q = decltype(Q)::value;
-                        static_for<Dim>([&](auto D) {
-                            constexpr Index_t d = decltype(D)::value;
+                    for (Index_t q = 0; q < NbQuad; ++q) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
                             gradient_output[grad_base + q * grad_stride_q +
                                             d * grad_stride_d] = out[q][d];
-                        });
-                    });
+                        }
+                    }
                 }
             };
 
@@ -286,28 +256,25 @@ namespace muGrid {
                 // Accumulate each node's contribution quad-point by quad-point
                 // (B folds, so only the nodes touched by quad q contribute),
                 // then scatter once — the structure of the hand-written kernel.
+                // Trip counts are compile-time constants and Element::B is
+                // constexpr, so the optimizer unrolls and folds B.
                 T fa[NbNodes] = {};
-                static_for<NbQuad>([&](auto Q) {
-                    constexpr Index_t q = decltype(Q)::value;
+                for (Index_t q = 0; q < NbQuad; ++q) {
                     T cg[Dim];
-                    static_for<Dim>([&](auto D) {
-                        constexpr Index_t d = decltype(D)::value;
+                    for (Dim_t d = 0; d < Dim; ++d) {
                         cg[d] = coeff[q][d] *
                                 gradient_input[grad_base + q * grad_stride_q +
                                                d * grad_stride_d];
-                    });
-                    static_for<NbNodes>([&](auto Nn) {
-                        constexpr Index_t n = decltype(Nn)::value;
-                        static_for<Dim>([&](auto D) {
-                            constexpr Index_t d = decltype(D)::value;
+                    }
+                    for (Index_t n = 0; n < NbNodes; ++n) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
                             fa[n] += static_cast<T>(Element::B[q][d][n]) * cg[d];
-                        });
-                    });
-                });
-                static_for<NbNodes>([&](auto Nn) {
-                    constexpr Index_t n = decltype(Nn)::value;
+                        }
+                    }
+                }
+                for (Index_t n = 0; n < NbNodes; ++n) {
                     nodal_output[nodal_base + node_lin[n]] += fa[n];
-                });
+                }
             };
 
             if constexpr (Dim == 2) {
