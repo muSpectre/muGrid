@@ -58,9 +58,12 @@ namespace muGrid {
 
   template <typename T, typename MemorySpace>
   class TypedFieldBase : public Field {
-    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+    static_assert(std::is_scalar<T>::value or
+                      std::is_same<T, Complex>::value or
+                      std::is_same<T, Complex32>::value,
                   "You can only register fields templated with one of the "
-                  "numeric types Real, Complex, Int, or UInt");
+                  "numeric types Real, Real32, Complex, Complex32, Int, "
+                  "or UInt");
 
    protected:
     /**
@@ -721,9 +724,12 @@ namespace muGrid {
       const std::string & unique_name, const Index_t & nb_components,
       const std::string & sub_division_tag, const Unit & unit,
       bool allow_existing) {
-    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+    static_assert(std::is_scalar<T>::value or
+                      std::is_same<T, Complex>::value or
+                      std::is_same<T, Complex32>::value,
                   "You can only register fields templated with one of the "
-                  "numeric types Real, Complex, Int, or UInt");
+                  "numeric types Real, Real32, Complex, Complex32, Int, "
+                  "or UInt");
     if (this->field_exists(unique_name)) {
       if (allow_existing) {
         auto & field{*this->fields[unique_name]};
@@ -788,9 +794,12 @@ namespace muGrid {
       const std::string & unique_name, const Shape_t & components_shape,
       const std::string & sub_division_tag, const Unit & unit,
       bool allow_existing) {
-    static_assert(std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+    static_assert(std::is_scalar<T>::value or
+                      std::is_same<T, Complex>::value or
+                      std::is_same<T, Complex32>::value,
                   "You can only register fields templated with one of the "
-                  "numeric types Real, Complex, Int, or UInt");
+                  "numeric types Real, Real32, Complex, Complex32, Int, "
+                  "or UInt");
     if (this->field_exists(unique_name)) {
       if (allow_existing) {
         auto & field{*this->fields[unique_name]};

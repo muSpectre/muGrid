@@ -485,6 +485,8 @@ void add_field_classes(py::module &mod) {
     add_typed_field<muGrid::Complex>(mod, "ComplexField");
     add_typed_field<muGrid::Int>(mod, "IntField");
     add_typed_field<muGrid::Uint>(mod, "UintField");
+    add_typed_field<muGrid::Real32>(mod, "Real32Field");
+    add_typed_field<muGrid::Complex32>(mod, "Complex32Field");
 
     // Device-space (GPU) typed fields - only when CUDA/HIP is enabled
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -492,15 +494,19 @@ void add_field_classes(py::module &mod) {
     add_typed_field_device<muGrid::Complex>(mod, "ComplexField");
     add_typed_field_device<muGrid::Int>(mod, "IntField");
     add_typed_field_device<muGrid::Uint>(mod, "UintField");
+    add_typed_field_device<muGrid::Real32>(mod, "Real32Field");
+    add_typed_field_device<muGrid::Complex32>(mod, "Complex32Field");
 #endif
 
     add_field_map<muGrid::Real>(mod, "RealFieldMap");
     add_field_map<muGrid::Complex>(mod, "ComplexFieldMap");
     add_field_map<muGrid::Int>(mod, "IntFieldMap");
     add_field_map<muGrid::Uint>(mod, "UintFieldMap");
+    add_field_map<muGrid::Real32>(mod, "Real32FieldMap");
 
     add_mutable_mapped_field<muGrid::Real>(mod, "RealMappedField");
     add_mutable_mapped_field<muGrid::Complex>(mod, "ComplexMappedField");
     add_mutable_mapped_field<muGrid::Int>(mod, "IntMappedField");
     add_mutable_mapped_field<muGrid::Uint>(mod, "UintMappedField");
+    add_mutable_mapped_field<muGrid::Real32>(mod, "Real32MappedField");
 }

@@ -53,6 +53,7 @@ namespace muGrid {
     X(Int, NC_INT)         \
     X(Uint, NC_UINT)       \
     X(Real, NC_DOUBLE)     \
+    X(Real32, NC_FLOAT)    \
     X(Index, NC_INT64)
 
 nc_type descriptor_to_nc_type(TypeDescriptor td) {

@@ -62,39 +62,41 @@ namespace fem_gradient_kernels {
         // sum_n B[q][d][n] * u[n], unrolled over n at compile time. Terms with a
         // structurally-zero B are dropped (no multiply), and the gathered u
         // values are cheap corner reads, so this matches the hand-written code.
-        template <class E, Index_t q, Index_t d, Index_t n = 0>
-        __device__ __forceinline__ Real bsum(const Real * u) {
+        template <typename T, class E, Index_t q, Index_t d, Index_t n = 0>
+        __device__ __forceinline__ T bsum(const T * u) {
             if constexpr (n == E::NbNodes) {
-                return Real(0);
+                return T(0);
             } else {
                 constexpr Real b = E::B[q][d][n];
                 if constexpr (b != Real(0)) {
-                    return b * u[n] + bsum<E, q, d, n + 1>(u);
+                    return static_cast<T>(b) * u[n] +
+                           bsum<T, E, q, d, n + 1>(u);
                 } else {
-                    return bsum<E, q, d, n + 1>(u);
+                    return bsum<T, E, q, d, n + 1>(u);
                 }
             }
         }
 
         // Write all NbQuad×Dim gradient components for one pixel, unrolled.
-        template <class E, Index_t k = 0>
+        template <typename T, class E, Index_t k = 0>
         __device__ __forceinline__ void
-        grad_store(const Real * u, Real * grad, Index_t base, Index_t gsq,
-                   Index_t gsd, const Real * inv_h, bool increment) {
+        grad_store(const T * u, T * grad, Index_t base, Index_t gsq,
+                   Index_t gsd, const T * inv_h, bool increment) {
             constexpr Index_t Dim = E::SpatialDim;
             if constexpr (k == E::NbQuad * Dim) {
                 return;
             } else {
                 constexpr Index_t q = k / Dim;
                 constexpr Index_t d = k % Dim;
-                Real v = bsum<E, q, d>(u) * inv_h[d];
+                T v = bsum<T, E, q, d>(u) * inv_h[d];
                 Index_t idx = base + q * gsq + d * gsd;
                 if (increment) {
                     grad[idx] += v;
                 } else {
                     grad[idx] = v;
                 }
-                grad_store<E, k + 1>(u, grad, base, gsq, gsd, inv_h, increment);
+                grad_store<T, E, k + 1>(u, grad, base, gsq, gsd, inv_h,
+                                        increment);
             }
         }
 
@@ -102,20 +104,22 @@ namespace fem_gradient_kernels {
         // m) to the divergence at a node: sum_{q,d} coeff[q][d] B[q][d][m]
         // g[base + q·gsq + d·gsd], unrolled, skipping the global loads whose B
         // is structurally zero.
-        template <class E, Index_t m, Index_t k = 0>
-        __device__ __forceinline__ Real
-        div_node(const Real * g, Index_t base, Index_t gsq, Index_t gsd,
-                 const Real (&coeff)[E::NbQuad][E::SpatialDim]) {
+        template <typename T, class E, Index_t m, Index_t k = 0>
+        __device__ __forceinline__ T
+        div_node(const T * g, Index_t base, Index_t gsq, Index_t gsd,
+                 const T (&coeff)[E::NbQuad][E::SpatialDim]) {
             constexpr Index_t Dim = E::SpatialDim;
             if constexpr (k == E::NbQuad * Dim) {
-                return Real(0);
+                return T(0);
             } else {
                 constexpr Index_t q = k / Dim;
                 constexpr Index_t d = k % Dim;
                 constexpr Real b = E::B[q][d][m];
-                Real rest = div_node<E, m, k + 1>(g, base, gsq, gsd, coeff);
+                T rest = div_node<T, E, m, k + 1>(g, base, gsq, gsd, coeff);
                 if constexpr (b != Real(0)) {
-                    return coeff[q][d] * b * g[base + q * gsq + d * gsd] + rest;
+                    return coeff[q][d] * static_cast<T>(b) *
+                               g[base + q * gsq + d * gsd] +
+                           rest;
                 } else {
                     return rest;
                 }
@@ -130,28 +134,28 @@ namespace fem_gradient_kernels {
 
     //! Per-element launch parameters (small POD, passed to the kernel by value;
     //! raw arrays would decay to host pointers, so they are wrapped here).
-    template <class E>
+    template <typename T, class E>
     struct GradParams {
         Index_t nb[E::SpatialDim];
         Index_t nstride[E::SpatialDim];
         Index_t gstride[E::SpatialDim];
         Index_t gsq, gsd;
-        Real inv_h[E::SpatialDim];
+        T inv_h[E::SpatialDim];
     };
-    template <class E>
+    template <typename T, class E>
     struct DivParams {
         Index_t nb[E::SpatialDim];
         Index_t nstride[E::SpatialDim];
         Index_t gstride[E::SpatialDim];
         Index_t gsq, gsd;
-        Real coeff[E::NbQuad][E::SpatialDim];
+        T coeff[E::NbQuad][E::SpatialDim];
     };
 
     //! Gradient: one thread per pixel/voxel, gather its 2^Dim corner nodes.
-    template <class E>
-    __global__ void fem_gradient_kernel(const Real * MUGRID_RESTRICT nodal,
-                                        Real * MUGRID_RESTRICT grad,
-                                        GradParams<E> P, bool increment) {
+    template <typename T, class E>
+    __global__ void fem_gradient_kernel(const T * MUGRID_RESTRICT nodal,
+                                        T * MUGRID_RESTRICT grad,
+                                        GradParams<T, E> P, bool increment) {
         constexpr Index_t Dim = E::SpatialDim;
         constexpr Index_t NbNodes = E::NbNodes;
         Index_t c[Dim];
@@ -168,7 +172,7 @@ namespace fem_gradient_kernels {
             nbase += c[d] * P.nstride[d];
             gbase += c[d] * P.gstride[d];
         }
-        Real u[NbNodes];
+        T u[NbNodes];
         for (Index_t n = 0; n < NbNodes; ++n) {
             Index_t off = 0;
             for (Index_t d = 0; d < Dim; ++d) {
@@ -176,18 +180,18 @@ namespace fem_gradient_kernels {
             }
             u[n] = nodal[nbase + off];
         }
-        grad_store<E>(u, grad, gbase, P.gsq, P.gsd, P.inv_h, increment);
+        grad_store<T, E>(u, grad, gbase, P.gsq, P.gsd, P.inv_h, increment);
     }
 
     //! Divergence: one thread per node, gather from its 2^Dim adjacent
     //! elements (no atomics). Element po (offset p_d = -((po>>d)&1)) has this
     //! node as its local node po.
-    template <class E, Index_t po = 0>
-    __device__ __forceinline__ Real
-    div_gather(const Real * g, const Index_t * c, const DivParams<E> & P) {
+    template <typename T, class E, Index_t po = 0>
+    __device__ __forceinline__ T
+    div_gather(const T * g, const Index_t * c, const DivParams<T, E> & P) {
         constexpr Index_t Dim = E::SpatialDim;
         if constexpr (po == (Index_t(1) << Dim)) {
-            return Real(0);
+            return T(0);
         } else {
             bool ok = true;
             Index_t base = 0;
@@ -196,16 +200,16 @@ namespace fem_gradient_kernels {
                 if (cd < 0 || cd >= P.nb[d] - 1) ok = false;
                 base += cd * P.gstride[d];
             }
-            Real here = ok ? div_node<E, po>(g, base, P.gsq, P.gsd, P.coeff)
-                           : Real(0);
-            return here + div_gather<E, po + 1>(g, c, P);
+            T here = ok ? div_node<T, E, po>(g, base, P.gsq, P.gsd, P.coeff)
+                        : T(0);
+            return here + div_gather<T, E, po + 1>(g, c, P);
         }
     }
 
-    template <class E>
-    __global__ void fem_divergence_kernel(const Real * MUGRID_RESTRICT g,
-                                          Real * MUGRID_RESTRICT nodal,
-                                          DivParams<E> P, bool increment) {
+    template <typename T, class E>
+    __global__ void fem_divergence_kernel(const T * MUGRID_RESTRICT g,
+                                          T * MUGRID_RESTRICT nodal,
+                                          DivParams<T, E> P, bool increment) {
         constexpr Index_t Dim = E::SpatialDim;
         Index_t c[Dim];
         c[0] = blockIdx.x * blockDim.x + threadIdx.x;
@@ -216,7 +220,7 @@ namespace fem_gradient_kernels {
         for (Index_t d = 0; d < Dim; ++d) {
             if (c[d] >= P.nb[d]) return;
         }
-        Real contrib = div_gather<E>(g, c, P);
+        T contrib = div_gather<T, E>(g, c, P);
         Index_t idx = 0;
         for (Index_t d = 0; d < Dim; ++d) {
             idx += c[d] * P.nstride[d];
@@ -232,13 +236,13 @@ namespace fem_gradient_kernels {
     // Launch wrappers (declared in fem_gradient.hh, called by the operator)
     // =====================================================================
 
-    template <class E>
-    void fem_gradient_gpu(const Real * nodal, Real * grad, const Index_t * nb,
+    template <class E, typename T>
+    void fem_gradient_gpu(const T * nodal, T * grad, const Index_t * nb,
                           const Index_t * nstride, const Index_t * gstride,
-                          Index_t gsq, Index_t gsd, const Real * h, Real alpha,
+                          Index_t gsq, Index_t gsd, const T * h, T alpha,
                           bool increment) {
         constexpr Index_t Dim = E::SpatialDim;
-        GradParams<E> P;
+        GradParams<T, E> P;
         for (Index_t d = 0; d < Dim; ++d) {
             P.nb[d] = nb[d];
             P.nstride[d] = nstride[d];
@@ -247,19 +251,22 @@ namespace fem_gradient_kernels {
         }
         P.gsq = gsq;
         P.gsd = gsd;
+        // Hoist the template-id into an alias: the launch macro is variadic and
+        // would otherwise split the `<T, E>` comma into separate arguments.
+        auto kern = fem_gradient_kernel<T, E>;
         if constexpr (Dim == 2) {
             dim3 block(BLOCK_SIZE_2D, BLOCK_SIZE_2D);
             dim3 grid((nb[0] - 1 + block.x - 1) / block.x,
                       (nb[1] - 1 + block.y - 1) / block.y);
-            GPU_LAUNCH_KERNEL(fem_gradient_kernel<E>, grid, block, nodal, grad,
-                              P, increment);
+            GPU_LAUNCH_KERNEL(kern, grid, block, nodal,
+                              grad, P, increment);
         } else {
             dim3 block(BLOCK_SIZE_3D, BLOCK_SIZE_3D, BLOCK_SIZE_3D);
             dim3 grid((nb[0] - 1 + block.x - 1) / block.x,
                       (nb[1] - 1 + block.y - 1) / block.y,
                       (nb[2] - 1 + block.z - 1) / block.z);
-            GPU_LAUNCH_KERNEL(fem_gradient_kernel<E>, grid, block, nodal, grad,
-                              P, increment);
+            GPU_LAUNCH_KERNEL(kern, grid, block, nodal,
+                              grad, P, increment);
         }
         const char * err{gpu_last_error()};
         if (err != nullptr) {
@@ -267,14 +274,14 @@ namespace fem_gradient_kernels {
         }
     }
 
-    template <class E>
-    void fem_divergence_gpu(const Real * grad, Real * nodal, const Index_t * nb,
+    template <class E, typename T>
+    void fem_divergence_gpu(const T * grad, T * nodal, const Index_t * nb,
                             const Index_t * nstride, const Index_t * gstride,
-                            Index_t gsq, Index_t gsd, const Real * h,
-                            const Real * quad_weights, Real alpha,
+                            Index_t gsq, Index_t gsd, const T * h,
+                            const T * quad_weights, T alpha,
                             bool increment) {
         constexpr Index_t Dim = E::SpatialDim;
-        DivParams<E> P;
+        DivParams<T, E> P;
         for (Index_t d = 0; d < Dim; ++d) {
             P.nb[d] = nb[d];
             P.nstride[d] = nstride[d];
@@ -287,19 +294,20 @@ namespace fem_gradient_kernels {
                 P.coeff[q][d] = alpha * quad_weights[q] / h[d];
             }
         }
+        auto kern = fem_divergence_kernel<T, E>;
         if constexpr (Dim == 2) {
             dim3 block(BLOCK_SIZE_2D, BLOCK_SIZE_2D);
             dim3 grid((nb[0] + block.x - 1) / block.x,
                       (nb[1] + block.y - 1) / block.y);
-            GPU_LAUNCH_KERNEL(fem_divergence_kernel<E>, grid, block, grad, nodal,
-                              P, increment);
+            GPU_LAUNCH_KERNEL(kern, grid, block, grad,
+                              nodal, P, increment);
         } else {
             dim3 block(BLOCK_SIZE_3D, BLOCK_SIZE_3D, BLOCK_SIZE_3D);
             dim3 grid((nb[0] + block.x - 1) / block.x,
                       (nb[1] + block.y - 1) / block.y,
                       (nb[2] + block.z - 1) / block.z);
-            GPU_LAUNCH_KERNEL(fem_divergence_kernel<E>, grid, block, grad, nodal,
-                              P, increment);
+            GPU_LAUNCH_KERNEL(kern, grid, block, grad,
+                              nodal, P, increment);
         }
         const char * err{gpu_last_error()};
         if (err != nullptr) {
@@ -307,35 +315,25 @@ namespace fem_gradient_kernels {
         }
     }
 
-    // Explicit instantiations for the supported elements.
-    template void fem_gradient_gpu<P1Tri2D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, Real, bool);
-    template void fem_gradient_gpu<P1Tet3D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, Real, bool);
-    template void fem_divergence_gpu<P1Tri2D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
-        bool);
-    template void fem_divergence_gpu<P1Tet3D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
-        bool);
-    template void fem_gradient_gpu<Q1Quad2D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, Real, bool);
-    template void fem_gradient_gpu<Q1Hex3D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, Real, bool);
-    template void fem_divergence_gpu<Q1Quad2D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
-        bool);
-    template void fem_divergence_gpu<Q1Hex3D>(
-        const Real *, Real *, const Index_t *, const Index_t *,
-        const Index_t *, Index_t, Index_t, const Real *, const Real *, Real,
-        bool);
+    // Explicit instantiations for the supported elements, in double and single
+    // precision (the device kernels are precision-clean — B comes from the
+    // constexpr traits, no __constant__ memory).
+#define MUGRID_INSTANTIATE_FEM_GPU(E, T)                                       \
+    template void fem_gradient_gpu<E, T>(                                      \
+        const T *, T *, const Index_t *, const Index_t *, const Index_t *,     \
+        Index_t, Index_t, const T *, T, bool);                                 \
+    template void fem_divergence_gpu<E, T>(                                    \
+        const T *, T *, const Index_t *, const Index_t *, const Index_t *,     \
+        Index_t, Index_t, const T *, const T *, T, bool);
+    MUGRID_INSTANTIATE_FEM_GPU(P1Tri2D, Real)
+    MUGRID_INSTANTIATE_FEM_GPU(P1Tet3D, Real)
+    MUGRID_INSTANTIATE_FEM_GPU(Q1Quad2D, Real)
+    MUGRID_INSTANTIATE_FEM_GPU(Q1Hex3D, Real)
+    MUGRID_INSTANTIATE_FEM_GPU(P1Tri2D, Real32)
+    MUGRID_INSTANTIATE_FEM_GPU(P1Tet3D, Real32)
+    MUGRID_INSTANTIATE_FEM_GPU(Q1Quad2D, Real32)
+    MUGRID_INSTANTIATE_FEM_GPU(Q1Hex3D, Real32)
+#undef MUGRID_INSTANTIATE_FEM_GPU
 
 }  // namespace fem_gradient_kernels
 }  // namespace muGrid

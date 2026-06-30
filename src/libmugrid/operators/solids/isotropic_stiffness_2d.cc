@@ -39,6 +39,28 @@
 
 namespace muGrid {
 
+    // Forward declarations of the (templated) host kernels defined at the
+    // bottom of this file, so the operator's impl methods above can call them.
+    namespace isotropic_stiffness_kernels {
+        template <typename T>
+        void isotropic_stiffness_2d_host(
+            const T *, const T *, const T *, T *, Index_t, Index_t, Index_t,
+            Index_t, Index_t, Index_t, Index_t, Index_t, Index_t, Index_t,
+            Index_t, Index_t, const T *, const T *, T, bool);
+        template <typename T>
+        void isotropic_stiffness_2d_host_uniform(
+            const T *, T, T, T *, Index_t, Index_t, Index_t, Index_t, Index_t,
+            Index_t, Index_t, Index_t, const T *, const T *, T, bool);
+        template <typename T>
+        void isotropic_stiffness_2d_host_macro_rhs(
+            const T *, const T *, T *, Index_t, Index_t, Index_t, Index_t,
+            Index_t, Index_t, Index_t, const T *, const T *, T, bool);
+        template <typename T>
+        void isotropic_stiffness_2d_host_average(
+            const T *, const T *, const T *, Index_t, Index_t, Index_t, Index_t,
+            Index_t, Index_t, Index_t, const T *, const T *, Real, Real *);
+    }  // namespace isotropic_stiffness_kernels
+
     // ============================================================================
     // 2D Implementation
     // ============================================================================
@@ -123,10 +145,11 @@ namespace muGrid {
     }
 
     template <>
+    template <typename T>
     void IsotropicStiffnessOperator<2>::apply_impl(
-        const TypedFieldBase<Real> & displacement,
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
-        Real alpha, TypedFieldBase<Real> & force, bool increment) const {
+        const TypedFieldBase<T> & displacement,
+        const TypedFieldBase<T> & lambda, const TypedFieldBase<T> & mu,
+        T alpha, TypedFieldBase<T> & force, bool increment) const {
 
         // Validate field collections and ghosts; the dimension-generic checks
         // live in internal::validate_stiffness_fields (isotropic_stiffness.hh).
@@ -179,24 +202,32 @@ namespace muGrid {
         Index_t mat_offset = mat_offset_x * mat_stride_x +
                              mat_offset_y * mat_stride_y;
 
-        const Real * disp_data = displacement.data() + disp_offset;
-        const Real * lambda_data = lambda.data() + mat_offset;
-        const Real * mu_data = mu.data() + mat_offset;
-        Real * force_data = force.data() + force_offset;
+        const T * disp_data = displacement.data() + disp_offset;
+        const T * lambda_data = lambda.data() + mat_offset;
+        const T * mu_data = mu.data() + mat_offset;
+        T * force_data = force.data() + force_offset;
 
-        isotropic_stiffness_kernels::isotropic_stiffness_2d_host(
+        // The geometry matrices are stored in double; for the double
+        // instantiation they pass straight through, otherwise they are
+        // converted to T once into the scratch arrays.
+        std::array<T, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS> G_s, V_s;
+        const T * G_ptr = geometry_as<T>(G_matrix, G_s);
+        const T * V_ptr = geometry_as<T>(V_matrix, V_s);
+
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host<T>(
             disp_data, lambda_data, mu_data, force_data, nnx,
             nny,         // Number of interior nodes
             nelx, nely,  // Number of elements
             disp_stride_x, disp_stride_y, disp_stride_d, mat_stride_x,
             mat_stride_y, force_stride_x, force_stride_y, force_stride_d,
-            G_matrix.data(), V_matrix.data(), alpha, increment);
+            G_ptr, V_ptr, alpha, increment);
     }
 
     template <>
+    template <typename T>
     void IsotropicStiffnessOperator<2>::apply_uniform_impl(
-        const TypedFieldBase<Real> & displacement, Real lambda, Real mu,
-        Real alpha, TypedFieldBase<Real> & force, bool increment) const {
+        const TypedFieldBase<T> & displacement, T lambda, T mu,
+        T alpha, TypedFieldBase<T> & force, bool increment) const {
 
         // Uniform Lamé scalars: no material field. Mirrors apply_impl<2> minus
         // all material-field discovery and validation.
@@ -239,18 +270,23 @@ namespace muGrid {
         Index_t force_offset =
             STENCIL_LEFT * force_stride_x + STENCIL_LEFT * force_stride_y;
 
-        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_uniform(
+        std::array<T, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS> G_s, V_s;
+        const T * G_ptr = geometry_as<T>(G_matrix, G_s);
+        const T * V_ptr = geometry_as<T>(V_matrix, V_s);
+
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_uniform<T>(
             displacement.data() + disp_offset, lambda, mu,
             force.data() + force_offset, nnx, nny, disp_stride_x, disp_stride_y,
             disp_stride_d, force_stride_x, force_stride_y, force_stride_d,
-            G_matrix.data(), V_matrix.data(), alpha, increment);
+            G_ptr, V_ptr, alpha, increment);
     }
 
     template <>
+    template <typename T>
     void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
+        const TypedFieldBase<T> & lambda, const TypedFieldBase<T> & mu,
         const std::array<Real, 4> & E_macro,
-        TypedFieldBase<Real> & force) const {
+        TypedFieldBase<T> & force) const {
 
         // The force field plays the role of the node field for geometry; the
         // displacement is the constant affine pattern folded into Gu, Vu.
@@ -281,18 +317,22 @@ namespace muGrid {
 
         ElementMatrix Gu{}, Vu{};
         this->macro_rhs_vectors(E_macro, Gu, Vu);
+        std::array<T, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS> Gu_s, Vu_s;
+        const T * Gu_ptr = geometry_as<T>(Gu, Gu_s);
+        const T * Vu_ptr = geometry_as<T>(Vu, Vu_s);
 
-        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_macro_rhs(
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_macro_rhs<T>(
             lambda.data() + mat_offset, mu.data() + mat_offset,
             force.data() + force_offset, nnx, nny, mat_stride_x, mat_stride_y,
-            force_stride_x, force_stride_y, force_stride_d, Gu.data(),
-            Vu.data(), 1.0, false);
+            force_stride_x, force_stride_y, force_stride_d, Gu_ptr,
+            Vu_ptr, static_cast<T>(1), false);
     }
 
     template <>
+    template <typename T>
     std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
-        const TypedFieldBase<Real> & displacement,
-        const TypedFieldBase<Real> & lambda, const TypedFieldBase<Real> & mu,
+        const TypedFieldBase<T> & displacement,
+        const TypedFieldBase<T> & lambda, const TypedFieldBase<T> & mu,
         const std::array<Real, 4> & E_macro) const {
 
         const auto info = internal::validate_stiffness_fields<2>(
@@ -330,12 +370,17 @@ namespace muGrid {
 
         const Real vol_elem = grid_spacing[0] * grid_spacing[1];
 
+        std::array<T, Dim * NB_NODES> Dbar_s;
+        std::array<T, 4> E_s;
+        const T * Dbar_ptr = geometry_as<T>(Dbar_matrix, Dbar_s);
+        const T * E_ptr = geometry_as<T>(E_macro, E_s);
+
         std::array<Real, 4> accum{};
-        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_average(
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_average<T>(
             displacement.data() + disp_offset, lambda.data() + mat_offset,
             mu.data() + mat_offset, nelx, nely, disp_stride_x, disp_stride_y,
-            disp_stride_d, mat_stride_x, mat_stride_y, Dbar_matrix.data(),
-            E_macro.data(), vol_elem, accum.data());
+            disp_stride_d, mat_stride_x, mat_stride_y, Dbar_ptr,
+            E_ptr, vol_elem, accum.data());
         return accum;
     }
 
@@ -352,17 +397,17 @@ namespace muGrid {
         // Shared kernel body for the per-pixel (Uniform == false) and the
         // spatially-uniform (Uniform == true) stiffness apply. See the 3D
         // counterpart for the rationale.
-        template <bool Uniform>
+        template <typename T, bool Uniform>
         static void isotropic_stiffness_2d_host_tmpl(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda,
-            const Real * MUGRID_RESTRICT mu, Real * MUGRID_RESTRICT force,
+            const T * MUGRID_RESTRICT displacement,
+            const T * MUGRID_RESTRICT lambda,
+            const T * MUGRID_RESTRICT mu, T * MUGRID_RESTRICT force,
             Index_t nnx, Index_t nny, Index_t disp_stride_x,
             Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
             Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment, Real lam_u,
-            Real mu_u) {
+            Index_t force_stride_y, Index_t force_stride_d, const T * G,
+            const T * V, T alpha, bool increment, T lam_u,
+            T mu_u) {
 
             constexpr Index_t NB_NODES = 4;
             constexpr Index_t NB_DOFS = 2;
@@ -410,7 +455,7 @@ namespace muGrid {
             for (SIndex_t iy = iy_start; iy < iy_end; ++iy) {
                 for (SIndex_t ix = ix_start; ix < ix_end; ++ix) {
                     // Accumulate force for this node
-                    Real f[NB_DOFS] = {0.0, 0.0};
+                    T f[NB_DOFS] = {0, 0};
 
                     // Loop over neighboring elements (all 4 elements guaranteed
                     // to exist for nodes in this iteration range)
@@ -421,7 +466,7 @@ namespace muGrid {
                         Index_t local_node = ELEM_OFFSETS[elem][2];
 
                         // Get material parameters for this element
-                        Real lam, mu_val;
+                        T lam, mu_val;
                         if constexpr (Uniform) {
                             lam = lam_u;
                             mu_val = mu_u;
@@ -433,7 +478,7 @@ namespace muGrid {
                         }
 
                         // Gather displacements from all 4 nodes of this element
-                        Real u[NB_ELEM_DOFS];
+                        T u[NB_ELEM_DOFS];
                         for (Index_t node = 0; node < NB_NODES; ++node) {
                             SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
                             SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
@@ -449,10 +494,11 @@ namespace muGrid {
                         // this node
                         for (Index_t d = 0; d < NB_DOFS; ++d) {
                             Index_t row = local_node * NB_DOFS + d;
-                            Real contrib = 0.0;
+                            T contrib = 0;
                             for (Index_t j = 0; j < NB_ELEM_DOFS; ++j) {
                                 contrib +=
-                                    (2.0 * mu_val * G[row * NB_ELEM_DOFS + j] +
+                                    (static_cast<T>(2) * mu_val *
+                                         G[row * NB_ELEM_DOFS + j] +
                                      lam * V[row * NB_ELEM_DOFS + j]) *
                                     u[j];
                             }
@@ -476,31 +522,33 @@ namespace muGrid {
         }
 
         // Per-pixel material entry point (unchanged public signature).
+        template <typename T>
         void isotropic_stiffness_2d_host(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda,
-            const Real * MUGRID_RESTRICT mu, Real * MUGRID_RESTRICT force,
+            const T * MUGRID_RESTRICT displacement,
+            const T * MUGRID_RESTRICT lambda,
+            const T * MUGRID_RESTRICT mu, T * MUGRID_RESTRICT force,
             Index_t nnx, Index_t nny, Index_t /*nelx*/, Index_t /*nely*/,
             Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
             Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment) {
-            isotropic_stiffness_2d_host_tmpl<false>(
+            Index_t force_stride_y, Index_t force_stride_d, const T * G,
+            const T * V, T alpha, bool increment) {
+            isotropic_stiffness_2d_host_tmpl<T, false>(
                 displacement, lambda, mu, force, nnx, nny, disp_stride_x,
                 disp_stride_y, disp_stride_d, mat_stride_x, mat_stride_y,
                 force_stride_x, force_stride_y, force_stride_d, G, V, alpha,
-                increment, 0.0, 0.0);
+                increment, T(0), T(0));
         }
 
         // Uniform Lamé scalars: no material pointers, no material strides.
+        template <typename T>
         void isotropic_stiffness_2d_host_uniform(
-            const Real * MUGRID_RESTRICT displacement, Real lambda, Real mu,
-            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
+            const T * MUGRID_RESTRICT displacement, T lambda, T mu,
+            T * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
             Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
             Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
+            Index_t force_stride_d, const T * G, const T * V, T alpha,
             bool increment) {
-            isotropic_stiffness_2d_host_tmpl<true>(
+            isotropic_stiffness_2d_host_tmpl<T, true>(
                 displacement, nullptr, nullptr, force, nnx, nny, disp_stride_x,
                 disp_stride_y, disp_stride_d, 0, 0, force_stride_x,
                 force_stride_y, force_stride_d, G, V, alpha, increment, lambda,
@@ -511,12 +559,13 @@ namespace muGrid {
         // u* folded into the constant per-element vectors Gu = G u*, Vu = V u*.
         // Same gather-by-node assembly as the apply kernel, but the per-element
         // K_e u* is the precomputed 2μ_e Gu + λ_e Vu (no displacement gather).
+        template <typename T>
         void isotropic_stiffness_2d_host_macro_rhs(
-            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
-            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
+            const T * MUGRID_RESTRICT lambda, const T * MUGRID_RESTRICT mu,
+            T * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
             Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * Gu,
-            const Real * Vu, Real alpha, bool increment) {
+            Index_t force_stride_y, Index_t force_stride_d, const T * Gu,
+            const T * Vu, T alpha, bool increment) {
 
             constexpr Index_t NB_DOFS = 2;
             using SIndex_t = std::ptrdiff_t;
@@ -531,18 +580,19 @@ namespace muGrid {
 
             for (SIndex_t iy = 0; iy < static_cast<SIndex_t>(nny); ++iy) {
                 for (SIndex_t ix = 0; ix < static_cast<SIndex_t>(nnx); ++ix) {
-                    Real f[NB_DOFS] = {0.0, 0.0};
+                    T f[NB_DOFS] = {0, 0};
                     for (Index_t elem = 0; elem < 4; ++elem) {
                         SIndex_t ex = ix + ELEM_OFFSETS[elem][0];
                         SIndex_t ey = iy + ELEM_OFFSETS[elem][1];
                         Index_t local_node = ELEM_OFFSETS[elem][2];
                         SIndex_t mat_idx =
                             ex * s_mat_stride_x + ey * s_mat_stride_y;
-                        Real lam = lambda[mat_idx];
-                        Real mu_val = mu[mat_idx];
+                        T lam = lambda[mat_idx];
+                        T mu_val = mu[mat_idx];
                         for (Index_t d = 0; d < NB_DOFS; ++d) {
                             Index_t row = local_node * NB_DOFS + d;
-                            f[d] += 2.0 * mu_val * Gu[row] + lam * Vu[row];
+                            f[d] += static_cast<T>(2) * mu_val * Gu[row] +
+                                    lam * Vu[row];
                         }
                     }
                     SIndex_t base =
@@ -563,12 +613,13 @@ namespace muGrid {
         // Stress average: loop over local elements, compute the element-
         // averaged strain ḡ = Dbar u, form σ = C(λ,μ):(E_macro + sym ḡ), and
         // accumulate the local volume integral vol_elem Σ_e σ_e into accum_out.
+        template <typename T>
         void isotropic_stiffness_2d_host_average(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
+            const T * MUGRID_RESTRICT displacement,
+            const T * MUGRID_RESTRICT lambda, const T * MUGRID_RESTRICT mu,
             Index_t nelx, Index_t nely, Index_t disp_stride_x,
             Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
-            Index_t mat_stride_y, const Real * Dbar, const Real * E_macro,
+            Index_t mat_stride_y, const T * Dbar, const T * E_macro,
             Real vol_elem, Real * accum_out) {
 
             constexpr Index_t NB_NODES = 4;
@@ -584,11 +635,14 @@ namespace muGrid {
             static const SIndex_t NODE_OFFSET[4][2] = {
                 {0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
+            // The per-element stress is formed in working precision T, but the
+            // volume integral is accumulated in double for the cross-rank
+            // reduction.
             Real acc[DIM * DIM] = {0.0, 0.0, 0.0, 0.0};
 
             for (SIndex_t ey = 0; ey < static_cast<SIndex_t>(nely); ++ey) {
                 for (SIndex_t ex = 0; ex < static_cast<SIndex_t>(nelx); ++ex) {
-                    Real u[NB_NODES * NB_DOFS];
+                    T u[NB_NODES * NB_DOFS];
                     for (Index_t node = 0; node < NB_NODES; ++node) {
                         SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
                         SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
@@ -600,14 +654,14 @@ namespace muGrid {
                         }
                     }
                     SIndex_t mat_idx = ex * s_mat_stride_x + ey * s_mat_stride_y;
-                    Real lam = lambda[mat_idx];
-                    Real mu_val = mu[mat_idx];
+                    T lam = lambda[mat_idx];
+                    T mu_val = mu[mat_idx];
 
                     // ḡ_ij = Σ_n Dbar[j*NB_NODES+n] u[n,i]
-                    Real g[DIM][DIM];
+                    T g[DIM][DIM];
                     for (Index_t i = 0; i < DIM; ++i) {
                         for (Index_t j = 0; j < DIM; ++j) {
-                            Real s = 0.0;
+                            T s = 0;
                             for (Index_t n = 0; n < NB_NODES; ++n) {
                                 s += Dbar[j * NB_NODES + n] * u[n * NB_DOFS + i];
                             }
@@ -615,19 +669,19 @@ namespace muGrid {
                         }
                     }
                     // E = E_macro + sym(ḡ); σ = 2μ E + λ tr(E) δ.
-                    Real E[DIM][DIM];
+                    T E[DIM][DIM];
                     for (Index_t i = 0; i < DIM; ++i) {
                         for (Index_t j = 0; j < DIM; ++j) {
                             E[i][j] = E_macro[i * DIM + j] +
-                                      0.5 * (g[i][j] + g[j][i]);
+                                      static_cast<T>(0.5) * (g[i][j] + g[j][i]);
                         }
                     }
-                    Real trE = E[0][0] + E[1][1];
+                    T trE = E[0][0] + E[1][1];
                     for (Index_t i = 0; i < DIM; ++i) {
                         for (Index_t j = 0; j < DIM; ++j) {
-                            Real sig = 2.0 * mu_val * E[i][j] +
-                                       (i == j ? lam * trE : 0.0);
-                            acc[i * DIM + j] += sig;
+                            T sig = static_cast<T>(2) * mu_val * E[i][j] +
+                                    (i == j ? lam * trE : T(0));
+                            acc[i * DIM + j] += static_cast<Real>(sig);
                         }
                     }
                 }
@@ -638,5 +692,24 @@ namespace muGrid {
         }
 
     }  // namespace isotropic_stiffness_kernels
+
+    // Explicit instantiations of the per-precision host impls. The (templated)
+    // kernels above are instantiated implicitly through these.
+#define MUGRID_INSTANTIATE_STIFFNESS_2D(T)                                     \
+    template void IsotropicStiffnessOperator<2>::apply_impl<T>(                \
+        const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
+        const TypedFieldBase<T> &, T, TypedFieldBase<T> &, bool) const;        \
+    template void IsotropicStiffnessOperator<2>::apply_uniform_impl<T>(        \
+        const TypedFieldBase<T> &, T, T, T, TypedFieldBase<T> &, bool) const;  \
+    template void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl<T>(      \
+        const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
+        const std::array<Real, 4> &, TypedFieldBase<T> &) const;               \
+    template std::array<Real, 4>                                               \
+    IsotropicStiffnessOperator<2>::average_stress_impl<T>(                     \
+        const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
+        const TypedFieldBase<T> &, const std::array<Real, 4> &) const;
+    MUGRID_INSTANTIATE_STIFFNESS_2D(Real)
+    MUGRID_INSTANTIATE_STIFFNESS_2D(Real32)
+#undef MUGRID_INSTANTIATE_STIFFNESS_2D
 
 }  // namespace muGrid
