@@ -7,7 +7,7 @@ grid sizes. Lower is better.
 !!! info "Test machine & code version"
     - **CPU:** AMD Instinct MI300A Accelerator (192 logical cores)
     - **GPU:** 4x AMD Instinct MI300A
-    - **muGrid:** `0.109.0-55-g0d9153f6-dirty` — run 2026-06-28T00:15:03
+    - **muGrid:** `0.109.0-65-gf3ef7b08` — run 2026-06-28T22:18:45
 
 Run configuration: 3D single spherical inclusion, fused stiffness kernel,
 6 load cases, fixed `100` CG iterations per load case — i.e. a **fixed work
@@ -33,14 +33,14 @@ dropped from the plot, and larger sizes for that configuration are not attempted
 
 | Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) | 768³ (453.0M) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| CPU (1 core) | 1.13 | 3.94 | 8.86 | 30.4 | 72.4 | 245 | 578 | — | — | — | — | — |
-| CPU (92 cores, MPI) | 0.127 | 0.164 | 0.237 | 0.582 | 0.998 | 3.51 | 7.57 | 26.3 | 60.1 | 196 | 468 | 1.57e+03 |
-| GPU (1 device) | 2.24 | 0.313 | 0.272 | 0.302 | 0.385 | 0.909 | 1.92 | 9.02 | 15.5 | 59.9 | OOM | — |
-| GPU (4 devices, MPI) | 0.54 | 0.288 | 0.35 | 0.339 | 0.551 | 0.563 | 1.04 | 2.24 | 4.83 | 15.8 | 35.4 | OOM |
+| CPU (1 core) | 1.12 | 3.74 | 9.13 | 30.3 | 72.6 | 244 | 578 | — | — | — | — | — |
+| CPU (92 cores, MPI) | 0.129 | 0.164 | 0.239 | 0.588 | 1.02 | 3.49 | 7.77 | 26.5 | 61.4 | 196 | 474 | 1.58e+03 |
+| GPU (1 device) | 0.235 | 0.223 | 0.22 | 0.277 | 0.373 | 0.87 | 1.89 | 6.43 | 15.5 | 58.2 | OOM | — |
+| GPU (4 devices, MPI) | 0.48 | 0.34 | 0.499 | 0.526 | 0.584 | 0.728 | 1.02 | 2.2 | 4.64 | 15.8 | 35.3 | OOM |
 
 (values are **solve time in seconds**; `OOM` = the run ran out of memory)
 
-![Homogenization solve time vs. number of grid points](benchmark_homogenization.png)
+![Homogenization solve time vs. grid size](benchmark_homogenization.png)
 
 A single CPU core is quickly left behind, so the fair comparison is the full CPU
 (all 92 cores via MPI) against the GPU(s). The GPU leads in the mid-range,

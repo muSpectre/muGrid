@@ -100,15 +100,10 @@ def run(device, precond, n, dim, maxiter, tol, nranks=1):
                 secs=r["total_time_seconds"])
 
 
-def collect(args, prov):
-    """Run both studies; return DB rows (does not write)."""
-    _, nb_gpus = db.detect_gpu()
-    want_gpu = not args.no_gpu and nb_gpus >= 1
-    configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
-    rows = []
+def collect_iterations(args, prov):
+    """Study `iterations`: CG count, none vs reference, on a single CPU core."""
     common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim)
-
-    # Study 1: iterations (none vs reference), serial CPU.
+    rows = []
     for n in args.iter_sizes:
         for P in ("none", "reference"):
             r = run("cpu", P, n, args.dim, args.maxiter, args.tol)
@@ -121,12 +116,23 @@ def collect(args, prov):
                          "iters": r["iters"], "secs": r["secs"]})
             sys.stderr.write(f"  iter {P:9s} {n}^{args.dim} ({r['npts']} pts): "
                              f"{r['iters']:5d} it, {r['secs']:.3f} s\n")
+    return rows
 
-    # Study 2: reference-solve time across device/MPI configs. Each config
-    # sweeps grid sizes up to its own cap (a single CPU core tops out far sooner
-    # than the full node / the GPUs) and stops at the first out-of-memory size,
-    # which is recorded as an "oom" point (flagged in the table, dropped from the
-    # plot); larger sizes for that config are not attempted.
+
+def collect_timing(args, prov):
+    """Study `reference_timing`: reference-solve time across device/MPI configs.
+
+    Each config sweeps grid sizes up to its own cap (a single CPU core tops out
+    far sooner than the full node / the GPUs) and stops at the first
+    out-of-memory size, which is recorded as an "oom" point (flagged in the
+    table, dropped from the plot); larger sizes for that config are not
+    attempted.
+    """
+    _, nb_gpus = db.detect_gpu()
+    want_gpu = not args.no_gpu and nb_gpus >= 1
+    configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
+    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim)
+    rows = []
     for key, device, nranks in configs:
         label = db.CONFIG_META[key]["label"](nranks)
         cap = args.cpu1_max_size if key == "cpu1" else args.max_size
@@ -149,6 +155,16 @@ def collect(args, prov):
                          "iters": r["iters"], "secs": r["secs"]})
             sys.stderr.write(f"  time {label} {n}^{args.dim} ({r['npts']} pts): "
                              f"{r['iters']} it, {r['secs']:.3f} s\n")
+    return rows
+
+
+def collect(args, prov):
+    """Run the selected studies (`args.studies`); return DB rows (no write)."""
+    rows = []
+    if "iterations" in args.studies:
+        rows += collect_iterations(args, prov)
+    if "reference_timing" in args.studies:
+        rows += collect_timing(args, prov)
     return rows
 
 
@@ -404,6 +420,16 @@ def main():
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
     ap.add_argument("--maxiter", type=int, default=20000)
     ap.add_argument("--tol", type=float, default=1e-6)
+    ap.add_argument("--studies", nargs="+",
+                    choices=["iterations", "reference_timing"],
+                    default=["iterations", "reference_timing"],
+                    help="Which studies to MEASURE (collection only). "
+                         "`iterations` = none-vs-reference CG count (1 CPU "
+                         "core); `reference_timing` = device/MPI solve-time "
+                         "scaling. Rendering always uses whatever is in the DB.")
+    ap.add_argument("--collect-only", action="store_true",
+                    help="Measure and append to the database, then stop "
+                         "(no plots/page — render later with --render-only)")
     ap.add_argument("--render-only", action="store_true",
                     help="Skip running; render from the database")
     ap.add_argument("--timestamp", default=None,
@@ -423,15 +449,23 @@ def main():
             sys.exit("No successful runs — nothing to record.")
         db.append_rows(rows, args.db)
         sys.stderr.write(f"appended {len(rows)} rows to {args.db}\n")
+        if args.collect_only:
+            return
         select_ts = prov["timestamp"]
     else:
         select_ts = args.timestamp
 
-    rows = db.select(db.load(args.db), BENCHMARK, select_ts)
+    # Take the latest run of EACH study independently, so the page combines the
+    # iteration-count study and the timing study even when they were measured by
+    # separate jobs (the two are split across separate submission scripts).
+    rows = db.select_studies(db.load(args.db), BENCHMARK,
+                             ["iterations", "reference_timing"], select_ts)
     if not rows:
         sys.exit("No matching rows in the database.")
 
-    meta = {k: rows[0][k] for k in ("cpu", "gpu", "version", "timestamp")}
+    # Machine/version box: prefer the (heavier) timing run when present.
+    meta_rows = [r for r in rows if r["study"] == "reference_timing"] or rows
+    meta = {k: meta_rows[0][k] for k in ("cpu", "gpu", "version", "timestamp")}
     dim = next((r["dim"] for r in rows), args.dim)
     tol = next((r["tol"] for r in rows if r["study"] == "iterations"), args.tol)
     configs = db.render_configs(rows, "reference_timing")

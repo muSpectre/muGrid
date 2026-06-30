@@ -326,6 +326,9 @@ def main():
                     help="Ranks for the full-machine MPI CPU curve")
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
     ap.add_argument("--maxiter", type=int, default=100)
+    ap.add_argument("--collect-only", action="store_true",
+                    help="Measure and append to the database, then stop "
+                         "(no plot/page — render later with --render-only)")
     ap.add_argument("--render-only", action="store_true",
                     help="Skip running; render from the database")
     ap.add_argument("--timestamp", default=None,
@@ -345,6 +348,8 @@ def main():
             sys.exit("No successful runs — nothing to record.")
         db.append_rows(rows, args.db)
         sys.stderr.write(f"appended {len(rows)} rows to {args.db}\n")
+        if args.collect_only:
+            return
         select_ts = prov["timestamp"]
     else:
         select_ts = args.timestamp
