@@ -7,7 +7,7 @@ grid sizes. Lower is better.
 !!! info "Test machine & code version"
     - **CPU:** AMD Instinct MI300A Accelerator (192 logical cores)
     - **GPU:** 4x AMD Instinct MI300A
-    - **muGrid:** `0.109.0-65-gf3ef7b08` — run 2026-06-28T22:18:45
+    - **muGrid:** `0.110.0-9-g3cf17e02-dirty` — run 2026-06-30T15:55:33
 
 Run configuration: 3D single spherical inclusion, fused stiffness kernel,
 6 load cases, fixed `100` CG iterations per load case — i.e. a **fixed work
@@ -31,12 +31,12 @@ Each configuration is swept to the largest grid that still fits in memory: the
 first size that runs **out of memory** is recorded as `OOM` in the table and
 dropped from the plot, and larger sizes for that configuration are not attempted.
 
-| Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) | 768³ (453.0M) |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| CPU (1 core) | 1.12 | 3.74 | 9.13 | 30.3 | 72.6 | 244 | 578 | — | — | — | — | — |
-| CPU (92 cores, MPI) | 0.129 | 0.164 | 0.239 | 0.588 | 1.02 | 3.49 | 7.77 | 26.5 | 61.4 | 196 | 474 | 1.58e+03 |
-| GPU (1 device) | 0.235 | 0.223 | 0.22 | 0.277 | 0.373 | 0.87 | 1.89 | 6.43 | 15.5 | 58.2 | OOM | — |
-| GPU (4 devices, MPI) | 0.48 | 0.34 | 0.499 | 0.526 | 0.584 | 0.728 | 1.02 | 2.2 | 4.64 | 15.8 | 35.3 | OOM |
+| Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) | 768³ (453.0M) | 1024³ (1073.7M) | 1536³ (3623.9M) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| CPU (1 core) | 1.07 | 3.67 | 8.63 | 29.1 | 69.4 | 234 | 556 | — | — | — | — | — | — | — |
+| CPU (92 cores, MPI) | 0.123 | 0.158 | 0.225 | 0.568 | 0.956 | 3.33 | 7.14 | 24.2 | 56.8 | 194 | 441 | 1.43e+03 | 3.45e+03 | — |
+| GPU (1 device) | 0.806 | 3.17 | 20.4 | 125 | 399 | 415 | 418 | 397 | 357 | 346 | 309 | OOM | — | — |
+| GPU (4 devices, MPI) | 0.735 | 1.38 | 3.45 | 11.9 | 78.2 | 384 | 413 | 460 | 437 | 445 | 411 | 395 | 398 | OOM |
 
 (values are **solve time in seconds**; `OOM` = the run ran out of memory)
 
