@@ -28,7 +28,8 @@ Identity of the data point:
   label      series within a study, e.g. a config key ("cpu1"/"cpuN"/"gpu1"/
              "gpuN"), a rank count, or a preconditioner name
 Run parameters:
-  device nranks dim n npts precond maxiter tol
+  device nranks dim n npts precond precision maxiter tol
+  (`precision` is "double"/"single"; blank on legacy rows, read as "double")
 Results:
   iters secs gbps E
 Unused columns for a given row are left blank.
@@ -51,7 +52,8 @@ FIELDS = [
     # identity
     "benchmark", "study", "label",
     # run parameters
-    "device", "nranks", "dim", "n", "npts", "precond", "maxiter", "tol",
+    "device", "nranks", "dim", "n", "npts", "precond", "precision",
+    "maxiter", "tol",
     # results
     "iters", "secs", "gbps", "E",
     # status: blank/"ok" for a normal point, "oom" for a run that ran out of
@@ -376,4 +378,51 @@ def select_studies(rows, benchmark, studies, timestamp=None):
             out.extend(r for r in sub if r["timestamp"] == target)
         else:
             out.extend(r for r in sub if r["timestamp"].startswith(timestamp))
+    return out
+
+
+# Floating-point precision names. Legacy rows predate the `precision` column and
+# were all measured in double precision, so a blank cell reads as "double".
+PRECISIONS = ["double", "single"]
+
+# When both precisions are overlaid on one plot, the device config sets the
+# colour/marker and the precision sets the line style (double solid, single
+# dashed); the short label is used as a legend/table suffix.
+PRECISION_STYLE = {"double": dict(linestyle="-"),
+                   "single": dict(linestyle="--")}
+PRECISION_LABEL = {"double": "fp64", "single": "fp32"}
+
+
+def norm_precision(row):
+    """Precision of a row, defaulting a blank/missing cell to "double"."""
+    return (row.get("precision") or "").strip() or "double"
+
+
+def select_precisions(rows, benchmark, studies, timestamp=None):
+    """Rows for the given studies, latest run **per (study, precision)**.
+
+    Like `select_studies`, but within each study the rows are further grouped by
+    precision and the most recent run is taken *independently for each
+    precision*. This lets a page overlay the double- and single-precision curves
+    even though they are measured by separate jobs (separate timestamps): the
+    fp64 and fp32 scaling scripts each append their own dated run, and both show
+    up here. With an explicit `timestamp` the behaviour matches `select_studies`
+    (one pinned run, whatever precision it happens to be).
+    """
+    out = []
+    for study in studies:
+        sub = [r for r in rows
+               if r["benchmark"] == benchmark and r["study"] == study]
+        if not sub:
+            continue
+        groups = {}
+        for r in sub:
+            groups.setdefault(norm_precision(r), []).append(r)
+        for grp in groups.values():
+            if timestamp is None:
+                target = max(r["timestamp"] for r in grp)
+                out.extend(r for r in grp if r["timestamp"] == target)
+            else:
+                out.extend(r for r in grp
+                           if r["timestamp"].startswith(timestamp))
     return out

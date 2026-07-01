@@ -66,12 +66,12 @@ def _looks_like_oom(out):
     return out.returncode == -9  # killed by the OS OOM killer (SIGKILL)
 
 
-def run(device, precond, n, dim, maxiter, tol, nranks=1):
+def run(device, precond, n, dim, maxiter, tol, nranks=1, precision="double"):
     """Run one solve; dict of metrics, ``OOM`` if out of memory, else ``None``."""
     grid = ",".join([str(n)] * dim)
     base = [HOMOG, "-n", grid, "-d", device, "-k", "fused", "-P", precond,
-            "-i", str(maxiter), "--tol", str(tol), "--inclusion-type", "single",
-            "--json"]
+            "-i", str(maxiter), "--tol", str(tol), "--precision", precision,
+            "--inclusion-type", "single", "--json"]
     if nranks == 1:
         cmd = [sys.executable] + base
         env = os.environ
@@ -102,11 +102,13 @@ def run(device, precond, n, dim, maxiter, tol, nranks=1):
 
 def collect_iterations(args, prov):
     """Study `iterations`: CG count, none vs reference, on a single CPU core."""
-    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim)
+    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim,
+                  precision=args.precision)
     rows = []
     for n in args.iter_sizes:
         for P in ("none", "reference"):
-            r = run("cpu", P, n, args.dim, args.maxiter, args.tol)
+            r = run("cpu", P, n, args.dim, args.maxiter, args.tol,
+                    precision=args.precision)
             if r is None:
                 sys.stderr.write(f"  iter {P} {n}^{args.dim}: skipped\n")
                 continue
@@ -131,14 +133,15 @@ def collect_timing(args, prov):
     _, nb_gpus = db.detect_gpu()
     want_gpu = not args.no_gpu and nb_gpus >= 1
     configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
-    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim)
+    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim,
+                  precision=args.precision)
     rows = []
     for key, device, nranks in configs:
         label = db.CONFIG_META[key]["label"](nranks)
         cap = args.cpu1_max_size if key == "cpu1" else args.max_size
         for n in [s for s in args.sizes if s <= cap]:
             r = run(device, "reference", n, args.dim, args.maxiter, args.tol,
-                    nranks)
+                    nranks, args.precision)
             base = {**prov, **common, "benchmark": BENCHMARK,
                     "study": "reference_timing", "label": key, "device": device,
                     "nranks": nranks, "n": n, "npts": n ** args.dim,
@@ -184,21 +187,28 @@ def sup(dim):
 
 
 def iters_from_rows(rows):
-    """{precond: {n: row}} from the iterations study."""
+    """{precision: {precond: {n: row}}} from the iterations study."""
     d = {}
     for r in rows:
         if r["study"] == "iterations":
-            d.setdefault(r["label"], {})[r["n"]] = r
+            d.setdefault(db.norm_precision(r), {}) \
+             .setdefault(r["label"], {})[r["n"]] = r
     return d
 
 
 def timing_from_rows(rows):
-    """{config_key: {n: row}} from the reference_timing study."""
+    """{precision: {config_key: {n: row}}} from the reference_timing study."""
     d = {}
     for r in rows:
         if r["study"] == "reference_timing":
-            d.setdefault(r["label"], {})[r["n"]] = r
+            d.setdefault(db.norm_precision(r), {}) \
+             .setdefault(r["label"], {})[r["n"]] = r
     return d
+
+
+def precisions_in(merged):
+    """Precisions present in a {precision: ...} dict, in canonical order."""
+    return [p for p in db.PRECISIONS if p in merged]
 
 
 def sizes_in(rows, study):
@@ -209,21 +219,28 @@ def sizes_in(rows, study):
 # Tables
 # --------------------------------------------------------------------------- #
 def iteration_table(sizes, iters, dim):
-    cols = [n for n in sizes if n in iters.get("none", {})]
+    precisions = precisions_in(iters)
+    show_prec = len(precisions) > 1
+    cols = [n for n in sizes
+            if any(n in iters.get(p, {}).get("none", {}) for p in precisions)]
     head = "| Preconditioner | " + " | ".join(
         f"{n}{sup(dim)} ({fmt_points(n ** dim)})" for n in cols) + " |"
     lines = [head, "|" + "---|" * (len(cols) + 1)]
-    for P in ("none", "reference"):
-        cells = " | ".join(
-            (str(iters[P][n]["iters"]) if n in iters.get(P, {}) else "—")
-            for n in cols)
-        lines.append(f"| {P} | {cells} |")
-    cells = []
-    for n in cols:
-        a = iters.get("none", {}).get(n)
-        b = iters.get("reference", {}).get(n)
-        cells.append(f"{a['secs'] / b['secs']:.0f}×" if a and b else "—")
-    lines.append("| **CPU-core wall-time speedup** | " + " | ".join(cells) + " |")
+    for prec in precisions:
+        pi = iters.get(prec, {})
+        suffix = f", {db.PRECISION_LABEL[prec]}" if show_prec else ""
+        for P in ("none", "reference"):
+            cells = " | ".join(
+                (str(pi[P][n]["iters"]) if n in pi.get(P, {}) else "—")
+                for n in cols)
+            lines.append(f"| {P}{suffix} | {cells} |")
+        cells = []
+        for n in cols:
+            a = pi.get("none", {}).get(n)
+            b = pi.get("reference", {}).get(n)
+            cells.append(f"{a['secs'] / b['secs']:.0f}×" if a and b else "—")
+        lines.append(f"| **CPU-core wall-time speedup{suffix}** | "
+                     + " | ".join(cells) + " |")
     return "\n".join(lines)
 
 
@@ -238,17 +255,24 @@ def _cell(res, n):
 
 
 def timing_table(sizes, configs, timing, dim):
-    cols = [n for n in sizes if any(n in timing.get(k, {}) for k, *_ in configs)]
+    precisions = precisions_in(timing)
+    show_prec = len(precisions) > 1
+    cols = [n for n in sizes
+            if any(n in timing.get(p, {}).get(k, {})
+                   for p in precisions for k, *_ in configs)]
     head = ("| Configuration | "
             + " | ".join(f"{n}{sup(dim)} ({fmt_points(n ** dim)})" for n in cols)
             + " |")
     lines = [head, "|" + "---|" * (len(cols) + 1)]
     for key, label, _style in configs:
-        res = timing.get(key)
-        if not res:
-            continue
-        cells = " | ".join(_cell(res, n) for n in cols)
-        lines.append(f"| {label} | {cells} |")
+        for prec in precisions:
+            res = timing.get(prec, {}).get(key)
+            if not res:
+                continue
+            row_label = (f"{label}, {db.PRECISION_LABEL[prec]}" if show_prec
+                         else label)
+            cells = " | ".join(_cell(res, n) for n in cols)
+            lines.append(f"| {row_label} | {cells} |")
     return "\n".join(lines)
 
 
@@ -262,16 +286,24 @@ def make_iter_plot(iters, dim, path):
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
     all_n = set()
-    for P, sty in (
-            ("none", dict(marker="o", color="#c62828",
-                          label="unpreconditioned")),
-            ("reference", dict(marker="s", color="#00897b",
-                               label="reference preconditioner"))):
-        pts = sorted((n, r["iters"]) for n, r in iters.get(P, {}).items())
-        if pts:
+    precisions = precisions_in(iters)
+    show_prec = len(precisions) > 1
+    styles = {"none": dict(marker="o", color="#c62828"),
+              "reference": dict(marker="s", color="#00897b")}
+    names = {"none": "unpreconditioned",
+             "reference": "reference preconditioner"}
+    for prec in precisions:
+        for P in ("none", "reference"):
+            pts = sorted((n, r["iters"])
+                         for n, r in iters.get(prec, {}).get(P, {}).items())
+            if not pts:
+                continue
             xs, ys = zip(*pts)
             all_n.update(xs)
-            ax.loglog(xs, ys, **sty)
+            leg = (f"{names[P]}, {db.PRECISION_LABEL[prec]}" if show_prec
+                   else names[P])
+            ax.loglog(xs, ys, label=leg,
+                      **{**styles[P], **db.PRECISION_STYLE[prec]})
     db.set_grid_size_xaxis(ax, all_n, dim)
     ax.set_ylabel("CG iterations to converge")
     ax.set_title(f"Homogenization ({dim}D, fused): iterations vs. grid size")
@@ -289,15 +321,22 @@ def make_timing_plot(configs, timing, dim, path):
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
     all_n = set()
+    precisions = precisions_in(timing)
+    show_prec = len(precisions) > 1
     for key, label, style in configs:
-        # Only points with a real measured time — OOM points carry no time.
-        pts = sorted((n, r["secs"]) for n, r in timing.get(key, {}).items()
-                     if isinstance(r.get("secs"), (int, float)))
-        if not pts:
-            continue
-        xs, ys = zip(*pts)
-        all_n.update(xs)
-        ax.loglog(xs, ys, label=label, **style)
+        for prec in precisions:
+            res = timing.get(prec, {}).get(key, {})
+            # Only points with a real measured time — OOM points carry no time.
+            pts = sorted((n, r["secs"]) for n, r in res.items()
+                         if isinstance(r.get("secs"), (int, float)))
+            if not pts:
+                continue
+            xs, ys = zip(*pts)
+            all_n.update(xs)
+            leg = (f"{label}, {db.PRECISION_LABEL[prec]}" if show_prec
+                   else label)
+            ax.loglog(xs, ys, label=leg,
+                      **{**style, **db.PRECISION_STYLE[prec]})
     db.set_grid_size_xaxis(ax, all_n, dim)
     ax.set_ylabel("Reference-preconditioned solve time (s)")
     ax.set_title(f"Homogenization ({dim}D, fused, reference prec.): "
@@ -326,6 +365,7 @@ matvec kernel** and are run **to convergence** (relative tolerance `{tol}`).
 
 Run configuration: {dim}D, single spherical inclusion, fused stiffness kernel,
 {ncases} load cases (iterations summed over all cases).
+{precision_note}
 
 ## CG iterations vs. grid size
 
@@ -383,12 +423,24 @@ python examples/benchmark_homogenization_preconditioner.py \\
 """
 
 
+def _precision_note(precisions):
+    """One-line note describing the precision(s) shown, or '' for plain fp64."""
+    if len(precisions) > 1:
+        return ("\nBoth **double** (`fp64`, solid) and **single** (`fp32`, "
+                "dashed) precision are shown; single precision halves the "
+                "resident field memory and the bytes moved per iteration.")
+    if precisions == ["single"]:
+        return "\nAll runs are in **single** precision (`fp32`)."
+    return ""
+
+
 def write_doc_page(path, meta, dim, tol, ncases, iter_table, timing_table,
-                   iter_plot, timing_plot):
+                   iter_plot, timing_plot, precisions):
     with open(path, "w") as fh:
         fh.write(DOC_TEMPLATE.format(
             cpu=meta["cpu"], gpu=meta["gpu"], version=meta["version"],
             timestamp=meta["timestamp"], dim=dim, tol=tol, ncases=ncases,
+            precision_note=_precision_note(precisions),
             iter_table=iter_table, timing_table=timing_table,
             iter_plot=os.path.basename(iter_plot),
             timing_plot=os.path.basename(timing_plot)))
@@ -418,6 +470,11 @@ def main():
                     help="Grid sizes for the none-vs-reference iteration study")
     ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count())
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
+    ap.add_argument("--precision", choices=db.PRECISIONS, default="double",
+                    help="Floating-point precision to MEASURE this run in "
+                         "(recorded per row). Rendering overlays whatever "
+                         "precisions are in the DB — run once per precision to "
+                         "get both curves (default: double)")
     ap.add_argument("--maxiter", type=int, default=20000)
     ap.add_argument("--tol", type=float, default=1e-6)
     ap.add_argument("--studies", nargs="+",
@@ -455,17 +512,20 @@ def main():
     else:
         select_ts = args.timestamp
 
-    # Take the latest run of EACH study independently, so the page combines the
-    # iteration-count study and the timing study even when they were measured by
-    # separate jobs (the two are split across separate submission scripts).
-    rows = db.select_studies(db.load(args.db), BENCHMARK,
-                             ["iterations", "reference_timing"], select_ts)
+    # Take the latest run of EACH study independently and, within a study, of
+    # EACH precision independently — so the page combines the iteration-count
+    # and timing studies AND overlays the fp64 and fp32 curves, even though all
+    # four are measured by separate jobs (separate submission scripts, separate
+    # timestamps).
+    rows = db.select_precisions(db.load(args.db), BENCHMARK,
+                                ["iterations", "reference_timing"], select_ts)
     if not rows:
         sys.exit("No matching rows in the database.")
 
-    # Machine/version box: prefer the (heavier) timing run when present.
+    # Machine/version box: prefer the (heavier) timing run, most recent one.
     meta_rows = [r for r in rows if r["study"] == "reference_timing"] or rows
-    meta = {k: meta_rows[0][k] for k in ("cpu", "gpu", "version", "timestamp")}
+    meta = max(meta_rows, key=lambda r: r["timestamp"])
+    meta = {k: meta[k] for k in ("cpu", "gpu", "version", "timestamp")}
     dim = next((r["dim"] for r in rows), args.dim)
     tol = next((r["tol"] for r in rows if r["study"] == "iterations"), args.tol)
     configs = db.render_configs(rows, "reference_timing")
@@ -477,6 +537,10 @@ def main():
                          dim)
     print("\n" + it_tab + "\n\n" + t_tab)
 
+    # Precisions present anywhere on the page (union of the two studies).
+    precisions = [p for p in db.PRECISIONS
+                  if p in iters or p in timing]
+
     iters_path = os.path.abspath(args.iter_plot)
     time_path = os.path.abspath(args.time_plot)
     make_iter_plot(iters, dim, iters_path)
@@ -486,7 +550,7 @@ def main():
     if args.doc_out:
         write_doc_page(args.doc_out, meta, dim, tol,
                        3 if dim == 2 else 6, it_tab, t_tab,
-                       iters_path, time_path)
+                       iters_path, time_path, precisions)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
 

@@ -69,14 +69,15 @@ def _looks_like_oom(out):
     return out.returncode == -9
 
 
-def run(device, n, maxiter, nranks=1):
+def run(device, n, maxiter, nranks=1, precision="double"):
     """Run one homogenization solve.
 
     Returns a dict of metrics on success, the string ``OOM`` if the run ran out
     of memory, or ``None`` for any other failure.
     """
     base = [HOMOG, "-n", f"{n},{n},{n}", "-d", device, "-k", "fused",
-            "-i", str(maxiter), "--inclusion-type", "single", "--json"]
+            "-i", str(maxiter), "--precision", precision,
+            "--inclusion-type", "single", "--json"]
     if nranks == 1:
         cmd = [sys.executable] + base
         env = os.environ
@@ -122,10 +123,11 @@ def collect(args, prov):
         label = CONFIG_META[key]["label"](nranks)
         cap = args.cpu1_max_size if key == "cpu1" else args.max_size
         for n in [s for s in args.sizes if s <= cap]:
-            r = run(device, n, args.maxiter, nranks)
+            r = run(device, n, args.maxiter, nranks, args.precision)
             base = {**prov, "benchmark": BENCHMARK, "study": "time_vs_size",
                     "label": key, "device": device, "nranks": nranks,
-                    "dim": 3, "n": n, "npts": n ** 3, "maxiter": args.maxiter}
+                    "dim": 3, "n": n, "npts": n ** 3, "maxiter": args.maxiter,
+                    "precision": args.precision}
             if r is None:
                 sys.stderr.write(f"  {label} {n}^3: skipped (run failed)\n")
                 continue
@@ -155,13 +157,19 @@ def fmt_points(npts):
 
 
 def merged_from_rows(rows):
-    """{config_key: {n: {secs, iters, gbps, npts}}}."""
+    """{precision: {config_key: {n: row}}} for the time_vs_size study."""
     d = {}
     for r in rows:
         if r["study"] != "time_vs_size":
             continue
-        d.setdefault(r["label"], {})[r["n"]] = r
+        prec = db.norm_precision(r)
+        d.setdefault(prec, {}).setdefault(r["label"], {})[r["n"]] = r
     return d
+
+
+def precisions_in(merged):
+    """Precisions present in `merged`, in canonical (double, single) order."""
+    return [p for p in db.PRECISIONS if p in merged]
 
 
 def sizes_in(rows, study):
@@ -182,17 +190,25 @@ def _cell(res, n):
 
 
 def table_markdown(sizes, configs, merged):
-    cols = [n for n in sizes if any(n in merged.get(k, {}) for k, *_ in configs)]
+    precisions = precisions_in(merged)
+    show_prec = len(precisions) > 1
+    # Columns: sizes measured by any (config, precision) present.
+    cols = [n for n in sizes
+            if any(n in merged.get(p, {}).get(k, {})
+                   for p in precisions for k, *_ in configs)]
     header = ("| Configuration | "
               + " | ".join(f"{n}³ ({fmt_points(n ** 3)})" for n in cols) + " |")
     sep = "|" + "---|" * (len(cols) + 1)
     lines = [header, sep]
     for key, label, _style in configs:
-        res = merged.get(key)
-        if not res:
-            continue
-        cells = " | ".join(_cell(res, n) for n in cols)
-        lines.append(f"| {label} | {cells} |")
+        for prec in precisions:
+            res = merged.get(prec, {}).get(key)
+            if not res:
+                continue
+            row_label = (f"{label}, {db.PRECISION_LABEL[prec]}" if show_prec
+                         else label)
+            cells = " | ".join(_cell(res, n) for n in cols)
+            lines.append(f"| {row_label} | {cells} |")
     return "\n".join(lines)
 
 
@@ -206,16 +222,22 @@ def make_merged_plot(configs, merged, path):
 
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
     all_n = set()
+    precisions = precisions_in(merged)
+    show_prec = len(precisions) > 1
     for key, label, style in configs:
-        # Only points with a real measured time — OOM points carry no time.
-        pts = sorted((n, merged[key][n]["secs"])
-                     for n in merged.get(key, {})
-                     if isinstance(merged[key][n].get("secs"), (int, float)))
-        if not pts:
-            continue
-        xs, ys = zip(*pts)
-        all_n.update(xs)
-        ax.loglog(xs, ys, label=label, **style)
+        for prec in precisions:
+            res = merged.get(prec, {}).get(key, {})
+            # Only points with a real measured time — OOM points carry no time.
+            pts = sorted((n, res[n]["secs"]) for n in res
+                         if isinstance(res[n].get("secs"), (int, float)))
+            if not pts:
+                continue
+            xs, ys = zip(*pts)
+            all_n.update(xs)
+            leg = (f"{label}, {db.PRECISION_LABEL[prec]}" if show_prec
+                   else label)
+            ax.loglog(xs, ys, label=leg,
+                      **{**style, **db.PRECISION_STYLE[prec]})
     db.set_grid_size_xaxis(ax, all_n, 3)
     ax.set_ylabel("Solve time (s)")
     ax.set_title("Homogenization (3D, fused): time vs. grid size")
@@ -244,6 +266,7 @@ Run configuration: 3D single spherical inclusion, fused stiffness kernel,
 6 load cases, fixed `{maxiter}` CG iterations per load case — i.e. a **fixed work
 budget** so every configuration performs identical arithmetic. Times are the
 solver wall time (`total_time_seconds`, excluding setup).
+{precision_note}
 
 ## Time vs. grid size
 
@@ -289,7 +312,19 @@ python examples/benchmark_homogenization.py \\
 """
 
 
-def write_doc_page(path, plot_path, table, meta, ncores, cpu1_max, multi_gpu):
+def _precision_note(precisions):
+    """One-line note describing the precision(s) shown, or '' for plain fp64."""
+    if len(precisions) > 1:
+        return ("\nBoth **double** (`fp64`, solid) and **single** (`fp32`, "
+                "dashed) precision are shown; single precision halves the "
+                "resident field memory and the bytes moved per iteration.")
+    if precisions == ["single"]:
+        return "\nAll runs are in **single** precision (`fp32`)."
+    return ""
+
+
+def write_doc_page(path, plot_path, table, meta, ncores, cpu1_max, multi_gpu,
+                   precisions):
     if multi_gpu:
         gpu_mpi_bullet = ("- **GPU (N devices, MPI)** — several GPUs via MPI "
                           "domain decomposition, one rank per device "
@@ -301,6 +336,7 @@ def write_doc_page(path, plot_path, table, meta, ncores, cpu1_max, multi_gpu):
             cpu=meta["cpu"], gpu=meta["gpu"], version=meta["version"],
             timestamp=meta["timestamp"], table=table, maxiter=meta["maxiter"],
             ncores=ncores, cpu1_max=cpu1_max, gpu_mpi_bullet=gpu_mpi_bullet,
+            precision_note=_precision_note(precisions),
             plot_name=os.path.basename(plot_path)))
 
 
@@ -325,6 +361,11 @@ def main():
     ap.add_argument("--mpi-cpu-ranks", type=int, default=os.cpu_count(),
                     help="Ranks for the full-machine MPI CPU curve")
     ap.add_argument("--no-gpu", action="store_true", help="Skip the GPU curves")
+    ap.add_argument("--precision", choices=db.PRECISIONS, default="double",
+                    help="Floating-point precision to MEASURE this run in "
+                         "(recorded per row). Rendering overlays whatever "
+                         "precisions are in the DB — run this once per precision "
+                         "to get both curves (default: double)")
     ap.add_argument("--maxiter", type=int, default=100)
     ap.add_argument("--collect-only", action="store_true",
                     help="Measure and append to the database, then stop "
@@ -354,11 +395,16 @@ def main():
     else:
         select_ts = args.timestamp
 
-    rows = db.select(db.load(args.db), BENCHMARK, select_ts)
+    # Latest run PER PRECISION, so the page overlays the fp64 and fp32 curves
+    # even though they are measured by separate jobs (separate timestamps).
+    rows = db.select_precisions(db.load(args.db), BENCHMARK,
+                                ["time_vs_size"], select_ts)
     if not rows:
         sys.exit("No matching rows in the database.")
 
-    meta = {k: rows[0][k] for k in ("cpu", "gpu", "version", "timestamp")}
+    # Machine/version box from the most recent run among the precisions shown.
+    meta_row = max(rows, key=lambda r: r["timestamp"])
+    meta = {k: meta_row[k] for k in ("cpu", "gpu", "version", "timestamp")}
     meta["maxiter"] = next((r["maxiter"] for r in rows
                             if r["study"] == "time_vs_size"), args.maxiter)
     configs = db.render_configs(rows, "time_vs_size")
@@ -370,6 +416,7 @@ def main():
                    default=args.cpu1_max_size)
 
     sizes = sizes_in(rows, "time_vs_size")
+    precisions = precisions_in(merged)
     table = table_markdown(sizes, configs, merged)
     print("\n" + table)
 
@@ -379,7 +426,7 @@ def main():
 
     if args.doc_out:
         write_doc_page(args.doc_out, plot_out, table, meta, ncores, cpu1_max,
-                       multi_gpu)
+                       multi_gpu, precisions)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
 
