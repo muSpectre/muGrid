@@ -460,6 +460,26 @@ namespace muGrid {
                                                      E_macro);
         }
 
+        //! Assemble the diagonal of the system matrix, diag(K), into the nodal
+        //! field @p diagonal (same shape as displacement/force). This is the
+        //! Jacobi preconditioner ingredient of the Green-Jacobi (J-FFT) scheme:
+        //! since K = 2μ G + λ V per element, the nodal diagonal is
+        //! Σ_e (2μ_e G[r,r] + λ_e V[r,r]) with r the node's local DOF in each
+        //! incident element — exactly the macro-RHS assembly with the constant
+        //! per-element vectors replaced by the diagonals of G and V, so it
+        //! reuses the same fused (host/GPU, MPI-gather) kernel.
+        void assemble_diagonal(const TypedFieldBase<Real> & lambda,
+                               const TypedFieldBase<Real> & mu,
+                               TypedFieldBase<Real> & diagonal) const {
+            this->assemble_diagonal_impl<Real>(lambda, mu, diagonal);
+        }
+        //! Single-precision (Real32) overload of assemble_diagonal.
+        void assemble_diagonal(const TypedFieldBase<Real32> & lambda,
+                               const TypedFieldBase<Real32> & mu,
+                               TypedFieldBase<Real32> & diagonal) const {
+            this->assemble_diagonal_impl<Real32>(lambda, mu, diagonal);
+        }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // ---- Device interface (host- and single-precision) ----
         // DSpace shorthand for the device-field overloads below.
@@ -545,6 +565,18 @@ namespace muGrid {
                        const std::array<Real, Dim * Dim> & E_macro) const {
             return this->average_stress_impl<Real32>(displacement, lambda, mu,
                                                      E_macro);
+        }
+
+        //! Device counterpart of assemble_diagonal (see the host overload).
+        void assemble_diagonal(const DField<Real> & lambda,
+                               const DField<Real> & mu,
+                               DField<Real> & diagonal) const {
+            this->assemble_diagonal_impl<Real>(lambda, mu, diagonal);
+        }
+        void assemble_diagonal(const DField<Real32> & lambda,
+                               const DField<Real32> & mu,
+                               DField<Real32> & diagonal) const {
+            this->assemble_diagonal_impl<Real32>(lambda, mu, diagonal);
         }
 #endif
 
@@ -714,6 +746,13 @@ namespace muGrid {
                             const TypedFieldBase<T> & mu,
                             const std::array<Real, Dim * Dim> & E_macro) const;
 
+        //! Host diagonal assembly (dimension-specific; explicit specialization
+        //! in isotropic_stiffness_{2,3}d.cc).
+        template <typename T>
+        void assemble_diagonal_impl(const TypedFieldBase<T> & lambda,
+                                    const TypedFieldBase<T> & mu,
+                                    TypedFieldBase<T> & diagonal) const;
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // The geometry matrices (G/V/Dbar/Gu/Vu/E_macro) live in double
         // __constant__ memory and stay double; the kernels cast them to T at
@@ -753,6 +792,14 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
             const TypedFieldBase<T, DefaultDeviceSpace> & mu,
             const std::array<Real, Dim * Dim> & E_macro) const;
+
+        //! Device diagonal assembly (explicit specialization in
+        //! isotropic_stiffness_gpu.cc).
+        template <typename T>
+        void assemble_diagonal_impl(
+            const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<T, DefaultDeviceSpace> & mu,
+            TypedFieldBase<T, DefaultDeviceSpace> & diagonal) const;
 #endif
     };
 
@@ -789,7 +836,11 @@ namespace muGrid {
     std::array<Real, D * D>                                                    \
     IsotropicStiffnessOperator<D>::average_stress_impl(                        \
         const TFB &, const TFB &, const TFB &,                                 \
-        const std::array<Real, D * D> &) const;
+        const std::array<Real, D * D> &) const;                                \
+    template <>                                                                \
+    template <typename T>                                                      \
+    void IsotropicStiffnessOperator<D>::assemble_diagonal_impl(                \
+        const TFB &, const TFB &, TFB &) const;
 
     template <>
     void IsotropicStiffnessOperator<2>::precompute_matrices();

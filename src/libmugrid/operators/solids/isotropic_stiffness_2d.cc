@@ -330,6 +330,59 @@ namespace muGrid {
 
     template <>
     template <typename T>
+    void IsotropicStiffnessOperator<2>::assemble_diagonal_impl(
+        const TypedFieldBase<T> & lambda, const TypedFieldBase<T> & mu,
+        TypedFieldBase<T> & diagonal) const {
+
+        // diag(K) = Σ_e (2μ_e diag(G) + λ_e diag(V)); this is the macro-RHS
+        // gather with the constant per-element vectors Gu, Vu replaced by the
+        // diagonals of the element matrices G, V. The diagonal field plays the
+        // role of the node (force) field.
+        const auto info = internal::validate_stiffness_fields<2>(
+            diagonal.get_collection(), lambda.get_collection());
+        const auto * node_global_fc = info.disp_fc;
+        const auto * mat_global_fc = info.mat_fc;
+
+        const Index_t nnx = info.nb_computable[0];
+        const Index_t nny = info.nb_computable[1];
+        constexpr Index_t STENCIL_LEFT = 1;
+
+        auto nb_nodes = node_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t nx = nb_nodes[0];
+        auto mat_nb = mat_global_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        Index_t mat_nx = mat_nb[0];
+
+        Index_t mat_stride_x = 1;
+        Index_t mat_stride_y = mat_nx;
+        Index_t force_stride_d = 1;
+        Index_t force_stride_x = NB_DOFS_PER_NODE;
+        Index_t force_stride_y = NB_DOFS_PER_NODE * nx;
+
+        Index_t force_offset =
+            STENCIL_LEFT * force_stride_x + STENCIL_LEFT * force_stride_y;
+        Index_t mat_offset =
+            STENCIL_LEFT * mat_stride_x + STENCIL_LEFT * mat_stride_y;
+
+        // Diagonals of the element matrices (only the first NB_ELEMENT_DOFS
+        // entries are read by the macro-RHS kernel, indexed by local DOF row).
+        ElementMatrix Gd{}, Vd{};
+        for (Index_t r = 0; r < NB_ELEMENT_DOFS; ++r) {
+            Gd[r] = G_matrix[r * NB_ELEMENT_DOFS + r];
+            Vd[r] = V_matrix[r * NB_ELEMENT_DOFS + r];
+        }
+        std::array<T, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS> Gd_s, Vd_s;
+        const T * Gd_ptr = geometry_as<T>(Gd, Gd_s);
+        const T * Vd_ptr = geometry_as<T>(Vd, Vd_s);
+
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_macro_rhs<T>(
+            lambda.data() + mat_offset, mu.data() + mat_offset,
+            diagonal.data() + force_offset, nnx, nny, mat_stride_x,
+            mat_stride_y, force_stride_x, force_stride_y, force_stride_d,
+            Gd_ptr, Vd_ptr, static_cast<T>(1), false);
+    }
+
+    template <>
+    template <typename T>
     std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
         const TypedFieldBase<T> & displacement,
         const TypedFieldBase<T> & lambda, const TypedFieldBase<T> & mu,
@@ -707,7 +760,10 @@ namespace muGrid {
     template std::array<Real, 4>                                               \
     IsotropicStiffnessOperator<2>::average_stress_impl<T>(                     \
         const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
-        const TypedFieldBase<T> &, const std::array<Real, 4> &) const;
+        const TypedFieldBase<T> &, const std::array<Real, 4> &) const;         \
+    template void IsotropicStiffnessOperator<2>::assemble_diagonal_impl<T>(    \
+        const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
+        TypedFieldBase<T> &) const;
     MUGRID_INSTANTIATE_STIFFNESS_2D(Real)
     MUGRID_INSTANTIATE_STIFFNESS_2D(Real32)
 #undef MUGRID_INSTANTIATE_STIFFNESS_2D

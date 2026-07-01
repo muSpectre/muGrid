@@ -4,6 +4,14 @@ Change log for µGrid
 Unreleased
 ----------
 
+- ENH: Added the Green-Jacobi (J-FFT) preconditioner of Ladecký et al. for
+  FFT-accelerated FE homogenization: `GreenJacobiPreconditioner` and
+  `make_green_jacobi_preconditioner` wrap the reference-material (Green) Fourier
+  preconditioner in a symmetric Jacobi scaling `J^{1/2} G J^{1/2}`, restoring fast
+  CG convergence on smooth high-contrast (e.g. phase-field topology-optimization)
+  data where plain Green degrades. The Jacobi diagonal `diag(K)` is built by a new
+  fused `IsotropicStiffnessOperator.assemble_diagonal` kernel (host + GPU, MPI-aware)
+  that reuses the macro-RHS gather with the element-matrix diagonals of `G`/`V`
 - ENH: Single-precision support — added `Real32`/`Complex32` scalar types to the type
   registry (MPI, NetCDF); fields can now be hosted in `float`/`complex<float>` and are
   exposed via `register_real32_field`/`register_complex32_field` with zero-copy DLPack

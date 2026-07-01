@@ -439,6 +439,109 @@ class BlockFourierPreconditioner(Preconditioner):
             engine.ifft(work, z)
 
 
+class GreenJacobiPreconditioner(Preconditioner):
+    r"""
+    Green-Jacobi preconditioner ``z = J^{1/2} G J^{1/2} r`` — the J-FFT scheme
+    of Ladecký et al. ("Jacobi-accelerated FFT-based solver for smooth
+    high-contrast data").
+
+    The standard Green's-function (reference-material) preconditioner ``G`` is a
+    *global*, spatially-uniform approximation of the inverse operator, applied in
+    Fourier space. Its conditioning degrades when the material data is smoothly
+    varying at high contrast — exactly the regime of phase-field topology
+    optimization, grid adaptation, and nonlinear effective moduli — where the
+    Green-preconditioned spectrum spreads out. Scaling ``G`` symmetrically by the
+    *local* Jacobi diagonal ``J = diag(K)^{-1}`` of the actual (heterogeneous)
+    system matrix re-clusters the spectrum around one and restores fast CG
+    convergence, while keeping the ``O(N log N)`` cost of the FFT-based apply.
+
+    The symmetric split ``J^{1/2} G J^{1/2}`` keeps ``M⁻¹`` symmetric
+    positive-definite (``G`` is SPD on the non-rigid-body subspace and
+    ``J^{1/2}`` is a positive diagonal), so plain PCG remains valid.
+
+    Parameters
+    ----------
+    green : Preconditioner or callable
+        The inner Green's-function preconditioner (e.g. the result of
+        :func:`make_reference_stiffness_preconditioner`). Any object with an
+        ``apply(r, z)`` / ``__call__(r, z)`` computing ``z = G r`` works.
+    diagonal : muGrid.Field
+        The diagonal ``diag(K)`` of the actual system matrix, as a field on the
+        solver's (real-space) collection with the same component shape as the
+        solver fields. Typically assembled with
+        :meth:`IsotropicStiffnessOperator.assemble_diagonal`. Zero (or
+        non-positive) entries — e.g. true void — are treated as
+        ``J^{1/2} = 1``; those degrees of freedom carry no stiffness and do not
+        couple, so the replacement value does not affect the solution.
+    void_tol : float, optional
+        Diagonal entries ``<= void_tol`` are treated as void (``J^{1/2} = 1``).
+        Default ``0.0``.
+    name : str, optional
+        Prefix for the ``J^{1/2}`` and scratch work fields.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records the inner Green apply ("green") and the
+        two diagonal scalings ("scale").
+    """
+
+    def __init__(self, green, diagonal, void_tol=0.0,
+                 name="green-jacobi-preconditioner", timer=None):
+        self._green = green
+        self._name = name
+        self._timer = timer
+        self._void_tol = float(void_tol)
+        self._jhalf = None
+        self._work = None
+        self.update_diagonal(diagonal)
+
+    def _timed(self, name):
+        return self._timer(name) if self._timer is not None else nullcontext()
+
+    def update_diagonal(self, diagonal):
+        r"""(Re)compute ``J^{1/2} = diag(K)^{-1/2}`` from a freshly assembled
+        diagonal field. Call this whenever the material (and hence the system
+        matrix) changes, e.g. once per optimization or Newton step; the inner
+        Green preconditioner, built from spatially uniform reference data, does
+        not change and is reused."""
+        s = diagonal.s
+        vals = s.get() if hasattr(s, "get") else np.asarray(s)
+        positive = vals > self._void_tol
+        # Guard the sqrt against void/roundoff-negative entries; those DOFs get
+        # J^{1/2} = 1 via the where() below regardless of the safe denominator.
+        safe = np.where(positive, vals, 1.0)
+        jhalf = np.where(positive, 1.0 / np.sqrt(safe), 1.0)
+        if self._jhalf is None:
+            self._jhalf = wrap_field(
+                diagonal.collection.real_field(
+                    f"{self._name}-jhalf", tuple(diagonal.components_shape)
+                )
+            )
+        # Zero the ghosts (as JacobiPreconditioner does); only the interior
+        # participates in the CG inner products.
+        self._jhalf.set_zero()
+        _fill_field(self._jhalf, jhalf)
+
+    def _work_field(self, r):
+        if self._work is None:
+            self._work = wrap_field(
+                r.collection.real_field(
+                    f"{self._name}-work", tuple(r.components_shape)
+                )
+            )
+            self._work.set_zero()
+        return self._work
+
+    def apply(self, r, z):
+        r"""Compute ``z = J^{1/2} G ( J^{1/2} r )``."""
+        w = self._work_field(r)
+        with self._timed("scale"):
+            linalg.copy(r, w)
+            linalg.scal(self._jhalf, w)  # w = J^{1/2} r
+        with self._timed("green"):
+            self._green.apply(w, z)  # z = G w
+        with self._timed("scale"):
+            linalg.scal(self._jhalf, z)  # z = J^{1/2} z
+
+
 def make_reference_stiffness_preconditioner(
     engine,
     apply_reference_stiffness,
@@ -561,3 +664,114 @@ def make_reference_stiffness_preconditioner(
     del impulse, column, column_hat
 
     return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer)
+
+
+def make_green_jacobi_preconditioner(
+    engine,
+    stiffness_op,
+    lambda_field,
+    mu_field,
+    nb_components,
+    reference_lambda=None,
+    reference_mu=None,
+    void_tol=0.0,
+    name="green-jacobi-preconditioner",
+    timer=None,
+):
+    r"""
+    Assemble the Green-Jacobi (J-FFT) preconditioner for FFT-accelerated FE
+    homogenization with the fused :class:`IsotropicStiffnessOperator`.
+
+    This wires together the two ingredients of
+    :class:`GreenJacobiPreconditioner`:
+
+    * the Green's-function (reference-material) preconditioner ``G``, built from
+      the operator's spatially-uniform reference stiffness
+      (:meth:`IsotropicStiffnessOperator.apply_uniform`) via
+      :func:`make_reference_stiffness_preconditioner`; and
+    * the Jacobi diagonal ``diag(K)`` of the actual heterogeneous system matrix,
+      assembled by the fused
+      :meth:`IsotropicStiffnessOperator.assemble_diagonal` kernel (host/GPU,
+      MPI-aware).
+
+    The reference Lamé parameters default to the volume means of the supplied
+    ``lambda_field`` / ``mu_field`` (a common, robust choice). The returned
+    preconditioner exposes :meth:`GreenJacobiPreconditioner.update_diagonal`
+    (and the convenience :meth:`refresh` below) to recompute the Jacobi part
+    when the material changes across optimization/Newton steps; the Green part
+    is reference-only and is reused unchanged.
+
+    Parameters
+    ----------
+    engine : muGrid.FFTEngine
+        FFT engine; its real-space collection holds the solver fields.
+    stiffness_op : IsotropicStiffnessOperator2D or 3D
+        The fused stiffness operator (also the system matrix of the solve).
+    lambda_field, mu_field : muGrid.Field
+        Per-pixel Lamé fields of the actual material (with ghosts filled), on a
+        collection whose computable region matches ``engine.real_space_collection``.
+    nb_components : int
+        Degrees of freedom per node (``dim`` for one node per pixel).
+    reference_lambda, reference_mu : float, optional
+        Uniform reference Lamé parameters for the Green part. Default: the local
+        means of ``lambda_field`` / ``mu_field`` (not MPI-reduced; pass explicit
+        values for a deterministic reference under domain decomposition).
+    void_tol : float, optional
+        Passed to :class:`GreenJacobiPreconditioner`.
+    name : str, optional
+        Prefix for the managed fields.
+    timer : muTimer.Timer, optional
+        Forwarded to both sub-preconditioners.
+
+    Returns
+    -------
+    GreenJacobiPreconditioner
+        Ready to pass as ``prec=`` to
+        :func:`muGrid.Solvers.conjugate_gradients`, with a ``refresh()`` method
+        bound for in-place material updates.
+    """
+    n = int(nb_components)
+
+    if reference_lambda is None:
+        lam_s = lambda_field.s
+        reference_lambda = float(
+            (lam_s.get() if hasattr(lam_s, "get") else np.asarray(lam_s)).mean()
+        )
+    if reference_mu is None:
+        mu_s = mu_field.s
+        reference_mu = float(
+            (mu_s.get() if hasattr(mu_s, "get") else np.asarray(mu_s)).mean()
+        )
+
+    def apply_reference_stiffness(u, f):
+        engine.communicate_ghosts(u)
+        stiffness_op.apply_uniform(u, reference_lambda, reference_mu, f)
+
+    green = make_reference_stiffness_preconditioner(
+        engine, apply_reference_stiffness, n, name=f"{name}-green", timer=timer
+    )
+
+    diagonal = engine.real_space_field(f"{name}-diagonal", components=(n,))
+    stiffness_op.assemble_diagonal(lambda_field, mu_field, diagonal)
+
+    prec = GreenJacobiPreconditioner(
+        green, diagonal, void_tol=void_tol, name=name, timer=timer
+    )
+
+    # Keep the ingredients so the Jacobi part can be recomputed in place when
+    # the material changes (the Green part is reference-only and stays fixed).
+    prec._stiffness_op = stiffness_op
+    prec._lambda_field = lambda_field
+    prec._mu_field = mu_field
+    prec._diagonal = diagonal
+
+    def refresh():
+        """Re-assemble diag(K) from the (updated) material fields and refresh
+        J^{1/2}. Call after changing ``lambda_field`` / ``mu_field`` in place."""
+        stiffness_op.assemble_diagonal(
+            prec._lambda_field, prec._mu_field, prec._diagonal
+        )
+        prec.update_diagonal(prec._diagonal)
+
+    prec.refresh = refresh
+    return prec

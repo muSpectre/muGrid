@@ -1249,6 +1249,95 @@ void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
 
 template <>
 template <typename T>
+void IsotropicStiffnessOperator<2>::assemble_diagonal_impl(
+    const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
+    const TypedFieldBase<T, DefaultDeviceSpace> & mu,
+    TypedFieldBase<T, DefaultDeviceSpace> & diagonal) const {
+
+    // diag(K) = Σ_e (2μ_e diag(G) + λ_e diag(V)): the macro-RHS gather with the
+    // per-element vectors replaced by the diagonals of G, V (see the host impl).
+    const auto info = internal::validate_stiffness_fields<2>(
+        diagonal.get_collection(), lambda.get_collection());
+    const auto * node_fc = info.disp_fc;
+    const auto * mat_fc = info.mat_fc;
+    const Index_t nnx = info.nb_computable[0];
+    const Index_t nny = info.nb_computable[1];
+    constexpr Index_t STENCIL_LEFT = 1;
+
+    auto wg = node_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    auto mwg = mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nx = wg[0], ny = wg[1];
+    Index_t mat_nx = mwg[0];
+
+    // SoA layout: [d, x, y]
+    Index_t force_stride_d = nx * ny, force_stride_x = 1, force_stride_y = nx;
+    Index_t mat_stride_x = 1, mat_stride_y = mat_nx;
+    Index_t force_offset =
+        STENCIL_LEFT * force_stride_x + STENCIL_LEFT * force_stride_y;
+    Index_t mat_offset =
+        STENCIL_LEFT * mat_stride_x + STENCIL_LEFT * mat_stride_y;
+
+    ElementMatrix Gd{}, Vd{};
+    for (Index_t r = 0; r < NB_ELEMENT_DOFS; ++r) {
+        Gd[r] = G_matrix[r * NB_ELEMENT_DOFS + r];
+        Vd[r] = V_matrix[r * NB_ELEMENT_DOFS + r];
+    }
+
+    isotropic_stiffness_kernels::isotropic_stiffness_2d_gpu_macro_rhs<T>(
+        lambda.view().data() + mat_offset, mu.view().data() + mat_offset,
+        diagonal.view().data() + force_offset, nnx, nny, mat_stride_x,
+        mat_stride_y, force_stride_x, force_stride_y, force_stride_d, Gd.data(),
+        Vd.data(), static_cast<T>(1), false);
+}
+
+template <>
+template <typename T>
+void IsotropicStiffnessOperator<3>::assemble_diagonal_impl(
+    const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
+    const TypedFieldBase<T, DefaultDeviceSpace> & mu,
+    TypedFieldBase<T, DefaultDeviceSpace> & diagonal) const {
+
+    const auto info = internal::validate_stiffness_fields<3>(
+        diagonal.get_collection(), lambda.get_collection());
+    const auto * node_fc = info.disp_fc;
+    const auto * mat_fc = info.mat_fc;
+    const Index_t nnx = info.nb_computable[0];
+    const Index_t nny = info.nb_computable[1];
+    const Index_t nnz = info.nb_computable[2];
+    constexpr Index_t STENCIL_LEFT = 1;
+
+    auto wg = node_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    auto mwg = mat_fc->get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t nx = wg[0], ny = wg[1], nz = wg[2];
+    Index_t mat_nx = mwg[0], mat_ny = mwg[1];
+
+    Index_t force_stride_d = nx * ny * nz, force_stride_x = 1,
+            force_stride_y = nx, force_stride_z = nx * ny;
+    Index_t mat_stride_x = 1, mat_stride_y = mat_nx,
+            mat_stride_z = mat_nx * mat_ny;
+    Index_t force_offset = STENCIL_LEFT * force_stride_x +
+                           STENCIL_LEFT * force_stride_y +
+                           STENCIL_LEFT * force_stride_z;
+    Index_t mat_offset = STENCIL_LEFT * mat_stride_x +
+                         STENCIL_LEFT * mat_stride_y +
+                         STENCIL_LEFT * mat_stride_z;
+
+    ElementMatrix Gd{}, Vd{};
+    for (Index_t r = 0; r < NB_ELEMENT_DOFS; ++r) {
+        Gd[r] = G_matrix[r * NB_ELEMENT_DOFS + r];
+        Vd[r] = V_matrix[r * NB_ELEMENT_DOFS + r];
+    }
+
+    isotropic_stiffness_kernels::isotropic_stiffness_3d_gpu_macro_rhs<T>(
+        lambda.view().data() + mat_offset, mu.view().data() + mat_offset,
+        diagonal.view().data() + force_offset, nnx, nny, nnz, mat_stride_x,
+        mat_stride_y, mat_stride_z, force_stride_x, force_stride_y,
+        force_stride_z, force_stride_d, Gd.data(), Vd.data(),
+        static_cast<T>(1), false);
+}
+
+template <>
+template <typename T>
 std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & displacement,
     const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
@@ -1353,7 +1442,11 @@ std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
         const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
         const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
         const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
-        const std::array<Real, D * D> &) const;
+        const std::array<Real, D * D> &) const;                                \
+    template void IsotropicStiffnessOperator<D>::assemble_diagonal_impl<T>(    \
+        const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
+        const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
+        TypedFieldBase<T, DefaultDeviceSpace> &) const;
     MUGRID_INSTANTIATE_STIFFNESS_GPU(2, Real)
     MUGRID_INSTANTIATE_STIFFNESS_GPU(3, Real)
     MUGRID_INSTANTIATE_STIFFNESS_GPU(2, Real32)
