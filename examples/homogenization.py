@@ -284,6 +284,16 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--precision",
+    choices=["double", "single"],
+    default="double",
+    help="Floating-point precision for all solver fields: 'double' (float64) or "
+    "'single' (float32). Single precision halves the per-field memory and is "
+    "selected purely through the field dtype -- the fused operator, the linalg "
+    "primitives and the CG solver all pick it up from the fields (default: double)",
+)
+
+parser.add_argument(
     "-P",
     "--preconditioner",
     choices=["none", "reference"],
@@ -336,6 +346,12 @@ if args.profile_memory:
 dim = len(args.nb_grid_pts)
 if dim not in (2, 3):
     raise ValueError("Only 2D and 3D grids are supported")
+
+# Solver-field precision. Single precision is selected purely through the field
+# dtype: every field below is created with `dtype=dtype`, and the fused operator,
+# the CG solver and (for the reference preconditioner) the FFT engine all pick up
+# the precision from the fields they are handed -- no separate code path.
+dtype = np.float32 if args.precision == "single" else np.float64
 
 # Physical domain size (unit cell)
 domain_size = np.ones(dim)
@@ -425,6 +441,7 @@ if not args.quiet:
     parprint(f"Dimensions: {dim}D", comm=comm)
     parprint(f"Grid spacing: {grid_spacing}", comm=comm)
     parprint(f"Device: {device.device_string}", comm=comm)
+    parprint(f"Precision: {args.precision} ({np.dtype(dtype).name})", comm=comm)
     parprint(f"Number of quadrature points per pixel: {nb_quad}", comm=comm)
     parprint(f"Number of nodal points per pixel: {nb_nodes}", comm=comm)
     parprint(f"Quadrature weights: {quad_weights}", comm=comm)
@@ -451,19 +468,19 @@ if not args.quiet:
 # allocated only for the generic correctness-reference kernel.
 if args.kernel == "generic":
     grad_u = fc.real_field(
-        "grad_u", (dim, dim), "quad"
+        "grad_u", (dim, dim), "quad", dtype=dtype
     )  # displacement gradient tensor
     stress_field = fc.real_field(
-        "stress_field", (dim, dim), "quad"
+        "stress_field", (dim, dim), "quad", dtype=dtype
     )  # stress tensor
 else:
     grad_u = None
     stress_field = None
 
 # Vector fields for CG solver (displacement and force vectors)
-u_field = fc.real_field("u_field", (dim,))
-f_field = fc.real_field("f_field", (dim,))
-rhs_field = fc.real_field("rhs_field", (dim,))
+u_field = fc.real_field("u_field", (dim,), dtype=dtype)
+f_field = fc.real_field("f_field", (dim,), dtype=dtype)
+rhs_field = fc.real_field("rhs_field", (dim,), dtype=dtype)
 
 # Material stiffness at each quadrature point [voigt, voigt, quad, *grid].
 # The full C tensor (nb_voigt² × nb_quad per pixel) is only needed for the
@@ -487,8 +504,8 @@ if need_C_tensor:
                 C_field_np[i, j, q] = (
                     C_matrix[i, j] * (1 - phase) + C_inclusion[i, j] * phase
                 )
-    # Convert to device array if using GPU
-    C_field = arr.asarray(C_field_np)
+    # Convert to device array if using GPU (in the solver precision)
+    C_field = arr.asarray(C_field_np.astype(dtype))
 else:
     C_field_np = None
     C_field = None
@@ -508,8 +525,8 @@ if args.kernel == "fused":
     # so the fast fused matvec works together with the preconditioner — and it
     # stays consistent under MPI, where the FFTEngine's decomposition would not
     # match a separately constructed CartesianDecomposition.
-    lambda_field = fc.real_field("lambda")
-    mu_field = fc.real_field("mu")
+    lambda_field = fc.real_field("lambda", dtype=dtype)
+    mu_field = fc.real_field("mu", dtype=dtype)
 
     # Set spatially varying material properties based on phase
     # Phase is defined at grid points, element properties taken at grid points
@@ -1094,8 +1111,11 @@ apply_lups = (
 # - FEM gradient: reads neighbor values, writes gradient
 # - Stress computation: reads strain, writes stress
 # - Divergence: reads stress, writes force
-# Approximate: 2 * dim * dim * nb_quad + dim values per grid point, 8 bytes each
-bytes_per_call = nb_grid_pts_total * (2 * dim * dim * nb_quad + dim) * 8
+# Approximate: 2 * dim * dim * nb_quad + dim values per grid point, each of the
+# solver precision (8 bytes for double, 4 for single).
+bytes_per_call = (
+    nb_grid_pts_total * (2 * dim * dim * nb_quad + dim) * np.dtype(dtype).itemsize
+)
 total_bytes = nb_stiffness_calls * bytes_per_call
 memory_throughput = total_bytes / elapsed_time if elapsed_time > 0 else 0
 
@@ -1141,6 +1161,7 @@ if args.json:
             "volume_fraction": float(v_f),
             "kernel": args.kernel,
             "preconditioner": args.preconditioner,
+            "precision": args.precision,
         },
         "results": {
             "total_cg_iterations": int(total_iterations),
