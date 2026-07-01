@@ -101,13 +101,21 @@ parser.add_argument(
 parser.add_argument(
     "--json",
     action="store_true",
-    help="Output results in JSON format (implies --quiet)",
+    help="Output results in JSON format on stdout (implies --quiet)",
+)
+
+parser.add_argument(
+    "--json-out",
+    default=None,
+    metavar="FILE",
+    help="Write the JSON results to FILE (rank 0 only). Robust alternative to "
+    "scraping stdout; implies --quiet",
 )
 
 args = parser.parse_args()
 
-# JSON implies quiet mode
-if args.json:
+# JSON output (to stdout or a file) implies quiet mode
+if args.json or args.json_out:
     args.quiet = True
 
 if args.device == "cpu":
@@ -357,7 +365,7 @@ apply_flops_rate = (
 # meaningful, so they are omitted from the output.
 report_estimates = args.preconditioner == "none"
 
-if args.json:
+if args.json or args.json_out:
     # JSON output (convert numpy types to Python types for JSON serialization)
     # Timer's to_dict() includes PAPI data when available
     results = {
@@ -406,7 +414,12 @@ if args.json:
         },
         "timing": timer.to_dict(),
     }
-    parprint(json.dumps(results, indent=2), comm=comm)
+    payload = json.dumps(results, indent=2)
+    if args.json:
+        parprint(payload, comm=comm)
+    if args.json_out and comm.rank == 0:
+        with open(args.json_out, "w") as fh:
+            fh.write(payload)
 else:
     # Text output
     parprint(f"\n{'='*60}", comm=comm)

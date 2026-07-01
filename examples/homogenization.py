@@ -256,7 +256,15 @@ parser.add_argument(
 parser.add_argument(
     "--json",
     action="store_true",
-    help="Output results in JSON format (implies --quiet)",
+    help="Output results in JSON format on stdout (implies --quiet)",
+)
+
+parser.add_argument(
+    "--json-out",
+    default=None,
+    metavar="FILE",
+    help="Write the JSON results to FILE (rank 0 only). Robust alternative to "
+    "scraping stdout; implies --quiet",
 )
 
 parser.add_argument(
@@ -307,8 +315,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-# JSON implies quiet mode
-if args.json:
+# JSON output (to stdout or a file) implies quiet mode
+if args.json or args.json_out:
     args.quiet = True
 
 # Select array library based on memory location
@@ -1142,7 +1150,7 @@ E_voigt = v_f * E_i + (1 - v_f) * E_m
 E_reuss = 1.0 / (v_f / E_i + (1 - v_f) / E_m)
 E_eff_approx = C_eff[0, 0] * (1 - nu**2)
 
-if args.json:
+if args.json or args.json_out:
     # JSON output
     # Timer's to_dict() includes PAPI data when available
     results = {
@@ -1188,7 +1196,12 @@ if args.json:
         },
         "timing": timer.to_dict(),
     }
-    parprint(json.dumps(results, indent=2), comm=comm)
+    payload = json.dumps(results, indent=2)
+    if args.json:
+        parprint(payload, comm=comm)
+    if args.json_out and comm.rank == 0:
+        with open(args.json_out, "w") as fh:
+            fh.write(payload)
 else:
     # Text output
     parprint("\n" + "=" * 60, comm=comm)

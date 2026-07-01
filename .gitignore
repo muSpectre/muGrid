@@ -39,6 +39,10 @@
 
 .venv
 
+# Benchmark per-point result cache (regenerable; the committed results.csv is
+# the aggregate — see benchmarks/README.md)
+/benchmarks/cache/
+
 # Agents
 AGENTS.md
 CLAUDE.md

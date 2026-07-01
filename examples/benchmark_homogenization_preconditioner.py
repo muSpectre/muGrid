@@ -34,10 +34,13 @@ Examples
 """
 
 import argparse
+import concurrent.futures
+import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import benchmark_db as db  # noqa: E402
@@ -56,8 +59,9 @@ _OOM_PATTERNS = re.compile(
     r"cudaErrorMemoryAllocation|CUDA_ERROR_OUT_OF_MEMORY|hipErrorOutOfMemory|"
     r"hipErrorMemoryAllocation|failed to allocate", re.IGNORECASE)
 
-# Sentinel returned by run() when a data point ran out of memory.
-OOM = "oom"
+# Sentinel returned by run() when a data point ran out of memory (shared with the
+# cache, which stores the OOM outcome so a resubmit does not re-attempt it).
+OOM = db.OOM
 
 
 def _looks_like_oom(out):
@@ -67,57 +71,84 @@ def _looks_like_oom(out):
 
 
 def run(device, precond, n, dim, maxiter, tol, nranks=1, precision="double"):
-    """Run one solve; dict of metrics, ``OOM`` if out of memory, else ``None``."""
+    """Run one solve; dict of metrics, ``db.OOM`` if out of memory, else ``None``.
+
+    The child writes its JSON to a private file (``--json-out``) that we read
+    back, so stray stdout (MPI/UCX banners, warnings) cannot corrupt the parse.
+    """
     grid = ",".join([str(n)] * dim)
-    base = [HOMOG, "-n", grid, "-d", device, "-k", "fused", "-P", precond,
-            "-i", str(maxiter), "--tol", str(tol), "--precision", precision,
-            "--inclusion-type", "single", "--json"]
-    if nranks == 1:
-        cmd = [sys.executable] + base
-        env = os.environ
-    else:
-        cmd = ["mpiexec", "-n", str(nranks), sys.executable] + base
-        env = dict(os.environ, OMPI_MCA_rmaps_base_oversubscribe="1")
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=7200,
-                             env=env)
-    except subprocess.SubprocessError:
-        return None
-    m = re.search(r"\{.*\}", out.stdout, re.DOTALL)
-    if not m:
-        if _looks_like_oom(out):
-            return OOM
-        sys.stderr.write(f"  [{device} {precond} n={n} ranks={nranks}] no JSON\n"
-                         f"{out.stderr[-400:]}\n")
-        return None
-    import json
-    try:
-        d = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "result.json")
+        base = [HOMOG, "-n", grid, "-d", device, "-k", "fused", "-P", precond,
+                "-i", str(maxiter), "--tol", str(tol), "--precision", precision,
+                "--inclusion-type", "single", "--json-out", out_path]
+        if nranks == 1:
+            cmd = [sys.executable] + base
+            env = os.environ
+        else:
+            cmd = ["mpiexec", "-n", str(nranks), sys.executable] + base
+            env = dict(os.environ, OMPI_MCA_rmaps_base_oversubscribe="1")
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True,
+                                 timeout=7200, env=env)
+        except subprocess.SubprocessError:
+            return None
+        try:
+            with open(out_path) as fh:
+                d = json.load(fh)
+        except (OSError, ValueError):
+            if _looks_like_oom(out):
+                return db.OOM
+            sys.stderr.write(f"  [{device} {precond} n={n} ranks={nranks}] "
+                             f"no JSON\n{out.stderr[-400:]}\n")
+            return None
     r, c = d["results"], d["config"]
     return dict(npts=c["nb_grid_pts_total"], iters=r["total_cg_iterations"],
                 secs=r["total_time_seconds"])
 
 
+def _resolve(fields, runner, prov, args):
+    """Resolve one point through the cache; return (fields, result, from_cache)."""
+    result, cached = db.cached_point(fields, prov, runner,
+                                     cache_dir=args.cache_dir, force=args.force)
+    return fields, result, cached
+
+
 def collect_iterations(args, prov):
-    """Study `iterations`: CG count, none vs reference, on a single CPU core."""
-    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim,
-                  precision=args.precision)
-    rows = []
+    """Study `iterations`: CG count, none vs reference, on a single CPU core.
+
+    Every point is a single core, so the whole (size x preconditioner) grid is
+    resolved through a worker pool of `--jobs` (each point cached as it lands)."""
+    tasks = []
     for n in args.iter_sizes:
         for P in ("none", "reference"):
-            r = run("cpu", P, n, args.dim, args.maxiter, args.tol,
-                    precision=args.precision)
-            if r is None:
-                sys.stderr.write(f"  iter {P} {n}^{args.dim}: skipped\n")
-                continue
-            rows.append({**prov, **common, "benchmark": BENCHMARK,
-                         "study": "iterations", "label": P, "device": "cpu",
-                         "nranks": 1, "n": n, "npts": r["npts"], "precond": P,
-                         "iters": r["iters"], "secs": r["secs"]})
-            sys.stderr.write(f"  iter {P:9s} {n}^{args.dim} ({r['npts']} pts): "
-                             f"{r['iters']:5d} it, {r['secs']:.3f} s\n")
+            fields = {"benchmark": BENCHMARK, "study": "iterations", "label": P,
+                      "device": "cpu", "nranks": 1, "dim": args.dim, "n": n,
+                      "precond": P, "precision": args.precision,
+                      "maxiter": args.maxiter, "tol": args.tol}
+            tasks.append(fields)
+
+    def work(fields):
+        return _resolve(
+            fields,
+            lambda: run("cpu", fields["precond"], fields["n"], args.dim,
+                        args.maxiter, args.tol, precision=args.precision),
+            prov, args)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
+        results = list(ex.map(work, tasks))
+
+    rows = []
+    for fields, r, cached in results:
+        P, n = fields["precond"], fields["n"]
+        tag = " [cached]" if cached else ""
+        if r is None or r == OOM:
+            sys.stderr.write(f"  iter {P} {n}^{args.dim}: skipped{tag}\n")
+            continue
+        rows.append({**prov, **fields, "npts": r["npts"],
+                     "iters": r["iters"], "secs": r["secs"]})
+        sys.stderr.write(f"  iter {P:9s} {n}^{args.dim} ({r['npts']} pts): "
+                         f"{r['iters']:5d} it, {r['secs']:.3f} s{tag}\n")
     return rows
 
 
@@ -133,31 +164,55 @@ def collect_timing(args, prov):
     _, nb_gpus = db.detect_gpu()
     want_gpu = not args.no_gpu and nb_gpus >= 1
     configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
-    common = dict(maxiter=args.maxiter, tol=args.tol, dim=args.dim,
-                  precision=args.precision)
     rows = []
+
+    def fields_for(key, device, nranks, n):
+        return {"benchmark": BENCHMARK, "study": "reference_timing",
+                "label": key, "device": device, "nranks": nranks, "dim": args.dim,
+                "n": n, "precond": "reference", "precision": args.precision,
+                "maxiter": args.maxiter, "tol": args.tol}
+
+    def resolve(key, device, nranks, n):
+        f = fields_for(key, device, nranks, n)
+        return _resolve(
+            f, lambda: run(device, "reference", n, args.dim, args.maxiter,
+                           args.tol, nranks, args.precision), prov, args)
+
     for key, device, nranks in configs:
         label = db.CONFIG_META[key]["label"](nranks)
         cap = args.cpu1_max_size if key == "cpu1" else args.max_size
-        for n in [s for s in args.sizes if s <= cap]:
-            r = run(device, "reference", n, args.dim, args.maxiter, args.tol,
-                    nranks, args.precision)
-            base = {**prov, **common, "benchmark": BENCHMARK,
-                    "study": "reference_timing", "label": key, "device": device,
-                    "nranks": nranks, "n": n, "npts": n ** args.dim,
-                    "precond": "reference"}
+        sizes = [s for s in args.sizes if s <= cap]
+        # cpu1 is the only node-safe config to parallelise (one core per point,
+        # capped below OOM); the rest use the whole node/GPU per point and keep
+        # the first-OOM early stop.
+        points = []
+        if key == "cpu1" and args.jobs > 1:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
+                points = sorted(ex.map(lambda n: resolve(key, device, nranks, n),
+                                       sizes),
+                                key=lambda t: t[0]["n"])
+        else:
+            for n in sizes:
+                point = resolve(key, device, nranks, n)
+                points.append(point)
+                if point[1] == OOM:
+                    break
+        for f, r, cached in points:
+            n = f["n"]
+            base = {**prov, **f, "npts": n ** args.dim}
+            tag = " [cached]" if cached else ""
             if r is None:
                 sys.stderr.write(f"  time {label} {n}^{args.dim}: skipped\n")
                 continue
-            if r is OOM:
+            if r == OOM:
                 rows.append({**base, "status": "oom"})
                 sys.stderr.write(f"  time {label} {n}^{args.dim}: OUT OF "
-                                 "MEMORY — stopping this config\n")
-                break
+                                 f"MEMORY{tag}\n")
+                continue
             rows.append({**base, "npts": r["npts"], "status": "ok",
                          "iters": r["iters"], "secs": r["secs"]})
             sys.stderr.write(f"  time {label} {n}^{args.dim} ({r['npts']} pts): "
-                             f"{r['iters']} it, {r['secs']:.3f} s\n")
+                             f"{r['iters']} it, {r['secs']:.3f} s{tag}\n")
     return rows
 
 
@@ -477,6 +532,20 @@ def main():
                          "get both curves (default: double)")
     ap.add_argument("--maxiter", type=int, default=20000)
     ap.add_argument("--tol", type=float, default=1e-6)
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="Parallel worker processes for the single-CPU-core "
+                         "points (the iteration study and the cpu1 timing sweep; "
+                         "each point uses one core). MPI/GPU configs always run "
+                         "serially, one per node/GPU (default: 1)")
+    ap.add_argument("--cache-dir", default=db.CACHE_DIR,
+                    help="Per-point result cache directory. Finished points are "
+                         "replayed from here, so a killed run resumes cheaply")
+    ap.add_argument("--force", action="store_true",
+                    help="Recompute even on a cache hit (and refresh the cache)")
+    ap.add_argument("--aggregate-only", action="store_true",
+                    help="Do not run: append a fresh run to the database from the "
+                         "points already in the cache for the current commit. "
+                         "Recovers a sweep that could not finish in one job")
     ap.add_argument("--studies", nargs="+",
                     choices=["iterations", "reference_timing"],
                     default=["iterations", "reference_timing"],
@@ -499,7 +568,15 @@ def main():
         HERE, "..", "docs", "benchmark_homogenization_preconditioner_time.png"))
     args = ap.parse_args()
 
-    if not args.render_only:
+    if args.aggregate_only:
+        prov = db.run_provenance()
+        rows = db.cache_rows(BENCHMARK, args.studies, prov, args.cache_dir)
+        if not rows:
+            sys.exit("Nothing cached for the current commit — nothing to record.")
+        db.append_rows(rows, args.db)
+        sys.stderr.write(f"aggregated {len(rows)} cached points into {args.db}\n")
+        return
+    elif not args.render_only:
         prov = db.run_provenance()
         rows = collect(args, prov)
         if not rows:

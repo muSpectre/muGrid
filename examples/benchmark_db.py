@@ -37,6 +37,8 @@ Unused columns for a given row are left blank.
 
 import csv
 import datetime
+import hashlib
+import json
 import os
 import platform
 import re
@@ -45,6 +47,7 @@ import subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(HERE)
 DB_PATH = os.path.join(REPO_ROOT, "benchmarks", "results.csv")
+CACHE_DIR = os.path.join(REPO_ROOT, "benchmarks", "cache")
 
 FIELDS = [
     # provenance
@@ -426,3 +429,134 @@ def select_precisions(rows, benchmark, studies, timestamp=None):
                 out.extend(r for r in grp
                            if r["timestamp"].startswith(timestamp))
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Per-point result cache
+# --------------------------------------------------------------------------- #
+# Each data point (one benchmark/study/config/size/precision/... combination) is
+# an independent measurement of ONE code version, reproducible up to timing
+# noise. We cache its result in its own JSON file, keyed by the code commit plus
+# the point's identity, so that:
+#   * a job that dies part-way can be resubmitted and replays the finished points
+#     from the cache in seconds instead of recomputing them (resumability),
+#   * independent points can be measured by separate jobs / array tasks, each
+#     writing its own file with no shared-file races (safe fan-out), and
+#   * the committed CSV stays the human-facing *aggregate*, rebuilt from the
+#     cache rather than being the primary, all-or-nothing store.
+# The cache lives under benchmarks/cache/ and is git-ignored (regenerable).
+
+# The OOM outcome is a real, cacheable result: at a fixed commit and machine a
+# point either fits or it does not, so a resubmit should not re-attempt it.
+OOM = "oom"
+
+# Identity + parameter fields that define a point. Two runs of the SAME commit
+# with identical values here yield the same measurement, so the result is safe
+# to reuse. Result columns (iters/secs/gbps/npts/status) are deliberately absent.
+CACHE_KEY_FIELDS = ("benchmark", "study", "label", "device", "nranks", "dim",
+                    "n", "precision", "precond", "maxiter", "tol")
+
+
+def _cache_digest(fields, commit):
+    payload = {k: fields.get(k) for k in CACHE_KEY_FIELDS}
+    blob = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha1(f"{commit}|{blob}".encode()).hexdigest()[:16]
+
+
+def cache_path(fields, commit, cache_dir=CACHE_DIR):
+    """File holding the cached result for one point at one commit."""
+    return os.path.join(cache_dir, str(fields["benchmark"]),
+                        str(fields["study"]),
+                        f"{_cache_digest(fields, commit)}.json")
+
+
+def cache_load(fields, commit, cache_dir=CACHE_DIR):
+    """Cached record dict for a point, or None if absent/unreadable."""
+    try:
+        with open(cache_path(fields, commit, cache_dir)) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def cache_store(record, cache_dir=CACHE_DIR):
+    """Write a point record atomically to its cache file."""
+    path = cache_path(record["fields"], record["commit"], cache_dir)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.tmp"  # unique per process -> no concurrent clobber
+    with open(tmp, "w") as fh:
+        json.dump(record, fh, indent=2, default=str)
+    os.replace(tmp, path)  # atomic rename
+
+
+def cached_point(fields, prov, runner, cache_dir=CACHE_DIR, force=False):
+    """Resolve one data point, reusing the cache when possible.
+
+    `fields`   identity+parameter dict (a subset of FIELDS) for this point.
+    `prov`     provenance from run_provenance() (supplies commit/version/cpu/gpu).
+    `runner()` -> a metrics dict, the OOM sentinel ``db.OOM``, or None (transient
+               failure).
+
+    On a cache hit (same commit, working tree clean, not `force`) the stored
+    result is returned without running. Otherwise `runner()` is invoked and a real
+    measurement or an OOM outcome is written to the cache (None is NOT cached — it
+    is a transient failure worth retrying). Dirty working trees are never cached
+    (the commit alone does not identify the code). Returns ``(result, from_cache)``.
+    """
+    commit = prov["commit"]
+    clean = str(prov.get("dirty", 0)) == "0"
+    if clean and not force:
+        rec = cache_load(fields, commit, cache_dir)
+        if rec is not None:
+            return rec["result"], True
+    result = runner()
+    if clean and result is not None:
+        cache_store({
+            "fields": {k: fields.get(k) for k in fields},
+            "commit": commit,
+            "version": prov.get("version"),
+            "cpu": prov.get("cpu"),
+            "gpu": prov.get("gpu"),
+            "measured_at": now_iso(),
+            "result": result,
+        }, cache_dir)
+    return result, False
+
+
+def cache_rows(benchmark, studies, prov, cache_dir=CACHE_DIR):
+    """CSV rows for every cached point of `benchmark`/`studies` at the current
+    commit — the snapshot `--aggregate-only` appends to the DB as one dated run.
+
+    The row's timestamp is this aggregation's (so all rows form one run), but the
+    machine/version/commit are the cache's (what actually produced the number).
+    """
+    commit = prov["commit"]
+    rows = []
+    for study in studies:
+        d = os.path.join(cache_dir, str(benchmark), str(study))
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(d, name)) as fh:
+                    rec = json.load(fh)
+            except (OSError, ValueError):
+                continue
+            if rec.get("commit") != commit:
+                continue
+            f = rec.get("fields", {})
+            row = {"timestamp": prov["timestamp"], "version": rec.get("version"),
+                   "commit": rec.get("commit"), "dirty": 0, "cpu": rec.get("cpu"),
+                   "gpu": rec.get("gpu"), **f}
+            if f.get("n") is not None and f.get("dim") is not None:
+                row["npts"] = int(f["n"]) ** int(f["dim"])
+            res = rec.get("result")
+            if res == OOM:
+                row["status"] = "oom"
+            elif isinstance(res, dict):
+                row["status"] = "ok"
+                row.update(res)
+            rows.append(row)
+    return rows

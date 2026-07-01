@@ -34,10 +34,13 @@ Needs an MPI-enabled muGrid build and `mpi4py` for the MPI configurations; point
 """
 
 import argparse
+import concurrent.futures
+import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import benchmark_db as db  # noqa: E402
@@ -57,8 +60,9 @@ _OOM_PATTERNS = re.compile(
     r"cudaErrorMemoryAllocation|CUDA_ERROR_OUT_OF_MEMORY|hipErrorOutOfMemory|"
     r"hipErrorMemoryAllocation|failed to allocate", re.IGNORECASE)
 
-# Sentinel returned by run() when a data point ran out of memory.
-OOM = "oom"
+# Sentinel returned by run() when a data point ran out of memory (shared with the
+# cache, which stores the OOM outcome so a resubmit does not re-attempt it).
+OOM = db.OOM
 
 
 def _looks_like_oom(out):
@@ -72,43 +76,84 @@ def _looks_like_oom(out):
 def run(device, n, maxiter, nranks=1, precision="double"):
     """Run one homogenization solve.
 
-    Returns a dict of metrics on success, the string ``OOM`` if the run ran out
-    of memory, or ``None`` for any other failure.
+    Returns a dict of metrics on success, the sentinel ``db.OOM`` if the run ran
+    out of memory, or ``None`` for any other failure. The child writes its JSON to
+    a private file (``--json-out``) that we read back, so stray stdout (MPI/UCX
+    banners, warnings) can never corrupt the parse.
     """
-    base = [HOMOG, "-n", f"{n},{n},{n}", "-d", device, "-k", "fused",
-            "-i", str(maxiter), "--precision", precision,
-            "--inclusion-type", "single", "--json"]
-    if nranks == 1:
-        cmd = [sys.executable] + base
-        env = os.environ
-    else:
-        cmd = ["mpiexec", "-n", str(nranks), sys.executable] + base
-        env = dict(os.environ, OMPI_MCA_rmaps_base_oversubscribe="1")
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=7200,
-                             env=env)
-    except subprocess.SubprocessError:
-        return None
-    m = re.search(r"\{.*\}", out.stdout, re.DOTALL)
-    if not m:
-        if _looks_like_oom(out):
-            return OOM
-        sys.stderr.write(f"  [{device} n={n} ranks={nranks}] no JSON\n"
-                         f"{out.stderr[-400:]}\n")
-        return None
-    import json
-    try:
-        d = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "result.json")
+        base = [HOMOG, "-n", f"{n},{n},{n}", "-d", device, "-k", "fused",
+                "-i", str(maxiter), "--precision", precision,
+                "--inclusion-type", "single", "--json-out", out_path]
+        if nranks == 1:
+            cmd = [sys.executable] + base
+            env = os.environ
+        else:
+            cmd = ["mpiexec", "-n", str(nranks), sys.executable] + base
+            env = dict(os.environ, OMPI_MCA_rmaps_base_oversubscribe="1")
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True,
+                                 timeout=7200, env=env)
+        except subprocess.SubprocessError:
+            return None
+        try:
+            with open(out_path) as fh:
+                d = json.load(fh)
+        except (OSError, ValueError):
+            if _looks_like_oom(out):
+                return db.OOM
+            sys.stderr.write(f"  [{device} n={n} ranks={nranks}] no JSON\n"
+                             f"{out.stderr[-400:]}\n")
+            return None
     r, c = d["results"], d["config"]
     return dict(npts=c["nb_grid_pts_total"], iters=r["total_cg_iterations"],
                 secs=r["total_time_seconds"],
                 gbps=r.get("memory_throughput_GBps"))
 
 
+def _point_fields(key, device, nranks, n, args):
+    """Identity + parameters of one data point (the cache key, minus results)."""
+    return {"benchmark": BENCHMARK, "study": "time_vs_size", "label": key,
+            "device": device, "nranks": nranks, "dim": 3, "n": n,
+            "maxiter": args.maxiter, "precision": args.precision}
+
+
+def _resolve(key, device, nranks, n, prov, args):
+    """Resolve one point through the cache; return (n, result, from_cache)."""
+    fields = _point_fields(key, device, nranks, n, args)
+    result, cached = db.cached_point(
+        fields, prov,
+        lambda: run(device, n, args.maxiter, nranks, args.precision),
+        cache_dir=args.cache_dir, force=args.force)
+    return n, result, cached
+
+
+def _sweep_serial(key, device, nranks, sizes, prov, args):
+    """Sweep sizes in order, stopping at the first out-of-memory size (larger
+    grids for the same config would also OOM)."""
+    out = []
+    for n in sizes:
+        point = _resolve(key, device, nranks, n, prov, args)
+        out.append(point)
+        if point[1] == OOM:
+            break
+    return out
+
+
+def _sweep_parallel(key, device, nranks, sizes, prov, args):
+    """Resolve all sizes concurrently (used only for the single-CPU-core config,
+    where every point is one core and capped below any OOM threshold)."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
+        futs = [ex.submit(_resolve, key, device, nranks, n, prov, args)
+                for n in sizes]
+        out = [f.result() for f in futs]
+    return sorted(out, key=lambda t: t[0])
+
+
 def collect(args, prov):
-    """Run all data points and return DB rows (does not write)."""
+    """Run all data points and return DB rows (does not write the CSV; each point
+    is cached as it completes, so a killed run resumes from where it stopped)."""
     _, nb_gpus = db.detect_gpu()
     want_gpu = not args.no_gpu and nb_gpus >= 1
     configs = db.plan_configs(args.mpi_cpu_ranks, nb_gpus, want_gpu)
@@ -117,31 +162,39 @@ def collect(args, prov):
     # Time vs. size, one curve per device/MPI config. Each config sweeps grid
     # sizes up to its own cap (a single CPU core tops out far sooner than the
     # full node / the GPUs), and stops at the first size that runs out of
-    # memory — which is recorded as an "oom" point and shown in the table but
-    # omitted from the plot. Larger sizes for that config are not attempted.
+    # memory — recorded as an "oom" point (shown in the table, omitted from the
+    # plot); larger sizes for that config are not attempted.
     for key, device, nranks in configs:
         label = CONFIG_META[key]["label"](nranks)
         cap = args.cpu1_max_size if key == "cpu1" else args.max_size
-        for n in [s for s in args.sizes if s <= cap]:
-            r = run(device, n, args.maxiter, nranks, args.precision)
+        sizes = [s for s in args.sizes if s <= cap]
+        # The single CPU core is the one config safe to parallelise: each point
+        # uses exactly one core and is capped (cpu1_max_size) below any OOM
+        # threshold. Every other config already uses the whole node (MPI) or a
+        # whole GPU per point, so those sweep serially and keep the OOM early stop.
+        if key == "cpu1" and args.jobs > 1:
+            points = _sweep_parallel(key, device, nranks, sizes, prov, args)
+        else:
+            points = _sweep_serial(key, device, nranks, sizes, prov, args)
+        for n, r, cached in points:
             base = {**prov, "benchmark": BENCHMARK, "study": "time_vs_size",
                     "label": key, "device": device, "nranks": nranks,
                     "dim": 3, "n": n, "npts": n ** 3, "maxiter": args.maxiter,
                     "precision": args.precision}
+            tag = " [cached]" if cached else ""
             if r is None:
                 sys.stderr.write(f"  {label} {n}^3: skipped (run failed)\n")
                 continue
-            if r is OOM:
+            if r == OOM:
                 rows.append({**base, "status": "oom"})
-                sys.stderr.write(f"  {label} {n}^3: OUT OF MEMORY — stopping "
-                                 "this config\n")
-                break
+                sys.stderr.write(f"  {label} {n}^3: OUT OF MEMORY{tag}\n")
+                continue
             rows.append({**base, "npts": r["npts"], "status": "ok",
                          "iters": r["iters"], "secs": r["secs"],
                          "gbps": r["gbps"]})
             sys.stderr.write(f"  {label} {n}^3 ({r['npts']} pts): "
                              f"{r['secs']:.3f} s, {r['iters']} it, "
-                             f"{r['gbps']:.1f} GB/s\n")
+                             f"{r['gbps']:.1f} GB/s{tag}\n")
     return rows
 
 
@@ -367,9 +420,22 @@ def main():
                          "precisions are in the DB — run this once per precision "
                          "to get both curves (default: double)")
     ap.add_argument("--maxiter", type=int, default=100)
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="Parallel worker processes for the single-CPU-core "
+                         "sweep (each point uses one core). Other configs always "
+                         "run serially, one per node/GPU (default: 1)")
+    ap.add_argument("--cache-dir", default=db.CACHE_DIR,
+                    help="Per-point result cache directory. Finished points are "
+                         "replayed from here, so a killed run resumes cheaply")
+    ap.add_argument("--force", action="store_true",
+                    help="Recompute even on a cache hit (and refresh the cache)")
     ap.add_argument("--collect-only", action="store_true",
                     help="Measure and append to the database, then stop "
                          "(no plot/page — render later with --render-only)")
+    ap.add_argument("--aggregate-only", action="store_true",
+                    help="Do not run: append a fresh run to the database from the "
+                         "points already in the cache for the current commit. "
+                         "Recovers a sweep that could not finish in one job")
     ap.add_argument("--render-only", action="store_true",
                     help="Skip running; render from the database")
     ap.add_argument("--timestamp", default=None,
@@ -382,7 +448,15 @@ def main():
                                          "benchmark_homogenization.png"))
     args = ap.parse_args()
 
-    if not args.render_only:
+    if args.aggregate_only:
+        prov = db.run_provenance()
+        rows = db.cache_rows(BENCHMARK, ["time_vs_size"], prov, args.cache_dir)
+        if not rows:
+            sys.exit("Nothing cached for the current commit — nothing to record.")
+        db.append_rows(rows, args.db)
+        sys.stderr.write(f"aggregated {len(rows)} cached points into {args.db}\n")
+        return
+    elif not args.render_only:
         prov = db.run_provenance()
         rows = collect(args, prov)
         if not rows:
