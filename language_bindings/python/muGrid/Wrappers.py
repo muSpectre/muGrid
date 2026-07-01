@@ -1353,7 +1353,9 @@ class FEMGradientOperator:
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """
-        Apply the gradient operator (nodal values → quadrature point gradients).
+        Apply the gradient operator ``B`` (nodal values → quadrature point
+        gradients). This is the *unweighted* gradient; the quadrature weights
+        enter through :meth:`transpose` (see its note).
 
         Parameters
         ----------
@@ -1389,8 +1391,19 @@ class FEMGradientOperator:
         nodal_field: Field,
         weights: Optional[Sequence[float]] = None,
     ) -> None:
-        """
-        Apply transpose (divergence) operator (quadrature points → nodal values).
+        r"""
+        Apply the **quadrature-weighted** transpose ``Bᵀ W`` (quadrature points →
+        nodal values) -- the discretised divergence / Galerkin (L²) adjoint of
+        :meth:`apply`, **not** the bare matrix transpose.
+
+        With ``weights=None`` the element's *physical* quadrature weights ``W``
+        (``Wfrac · cell_volume``) are used, so
+
+            ``⟨W · apply(u), v⟩ == ⟨u, transpose(v)⟩``   and
+            ``transpose(apply(u)) == Bᵀ W B u``          (the FE stiffness action).
+
+        Assemble energies/forces via ``transpose(apply(...))`` directly; do **not**
+        also multiply by the quadrature weights yourself (that applies ``W`` twice).
 
         Parameters
         ----------
@@ -1399,7 +1412,9 @@ class FEMGradientOperator:
         nodal_field : Field
             Output field at nodal points.
         weights : sequence of float, optional
-            Weights for the transpose operation.
+            Per-quadrature-point weights (length ``nb_quad_pts``) overriding the
+            physical quadrature weights ``W`` -- e.g. to fold in per-quadrature
+            material or stress coefficients. Defaults to ``W``.
         """
         if weights is None:
             weights = []

@@ -7,6 +7,10 @@ Unreleased
 - ENH: Added fused `compute_sensitivity` (host + GPU) to the isotropic stiffness
   operator
 - ENH: Added the Green-Jacobi (J-FFT) preconditioner
+- DOC: Documented that `FEMGradientOperator.transpose` is the quadrature-weighted
+  (Galerkin) adjoint `Bᵀ W`, not the bare matrix transpose — with no `weights`
+  it applies the physical quadrature weights, so `transpose(apply(u)) = Bᵀ W B u`
+  (the FE stiffness action); added tests pinning this convention (P1/Q1, 2D/3D)
 - ENH: Single-precision floating-point support
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements
 - ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
