@@ -5,8 +5,7 @@ Unreleased
 ----------
 
 - ENH: Added fused `compute_sensitivity` (host + GPU) to the isotropic stiffness
-  operator — per-pixel material-derivative geometry contractions for
-  topology-optimization adjoint sensitivities (SIMP chain rule applied by the caller)
+  operator
 - ENH: Added the Green-Jacobi (J-FFT) preconditioner
 - ENH: Single-precision floating-point support
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements
