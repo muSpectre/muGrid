@@ -917,7 +917,8 @@ if args.preconditioner == "reference":
         # inverse, zero mode projected) lives in muGrid.Preconditioners; here we
         # only supply the action of the reference stiffness Kʳᵉᶠ.
         prec = make_reference_stiffness_preconditioner(
-            decomposition, apply_reference_stiffness, dim, timer=timer
+            decomposition, apply_reference_stiffness, dim, timer=timer,
+            dtype=dtype
         )
 
     if not args.quiet:

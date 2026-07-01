@@ -192,6 +192,11 @@ class FourierPreconditioner(Preconditioner):
         Timer for performance profiling. When given, :meth:`apply` records
         the forward transform ("fft"), the pointwise kernel multiplication
         ("scale") and the inverse transform ("ifft").
+    dtype : data-type, optional
+        Real-space precision of the fields the preconditioner is applied to:
+        ``np.float64`` (default) or ``np.float32``. The kernel field and the FFT
+        work buffer are created at the matching precision so the internal
+        transforms pair with the solver's fields.
 
     Examples
     --------
@@ -210,11 +215,23 @@ class FourierPreconditioner(Preconditioner):
                             rhs, solution, hessp=hessp, prec=prec)
     """
 
-    def __init__(self, engine, kernel, name="fourier-preconditioner", timer=None):
+    def __init__(self, engine, kernel, name="fourier-preconditioner", timer=None,
+                 dtype=np.float64):
         self._engine = engine
         self._name = name
         self._timer = timer
         self._work = {}  # work field per components shape
+
+        self._real_dtype = np.dtype(dtype)
+        if self._real_dtype == np.dtype(np.float32):
+            self._complex_dtype = np.dtype(np.complex64)
+        elif self._real_dtype == np.dtype(np.float64):
+            self._complex_dtype = np.dtype(np.complex128)
+        else:
+            raise ValueError(
+                f"FourierPreconditioner dtype must be float32 or float64, "
+                f"got {self._real_dtype}"
+            )
 
         if callable(kernel):
             kernel = kernel(engine)
@@ -233,7 +250,7 @@ class FourierPreconditioner(Preconditioner):
         # linalg.scal with no array-library dependence in the
         # hot loop.
         self._kernel_field = engine.fourier_space_collection.real_field(
-            f"{name}-kernel"
+            f"{name}-kernel", dtype=self._real_dtype
         )
         values = kernel * engine.normalisation
         s = self._kernel_field.s
@@ -251,7 +268,8 @@ class FourierPreconditioner(Preconditioner):
         if key not in self._work:
             suffix = "x".join(str(c) for c in key) if key else "scalar"
             self._work[key] = self._engine.fourier_space_field(
-                f"{self._name}-work-{suffix}", components=key
+                f"{self._name}-work-{suffix}", components=key,
+                dtype=self._complex_dtype
             )
         return self._work[key]
 
@@ -312,13 +330,32 @@ class BlockFourierPreconditioner(Preconditioner):
     timer : muTimer.Timer, optional
         When given, :meth:`apply` records the forward transform ("fft"), the
         per-mode block multiply ("scale") and the inverse transform ("ifft").
+    dtype : data-type, optional
+        Real-space precision of the fields the preconditioner will be applied to:
+        ``np.float64`` (default) or ``np.float32``. The FFT work buffer and the
+        stored symbol are created at the matching precision (``complex128`` /
+        ``complex64``) so the internal transforms pair correctly with the
+        solver's fields -- a single-precision solve needs a single-precision
+        preconditioner, otherwise the internal ``ifft`` mismatches and the
+        result is NaN.
     """
 
     def __init__(self, engine, blocks, name="block-fourier-preconditioner",
-                 timer=None):
+                 timer=None, dtype=np.float64):
         self._engine = engine
         self._name = name
         self._timer = timer
+
+        real_dtype = np.dtype(dtype)
+        if real_dtype == np.dtype(np.float32):
+            complex_dtype = np.dtype(np.complex64)
+        elif real_dtype == np.dtype(np.float64):
+            complex_dtype = np.dtype(np.complex128)
+        else:
+            raise ValueError(
+                f"BlockFourierPreconditioner dtype must be float32 or float64, "
+                f"got {real_dtype}"
+            )
 
         blocks = np.asarray(blocks)
         n = blocks.shape[0]
@@ -335,7 +372,8 @@ class BlockFourierPreconditioner(Preconditioner):
             )
 
         self._n = n
-        self._work = engine.fourier_space_field(f"{name}-work", components=(n,))
+        self._work = engine.fourier_space_field(
+            f"{name}-work", components=(n,), dtype=complex_dtype)
         # Match the array library of the work field's view (numpy or cupy) so
         # the per-mode multiply runs where the fields live.
         sample = self._work.s
@@ -369,13 +407,17 @@ class BlockFourierPreconditioner(Preconditioner):
         )
         self._hermitian = herm_scale == 0.0 or herm_asym <= 1e-10 * herm_scale
 
+        # Store the symbol at the solve precision (real diagonals, complex
+        # off-diagonals / dense block): it is the largest persistent buffer, and
+        # a single-precision solve should not carry a double-precision symbol.
         if self._hermitian:
-            diag = np.empty((n,) + blocks.shape[2:], dtype=blocks.real.dtype)
+            diag = np.empty((n,) + blocks.shape[2:], dtype=real_dtype)
             for i in range(n):
                 diag[i] = blocks[i, i].real
             self._diag = xp.asarray(diag)
             self._off = {
-                (i, j): xp.asarray(np.ascontiguousarray(blocks[i, j]))
+                (i, j): xp.asarray(
+                    np.ascontiguousarray(blocks[i, j]).astype(complex_dtype))
                 for i in range(n)
                 for j in range(i + 1, n)
             }
@@ -383,7 +425,8 @@ class BlockFourierPreconditioner(Preconditioner):
         else:
             self._diag = None
             self._off = None
-            self._blocks = xp.asarray(np.ascontiguousarray(blocks))
+            self._blocks = xp.asarray(
+                np.ascontiguousarray(blocks).astype(complex_dtype))
 
     def _timed(self, name):
         return self._timer(name) if self._timer is not None else nullcontext()
@@ -445,6 +488,7 @@ def make_reference_stiffness_preconditioner(
     nb_components,
     name="reference-stiffness-preconditioner",
     timer=None,
+    dtype=np.float64,
 ):
     """
     Build the reference-material (Green's-function) preconditioner of Ladecký et
@@ -486,6 +530,14 @@ def make_reference_stiffness_preconditioner(
         Prefix for the engine-managed work fields and the preconditioner.
     timer : muTimer.Timer, optional
         Forwarded to the returned preconditioner (records "fft"/"scale"/"ifft").
+    dtype : data-type, optional
+        Real-space precision of the solve, ``np.float64`` (default) or
+        ``np.float32``. The impulse-response fields and the returned
+        preconditioner's work buffer are created at this precision (with the
+        matching complex type) so the internal transforms pair with the solver's
+        fields; ``apply_reference_stiffness`` is therefore invoked on fields of
+        this precision too. The symbol itself is assembled and inverted in
+        double regardless, for accuracy.
 
     Returns
     -------
@@ -496,6 +548,17 @@ def make_reference_stiffness_preconditioner(
     fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
     dim = len(fourier_shape)
     n = int(nb_components)
+
+    real_dtype = np.dtype(dtype)
+    if real_dtype == np.dtype(np.float32):
+        complex_dtype = np.dtype(np.complex64)
+    elif real_dtype == np.dtype(np.float64):
+        complex_dtype = np.dtype(np.complex128)
+    else:
+        raise ValueError(
+            f"reference-stiffness preconditioner dtype must be float32 or "
+            f"float64, got {real_dtype}"
+        )
 
     # Global-origin pixel(s) in this rank's interior: the nodal coordinate is
     # exactly 0 in every direction only at global index 0 (coord = index / N).
@@ -509,9 +572,12 @@ def make_reference_stiffness_preconditioner(
     impulse_name = f"{name}-impulse"
     column_name = f"{name}-column"
     column_hat_name = f"{name}-column-hat"
-    impulse = engine.real_space_field(impulse_name, components=(n,))
-    column = engine.real_space_field(column_name, components=(n,))
-    column_hat = engine.fourier_space_field(column_hat_name, components=(n,))
+    impulse = engine.real_space_field(
+        impulse_name, components=(n,), dtype=real_dtype)
+    column = engine.real_space_field(
+        column_name, components=(n,), dtype=real_dtype)
+    column_hat = engine.fourier_space_field(
+        column_hat_name, components=(n,), dtype=complex_dtype)
 
     # K_hat[alpha, beta, q] = (FFT of Kʳᵉᶠ applied to impulse e_beta)[alpha](q)
     K_hat = np.zeros((n, n) + fourier_shape, dtype=complex)
@@ -560,4 +626,5 @@ def make_reference_stiffness_preconditioner(
     engine.fourier_space_collection.pop_field(column_hat_name)
     del impulse, column, column_hat
 
-    return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer)
+    return BlockFourierPreconditioner(
+        engine, K_inv, name=name, timer=timer, dtype=real_dtype)
