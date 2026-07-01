@@ -83,6 +83,8 @@ using Complex = std::complex<double>;
     X(Uint, unsigned int, "Uint")                           \
     X(Real, double, "Real")                                 \
     X(Complex, std::complex<double>, "Complex")             \
+    X(Real32, float, "Real32")                              \
+    X(Complex32, std::complex<float>, "Complex32")          \
     X(Index, std::ptrdiff_t, "Index")
 
 enum class TypeDescriptor : std::uint8_t {

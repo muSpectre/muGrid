@@ -272,4 +272,8 @@ namespace muGrid {
   template class FieldMap<Uint, Mapping::Mut>;
   template class FieldMap<Index_t, Mapping::Const>;
   template class FieldMap<Index_t, Mapping::Mut>;
+  template class FieldMap<Real32, Mapping::Const>;
+  template class FieldMap<Real32, Mapping::Mut>;
+  template class FieldMap<Complex32, Mapping::Const>;
+  template class FieldMap<Complex32, Mapping::Mut>;
 }  // namespace muGrid

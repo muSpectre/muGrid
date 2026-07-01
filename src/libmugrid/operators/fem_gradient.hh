@@ -86,33 +86,20 @@ namespace muGrid {
         // arrays, matching the host kernels, so the same call site serves 2D and
         // 3D. `nb` are the with-ghost grid points, `gsq`/`gsd` the gradient
         // quad/dim strides, `h` the grid spacing.
-        template <class Element>
-        void fem_gradient_gpu(const Real * nodal, Real * grad,
+        template <class Element, typename T>
+        void fem_gradient_gpu(const T * nodal, T * grad,
                               const Index_t * nb, const Index_t * nstride,
                               const Index_t * gstride, Index_t gsq, Index_t gsd,
-                              const Real * h, Real alpha, bool increment);
-        template <class Element>
-        void fem_divergence_gpu(const Real * grad, Real * nodal,
+                              const T * h, T alpha, bool increment);
+        template <class Element, typename T>
+        void fem_divergence_gpu(const T * grad, T * nodal,
                                 const Index_t * nb, const Index_t * nstride,
                                 const Index_t * gstride, Index_t gsq,
-                                Index_t gsd, const Real * h,
-                                const Real * quad_weights, Real alpha,
+                                Index_t gsd, const T * h,
+                                const T * quad_weights, T alpha,
                                 bool increment);
 #endif
 
-        // Compile-time unrolled 0..N-1 loop: the body is called with an
-        // std::integral_constant, so loop-carried indices are template
-        // parameters. This is what makes the constexpr table access
-        // `Element::B[q][d][n]` a core constant expression that the compiler
-        // folds (dropping the structural zeros / ±1 of a simplex), so the
-        // element-generic kernel matches the old hand-unrolled code on every
-        // compiler instead of relying on unroll heuristics.
-        template <Index_t N, class F>
-        inline void static_for(F && f) {
-            [&]<Index_t... I>(std::integer_sequence<Index_t, I...>) {
-                (f(std::integral_constant<Index_t, I>{}), ...);
-            }(std::make_integer_sequence<Index_t, N>{});
-        }
 
         // ===================================================================
         // Generic, element-templated host kernels
@@ -124,13 +111,15 @@ namespace muGrid {
         // hand-written code. Works for any element (e.g. Q1) with no new code.
 
         //! Gradient (nodal → quadrature): grad[q][d] = (Σ_n B[q][d][n] u[n])/h_d.
-        template <class Element>
+        //! Templated on the field scalar type @p T (Real or Real32); the
+        //! element's B table stays `double` constexpr and is read into @p T.
+        template <class Element, typename T>
         void fem_gradient_host_generic(
-            const Real * MUGRID_RESTRICT nodal_input,
-            Real * MUGRID_RESTRICT gradient_output, const Index_t * nb_grid_pts,
+            const T * MUGRID_RESTRICT nodal_input,
+            T * MUGRID_RESTRICT gradient_output, const Index_t * nb_grid_pts,
             const Index_t * nodal_stride, const Index_t * grad_stride,
             Index_t grad_stride_q, Index_t grad_stride_d,
-            const Real * grid_spacing, Real alpha, bool increment) {
+            const T * grid_spacing, T alpha, bool increment) {
             constexpr Dim_t Dim = Element::SpatialDim;
             constexpr Index_t NbNodes = Element::NbNodes;
             constexpr Index_t NbQuad = Element::NbQuad;
@@ -143,51 +132,45 @@ namespace muGrid {
                 }
                 node_lin[n] = off;
             }
-            Real inv_h[Dim];
+            T inv_h[Dim];
             for (Dim_t d = 0; d < Dim; ++d) {
                 inv_h[d] = alpha / grid_spacing[d];
             }
 
             auto pixel = [&](Index_t nodal_base, Index_t grad_base) {
-                Real u[NbNodes];
-                static_for<NbNodes>([&](auto Nn) {
-                    constexpr Index_t n = decltype(Nn)::value;
+                T u[NbNodes];
+                for (Index_t n = 0; n < NbNodes; ++n) {
                     u[n] = nodal_input[nodal_base + node_lin[n]];
-                });
-                // Contract first (B folds to ±1/0 at compile time), then write
-                // with a single branch — keeps the strided stores out of the
-                // increment test, matching the hand-written kernels.
-                Real out[NbQuad][Dim];
-                static_for<NbQuad>([&](auto Q) {
-                    constexpr Index_t q = decltype(Q)::value;
-                    static_for<Dim>([&](auto D) {
-                        constexpr Index_t d = decltype(D)::value;
-                        Real acc = 0.0;
-                        static_for<NbNodes>([&](auto Nn) {
-                            constexpr Index_t n = decltype(Nn)::value;
-                            acc += Element::B[q][d][n] * u[n];
-                        });
+                }
+                // Contract first, then write with a single branch — keeps the
+                // strided stores out of the increment test, matching the
+                // hand-written kernels. Trip counts are compile-time constants
+                // and Element::B is constexpr, so the optimizer unrolls these
+                // loops and folds B's structural zeros / ±1.
+                T out[NbQuad][Dim];
+                for (Index_t q = 0; q < NbQuad; ++q) {
+                    for (Dim_t d = 0; d < Dim; ++d) {
+                        T acc = T(0);
+                        for (Index_t n = 0; n < NbNodes; ++n) {
+                            acc += static_cast<T>(Element::B[q][d][n]) * u[n];
+                        }
                         out[q][d] = acc * inv_h[d];
-                    });
-                });
+                    }
+                }
                 if (increment) {
-                    static_for<NbQuad>([&](auto Q) {
-                        constexpr Index_t q = decltype(Q)::value;
-                        static_for<Dim>([&](auto D) {
-                            constexpr Index_t d = decltype(D)::value;
+                    for (Index_t q = 0; q < NbQuad; ++q) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
                             gradient_output[grad_base + q * grad_stride_q +
                                             d * grad_stride_d] += out[q][d];
-                        });
-                    });
+                        }
+                    }
                 } else {
-                    static_for<NbQuad>([&](auto Q) {
-                        constexpr Index_t q = decltype(Q)::value;
-                        static_for<Dim>([&](auto D) {
-                            constexpr Index_t d = decltype(D)::value;
+                    for (Index_t q = 0; q < NbQuad; ++q) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
                             gradient_output[grad_base + q * grad_stride_q +
                                             d * grad_stride_d] = out[q][d];
-                        });
-                    });
+                        }
+                    }
                 }
             };
 
@@ -214,13 +197,14 @@ namespace muGrid {
 
         //! Divergence / transpose (quadrature → nodal), scatter with weights:
         //! f[n] += alpha Σ_q w_q Σ_d B[q][d][n] g[q][d] / h_d.
-        template <class Element>
+        //! Templated on the field scalar type @p T (Real or Real32).
+        template <class Element, typename T>
         void fem_divergence_host_generic(
-            const Real * MUGRID_RESTRICT gradient_input,
-            Real * MUGRID_RESTRICT nodal_output, const Index_t * nb_grid_pts,
+            const T * MUGRID_RESTRICT gradient_input,
+            T * MUGRID_RESTRICT nodal_output, const Index_t * nb_grid_pts,
             const Index_t * grad_stride, Index_t grad_stride_q,
             Index_t grad_stride_d, const Index_t * nodal_stride,
-            const Real * grid_spacing, const Real * quad_weights, Real alpha,
+            const T * grid_spacing, const T * quad_weights, T alpha,
             bool increment) {
             constexpr Dim_t Dim = Element::SpatialDim;
             constexpr Index_t NbNodes = Element::NbNodes;
@@ -238,7 +222,7 @@ namespace muGrid {
             // hoisting the quadrature-weight and 1/h loads out of the pixel
             // loop (the hand-written kernels do the same). B folds against this
             // at compile time, dropping the zero entries.
-            Real coeff[NbQuad][Dim];
+            T coeff[NbQuad][Dim];
             for (Index_t q = 0; q < NbQuad; ++q) {
                 for (Dim_t d = 0; d < Dim; ++d) {
                     coeff[q][d] = alpha * quad_weights[q] / grid_spacing[d];
@@ -272,28 +256,25 @@ namespace muGrid {
                 // Accumulate each node's contribution quad-point by quad-point
                 // (B folds, so only the nodes touched by quad q contribute),
                 // then scatter once — the structure of the hand-written kernel.
-                Real fa[NbNodes] = {};
-                static_for<NbQuad>([&](auto Q) {
-                    constexpr Index_t q = decltype(Q)::value;
-                    Real cg[Dim];
-                    static_for<Dim>([&](auto D) {
-                        constexpr Index_t d = decltype(D)::value;
+                // Trip counts are compile-time constants and Element::B is
+                // constexpr, so the optimizer unrolls and folds B.
+                T fa[NbNodes] = {};
+                for (Index_t q = 0; q < NbQuad; ++q) {
+                    T cg[Dim];
+                    for (Dim_t d = 0; d < Dim; ++d) {
                         cg[d] = coeff[q][d] *
                                 gradient_input[grad_base + q * grad_stride_q +
                                                d * grad_stride_d];
-                    });
-                    static_for<NbNodes>([&](auto Nn) {
-                        constexpr Index_t n = decltype(Nn)::value;
-                        static_for<Dim>([&](auto D) {
-                            constexpr Index_t d = decltype(D)::value;
-                            fa[n] += Element::B[q][d][n] * cg[d];
-                        });
-                    });
-                });
-                static_for<NbNodes>([&](auto Nn) {
-                    constexpr Index_t n = decltype(Nn)::value;
+                    }
+                    for (Index_t n = 0; n < NbNodes; ++n) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
+                            fa[n] += static_cast<T>(Element::B[q][d][n]) * cg[d];
+                        }
+                    }
+                }
+                for (Index_t n = 0; n < NbNodes; ++n) {
                     nodal_output[nodal_base + node_lin[n]] += fa[n];
-                });
+                }
             };
 
             if constexpr (Dim == 2) {
@@ -330,13 +311,17 @@ namespace muGrid {
      * fem_element.hh); the kernels are generic over it. Supported elements:
      * `P1Tri2D/3D` (triangles/tets) and, by adding a traits struct, Q1.
      */
-    template <class Element>
+    template <class Element, typename T = Real>
     class FEMGradientOperator : public LinearOperator {
         static_assert(Element::SpatialDim == 2 || Element::SpatialDim == 3,
                       "FEMGradientOperator is only implemented for 2D and 3D");
+        static_assert(std::is_same_v<T, Real> || std::is_same_v<T, Real32>,
+                      "FEMGradientOperator scalar type must be Real or Real32");
 
        public:
         using Parent = LinearOperator;
+        //! Scalar type the operator and its fields use.
+        using Scalar = T;
 
         //! Spatial dimension of the element.
         static constexpr Dim_t Dim = Element::SpatialDim;
@@ -378,25 +363,25 @@ namespace muGrid {
         FEMGradientOperator & operator=(FEMGradientOperator && other) = default;
 
         // ---- Host interface ----
-        void apply(const TypedFieldBase<Real> & nodal_field,
-                   TypedFieldBase<Real> & gradient_field) const override {
-            this->apply_impl(nodal_field, gradient_field, 1.0, false);
+        void apply(const TypedFieldBase<T> & nodal_field,
+                   TypedFieldBase<T> & gradient_field) const override {
+            this->apply_impl(nodal_field, gradient_field, T(1), false);
         }
-        void apply_increment(const TypedFieldBase<Real> & nodal_field,
-                             const Real & alpha,
-                             TypedFieldBase<Real> & gradient_field)
+        void apply_increment(const TypedFieldBase<T> & nodal_field,
+                             const T & alpha,
+                             TypedFieldBase<T> & gradient_field)
             const override {
             this->apply_impl(nodal_field, gradient_field, alpha, true);
         }
-        void transpose(const TypedFieldBase<Real> & gradient_field,
-                       TypedFieldBase<Real> & nodal_field,
+        void transpose(const TypedFieldBase<T> & gradient_field,
+                       TypedFieldBase<T> & nodal_field,
                        const std::vector<Real> & weights = {}) const override {
-            this->transpose_impl(gradient_field, nodal_field, 1.0, false,
+            this->transpose_impl(gradient_field, nodal_field, T(1), false,
                                  weights);
         }
-        void transpose_increment(const TypedFieldBase<Real> & gradient_field,
-                                 const Real & alpha,
-                                 TypedFieldBase<Real> & nodal_field,
+        void transpose_increment(const TypedFieldBase<T> & gradient_field,
+                                 const T & alpha,
+                                 TypedFieldBase<T> & nodal_field,
                                  const std::vector<Real> & weights = {})
             const override {
             this->transpose_impl(gradient_field, nodal_field, alpha, true,
@@ -405,28 +390,28 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // ---- Device interface ----
-        void apply(const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
-                   TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field)
+        void apply(const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
+                   TypedFieldBase<T, DefaultDeviceSpace> & gradient_field)
             const {
-            this->apply_impl(nodal_field, gradient_field, 1.0, false);
+            this->apply_impl(nodal_field, gradient_field, T(1), false);
         }
         void apply_increment(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
-            const Real & alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field) const {
+            const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
+            const T & alpha,
+            TypedFieldBase<T, DefaultDeviceSpace> & gradient_field) const {
             this->apply_impl(nodal_field, gradient_field, alpha, true);
         }
         void transpose(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
-            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
+            TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
             const std::vector<Real> & weights = {}) const {
-            this->transpose_impl(gradient_field, nodal_field, 1.0, false,
+            this->transpose_impl(gradient_field, nodal_field, T(1), false,
                                  weights);
         }
         void transpose_increment(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
-            const Real & alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
+            const TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
+            const T & alpha,
+            TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
             const std::vector<Real> & weights = {}) const {
             this->transpose_impl(gradient_field, nodal_field, alpha, true,
                                  weights);
@@ -546,8 +531,8 @@ namespace muGrid {
         }
 
         //! Host apply/gradient with optional increment.
-        void apply_impl(const TypedFieldBase<Real> & nodal_field,
-                        TypedFieldBase<Real> & gradient_field, Real alpha,
+        void apply_impl(const TypedFieldBase<T> & nodal_field,
+                        TypedFieldBase<T> & gradient_field, T alpha,
                         bool increment) const {
             Index_t nb_components;
             const auto & collection =
@@ -555,28 +540,28 @@ namespace muGrid {
                                       nb_components);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
-            const Real * nodal = nodal_field.data();
-            Real * gradient = gradient_field.data();
+            const T * nodal = nodal_field.data();
+            T * gradient = gradient_field.data();
             const Index_t nb_sub = this->get_nb_input_components();
 
             // AoS layout: components fastest, then sub-pts/quad/operators, then
             // the spatial axes. Build the per-axis strides as arrays so the
             // element-generic kernel handles 2D and 3D uniformly.
             std::array<Index_t, Dim> nbg{}, nstride{}, gstride{};
-            std::array<Real, Dim> h{};
+            std::array<T, Dim> h{};
             Index_t span = 1;
             for (Dim_t d = 0; d < Dim; ++d) {
                 nbg[d] = nb_grid_pts[d];
                 nstride[d] = nb_components * nb_sub * span;
                 gstride[d] = nb_components * DIM * NB_QUAD * span;
-                h[d] = grid_spacing[d];
+                h[d] = static_cast<T>(grid_spacing[d]);
                 span *= nb_grid_pts[d];
             }
             const Index_t grad_stride_d = nb_components;
             const Index_t grad_stride_q = nb_components * DIM;
 
             for (Index_t comp = 0; comp < nb_components; ++comp) {
-                fem_gradient_kernels::fem_gradient_host_generic<Element>(
+                fem_gradient_kernels::fem_gradient_host_generic<Element, T>(
                     nodal + comp, gradient + comp, nbg.data(), nstride.data(),
                     gstride.data(), grad_stride_q, grad_stride_d, h.data(),
                     alpha, increment);
@@ -584,8 +569,8 @@ namespace muGrid {
         }
 
         //! Host transpose/divergence with optional increment.
-        void transpose_impl(const TypedFieldBase<Real> & gradient_field,
-                            TypedFieldBase<Real> & nodal_field, Real alpha,
+        void transpose_impl(const TypedFieldBase<T> & gradient_field,
+                            TypedFieldBase<T> & nodal_field, T alpha,
                             bool increment,
                             const std::vector<Real> & weights) const {
             Index_t nb_components;
@@ -594,27 +579,33 @@ namespace muGrid {
                                       nb_components);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
-            const Real * gradient = gradient_field.data();
-            Real * nodal = nodal_field.data();
-            const std::vector<Real> quad_weights =
+            const T * gradient = gradient_field.data();
+            T * nodal = nodal_field.data();
+            const std::vector<Real> quad_weights_real =
                 weights.empty() ? this->get_quadrature_weights() : weights;
+            // Quadrature weights are stored/​passed in double; convert to the
+            // operator's scalar type for the kernel.
+            std::vector<T> quad_weights(quad_weights_real.size());
+            for (std::size_t i = 0; i < quad_weights_real.size(); ++i) {
+                quad_weights[i] = static_cast<T>(quad_weights_real[i]);
+            }
             const Index_t nb_sub = this->get_nb_input_components();
 
             std::array<Index_t, Dim> nbg{}, nstride{}, gstride{};
-            std::array<Real, Dim> h{};
+            std::array<T, Dim> h{};
             Index_t span = 1;
             for (Dim_t d = 0; d < Dim; ++d) {
                 nbg[d] = nb_grid_pts[d];
                 nstride[d] = nb_components * nb_sub * span;
                 gstride[d] = nb_components * DIM * NB_QUAD * span;
-                h[d] = grid_spacing[d];
+                h[d] = static_cast<T>(grid_spacing[d]);
                 span *= nb_grid_pts[d];
             }
             const Index_t grad_stride_d = nb_components;
             const Index_t grad_stride_q = nb_components * DIM;
 
             for (Index_t comp = 0; comp < nb_components; ++comp) {
-                fem_gradient_kernels::fem_divergence_host_generic<Element>(
+                fem_gradient_kernels::fem_divergence_host_generic<Element, T>(
                     gradient + comp, nodal + comp, nbg.data(), gstride.data(),
                     grad_stride_q, grad_stride_d, nstride.data(), h.data(),
                     quad_weights.data(), alpha, increment);
@@ -624,30 +615,30 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         //! Device apply/gradient with optional increment.
         void apply_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
-            TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
-            Real alpha, bool increment) const {
+            const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
+            TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
+            T alpha, bool increment) const {
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
                                       nb_components);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
-            const Real * nodal = nodal_field.view().data();
-            Real * gradient = gradient_field.view().data();
+            const T * nodal = nodal_field.view().data();
+            T * gradient = gradient_field.view().data();
             const Index_t nb_input = this->get_nb_input_components();
 
             // SoA layout: spatial axes fastest, then sub-pts/quad/dim, then
             // components. Build per-axis strides as arrays so one call site
             // serves 2D and 3D (the kernel is element-generic).
             std::array<Index_t, Dim> nbg{}, nstride{}, gstride{};
-            std::array<Real, Dim> h{};
+            std::array<T, Dim> h{};
             Index_t span = 1;
             for (Dim_t d = 0; d < Dim; ++d) {
                 nbg[d] = nb_grid_pts[d];
                 nstride[d] = span;
                 gstride[d] = span;
-                h[d] = grid_spacing[d];
+                h[d] = static_cast<T>(grid_spacing[d]);
                 span *= nb_grid_pts[d];
             }
             const Index_t gsq = span;
@@ -655,7 +646,7 @@ namespace muGrid {
             const Index_t nodal_stride_c = span * nb_input;
             const Index_t grad_stride_c = span * NB_QUAD * DIM;
             for (Index_t comp = 0; comp < nb_components; ++comp) {
-                fem_gradient_kernels::fem_gradient_gpu<Element>(
+                fem_gradient_kernels::fem_gradient_gpu<Element, T>(
                     nodal + comp * nodal_stride_c,
                     gradient + comp * grad_stride_c, nbg.data(),
                     nstride.data(), gstride.data(), gsq, gsd, h.data(), alpha,
@@ -665,8 +656,8 @@ namespace muGrid {
 
         //! Device transpose/divergence with optional increment.
         void transpose_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & gradient_field,
-            TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field, Real alpha,
+            const TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
+            TypedFieldBase<T, DefaultDeviceSpace> & nodal_field, T alpha,
             bool increment, const std::vector<Real> & weights) const {
             Index_t nb_components;
             const auto & collection =
@@ -674,20 +665,24 @@ namespace muGrid {
                                       nb_components);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
-            const Real * gradient = gradient_field.view().data();
-            Real * nodal = nodal_field.view().data();
-            const std::vector<Real> quad_weights =
+            const T * gradient = gradient_field.view().data();
+            T * nodal = nodal_field.view().data();
+            const std::vector<Real> quad_weights_real =
                 weights.empty() ? this->get_quadrature_weights() : weights;
+            std::vector<T> quad_weights(quad_weights_real.size());
+            for (std::size_t i = 0; i < quad_weights_real.size(); ++i) {
+                quad_weights[i] = static_cast<T>(quad_weights_real[i]);
+            }
             const Index_t nb_input = this->get_nb_input_components();
 
             std::array<Index_t, Dim> nbg{}, nstride{}, gstride{};
-            std::array<Real, Dim> h{};
+            std::array<T, Dim> h{};
             Index_t span = 1;
             for (Dim_t d = 0; d < Dim; ++d) {
                 nbg[d] = nb_grid_pts[d];
                 nstride[d] = span;
                 gstride[d] = span;
-                h[d] = grid_spacing[d];
+                h[d] = static_cast<T>(grid_spacing[d]);
                 span *= nb_grid_pts[d];
             }
             const Index_t gsq = span;
@@ -697,7 +692,7 @@ namespace muGrid {
             // The wrapper folds the quadrature weights into per-(quad, dim)
             // coefficients on the host, so no device staging is needed.
             for (Index_t comp = 0; comp < nb_components; ++comp) {
-                fem_gradient_kernels::fem_divergence_gpu<Element>(
+                fem_gradient_kernels::fem_divergence_gpu<Element, T>(
                     gradient + comp * grad_stride_c,
                     nodal + comp * nodal_stride_c, nbg.data(), nstride.data(),
                     gstride.data(), gsq, gsd, h.data(), quad_weights.data(),
@@ -715,6 +710,12 @@ namespace muGrid {
     using FEMGradientOperatorQ1_2D = FEMGradientOperator<Q1Quad2D>;
     //! 3D trilinear-hex (Q1) FEM gradient.
     using FEMGradientOperatorQ1_3D = FEMGradientOperator<Q1Hex3D>;
+
+    //! Single-precision (Real32) variants of the FEM gradient operators.
+    using FEMGradientOperator2D_32 = FEMGradientOperator<P1Tri2D, Real32>;
+    using FEMGradientOperator3D_32 = FEMGradientOperator<P1Tet3D, Real32>;
+    using FEMGradientOperatorQ1_2D_32 = FEMGradientOperator<Q1Quad2D, Real32>;
+    using FEMGradientOperatorQ1_3D_32 = FEMGradientOperator<Q1Hex3D, Real32>;
 
 }  // namespace muGrid
 

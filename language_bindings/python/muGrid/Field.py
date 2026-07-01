@@ -157,6 +157,15 @@ class Field:
         slices = self._make_slice(offsets, shape)
         return pixel_buf[slices]
 
+    @property
+    def dtype(self):
+        """
+        NumPy dtype of the field's scalar entries (e.g. ``float64``,
+        ``float32``, ``complex128``, ``complex64``). Read from the underlying
+        buffer, so it works identically on host (NumPy) and device (CuPy).
+        """
+        return self._get_buffer().dtype
+
     # Delegate attribute access to the underlying C++ object
     def __getattr__(self, name):
         """Delegate attribute access to the underlying C++ field."""
@@ -183,5 +192,3 @@ def wrap_field(field):
     if isinstance(field, Field):
         return field
     return Field(field)
-
-

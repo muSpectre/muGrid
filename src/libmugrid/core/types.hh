@@ -42,8 +42,14 @@
 #include <vector>
 
 // Compiler compatibility macros
+//
+// MUGRID_RESTRICT is a no-aliasing optimization hint; dropping it never
+// affects correctness. On MSVC it is defined empty: MSVC's `__restrict` on a
+// pointer to a *template-dependent* type (e.g. `const T * __restrict` in the
+// precision-generic operator kernels) triggers an internal compiler error
+// (C1001). GCC/Clang keep the hint via `__restrict__`.
 #if defined(_MSC_VER)
-    #define MUGRID_RESTRICT __restrict
+    #define MUGRID_RESTRICT
 #else
     #define MUGRID_RESTRICT __restrict__
 #endif
@@ -90,9 +96,15 @@ namespace muGrid {
 
     using Uint = unsigned int;  //!< type to use in math for unsigned integers
     using Int = int;            //!< type to use in math for signed integers
-    using Real = double;        //!< type to use in math for real numbers
-    using Complex =
-        std::complex<Real>;  //!< type to use in math for complex numbers
+    //! Explicit-width real/complex scalar types. `Real`/`Complex` stay the
+    //! default precision (the 64-bit variants), so precision-agnostic code is
+    //! unchanged; fields and operators may be instantiated at either width.
+    using Real32 = float;
+    using Real64 = double;
+    using Complex32 = std::complex<float>;
+    using Complex64 = std::complex<double>;
+    using Real = Real64;        //!< type to use in math for real numbers
+    using Complex = Complex64;  //!< type to use in math for complex numbers
 
     /**@}*/
 

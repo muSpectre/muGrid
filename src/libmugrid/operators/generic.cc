@@ -664,14 +664,22 @@ namespace muGrid {
         quadrature_point_field.set_zero();
         this->apply_increment(nodal_field, 1., quadrature_point_field);
     }
+    void GenericLinearOperator::apply(
+        const TypedFieldBase<Real32> & nodal_field,
+        TypedFieldBase<Real32> & quadrature_point_field) const {
+        quadrature_point_field.set_zero();
+        this->apply_increment(nodal_field, 1.f, quadrature_point_field);
+    }
 
     /* ---------------------------------------------------------------------- */
-    void GenericLinearOperator::apply_increment(
-        const TypedFieldBase<Real> & nodal_field, const Real & alpha,
-        TypedFieldBase<Real> & quadrature_point_field) const {
-        // Validate fields and get collection
-        const auto & collection = this->validate_fields(nodal_field,
-                                                        quadrature_point_field);
+    template <typename T>
+    void GenericLinearOperator::apply_increment_impl(
+        const TypedFieldBase<T> & nodal_field, T alpha,
+        TypedFieldBase<T> & quadrature_point_field) const {
+        // Validate fields and get collection (generic version works for any
+        // field scalar type)
+        const auto & collection = this->validate_fields_generic(
+            nodal_field, quadrature_point_field);
 
         // Get component counts
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
@@ -688,12 +696,25 @@ namespace muGrid {
             nb_nodal_components);
 
         // Get raw data pointers
-        const Real* nodal_data = nodal_field.data();
-        Real* quad_data = quadrature_point_field.data();
+        const T* nodal_data = nodal_field.data();
+        T* quad_data = quadrature_point_field.data();
 
         // Use KernelDispatcher for backend-agnostic kernel execution
-        KernelDispatcher<HostSpace>::apply_convolution(
+        KernelDispatcher<HostSpace>::template apply_convolution<T>(
             nodal_data, quad_data, alpha, params, sparse_op);
+    }
+
+    void GenericLinearOperator::apply_increment(
+        const TypedFieldBase<Real> & nodal_field, const Real & alpha,
+        TypedFieldBase<Real> & quadrature_point_field) const {
+        this->apply_increment_impl<Real>(nodal_field, alpha,
+                                         quadrature_point_field);
+    }
+    void GenericLinearOperator::apply_increment(
+        const TypedFieldBase<Real32> & nodal_field, const Real32 & alpha,
+        TypedFieldBase<Real32> & quadrature_point_field) const {
+        this->apply_increment_impl<Real32>(nodal_field, alpha,
+                                           quadrature_point_field);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -706,16 +727,25 @@ namespace muGrid {
         this->transpose_increment(quadrature_point_field, 1., nodal_field,
                                   weights);
     }
+    void GenericLinearOperator::transpose(
+        const TypedFieldBase<Real32> & quadrature_point_field,
+        TypedFieldBase<Real32> & nodal_field,
+        const std::vector<Real> & weights) const {
+        nodal_field.set_zero();
+        this->transpose_increment(quadrature_point_field, 1.f, nodal_field,
+                                  weights);
+    }
 
     /* ---------------------------------------------------------------------- */
-    void GenericLinearOperator::transpose_increment(
-        const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
-        TypedFieldBase<Real> & nodal_field,
+    template <typename T>
+    void GenericLinearOperator::transpose_increment_impl(
+        const TypedFieldBase<T> & quadrature_point_field, T alpha,
+        TypedFieldBase<T> & nodal_field,
         const std::vector<Real> & weights) const {
-        // Validate fields and get collection (is_transpose=true for correct ghost check)
-        const auto & collection = this->validate_fields(nodal_field,
-                                                        quadrature_point_field,
-                                                        true);
+        // Validate fields and get collection (is_transpose=true for correct
+        // ghost check; generic version works for any field scalar type)
+        const auto & collection = this->validate_fields_generic(
+            nodal_field, quadrature_point_field, true);
 
         // Get component counts
         const Index_t nb_nodal_components = nodal_field.get_nb_components();
@@ -732,13 +762,28 @@ namespace muGrid {
             nb_nodal_components);
 
         // Get raw data pointers
-        Real* nodal_data = nodal_field.data();
-        const Real* quad_data = quadrature_point_field.data();
+        T* nodal_data = nodal_field.data();
+        const T* quad_data = quadrature_point_field.data();
 
         // Use KernelDispatcher for backend-agnostic kernel execution
-        KernelDispatcher<HostSpace>::transpose_convolution(
+        KernelDispatcher<HostSpace>::template transpose_convolution<T>(
             quad_data, nodal_data, alpha, params, sparse_op,
             weights.empty() ? nullptr : weights.data());
+    }
+
+    void GenericLinearOperator::transpose_increment(
+        const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
+        TypedFieldBase<Real> & nodal_field,
+        const std::vector<Real> & weights) const {
+        this->transpose_increment_impl<Real>(quadrature_point_field, alpha,
+                                             nodal_field, weights);
+    }
+    void GenericLinearOperator::transpose_increment(
+        const TypedFieldBase<Real32> & quadrature_point_field,
+        const Real32 & alpha, TypedFieldBase<Real32> & nodal_field,
+        const std::vector<Real> & weights) const {
+        this->transpose_increment_impl<Real32>(quadrature_point_field, alpha,
+                                               nodal_field, weights);
     }
 
     /* ---------------------------------------------------------------------- */

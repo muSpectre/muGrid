@@ -68,6 +68,33 @@ SubPtMap = Dict[str, int]
 Shape = Union[Tuple[int, ...], List[int], Sequence[int]]
 
 
+def _typed_field(collection: Any, name: str, components: Shape, sub_pt: str,
+                 dtype: Any, allowed: Dict[Any, str], double_method: str):
+    """Get-or-create a field of the requested ``dtype`` on ``collection``.
+
+    The double-precision case delegates to the collection's get-or-create
+    convenience method (``real_field`` / ``complex_field``); the
+    single-precision case mirrors those semantics around the
+    ``register_*32_field`` methods (which are register-only) by returning the
+    existing field when one of the given name is already registered. ``allowed``
+    maps each supported NumPy dtype to the name of the register-only method to
+    use for it (the double dtype maps to ``double_method``)."""
+    dt = np.dtype(dtype)
+    method = allowed.get(dt)
+    if method is None:
+        kinds = ", ".join(str(np.dtype(d)) for d in allowed)
+        raise ValueError(
+            f"{double_method} supports dtype {kinds}, got {dt}"
+        )
+    if method == double_method:
+        # Collection's own get-or-create convenience (handles existing names).
+        return getattr(collection, double_method)(name, components, sub_pt)
+    # Single precision: emulate get-or-create around the register-only method.
+    if collection.field_exists(name):
+        return collection.get_field(name)
+    return getattr(collection, method)(name, components, sub_pt)
+
+
 class FieldCollectionMixin:
     """
     Mixin providing field creation methods for classes that have an underlying
@@ -92,6 +119,7 @@ class FieldCollectionMixin:
         name: str,
         components: Shape = (),
         sub_pt: str = "pixel",
+        dtype: Any = np.float64,
     ) -> Field:
         """
         Create a real-valued field.
@@ -104,13 +132,22 @@ class FieldCollectionMixin:
             Shape of field components. Default is () for scalar.
         sub_pt : str, optional
             Sub-point type. Default is "pixel".
+        dtype : data-type, optional
+            Floating-point precision of the field: ``np.float64`` (default,
+            double precision) or ``np.float32`` (single precision). Single
+            precision halves the memory footprint.
 
         Returns
         -------
         Field
             Wrapped field with .s, .p, .sg, .pg accessors.
         """
-        cpp_field = self._get_field_collection().real_field(name, components, sub_pt)
+        cpp_field = _typed_field(
+            self._get_field_collection(), name, components, sub_pt, dtype,
+            {np.dtype(np.float64): "real_field",
+             np.dtype(np.float32): "register_real32_field"},
+            "real_field",
+        )
         return Field(cpp_field)
 
     def complex_field(
@@ -118,6 +155,7 @@ class FieldCollectionMixin:
         name: str,
         components: Shape = (),
         sub_pt: str = "pixel",
+        dtype: Any = np.complex128,
     ) -> Field:
         """
         Create a complex-valued field.
@@ -130,13 +168,22 @@ class FieldCollectionMixin:
             Shape of field components. Default is () for scalar.
         sub_pt : str, optional
             Sub-point type. Default is "pixel".
+        dtype : data-type, optional
+            Precision of the field: ``np.complex128`` (default, double
+            precision) or ``np.complex64`` (single precision). Single
+            precision halves the memory footprint.
 
         Returns
         -------
         Field
             Wrapped field with .s, .p, .sg, .pg accessors.
         """
-        cpp_field = self._get_field_collection().complex_field(name, components, sub_pt)
+        cpp_field = _typed_field(
+            self._get_field_collection(), name, components, sub_pt, dtype,
+            {np.dtype(np.complex128): "complex_field",
+             np.dtype(np.complex64): "register_complex32_field"},
+            "complex_field",
+        )
         return Field(cpp_field)
 
     def int_field(
@@ -920,7 +967,7 @@ class FFTEngine:
         self._cpp.reduce_ghosts(_unwrap(field))
 
     def register_real_space_field(
-        self, name: str, components: Shape = ()
+        self, name: str, components: Shape = (), dtype: Any = np.float64
     ) -> Field:
         """
         Register a new real-space field.
@@ -933,6 +980,10 @@ class FFTEngine:
             Unique field name.
         components : tuple of int, optional
             Shape of field components. Default is () for scalar.
+        dtype : data-type, optional
+            ``np.float64`` (default) or ``np.float32``. Single precision pairs
+            with single-precision FFTs (the engine picks the transform
+            precision from the field dtype) and halves the memory footprint.
 
         Returns
         -------
@@ -944,11 +995,15 @@ class FFTEngine:
         RuntimeError
             If a field with the given name already exists.
         """
-        cpp_field = self._cpp.register_real_space_field(name, components)
-        return Field(cpp_field)
+        if np.dtype(dtype) == np.float64:
+            return Field(self._cpp.register_real_space_field(name, components))
+        # Single precision: register on the engine's real-space collection.
+        return self.real_space_collection.real_field(
+            name, components, dtype=dtype
+        )
 
     def register_fourier_space_field(
-        self, name: str, components: Shape = ()
+        self, name: str, components: Shape = (), dtype: Any = np.complex128
     ) -> Field:
         """
         Register a new Fourier-space field.
@@ -961,6 +1016,9 @@ class FFTEngine:
             Unique field name.
         components : tuple of int, optional
             Shape of field components. Default is () for scalar.
+        dtype : data-type, optional
+            ``np.complex128`` (default) or ``np.complex64`` (single precision,
+            the Fourier-space counterpart of a ``np.float32`` real field).
 
         Returns
         -------
@@ -972,10 +1030,17 @@ class FFTEngine:
         RuntimeError
             If a field with the given name already exists.
         """
-        cpp_field = self._cpp.register_fourier_space_field(name, components)
-        return Field(cpp_field)
+        if np.dtype(dtype) == np.complex128:
+            return Field(
+                self._cpp.register_fourier_space_field(name, components)
+            )
+        return self.fourier_space_collection.complex_field(
+            name, components, dtype=dtype
+        )
 
-    def real_space_field(self, name: str, components: Shape = ()) -> Field:
+    def real_space_field(
+        self, name: str, components: Shape = (), dtype: Any = np.float64
+    ) -> Field:
         """
         Get or create a real-space field for FFT operations.
 
@@ -988,16 +1053,24 @@ class FFTEngine:
             Unique field name.
         components : tuple of int, optional
             Shape of field components. Default is () for scalar.
+        dtype : data-type, optional
+            ``np.float64`` (default) or ``np.float32`` (single precision).
 
         Returns
         -------
         Field
             Wrapped real-valued field with array accessors.
         """
-        cpp_field = self._cpp.real_space_field(name, components)
-        return Field(cpp_field)
+        if np.dtype(dtype) == np.float64:
+            return Field(self._cpp.real_space_field(name, components))
+        collection = self.real_space_collection
+        if collection.field_exists(name):
+            return Field(collection.get_field(name))
+        return collection.real_field(name, components, dtype=dtype)
 
-    def fourier_space_field(self, name: str, components: Shape = ()) -> Field:
+    def fourier_space_field(
+        self, name: str, components: Shape = (), dtype: Any = np.complex128
+    ) -> Field:
         """
         Get or create a Fourier-space field for FFT operations.
 
@@ -1010,14 +1083,20 @@ class FFTEngine:
             Unique field name.
         components : tuple of int, optional
             Shape of field components. Default is () for scalar.
+        dtype : data-type, optional
+            ``np.complex128`` (default) or ``np.complex64`` (single precision).
 
         Returns
         -------
         Field
             Wrapped complex-valued field with array accessors.
         """
-        cpp_field = self._cpp.fourier_space_field(name, components)
-        return Field(cpp_field)
+        if np.dtype(dtype) == np.complex128:
+            return Field(self._cpp.fourier_space_field(name, components))
+        collection = self.fourier_space_collection
+        if collection.field_exists(name):
+            return Field(collection.get_field(name))
+        return collection.complex_field(name, components, dtype=dtype)
 
     @property
     def real_space_collection(self) -> GlobalFieldCollection:

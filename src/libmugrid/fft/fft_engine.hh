@@ -133,12 +133,26 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
+    // Single-precision path (real input is Real32). The serial (non-decomposed)
+    // layout uses the backend N-D transform (no work buffers/transpose); the
+    // MPI-decomposed layout uses the templated pencil/slab path.
+    if (input.get_type_descriptor() == TypeDescriptor::Real32) {
+      if (!this->need_transpose_xy && !this->need_transpose_yz) {
+        this->transform_serial_nd<Real32, Complex32>(input, output, true);
+      } else if (this->spatial_dim == 2) {
+        this->template fft_2d<Real32, Complex32>(input, output);
+      } else {
+        this->template fft_3d<Real32, Complex32>(input, output);
+      }
+      return;
+    }
+
     if (this->spatial_dim == 1) {
-      fft_1d(input, output);
+      this->template fft_1d<Real, Complex>(input, output);
     } else if (this->spatial_dim == 2) {
-      fft_2d(input, output);
+      this->template fft_2d<Real, Complex>(input, output);
     } else {
-      fft_3d(input, output);
+      this->template fft_3d<Real, Complex>(input, output);
     }
   }
 
@@ -171,12 +185,24 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
+    // Single-precision path (real output is Real32).
+    if (output.get_type_descriptor() == TypeDescriptor::Real32) {
+      if (!this->need_transpose_xy && !this->need_transpose_yz) {
+        this->transform_serial_nd<Real32, Complex32>(input, output, false);
+      } else if (this->spatial_dim == 2) {
+        this->template ifft_2d<Real32, Complex32>(input, output);
+      } else {
+        this->template ifft_3d<Real32, Complex32>(input, output);
+      }
+      return;
+    }
+
     if (this->spatial_dim == 1) {
-      ifft_1d(input, output);
+      this->template ifft_1d<Real, Complex>(input, output);
     } else if (this->spatial_dim == 2) {
-      ifft_2d(input, output);
+      this->template ifft_2d<Real, Complex>(input, output);
     } else {
-      ifft_3d(input, output);
+      this->template ifft_3d<Real, Complex>(input, output);
     }
   }
 
@@ -185,6 +211,120 @@ class FFTEngine : public FFTEngineBase {
   }
 
  protected:
+  /**
+   * Single-precision transform via the backend's N-dimensional entry point.
+   *
+   * Handles 1D/2D/3D on the serial (non-MPI-decomposed) layout only: the whole
+   * grid is local, so the transform is one planned backend call with no work
+   * buffers or pencil transposes (those remain double-only). @p forward selects
+   * r2c (real @p input → complex @p output) vs c2r. RT/CT are Real32/Complex32.
+   */
+  template <typename RT, typename CT>
+  void transform_serial_nd(const Field & input, Field & output, bool forward) {
+    if (!backend->supports_nd()) {
+      throw RuntimeError(
+          "single-precision FFT requires a backend with N-dimensional support "
+          "(pocketfft); the MPI/GPU fp32 path is not yet implemented");
+    }
+    const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
+    const DynGridIndex local_real =
+        this->get_nb_subdomain_grid_pts_without_ghosts();
+    const DynGridIndex & local_with_ghosts =
+        this->get_nb_subdomain_grid_pts_with_ghosts();
+    const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
+    const Dim_t dim = this->spatial_dim;
+
+    // Serial only: this rank must hold the entire domain.
+    for (Dim_t d{0}; d < dim; ++d) {
+      if (local_real[d] != nb_grid_pts[d]) {
+        throw RuntimeError(
+            "single-precision FFT currently supports only the serial "
+            "(non-MPI-decomposed) layout");
+      }
+    }
+
+    const Index_t nb_components{input.get_nb_components()};
+    if (output.get_nb_components() != nb_components) {
+      throw RuntimeError(
+          "Input and output fields must have the same number of components");
+    }
+
+    constexpr bool is_device = is_device_space_v<MemorySpace>;
+    const Field & real_field{forward ? input : output};
+    const Field & cplx_field{forward ? output : input};
+
+    const Index_t Nx{nb_grid_pts[0]};
+    const Index_t Fx{Nx / 2 + 1};
+    const Index_t Ny{dim > 1 ? nb_grid_pts[1] : Index_t{1}};
+    const Index_t Nz{dim > 2 ? nb_grid_pts[2] : Index_t{1}};
+    const Index_t lwx{local_with_ghosts[0]};
+    const Index_t lwy{dim > 1 ? local_with_ghosts[1] : Index_t{1}};
+
+    const Index_t nb_buf_pixels{lwx * lwy *
+                                (dim > 2 ? local_with_ghosts[2] : Index_t{1})};
+    const Index_t gl0{ghosts_left[0]};
+    const Index_t gl1{dim > 1 ? ghosts_left[1] : Index_t{0}};
+    const Index_t gl2{dim > 2 ? ghosts_left[2] : Index_t{0}};
+    const Index_t ghost_pixel_offset{gl0 + gl1 * lwx + gl2 * lwx * lwy};
+    const Index_t nb_fourier_pixels{Fx * (dim > 1 ? Ny : 1) *
+                                    (dim > 2 ? Nz : 1)};
+
+    // Per-axis element strides folded from the ghost layout and AoS/SoA
+    // component layout, mirroring the double serial-nd fast path.
+    const bool r_soa{real_field.get_storage_order() ==
+                     StorageOrder::StructureOfArrays};
+    const Index_t r_comp{r_soa ? nb_buf_pixels : Index_t{1}};
+    const Index_t r_x{r_soa ? Index_t{1} : nb_components};
+    const Index_t r_y{r_soa ? lwx : nb_components * lwx};
+    const Index_t r_z{r_soa ? lwx * lwy : nb_components * lwx * lwy};
+    const Index_t r_base{r_soa ? ghost_pixel_offset
+                               : ghost_pixel_offset * nb_components};
+
+    const bool f_soa{cplx_field.get_storage_order() ==
+                     StorageOrder::StructureOfArrays};
+    const Index_t f_comp{f_soa ? nb_fourier_pixels : Index_t{1}};
+    const Index_t f_x{f_soa ? Index_t{1} : nb_components};
+    const Index_t f_y{f_soa ? Fx : nb_components * Fx};
+    const Index_t f_z{f_soa ? Fx * Ny : nb_components * Fx * Ny};
+
+    // shape/axes in row-major order: {component, [Nz,] [Ny,] Nx}; the
+    // half-complex (x) axis is last, the component axis (0) is a batch axis.
+    std::vector<Index_t> shape, axes, r_strides, f_strides;
+    shape.push_back(nb_components);
+    r_strides.push_back(r_comp);
+    f_strides.push_back(f_comp);
+    if (dim > 2) {
+      shape.push_back(Nz);
+      r_strides.push_back(r_z);
+      f_strides.push_back(f_z);
+    }
+    if (dim > 1) {
+      shape.push_back(Ny);
+      r_strides.push_back(r_y);
+      f_strides.push_back(f_y);
+    }
+    shape.push_back(Nx);
+    r_strides.push_back(r_x);
+    f_strides.push_back(f_x);
+    for (Dim_t a{1}; a <= dim; ++a) {
+      axes.push_back(a);
+    }
+
+    RT * real_ptr{static_cast<RT *>(
+        const_cast<Field &>(real_field).get_void_data_ptr(!is_device))};
+    CT * cplx_ptr{static_cast<CT *>(
+        const_cast<Field &>(cplx_field).get_void_data_ptr(!is_device))};
+
+    if (forward) {
+      backend->r2c_nd(shape, axes, static_cast<const RT *>(real_ptr) + r_base,
+                      r_strides, cplx_ptr, f_strides);
+    } else {
+      backend->c2r_nd(shape, axes, static_cast<const CT *>(cplx_ptr),
+                      f_strides, real_ptr + r_base, r_strides);
+    }
+  }
+
+  template <typename RT, typename CT>
   void fft_1d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
@@ -198,10 +338,10 @@ class FFTEngine : public FFTEngineBase {
     }
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
-    const Real * input_ptr =
-        static_cast<const Real *>(input.get_void_data_ptr(!is_device));
-    Complex * output_ptr =
-        static_cast<Complex *>(output.get_void_data_ptr(!is_device));
+    const RT * input_ptr =
+        static_cast<const RT *>(input.get_void_data_ptr(!is_device));
+    CT * output_ptr =
+        static_cast<CT *>(output.get_void_data_ptr(!is_device));
 
     Index_t Nx{nb_grid_pts[0]};
     Index_t Fx{Nx / 2 + 1};
@@ -233,6 +373,7 @@ class FFTEngine : public FFTEngineBase {
     }
   }
 
+  template <typename RT, typename CT>
   void ifft_1d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     const DynGridIndex & ghosts_left = this->get_nb_ghosts_left();
@@ -246,10 +387,10 @@ class FFTEngine : public FFTEngineBase {
     }
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
-    const Complex * input_ptr =
-        static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
-    Real * output_ptr =
-        static_cast<Real *>(output.get_void_data_ptr(!is_device));
+    const CT * input_ptr =
+        static_cast<const CT *>(input.get_void_data_ptr(!is_device));
+    RT * output_ptr =
+        static_cast<RT *>(output.get_void_data_ptr(!is_device));
 
     Index_t Nx{nb_grid_pts[0]};
     Index_t Fx{Nx / 2 + 1};
@@ -281,6 +422,7 @@ class FFTEngine : public FFTEngineBase {
     }
   }
 
+  template <typename RT, typename CT>
   void fft_2d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
@@ -295,10 +437,10 @@ class FFTEngine : public FFTEngineBase {
     }
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
-    const Real * input_ptr =
-        static_cast<const Real *>(input.get_void_data_ptr(!is_device));
-    Complex * output_ptr =
-        static_cast<Complex *>(output.get_void_data_ptr(!is_device));
+    const RT * input_ptr =
+        static_cast<const RT *>(input.get_void_data_ptr(!is_device));
+    CT * output_ptr =
+        static_cast<CT *>(output.get_void_data_ptr(!is_device));
 
     Index_t Nx{nb_grid_pts[0]};
     Index_t Fx{Nx / 2 + 1};
@@ -343,7 +485,7 @@ class FFTEngine : public FFTEngineBase {
                : get_aos_strides(nb_work_pixels, Fx);
 
     Index_t work_size{nb_work_pixels * nb_components};
-    Complex * work_ptr{this->get_work_buffer(0, work_size)};
+    CT * work_ptr{this->template get_work_buffer<CT>(0, work_size)};
 
     // Step 1: r2c FFT along X for each component
     for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -366,7 +508,7 @@ class FFTEngine : public FFTEngineBase {
                    : get_aos_strides(nb_fourier_pixels, Fx);
 
     // Step 2 & 3: Transpose/copy and c2c FFT along Y
-    Transpose * transpose = this->get_transpose_xy(nb_components, storage_order);
+    Transpose * transpose = this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
     if (transpose != nullptr) {
       // MPI path: transpose to output, then c2c on output
       transpose->forward(work_ptr, output_ptr);
@@ -401,10 +543,11 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 3: Copy from work to output (same storage order, direct copy)
-      deep_copy<Complex, MemorySpace>(output_ptr, work_ptr, work_size);
+      deep_copy<CT, MemorySpace>(output_ptr, work_ptr, work_size);
     }
   }
 
+  template <typename RT, typename CT>
   void fft_3d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
@@ -424,19 +567,19 @@ class FFTEngine : public FFTEngineBase {
     Index_t Fx{Nx / 2 + 1};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
-    const Real * input_ptr =
-        static_cast<const Real *>(input.get_void_data_ptr(!is_device));
-    Complex * output_ptr =
-        static_cast<Complex *>(output.get_void_data_ptr(!is_device));
+    const RT * input_ptr =
+        static_cast<const RT *>(input.get_void_data_ptr(!is_device));
+    CT * output_ptr =
+        static_cast<CT *>(output.get_void_data_ptr(!is_device));
 
     // Storage order: SoA on GPU, AoS on CPU
     StorageOrder storage_order{input.get_storage_order()};
     bool is_soa{(storage_order == StorageOrder::StructureOfArrays)};
 
     Transpose * transpose_xy =
-        this->get_transpose_xy(nb_components, storage_order);
+        this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
     Transpose * transpose_yz =
-        this->get_transpose_yz(nb_components, storage_order);
+        this->get_transpose_yz(nb_components, storage_order, std::is_same_v<CT, Complex32>);
 
     bool need_mpi_path{(transpose_xy != nullptr || transpose_yz != nullptr)};
 
@@ -480,7 +623,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_ypencil_pixels, local_yfx, Ny)
                  : get_aos_strides_3d(nb_ypencil_pixels, local_yfx, Ny);
 
-      Complex * work_y_ptr{this->get_work_buffer(1, ypencil_size)};
+      CT * work_y_ptr{this->template get_work_buffer<CT>(1, ypencil_size)};
 
       if (transpose_xy == nullptr && backend->supports_nd()) {
         // Slab fast path (P2 == 1: X and Y are both local). Transform the two
@@ -509,7 +652,7 @@ class FFTEngine : public FFTEngineBase {
               work_z_z_dist] =
             is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
                    : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
-        Complex * work_z_ptr{this->get_work_buffer(0, zpencil_size)};
+        CT * work_z_ptr{this->template get_work_buffer<CT>(0, zpencil_size)};
 
         // Step 1: r2c FFT along X for each component
         for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -530,7 +673,7 @@ class FFTEngine : public FFTEngineBase {
           transpose_xy->forward(work_z_ptr, work_y_ptr);
         } else {
           // No X<->Y redistribution (P2 == 1): same shape, copy through.
-          deep_copy<Complex, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
+          deep_copy<CT, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
         }
 
         // Step 2b: c2c FFT along Y for each component
@@ -566,7 +709,7 @@ class FFTEngine : public FFTEngineBase {
       } else {
         // No Y<->Z redistribution needed (P1 == 1): Z is already local and
         // the Fourier layout has the same shape as the Y-pencil.
-        deep_copy<Complex, MemorySpace>(output_ptr, work_y_ptr, fourier_size);
+        deep_copy<CT, MemorySpace>(output_ptr, work_y_ptr, fourier_size);
       }
 
       // Step 4: c2c FFT along Z for each component
@@ -629,7 +772,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_fourier_pixels, Fx, Ny)
                  : get_aos_strides_3d(nb_fourier_pixels, Fx, Ny);
 
-      Complex * work_ptr{this->get_work_buffer(0, work_size)};
+      CT * work_ptr{this->template get_work_buffer<CT>(0, work_size)};
 
       // Step 1: r2c FFT along X for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -686,10 +829,11 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Copy from work to output (same storage order)
-      deep_copy<Complex, MemorySpace>(output_ptr, work_ptr, work_size);
+      deep_copy<CT, MemorySpace>(output_ptr, work_ptr, work_size);
     }
   }
 
+  template <typename RT, typename CT>
   void ifft_2d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
@@ -704,10 +848,10 @@ class FFTEngine : public FFTEngineBase {
     }
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
-    const Complex * input_ptr =
-        static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
-    Real * output_ptr =
-        static_cast<Real *>(output.get_void_data_ptr(!is_device));
+    const CT * input_ptr =
+        static_cast<const CT *>(input.get_void_data_ptr(!is_device));
+    RT * output_ptr =
+        static_cast<RT *>(output.get_void_data_ptr(!is_device));
 
     Index_t Nx{nb_grid_pts[0]};
     Index_t Fx{Nx / 2 + 1};
@@ -739,7 +883,7 @@ class FFTEngine : public FFTEngineBase {
     StorageOrder in_storage_order{input.get_storage_order()};
     bool in_is_soa{(in_storage_order == StorageOrder::StructureOfArrays)};
 
-    Transpose * transpose = this->get_transpose_xy(nb_components, storage_order);
+    Transpose * transpose = this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
     if (transpose != nullptr) {
       Index_t local_fx{this->nb_fourier_subdomain_grid_pts[0]};
       Index_t local_fourier_pixels{local_fx * Ny};
@@ -750,8 +894,8 @@ class FFTEngine : public FFTEngineBase {
           in_is_soa ? get_soa_strides(local_fourier_pixels, local_fx)
                     : get_aos_strides(local_fourier_pixels, local_fx);
 
-      Complex * temp_ptr{this->get_work_buffer(0, local_fourier_size)};
-      deep_copy<Complex, MemorySpace>(temp_ptr, input_ptr, local_fourier_size);
+      CT * temp_ptr{this->template get_work_buffer<CT>(0, local_fourier_size)};
+      deep_copy<CT, MemorySpace>(temp_ptr, input_ptr, local_fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -764,7 +908,7 @@ class FFTEngine : public FFTEngineBase {
       // Step 2: Transpose X<->Y backward
       Index_t nb_work_pixels{Fx * local_real[1]};
       Index_t work_size{nb_work_pixels * nb_components};
-      Complex * work_buffer_ptr{this->get_work_buffer(1, work_size)};
+      CT * work_buffer_ptr{this->template get_work_buffer<CT>(1, work_size)};
 
       transpose->backward(temp_ptr, work_buffer_ptr);
 
@@ -795,8 +939,8 @@ class FFTEngine : public FFTEngineBase {
                     : get_aos_strides(nb_fourier_pixels, Fx);
 
       // Work buffer uses same storage order
-      Complex * temp_ptr{this->get_work_buffer(0, fourier_size)};
-      deep_copy<Complex, MemorySpace>(temp_ptr, input_ptr, fourier_size);
+      CT * temp_ptr{this->template get_work_buffer<CT>(0, fourier_size)};
+      deep_copy<CT, MemorySpace>(temp_ptr, input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
       for (Index_t comp{0}; comp < nb_components; ++comp) {
@@ -819,6 +963,7 @@ class FFTEngine : public FFTEngineBase {
     }
   }
 
+  template <typename RT, typename CT>
   void ifft_3d(const Field & input, Field & output) {
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     DynGridIndex local_real = this->get_nb_subdomain_grid_pts_without_ghosts();
@@ -838,10 +983,10 @@ class FFTEngine : public FFTEngineBase {
     Index_t Fx{Nx / 2 + 1};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
-    const Complex * input_ptr =
-        static_cast<const Complex *>(input.get_void_data_ptr(!is_device));
-    Real * output_ptr =
-        static_cast<Real *>(output.get_void_data_ptr(!is_device));
+    const CT * input_ptr =
+        static_cast<const CT *>(input.get_void_data_ptr(!is_device));
+    RT * output_ptr =
+        static_cast<RT *>(output.get_void_data_ptr(!is_device));
 
     // Storage order: SoA on GPU, AoS on CPU
     StorageOrder storage_order{output.get_storage_order()};
@@ -875,9 +1020,9 @@ class FFTEngine : public FFTEngineBase {
     bool in_is_soa{(in_storage_order == StorageOrder::StructureOfArrays)};
 
     Transpose * transpose_xy =
-        this->get_transpose_xy(nb_components, storage_order);
+        this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
     Transpose * transpose_yz =
-        this->get_transpose_yz(nb_components, storage_order);
+        this->get_transpose_yz(nb_components, storage_order, std::is_same_v<CT, Complex32>);
 
     bool need_mpi_path{(transpose_xy != nullptr || transpose_yz != nullptr)};
 
@@ -895,8 +1040,8 @@ class FFTEngine : public FFTEngineBase {
                     : get_aos_strides_3d(nb_fourier_pixels, fourier_local[0],
                                          fourier_local[1]);
 
-      Complex * temp_ptr{this->get_work_buffer(0, fourier_size)};
-      deep_copy<Complex, MemorySpace>(temp_ptr, input_ptr, fourier_size);
+      CT * temp_ptr{this->template get_work_buffer<CT>(0, fourier_size)};
+      deep_copy<CT, MemorySpace>(temp_ptr, input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Z for each component
       // For SoA: Batch all local_fx * local_fy transforms together
@@ -936,7 +1081,7 @@ class FFTEngine : public FFTEngineBase {
           is_soa ? get_soa_strides_3d(nb_ypencil_pixels, local_yfx, Ny)
                  : get_aos_strides_3d(nb_ypencil_pixels, local_yfx, Ny);
 
-      Complex * work_y_ptr{this->get_work_buffer(1, ypencil_size)};
+      CT * work_y_ptr{this->template get_work_buffer<CT>(1, ypencil_size)};
 
       // Step 2: Transpose Y<->Z backward (gather Y, scatter Z across P1)
       if (transpose_yz != nullptr) {
@@ -945,7 +1090,7 @@ class FFTEngine : public FFTEngineBase {
         // No Y<->Z redistribution needed (P1 == 1): the Fourier layout has
         // the same shape as the Y-pencil; copy the data through so the
         // Y-IFFT below does not run on an uninitialised work_y.
-        deep_copy<Complex, MemorySpace>(work_y_ptr, temp_ptr, ypencil_size);
+        deep_copy<CT, MemorySpace>(work_y_ptr, temp_ptr, ypencil_size);
       }
 
       if (transpose_xy == nullptr && backend->supports_nd()) {
@@ -986,13 +1131,13 @@ class FFTEngine : public FFTEngineBase {
               work_z_z_dist] =
             is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
                    : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
-        Complex * work_z_ptr{this->get_work_buffer(2, zpencil_size)};
+        CT * work_z_ptr{this->template get_work_buffer<CT>(2, zpencil_size)};
 
         // Step 4a: Transpose X<->Y backward (gather X, scatter Y across P2)
         if (transpose_xy != nullptr) {
           transpose_xy->backward(work_y_ptr, work_z_ptr);
         } else {
-          deep_copy<Complex, MemorySpace>(work_z_ptr, work_y_ptr, zpencil_size);
+          deep_copy<CT, MemorySpace>(work_z_ptr, work_y_ptr, zpencil_size);
         }
 
         // Step 4b: c2r IFFT along X for each component
@@ -1038,8 +1183,8 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Work buffer with same storage order
-      Complex * work_ptr{this->get_work_buffer(0, work_size)};
-      deep_copy<Complex, MemorySpace>(work_ptr, input_ptr, work_size);
+      CT * work_ptr{this->template get_work_buffer<CT>(0, work_size)};
+      deep_copy<CT, MemorySpace>(work_ptr, input_ptr, work_size);
 
       // Step 1: c2c IFFT along Z for each component
       // For SoA: Batch all Fx*Ny transforms together with dist=1
@@ -1101,12 +1246,21 @@ class FFTEngine : public FFTEngineBase {
   //! device allocation per fft/ifft call is expensive and can fail when
   //! the device is near capacity (e.g. when a cupy memory pool holds the
   //! remaining free memory).
-  Complex * get_work_buffer(std::size_t slot, Index_t size) {
-    WorkBuffer & buf{this->work_buffers.at(slot)};
-    if (buf.size() < static_cast<std::size_t>(size)) {
-      buf.resize(static_cast<std::size_t>(size));
+  template <typename CT = Complex>
+  CT * get_work_buffer(std::size_t slot, Index_t size) {
+    if constexpr (std::is_same_v<CT, Complex>) {
+      WorkBuffer & buf{this->work_buffers.at(slot)};
+      if (buf.size() < static_cast<std::size_t>(size)) {
+        buf.resize(static_cast<std::size_t>(size));
+      }
+      return buf.data();
+    } else {
+      auto & buf{this->work_buffers32.at(slot)};
+      if (buf.size() < static_cast<std::size_t>(size)) {
+        buf.resize(static_cast<std::size_t>(size));
+      }
+      return buf.data();
     }
-    return buf.data();
   }
 
   //! FFT backend for this memory space
@@ -1115,6 +1269,8 @@ class FFTEngine : public FFTEngineBase {
   //! Scratch buffers reused across transforms; at most three are alive at
   //! once (3D MPI inverse transform)
   std::array<WorkBuffer, 3> work_buffers{};
+  //! Single-precision scratch buffers (parallel to work_buffers).
+  std::array<Array<Complex32, MemorySpace>, 3> work_buffers32{};
 };
 
 // Explicit template instantiation declarations for common memory spaces

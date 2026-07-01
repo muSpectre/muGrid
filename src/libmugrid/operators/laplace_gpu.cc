@@ -55,12 +55,13 @@ constexpr int BLOCK_SIZE_3D = 8;
  * GPU kernel for 2D Laplace operator with 5-point stencil.
  * Works with both CUDA and HIP - the __global__ keyword is the same.
  */
+template <typename T>
 __global__ void laplace_2d_kernel(
-    const Real* MUGRID_RESTRICT input,
-    Real* MUGRID_RESTRICT output,
+    const T* MUGRID_RESTRICT input,
+    T* MUGRID_RESTRICT output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
-    Real scale,
+    T scale,
     bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
@@ -72,13 +73,14 @@ __global__ void laplace_2d_kernel(
         Index_t idx = ix * stride_x + iy * stride_y;
 
         // 5-point stencil: [0,1,0; 1,-4,1; 0,1,0]
-        Real center = input[idx];
-        Real left   = input[idx - stride_x];
-        Real right  = input[idx + stride_x];
-        Real down   = input[idx - stride_y];
-        Real up     = input[idx + stride_y];
+        T center = input[idx];
+        T left   = input[idx - stride_x];
+        T right  = input[idx + stride_x];
+        T down   = input[idx - stride_y];
+        T up     = input[idx + stride_y];
 
-        Real result = scale * (left + right + down + up - 4.0 * center);
+        T result = scale * (left + right + down + up -
+                            static_cast<T>(4) * center);
         if (increment) {
             output[idx] += result;
         } else {
@@ -91,12 +93,13 @@ __global__ void laplace_2d_kernel(
  * GPU kernel for 3D Laplace operator with 7-point stencil.
  * Works with both CUDA and HIP.
  */
+template <typename T>
 __global__ void laplace_3d_kernel(
-    const Real* MUGRID_RESTRICT input,
-    Real* MUGRID_RESTRICT output,
+    const T* MUGRID_RESTRICT input,
+    T* MUGRID_RESTRICT output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    Real scale,
+    T scale,
     bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
@@ -109,15 +112,16 @@ __global__ void laplace_3d_kernel(
         Index_t idx = ix * stride_x + iy * stride_y + iz * stride_z;
 
         // 7-point stencil: center=-6, neighbors=+1
-        Real center = input[idx];
-        Real xm = input[idx - stride_x];
-        Real xp = input[idx + stride_x];
-        Real ym = input[idx - stride_y];
-        Real yp = input[idx + stride_y];
-        Real zm = input[idx - stride_z];
-        Real zp = input[idx + stride_z];
+        T center = input[idx];
+        T xm = input[idx - stride_x];
+        T xp = input[idx + stride_x];
+        T ym = input[idx - stride_y];
+        T yp = input[idx + stride_y];
+        T zm = input[idx - stride_z];
+        T zp = input[idx + stride_z];
 
-        Real result = scale * (xm + xp + ym + yp + zm + zp - 6.0 * center);
+        T result = scale * (xm + xp + ym + yp + zm + zp -
+                            static_cast<T>(6) * center);
         if (increment) {
             output[idx] += result;
         } else {
@@ -127,12 +131,13 @@ __global__ void laplace_3d_kernel(
 }
 
 // Launch wrapper for 2D - uses unified macro
+template <typename T>
 void laplace_2d_gpu(
-    const Real* input,
-    Real* output,
+    const T* input,
+    T* output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
-    Real scale,
+    T scale,
     bool increment) {
 
     // Compute grid dimensions (for interior points only)
@@ -145,17 +150,19 @@ void laplace_2d_gpu(
         (interior_ny + block.y - 1) / block.y
     );
 
-    GPU_LAUNCH_KERNEL(laplace_2d_kernel, grid, block,
+    auto kern = laplace_2d_kernel<T>;
+    GPU_LAUNCH_KERNEL(kern, grid, block,
         input, output, nx, ny, stride_x, stride_y, scale, increment);
 }
 
 // Launch wrapper for 3D - uses unified macro
+template <typename T>
 void laplace_3d_gpu(
-    const Real* input,
-    Real* output,
+    const T* input,
+    T* output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    Real scale,
+    T scale,
     bool increment) {
 
     // Compute grid dimensions (for interior points only)
@@ -170,9 +177,22 @@ void laplace_3d_gpu(
         (interior_nz + block.z - 1) / block.z
     );
 
-    GPU_LAUNCH_KERNEL(laplace_3d_kernel, grid, block,
+    auto kern = laplace_3d_kernel<T>;
+    GPU_LAUNCH_KERNEL(kern, grid, block,
         input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale, increment);
 }
+
+// Explicit instantiations for double and single precision.
+template void laplace_2d_gpu<Real>(const Real *, Real *, Index_t, Index_t,
+                                   Index_t, Index_t, Real, bool);
+template void laplace_3d_gpu<Real>(const Real *, Real *, Index_t, Index_t,
+                                   Index_t, Index_t, Index_t, Index_t, Real,
+                                   bool);
+template void laplace_2d_gpu<Real32>(const Real32 *, Real32 *, Index_t, Index_t,
+                                     Index_t, Index_t, Real32, bool);
+template void laplace_3d_gpu<Real32>(const Real32 *, Real32 *, Index_t, Index_t,
+                                     Index_t, Index_t, Index_t, Index_t, Real32,
+                                     bool);
 
 }  // namespace laplace_kernels
 }  // namespace muGrid

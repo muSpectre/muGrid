@@ -61,6 +61,7 @@ using muGrid::IsotropicStiffnessOperator3D;
 using muGrid::FEMElementKind;
 using muGrid::TypedFieldBase;
 using muGrid::Real;
+using muGrid::Real32;
 using muGrid::Dim_t;
 using muGrid::Index_t;
 using muGrid::Shape_t;
@@ -162,8 +163,11 @@ static py::tuple ghost_requirement_to_python(const GhostRequirement & req) {
 void add_gradient_operator(py::module & mod) {
     py::class_<LinearOperator, PyGradientOperator>(mod, "GradientOperator")
         .def(py::init<>())
-        .def("apply", &LinearOperator::apply, "nodal_field"_a,
-             "quadrature_point_field"_a)
+        .def("apply",
+             static_cast<void (LinearOperator::*)(
+                 const TypedFieldBase<Real> &, TypedFieldBase<Real> &) const>(
+                 &LinearOperator::apply),
+             "nodal_field"_a, "quadrature_point_field"_a)
         .def_property_readonly("nb_quad_pts",
                                &LinearOperator::get_nb_quad_pts)
         .def_property_readonly("nb_input_components",
@@ -402,6 +406,24 @@ void add_stencil_gradient_operator(py::module & mod) {
             .def_property_readonly("nb_input_components", &GenericLinearOperator::get_nb_input_components)
             .def_property_readonly("nb_output_components", &GenericLinearOperator::get_nb_output_components);
 
+    // Single-precision (float32) host overloads.
+    {
+        using F = TypedFieldBase<Real32>;
+        conv_op
+            .def("apply",
+                 static_cast<void (GenericLinearOperator::*)(const F &, F &)
+                                 const>(&GenericLinearOperator::apply),
+                 "nodal_field"_a, "quadrature_point_field"_a,
+                 "Apply convolution to host float32 fields")
+            .def("transpose",
+                 static_cast<void (GenericLinearOperator::*)(
+                     const F &, F &, const std::vector<Real> &) const>(
+                     &GenericLinearOperator::transpose),
+                 "quadrature_point_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose convolution to host float32 fields");
+    }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Device field overloads (only when GPU backend is enabled)
     using ApplyDeviceFn = void (GenericLinearOperator::*)(
@@ -421,6 +443,56 @@ void add_stencil_gradient_operator(py::module & mod) {
             "quadrature_point_field"_a, "nodal_field"_a,
             "weights"_a = std::vector<Real>{},
             "Apply transpose convolution to device (GPU) fields");
+
+    // Single-precision (float32) device overloads.
+    {
+        using FD = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+        conv_op
+            .def("apply",
+                 static_cast<void (GenericLinearOperator::*)(const FD &, FD &)
+                                 const>(&GenericLinearOperator::apply),
+                 "nodal_field"_a, "quadrature_point_field"_a,
+                 "Apply convolution to device float32 fields")
+            .def("transpose",
+                 static_cast<void (GenericLinearOperator::*)(
+                     const FD &, FD &, const std::vector<Real> &) const>(
+                     &GenericLinearOperator::transpose),
+                 "quadrature_point_field"_a, "nodal_field"_a,
+                 "weights"_a = std::vector<Real>{},
+                 "Apply transpose convolution to device float32 fields");
+    }
+#endif
+}
+
+// Add the single-precision (float32) apply/transpose overloads to an
+// already-bound LaplaceOperator class (host, and device under CUDA/HIP).
+template <class Op>
+static void add_laplace_real32_overloads(py::class_<Op, LinearOperator> & cls) {
+    using F = TypedFieldBase<Real32>;
+    cls.def("apply",
+            static_cast<void (Op::*)(const F &, F &) const>(&Op::apply),
+            "input_field"_a, "output_field"_a,
+            "Single-precision (float32) apply")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const F &, const Real32 &, F &) const>(
+                 &Op::apply_increment),
+             "input_field"_a, "alpha"_a, "output_field"_a)
+        .def("transpose",
+             static_cast<void (Op::*)(const F &, F &,
+                                      const std::vector<Real> &) const>(
+                 &Op::transpose),
+             "input_field"_a, "output_field"_a,
+             "weights"_a = std::vector<Real>{});
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using FD = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    cls.def("apply",
+            static_cast<void (Op::*)(const FD &, FD &) const>(&Op::apply),
+            "input_field"_a, "output_field"_a,
+            "Single-precision (float32) apply on device fields")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const FD &, const Real32 &, FD &) const>(
+                 &Op::apply_increment),
+             "input_field"_a, "alpha"_a, "output_field"_a);
 #endif
 }
 
@@ -454,8 +526,13 @@ void add_laplace_operator_2d(py::module & mod) {
                      &LaplaceOperator2D::apply_increment),
                  "input_field"_a, "alpha"_a, "output_field"_a,
                  "Add alpha * Laplace(input) to output on host (CPU) fields")
-            .def("transpose", &LaplaceOperator2D::transpose, "input_field"_a,
-                 "output_field"_a, "weights"_a = std::vector<Real>{},
+            .def("transpose",
+                 static_cast<void (LaplaceOperator2D::*)(
+                     const RealFieldHost &, RealFieldHost &,
+                     const std::vector<Real> &) const>(
+                     &LaplaceOperator2D::transpose),
+                 "input_field"_a, "output_field"_a,
+                 "weights"_a = std::vector<Real>{},
                  "Apply the transpose; identical to apply for the self-adjoint "
                  "Laplacian (weights are ignored)")
             .def_property_readonly("nb_stencil_pts",
@@ -495,6 +572,7 @@ void add_laplace_operator_2d(py::module & mod) {
                    "input_field"_a, "output_field"_a,
                    "Apply the Laplace operator to device (GPU) fields");
 #endif
+    add_laplace_real32_overloads(laplace_op);
 }
 
 // Bind class LaplaceOperator3D (dimension-specific)
@@ -527,8 +605,13 @@ void add_laplace_operator_3d(py::module & mod) {
                      &LaplaceOperator3D::apply_increment),
                  "input_field"_a, "alpha"_a, "output_field"_a,
                  "Add alpha * Laplace(input) to output on host (CPU) fields")
-            .def("transpose", &LaplaceOperator3D::transpose, "input_field"_a,
-                 "output_field"_a, "weights"_a = std::vector<Real>{},
+            .def("transpose",
+                 static_cast<void (LaplaceOperator3D::*)(
+                     const RealFieldHost &, RealFieldHost &,
+                     const std::vector<Real> &) const>(
+                     &LaplaceOperator3D::transpose),
+                 "input_field"_a, "output_field"_a,
+                 "weights"_a = std::vector<Real>{},
                  "Apply the transpose; identical to apply for the self-adjoint "
                  "Laplacian (weights are ignored)")
             .def_property_readonly("nb_stencil_pts",
@@ -568,6 +651,7 @@ void add_laplace_operator_3d(py::module & mod) {
                    "input_field"_a, "output_field"_a,
                    "Apply the Laplace operator to device (GPU) fields");
 #endif
+    add_laplace_real32_overloads(laplace_op);
 }
 
 // Bind a FEMGradientOperator<Element> instantiation. The 2D/3D and
@@ -576,14 +660,19 @@ void add_laplace_operator_3d(py::module & mod) {
 template <class Op>
 static void bind_fem_gradient_operator(py::module & mod, const char * name,
                                        const char * doc) {
+    // The operator's scalar type (Real or Real32); the host/device field types
+    // and the apply/transpose argument types follow from it, so one helper
+    // binds both the double- and single-precision instantiations.
+    using T = typename Op::Scalar;
+    using FieldHost = TypedFieldBase<T>;
     using ApplyHostFn =
-        void (Op::*)(const RealFieldHost &, RealFieldHost &) const;
+        void (Op::*)(const FieldHost &, FieldHost &) const;
     using TransposeHostFn = void (Op::*)(
-        const RealFieldHost &, RealFieldHost &, const std::vector<Real> &) const;
+        const FieldHost &, FieldHost &, const std::vector<Real> &) const;
     using ApplyIncrementHostFn =
-        void (Op::*)(const RealFieldHost &, const Real &, RealFieldHost &) const;
+        void (Op::*)(const FieldHost &, const T &, FieldHost &) const;
     using TransposeIncrementHostFn =
-        void (Op::*)(const RealFieldHost &, const Real &, RealFieldHost &,
+        void (Op::*)(const FieldHost &, const T &, FieldHost &,
                      const std::vector<Real> &) const;
 
     auto fem_grad_op =
@@ -641,16 +730,17 @@ static void bind_fem_gradient_operator(py::module & mod, const char * name,
             });
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using FieldDevice = TypedFieldBase<T, muGrid::DefaultDeviceSpace>;
     using ApplyDeviceFn =
-        void (Op::*)(const RealFieldDevice &, RealFieldDevice &) const;
+        void (Op::*)(const FieldDevice &, FieldDevice &) const;
     using TransposeDeviceFn = void (Op::*)(
-        const RealFieldDevice &, RealFieldDevice &, const std::vector<Real> &)
+        const FieldDevice &, FieldDevice &, const std::vector<Real> &)
         const;
     using ApplyIncrementDeviceFn =
-        void (Op::*)(const RealFieldDevice &, const Real &, RealFieldDevice &)
+        void (Op::*)(const FieldDevice &, const T &, FieldDevice &)
             const;
     using TransposeIncrementDeviceFn =
-        void (Op::*)(const RealFieldDevice &, const Real &, RealFieldDevice &,
+        void (Op::*)(const FieldDevice &, const T &, FieldDevice &,
                      const std::vector<Real> &) const;
     fem_grad_op
         .def("apply", static_cast<ApplyDeviceFn>(&Op::apply), "nodal_field"_a,
@@ -682,6 +772,12 @@ void add_fem_gradient_operator_2d(py::module & mod) {
         mod, "FEMGradientOperatorQ1_2D",
         "2D Q1 (bilinear quad) FEM gradient operator (2x2 Gauss, 4 quadrature "
         "points).");
+    bind_fem_gradient_operator<muGrid::FEMGradientOperator2D_32>(
+        mod, "FEMGradientOperator2D_32",
+        "Single-precision (float32) 2D linear FEM gradient operator.");
+    bind_fem_gradient_operator<muGrid::FEMGradientOperatorQ1_2D_32>(
+        mod, "FEMGradientOperatorQ1_2D_32",
+        "Single-precision (float32) 2D Q1 FEM gradient operator.");
 }
 
 void add_fem_gradient_operator_3d(py::module & mod) {
@@ -693,7 +789,88 @@ void add_fem_gradient_operator_3d(py::module & mod) {
         mod, "FEMGradientOperatorQ1_3D",
         "3D Q1 (trilinear hex) FEM gradient operator (2x2x2 Gauss, 8 "
         "quadrature points).");
+    bind_fem_gradient_operator<muGrid::FEMGradientOperator3D_32>(
+        mod, "FEMGradientOperator3D_32",
+        "Single-precision (float32) 3D linear FEM gradient operator.");
+    bind_fem_gradient_operator<muGrid::FEMGradientOperatorQ1_3D_32>(
+        mod, "FEMGradientOperatorQ1_3D_32",
+        "Single-precision (float32) 3D Q1 FEM gradient operator.");
 }
+
+// Add the single-precision (Real32) apply overloads to an already-bound
+// IsotropicStiffnessOperator class. The operator is monomorphic per call: the
+// same C++ object serves both precisions through overloaded apply methods, so
+// this just registers the float32-field overloads alongside the double ones.
+// DD is Dim*Dim (the flattened macro-strain length: 4 in 2D, 9 in 3D).
+template <class Op, std::size_t DD>
+static void add_stiffness_real32_overloads(py::class_<Op> & cls) {
+    using F = TypedFieldBase<Real32>;
+    cls.def("apply",
+            static_cast<void (Op::*)(const F &, const F &, const F &, F &)
+                            const>(&Op::apply),
+            "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+            "Single-precision (float32) apply: force = K @ displacement")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const F &, const F &, const F &, Real32,
+                                      F &) const>(&Op::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
+             "force"_a)
+        .def("apply_uniform",
+             static_cast<void (Op::*)(const F &, Real32, Real32, F &) const>(
+                 &Op::apply_uniform),
+             "displacement"_a, "lambda"_a, "mu"_a, "force"_a)
+        .def("apply_uniform_increment",
+             static_cast<void (Op::*)(const F &, Real32, Real32, Real32, F &)
+                             const>(&Op::apply_uniform_increment),
+             "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a)
+        .def("apply_macro_rhs",
+             static_cast<void (Op::*)(const F &, const F &,
+                                      const std::array<Real, DD> &, F &) const>(
+                 &Op::apply_macro_rhs),
+             "lambda_field"_a, "mu_field"_a, "E_macro"_a, "force"_a)
+        .def("average_stress",
+             static_cast<std::array<Real, DD> (Op::*)(
+                 const F &, const F &, const F &, const std::array<Real, DD> &)
+                             const>(&Op::average_stress),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a);
+}
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+// Single-precision (float32) device apply overloads on an IsotropicStiffness
+// class (mirrors add_stiffness_real32_overloads for device fields).
+template <class Op, std::size_t DD>
+static void add_stiffness_real32_device_overloads(py::class_<Op> & cls) {
+    using F = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    cls.def("apply",
+            static_cast<void (Op::*)(const F &, const F &, const F &, F &)
+                            const>(&Op::apply),
+            "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+            "Single-precision (float32) apply on device fields")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const F &, const F &, const F &, Real32,
+                                      F &) const>(&Op::apply_increment),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "alpha"_a,
+             "force"_a)
+        .def("apply_uniform",
+             static_cast<void (Op::*)(const F &, Real32, Real32, F &) const>(
+                 &Op::apply_uniform),
+             "displacement"_a, "lambda"_a, "mu"_a, "force"_a)
+        .def("apply_uniform_increment",
+             static_cast<void (Op::*)(const F &, Real32, Real32, Real32, F &)
+                             const>(&Op::apply_uniform_increment),
+             "displacement"_a, "lambda"_a, "mu"_a, "alpha"_a, "force"_a)
+        .def("apply_macro_rhs",
+             static_cast<void (Op::*)(const F &, const F &,
+                                      const std::array<Real, DD> &, F &) const>(
+                 &Op::apply_macro_rhs),
+             "lambda_field"_a, "mu_field"_a, "E_macro"_a, "force"_a)
+        .def("average_stress",
+             static_cast<std::array<Real, DD> (Op::*)(
+                 const F &, const F &, const F &, const std::array<Real, DD> &)
+                             const>(&Op::average_stress),
+             "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a);
+}
+#endif
 
 // Bind class IsotropicStiffnessOperator2D
 void add_isotropic_stiffness_operator_2d(py::module & mod) {
@@ -819,6 +996,9 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                 },
                 "Ghost layers (left, right) sufficient for all operations");
 
+    // Single-precision (float32) host apply overloads on the same class.
+    add_stiffness_real32_overloads<IsotropicStiffnessOperator2D, 4>(op);
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     using ApplyDeviceFn = void (IsotropicStiffnessOperator2D::*)(
         const RealFieldDevice &, const RealFieldDevice &,
@@ -863,6 +1043,8 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                  &IsotropicStiffnessOperator2D::average_stress),
              "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a,
              "Local volume integral of stress on device (GPU) fields");
+    // Single-precision (float32) device apply overloads.
+    add_stiffness_real32_device_overloads<IsotropicStiffnessOperator2D, 4>(op);
 #endif
 }
 
@@ -977,6 +1159,9 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                 },
                 "Ghost layers (left, right) sufficient for all operations");
 
+    // Single-precision (float32) host apply overloads on the same class.
+    add_stiffness_real32_overloads<IsotropicStiffnessOperator3D, 9>(op);
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     using ApplyDeviceFn = void (IsotropicStiffnessOperator3D::*)(
         const RealFieldDevice &, const RealFieldDevice &,
@@ -1021,6 +1206,8 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                  &IsotropicStiffnessOperator3D::average_stress),
              "displacement"_a, "lambda_field"_a, "mu_field"_a, "E_macro"_a,
              "Local volume integral of stress on device (GPU) fields");
+    // Single-precision (float32) device apply overloads.
+    add_stiffness_real32_device_overloads<IsotropicStiffnessOperator3D, 9>(op);
 #endif
 }
 

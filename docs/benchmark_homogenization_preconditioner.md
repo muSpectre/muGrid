@@ -8,7 +8,7 @@ matvec kernel** and are run **to convergence** (relative tolerance `1e-06`).
 !!! info "Test machine & code version"
     - **CPU:** AMD Instinct MI300A Accelerator (192 logical cores)
     - **GPU:** 4x AMD Instinct MI300A
-    - **muGrid:** `0.109.0-56-gf1774dbd-dirty` — run 2026-06-28T01:19:13
+    - **muGrid:** `0.110.0-dirty` — run 2026-06-29T12:13:40
 
 Run configuration: 3D, single spherical inclusion, fused stiffness kernel,
 6 load cases (iterations summed over all cases).
@@ -29,7 +29,7 @@ single CPU core.
 
 (last row: unpreconditioned ÷ reference **wall time** on one CPU core)
 
-![Iterations vs. number of grid points](benchmark_homogenization_preconditioner_iters.png)
+![Iterations vs. grid size](benchmark_homogenization_preconditioner_iters.png)
 
 ## Reference solve: device & MPI scaling
 
@@ -46,17 +46,17 @@ Each configuration is swept to the largest grid that still fits in memory: the
 first size that runs **out of memory** is recorded as `OOM` in the table and
 dropped from the plot, and larger sizes for that configuration are not attempted.
 
-| Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| CPU (1 core) | 0.283 | 0.931 | 2.24 | 9.46 | 19.9 | 75.2 | 206 | — | — | — | — |
-| CPU (92 cores, MPI) | — | — | — | 0.228 | 0.356 | 1.87 | 3.96 | 14.4 | 27.2 | 104 | 207 |
-| GPU (1 device) | 0.708 | 0.645 | 0.577 | 0.657 | 0.74 | 1.39 | 2.58 | 8.09 | OOM | — | — |
-| GPU (4 devices, MPI) | — | 3.19 | — | 1.23 | — | 2.1 | 1.82 | 6.1 | 11.9 | OOM | — |
+| Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) | 768³ (453.0M) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| CPU (1 core) | 0.279 | 0.88 | 2.04 | 7.16 | 17.4 | 60.9 | 153 | — | — | — | — | — |
+| CPU (92 cores, MPI) | — | — | — | 0.22 | 0.345 | 1.69 | 3.5 | 12.8 | 22.8 | 86.2 | 195 | — |
+| GPU (1 device) | 0.605 | 0.722 | 0.728 | 0.664 | 0.65 | 1.09 | 1.99 | 5.89 | 13.2 | OOM | — | — |
+| GPU (4 devices, MPI) | — | 3.07 | — | 1.33 | — | 2.1 | 1.73 | 5.12 | 10.2 | 36.6 | 75.7 | OOM |
 
 (values are **solve time in seconds**, run to convergence; `OOM` = ran out of
 memory)
 
-![Reference solve time vs. number of grid points](benchmark_homogenization_preconditioner_time.png)
+![Reference solve time vs. grid size](benchmark_homogenization_preconditioner_time.png)
 
 The preconditioner parallelises cleanly: it is applied in Fourier space by the
 FFT engine, which owns its MPI decomposition, and the per-mode block solve is

@@ -181,11 +181,12 @@ class TestMPIFFTEngineConstruction:
         nb_grid_pts = [16, 20]
         dev = get_device_for_rank(device, comm)
         engine = FFTEngine(nb_grid_pts, comm, device=dev)
-        # Should be PocketFFT for CPU, cuFFT for GPU
+        # Should be PocketFFT for CPU, and the native GPU backend for GPU
+        # (cuFFT on NVIDIA, rocFFT on AMD).
         if device == "cpu":
             assert engine.backend_name == "PocketFFT"
         else:
-            assert engine.backend_name == "cuFFT"
+            assert engine.backend_name in ("cuFFT", "rocFFT")
 
 
 @pytest.mark.parametrize("device", get_test_devices())
@@ -892,6 +893,135 @@ class TestMPIFFTCollectionWrappers:
         if device == "gpu":
             result = result.get()
         assert_allclose(result, original, atol=1e-14)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+class TestMPIFFTSinglePrecision:
+    """Single-precision (float32 / complex64) MPI FFTs.
+
+    Regression tests for the multi-GPU single-precision path. The GPU FFT
+    backends (rocFFT, cuFFT) originally implemented only double precision, so
+    every fp32 transform that went through the MPI pencil path (the 1D r2c/c2r/
+    c2c primitives) or the serial N-D path raised "single-precision … not
+    supported by this FFT backend". These tests drive a real fp32 transform end
+    to end and compare against a float64 numpy reference.
+
+    The tolerance is scaled by the grid size: the float32 r2c relative error
+    grows with the transform length, and the Fourier coefficients of unit-
+    variance noise have magnitude O(sqrt(N)). A transpose that garbled
+    components (a bug a roundtrip cannot see) would produce errors of order the
+    signal itself, far above this tolerance.
+    """
+
+    @pytest.mark.parametrize(
+        "nb_grid_pts",
+        [
+            [16, 20],
+            [8, 10, 12],
+            [8, 9, 11],  # odd 3D grid, uneven splits
+        ],
+    )
+    @pytest.mark.parametrize("nb_components", [1, 3])
+    def test_forward_vs_numpy(self, comm, device, nb_grid_pts, nb_components):
+        """fp32 forward FFT against a float64 numpy reference, per component."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        components = () if nb_components == 1 else (nb_components,)
+        real_field = engine.real_space_field(
+            "real_sp", components, dtype=np.float32
+        )
+        fourier_field = engine.fourier_space_field(
+            "fourier_sp", components, dtype=np.complex64
+        )
+
+        # The Fourier dtype must actually be single precision, else the engine
+        # silently ran a double transform and the test would be vacuous.
+        assert real_field.p.dtype == np.float32
+        assert fourier_field.p.dtype == np.complex64
+
+        np.random.seed(42)
+        if nb_components == 1:
+            global_input = np.random.randn(*nb_grid_pts).astype(np.float32)
+            global_ref = np.fft.rfftn(global_input.astype(np.float64).T).T
+            subdomain_slices = make_subdomain_slices(
+                engine.subdomain_locations, engine.nb_subdomain_grid_pts
+            )
+            real_field.p[...] = xp.asarray(global_input[subdomain_slices])
+        else:
+            global_input = np.random.randn(nb_components, *nb_grid_pts).astype(
+                np.float32
+            )
+            global_ref = np.array(
+                [
+                    np.fft.rfftn(global_input[c].astype(np.float64).T).T
+                    for c in range(nb_components)
+                ]
+            )
+            subdomain_slices = make_subdomain_slices(
+                engine.subdomain_locations, engine.nb_subdomain_grid_pts
+            )
+            real_field.p[...] = xp.asarray(
+                global_input[(slice(None),) + subdomain_slices]
+            )
+
+        engine.fft(real_field, fourier_field)
+
+        fourier_slices = make_fourier_slices(
+            engine.fourier_subdomain_locations,
+            engine.nb_fourier_subdomain_grid_pts,
+        )
+        if nb_components == 1:
+            expected_local = global_ref[fourier_slices]
+        else:
+            expected_local = global_ref[(slice(None),) + fourier_slices]
+
+        result = fourier_field.p
+        if device == "gpu":
+            result = result.get()
+        tol = 1e-4 * np.prod(nb_grid_pts)
+        assert_allclose(result, expected_local, atol=tol, rtol=1e-3)
+
+    @pytest.mark.parametrize(
+        "nb_grid_pts",
+        [
+            [16, 20],
+            [8, 10, 12],
+        ],
+    )
+    def test_roundtrip(self, comm, device, nb_grid_pts):
+        """fp32 ifft(fft(x)) * normalisation == x across the MPI pencil path."""
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(nb_grid_pts, comm, device=dev)
+
+        real_field = engine.real_space_field("real_sp", dtype=np.float32)
+        fourier_field = engine.fourier_space_field(
+            "fourier_sp", dtype=np.complex64
+        )
+
+        np.random.seed(42 + comm.rank)
+        original = np.random.randn(*engine.nb_subdomain_grid_pts).astype(
+            np.float32
+        )
+        real_field.p[...] = xp.asarray(original)
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.p[...] *= engine.normalisation
+
+        result = real_field.p
+        if device == "gpu":
+            result = result.get()
+        assert result.dtype == np.float32
+        assert_allclose(result, original, atol=1e-5)
 
 
 @pytest.mark.parametrize("device", get_test_devices())

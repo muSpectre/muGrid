@@ -96,10 +96,14 @@ namespace muGrid {
          * - X-dimension is innermost for contiguous memory access
          * - Compiler can vectorize the x-loop when strides are 1
          */
+        // Templated on the field scalar type T (Real or Real32). The sparse
+        // operator's coefficients stay in double (`op_values`) and are cast to
+        // T at the point of load, so the inner product runs in T.
+        template <typename T>
         inline void apply_convolution_kernel(
-            const Real* MUGRID_RESTRICT nodal_data,
-            Real* MUGRID_RESTRICT quad_data,
-            const Real alpha,
+            const T* MUGRID_RESTRICT nodal_data,
+            T* MUGRID_RESTRICT quad_data,
+            const T alpha,
             const GridTraversalParams& params,
             const Index_t* MUGRID_RESTRICT quad_indices,
             const Index_t* MUGRID_RESTRICT nodal_indices,
@@ -127,7 +131,7 @@ namespace muGrid {
             for (Index_t i = 0; i < nnz; ++i) {
                 const Index_t nodal_idx = nodal_indices[i];
                 const Index_t quad_idx = quad_indices[i];
-                const Real scaled_op_val = alpha * op_values[i];
+                const T scaled_op_val = alpha * static_cast<T>(op_values[i]);
 
                 for (Index_t z = 0; z < nz; ++z) {
                     const Index_t nodal_z = nodal_base + z * nodal_stride_z + nodal_idx;
@@ -166,10 +170,11 @@ namespace muGrid {
          *
          * Loop structure is optimized for SIMD vectorization (same as apply).
          */
+        template <typename T>
         inline void transpose_convolution_kernel(
-            const Real* MUGRID_RESTRICT quad_data,
-            Real* MUGRID_RESTRICT nodal_data,
-            const Real alpha,
+            const T* MUGRID_RESTRICT quad_data,
+            T* MUGRID_RESTRICT nodal_data,
+            const T alpha,
             const GridTraversalParams& params,
             const Index_t* MUGRID_RESTRICT quad_indices,
             const Index_t* MUGRID_RESTRICT nodal_indices,
@@ -196,9 +201,10 @@ namespace muGrid {
             for (Index_t i = 0; i < nnz; ++i) {
                 const Index_t nodal_idx = nodal_indices[i];
                 const Index_t quad_idx = quad_indices[i];
-                const Real w = (weights != nullptr) ? weights[quad_pt_indices[i]]
-                                                    : Real{1};
-                const Real scaled_op_val = alpha * w * op_values[i];
+                const T w = (weights != nullptr)
+                                ? static_cast<T>(weights[quad_pt_indices[i]])
+                                : T{1};
+                const T scaled_op_val = alpha * w * static_cast<T>(op_values[i]);
 
                 for (Index_t z = 0; z < nz; ++z) {
                     const Index_t nodal_z = nodal_base + z * nodal_stride_z + nodal_idx;

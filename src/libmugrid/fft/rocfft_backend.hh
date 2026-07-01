@@ -90,6 +90,18 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
               const std::vector<Index_t> & in_strides, Real * output,
               const std::vector<Index_t> & out_strides) override;
 
+  // Single-precision (Real32/Complex32) N-D transforms. Mirror the double
+  // variants with a single-precision rocFFT plan (rocfft_precision_single).
+  void r2c_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Real32 * input,
+              const std::vector<Index_t> & in_strides, Complex32 * output,
+              const std::vector<Index_t> & out_strides) override;
+
+  void c2r_nd(const std::vector<Index_t> & shape,
+              const std::vector<Index_t> & axes, const Complex32 * input,
+              const std::vector<Index_t> & in_strides, Real32 * output,
+              const std::vector<Index_t> & out_strides) override;
+
   const char * name() const override { return "rocfft"; }
 
  protected:
@@ -110,6 +122,18 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
   void exec_c2c_backward(RocfftCachedPlan & cached, const Complex * input,
                          Complex * output);
 
+  // Single-precision exec hooks. rocfft_execute is precision-agnostic (it
+  // takes void buffers; the precision is baked into the plan), so these differ
+  // from the double overloads only in the pointer types they accept.
+  void exec_r2c(RocfftCachedPlan & cached, const Real32 * input,
+                Complex32 * output);
+  void exec_c2r(RocfftCachedPlan & cached, const Complex32 * input,
+                Real32 * output);
+  void exec_c2c_forward(RocfftCachedPlan & cached, const Complex32 * input,
+                        Complex32 * output);
+  void exec_c2c_backward(RocfftCachedPlan & cached, const Complex32 * input,
+                         Complex32 * output);
+
   // ---- rocFFT-specific N-D helpers ----
 
   /**
@@ -118,7 +142,7 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
    * (fastest-varying dimension first); the `*_dist` are the batch (component)
    * strides.
    */
-  RocfftCachedPlan & get_nd_plan(TransformType type,
+  RocfftCachedPlan & get_nd_plan(TransformType type, rocfft_precision precision,
                                  const std::vector<std::size_t> & lengths,
                                  const std::vector<std::size_t> & in_strides,
                                  std::size_t in_dist,
@@ -127,10 +151,12 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
 
   /**
    * Build a rocFFT plan + execution info + work buffer for the given transform
-   * type and advanced data layout. Shared by make_plan (1D) and get_nd_plan.
+   * type, precision and advanced data layout. Shared by make_plan (1D) and
+   * get_nd_plan.
    */
   RocfftCachedPlan create_plan(TransformType type,
                                rocfft_transform_type transform_type,
+                               rocfft_precision precision,
                                const std::vector<std::size_t> & lengths,
                                const std::vector<std::size_t> & in_strides,
                                std::size_t in_dist,

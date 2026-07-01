@@ -318,12 +318,13 @@ void FFTEngineBase::initialise_fft_base() {
 
 #ifdef WITH_MPI
 Transpose * FFTEngineBase::get_transpose_xy(Index_t nb_components,
-                                            StorageOrder layout) {
+                                            StorageOrder layout,
+                                            bool single_precision) {
   if (!this->need_transpose_xy) {
     return nullptr;
   }
 
-  TransposeKey key{nb_components, layout};
+  TransposeKey key{nb_components, layout, single_precision};
   auto it = this->transpose_xy_cache.find(key);
   if (it != this->transpose_xy_cache.end()) {
     return it->second.get();
@@ -336,7 +337,7 @@ Transpose * FFTEngineBase::get_transpose_xy(Index_t nb_components,
   auto transpose = std::make_unique<Transpose>(
       comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
       cfg.axis_in, cfg.axis_out, nb_components, layout,
-      this->get_device().is_device());
+      this->get_device().is_device(), single_precision);
 
   auto * ptr = transpose.get();
   this->transpose_xy_cache[key] = std::move(transpose);
@@ -344,12 +345,13 @@ Transpose * FFTEngineBase::get_transpose_xy(Index_t nb_components,
 }
 
 Transpose * FFTEngineBase::get_transpose_yz(Index_t nb_components,
-                                            StorageOrder layout) {
+                                            StorageOrder layout,
+                                            bool single_precision) {
   if (!this->need_transpose_yz) {
     return nullptr;
   }
 
-  TransposeKey key{nb_components, layout};
+  TransposeKey key{nb_components, layout, single_precision};
   auto it = this->transpose_yz_cache.find(key);
   if (it != this->transpose_yz_cache.end()) {
     return it->second.get();
@@ -362,7 +364,7 @@ Transpose * FFTEngineBase::get_transpose_yz(Index_t nb_components,
   auto transpose = std::make_unique<Transpose>(
       comm, cfg.local_in, cfg.local_out, cfg.global_in, cfg.global_out,
       cfg.axis_in, cfg.axis_out, nb_components, layout,
-      this->get_device().is_device());
+      this->get_device().is_device(), single_precision);
 
   auto * ptr = transpose.get();
   this->transpose_yz_cache[key] = std::move(transpose);
@@ -370,10 +372,10 @@ Transpose * FFTEngineBase::get_transpose_yz(Index_t nb_components,
 }
 #else
 // Non-MPI stubs
-Transpose * FFTEngineBase::get_transpose_xy(Index_t, StorageOrder) {
+Transpose * FFTEngineBase::get_transpose_xy(Index_t, StorageOrder, bool) {
   return nullptr;
 }
-Transpose * FFTEngineBase::get_transpose_yz(Index_t, StorageOrder) {
+Transpose * FFTEngineBase::get_transpose_yz(Index_t, StorageOrder, bool) {
   return nullptr;
 }
 #endif

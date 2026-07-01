@@ -108,7 +108,16 @@ namespace muGrid {
         // combined footprint.
         BOOST_REQUIRE_EQUAL(rep.pools.size(), 1u);
         BOOST_CHECK_GE(rep.pools.front().peak, scalar_bytes + vector_bytes);
-        BOOST_CHECK(!rep.pools.front().unified);
+        // Whether that pool is flagged "unified" is a property of the hardware,
+        // not the fields: on a unified-memory architecture (an APU such as the
+        // MI300A) host and device share one physical pool, so a host field is
+        // correctly filed under "unified"; on a discrete GPU (or a host-only
+        // build) they are separate and the host pool is not unified. Mirror the
+        // profiler's own probe (Device::gpu(0) being a host-accessible device)
+        // rather than baking in the discrete-GPU case.
+        const Device dev0{Device::gpu(0)};
+        const bool expect_unified{dev0.is_device() && dev0.is_host_accessible()};
+        BOOST_CHECK_EQUAL(rep.pools.front().unified, expect_unified);
 
         prof.disable();
         prof.reset();

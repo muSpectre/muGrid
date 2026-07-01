@@ -151,17 +151,18 @@ void cuFFTBackend::check_cufft_result(cufftResult result,
 }
 
 cufftHandle cuFFTBackend::make_plan(const PlanKey & key) {
+  const bool single = (key.precision == Base::Precision::Single);
   cufftType cufft_type;
   switch (key.kind) {
   case Base::Kind::R2C:
-    cufft_type = CUFFT_D2Z;
+    cufft_type = single ? CUFFT_R2C : CUFFT_D2Z;
     break;
   case Base::Kind::C2R:
-    cufft_type = CUFFT_Z2D;
+    cufft_type = single ? CUFFT_C2R : CUFFT_Z2D;
     break;
   case Base::Kind::C2C:
     // Direction-agnostic; CUFFT_FORWARD/INVERSE is selected at execution.
-    cufft_type = CUFFT_Z2Z;
+    cufft_type = single ? CUFFT_C2C : CUFFT_Z2Z;
     break;
   default:
     throw RuntimeError("Unknown transform type");
@@ -239,6 +240,45 @@ void cuFFTBackend::exec_c2c_backward(cufftHandle & plan, const Complex * input,
           reinterpret_cast<const cufftDoubleComplex *>(input)),
       reinterpret_cast<cufftDoubleComplex *>(output), CUFFT_INVERSE);
   check_cufft_result(result, "Z2Z backward execution");
+}
+
+// ---- Single-precision exec hooks (CUFFT_R2C/C2R/C2C) ----
+
+void cuFFTBackend::exec_r2c(cufftHandle & plan, const Real32 * input,
+                            Complex32 * output) {
+  cufftResult result =
+      cufftExecR2C(plan, const_cast<cufftReal *>(input),
+                   reinterpret_cast<cufftComplex *>(output));
+  check_cufft_result(result, "R2C execution");
+}
+
+void cuFFTBackend::exec_c2r(cufftHandle & plan, const Complex32 * input,
+                            Real32 * output) {
+  // Note: cuFFT may modify the input during c2r transforms; the engine stages
+  // a copy where it needs the input preserved.
+  cufftResult result = cufftExecC2R(
+      plan,
+      const_cast<cufftComplex *>(reinterpret_cast<const cufftComplex *>(input)),
+      reinterpret_cast<cufftReal *>(output));
+  check_cufft_result(result, "C2R execution");
+}
+
+void cuFFTBackend::exec_c2c_forward(cufftHandle & plan, const Complex32 * input,
+                                    Complex32 * output) {
+  cufftResult result = cufftExecC2C(
+      plan,
+      const_cast<cufftComplex *>(reinterpret_cast<const cufftComplex *>(input)),
+      reinterpret_cast<cufftComplex *>(output), CUFFT_FORWARD);
+  check_cufft_result(result, "C2C forward execution");
+}
+
+void cuFFTBackend::exec_c2c_backward(cufftHandle & plan, const Complex32 * input,
+                                     Complex32 * output) {
+  cufftResult result = cufftExecC2C(
+      plan,
+      const_cast<cufftComplex *>(reinterpret_cast<const cufftComplex *>(input)),
+      reinterpret_cast<cufftComplex *>(output), CUFFT_INVERSE);
+  check_cufft_result(result, "C2C backward execution");
 }
 
 cufftHandle cuFFTBackend::get_nd_plan(cufftType type, const std::vector<int> & n,
@@ -334,6 +374,78 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   cufftResult result = cufftExecZ2D(
       plan, scratch, reinterpret_cast<cufftDoubleReal *>(output));
   check_cufft_result(result, "Z2D (N-D) execution");
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+}
+
+// ---- Single-precision (Real32/Complex32) N-D transforms ----
+// Mirror the double variants with the single-precision cuFFT plan/exec
+// (CUFFT_R2C / cufftExecR2C, CUFFT_C2R / cufftExecC2R). The N-D plan cache key
+// includes the cufftType, so float and double plans never collide.
+
+void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes,
+                          const Real32 * input,
+                          const std::vector<Index_t> & in_strides,
+                          Complex32 * output,
+                          const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  NdLayout in{derive_nd_layout(shape, axes, in_strides)};
+  NdLayout out{derive_nd_layout(shape, axes, out_strides)};
+
+  if (in.stride != 1) {
+    throw RuntimeError(
+        "cuFFT N-D r2c requires unit innermost stride on the real input "
+        "(got " +
+        std::to_string(in.stride) + "); the GPU field layout must be SoA.");
+  }
+  this->check_complex_aligned(output, "r2c (N-D, fp32)");
+
+  cufftHandle plan =
+      get_nd_plan(CUFFT_R2C, in.n, in.embed, in.stride, in.dist, out.embed,
+                  out.stride, out.dist, static_cast<int>(shape[0]));
+  cufftResult result =
+      cufftExecR2C(plan, const_cast<cufftReal *>(input),
+                   reinterpret_cast<cufftComplex *>(output));
+  check_cufft_result(result, "R2C (N-D) execution");
+  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+}
+
+void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
+                          const std::vector<Index_t> & axes,
+                          const Complex32 * input,
+                          const std::vector<Index_t> & in_strides,
+                          Real32 * output,
+                          const std::vector<Index_t> & out_strides) {
+  if (shape[0] == 0) {
+    return;
+  }
+  NdLayout in{derive_nd_layout(shape, axes, in_strides)};
+  NdLayout out{derive_nd_layout(shape, axes, out_strides)};
+
+  if (out.stride != 1) {
+    throw RuntimeError(
+        "cuFFT N-D c2r requires unit innermost stride on the real output "
+        "(got " +
+        std::to_string(out.stride) + "); the GPU field layout must be SoA.");
+  }
+  this->check_complex_aligned(input, "c2r (N-D, fp32)");
+
+  // C2R overwrites its input; stage through scratch (see the Z2D variant).
+  const std::size_t span{static_cast<std::size_t>(shape[0]) *
+                         static_cast<std::size_t>(in.dist)};
+  auto * scratch = static_cast<cufftComplex *>(
+      this->ensure_scratch(span * sizeof(cufftComplex)));
+  GPU_MEMCPY_D2D(scratch, reinterpret_cast<const cufftComplex *>(input),
+                 span * sizeof(cufftComplex));
+
+  cufftHandle plan =
+      get_nd_plan(CUFFT_C2R, in.n, in.embed, in.stride, in.dist, out.embed,
+                  out.stride, out.dist, static_cast<int>(shape[0]));
+  cufftResult result =
+      cufftExecC2R(plan, scratch, reinterpret_cast<cufftReal *>(output));
+  check_cufft_result(result, "C2R (N-D) execution");
   GPU_STREAM_SYNCHRONIZE_DEFAULT();
 }
 

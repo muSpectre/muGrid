@@ -287,6 +287,20 @@ void leray_project(const TypedField<Real, MemorySpace>& k,
                    const TypedField<Complex, MemorySpace>& N,
                    TypedField<Complex, MemorySpace>& out);
 
+//! Single-precision (Real32/Complex32) overloads of the field-valued scal and
+//! the Leray projection (the spectral-solver / preconditioner kernels).
+template <typename MemorySpace>
+void scal(const TypedField<Real32, MemorySpace>& alpha,
+          TypedField<Complex32, MemorySpace>& x);
+template <typename MemorySpace>
+void scal(const TypedField<Real32, MemorySpace>& alpha,
+          TypedField<Real32, MemorySpace>& x);
+template <typename MemorySpace>
+void leray_project(const TypedField<Real32, MemorySpace>& k,
+                   const TypedField<Real32, MemorySpace>& invk,
+                   const TypedField<Complex32, MemorySpace>& N,
+                   TypedField<Complex32, MemorySpace>& out);
+
 namespace internal {
 
     //! Validate a field-valued alpha for scal(): same collection, same

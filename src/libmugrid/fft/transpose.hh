@@ -114,7 +114,7 @@ namespace muGrid {
                   Index_t global_out, Index_t axis_in, Index_t axis_out,
                   Index_t nb_components = 1,
                   StorageOrder layout = StorageOrder::ArrayOfStructures,
-                  bool on_device = false);
+                  bool on_device = false, bool single_precision = false);
 
         Transpose() = delete;
         Transpose(const Transpose & other) = delete;
@@ -132,7 +132,14 @@ namespace muGrid {
          * @param input   Pointer to input complex data
          * @param output  Pointer to output complex data
          */
-        void forward(const Complex * input, Complex * output) const;
+        void forward(const Complex * input, Complex * output) const {
+            this->forward_impl(input, output);
+        }
+        //! Single-precision (Complex32) forward transpose. Valid only when the
+        //! transpose was constructed with single_precision = true.
+        void forward(const Complex32 * input, Complex32 * output) const {
+            this->forward_impl(input, output);
+        }
 
         /**
          * Perform backward transpose (reverse of forward).
@@ -140,7 +147,13 @@ namespace muGrid {
          * @param input   Pointer to input complex data
          * @param output  Pointer to output complex data
          */
-        void backward(const Complex * input, Complex * output) const;
+        void backward(const Complex * input, Complex * output) const {
+            this->backward_impl(input, output);
+        }
+        //! Single-precision (Complex32) backward transpose.
+        void backward(const Complex32 * input, Complex32 * output) const {
+            this->backward_impl(input, output);
+        }
 
         /**
          * Get the local input shape.
@@ -170,6 +183,12 @@ namespace muGrid {
         Index_t get_nb_components() const { return this->nb_components; }
 
        protected:
+        //! Element-type-agnostic forward/backward transpose. Operates on raw
+        //! bytes (element size + MPI datatype are stored members), so it serves
+        //! both the double (Complex) and single (Complex32) overloads above.
+        void forward_impl(const void * input, void * output) const;
+        void backward_impl(const void * input, void * output) const;
+
 #ifdef WITH_MPI
         /**
          * Build MPI datatype for a block in a multi-dimensional array.
@@ -209,7 +228,7 @@ namespace muGrid {
          * dimensions except `src_axis`/`dst_axis`, where peer r owns
          * `src_counts[r]` slices starting at `src_displs[r]`.
          */
-        void staged_alltoall(const Complex * input, Complex * output,
+        void staged_alltoall(const void * input, void * output,
                              const DynGridIndex & src_shape, Index_t src_axis,
                              const std::vector<Index_t> & src_counts,
                              const std::vector<Index_t> & src_displs,
@@ -295,6 +314,16 @@ namespace muGrid {
 
         //! Receive displacements (always 0 when offset is in datatype)
         std::vector<int> recv_displs;
+#endif
+
+        //! Size in bytes of one transported element (one complex value times
+        //! nb_components is folded into the MPI datatype, so this is the size of
+        //! a single complex scalar: 16 for Complex, 8 for Complex32).
+        std::size_t elem_size{sizeof(Complex)};
+#ifdef WITH_MPI
+        //! MPI datatype of one complex scalar (MPI_DOUBLE_COMPLEX / MPI_COMPLEX);
+        //! the base from which the per-peer block datatypes are built.
+        MPI_Datatype elem_mpi_type{MPI_DOUBLE_COMPLEX};
 #endif
 
         //! Flag indicating if datatypes have been initialized

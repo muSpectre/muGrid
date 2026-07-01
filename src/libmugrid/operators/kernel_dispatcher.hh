@@ -56,15 +56,16 @@ namespace muGrid {
         /**
          * @brief Forward convolution: quad_data += alpha * Op * nodal_data
          */
+        template <typename T>
         static void apply_convolution(
-            const Real* nodal_data,
-            Real* quad_data,
-            const Real alpha,
+            const T* nodal_data,
+            T* quad_data,
+            const T alpha,
             const GridTraversalParams& params,
             const SparseOperatorSoA<MemorySpace>& sparse_op) {
 
             if constexpr (is_host_space_v<MemorySpace>) {
-                cpu::apply_convolution_kernel(
+                cpu::apply_convolution_kernel<T>(
                     nodal_data, quad_data, alpha, params,
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
@@ -74,7 +75,7 @@ namespace muGrid {
 #if (defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)) && \
     (defined(__CUDACC__) || defined(__HIPCC__))
             else if constexpr (is_device_space_v<MemorySpace>) {
-                gpu::apply_convolution_kernel(
+                gpu::apply_convolution_kernel<T>(
                     nodal_data, quad_data, alpha, params,
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
@@ -94,16 +95,17 @@ namespace muGrid {
          * @param weights Per-quad-point integration weights. Pass nullptr (or
          *   rely on the default) to skip weighting (all weights treated as 1).
          */
+        template <typename T>
         static void transpose_convolution(
-            const Real* quad_data,
-            Real* nodal_data,
-            const Real alpha,
+            const T* quad_data,
+            T* nodal_data,
+            const T alpha,
             const GridTraversalParams& params,
             const SparseOperatorSoA<MemorySpace>& sparse_op,
             const Real* weights = nullptr) {
 
             if constexpr (is_host_space_v<MemorySpace>) {
-                cpu::transpose_convolution_kernel(
+                cpu::transpose_convolution_kernel<T>(
                     quad_data, nodal_data, alpha, params,
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),
@@ -115,7 +117,7 @@ namespace muGrid {
 #if (defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)) && \
     (defined(__CUDACC__) || defined(__HIPCC__))
             else if constexpr (is_device_space_v<MemorySpace>) {
-                gpu::transpose_convolution_kernel(
+                gpu::transpose_convolution_kernel<T>(
                     quad_data, nodal_data, alpha, params,
                     sparse_op.quad_indices.data(),
                     sparse_op.nodal_indices.data(),

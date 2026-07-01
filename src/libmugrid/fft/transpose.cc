@@ -72,15 +72,21 @@ namespace muGrid {
                          const DynGridIndex & local_out, Index_t global_in,
                          Index_t global_out, Index_t axis_in, Index_t axis_out,
                          Index_t nb_components, StorageOrder layout,
-                         bool on_device)
+                         bool on_device, bool single_precision)
         : comm{comm}, local_in{local_in}, local_out{local_out},
           global_in{global_in}, global_out{global_out}, axis_in{axis_in},
           axis_out{axis_out}, nb_components{nb_components}, layout{layout},
+          elem_size{single_precision ? sizeof(std::complex<float>)
+                                     : sizeof(std::complex<double>)},
           on_device{on_device} {
         if (local_in.get_dim() != local_out.get_dim()) {
             throw RuntimeError(
                 "Input and output must have same dimensionality");
         }
+#ifdef WITH_MPI
+        this->elem_mpi_type =
+            single_precision ? MPI_COMPLEX : MPI_DOUBLE_COMPLEX;
+#endif
 
         int comm_size{comm.size()};
 
@@ -180,7 +186,7 @@ namespace muGrid {
         // a dimension), return an empty type instead.
         for (Dim_t d{0}; d < dim; ++d) {
             if (block_shape[d] == 0) {
-                MPI_Type_contiguous(0, mpi_type<Complex>(), &result);
+                MPI_Type_contiguous(0, this->elem_mpi_type, &result);
                 MPI_Type_commit(&result);
                 return result;
             }
@@ -194,7 +200,7 @@ namespace muGrid {
             // Create element type: nb_components complex values
             MPI_Datatype element_type;
             MPI_Type_contiguous(static_cast<int>(this->nb_components),
-                                mpi_type<Complex>(), &element_type);
+                                this->elem_mpi_type, &element_type);
             MPI_Type_commit(&element_type);
 
             if (dim == 2) {
@@ -254,7 +260,7 @@ namespace muGrid {
                                  static_cast<int>(block_start[1])};
 
                 MPI_Type_create_subarray(2, sizes, subsizes, starts,
-                                         MPI_ORDER_FORTRAN, mpi_type<Complex>(),
+                                         MPI_ORDER_FORTRAN, this->elem_mpi_type,
                                          &spatial_type);
             } else if (dim == 3) {
                 int sizes[3] = {static_cast<int>(local_shape[0]),
@@ -268,7 +274,7 @@ namespace muGrid {
                                  static_cast<int>(block_start[2])};
 
                 MPI_Type_create_subarray(3, sizes, subsizes, starts,
-                                         MPI_ORDER_FORTRAN, mpi_type<Complex>(),
+                                         MPI_ORDER_FORTRAN, this->elem_mpi_type,
                                          &spatial_type);
             } else {
                 throw RuntimeError("Transpose only supports 2D and 3D");
@@ -281,7 +287,7 @@ namespace muGrid {
                 grid_size *= local_shape[d];
             }
             MPI_Aint comp_stride{static_cast<MPI_Aint>(grid_size) *
-                                 static_cast<MPI_Aint>(sizeof(Complex))};
+                                 static_cast<MPI_Aint>(this->elem_size)};
 
             MPI_Type_create_hvector(static_cast<int>(this->nb_components), 1,
                                     comp_stride, spatial_type, &result);
@@ -454,12 +460,16 @@ namespace muGrid {
     }
 
     void Transpose::staged_alltoall(
-        const Complex * input, Complex * output, const DynGridIndex & src_shape,
+        const void * input, void * output, const DynGridIndex & src_shape,
         Index_t src_axis, const std::vector<Index_t> & src_counts,
         const std::vector<Index_t> & src_displs, const DynGridIndex & dst_shape,
         Index_t dst_axis, const std::vector<Index_t> & dst_counts,
         const std::vector<Index_t> & dst_displs) const {
         int comm_size{this->comm.size()};
+        // Field pointers are advanced in bytes (elem_size) so the same code
+        // serves Complex (16 B) and Complex32 (8 B).
+        const char * in{static_cast<const char *>(input)};
+        char * out{static_cast<char *>(output)};
 
         // Geometry of a column-major subarray block that is full in all
         // dimensions except `axis`: the block occupies contiguous runs of
@@ -523,17 +533,17 @@ namespace muGrid {
         char * recv_staging;
         if (dev) {
             send_staging = this->get_device_staging(0,
-                                                    send_total * sizeof(Complex));
+                                                    send_total * this->elem_size);
             recv_staging = this->get_device_staging(1,
-                                                    recv_total * sizeof(Complex));
+                                                    recv_total * this->elem_size);
         } else {
             auto & hs{this->host_staging[0]};
             auto & hr{this->host_staging[1]};
-            if (hs.size() < send_total * sizeof(Complex)) {
-                hs.resize(send_total * sizeof(Complex));
+            if (hs.size() < send_total * this->elem_size) {
+                hs.resize(send_total * this->elem_size);
             }
-            if (hr.size() < recv_total * sizeof(Complex)) {
-                hr.resize(recv_total * sizeof(Complex));
+            if (hr.size() < recv_total * this->elem_size) {
+                hr.resize(recv_total * this->elem_size);
             }
             send_staging = hs.data();
             recv_staging = hr.data();
@@ -552,11 +562,11 @@ namespace muGrid {
         if (bounce) {
             auto & host_send{this->host_staging[0]};
             auto & host_recv{this->host_staging[1]};
-            if (host_send.size() < send_total * sizeof(Complex)) {
-                host_send.resize(send_total * sizeof(Complex));
+            if (host_send.size() < send_total * this->elem_size) {
+                host_send.resize(send_total * this->elem_size);
             }
-            if (host_recv.size() < recv_total * sizeof(Complex)) {
-                host_recv.resize(recv_total * sizeof(Complex));
+            if (host_recv.size() < recv_total * this->elem_size) {
+                host_recv.resize(recv_total * this->elem_size);
             }
             send_buffer = host_send.data();
             recv_buffer = host_recv.data();
@@ -569,24 +579,28 @@ namespace muGrid {
             }
             auto * staging{send_staging +
                            static_cast<std::size_t>(send_displs_el[r]) *
-                               sizeof(Complex)};
+                               this->elem_size};
             if (aos) {
                 std::size_t width{src_pre * src_counts[r] * ncomp *
-                                  sizeof(Complex)};
+                                  this->elem_size};
                 std::size_t pitch{src_pre * src_shape[src_axis] * ncomp *
-                                  sizeof(Complex)};
-                const Complex * field{input +
-                                      src_displs[r] * src_pre * ncomp};
+                                  this->elem_size};
+                const char * field{
+                    in + static_cast<std::size_t>(src_displs[r] * src_pre *
+                                                  ncomp) *
+                             this->elem_size};
                 copy2d(staging, field, width, src_post, width, pitch);
             } else {
-                std::size_t width{src_pre * src_counts[r] * sizeof(Complex)};
+                std::size_t width{src_pre * src_counts[r] * this->elem_size};
                 std::size_t pitch{src_pre * src_shape[src_axis] *
-                                  sizeof(Complex)};
+                                  this->elem_size};
                 std::size_t comp_block{src_pre * src_counts[r] * src_post};
                 for (std::size_t c{0}; c < ncomp; ++c) {
-                    const Complex * field{input + c * src_spatial +
-                                          src_displs[r] * src_pre};
-                    copy2d(staging + c * comp_block * sizeof(Complex), field,
+                    const char * field{
+                        in + static_cast<std::size_t>(c * src_spatial +
+                                                      src_displs[r] * src_pre) *
+                                 this->elem_size};
+                    copy2d(staging + c * comp_block * this->elem_size, field,
                            width, src_post, width, pitch);
                 }
             }
@@ -599,7 +613,7 @@ namespace muGrid {
             GPU_STREAM_SYNCHRONIZE_DEFAULT();
             if (bounce && send_total > 0) {
                 GPU_MEMCPY_D2H(send_buffer, send_staging,
-                               send_total * sizeof(Complex));
+                               send_total * this->elem_size);
             }
         }
 #endif
@@ -618,14 +632,14 @@ namespace muGrid {
 
             // The self block never leaves the device.
             auto self_bytes{static_cast<std::size_t>(send_counts_el[my_rank]) *
-                            sizeof(Complex)};
+                            this->elem_size};
             if (self_bytes > 0) {
                 copy2d(recv_staging +
                            static_cast<std::size_t>(recv_displs_el[my_rank]) *
-                               sizeof(Complex),
+                               this->elem_size,
                        send_staging +
                            static_cast<std::size_t>(send_displs_el[my_rank]) *
-                               sizeof(Complex),
+                               this->elem_size,
                        self_bytes, 1, self_bytes, self_bytes);
             }
 
@@ -640,8 +654,8 @@ namespace muGrid {
                     MPI_Irecv(recv_buffer +
                                   static_cast<std::size_t>(
                                       recv_displs_el[peer]) *
-                                      sizeof(Complex),
-                              recv_counts_el[peer], mpi_type<Complex>(), peer,
+                                      this->elem_size,
+                              recv_counts_el[peer], this->elem_mpi_type, peer,
                               0, mpi_comm, &requests.back());
                 }
                 if (send_counts_el[peer] > 0) {
@@ -649,8 +663,8 @@ namespace muGrid {
                     MPI_Isend(send_buffer +
                                   static_cast<std::size_t>(
                                       send_displs_el[peer]) *
-                                      sizeof(Complex),
-                              send_counts_el[peer], mpi_type<Complex>(), peer,
+                                      this->elem_size,
+                              send_counts_el[peer], this->elem_mpi_type, peer,
                               0, mpi_comm, &requests.back());
                 }
             }
@@ -667,15 +681,15 @@ namespace muGrid {
             // it, so copy the two surrounding extents.
             auto self_begin{static_cast<std::size_t>(
                                 recv_displs_el[this->comm.rank()]) *
-                            sizeof(Complex)};
+                            this->elem_size};
             auto self_end{self_begin +
                           static_cast<std::size_t>(
                               recv_counts_el[this->comm.rank()]) *
-                              sizeof(Complex)};
+                              this->elem_size};
             if (self_begin > 0) {
                 GPU_MEMCPY_H2D(recv_staging, recv_buffer, self_begin);
             }
-            auto total_bytes{recv_total * sizeof(Complex)};
+            auto total_bytes{recv_total * this->elem_size};
             if (self_end < total_bytes) {
                 GPU_MEMCPY_H2D(recv_staging + self_end,
                                recv_buffer + self_end,
@@ -692,23 +706,28 @@ namespace muGrid {
             }
             auto * staging{recv_staging +
                            static_cast<std::size_t>(recv_displs_el[r]) *
-                               sizeof(Complex)};
+                               this->elem_size};
             if (aos) {
                 std::size_t width{dst_pre * dst_counts[r] * ncomp *
-                                  sizeof(Complex)};
+                                  this->elem_size};
                 std::size_t pitch{dst_pre * dst_shape[dst_axis] * ncomp *
-                                  sizeof(Complex)};
-                Complex * field{output + dst_displs[r] * dst_pre * ncomp};
+                                  this->elem_size};
+                char * field{
+                    out + static_cast<std::size_t>(dst_displs[r] * dst_pre *
+                                                   ncomp) *
+                              this->elem_size};
                 copy2d(field, staging, width, dst_post, pitch, width);
             } else {
-                std::size_t width{dst_pre * dst_counts[r] * sizeof(Complex)};
+                std::size_t width{dst_pre * dst_counts[r] * this->elem_size};
                 std::size_t pitch{dst_pre * dst_shape[dst_axis] *
-                                  sizeof(Complex)};
+                                  this->elem_size};
                 std::size_t comp_block{dst_pre * dst_counts[r] * dst_post};
                 for (std::size_t c{0}; c < ncomp; ++c) {
-                    Complex * field{output + c * dst_spatial +
-                                    dst_displs[r] * dst_pre};
-                    copy2d(field, staging + c * comp_block * sizeof(Complex),
+                    char * field{
+                        out + static_cast<std::size_t>(c * dst_spatial +
+                                                       dst_displs[r] * dst_pre) *
+                                  this->elem_size};
+                    copy2d(field, staging + c * comp_block * this->elem_size,
                            width, dst_post, pitch, width);
                 }
             }
@@ -716,19 +735,19 @@ namespace muGrid {
     }
 #endif  // WITH_MPI
 
-    void Transpose::forward(const Complex * input, Complex * output) const {
+    void Transpose::forward_impl(const void * input, void * output) const {
 #ifdef WITH_MPI
         MPI_Comm mpi_comm = this->comm.get_mpi_comm();
 
         if (mpi_comm == MPI_COMM_NULL || this->comm.size() == 1) {
-            // Serial case: direct copy (with reordering if needed)
-            // For serial, input and output have the same total size
+            // Serial case: direct byte copy (input/output have the same size)
             Index_t total_size{1};
             for (Dim_t d{0}; d < this->local_in.get_dim(); ++d) {
                 total_size *= this->local_in[d];
             }
             total_size *= this->nb_components;
-            std::copy(input, input + total_size, output);
+            std::memcpy(output, input,
+                        static_cast<std::size_t>(total_size) * this->elem_size);
             return;
         }
 
@@ -744,35 +763,37 @@ namespace muGrid {
             return;
         }
 
-        // Use MPI_Alltoallw with derived datatypes
+        // Use MPI_Alltoallw with derived datatypes (built from elem_mpi_type)
         MPI_Alltoallw(input, this->send_counts.data(), this->send_displs.data(),
                       this->send_types_fwd.data(), output,
                       this->recv_counts.data(), this->recv_displs.data(),
                       this->recv_types_fwd.data(), mpi_comm);
 
 #else   // WITH_MPI
-        // Serial case: direct copy
+        // Serial case: direct byte copy
         Index_t total_size{1};
         for (Dim_t d{0}; d < this->local_in.get_dim(); ++d) {
             total_size *= this->local_in[d];
         }
         total_size *= this->nb_components;
-        std::copy(input, input + total_size, output);
+        std::memcpy(output, input,
+                    static_cast<std::size_t>(total_size) * this->elem_size);
 #endif  // WITH_MPI
     }
 
-    void Transpose::backward(const Complex * input, Complex * output) const {
+    void Transpose::backward_impl(const void * input, void * output) const {
 #ifdef WITH_MPI
         MPI_Comm mpi_comm = this->comm.get_mpi_comm();
 
         if (mpi_comm == MPI_COMM_NULL || this->comm.size() == 1) {
-            // Serial case: direct copy
+            // Serial case: direct byte copy
             Index_t total_size{1};
             for (Dim_t d{0}; d < this->local_out.get_dim(); ++d) {
                 total_size *= this->local_out[d];
             }
             total_size *= this->nb_components;
-            std::copy(input, input + total_size, output);
+            std::memcpy(output, input,
+                        static_cast<std::size_t>(total_size) * this->elem_size);
             return;
         }
 
@@ -788,20 +809,21 @@ namespace muGrid {
             return;
         }
 
-        // Use MPI_Alltoallw with derived datatypes
+        // Use MPI_Alltoallw with derived datatypes (built from elem_mpi_type)
         MPI_Alltoallw(input, this->send_counts.data(), this->send_displs.data(),
                       this->send_types_bwd.data(), output,
                       this->recv_counts.data(), this->recv_displs.data(),
                       this->recv_types_bwd.data(), mpi_comm);
 
 #else   // WITH_MPI
-        // Serial case: direct copy
+        // Serial case: direct byte copy
         Index_t total_size{1};
         for (Dim_t d{0}; d < this->local_out.get_dim(); ++d) {
             total_size *= this->local_out[d];
         }
         total_size *= this->nb_components;
-        std::copy(input, input + total_size, output);
+        std::memcpy(output, input,
+                    static_cast<std::size_t>(total_size) * this->elem_size);
 #endif  // WITH_MPI
     }
 

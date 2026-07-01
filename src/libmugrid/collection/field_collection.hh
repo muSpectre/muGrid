@@ -172,9 +172,10 @@ namespace muGrid {
                                const std::string & sub_division_tag = PixelTag,
                                const Unit & unit = Unit::unitless()) {
             static_assert(
-                std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                std::is_scalar<T>::value or std::is_same<T, Complex>::value or
+                    std::is_same<T, Complex32>::value,
                 "You can only register fields templated with one of the "
-                "numeric types Real, Complex, Int, or UInt");
+                "numeric types Real, Real32, Complex, Complex32, Int, or UInt");
             return this->register_field_helper<T>(unique_name, nb_components,
                                                   sub_division_tag, unit);
         }
@@ -195,9 +196,10 @@ namespace muGrid {
                                const std::string & sub_division_tag = PixelTag,
                                const Unit & unit = Unit::unitless()) {
             static_assert(
-                std::is_scalar<T>::value or std::is_same<T, Complex>::value,
+                std::is_scalar<T>::value or std::is_same<T, Complex>::value or
+                    std::is_same<T, Complex32>::value,
                 "You can only register fields templated with one of the "
-                "numeric types Real, Complex, Int, or Uint");
+                "numeric types Real, Real32, Complex, Complex32, Int, or Uint");
             return this->register_field_helper<T>(unique_name, components_shape,
                                                   sub_division_tag, unit);
         }

@@ -691,306 +691,105 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  // Explicit template instantiations for HostSpace only
-  template class TypedFieldBase<Real, HostSpace>;
-  template class TypedFieldBase<Complex, HostSpace>;
-  template class TypedFieldBase<Int, HostSpace>;
-  template class TypedFieldBase<Uint, HostSpace>;
-  template class TypedFieldBase<Index_t, HostSpace>;
+  // Explicit template instantiations.
+  //
+  // The full set of muGrid scalar types (host and, under CUDA/HIP, device) is
+  // instantiated below via X-macros so that adding a scalar type stays a
+  // single-line change consistent with MUGRID_SCALAR_TYPES.
 
-  template class TypedField<Real, HostSpace>;
-  template class TypedField<Complex, HostSpace>;
-  template class TypedField<Int, HostSpace>;
-  template class TypedField<Uint, HostSpace>;
-  template class TypedField<Index_t, HostSpace>;
+  //! All scalar types that get a field instantiation.
+#define MUGRID_FIELD_TYPES(X) \
+    X(Real)                   \
+    X(Complex)                \
+    X(Int)                    \
+    X(Uint)                   \
+    X(Index_t)                \
+    X(Real32)                 \
+    X(Complex32)
 
-  // Explicit instantiation of template member functions for HostSpace
-  template TypedFieldBase<Real, HostSpace>::Eigen_map
-  TypedFieldBase<Real, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &);
-  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
-  TypedFieldBase<Real, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &) const;
-  template TypedFieldBase<Real, HostSpace>::EigenVec_map
-  TypedFieldBase<Real, HostSpace>::eigen_vec<HostSpace>();
-  template TypedFieldBase<Real, HostSpace>::EigenVec_cmap
-  TypedFieldBase<Real, HostSpace>::eigen_vec<HostSpace>() const;
-  template TypedFieldBase<Real, HostSpace>::Eigen_map
-  TypedFieldBase<Real, HostSpace>::eigen_sub_pt<HostSpace>();
-  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
-  TypedFieldBase<Real, HostSpace>::eigen_sub_pt<HostSpace>() const;
-  template TypedFieldBase<Real, HostSpace>::Eigen_map
-  TypedFieldBase<Real, HostSpace>::eigen_pixel<HostSpace>();
-  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
-  TypedFieldBase<Real, HostSpace>::eigen_pixel<HostSpace>() const;
-  template TypedFieldBase<Real, HostSpace>::Eigen_map
-  TypedFieldBase<Real, HostSpace>::eigen_mat<HostSpace>();
-  template TypedFieldBase<Real, HostSpace>::Eigen_cmap
-  TypedFieldBase<Real, HostSpace>::eigen_mat<HostSpace>() const;
-  template FieldMap<Real, Mapping::Mut>
-  TypedFieldBase<Real, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
-  template FieldMap<Real, Mapping::Const>
-  TypedFieldBase<Real, HostSpace>::get_pixel_map<HostSpace>(
-      const Index_t &) const;
-  template FieldMap<Real, Mapping::Mut>
-  TypedFieldBase<Real, HostSpace>::get_sub_pt_map<HostSpace>(const Index_t &);
-  template FieldMap<Real, Mapping::Const>
-  TypedFieldBase<Real, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &) const;
+  //! eigen_map / FieldMap accessor member-function instantiations for one
+  //! (type, memory space) pair.
+#define MUGRID_FIELD_EIGEN_MEMBERS(T, SPACE)                                   \
+    template TypedFieldBase<T, SPACE>::Eigen_map                               \
+    TypedFieldBase<T, SPACE>::eigen_map<SPACE>(const Index_t &,                \
+                                               const Index_t &);               \
+    template TypedFieldBase<T, SPACE>::Eigen_cmap                              \
+    TypedFieldBase<T, SPACE>::eigen_map<SPACE>(const Index_t &,                \
+                                               const Index_t &) const;         \
+    template TypedFieldBase<T, SPACE>::EigenVec_map                            \
+    TypedFieldBase<T, SPACE>::eigen_vec<SPACE>();                              \
+    template TypedFieldBase<T, SPACE>::EigenVec_cmap                           \
+    TypedFieldBase<T, SPACE>::eigen_vec<SPACE>() const;                        \
+    template TypedFieldBase<T, SPACE>::Eigen_map                               \
+    TypedFieldBase<T, SPACE>::eigen_sub_pt<SPACE>();                           \
+    template TypedFieldBase<T, SPACE>::Eigen_cmap                              \
+    TypedFieldBase<T, SPACE>::eigen_sub_pt<SPACE>() const;                     \
+    template TypedFieldBase<T, SPACE>::Eigen_map                               \
+    TypedFieldBase<T, SPACE>::eigen_pixel<SPACE>();                            \
+    template TypedFieldBase<T, SPACE>::Eigen_cmap                              \
+    TypedFieldBase<T, SPACE>::eigen_pixel<SPACE>() const;                      \
+    template TypedFieldBase<T, SPACE>::Eigen_map                               \
+    TypedFieldBase<T, SPACE>::eigen_mat<SPACE>();                              \
+    template TypedFieldBase<T, SPACE>::Eigen_cmap                              \
+    TypedFieldBase<T, SPACE>::eigen_mat<SPACE>() const;                        \
+    template FieldMap<T, Mapping::Mut>                                         \
+    TypedFieldBase<T, SPACE>::get_pixel_map<SPACE>(const Index_t &);           \
+    template FieldMap<T, Mapping::Const>                                       \
+    TypedFieldBase<T, SPACE>::get_pixel_map<SPACE>(const Index_t &) const;     \
+    template FieldMap<T, Mapping::Mut>                                         \
+    TypedFieldBase<T, SPACE>::get_sub_pt_map<SPACE>(const Index_t &);          \
+    template FieldMap<T, Mapping::Const>                                       \
+    TypedFieldBase<T, SPACE>::get_sub_pt_map<SPACE>(const Index_t &) const;
 
-  template TypedFieldBase<Complex, HostSpace>::Eigen_map
-  TypedFieldBase<Complex, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &);
-  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
-  TypedFieldBase<Complex, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &) const;
-  template TypedFieldBase<Complex, HostSpace>::EigenVec_map
-  TypedFieldBase<Complex, HostSpace>::eigen_vec<HostSpace>();
-  template TypedFieldBase<Complex, HostSpace>::EigenVec_cmap
-  TypedFieldBase<Complex, HostSpace>::eigen_vec<HostSpace>() const;
-  template TypedFieldBase<Complex, HostSpace>::Eigen_map
-  TypedFieldBase<Complex, HostSpace>::eigen_sub_pt<HostSpace>();
-  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
-  TypedFieldBase<Complex, HostSpace>::eigen_sub_pt<HostSpace>() const;
-  template TypedFieldBase<Complex, HostSpace>::Eigen_map
-  TypedFieldBase<Complex, HostSpace>::eigen_pixel<HostSpace>();
-  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
-  TypedFieldBase<Complex, HostSpace>::eigen_pixel<HostSpace>() const;
-  template TypedFieldBase<Complex, HostSpace>::Eigen_map
-  TypedFieldBase<Complex, HostSpace>::eigen_mat<HostSpace>();
-  template TypedFieldBase<Complex, HostSpace>::Eigen_cmap
-  TypedFieldBase<Complex, HostSpace>::eigen_mat<HostSpace>() const;
-  template FieldMap<Complex, Mapping::Mut>
-  TypedFieldBase<Complex, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
-  template FieldMap<Complex, Mapping::Const>
-  TypedFieldBase<Complex, HostSpace>::get_pixel_map<HostSpace>(
-      const Index_t &) const;
-  template FieldMap<Complex, Mapping::Mut>
-  TypedFieldBase<Complex, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &);
-  template FieldMap<Complex, Mapping::Const>
-  TypedFieldBase<Complex, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &) const;
+  //! push_back family (host space only).
+#define MUGRID_FIELD_PUSH_BACK(T)                                              \
+    template std::enable_if_t<is_host_space_v<HostSpace>, void>                \
+    TypedField<T, HostSpace>::push_back<HostSpace>(const T &);                 \
+    template std::enable_if_t<is_host_space_v<HostSpace>, void>                \
+    TypedField<T, HostSpace>::push_back_single<HostSpace>(const T &);          \
+    template std::enable_if_t<is_host_space_v<HostSpace>, void>                \
+    TypedField<T, HostSpace>::push_back<HostSpace>(                            \
+        const Eigen::Ref<                                                      \
+            const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &);         \
+    template std::enable_if_t<is_host_space_v<HostSpace>, void>                \
+    TypedField<T, HostSpace>::push_back_single<HostSpace>(                     \
+        const Eigen::Ref<                                                      \
+            const Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>> &);
 
-  template TypedFieldBase<Int, HostSpace>::Eigen_map
-  TypedFieldBase<Int, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &);
-  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
-  TypedFieldBase<Int, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &) const;
-  template TypedFieldBase<Int, HostSpace>::EigenVec_map
-  TypedFieldBase<Int, HostSpace>::eigen_vec<HostSpace>();
-  template TypedFieldBase<Int, HostSpace>::EigenVec_cmap
-  TypedFieldBase<Int, HostSpace>::eigen_vec<HostSpace>() const;
-  template TypedFieldBase<Int, HostSpace>::Eigen_map
-  TypedFieldBase<Int, HostSpace>::eigen_sub_pt<HostSpace>();
-  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
-  TypedFieldBase<Int, HostSpace>::eigen_sub_pt<HostSpace>() const;
-  template TypedFieldBase<Int, HostSpace>::Eigen_map
-  TypedFieldBase<Int, HostSpace>::eigen_pixel<HostSpace>();
-  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
-  TypedFieldBase<Int, HostSpace>::eigen_pixel<HostSpace>() const;
-  template TypedFieldBase<Int, HostSpace>::Eigen_map
-  TypedFieldBase<Int, HostSpace>::eigen_mat<HostSpace>();
-  template TypedFieldBase<Int, HostSpace>::Eigen_cmap
-  TypedFieldBase<Int, HostSpace>::eigen_mat<HostSpace>() const;
-  template FieldMap<Int, Mapping::Mut>
-  TypedFieldBase<Int, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
-  template FieldMap<Int, Mapping::Const>
-  TypedFieldBase<Int, HostSpace>::get_pixel_map<HostSpace>(
-      const Index_t &) const;
-  template FieldMap<Int, Mapping::Mut>
-  TypedFieldBase<Int, HostSpace>::get_sub_pt_map<HostSpace>(const Index_t &);
-  template FieldMap<Int, Mapping::Const>
-  TypedFieldBase<Int, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &) const;
-
-  template TypedFieldBase<Uint, HostSpace>::Eigen_map
-  TypedFieldBase<Uint, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &);
-  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
-  TypedFieldBase<Uint, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &) const;
-  template TypedFieldBase<Uint, HostSpace>::EigenVec_map
-  TypedFieldBase<Uint, HostSpace>::eigen_vec<HostSpace>();
-  template TypedFieldBase<Uint, HostSpace>::EigenVec_cmap
-  TypedFieldBase<Uint, HostSpace>::eigen_vec<HostSpace>() const;
-  template TypedFieldBase<Uint, HostSpace>::Eigen_map
-  TypedFieldBase<Uint, HostSpace>::eigen_sub_pt<HostSpace>();
-  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
-  TypedFieldBase<Uint, HostSpace>::eigen_sub_pt<HostSpace>() const;
-  template TypedFieldBase<Uint, HostSpace>::Eigen_map
-  TypedFieldBase<Uint, HostSpace>::eigen_pixel<HostSpace>();
-  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
-  TypedFieldBase<Uint, HostSpace>::eigen_pixel<HostSpace>() const;
-  template TypedFieldBase<Uint, HostSpace>::Eigen_map
-  TypedFieldBase<Uint, HostSpace>::eigen_mat<HostSpace>();
-  template TypedFieldBase<Uint, HostSpace>::Eigen_cmap
-  TypedFieldBase<Uint, HostSpace>::eigen_mat<HostSpace>() const;
-  template FieldMap<Uint, Mapping::Mut>
-  TypedFieldBase<Uint, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
-  template FieldMap<Uint, Mapping::Const>
-  TypedFieldBase<Uint, HostSpace>::get_pixel_map<HostSpace>(
-      const Index_t &) const;
-  template FieldMap<Uint, Mapping::Mut>
-  TypedFieldBase<Uint, HostSpace>::get_sub_pt_map<HostSpace>(const Index_t &);
-  template FieldMap<Uint, Mapping::Const>
-  TypedFieldBase<Uint, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &) const;
-
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
-  TypedFieldBase<Index_t, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &);
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
-  TypedFieldBase<Index_t, HostSpace>::eigen_map<HostSpace>(
-      const Index_t &, const Index_t &) const;
-  template TypedFieldBase<Index_t, HostSpace>::EigenVec_map
-  TypedFieldBase<Index_t, HostSpace>::eigen_vec<HostSpace>();
-  template TypedFieldBase<Index_t, HostSpace>::EigenVec_cmap
-  TypedFieldBase<Index_t, HostSpace>::eigen_vec<HostSpace>() const;
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
-  TypedFieldBase<Index_t, HostSpace>::eigen_sub_pt<HostSpace>();
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
-  TypedFieldBase<Index_t, HostSpace>::eigen_sub_pt<HostSpace>() const;
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
-  TypedFieldBase<Index_t, HostSpace>::eigen_pixel<HostSpace>();
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
-  TypedFieldBase<Index_t, HostSpace>::eigen_pixel<HostSpace>() const;
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_map
-  TypedFieldBase<Index_t, HostSpace>::eigen_mat<HostSpace>();
-  template TypedFieldBase<Index_t, HostSpace>::Eigen_cmap
-  TypedFieldBase<Index_t, HostSpace>::eigen_mat<HostSpace>() const;
-  template FieldMap<Index_t, Mapping::Mut>
-  TypedFieldBase<Index_t, HostSpace>::get_pixel_map<HostSpace>(const Index_t &);
-  template FieldMap<Index_t, Mapping::Const>
-  TypedFieldBase<Index_t, HostSpace>::get_pixel_map<HostSpace>(
-      const Index_t &) const;
-  template FieldMap<Index_t, Mapping::Mut>
-  TypedFieldBase<Index_t, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &);
-  template FieldMap<Index_t, Mapping::Const>
-  TypedFieldBase<Index_t, HostSpace>::get_sub_pt_map<HostSpace>(
-      const Index_t &) const;
-
-  // Explicit instantiation of push_back template member functions
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Real, HostSpace>::push_back<HostSpace>(const Real &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Real, HostSpace>::push_back_single<HostSpace>(const Real &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Real, HostSpace>::push_back<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic>> &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Real, HostSpace>::push_back_single<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Real, Eigen::Dynamic, Eigen::Dynamic>> &);
-
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Complex, HostSpace>::push_back<HostSpace>(const Complex &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Complex, HostSpace>::push_back_single<HostSpace>(const Complex &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Complex, HostSpace>::push_back<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>> &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Complex, HostSpace>::push_back_single<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Complex, Eigen::Dynamic, Eigen::Dynamic>> &);
-
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Int, HostSpace>::push_back<HostSpace>(const Int &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Int, HostSpace>::push_back_single<HostSpace>(const Int &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Int, HostSpace>::push_back<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Int, Eigen::Dynamic, Eigen::Dynamic>> &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Int, HostSpace>::push_back_single<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Int, Eigen::Dynamic, Eigen::Dynamic>> &);
-
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Uint, HostSpace>::push_back<HostSpace>(const Uint &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Uint, HostSpace>::push_back_single<HostSpace>(const Uint &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Uint, HostSpace>::push_back<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Uint, Eigen::Dynamic, Eigen::Dynamic>> &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Uint, HostSpace>::push_back_single<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Uint, Eigen::Dynamic, Eigen::Dynamic>> &);
-
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Index_t, HostSpace>::push_back<HostSpace>(const Index_t &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Index_t, HostSpace>::push_back_single<HostSpace>(const Index_t &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Index_t, HostSpace>::push_back<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
-  template std::enable_if_t<is_host_space_v<HostSpace>, void>
-  TypedField<Index_t, HostSpace>::push_back_single<HostSpace>(
-      const Eigen::Ref<const Eigen::Array<Index_t, Eigen::Dynamic, Eigen::Dynamic>> &);
-
-  // Same-space deep_copy_from instantiations (host -> host)
-  template void TypedFieldBase<Real, HostSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Real, HostSpace> &);
-  template void TypedFieldBase<Complex, HostSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Complex, HostSpace> &);
-  template void TypedFieldBase<Int, HostSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Int, HostSpace> &);
-  template void TypedFieldBase<Uint, HostSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Uint, HostSpace> &);
-  template void TypedFieldBase<Index_t, HostSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Index_t, HostSpace> &);
+  // Host class + member instantiations
+#define MUGRID_FIELD_INSTANTIATE_HOST(T)                                       \
+    template class TypedFieldBase<T, HostSpace>;                               \
+    template class TypedField<T, HostSpace>;                                   \
+    MUGRID_FIELD_EIGEN_MEMBERS(T, HostSpace)                                   \
+    MUGRID_FIELD_PUSH_BACK(T)                                                  \
+    template void TypedFieldBase<T, HostSpace>::deep_copy_from<HostSpace>(     \
+        const TypedFieldBase<T, HostSpace> &);
+  MUGRID_FIELD_TYPES(MUGRID_FIELD_INSTANTIATE_HOST)
+#undef MUGRID_FIELD_INSTANTIATE_HOST
 
   // Device-space explicit template instantiations (for CUDA/HIP builds)
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-  // Base class instantiations for device space
-  template class TypedFieldBase<Real, DefaultDeviceSpace>;
-  template class TypedFieldBase<Complex, DefaultDeviceSpace>;
-  template class TypedFieldBase<Int, DefaultDeviceSpace>;
-  template class TypedFieldBase<Uint, DefaultDeviceSpace>;
-  template class TypedFieldBase<Index_t, DefaultDeviceSpace>;
-
-  // Derived class instantiations for device space
-  template class TypedField<Real, DefaultDeviceSpace>;
-  template class TypedField<Complex, DefaultDeviceSpace>;
-  template class TypedField<Int, DefaultDeviceSpace>;
-  template class TypedField<Uint, DefaultDeviceSpace>;
-  template class TypedField<Index_t, DefaultDeviceSpace>;
-
-  // Same-space deep_copy_from instantiations (device -> device)
-  template void TypedFieldBase<Real, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Real, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Complex, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Complex, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Int, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Int, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Uint, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Uint, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Index_t, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Index_t, DefaultDeviceSpace> &);
-
-  // Cross-space deep_copy_from instantiations (host -> device)
-  template void TypedFieldBase<Real, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Real, HostSpace> &);
-  template void TypedFieldBase<Complex, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Complex, HostSpace> &);
-  template void TypedFieldBase<Int, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Int, HostSpace> &);
-  template void TypedFieldBase<Uint, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Uint, HostSpace> &);
-  template void TypedFieldBase<Index_t, DefaultDeviceSpace>::deep_copy_from<HostSpace>(
-      const TypedFieldBase<Index_t, HostSpace> &);
-
-  // Cross-space deep_copy_from instantiations (device -> host)
-  template void TypedFieldBase<Real, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Real, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Complex, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Complex, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Int, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Int, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Uint, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Uint, DefaultDeviceSpace> &);
-  template void TypedFieldBase<Index_t, HostSpace>::deep_copy_from<DefaultDeviceSpace>(
-      const TypedFieldBase<Index_t, DefaultDeviceSpace> &);
+#define MUGRID_FIELD_INSTANTIATE_DEVICE(T)                                     \
+    template class TypedFieldBase<T, DefaultDeviceSpace>;                       \
+    template class TypedField<T, DefaultDeviceSpace>;                           \
+    /* device -> device */                                                     \
+    template void                                                              \
+    TypedFieldBase<T, DefaultDeviceSpace>::deep_copy_from<DefaultDeviceSpace>( \
+        const TypedFieldBase<T, DefaultDeviceSpace> &);                        \
+    /* host -> device */                                                       \
+    template void                                                              \
+    TypedFieldBase<T, DefaultDeviceSpace>::deep_copy_from<HostSpace>(          \
+        const TypedFieldBase<T, HostSpace> &);                                 \
+    /* device -> host */                                                       \
+    template void                                                              \
+    TypedFieldBase<T, HostSpace>::deep_copy_from<DefaultDeviceSpace>(          \
+        const TypedFieldBase<T, DefaultDeviceSpace> &);
+  MUGRID_FIELD_TYPES(MUGRID_FIELD_INSTANTIATE_DEVICE)
+#undef MUGRID_FIELD_INSTANTIATE_DEVICE
 #endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
+
+#undef MUGRID_FIELD_EIGEN_MEMBERS
+#undef MUGRID_FIELD_PUSH_BACK
+#undef MUGRID_FIELD_TYPES
 
 }  // namespace muGrid

@@ -140,6 +140,56 @@ void add_field_collection(py::module & mod) {
             "unit"_a = muGrid::Unit::unitless(),
             py::return_value_policy::reference_internal)
         .def(
+            "register_real32_field",
+            [](FieldCollection & collection, const std::string & unique_name,
+               const Index_t & nb_components, const std::string & sub_division,
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.register_field<muGrid::Real32>(
+                    unique_name, nb_components, sub_division, unit);
+            },
+            "unique_name"_a, "nb_components"_a,
+            "sub_division"_a = muGrid::PixelTag,
+            "unit"_a = muGrid::Unit::unitless(),
+            py::return_value_policy::reference_internal)
+        .def(
+            "register_real32_field",
+            [](FieldCollection & collection, const std::string & unique_name,
+               const muGrid::Shape_t & components_shape,
+               const std::string & sub_division,
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.register_field<muGrid::Real32>(
+                    unique_name, components_shape, sub_division, unit);
+            },
+            "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
+            "sub_division"_a = muGrid::PixelTag,
+            "unit"_a = muGrid::Unit::unitless(),
+            py::return_value_policy::reference_internal)
+        .def(
+            "register_complex32_field",
+            [](FieldCollection & collection, const std::string & unique_name,
+               const Index_t & nb_components, const std::string & sub_division,
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.register_field<muGrid::Complex32>(
+                    unique_name, nb_components, sub_division, unit);
+            },
+            "unique_name"_a, "nb_components"_a,
+            "sub_division"_a = muGrid::PixelTag,
+            "unit"_a = muGrid::Unit::unitless(),
+            py::return_value_policy::reference_internal)
+        .def(
+            "register_complex32_field",
+            [](FieldCollection & collection, const std::string & unique_name,
+               const muGrid::Shape_t & components_shape,
+               const std::string & sub_division,
+               const muGrid::Unit & unit) -> muGrid::Field & {
+                return collection.register_field<muGrid::Complex32>(
+                    unique_name, components_shape, sub_division, unit);
+            },
+            "unique_name"_a, "components_shape"_a = muGrid::Shape_t{},
+            "sub_division"_a = muGrid::PixelTag,
+            "unit"_a = muGrid::Unit::unitless(),
+            py::return_value_policy::reference_internal)
+        .def(
             "register_uint_field",
             [](FieldCollection & collection, const std::string & unique_name,
                const Index_t & nb_components, const std::string & sub_division,

@@ -210,12 +210,21 @@ CONFIG_ORDER = ["cpu1", "cpuN", "gpu1", "gpuN"]
 
 
 def plan_configs(ncores, nb_gpus, want_gpu):
-    """Configs to RUN on this machine: list of (key, device, nranks)."""
-    cfgs = [("cpu1", "cpu", 1), ("cpuN", "cpu", ncores)]
-    if want_gpu and nb_gpus >= 1:
-        cfgs.append(("gpu1", "gpu", 1))
+    """Configs to RUN on this machine, FASTEST FIRST: list of (key, device,
+    nranks).
+
+    Ordered multi-GPU, single GPU, full-node MPI, single CPU core — so the
+    quickest configurations are measured first and the slow single core (the one
+    most likely to be cut off by a wall-clock limit) comes last. Rendering
+    re-sorts by `CONFIG_ORDER`, so this only affects execution order.
+    """
+    cfgs = []
     if want_gpu and nb_gpus > 1:
         cfgs.append(("gpuN", "gpu", nb_gpus))
+    if want_gpu and nb_gpus >= 1:
+        cfgs.append(("gpu1", "gpu", 1))
+    cfgs.append(("cpuN", "cpu", ncores))
+    cfgs.append(("cpu1", "cpu", 1))
     return cfgs
 
 
@@ -344,3 +353,27 @@ def select(rows, benchmark, timestamp=None):
         target = max(r["timestamp"] for r in sub)
         return [r for r in sub if r["timestamp"] == target]
     return [r for r in sub if r["timestamp"].startswith(timestamp)]
+
+
+def select_studies(rows, benchmark, studies, timestamp=None):
+    """Rows for the given studies of a benchmark, each from its OWN latest run.
+
+    Unlike `select`, which pins every row to a single run, this picks the most
+    recent run *per study* independently (or, with `timestamp`, the run whose
+    timestamp starts with the given string). A page that combines several
+    studies (e.g. the preconditioner's iteration-count and timing studies) can
+    therefore show the freshest data for each, even when the studies were
+    measured by separate jobs that ran at different times.
+    """
+    out = []
+    for study in studies:
+        sub = [r for r in rows
+               if r["benchmark"] == benchmark and r["study"] == study]
+        if not sub:
+            continue
+        if timestamp is None:
+            target = max(r["timestamp"] for r in sub)
+            out.extend(r for r in sub if r["timestamp"] == target)
+        else:
+            out.extend(r for r in sub if r["timestamp"].startswith(timestamp))
+    return out

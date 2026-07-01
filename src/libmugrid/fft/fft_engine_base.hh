@@ -210,8 +210,10 @@ class FFTEngineBase : public CartesianDecomposition {
    * get_transpose_yz: scatter Y / gather Z within the column communicator
    *   (3D only). Y-pencil [Fx/P2, Ny, Nz/P1] -> X-pencil [Fx/P2, Ny/P1, Nz].
    */
-  Transpose * get_transpose_xy(Index_t nb_components, StorageOrder layout);
-  Transpose * get_transpose_yz(Index_t nb_components, StorageOrder layout);
+  Transpose * get_transpose_xy(Index_t nb_components, StorageOrder layout,
+                               bool single_precision = false);
+  Transpose * get_transpose_yz(Index_t nb_components, StorageOrder layout,
+                               bool single_precision = false);
 
   // === Process grid ===
   int proc_grid_p1{1};   //!< First dimension of process grid
@@ -226,7 +228,9 @@ class FFTEngineBase : public CartesianDecomposition {
 #endif
 
   // === Transpose operations ===
-  using TransposeKey = std::pair<Index_t, StorageOrder>;
+  // (nb_components, layout, single_precision): fp32 and fp64 transposes carry
+  // different MPI datatypes, so they are cached under distinct keys.
+  using TransposeKey = std::tuple<Index_t, StorageOrder, bool>;
 
   TransposeConfig transpose_xy_config;
   TransposeConfig transpose_yz_config;

@@ -52,11 +52,17 @@ namespace py = pybind11;
 // Type aliases for host fields
 using RealFieldHost = TypedField<Real, HostSpace>;
 using ComplexFieldHost = TypedField<Complex, HostSpace>;
+using muGrid::Real32;
+using muGrid::Complex32;
+using Real32FieldHost = TypedField<Real32, HostSpace>;
+using Complex32FieldHost = TypedField<Complex32, HostSpace>;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 using DeviceSpace = muGrid::DefaultDeviceSpace;
 using RealFieldDevice = TypedField<Real, DeviceSpace>;
 using ComplexFieldDevice = TypedField<Complex, DeviceSpace>;
+using Real32FieldDevice = TypedField<Real32, DeviceSpace>;
+using Complex32FieldDevice = TypedField<Complex32, DeviceSpace>;
 #endif
 
 void add_linalg_functions(py::module &mod) {
@@ -353,6 +359,65 @@ void add_linalg_functions(py::module &mod) {
         fields; `out` may alias `N`.
         )pbdoc");
 
+    // Single-precision field-valued scal + Leray projection.
+    linalg.def("scal",
+        static_cast<void (*)(const Real32FieldHost &, Complex32FieldHost &)>(
+            &muGrid::linalg::scal<HostSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a complex64 field by a real float32 field (per-component).");
+    linalg.def("scal",
+        static_cast<void (*)(const Real32FieldHost &, Real32FieldHost &)>(
+            &muGrid::linalg::scal<HostSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a float32 field by a real float32 field (per-component).");
+    linalg.def("leray_project",
+        static_cast<void (*)(const Real32FieldHost &, const Real32FieldHost &,
+                             const Complex32FieldHost &, Complex32FieldHost &)>(
+            &muGrid::linalg::leray_project<HostSpace>),
+        "k"_a, "invk"_a, "N"_a, "out"_a,
+        "Single-precision (float32) fused Leray projection update.");
+
+    // --- Single-precision (float32) host operations ---
+    // Generic CG building blocks for Real32 and Complex32 fields. pybind
+    // dispatches by argument dtype, so these share the Python names above.
+#define MUGRID_BIND_LINALG_HOST(F, T)                                          \
+    linalg.def("vecdot",                                                       \
+        static_cast<T (*)(const F&, const F&)>(                                \
+            &muGrid::linalg::vecdot<T, HostSpace>), "a"_a, "b"_a);             \
+    linalg.def("norm_sq",                                                      \
+        static_cast<T (*)(const F&)>(&muGrid::linalg::norm_sq<T, HostSpace>),  \
+        "x"_a);                                                                \
+    linalg.def("axpy",                                                         \
+        static_cast<void (*)(T, const F&, F&)>(                                \
+            &muGrid::linalg::axpy<T, HostSpace>), "alpha"_a, "x"_a, "y"_a);    \
+    linalg.def("scal",                                                         \
+        static_cast<void (*)(T, F&)>(&muGrid::linalg::scal<T, HostSpace>),     \
+        "alpha"_a, "x"_a);                                                     \
+    linalg.def("axpby",                                                        \
+        static_cast<void (*)(T, const F&, T, F&)>(                             \
+            &muGrid::linalg::axpby<T, HostSpace>),                             \
+        "alpha"_a, "x"_a, "beta"_a, "y"_a);                                    \
+    linalg.def("copy",                                                         \
+        static_cast<void (*)(const F&, F&)>(                                   \
+            &muGrid::linalg::copy<T, HostSpace>), "src"_a, "dst"_a);           \
+    linalg.def("axpy_norm_sq",                                                 \
+        static_cast<T (*)(T, const F&, F&)>(                                   \
+            &muGrid::linalg::axpy_norm_sq<T, HostSpace>),                      \
+        "alpha"_a, "x"_a, "y"_a);                                              \
+    linalg.def("cross",                                                        \
+        static_cast<void (*)(const F&, const F&, F&)>(                         \
+            &muGrid::linalg::cross<T, HostSpace>), "a"_a, "b"_a, "out"_a);
+    MUGRID_BIND_LINALG_HOST(Real32FieldHost, Real32)
+    MUGRID_BIND_LINALG_HOST(Complex32FieldHost, Complex32)
+#undef MUGRID_BIND_LINALG_HOST
+    linalg.def("pipelined_cg_dots",
+        static_cast<std::array<Real32, 3> (*)(
+            const Real32FieldHost&, const Real32FieldHost&,
+            const Real32FieldHost&)>(
+            &muGrid::linalg::pipelined_cg_dots<Real32, HostSpace>),
+        "r"_a, "u"_a, "w"_a,
+        "Fused interior reduction for pipelined CG (float32).");
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---
 
@@ -490,5 +555,71 @@ void add_linalg_functions(py::module &mod) {
         "k"_a, "invk"_a, "N"_a, "out"_a,
         "Fused Leray projection out[c] -= k[c] * sum_d(invk[d] * N[d]) for "
         "complex fields with real coefficients on device (GPU).");
+
+    // --- Single-precision (float32) device CG building blocks ---
+#define MUGRID_BIND_LINALG_DEVICE(F, T)                                        \
+    linalg.def("vecdot",                                                       \
+        static_cast<T (*)(const F&, const F&)>(                                \
+            &muGrid::linalg::vecdot<T, DeviceSpace>), "a"_a, "b"_a);           \
+    linalg.def("norm_sq",                                                      \
+        static_cast<T (*)(const F&)>(&muGrid::linalg::norm_sq<T, DeviceSpace>),\
+        "x"_a);                                                                \
+    linalg.def("axpy",                                                         \
+        static_cast<void (*)(T, const F&, F&)>(                                \
+            &muGrid::linalg::axpy<T, DeviceSpace>), "alpha"_a, "x"_a, "y"_a);  \
+    linalg.def("scal",                                                         \
+        static_cast<void (*)(T, F&)>(&muGrid::linalg::scal<T, DeviceSpace>),   \
+        "alpha"_a, "x"_a);                                                     \
+    linalg.def("axpby",                                                        \
+        static_cast<void (*)(T, const F&, T, F&)>(                             \
+            &muGrid::linalg::axpby<T, DeviceSpace>),                           \
+        "alpha"_a, "x"_a, "beta"_a, "y"_a);                                    \
+    linalg.def("copy",                                                         \
+        static_cast<void (*)(const F&, F&)>(                                   \
+            &muGrid::linalg::copy<T, DeviceSpace>), "src"_a, "dst"_a);         \
+    linalg.def("axpy_norm_sq",                                                 \
+        static_cast<T (*)(T, const F&, F&)>(                                   \
+            &muGrid::linalg::axpy_norm_sq<T, DeviceSpace>),                    \
+        "alpha"_a, "x"_a, "y"_a);                                              \
+    linalg.def("cross",                                                        \
+        static_cast<void (*)(const F&, const F&, F&)>(                         \
+            &muGrid::linalg::cross<T, DeviceSpace>), "a"_a, "b"_a, "out"_a);
+    MUGRID_BIND_LINALG_DEVICE(Real32FieldDevice, Real32)
+    MUGRID_BIND_LINALG_DEVICE(Complex32FieldDevice, Complex32)
+#undef MUGRID_BIND_LINALG_DEVICE
+
+    // Single-precision pipelined CG dots + field-valued scal + Leray
+    // projection on device (custom kernels, double-accumulated reductions).
+    linalg.def("pipelined_cg_dots",
+        static_cast<std::array<Real32, 3> (*)(const Real32FieldDevice&,
+                                              const Real32FieldDevice&,
+                                              const Real32FieldDevice&)>(
+            &muGrid::linalg::pipelined_cg_dots<Real32, DeviceSpace>),
+        "r"_a, "u"_a, "w"_a,
+        "Fused interior reduction for pipelined CG on device (GPU), float32 "
+        "fields with double-accumulated dot products: [(r,u), (w,u), (r,r)].");
+
+    linalg.def("scal",
+        static_cast<void (*)(const Real32FieldDevice&, Complex32FieldDevice&)>(
+            &muGrid::linalg::scal<DeviceSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a complex64 field by a per-pixel float32 field on device (GPU): "
+        "x[c, i] *= alpha[c, i].");
+
+    linalg.def("scal",
+        static_cast<void (*)(const Real32FieldDevice&, Real32FieldDevice&)>(
+            &muGrid::linalg::scal<DeviceSpace>),
+        "alpha"_a, "x"_a,
+        "Scale a float32 field by a per-pixel float32 field on device (GPU): "
+        "x[c, i] *= alpha[c, i].");
+
+    linalg.def("leray_project",
+        static_cast<void (*)(const Real32FieldDevice&, const Real32FieldDevice&,
+                             const Complex32FieldDevice&,
+                             Complex32FieldDevice&)>(
+            &muGrid::linalg::leray_project<DeviceSpace>),
+        "k"_a, "invk"_a, "N"_a, "out"_a,
+        "Fused Leray projection out[c] -= k[c] * sum_d(invk[d] * N[d]) for "
+        "complex64 fields with float32 coefficients on device (GPU).");
 #endif
 }

@@ -62,9 +62,28 @@
 #include <array>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace muGrid {
+
+    //! Return a `const T*` view of a double-valued geometry array (G, V, Dbar
+    //! or E_macro): for T == Real this is `src.data()` with no copy; otherwise
+    //! the values are converted to T once into the caller-provided `scratch`
+    //! and its data() returned. Keeps the double-precision path zero-overhead
+    //! while letting the single-precision kernels run monomorphically in T.
+    template <typename T, typename SrcArray, typename ScratchArray>
+    const T * geometry_as(const SrcArray & src,
+                          [[maybe_unused]] ScratchArray & scratch) {
+        if constexpr (std::is_same_v<T, Real>) {
+            return src.data();
+        } else {
+            for (std::size_t i = 0; i < src.size(); ++i) {
+                scratch[i] = static_cast<T>(src[i]);
+            }
+            return scratch.data();
+        }
+    }
 
     /**
      * @class MaterialOperator
@@ -91,14 +110,33 @@ namespace muGrid {
         virtual void apply(const TypedFieldBase<Real> & displacement,
                            const TypedFieldBase<Real> & lambda,
                            const TypedFieldBase<Real> & mu,
-                           TypedFieldBase<Real> & force) const = 0;
+                           TypedFieldBase<Real> & force) const {
+            precision_not_implemented();
+        }
+        //! Single-precision (Real32) overload of apply().
+        virtual void apply(const TypedFieldBase<Real32> & displacement,
+                           const TypedFieldBase<Real32> & lambda,
+                           const TypedFieldBase<Real32> & mu,
+                           TypedFieldBase<Real32> & force) const {
+            precision_not_implemented();
+        }
 
         //! force += alpha * K(λ, μ) @ displacement
         virtual void
         apply_increment(const TypedFieldBase<Real> & displacement,
                         const TypedFieldBase<Real> & lambda,
                         const TypedFieldBase<Real> & mu, Real alpha,
-                        TypedFieldBase<Real> & force) const = 0;
+                        TypedFieldBase<Real> & force) const {
+            precision_not_implemented();
+        }
+        //! Single-precision (Real32) overload of apply_increment().
+        virtual void
+        apply_increment(const TypedFieldBase<Real32> & displacement,
+                        const TypedFieldBase<Real32> & lambda,
+                        const TypedFieldBase<Real32> & mu, Real32 alpha,
+                        TypedFieldBase<Real32> & force) const {
+            precision_not_implemented();
+        }
 
         //! Spatial dimension of the operator.
         virtual Dim_t get_spatial_dim() const = 0;
@@ -112,6 +150,18 @@ namespace muGrid {
         //! Ghost layers sufficient for all operations (apply is the only one).
         GhostRequirement get_ghost_requirement() const {
             return this->get_apply_ghost_requirement();
+        }
+
+       protected:
+        //! Default body for the precision overloads an operator does not
+        //! implement (operators are monomorphic in their scalar type; see
+        //! LinearOperator::precision_not_implemented).
+        [[noreturn]] static void precision_not_implemented() {
+            throw RuntimeError(
+                "This material operator was not instantiated for the scalar "
+                "precision of the supplied fields. Construct the operator for "
+                "the matching type (e.g. the Real32 variant for "
+                "single-precision fields).");
         }
     };
 
@@ -144,167 +194,6 @@ namespace muGrid {
         static constexpr Index_t nb_quad = 5;           //!< 5 tetrahedra
     };
 
-    // Kernel declarations. The host kernels are defined in
-    // isotropic_stiffness_2d.cc / isotropic_stiffness_3d.cc, the device kernels
-    // in isotropic_stiffness_gpu.cc.
-    namespace isotropic_stiffness_kernels {
-
-        void isotropic_stiffness_2d_host(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda,
-            const Real * MUGRID_RESTRICT mu, Real * MUGRID_RESTRICT force,
-            Index_t nnx, Index_t nny, Index_t nelx, Index_t nely,
-            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment);
-
-        void isotropic_stiffness_3d_host(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda,
-            const Real * MUGRID_RESTRICT mu, Real * MUGRID_RESTRICT force,
-            Index_t nnx, Index_t nny, Index_t nnz, Index_t nelx, Index_t nely,
-            Index_t nelz, Index_t disp_stride_x, Index_t disp_stride_y,
-            Index_t disp_stride_z, Index_t disp_stride_d, Index_t mat_stride_x,
-            Index_t mat_stride_y, Index_t mat_stride_z, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_z,
-            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
-            bool increment);
-
-        // Uniform-coefficient host kernels: spatially constant Lamé scalars
-        // (λ, μ) instead of per-pixel fields, so they need neither material
-        // pointers nor material strides. K_e = 2μ G + λ V is the same constant
-        // element matrix for every voxel.
-        void isotropic_stiffness_2d_host_uniform(
-            const Real * MUGRID_RESTRICT displacement, Real lambda, Real mu,
-            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
-            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-            Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
-            bool increment);
-
-        void isotropic_stiffness_3d_host_uniform(
-            const Real * MUGRID_RESTRICT displacement, Real lambda, Real mu,
-            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny, Index_t nnz,
-            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_z,
-            Index_t disp_stride_d, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_z,
-            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
-            bool increment);
-
-        // Macro-RHS host kernels: assemble force = Bᵀ C(λ,μ) E_macro with no
-        // global strain/stress field. Because the affine displacement u* with
-        // ∇u* = E_macro satisfies B_q u* = E_macro at every quad point, the
-        // element contribution is K_e u* = 2μ_e (G u*) + λ_e (V u*); the
-        // constant per-element vectors Gu = G u* and Vu = V u* are precomputed
-        // on the host, so the kernel only gathers material and accumulates.
-        void isotropic_stiffness_2d_host_macro_rhs(
-            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
-            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * Gu,
-            const Real * Vu, Real alpha, bool increment);
-
-        void isotropic_stiffness_3d_host_macro_rhs(
-            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
-            Real * MUGRID_RESTRICT force, Index_t nnx, Index_t nny, Index_t nnz,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
-            Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_z, Index_t force_stride_d, const Real * Gu,
-            const Real * Vu, Real alpha, bool increment);
-
-        // Stress-average host kernels: accumulate the local volume integral
-        // ∫ σ dV of σ = C(λ,μ):(E_macro + sym(∇u)) into accum_out (length
-        // Dim*Dim, row-major), looping over local elements. Dbar[j*NB_NODES+n]
-        // = scale[j] Σ_q w_q B[q][j][n] gives the element-averaged gradient
-        // ḡ_ij = Σ_n Dbar[j][n] u[n,i] directly (no global strain field).
-        void isotropic_stiffness_2d_host_average(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
-            Index_t nelx, Index_t nely, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
-            Index_t mat_stride_y, const Real * Dbar, const Real * E_macro,
-            Real vol_elem, Real * accum_out);
-
-        void isotropic_stiffness_3d_host_average(
-            const Real * MUGRID_RESTRICT displacement,
-            const Real * MUGRID_RESTRICT lambda, const Real * MUGRID_RESTRICT mu,
-            Index_t nelx, Index_t nely, Index_t nelz, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
-            const Real * Dbar, const Real * E_macro, Real vol_elem,
-            Real * accum_out);
-
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        void isotropic_stiffness_2d_gpu(
-            const Real * displacement, const Real * lambda, const Real * mu,
-            Real * force, Index_t nnx, Index_t nny, Index_t nelx, Index_t nely,
-            Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t force_stride_x,
-            Index_t force_stride_y, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment);
-
-        void isotropic_stiffness_3d_gpu(
-            const Real * displacement, const Real * lambda, const Real * mu,
-            Real * force, Index_t nnx, Index_t nny, Index_t nnz, Index_t nelx,
-            Index_t nely, Index_t nelz, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
-            Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_z, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment);
-
-        // Uniform-coefficient device kernels (see the host variants above).
-        void isotropic_stiffness_2d_gpu_uniform(
-            const Real * displacement, Real lambda, Real mu, Real * force,
-            Index_t nnx, Index_t nny, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_d,
-            Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_d, const Real * G, const Real * V, Real alpha,
-            bool increment);
-
-        void isotropic_stiffness_3d_gpu_uniform(
-            const Real * displacement, Real lambda, Real mu, Real * force,
-            Index_t nnx, Index_t nny, Index_t nnz, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
-            Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_z, Index_t force_stride_d, const Real * G,
-            const Real * V, Real alpha, bool increment);
-
-        // Macro-RHS device kernels (see the host variants above).
-        void isotropic_stiffness_2d_gpu_macro_rhs(
-            const Real * lambda, const Real * mu, Real * force, Index_t nnx,
-            Index_t nny, Index_t mat_stride_x, Index_t mat_stride_y,
-            Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_d, const Real * Gu, const Real * Vu,
-            Real alpha, bool increment);
-
-        void isotropic_stiffness_3d_gpu_macro_rhs(
-            const Real * lambda, const Real * mu, Real * force, Index_t nnx,
-            Index_t nny, Index_t nnz, Index_t mat_stride_x, Index_t mat_stride_y,
-            Index_t mat_stride_z, Index_t force_stride_x, Index_t force_stride_y,
-            Index_t force_stride_z, Index_t force_stride_d, const Real * Gu,
-            const Real * Vu, Real alpha, bool increment);
-
-        // Stress-average device kernels (see the host variants above). The
-        // Dim*Dim local volume integral is written to accum_out (host pointer).
-        void isotropic_stiffness_2d_gpu_average(
-            const Real * displacement, const Real * lambda, const Real * mu,
-            Index_t nelx, Index_t nely, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_d, Index_t mat_stride_x,
-            Index_t mat_stride_y, const Real * Dbar, const Real * E_macro,
-            Real vol_elem, Real * accum_out);
-
-        void isotropic_stiffness_3d_gpu_average(
-            const Real * displacement, const Real * lambda, const Real * mu,
-            Index_t nelx, Index_t nely, Index_t nelz, Index_t disp_stride_x,
-            Index_t disp_stride_y, Index_t disp_stride_z, Index_t disp_stride_d,
-            Index_t mat_stride_x, Index_t mat_stride_y, Index_t mat_stride_z,
-            const Real * Dbar, const Real * E_macro, Real vol_elem,
-            Real * accum_out);
-#endif
-
-    }  // namespace isotropic_stiffness_kernels
 
     namespace internal {
 
@@ -472,13 +361,28 @@ namespace muGrid {
                    const TypedFieldBase<Real> & lambda,
                    const TypedFieldBase<Real> & mu,
                    TypedFieldBase<Real> & force) const override {
-            this->apply_impl(displacement, lambda, mu, 1.0, force, false);
+            this->apply_impl<Real>(displacement, lambda, mu, 1.0, force, false);
         }
         void apply_increment(const TypedFieldBase<Real> & displacement,
                              const TypedFieldBase<Real> & lambda,
                              const TypedFieldBase<Real> & mu, Real alpha,
                              TypedFieldBase<Real> & force) const override {
-            this->apply_impl(displacement, lambda, mu, alpha, force, true);
+            this->apply_impl<Real>(displacement, lambda, mu, alpha, force, true);
+        }
+        //! Single-precision (Real32) overloads.
+        void apply(const TypedFieldBase<Real32> & displacement,
+                   const TypedFieldBase<Real32> & lambda,
+                   const TypedFieldBase<Real32> & mu,
+                   TypedFieldBase<Real32> & force) const override {
+            this->apply_impl<Real32>(displacement, lambda, mu, 1.0f, force,
+                                     false);
+        }
+        void apply_increment(const TypedFieldBase<Real32> & displacement,
+                             const TypedFieldBase<Real32> & lambda,
+                             const TypedFieldBase<Real32> & mu, Real32 alpha,
+                             TypedFieldBase<Real32> & force) const override {
+            this->apply_impl<Real32>(displacement, lambda, mu, alpha, force,
+                                     true);
         }
 
         // ---- Uniform-coefficient host interface ----
@@ -488,15 +392,28 @@ namespace muGrid {
         void apply_uniform(const TypedFieldBase<Real> & displacement,
                            Real lambda, Real mu,
                            TypedFieldBase<Real> & force) const {
-            this->apply_uniform_impl(displacement, lambda, mu, 1.0, force,
-                                     false);
+            this->apply_uniform_impl<Real>(displacement, lambda, mu, 1.0, force,
+                                           false);
         }
         //! force += alpha * K(λ, μ) @ displacement, uniform λ, μ.
         void apply_uniform_increment(const TypedFieldBase<Real> & displacement,
                                      Real lambda, Real mu, Real alpha,
                                      TypedFieldBase<Real> & force) const {
-            this->apply_uniform_impl(displacement, lambda, mu, alpha, force,
-                                     true);
+            this->apply_uniform_impl<Real>(displacement, lambda, mu, alpha,
+                                           force, true);
+        }
+        //! Single-precision (Real32) uniform-coefficient overloads.
+        void apply_uniform(const TypedFieldBase<Real32> & displacement,
+                           Real32 lambda, Real32 mu,
+                           TypedFieldBase<Real32> & force) const {
+            this->apply_uniform_impl<Real32>(displacement, lambda, mu, 1.0f,
+                                             force, false);
+        }
+        void apply_uniform_increment(
+            const TypedFieldBase<Real32> & displacement, Real32 lambda,
+            Real32 mu, Real32 alpha, TypedFieldBase<Real32> & force) const {
+            this->apply_uniform_impl<Real32>(displacement, lambda, mu, alpha,
+                                             force, true);
         }
 
         // ---- Streaming homogenization helpers (host) ----
@@ -508,7 +425,15 @@ namespace muGrid {
                              const TypedFieldBase<Real> & mu,
                              const std::array<Real, Dim * Dim> & E_macro,
                              TypedFieldBase<Real> & force) const {
-            this->apply_macro_rhs_impl(lambda, mu, E_macro, force);
+            this->apply_macro_rhs_impl<Real>(lambda, mu, E_macro, force);
+        }
+        //! Single-precision (Real32) overload of apply_macro_rhs (E_macro stays
+        //! double).
+        void apply_macro_rhs(const TypedFieldBase<Real32> & lambda,
+                             const TypedFieldBase<Real32> & mu,
+                             const std::array<Real, Dim * Dim> & E_macro,
+                             TypedFieldBase<Real32> & force) const {
+            this->apply_macro_rhs_impl<Real32>(lambda, mu, E_macro, force);
         }
 
         //! Volume-averaged stress integral ∫ σ dV over the local subdomain,
@@ -521,58 +446,105 @@ namespace muGrid {
                        const TypedFieldBase<Real> & lambda,
                        const TypedFieldBase<Real> & mu,
                        const std::array<Real, Dim * Dim> & E_macro) const {
-            return this->average_stress_impl(displacement, lambda, mu, E_macro);
+            return this->average_stress_impl<Real>(displacement, lambda, mu,
+                                                   E_macro);
+        }
+        //! Single-precision (Real32) overload of average_stress. The volume
+        //! integral is still returned in double for the cross-rank reduction.
+        std::array<Real, Dim * Dim>
+        average_stress(const TypedFieldBase<Real32> & displacement,
+                       const TypedFieldBase<Real32> & lambda,
+                       const TypedFieldBase<Real32> & mu,
+                       const std::array<Real, Dim * Dim> & E_macro) const {
+            return this->average_stress_impl<Real32>(displacement, lambda, mu,
+                                                     E_macro);
         }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        // ---- Device interface ----
-        void apply(const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-                   const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-                   const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
-                   TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
-            this->apply_impl(displacement, lambda, mu, 1.0, force, false);
+        // ---- Device interface (host- and single-precision) ----
+        // DSpace shorthand for the device-field overloads below.
+        template <typename U>
+        using DField = TypedFieldBase<U, DefaultDeviceSpace>;
+
+        void apply(const DField<Real> & displacement,
+                   const DField<Real> & lambda, const DField<Real> & mu,
+                   DField<Real> & force) const {
+            this->apply_impl<Real>(displacement, lambda, mu, 1.0, force, false);
         }
-        void apply_increment(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & mu, Real alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
-            this->apply_impl(displacement, lambda, mu, alpha, force, true);
+        void apply(const DField<Real32> & displacement,
+                   const DField<Real32> & lambda, const DField<Real32> & mu,
+                   DField<Real32> & force) const {
+            this->apply_impl<Real32>(displacement, lambda, mu, 1.0f, force,
+                                     false);
+        }
+        void apply_increment(const DField<Real> & displacement,
+                             const DField<Real> & lambda,
+                             const DField<Real> & mu, Real alpha,
+                             DField<Real> & force) const {
+            this->apply_impl<Real>(displacement, lambda, mu, alpha, force, true);
+        }
+        void apply_increment(const DField<Real32> & displacement,
+                             const DField<Real32> & lambda,
+                             const DField<Real32> & mu, Real32 alpha,
+                             DField<Real32> & force) const {
+            this->apply_impl<Real32>(displacement, lambda, mu, alpha, force,
+                                     true);
         }
 
         // ---- Uniform-coefficient device interface ----
-        void apply_uniform(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            Real lambda, Real mu,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
-            this->apply_uniform_impl(displacement, lambda, mu, 1.0, force,
-                                     false);
+        void apply_uniform(const DField<Real> & displacement, Real lambda,
+                           Real mu, DField<Real> & force) const {
+            this->apply_uniform_impl<Real>(displacement, lambda, mu, 1.0, force,
+                                           false);
         }
-        void apply_uniform_increment(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            Real lambda, Real mu, Real alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
-            this->apply_uniform_impl(displacement, lambda, mu, alpha, force,
-                                     true);
+        void apply_uniform(const DField<Real32> & displacement, Real32 lambda,
+                           Real32 mu, DField<Real32> & force) const {
+            this->apply_uniform_impl<Real32>(displacement, lambda, mu, 1.0f,
+                                             force, false);
+        }
+        void apply_uniform_increment(const DField<Real> & displacement,
+                                     Real lambda, Real mu, Real alpha,
+                                     DField<Real> & force) const {
+            this->apply_uniform_impl<Real>(displacement, lambda, mu, alpha,
+                                           force, true);
+        }
+        void apply_uniform_increment(const DField<Real32> & displacement,
+                                     Real32 lambda, Real32 mu, Real32 alpha,
+                                     DField<Real32> & force) const {
+            this->apply_uniform_impl<Real32>(displacement, lambda, mu, alpha,
+                                             force, true);
         }
 
         // ---- Streaming homogenization helpers (device) ----
         //! Device counterpart of apply_macro_rhs (see the host overload).
-        void apply_macro_rhs(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
-            const std::array<Real, Dim * Dim> & E_macro,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force) const {
-            this->apply_macro_rhs_impl(lambda, mu, E_macro, force);
+        void apply_macro_rhs(const DField<Real> & lambda,
+                             const DField<Real> & mu,
+                             const std::array<Real, Dim * Dim> & E_macro,
+                             DField<Real> & force) const {
+            this->apply_macro_rhs_impl<Real>(lambda, mu, E_macro, force);
+        }
+        void apply_macro_rhs(const DField<Real32> & lambda,
+                             const DField<Real32> & mu,
+                             const std::array<Real, Dim * Dim> & E_macro,
+                             DField<Real32> & force) const {
+            this->apply_macro_rhs_impl<Real32>(lambda, mu, E_macro, force);
         }
 
         //! Device counterpart of average_stress (see the host overload).
-        std::array<Real, Dim * Dim> average_stress(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
-            const std::array<Real, Dim * Dim> & E_macro) const {
-            return this->average_stress_impl(displacement, lambda, mu, E_macro);
+        std::array<Real, Dim * Dim>
+        average_stress(const DField<Real> & displacement,
+                       const DField<Real> & lambda, const DField<Real> & mu,
+                       const std::array<Real, Dim * Dim> & E_macro) const {
+            return this->average_stress_impl<Real>(displacement, lambda, mu,
+                                                   E_macro);
+        }
+        std::array<Real, Dim * Dim>
+        average_stress(const DField<Real32> & displacement,
+                       const DField<Real32> & lambda,
+                       const DField<Real32> & mu,
+                       const std::array<Real, Dim * Dim> & E_macro) const {
+            return this->average_stress_impl<Real32>(displacement, lambda, mu,
+                                                     E_macro);
         }
 #endif
 
@@ -711,151 +683,132 @@ namespace muGrid {
         }
 
         //! Host apply with optional increment (dimension-specific; explicit
-        //! specialization in isotropic_stiffness_{2,3}d.cc).
-        void apply_impl(const TypedFieldBase<Real> & displacement,
-                        const TypedFieldBase<Real> & lambda,
-                        const TypedFieldBase<Real> & mu, Real alpha,
-                        TypedFieldBase<Real> & force, bool increment) const;
+        //! member-template specialization in isotropic_stiffness_{2,3}d.cc,
+        //! instantiated for T ∈ {Real, Real32}).
+        template <typename T>
+        void apply_impl(const TypedFieldBase<T> & displacement,
+                        const TypedFieldBase<T> & lambda,
+                        const TypedFieldBase<T> & mu, T alpha,
+                        TypedFieldBase<T> & force, bool increment) const;
 
         //! Host apply for uniform Lamé scalars (dimension-specific; explicit
         //! specialization in isotropic_stiffness_{2,3}d.cc).
-        void apply_uniform_impl(const TypedFieldBase<Real> & displacement,
-                                Real lambda, Real mu, Real alpha,
-                                TypedFieldBase<Real> & force,
+        template <typename T>
+        void apply_uniform_impl(const TypedFieldBase<T> & displacement,
+                                T lambda, T mu, T alpha,
+                                TypedFieldBase<T> & force,
                                 bool increment) const;
 
         //! Host macro-RHS / stress-average (dimension-specific; explicit
-        //! specialization in isotropic_stiffness_{2,3}d.cc).
-        void apply_macro_rhs_impl(const TypedFieldBase<Real> & lambda,
-                                  const TypedFieldBase<Real> & mu,
+        //! specialization in isotropic_stiffness_{2,3}d.cc). E_macro stays in
+        //! double; the kernel-side per-element vectors are converted to T.
+        template <typename T>
+        void apply_macro_rhs_impl(const TypedFieldBase<T> & lambda,
+                                  const TypedFieldBase<T> & mu,
                                   const std::array<Real, Dim * Dim> & E_macro,
-                                  TypedFieldBase<Real> & force) const;
+                                  TypedFieldBase<T> & force) const;
+        template <typename T>
         std::array<Real, Dim * Dim>
-        average_stress_impl(const TypedFieldBase<Real> & displacement,
-                            const TypedFieldBase<Real> & lambda,
-                            const TypedFieldBase<Real> & mu,
+        average_stress_impl(const TypedFieldBase<T> & displacement,
+                            const TypedFieldBase<T> & lambda,
+                            const TypedFieldBase<T> & mu,
                             const std::array<Real, Dim * Dim> & E_macro) const;
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // The geometry matrices (G/V/Dbar/Gu/Vu/E_macro) live in double
+        // __constant__ memory and stay double; the kernels cast them to T at
+        // the point of load so the per-element arithmetic runs in T. Hence the
+        // device impls are member templates on T like their host counterparts.
+
         //! Device apply with optional increment (dimension-specific; explicit
         //! specialization in isotropic_stiffness_gpu.cc).
+        template <typename T>
         void apply_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & mu, Real alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force,
+            const TypedFieldBase<T, DefaultDeviceSpace> & displacement,
+            const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<T, DefaultDeviceSpace> & mu, T alpha,
+            TypedFieldBase<T, DefaultDeviceSpace> & force,
             bool increment) const;
 
         //! Device apply for uniform Lamé scalars (explicit specialization in
         //! isotropic_stiffness_gpu.cc).
+        template <typename T>
         void apply_uniform_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            Real lambda, Real mu, Real alpha,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force,
+            const TypedFieldBase<T, DefaultDeviceSpace> & displacement,
+            T lambda, T mu, T alpha,
+            TypedFieldBase<T, DefaultDeviceSpace> & force,
             bool increment) const;
 
         //! Device macro-RHS / stress-average (explicit specialization in
         //! isotropic_stiffness_gpu.cc).
+        template <typename T>
         void apply_macro_rhs_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+            const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<T, DefaultDeviceSpace> & mu,
             const std::array<Real, Dim * Dim> & E_macro,
-            TypedFieldBase<Real, DefaultDeviceSpace> & force) const;
+            TypedFieldBase<T, DefaultDeviceSpace> & force) const;
+        template <typename T>
         std::array<Real, Dim * Dim> average_stress_impl(
-            const TypedFieldBase<Real, DefaultDeviceSpace> & displacement,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & lambda,
-            const TypedFieldBase<Real, DefaultDeviceSpace> & mu,
+            const TypedFieldBase<T, DefaultDeviceSpace> & displacement,
+            const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
+            const TypedFieldBase<T, DefaultDeviceSpace> & mu,
             const std::array<Real, Dim * Dim> & E_macro) const;
 #endif
     };
 
-    // Explicit specialization declarations: the bodies live in the .cc files,
-    // so every translation unit that instantiates the operator must see that
-    // these members are specialized elsewhere (and not implicitly instantiated
-    // from the — intentionally undefined — primary template).
+    // Specialization declarations: the bodies live in the .cc files, so every
+    // translation unit that instantiates the operator must see that these
+    // members are specialized elsewhere (and not implicitly instantiated from
+    // the — intentionally undefined — primary template). precompute_matrices is
+    // a plain member specialization; the apply/transpose impls are member
+    // templates on the scalar type T (instantiated for Real and Real32 in the
+    // .cc files). One declaration per (Dim, space) covers both precisions.
+    // The field-base type is passed as a single object-like macro (TFB): the
+    // host one is `TypedFieldBase<T>`, the device one carries its own comma as
+    // `TypedFieldBase<T, DefaultDeviceSpace>`. Passing it as one already-formed
+    // token avoids a conditional comma (we deliberately do not use __VA_OPT__,
+    // which MSVC's default preprocessor does not support).
+#define MUGRID_TFB_HOST TypedFieldBase<T>
+#define MUGRID_TFB_DEVICE TypedFieldBase<T, DefaultDeviceSpace>
+#define MUGRID_DECLARE_STIFFNESS_IMPLS(D, TFB)                                 \
+    template <>                                                                \
+    template <typename T>                                                      \
+    void IsotropicStiffnessOperator<D>::apply_impl(                            \
+        const TFB &, const TFB &, const TFB &, T, TFB &, bool) const;          \
+    template <>                                                                \
+    template <typename T>                                                      \
+    void IsotropicStiffnessOperator<D>::apply_uniform_impl(                    \
+        const TFB &, T, T, T, TFB &, bool) const;                             \
+    template <>                                                                \
+    template <typename T>                                                      \
+    void IsotropicStiffnessOperator<D>::apply_macro_rhs_impl(                  \
+        const TFB &, const TFB &, const std::array<Real, D * D> &, TFB &)      \
+        const;                                                                 \
+    template <>                                                                \
+    template <typename T>                                                      \
+    std::array<Real, D * D>                                                    \
+    IsotropicStiffnessOperator<D>::average_stress_impl(                        \
+        const TFB &, const TFB &, const TFB &,                                 \
+        const std::array<Real, D * D> &) const;
+
     template <>
     void IsotropicStiffnessOperator<2>::precompute_matrices();
     template <>
-    void IsotropicStiffnessOperator<2>::apply_impl(
-        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
-        const TypedFieldBase<Real> &, Real, TypedFieldBase<Real> &, bool) const;
-    template <>
-    void IsotropicStiffnessOperator<2>::apply_uniform_impl(
-        const TypedFieldBase<Real> &, Real, Real, Real, TypedFieldBase<Real> &,
-        bool) const;
-    template <>
-    void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
-        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
-        const std::array<Real, 4> &, TypedFieldBase<Real> &) const;
-    template <>
-    std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
-        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
-        const TypedFieldBase<Real> &, const std::array<Real, 4> &) const;
-    template <>
     void IsotropicStiffnessOperator<3>::precompute_matrices();
-    template <>
-    void IsotropicStiffnessOperator<3>::apply_impl(
-        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
-        const TypedFieldBase<Real> &, Real, TypedFieldBase<Real> &, bool) const;
-    template <>
-    void IsotropicStiffnessOperator<3>::apply_uniform_impl(
-        const TypedFieldBase<Real> &, Real, Real, Real, TypedFieldBase<Real> &,
-        bool) const;
-    template <>
-    void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
-        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
-        const std::array<Real, 9> &, TypedFieldBase<Real> &) const;
-    template <>
-    std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
-        const TypedFieldBase<Real> &, const TypedFieldBase<Real> &,
-        const TypedFieldBase<Real> &, const std::array<Real, 9> &) const;
+
+    MUGRID_DECLARE_STIFFNESS_IMPLS(2, MUGRID_TFB_HOST)
+    MUGRID_DECLARE_STIFFNESS_IMPLS(3, MUGRID_TFB_HOST)
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-    template <>
-    void IsotropicStiffnessOperator<2>::apply_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &, Real,
-        TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
-    template <>
-    void IsotropicStiffnessOperator<2>::apply_uniform_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &, Real, Real, Real,
-        TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
-    template <>
-    void IsotropicStiffnessOperator<3>::apply_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &, Real,
-        TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
-    template <>
-    void IsotropicStiffnessOperator<3>::apply_uniform_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &, Real, Real, Real,
-        TypedFieldBase<Real, DefaultDeviceSpace> &, bool) const;
-    template <>
-    void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const std::array<Real, 4> &,
-        TypedFieldBase<Real, DefaultDeviceSpace> &) const;
-    template <>
-    std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const std::array<Real, 4> &) const;
-    template <>
-    void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const std::array<Real, 9> &,
-        TypedFieldBase<Real, DefaultDeviceSpace> &) const;
-    template <>
-    std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const TypedFieldBase<Real, DefaultDeviceSpace> &,
-        const std::array<Real, 9> &) const;
+    // Device impls are member templates on T too (the double __constant__
+    // geometry is cast to T inside the kernels). One declaration per dim covers
+    // both precisions.
+    MUGRID_DECLARE_STIFFNESS_IMPLS(2, MUGRID_TFB_DEVICE)
+    MUGRID_DECLARE_STIFFNESS_IMPLS(3, MUGRID_TFB_DEVICE)
 #endif
+#undef MUGRID_DECLARE_STIFFNESS_IMPLS
+#undef MUGRID_TFB_HOST
+#undef MUGRID_TFB_DEVICE
 
     //! 2D fused isotropic stiffness operator. Preserves the historical name.
     using IsotropicStiffnessOperator2D = IsotropicStiffnessOperator<2>;

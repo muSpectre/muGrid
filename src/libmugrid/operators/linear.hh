@@ -168,7 +168,17 @@ namespace muGrid {
      */
     virtual void
     apply(const TypedFieldBase<Real> & nodal_field,
-                   TypedFieldBase<Real> & quadrature_point_field) const = 0;
+                   TypedFieldBase<Real> & quadrature_point_field) const {
+      precision_not_implemented();
+    }
+    //! Single-precision (Real32) overload; see the Real overload. The default
+    //! throws so that an operator instantiated for one precision reports a
+    //! clear error when handed fields of the other.
+    virtual void
+    apply(const TypedFieldBase<Real32> & nodal_field,
+                   TypedFieldBase<Real32> & quadrature_point_field) const {
+      precision_not_implemented();
+    }
 
     /**
      * @brief Applies the gradient operation with increment.
@@ -185,7 +195,15 @@ namespace muGrid {
      */
     virtual void apply_increment(
         const TypedFieldBase<Real> & nodal_field, const Real & alpha,
-        TypedFieldBase<Real> & quadrature_point_field) const = 0;
+        TypedFieldBase<Real> & quadrature_point_field) const {
+      precision_not_implemented();
+    }
+    //! Single-precision (Real32) overload of apply_increment().
+    virtual void apply_increment(
+        const TypedFieldBase<Real32> & nodal_field, const Real32 & alpha,
+        TypedFieldBase<Real32> & quadrature_point_field) const {
+      precision_not_implemented();
+    }
 
     /**
      * @brief Applies the discretised divergence operation.
@@ -203,7 +221,17 @@ namespace muGrid {
     virtual void
     transpose(const TypedFieldBase<Real> & quadrature_point_field,
                     TypedFieldBase<Real> & nodal_field,
-                    const std::vector<Real> & weights = {}) const = 0;
+                    const std::vector<Real> & weights = {}) const {
+      precision_not_implemented();
+    }
+    //! Single-precision (Real32) overload of transpose(). Quadrature weights
+    //! stay double; they are converted to Real32 inside the kernel.
+    virtual void
+    transpose(const TypedFieldBase<Real32> & quadrature_point_field,
+                    TypedFieldBase<Real32> & nodal_field,
+                    const std::vector<Real> & weights = {}) const {
+      precision_not_implemented();
+    }
 
     /**
      * @brief Applies the discretised divergence operation with increment.
@@ -223,7 +251,16 @@ namespace muGrid {
     virtual void transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
         TypedFieldBase<Real> & nodal_field,
-        const std::vector<Real> & weights = {}) const = 0;
+        const std::vector<Real> & weights = {}) const {
+      precision_not_implemented();
+    }
+    //! Single-precision (Real32) overload of transpose_increment().
+    virtual void transpose_increment(
+        const TypedFieldBase<Real32> & quadrature_point_field,
+        const Real32 & alpha, TypedFieldBase<Real32> & nodal_field,
+        const std::vector<Real> & weights = {}) const {
+      precision_not_implemented();
+    }
 
       /**
        * @brief Returns the number of output components per pixel/voxel.
@@ -337,6 +374,22 @@ namespace muGrid {
     }
 
    protected:
+    /**
+     * @brief Default body for the precision overloads an operator does not
+     *        implement.
+     *
+     * Operators are monomorphic in their scalar type: an operator instantiated
+     * for `Real` implements only the `Real` apply/transpose overloads, an
+     * operator instantiated for `Real32` only the `Real32` ones. The overloads
+     * for the other precision inherit this throwing default.
+     */
+    [[noreturn]] static void precision_not_implemented() {
+      throw RuntimeError(
+          "This operator was not instantiated for the scalar precision of the "
+          "supplied fields. Construct the operator for the matching type (e.g. "
+          "the Real32 variant for single-precision fields).");
+    }
+
     /**
      * @brief Common field validation shared by all stencil operators.
      *
