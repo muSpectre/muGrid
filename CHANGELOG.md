@@ -4,63 +4,19 @@ Change log for µGrid
 Unreleased
 ----------
 
-- ENH: Added the Green-Jacobi (J-FFT) preconditioner of Ladecký et al. for
-  FFT-accelerated FE homogenization: `GreenJacobiPreconditioner` and
-  `make_green_jacobi_preconditioner` wrap the reference-material (Green) Fourier
-  preconditioner in a symmetric Jacobi scaling `J^{1/2} G J^{1/2}`, restoring fast
-  CG convergence on smooth high-contrast (e.g. phase-field topology-optimization)
-  data where plain Green degrades. The Jacobi diagonal `diag(K)` is built by a new
-  fused `IsotropicStiffnessOperator.assemble_diagonal` kernel (host + GPU, MPI-aware)
-  that reuses the macro-RHS gather with the element-matrix diagonals of `G`/`V`
-- ENH: Single-precision support — added `Real32`/`Complex32` scalar types to the type
-  registry (MPI, NetCDF); fields can now be hosted in `float`/`complex<float>` and are
-  exposed via `register_real32_field`/`register_complex32_field` with zero-copy DLPack
-  views and NetCDF round-trip
-- ENH: FEM gradient operator templated on scalar type (host + GPU); single-precision variants
-  (`FEMGradientOperator{2D,3D,Q1_2D,Q1_3D}_32`) bound and validated against double on an
-  affine patch test, on both CPU and GPU
-- ENH: Fused isotropic stiffness operator (apply / uniform / macro_rhs / average_stress)
-  templated on scalar type (host + GPU); the existing `IsotropicStiffnessOperator{2D,3D}` now
-  also accept float32 fields, matching double to ≈1e-7 relative on both CPU and GPU. On the GPU
-  the geometry matrices stay in double `__constant__` memory and are cast to the working type at
-  load, so the per-element arithmetic runs in single precision
-- ENH: `LaplaceOperator{2D,3D}` and `GenericLinearOperator` templated on scalar type (host + GPU);
-  both now accept float32 fields. The Generic operator keeps its sparse-operator coefficients in
-  double (one shared cache) and casts to the working type in the kernels
-- ENH: Single-precision FFT — `FFTEngine.fft`/`ifft` now accept float32 real-space (`Real32`) and
-  complex64 Fourier (`Complex32`) fields; the engine picks the precision from the field dtype.
-  Works on host (pocketfft) and GPU (cuFFT `R2C`/`C2R`) serial, and **MPI-distributed across both
-  slab and pencil decompositions** (the pencil transpose carries `MPI_COMPLEX` datatypes and
-  `Complex32` work buffers), matching double to ≈1e-7 forward / ≈1e-6 round-trip on 2 and 4 ranks
-- ENH: Single-precision linalg primitives — the CG building blocks (`vecdot`, `norm_sq`, `axpy`,
-  `scal`, `axpby`, `copy`, `axpy_norm_sq`, `cross`), `pipelined_cg_dots`, the field-valued `scal`
-  and the `leray_project` spectral-projection kernel all accept `Real32`/`Complex32` fields on host
-  and GPU. The GPU reductions (`pipelined_cg_dots` dot products, the `leray_project` contraction)
-  accumulate in double even for float32 fields, so a single-precision CG keeps a double-accurate
-  inner product
-- ENH: `dtype=` field-creation API — `real_field(name, components, dtype=np.float32)` and
-  `complex_field(..., dtype=np.complex64)` (on `GlobalFieldCollection`, `LocalFieldCollection`,
-  `CartesianDecomposition`, and the `FFTEngine` real/Fourier-space field methods) select single
-  precision without a separate method name. Single-precision creation keeps the get-or-create
-  semantics of the double-precision convenience methods. Added a `Field.dtype` property, and the
-  `conjugate_gradients` / `conjugate_gradients_pipelined` solvers now allocate their work fields at
-  the right-hand side's precision, so a float32 rhs yields an end-to-end single-precision solve
-- ENH: Added `examples/precision_homogenization.py` — runs the same fused-stiffness homogenization
-  in float64 and float32 (chosen purely via `dtype=`), reporting the effective-stiffness difference
-  (≈1e-6 relative) and the halved field memory footprint
-- ENH: Added Q1 (bilinear quad / trilinear hex) elements to the FEM gradient and fused
-  stiffness operators (host + GPU), selected via `muGrid.FEMElement.{p1,q1}`; Q1 is now
-  the default element. Element traits renamed `LinearSimplex2D/3D` → `P1Tri2D`/`P1Tet3D`
-- ENH: Unified FE shape-function tables into element traits (`fem_element.hh`); FEM
-  gradient operator templated on element with a single generic host/GPU kernel
+- ENH: Added the Green-Jacobi (J-FFT) preconditioner
+- ENH: Single-precision floating-point support
+- ENH: Added Q1 (bilinear quad / trilinear hex) elements
 - ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
-  operator (host + GPU), so FE homogenization needs no resident strain/stress fields
-- ENH: Aliased the CG preconditioned-residual onto the residual when unpreconditioned,
-  saving one work vector
-- ENH: Reference preconditioner frees its impulse-response scratch after assembly and
-  stores Hermitian symbols as a triangle, halving the symbol memory
-- ENH: Reference preconditioner apply is now einsum-free (no batched cuBLAS path)
+  operator, so FE homogenization needs no resident strain/stress fields
+- API: `dtype=` field-creation API
 - API: Bound `FieldCollection.pop_field` to free a field's memory from Python
+- MAINT: Unified FE shape-function tables into element traits
+- MAINT: Aliased the CG preconditioned-residual onto the residual when unpreconditioned,
+  saving one work vector
+- MAINT: Reference preconditioner frees its impulse-response scratch after assembly and
+  stores Hermitian symbols as a triangle, halving the symbol memory
+- MAINT: Reference preconditioner apply is now einsum-free
 - BUG: `average_stress` integrates the owned region, not the padded one
 
 v0.110.0 (28Jun26)
