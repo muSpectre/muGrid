@@ -59,6 +59,11 @@ namespace muGrid {
         void isotropic_stiffness_2d_host_average(
             const T *, const T *, const T *, Index_t, Index_t, Index_t, Index_t,
             Index_t, Index_t, Index_t, const T *, const T *, Real, Real *);
+        template <typename T>
+        void isotropic_stiffness_2d_host_sensitivity(
+            const T *, const T *, T *, T *, Index_t, Index_t, Index_t, Index_t,
+            Index_t, Index_t, Index_t, const T *, const T *, const T *,
+            const T *);
     }  // namespace isotropic_stiffness_kernels
 
     // ============================================================================
@@ -379,6 +384,67 @@ namespace muGrid {
             diagonal.data() + force_offset, nnx, nny, mat_stride_x,
             mat_stride_y, force_stride_x, force_stride_y, force_stride_d,
             Gd_ptr, Vd_ptr, static_cast<T>(1), false);
+    }
+
+    template <>
+    template <typename T>
+    void IsotropicStiffnessOperator<2>::compute_sensitivity_impl(
+        const TypedFieldBase<T> & forward_disp,
+        const std::array<Real, 4> & forward_macro,
+        const TypedFieldBase<T> & costate_disp,
+        const std::array<Real, 4> & costate_macro,
+        TypedFieldBase<T> & g_shear, TypedFieldBase<T> & g_vol) const {
+
+        // g_shear = aₑᵀ G bₑ, g_vol = aₑᵀ V bₑ, with aₑ, bₑ the total (macro +
+        // fluctuation) element DOF vectors of the forward and costate fields.
+        // Iterate the owned elements (one per pixel), exactly like
+        // average_stress, so FFT-padded pixels are not double-counted; the
+        // per-pixel output lives on the material (g_shear) collection.
+        const auto info = internal::validate_stiffness_fields<2>(
+            forward_disp.get_collection(), g_shear.get_collection());
+        const auto * disp_fc = info.disp_fc;
+        const auto * out_fc = info.mat_fc;
+
+        auto disp_gl = disp_fc->get_nb_ghosts_left();
+        auto disp_gr = disp_fc->get_nb_ghosts_right();
+        auto disp_wg = disp_fc->get_nb_subdomain_grid_pts_with_ghosts();
+        auto out_gl = out_fc->get_nb_ghosts_left();
+        auto out_wg = out_fc->get_nb_subdomain_grid_pts_with_ghosts();
+
+        const Index_t nelx = disp_wg[0] - disp_gl[0] - disp_gr[0];
+        const Index_t nely = disp_wg[1] - disp_gl[1] - disp_gr[1];
+
+        Index_t nx = disp_wg[0];
+        Index_t out_nx = out_wg[0];
+
+        Index_t disp_stride_d = 1;
+        Index_t disp_stride_x = NB_DOFS_PER_NODE;
+        Index_t disp_stride_y = NB_DOFS_PER_NODE * nx;
+        Index_t out_stride_x = 1;
+        Index_t out_stride_y = out_nx;
+
+        Index_t disp_offset =
+            disp_gl[0] * disp_stride_x + disp_gl[1] * disp_stride_y;
+        Index_t out_offset =
+            out_gl[0] * out_stride_x + out_gl[1] * out_stride_y;
+
+        std::array<Real, NB_ELEMENT_DOFS> ustar_f{}, ustar_c{};
+        this->affine_element_dofs(forward_macro, ustar_f);
+        this->affine_element_dofs(costate_macro, ustar_c);
+
+        std::array<T, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS> G_s, V_s;
+        std::array<T, NB_ELEMENT_DOFS> uf_s, uc_s;
+        const T * G_ptr = geometry_as<T>(G_matrix, G_s);
+        const T * V_ptr = geometry_as<T>(V_matrix, V_s);
+        const T * uf_ptr = geometry_as<T>(ustar_f, uf_s);
+        const T * uc_ptr = geometry_as<T>(ustar_c, uc_s);
+
+        isotropic_stiffness_kernels::isotropic_stiffness_2d_host_sensitivity<T>(
+            forward_disp.data() + disp_offset,
+            costate_disp.data() + disp_offset, g_shear.data() + out_offset,
+            g_vol.data() + out_offset, nelx, nely, disp_stride_x, disp_stride_y,
+            disp_stride_d, out_stride_x, out_stride_y, G_ptr, V_ptr, uf_ptr,
+            uc_ptr);
     }
 
     template <>
@@ -744,6 +810,67 @@ namespace muGrid {
             }
         }
 
+        // Sensitivity contraction: per owned element, form the total forward
+        // and costate element DOF vectors a = u* + gather(fwd), b = u* +
+        // gather(cos), then write g_shear = aᵀ G b and g_vol = aᵀ V b to the
+        // per-pixel output fields. Same element gather as average, but a
+        // bilinear DOF-matrix contraction (exact for P1 and Q1) and per-pixel
+        // output rather than a global reduction.
+        template <typename T>
+        void isotropic_stiffness_2d_host_sensitivity(
+            const T * MUGRID_RESTRICT fwd, const T * MUGRID_RESTRICT cos,
+            T * MUGRID_RESTRICT g_shear, T * MUGRID_RESTRICT g_vol,
+            Index_t nelx, Index_t nely, Index_t disp_stride_x,
+            Index_t disp_stride_y, Index_t disp_stride_d, Index_t out_stride_x,
+            Index_t out_stride_y, const T * G, const T * V,
+            const T * ustar_f, const T * ustar_c) {
+
+            constexpr Index_t NB_NODES = 4;
+            constexpr Index_t NB_DOFS = 2;
+            constexpr Index_t NB_ELEM_DOFS = NB_NODES * NB_DOFS;
+            using SIndex_t = std::ptrdiff_t;
+            SIndex_t s_disp_stride_x = static_cast<SIndex_t>(disp_stride_x);
+            SIndex_t s_disp_stride_y = static_cast<SIndex_t>(disp_stride_y);
+            SIndex_t s_disp_stride_d = static_cast<SIndex_t>(disp_stride_d);
+            SIndex_t s_out_stride_x = static_cast<SIndex_t>(out_stride_x);
+            SIndex_t s_out_stride_y = static_cast<SIndex_t>(out_stride_y);
+
+            static const SIndex_t NODE_OFFSET[4][2] = {
+                {0, 0}, {1, 0}, {0, 1}, {1, 1}};
+
+            for (SIndex_t ey = 0; ey < static_cast<SIndex_t>(nely); ++ey) {
+                for (SIndex_t ex = 0; ex < static_cast<SIndex_t>(nelx); ++ex) {
+                    T a[NB_ELEM_DOFS], b[NB_ELEM_DOFS];
+                    for (Index_t node = 0; node < NB_NODES; ++node) {
+                        SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
+                        SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
+                        SIndex_t disp_idx =
+                            nx_pos * s_disp_stride_x + ny_pos * s_disp_stride_y;
+                        for (Index_t d = 0; d < NB_DOFS; ++d) {
+                            Index_t r = node * NB_DOFS + d;
+                            SIndex_t k = disp_idx + d * s_disp_stride_d;
+                            a[r] = ustar_f[r] + fwd[k];
+                            b[r] = ustar_c[r] + cos[k];
+                        }
+                    }
+                    T gs = 0, gv = 0;
+                    for (Index_t r = 0; r < NB_ELEM_DOFS; ++r) {
+                        T Gr = 0, Vr = 0;
+                        for (Index_t c = 0; c < NB_ELEM_DOFS; ++c) {
+                            Gr += G[r * NB_ELEM_DOFS + c] * b[c];
+                            Vr += V[r * NB_ELEM_DOFS + c] * b[c];
+                        }
+                        gs += a[r] * Gr;
+                        gv += a[r] * Vr;
+                    }
+                    SIndex_t out_idx =
+                        ex * s_out_stride_x + ey * s_out_stride_y;
+                    g_shear[out_idx] = gs;
+                    g_vol[out_idx] = gv;
+                }
+            }
+        }
+
     }  // namespace isotropic_stiffness_kernels
 
     // Explicit instantiations of the per-precision host impls. The (templated)
@@ -763,7 +890,11 @@ namespace muGrid {
         const TypedFieldBase<T> &, const std::array<Real, 4> &) const;         \
     template void IsotropicStiffnessOperator<2>::assemble_diagonal_impl<T>(    \
         const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
-        TypedFieldBase<T> &) const;
+        TypedFieldBase<T> &) const;                                            \
+    template void IsotropicStiffnessOperator<2>::compute_sensitivity_impl<T>(  \
+        const TypedFieldBase<T> &, const std::array<Real, 4> &,                \
+        const TypedFieldBase<T> &, const std::array<Real, 4> &,                \
+        TypedFieldBase<T> &, TypedFieldBase<T> &) const;
     MUGRID_INSTANTIATE_STIFFNESS_2D(Real)
     MUGRID_INSTANTIATE_STIFFNESS_2D(Real32)
 #undef MUGRID_INSTANTIATE_STIFFNESS_2D

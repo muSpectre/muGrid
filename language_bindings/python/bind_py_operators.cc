@@ -836,7 +836,14 @@ static void add_stiffness_real32_overloads(py::class_<Op> & cls) {
         .def("assemble_diagonal",
              static_cast<void (Op::*)(const F &, const F &, F &) const>(
                  &Op::assemble_diagonal),
-             "lambda_field"_a, "mu_field"_a, "diagonal"_a);
+             "lambda_field"_a, "mu_field"_a, "diagonal"_a)
+        .def("compute_sensitivity",
+             static_cast<void (Op::*)(
+                 const F &, const std::array<Real, DD> &, const F &,
+                 const std::array<Real, DD> &, F &, F &) const>(
+                 &Op::compute_sensitivity),
+             "forward_disp"_a, "forward_macro"_a, "costate_disp"_a,
+             "costate_macro"_a, "g_shear"_a, "g_vol"_a);
 }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -876,7 +883,14 @@ static void add_stiffness_real32_device_overloads(py::class_<Op> & cls) {
         .def("assemble_diagonal",
              static_cast<void (Op::*)(const F &, const F &, F &) const>(
                  &Op::assemble_diagonal),
-             "lambda_field"_a, "mu_field"_a, "diagonal"_a);
+             "lambda_field"_a, "mu_field"_a, "diagonal"_a)
+        .def("compute_sensitivity",
+             static_cast<void (Op::*)(
+                 const F &, const std::array<Real, DD> &, const F &,
+                 const std::array<Real, DD> &, F &, F &) const>(
+                 &Op::compute_sensitivity),
+             "forward_disp"_a, "forward_macro"_a, "costate_disp"_a,
+             "costate_macro"_a, "g_shear"_a, "g_vol"_a);
 }
 #endif
 
@@ -984,6 +998,19 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                  "Assemble diag(K) into the nodal field 'diagonal' (same shape "
                  "as displacement/force). This is the Jacobi ingredient of the "
                  "Green-Jacobi (J-FFT) preconditioner.")
+            .def("compute_sensitivity",
+                 static_cast<void (IsotropicStiffnessOperator2D::*)(
+                     const RealFieldHost &, const std::array<Real, 4> &,
+                     const RealFieldHost &, const std::array<Real, 4> &,
+                     RealFieldHost &, RealFieldHost &) const>(
+                     &IsotropicStiffnessOperator2D::compute_sensitivity),
+                 "forward_disp"_a, "forward_macro"_a, "costate_disp"_a,
+                 "costate_macro"_a, "g_shear"_a, "g_vol"_a,
+                 "Per-pixel sensitivity contractions g_shear = a^T G b, g_vol = "
+                 "a^T V b of the total forward strain (forward_disp + "
+                 "forward_macro) with the total costate strain (costate_disp + "
+                 "costate_macro). Multiply by d(2mu)/drho and dlambda/drho for "
+                 "the SIMP material-derivative sensitivity.")
             .def_property_readonly(
                 "G",
                 [](const IsotropicStiffnessOperator2D & op) {
@@ -1066,7 +1093,16 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                  RealFieldDevice &) const>(
                  &IsotropicStiffnessOperator2D::assemble_diagonal),
              "lambda_field"_a, "mu_field"_a, "diagonal"_a,
-             "Assemble diag(K) into a device (GPU) nodal field");
+             "Assemble diag(K) into a device (GPU) nodal field")
+        .def("compute_sensitivity",
+             static_cast<void (IsotropicStiffnessOperator2D::*)(
+                 const RealFieldDevice &, const std::array<Real, 4> &,
+                 const RealFieldDevice &, const std::array<Real, 4> &,
+                 RealFieldDevice &, RealFieldDevice &) const>(
+                 &IsotropicStiffnessOperator2D::compute_sensitivity),
+             "forward_disp"_a, "forward_macro"_a, "costate_disp"_a,
+             "costate_macro"_a, "g_shear"_a, "g_vol"_a,
+             "Per-pixel sensitivity contractions on device (GPU) fields");
     // Single-precision (float32) device apply overloads.
     add_stiffness_real32_device_overloads<IsotropicStiffnessOperator2D, 4>(op);
 #endif
@@ -1163,6 +1199,18 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                  "Assemble diag(K) into the nodal field 'diagonal' (same shape "
                  "as displacement/force). This is the Jacobi ingredient of the "
                  "Green-Jacobi (J-FFT) preconditioner.")
+            .def("compute_sensitivity",
+                 static_cast<void (IsotropicStiffnessOperator3D::*)(
+                     const RealFieldHost &, const std::array<Real, 9> &,
+                     const RealFieldHost &, const std::array<Real, 9> &,
+                     RealFieldHost &, RealFieldHost &) const>(
+                     &IsotropicStiffnessOperator3D::compute_sensitivity),
+                 "forward_disp"_a, "forward_macro"_a, "costate_disp"_a,
+                 "costate_macro"_a, "g_shear"_a, "g_vol"_a,
+                 "Per-pixel sensitivity contractions g_shear = a^T G b, g_vol = "
+                 "a^T V b of the total forward strain with the total costate "
+                 "strain. Multiply by d(2mu)/drho and dlambda/drho for the SIMP "
+                 "material-derivative sensitivity.")
             .def_property_readonly(
                 "G",
                 [](const IsotropicStiffnessOperator3D & op) {
@@ -1245,7 +1293,16 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                  RealFieldDevice &) const>(
                  &IsotropicStiffnessOperator3D::assemble_diagonal),
              "lambda_field"_a, "mu_field"_a, "diagonal"_a,
-             "Assemble diag(K) into a device (GPU) nodal field");
+             "Assemble diag(K) into a device (GPU) nodal field")
+        .def("compute_sensitivity",
+             static_cast<void (IsotropicStiffnessOperator3D::*)(
+                 const RealFieldDevice &, const std::array<Real, 9> &,
+                 const RealFieldDevice &, const std::array<Real, 9> &,
+                 RealFieldDevice &, RealFieldDevice &) const>(
+                 &IsotropicStiffnessOperator3D::compute_sensitivity),
+             "forward_disp"_a, "forward_macro"_a, "costate_disp"_a,
+             "costate_macro"_a, "g_shear"_a, "g_vol"_a,
+             "Per-pixel sensitivity contractions on device (GPU) fields");
     // Single-precision (float32) device apply overloads.
     add_stiffness_real32_device_overloads<IsotropicStiffnessOperator3D, 9>(op);
 #endif

@@ -480,6 +480,42 @@ namespace muGrid {
             this->assemble_diagonal_impl<Real32>(lambda, mu, diagonal);
         }
 
+        //! Assemble the per-pixel geometry contractions of the topology-
+        //! optimization material-derivative sensitivity. With the total forward
+        //! strain ε(a) = forward_macro + sym∇(forward_disp) and the total
+        //! costate strain ε(b) = costate_macro + sym∇(costate_disp), this writes
+        //!   g_shear = aₑᵀ G bₑ  ( = Σ_q w_q ε(a)_q : ε(b)_q ),
+        //!   g_vol   = aₑᵀ V bₑ  ( = Σ_q w_q tr ε(a)_q · tr ε(b)_q )
+        //! into the per-pixel scalar fields @p g_shear, @p g_vol. The material-
+        //! derivative sensitivity of a SIMP-interpolated material is then, per
+        //! pixel, `d(2μ)/dρ · g_shear + dλ/dρ · g_vol` summed over load cases —
+        //! so this kernel is material-model-agnostic (the caller applies the
+        //! chain rule). Passing the costate macro strain equal to ∂f/∂⟨σ⟩ folds
+        //! the explicit objective term and the adjoint term into one call.
+        void
+        compute_sensitivity(const TypedFieldBase<Real> & forward_disp,
+                            const std::array<Real, Dim * Dim> & forward_macro,
+                            const TypedFieldBase<Real> & costate_disp,
+                            const std::array<Real, Dim * Dim> & costate_macro,
+                            TypedFieldBase<Real> & g_shear,
+                            TypedFieldBase<Real> & g_vol) const {
+            this->compute_sensitivity_impl<Real>(forward_disp, forward_macro,
+                                                 costate_disp, costate_macro,
+                                                 g_shear, g_vol);
+        }
+        //! Single-precision (Real32) overload of compute_sensitivity.
+        void
+        compute_sensitivity(const TypedFieldBase<Real32> & forward_disp,
+                            const std::array<Real, Dim * Dim> & forward_macro,
+                            const TypedFieldBase<Real32> & costate_disp,
+                            const std::array<Real, Dim * Dim> & costate_macro,
+                            TypedFieldBase<Real32> & g_shear,
+                            TypedFieldBase<Real32> & g_vol) const {
+            this->compute_sensitivity_impl<Real32>(forward_disp, forward_macro,
+                                                   costate_disp, costate_macro,
+                                                   g_shear, g_vol);
+        }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // ---- Device interface (host- and single-precision) ----
         // DSpace shorthand for the device-field overloads below.
@@ -577,6 +613,29 @@ namespace muGrid {
                                const DField<Real32> & mu,
                                DField<Real32> & diagonal) const {
             this->assemble_diagonal_impl<Real32>(lambda, mu, diagonal);
+        }
+
+        //! Device counterpart of compute_sensitivity (see the host overload).
+        void
+        compute_sensitivity(const DField<Real> & forward_disp,
+                            const std::array<Real, Dim * Dim> & forward_macro,
+                            const DField<Real> & costate_disp,
+                            const std::array<Real, Dim * Dim> & costate_macro,
+                            DField<Real> & g_shear, DField<Real> & g_vol) const {
+            this->compute_sensitivity_impl<Real>(forward_disp, forward_macro,
+                                                 costate_disp, costate_macro,
+                                                 g_shear, g_vol);
+        }
+        void
+        compute_sensitivity(const DField<Real32> & forward_disp,
+                            const std::array<Real, Dim * Dim> & forward_macro,
+                            const DField<Real32> & costate_disp,
+                            const std::array<Real, Dim * Dim> & costate_macro,
+                            DField<Real32> & g_shear,
+                            DField<Real32> & g_vol) const {
+            this->compute_sensitivity_impl<Real32>(forward_disp, forward_macro,
+                                                   costate_disp, costate_macro,
+                                                   g_shear, g_vol);
         }
 #endif
 
@@ -701,6 +760,27 @@ namespace muGrid {
             }
         }
 
+        //! Affine element DOF vector u*ₑ of a macroscopic strain E_macro:
+        //! u*[n·Dim+i] = Σ_j E[i,j] · offsetₙⱼ · hⱼ (relative to the element
+        //! origin; G/V annihilate the rigid translation, so the origin choice is
+        //! immaterial). Shared by the macro-RHS assembly and compute_sensitivity.
+        void affine_element_dofs(
+            const std::array<Real, Dim * Dim> & E_macro,
+            std::array<Real, NB_ELEMENT_DOFS> & u_star) const {
+            constexpr auto NODE_OFFSET = node_offset_table();
+            for (Index_t n = 0; n < NB_NODES; ++n) {
+                for (Index_t i = 0; i < Dim; ++i) {
+                    Real ui = 0.0;
+                    for (Index_t j = 0; j < Dim; ++j) {
+                        ui += E_macro[i * Dim + j] *
+                              static_cast<Real>(NODE_OFFSET[n][j]) *
+                              this->grid_spacing[j];
+                    }
+                    u_star[n * Dim + i] = ui;
+                }
+            }
+        }
+
         //! Node offsets within an element [node][dim] (binary indexing); shared
         //! by the affine-displacement construction above.
         static constexpr std::array<std::array<Index_t, Dim>, NB_NODES>
@@ -753,6 +833,16 @@ namespace muGrid {
                                     const TypedFieldBase<T> & mu,
                                     TypedFieldBase<T> & diagonal) const;
 
+        //! Host sensitivity contraction (dimension-specific; explicit
+        //! specialization in isotropic_stiffness_{2,3}d.cc).
+        template <typename T>
+        void compute_sensitivity_impl(
+            const TypedFieldBase<T> & forward_disp,
+            const std::array<Real, Dim * Dim> & forward_macro,
+            const TypedFieldBase<T> & costate_disp,
+            const std::array<Real, Dim * Dim> & costate_macro,
+            TypedFieldBase<T> & g_shear, TypedFieldBase<T> & g_vol) const;
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // The geometry matrices (G/V/Dbar/Gu/Vu/E_macro) live in double
         // __constant__ memory and stay double; the kernels cast them to T at
@@ -800,6 +890,17 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
             const TypedFieldBase<T, DefaultDeviceSpace> & mu,
             TypedFieldBase<T, DefaultDeviceSpace> & diagonal) const;
+
+        //! Device sensitivity contraction (explicit specialization in
+        //! isotropic_stiffness_gpu.cc).
+        template <typename T>
+        void compute_sensitivity_impl(
+            const TypedFieldBase<T, DefaultDeviceSpace> & forward_disp,
+            const std::array<Real, Dim * Dim> & forward_macro,
+            const TypedFieldBase<T, DefaultDeviceSpace> & costate_disp,
+            const std::array<Real, Dim * Dim> & costate_macro,
+            TypedFieldBase<T, DefaultDeviceSpace> & g_shear,
+            TypedFieldBase<T, DefaultDeviceSpace> & g_vol) const;
 #endif
     };
 
@@ -840,7 +941,12 @@ namespace muGrid {
     template <>                                                                \
     template <typename T>                                                      \
     void IsotropicStiffnessOperator<D>::assemble_diagonal_impl(                \
-        const TFB &, const TFB &, TFB &) const;
+        const TFB &, const TFB &, TFB &) const;                                \
+    template <>                                                                \
+    template <typename T>                                                      \
+    void IsotropicStiffnessOperator<D>::compute_sensitivity_impl(              \
+        const TFB &, const std::array<Real, D * D> &, const TFB &,             \
+        const std::array<Real, D * D> &, TFB &, TFB &) const;
 
     template <>
     void IsotropicStiffnessOperator<2>::precompute_matrices();
