@@ -304,12 +304,28 @@ namespace muGrid {
      * @class FEMGradientOperator
      * @brief FEM gradient operator templated on the element type.
      *
-     * apply() computes the gradient (nodal → quadrature points); transpose()
-     * computes the (negative) discretised divergence (quadrature → nodal
-     * points). The element-specific data (shape-function-gradient table B,
-     * quadrature weights, node count) comes from the @p Element traits (see
+     * `apply()` computes the (unweighted) gradient `B` (nodal → quadrature
+     * points). `transpose()` computes the **quadrature-weighted** transpose
+     * `Bᵀ W` (quadrature → nodal points), i.e. the discretised divergence /
+     * Galerkin (L²) adjoint — **not** the bare matrix transpose `Bᵀ`.
+     *
+     * Weighting convention (important):
+     * - With no `weights` argument, `transpose()` uses the element's *physical*
+     *   quadrature weights `W` (`Wfrac · cell_volume`, see
+     *   get_quadrature_weights()). It is therefore the adjoint of `apply()` with
+     *   respect to the L² inner product on quadrature space and the plain inner
+     *   product on nodal space:  `⟨W · apply(u), v⟩ = ⟨u, transpose(v)⟩`.
+     * - Consequently `transpose(apply(u)) = Bᵀ W B u` is the FE stiffness /
+     *   (scalar) FE-Laplacian action — assemble energies/forces this way, do not
+     *   insert `W` yourself as well (that would apply the weights twice).
+     * - Pass an explicit `weights` vector (length NB_QUAD) to override `W`, e.g.
+     *   to fold per-quadrature-point material or stress coefficients into the
+     *   assembly.
+     *
+     * The element-specific data (shape-function-gradient table B, quadrature
+     * weights, node count) comes from the @p Element traits (see
      * fem_element.hh); the kernels are generic over it. Supported elements:
-     * `P1Tri2D/3D` (triangles/tets) and, by adding a traits struct, Q1.
+     * `P1Tri2D/3D` (triangles/tets) and `Q1Quad2D`/`Q1Hex3D`.
      */
     template <class Element, typename T = Real>
     class FEMGradientOperator : public LinearOperator {
@@ -363,6 +379,7 @@ namespace muGrid {
         FEMGradientOperator & operator=(FEMGradientOperator && other) = default;
 
         // ---- Host interface ----
+        //! Gradient `B`: nodal field → quadrature-point gradients (unweighted).
         void apply(const TypedFieldBase<T> & nodal_field,
                    TypedFieldBase<T> & gradient_field) const override {
             this->apply_impl(nodal_field, gradient_field, T(1), false);
@@ -373,6 +390,12 @@ namespace muGrid {
             const override {
             this->apply_impl(nodal_field, gradient_field, alpha, true);
         }
+        //! Weighted transpose `Bᵀ W`: quadrature-point field → nodal field (the
+        //! discretised divergence / Galerkin adjoint). With empty @p weights the
+        //! element's physical quadrature weights are used, so
+        //! `⟨W apply(u), v⟩ = ⟨u, transpose(v)⟩` and
+        //! `transpose(apply(u)) = Bᵀ W B u` (the FE stiffness action). Pass
+        //! @p weights (length NB_QUAD) to override the quadrature weights.
         void transpose(const TypedFieldBase<T> & gradient_field,
                        TypedFieldBase<T> & nodal_field,
                        const std::vector<Real> & weights = {}) const override {

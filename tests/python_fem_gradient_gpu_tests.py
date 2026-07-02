@@ -492,5 +492,92 @@ class TestFEMGradientElements:
             np.testing.assert_allclose(comp, a[j], atol=1e-12)
 
 
+# =============================================================================
+# Weighting convention of transpose()  (pins the documented semantics)
+# =============================================================================
+
+
+class TestFEMGradientTransposeConvention:
+    """`transpose()` is the *quadrature-weighted* transpose ``Bᵀ W`` (the
+    Galerkin / L² adjoint), not the bare matrix transpose. These tests pin that
+    contract so it cannot silently change; see the FEMGradientOperator
+    docstring."""
+
+    ELEMENTS = [muGrid.FEMElement.p1, muGrid.FEMElement.q1]
+    NAMES = {muGrid.FEMElement.p1: "p1", muGrid.FEMElement.q1: "q1"}
+
+    def _setup(self, dim, element, n=6):
+        grad = muGrid.FEMGradientOperator(dim, [0.7, 1.3, 1.1][:dim], element)
+        nq, nc = grad.nb_quad_pts, grad.nb_output_components
+        eng = muGrid.FFTEngine(
+            (n,) * dim, muGrid.Communicator(), nb_ghosts_left=(1,) * dim,
+            nb_ghosts_right=(1,) * dim, nb_sub_pts={"quad": nq},
+        )
+        return grad, eng, eng.real_space_collection, nq, nc
+
+    @pytest.mark.parametrize("element", ELEMENTS, ids=NAMES.get)
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_transpose_is_weighted_adjoint(self, dim, element):
+        """⟨W·apply(u), v⟩ == ⟨u, transpose(v)⟩ (default weights = W)."""
+        grad, eng, fc, nq, nc = self._setup(dim, element)
+        w = np.asarray(grad.quadrature_weights).reshape((1, nq) + (1,) * dim)
+        u = fc.real_field("u", (1,))
+        Bu = fc.real_field("Bu", (nc,), "quad")
+        v = fc.real_field("v", (nc,), "quad")
+        BTv = fc.real_field("BTv", (1,))
+        rng = np.random.default_rng(0)
+        u.p[...] = rng.standard_normal(np.asarray(u.p).shape)
+        v.s[...] = rng.standard_normal(np.asarray(v.s).shape)
+        eng.communicate_ghosts(u)
+        eng.communicate_ghosts(v)
+        grad.apply(u, Bu)
+        grad.transpose(v, BTv)
+        lhs = float(np.sum(w * np.asarray(Bu.s) * np.asarray(v.s)))
+        rhs = float(np.sum(np.asarray(u.p) * np.asarray(BTv.p)))
+        np.testing.assert_allclose(lhs, rhs, rtol=1e-11)
+
+    @pytest.mark.parametrize("element", ELEMENTS, ids=NAMES.get)
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_transpose_apply_is_fe_stiffness(self, dim, element):
+        """transpose(apply(u)) == Bᵀ W B u, i.e. uᵀ·transpose(apply(u)) equals
+        the FE energy Σ_q w_q |∇u_q|² (do not weight again)."""
+        grad, eng, fc, nq, nc = self._setup(dim, element)
+        w = np.asarray(grad.quadrature_weights).reshape((1, nq) + (1,) * dim)
+        u = fc.real_field("u", (1,))
+        Bu = fc.real_field("Bu", (nc,), "quad")
+        Lu = fc.real_field("Lu", (1,))
+        rng = np.random.default_rng(1)
+        u.p[...] = rng.standard_normal(np.asarray(u.p).shape)
+        eng.communicate_ghosts(u)
+        grad.apply(u, Bu)
+        energy = float(np.sum(w * np.asarray(Bu.s) ** 2))  # Σ_q w_q |∇u_q|²
+        grad.transpose(Bu, Lu)  # NB: no manual weighting
+        form = float(np.sum(np.asarray(u.p) * np.asarray(Lu.p)))
+        np.testing.assert_allclose(form, energy, rtol=1e-11)
+
+    @pytest.mark.parametrize("element", ELEMENTS, ids=NAMES.get)
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_transpose_custom_weights_override(self, dim, element):
+        """Explicit weights override the quadrature weights:
+        ⟨c·apply(u), v⟩ == ⟨u, transpose(v, weights=c)⟩."""
+        grad, eng, fc, nq, nc = self._setup(dim, element)
+        rng = np.random.default_rng(2)
+        c = rng.uniform(0.5, 2.0, nq)
+        cc = c.reshape((1, nq) + (1,) * dim)
+        u = fc.real_field("u", (1,))
+        Bu = fc.real_field("Bu", (nc,), "quad")
+        v = fc.real_field("v", (nc,), "quad")
+        BTv = fc.real_field("BTv", (1,))
+        u.p[...] = rng.standard_normal(np.asarray(u.p).shape)
+        v.s[...] = rng.standard_normal(np.asarray(v.s).shape)
+        eng.communicate_ghosts(u)
+        eng.communicate_ghosts(v)
+        grad.apply(u, Bu)
+        grad.transpose(v, BTv, weights=list(c))
+        lhs = float(np.sum(cc * np.asarray(Bu.s) * np.asarray(v.s)))
+        rhs = float(np.sum(np.asarray(u.p) * np.asarray(BTv.p)))
+        np.testing.assert_allclose(lhs, rhs, rtol=1e-11)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

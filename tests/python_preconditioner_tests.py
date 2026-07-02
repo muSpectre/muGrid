@@ -16,8 +16,10 @@ import muGrid
 from muGrid.Preconditioners import (
     BlockFourierPreconditioner,
     FourierPreconditioner,
+    GreenJacobiPreconditioner,
     IdentityPreconditioner,
     JacobiPreconditioner,
+    make_green_jacobi_preconditioner,
     make_reference_stiffness_preconditioner,
 )
 from muGrid.Solvers import conjugate_gradients
@@ -673,6 +675,161 @@ def test_jacobi_broadcast_multicomponent(comm, device):
     prec = JacobiPreconditioner(diag)
     prec(r, z)
     np.testing.assert_allclose(to_host(z.p), r_values / diag, atol=1e-15)
+
+
+# =============================================================================
+# Green-Jacobi (J-FFT) preconditioner
+# =============================================================================
+
+
+def _elasticity_reference_precond(comm, engine, n):
+    """A 2-component block-circulant reference operator (componentwise minus-FD-
+    Laplacian) and its exact Green preconditioner — a lightweight stand-in for
+    the reference stiffness that keeps these class-level tests self-contained."""
+    grid_spacing = 1 / tuple(engine.nb_domain_grid_pts)[0]
+    laplace = muGrid.GenericLinearOperator(
+        [-1, -1], np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    )
+
+    def apply_operator(u, Au):
+        engine.communicate_ghosts(u)
+        laplace.apply(u, Au)
+        Au.s[...] /= -grid_spacing**2
+
+    green = make_reference_stiffness_preconditioner(engine, apply_operator, n)
+    return apply_operator, green
+
+
+def test_green_jacobi_identity_diagonal(comm):
+    """With a unit diagonal, J^{1/2} = 1 and Green-Jacobi reduces exactly to the
+    inner Green preconditioner."""
+    n = 2
+    engine = make_engine(comm, (16, 16))
+    _, green = _elasticity_reference_precond(comm, engine, n)
+
+    diag = engine.real_space_field("diag", components=(n,))
+    diag.p[...] = 1.0
+    gj = GreenJacobiPreconditioner(green, diag)
+
+    r = engine.real_space_field("r", components=(n,))
+    z_green = engine.real_space_field("z_green", components=(n,))
+    z_gj = engine.real_space_field("z_gj", components=(n,))
+    rng = np.random.default_rng(3)
+    r.p[...] = rng.standard_normal(r.p.shape)
+
+    green.apply(r, z_green)
+    gj.apply(r, z_gj)
+    np.testing.assert_allclose(
+        np.asarray(z_gj.p), np.asarray(z_green.p), atol=1e-12
+    )
+
+
+def test_green_jacobi_void_diagonal_is_finite(comm):
+    """Void entries in the diagonal (<= void_tol) must not produce NaN/Inf: they
+    are treated as J^{1/2} = 1 (those DOFs carry no stiffness)."""
+    n = 2
+    engine = make_engine(comm, (16, 16))
+    _, green = _elasticity_reference_precond(comm, engine, n)
+
+    diag = engine.real_space_field("diag", components=(n,))
+    diag.p[...] = 1.0
+    diag.p[:, :4, :4] = 0.0  # a void patch
+    gj = GreenJacobiPreconditioner(green, diag)
+
+    r = engine.real_space_field("r", components=(n,))
+    z = engine.real_space_field("z", components=(n,))
+    r.p[...] = 1.0
+    gj.apply(r, z)
+    assert np.all(np.isfinite(np.asarray(z.p)))
+
+
+def test_green_jacobi_elasticity_homogenization(comm):
+    """End-to-end demonstration of J-FFT (the paper's headline result): an
+    FFT-accelerated FE elasticity homogenization with a smooth, high-contrast
+    material. The plain Green (reference-material) preconditioner degrades badly
+    as the contrast grows, while the Green-Jacobi preconditioner assembled by
+    make_green_jacobi_preconditioner — Green scaled by the Jacobi diagonal from
+    the fused assemble_diagonal kernel — stays fast, converging to the same
+    displacement in far fewer iterations."""
+    n = 2
+    nb_grid_pts = (32, 32)
+    grid_spacing = [1 / nb_grid_pts[0], 1 / nb_grid_pts[1]]
+    op = muGrid.IsotropicStiffnessOperator2D(grid_spacing, muGrid.FEMElement.q1)
+
+    def build():
+        # Node and material fields must share one collection so their
+        # stencil-computable regions match; the FFT engine's real-space
+        # collection is r2c-padded, so create the material there too (mirrors
+        # examples/homogenization.py) and fill ghosts via communicate_ghosts.
+        engine = muGrid.FFTEngine(
+            nb_grid_pts, comm, nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
+        )
+        fc = engine.real_space_collection
+        lam = fc.real_field("lambda")
+        mu = fc.real_field("mu")
+        x, y = engine.coords  # local, in [0, 1)
+        contrast = 1 + 1e4 * (np.sin(np.pi * x) ** 2 * np.sin(np.pi * y) ** 2)
+        lam.p[...] = contrast
+        mu.p[...] = contrast
+        engine.communicate_ghosts(lam)
+        engine.communicate_ghosts(mu)
+        return engine, lam, mu
+
+    def hessp_factory(engine, lam, mu):
+        def hessp(u, Au):
+            engine.communicate_ghosts(u)
+            op.apply(u, lam, mu, Au)
+        return hessp
+
+    def rhs_field(engine, lam, mu):
+        # RHS = -div(C : E_macro) for a shear macro strain.
+        E = [0.0, 0.5, 0.5, 0.0]
+        f = engine.real_space_field("rhs", components=(n,))
+        op.apply_macro_rhs(lam, mu, E, f)
+        f.s[...] *= -1.0
+        return f
+
+    def solve(use_jacobi):
+        engine, lam, mu = build()
+        # Global (MPI-reduced) reference Lamé means, so the reference stiffness
+        # — and hence the assembled Green symbol — is identical on every rank.
+        n_global = comm.sum(int(lam.p.size))
+        lam_ref = comm.sum(float(np.asarray(lam.p).sum())) / n_global
+        mu_ref = comm.sum(float(np.asarray(mu.p).sum())) / n_global
+        if use_jacobi:
+            prec = make_green_jacobi_preconditioner(
+                engine, op, lam, mu, n,
+                reference_lambda=lam_ref, reference_mu=mu_ref,
+            )
+        else:
+
+            def apply_ref(u, f):
+                engine.communicate_ghosts(u)
+                op.apply_uniform(u, lam_ref, mu_ref, f)
+
+            prec = make_reference_stiffness_preconditioner(engine, apply_ref, n)
+
+        rhs = rhs_field(engine, lam, mu)
+        sol = engine.real_space_field("solution", components=(n,))
+        sol.p[...] = 0.0
+        iterations = []
+        conjugate_gradients(
+            comm, engine.real_space_collection, rhs, sol,
+            hessp=hessp_factory(engine, lam, mu), prec=prec,
+            rtol=1e-8, maxiter=2000,
+            callback=lambda it, state: iterations.append(it),
+        )
+        return to_host(sol.p), max(iterations)
+
+    sol_green, it_green = solve(use_jacobi=False)
+    sol_gj, it_gj = solve(use_jacobi=True)
+
+    # Same solution (both solve the same SPD system to the same tolerance)...
+    np.testing.assert_allclose(sol_gj, sol_green, atol=1e-5)
+    # ... but Green-Jacobi converges dramatically faster on smooth high
+    # contrast (empirically ~20 vs several hundred iterations here).
+    assert it_gj < it_green / 3
+    assert it_gj < 60
 
 
 if __name__ == "__main__":

@@ -2231,5 +2231,349 @@ class TestFEMElements:
         assert np.abs(np.asarray(f_s.p) - np.asarray(f_q.p)).max() > 1e-6
 
 
+# =============================================================================
+# assemble_diagonal (Jacobi ingredient of the Green-Jacobi / J-FFT preconditioner)
+# =============================================================================
+
+
+def _fill_periodic(field, n, dim):
+    """Fill one-cell periodic ghosts into a field's padded (pg) view."""
+    if dim == 2:
+        field.pg[:, 1 : n + 1, 1 : n + 1] = field.p
+        field.pg[:, 0, :] = field.pg[:, n, :]
+        field.pg[:, n + 1, :] = field.pg[:, 1, :]
+        field.pg[:, :, 0] = field.pg[:, :, n]
+        field.pg[:, :, n + 1] = field.pg[:, :, 1]
+    else:
+        field.pg[:, 1 : n + 1, 1 : n + 1, 1 : n + 1] = field.p
+        field.pg[:, 0, :, :] = field.pg[:, n, :, :]
+        field.pg[:, n + 1, :, :] = field.pg[:, 1, :, :]
+        field.pg[:, :, 0, :] = field.pg[:, :, n, :]
+        field.pg[:, :, n + 1, :] = field.pg[:, :, 1, :]
+        field.pg[:, :, :, 0] = field.pg[:, :, :, n]
+        field.pg[:, :, :, n + 1] = field.pg[:, :, :, 1]
+
+
+def _brute_force_diagonal(op, n, dim, lambda_field, mu_field):
+    """diag(K) computed column-by-column: apply K to each periodic unit impulse
+    and read the entry at the impulse's own DOF. For n >= 3 the periodic images
+    of an interior impulse stay outside its incident elements, so this yields
+    the exact diagonal at every node."""
+    ghosts = (1,) * dim
+    fc = muGrid.GlobalFieldCollection(
+        (n,) * dim, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+    )
+    u = fc.real_field("bf_u", (dim,))
+    f = fc.real_field("bf_f", (dim,))
+    D = np.zeros((dim,) + (n,) * dim)
+    for d in range(dim):
+        for idx in np.ndindex(*(n,) * dim):
+            u.p[...] = 0.0
+            u.p[(d,) + idx] = 1.0
+            _fill_periodic(u, n, dim)
+            op.apply(u, lambda_field, mu_field, f)
+            D[(d,) + idx] = f.p[(d,) + idx]
+    return D
+
+
+class TestAssembleDiagonal:
+    """diag(K) assembled by the fused kernel must match the true diagonal."""
+
+    @pytest.mark.parametrize("element", [muGrid.FEMElement.p1, muGrid.FEMElement.q1])
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_matches_brute_force(self, dim, element):
+        n = 6 if dim == 2 else 4
+        h = [0.7, 1.3, 1.1][:dim]
+        Op = (
+            muGrid.IsotropicStiffnessOperator2D
+            if dim == 2
+            else muGrid.IsotropicStiffnessOperator3D
+        )
+        op = Op(tuple(h), element)
+
+        ghosts = (1,) * dim
+        fcm = muGrid.GlobalFieldCollection(
+            (n,) * dim, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        fc = muGrid.GlobalFieldCollection(
+            (n,) * dim, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        lam = fcm.real_field("lambda", (1,))
+        mu = fcm.real_field("mu", (1,))
+        diag = fc.real_field("diag", (dim,))
+
+        rng = np.random.default_rng(0)
+        lam.p[...] = rng.uniform(0.5, 2.0, lam.p.shape)
+        mu.p[...] = rng.uniform(0.5, 2.0, mu.p.shape)
+        _fill_periodic(lam, n, dim)
+        _fill_periodic(mu, n, dim)
+
+        op.assemble_diagonal(lam, mu, diag)
+        ref = _brute_force_diagonal(op, n, dim, lam, mu)
+
+        # The analytic per-element diagonal must reproduce the matrix-free
+        # diagonal to round-off (both come from the same K = 2μ G + λ V).
+        np.testing.assert_allclose(np.asarray(diag.p), ref, rtol=1e-11, atol=1e-11)
+        # And the diagonal of an SPD stiffness must be strictly positive.
+        assert np.asarray(diag.p).min() > 0.0
+
+    def test_void_gives_zero_diagonal(self):
+        """A void pixel (λ = μ = 0) contributes nothing; nodes surrounded by
+        void have a zero diagonal (handled downstream by the preconditioner)."""
+        n, dim = 6, 2
+        op = muGrid.IsotropicStiffnessOperator2D((0.5, 0.5), muGrid.FEMElement.q1)
+        ghosts = (1, 1)
+        fcm = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        fc = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        lam = fcm.real_field("lambda", (1,))
+        mu = fcm.real_field("mu", (1,))
+        diag = fc.real_field("diag", (2,))
+        lam.p[...] = 1.0
+        mu.p[...] = 1.0
+        # Carve a void block; the node at its interior sees only void elements.
+        lam.p[:, 1:4, 1:4] = 0.0
+        mu.p[:, 1:4, 1:4] = 0.0
+        _fill_periodic(lam, n, dim)
+        _fill_periodic(mu, n, dim)
+        op.assemble_diagonal(lam, mu, diag)
+        # Node (2,2) is surrounded by the four void elements (1,1),(2,1),(1,2),(2,2).
+        np.testing.assert_allclose(np.asarray(diag.p)[:, 2, 2], 0.0, atol=1e-14)
+
+    @pytest.mark.parametrize("device", get_test_devices())
+    def test_diagonal_cpu_gpu_parity(self, device):
+        """The GPU diagonal kernel agrees with the CPU one (and both with the
+        brute-force reference)."""
+        skip_if_gpu_unavailable(device)
+        n, dim = 6, 2
+        op = muGrid.IsotropicStiffnessOperator2D((0.7, 1.3), muGrid.FEMElement.q1)
+        ghosts = (1, 1)
+        dev = create_device(device)
+        fcm = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, device=dev
+        )
+        fc = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, device=dev
+        )
+        lam = fcm.real_field("lambda", (1,))
+        mu = fcm.real_field("mu", (1,))
+        diag = fc.real_field("diag", (2,))
+        rng = np.random.default_rng(2)
+        lam_vals = rng.uniform(0.5, 2.0, (1, n, n))
+        mu_vals = rng.uniform(0.5, 2.0, (1, n, n))
+
+        def host_or_dev(a):
+            if device != "cpu":
+                return cp.asarray(a)
+            return a
+
+        lam.p[...] = host_or_dev(lam_vals)
+        mu.p[...] = host_or_dev(mu_vals)
+        _fill_periodic(lam, n, dim)
+        _fill_periodic(mu, n, dim)
+        op.assemble_diagonal(lam, mu, diag)
+
+        got = np.asarray(diag.p.get() if device != "cpu" else diag.p)
+
+        # CPU reference on host fields with the same material.
+        fcm_h = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        lam_h = fcm_h.real_field("lambda", (1,))
+        mu_h = fcm_h.real_field("mu", (1,))
+        lam_h.p[...] = lam_vals
+        mu_h.p[...] = mu_vals
+        _fill_periodic(lam_h, n, dim)
+        _fill_periodic(mu_h, n, dim)
+        ref = _brute_force_diagonal(op, n, dim, lam_h, mu_h)
+        np.testing.assert_allclose(got, ref, rtol=1e-11, atol=1e-11)
+
+
+# =============================================================================
+# compute_sensitivity (material-derivative geometry contractions for topology
+# optimization; the Option-A SIMP driver applies the chain rule in Python)
+# =============================================================================
+
+
+def _sensitivity_reference(op, n, dim, fwd_p, cos_p, e_fwd, e_cos, h):
+    """Per-pixel g_shear = aₑᵀ G bₑ, g_vol = aₑᵀ V bₑ with aₑ, bₑ the total
+    (affine macro + fluctuation) element DOF vectors — the exact quantity the
+    kernel must produce, assembled independently in numpy from the operator's
+    G/V matrices."""
+    G = np.asarray(op.G)
+    V = np.asarray(op.V)
+    nb_nodes = 2**dim
+    offs = [tuple((node >> d) & 1 for d in range(dim)) for node in range(nb_nodes)]
+
+    def ustar(E):
+        u = np.zeros(nb_nodes * dim)
+        for node, off in enumerate(offs):
+            for i in range(dim):
+                u[node * dim + i] = sum(
+                    E[i * dim + j] * off[j] * h[j] for j in range(dim)
+                )
+        return u
+
+    uf, uc = ustar(e_fwd), ustar(e_cos)
+    gs = np.zeros((n,) * dim)
+    gv = np.zeros((n,) * dim)
+    for idx in np.ndindex(*(n,) * dim):
+        a = uf.copy()
+        b = uc.copy()
+        for node, off in enumerate(offs):
+            npos = tuple((idx[d] + off[d]) % n for d in range(dim))
+            for i in range(dim):
+                a[node * dim + i] += fwd_p[(i,) + npos]
+                b[node * dim + i] += cos_p[(i,) + npos]
+        gs[idx] = a @ G @ b
+        gv[idx] = a @ V @ b
+    return gs, gv
+
+
+class TestComputeSensitivity:
+    """The fused sensitivity contraction must match the direct G/V bilinear."""
+
+    @pytest.mark.parametrize("element", [muGrid.FEMElement.p1, muGrid.FEMElement.q1])
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_matches_gv_contraction(self, dim, element):
+        n = 5 if dim == 2 else 4
+        h = [0.7, 1.3, 1.1][:dim]
+        Op = (
+            muGrid.IsotropicStiffnessOperator2D
+            if dim == 2
+            else muGrid.IsotropicStiffnessOperator3D
+        )
+        op = Op(tuple(h), element)
+
+        ghosts = (1,) * dim
+        fc = muGrid.GlobalFieldCollection(
+            (n,) * dim, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        fwd = fc.real_field("fwd", (dim,))
+        cos = fc.real_field("cos", (dim,))
+        g_shear = fc.real_field("g_shear", (1,))
+        g_vol = fc.real_field("g_vol", (1,))
+
+        rng = np.random.default_rng(4)
+        fwd.p[...] = rng.standard_normal(fwd.p.shape)
+        cos.p[...] = rng.standard_normal(cos.p.shape)
+        _fill_periodic(fwd, n, dim)
+        _fill_periodic(cos, n, dim)
+
+        e_fwd = list(rng.standard_normal(dim * dim))
+        e_cos = list(rng.standard_normal(dim * dim))
+
+        op.compute_sensitivity(fwd, e_fwd, cos, e_cos, g_shear, g_vol)
+
+        gs_ref, gv_ref = _sensitivity_reference(
+            op, n, dim, np.asarray(fwd.p), np.asarray(cos.p), e_fwd, e_cos, h
+        )
+        np.testing.assert_allclose(
+            np.asarray(g_shear.p)[0], gs_ref, rtol=1e-11, atol=1e-11
+        )
+        np.testing.assert_allclose(
+            np.asarray(g_vol.p)[0], gv_ref, rtol=1e-11, atol=1e-11
+        )
+
+    def test_simp_chain_rule_matches_energy_derivative(self):
+        """Option A end-to-end: the assembled SIMP sensitivity
+        s = 2μ'(ρ) g_shear + λ'(ρ) g_vol (macro strains zero) equals the
+        finite-difference derivative of the bilinear λᵀ K(ρ) u w.r.t. the
+        element density ρ, at strictly interior pixels (no periodic image)."""
+        n, dim, p = 6, 2, 3.0
+        lam0, mu0, lamv, muv = 2.0, 1.5, 1e-3, 1e-3
+        op = muGrid.IsotropicStiffnessOperator2D((0.5, 0.5), muGrid.FEMElement.q1)
+        ghosts = (1, 1)
+        fc = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        fcm = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+        )
+        u = fc.real_field("u", (2,))
+        lam_adj = fc.real_field("lam_adj", (2,))
+        g_shear = fcm.real_field("gs", (1,))
+        g_vol = fcm.real_field("gv", (1,))
+        lam = fcm.real_field("lambda", (1,))
+        mu = fcm.real_field("mu", (1,))
+        Ku = fc.real_field("Ku", (2,))
+
+        rng = np.random.default_rng(5)
+        u.p[...] = rng.standard_normal(u.p.shape)
+        lam_adj.p[...] = rng.standard_normal(lam_adj.p.shape)
+        _fill_periodic(u, n, dim)
+        _fill_periodic(lam_adj, n, dim)
+        rho = rng.uniform(0.3, 0.9, (1, n, n))
+
+        def set_material(rho_arr):
+            lam.p[...] = rho_arr**p * (lam0 - lamv) + lamv
+            mu.p[...] = rho_arr**p * (mu0 - muv) + muv
+            _fill_periodic(lam, n, dim)
+            _fill_periodic(mu, n, dim)
+
+        # Assembled SIMP sensitivity via the kernel + chain rule (macro = 0).
+        zero = [0.0] * (dim * dim)
+        op.compute_sensitivity(u, zero, lam_adj, zero, g_shear, g_vol)
+        dtwomu = 2 * p * rho ** (p - 1) * (mu0 - muv)
+        dlam = p * rho ** (p - 1) * (lam0 - lamv)
+        s = dtwomu * np.asarray(g_shear.p) + dlam * np.asarray(g_vol.p)
+
+        # Finite-difference of Q(ρ) = λᵀ K(ρ) u, per interior pixel.
+        def energy(rho_arr):
+            set_material(rho_arr)
+            op.apply(u, lam, mu, Ku)
+            return float(np.sum(np.asarray(lam_adj.p) * np.asarray(Ku.p)))
+
+        d = 1e-6
+        for iy in range(1, n - 1):
+            for ix in range(1, n - 1):
+                rp = rho.copy()
+                rp[0, ix, iy] += d
+                rm = rho.copy()
+                rm[0, ix, iy] -= d
+                fd = (energy(rp) - energy(rm)) / (2 * d)
+                np.testing.assert_allclose(s[0, ix, iy], fd, rtol=1e-5, atol=1e-6)
+
+    @pytest.mark.parametrize("device", get_test_devices())
+    def test_sensitivity_cpu_gpu_parity(self, device):
+        skip_if_gpu_unavailable(device)
+        n, dim = 5, 2
+        op = muGrid.IsotropicStiffnessOperator2D((0.7, 1.3), muGrid.FEMElement.q1)
+        ghosts = (1, 1)
+        dev = create_device(device)
+        fc = muGrid.GlobalFieldCollection(
+            (n, n), nb_ghosts_left=ghosts, nb_ghosts_right=ghosts, device=dev
+        )
+        fwd = fc.real_field("fwd", (2,))
+        cos = fc.real_field("cos", (2,))
+        g_shear = fc.real_field("g_shear", (1,))
+        g_vol = fc.real_field("g_vol", (1,))
+        rng = np.random.default_rng(6)
+        fwd_v = rng.standard_normal((2, n, n))
+        cos_v = rng.standard_normal((2, n, n))
+
+        def hod(a):
+            return cp.asarray(a) if device != "cpu" else a
+
+        fwd.p[...] = hod(fwd_v)
+        cos.p[...] = hod(cos_v)
+        _fill_periodic(fwd, n, dim)
+        _fill_periodic(cos, n, dim)
+        e_fwd = list(rng.standard_normal(4))
+        e_cos = list(rng.standard_normal(4))
+        op.compute_sensitivity(fwd, e_fwd, cos, e_cos, g_shear, g_vol)
+
+        gs = np.asarray(g_shear.p.get() if device != "cpu" else g_shear.p)
+        gv = np.asarray(g_vol.p.get() if device != "cpu" else g_vol.p)
+        gs_ref, gv_ref = _sensitivity_reference(
+            op, n, dim, fwd_v, cos_v, e_fwd, e_cos, [0.7, 1.3]
+        )
+        np.testing.assert_allclose(gs[0], gs_ref, rtol=1e-11, atol=1e-11)
+        np.testing.assert_allclose(gv[0], gv_ref, rtol=1e-11, atol=1e-11)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
