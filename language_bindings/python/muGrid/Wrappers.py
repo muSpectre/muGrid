@@ -256,6 +256,45 @@ def _unwrap(obj: Any) -> Any:
     return getattr(obj, "_cpp", obj)
 
 
+# Valid real<->complex precision pairings for an FFT: the transform runs in the
+# precision of the fields, so a real field must be paired with the complex field
+# of matching precision. A mismatched pair (e.g. float32 real with complex128
+# Fourier) does not raise in the C++ layer -- it silently produces garbage/NaN
+# -- so it is caught here with an actionable message.
+_FFT_REAL_TO_COMPLEX = {
+    np.dtype(np.float32): np.dtype(np.complex64),
+    np.dtype(np.float64): np.dtype(np.complex128),
+}
+
+
+def _check_fft_precision(real_field: Any, complex_field: Any,
+                         direction: str) -> None:
+    """Raise if the real- and Fourier-space fields have mismatched precision.
+
+    ``real_field`` is the real-space field and ``complex_field`` the
+    Fourier-space field of a forward (``direction="fft"``) or inverse
+    (``direction="ifft"``) transform. The FFT pairs ``float32`` with
+    ``complex64`` and ``float64`` with ``complex128``; any other combination is
+    rejected here rather than silently transforming into a NaN-filled buffer.
+    """
+    try:
+        real_dtype = np.dtype(real_field.dtype)
+        complex_dtype = np.dtype(complex_field.dtype)
+    except (AttributeError, TypeError):
+        # dtype not introspectable (e.g. a raw C++ field); leave it to C++.
+        return
+    expected = _FFT_REAL_TO_COMPLEX.get(real_dtype)
+    if expected is None or complex_dtype != expected:
+        raise ValueError(
+            f"FFT precision mismatch in {direction}(): the real-space field is "
+            f"{real_dtype} but the Fourier-space field is {complex_dtype}. The "
+            f"transform pairs float32 with complex64 and float64 with "
+            f"complex128 -- create both fields at the same precision, e.g. "
+            f"real_space_field(..., dtype=np.float32) together with "
+            f"fourier_space_field(..., dtype=np.complex64)."
+        )
+
+
 def _parse_device(
     device: Optional[Union[str, "_muGrid.Device"]],
 ) -> "_muGrid.Device":
@@ -918,6 +957,7 @@ class FFTEngine:
         output_field : Field
             Fourier-space field (must be in this engine's Fourier collection).
         """
+        _check_fft_precision(input_field, output_field, "fft")
         self._cpp.fft(_unwrap(input_field), _unwrap(output_field))
 
     def ifft(self, input_field: Field, output_field: Field) -> None:
@@ -934,6 +974,7 @@ class FFTEngine:
         output_field : Field
             Real-space field (must be in this engine's real collection).
         """
+        _check_fft_precision(output_field, input_field, "ifft")
         self._cpp.ifft(_unwrap(input_field), _unwrap(output_field))
 
     def communicate_ghosts(self, field: Field) -> None:

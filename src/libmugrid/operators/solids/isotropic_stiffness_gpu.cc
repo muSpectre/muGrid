@@ -448,28 +448,44 @@ __global__ void isotropic_stiffness_3d_macro_rhs_kernel(
 }
 
 // ============================================================================
-// Stress-Average GPU Kernels (grid-stride reduction into d_accum[dim*dim])
+// Stress-Average GPU Kernels (two-pass shared-memory reduction)
 // ============================================================================
 
+// Block size for the stress-average reduction. Each block launches this many
+// threads and tree-reduces in shared memory, so it must be a power of two.
+constexpr int AVERAGE_BLOCK_SIZE = 256;
+
 // 2D: each thread grid-strides over owned elements, accumulating the local
-// stress σ = C(λ,μ):(E_macro + sym ḡ) in registers, then atomic-adds the
-// Dim*Dim components into the global accumulator. d_accum is *not* scaled by
-// the element volume here -- the host does that after copy-back.
+// stress σ = C(λ,μ):(E_macro + sym ḡ) in registers; the block then tree-reduces
+// the Dim*Dim components in shared memory and writes one partial sum per block
+// per component into `partial` (laid out [comp][block]). A second pass
+// (isotropic_stiffness_average_final_kernel) sums the partials. This mirrors the
+// CG dot-product reductions in linalg_gpu.cc and replaces the previous global
+// atomic accumulation, whose contention on the Dim*Dim accumulators serialised
+// catastrophically on HIP (which has no native fp64 atomicAdd fast path, so it
+// fell back to a compare-and-swap spin loop). `partial` is *not* scaled by the
+// element volume here -- the host does that after the final reduction.
 template <typename T>
 __global__ void isotropic_stiffness_2d_average_kernel(
     const T * __restrict__ displacement, const T * __restrict__ lambda,
     const T * __restrict__ mu, Index_t nelx, Index_t nely,
     Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_d,
-    Index_t mat_stride_x, Index_t mat_stride_y, Real * d_accum) {
+    Index_t mat_stride_x, Index_t mat_stride_y, Real * partial,
+    Index_t num_blocks) {
 
     constexpr int NB_NODES = 4;
     constexpr int NB_DOFS = 2;
     constexpr int DIM = 2;
+    constexpr int NCOMP = DIM * DIM;
     const int NODE_OFFSET[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+
+    __shared__ Real sh[NCOMP][AVERAGE_BLOCK_SIZE];
 
     // Per-element stress formed in working precision T; the volume integral is
     // accumulated in double (cross-rank reduction stays double-accurate).
-    Real acc[DIM * DIM] = {0.0, 0.0, 0.0, 0.0};
+    Real acc[NCOMP];
+    #pragma unroll
+    for (int k = 0; k < NCOMP; ++k) acc[k] = 0.0;
     Index_t nel = nelx * nely;
     Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
     for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
@@ -495,12 +511,12 @@ __global__ void isotropic_stiffness_2d_average_kernel(
         for (int i = 0; i < DIM; ++i)
             #pragma unroll
             for (int j = 0; j < DIM; ++j) {
-                T s = T(0);
+                T sg = T(0);
                 #pragma unroll
                 for (int n = 0; n < NB_NODES; ++n)
-                    s += static_cast<T>(d_Dbar_2D[j * NB_NODES + n]) *
-                         u[n * NB_DOFS + i];
-                g[i][j] = s;
+                    sg += static_cast<T>(d_Dbar_2D[j * NB_NODES + n]) *
+                          u[n * NB_DOFS + i];
+                g[i][j] = sg;
             }
         T E[DIM][DIM];
         #pragma unroll
@@ -518,31 +534,51 @@ __global__ void isotropic_stiffness_2d_average_kernel(
                     static_cast<T>(2) * mu_val * E[i][j] +
                     (i == j ? lam * trE : T(0)));
     }
+
+    // Tree-reduce each component within the block, then write one partial sum
+    // per block per component.
+    Index_t tid = threadIdx.x;
     #pragma unroll
-    for (int k = 0; k < DIM * DIM; ++k)
-        mugrid_atomic_add_double(&d_accum[k], acc[k]);
+    for (int k = 0; k < NCOMP; ++k) sh[k][tid] = acc[k];
+    __syncthreads();
+    for (int red = blockDim.x / 2; red > 0; red >>= 1) {
+        if (tid < red) {
+            #pragma unroll
+            for (int k = 0; k < NCOMP; ++k) sh[k][tid] += sh[k][tid + red];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        #pragma unroll
+        for (int k = 0; k < NCOMP; ++k)
+            partial[k * num_blocks + blockIdx.x] = sh[k][0];
+    }
 }
 
-// 3D stress average (see 2D variant).
+// 3D stress average (see 2D variant): block tree-reduction into per-block
+// partial sums, no global atomics.
 template <typename T>
 __global__ void isotropic_stiffness_3d_average_kernel(
     const T * __restrict__ displacement, const T * __restrict__ lambda,
     const T * __restrict__ mu, Index_t nelx, Index_t nely, Index_t nelz,
     Index_t disp_stride_x, Index_t disp_stride_y, Index_t disp_stride_z,
     Index_t disp_stride_d, Index_t mat_stride_x, Index_t mat_stride_y,
-    Index_t mat_stride_z, Real * d_accum) {
+    Index_t mat_stride_z, Real * partial, Index_t num_blocks) {
 
     constexpr int NB_NODES = 8;
     constexpr int NB_DOFS = 3;
     constexpr int DIM = 3;
+    constexpr int NCOMP = DIM * DIM;
     const int NODE_OFFSET[8][3] = {
         {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
         {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
 
+    __shared__ Real sh[NCOMP][AVERAGE_BLOCK_SIZE];
+
     // Per-element stress in T, volume integral accumulated in double.
-    Real acc[DIM * DIM];
+    Real acc[NCOMP];
     #pragma unroll
-    for (int k = 0; k < DIM * DIM; ++k) acc[k] = 0.0;
+    for (int k = 0; k < NCOMP; ++k) acc[k] = 0.0;
 
     Index_t nelxy = nelx * nely;
     Index_t nel = nelxy * nelz;
@@ -575,12 +611,12 @@ __global__ void isotropic_stiffness_3d_average_kernel(
         for (int i = 0; i < DIM; ++i)
             #pragma unroll
             for (int j = 0; j < DIM; ++j) {
-                T s = T(0);
+                T sg = T(0);
                 #pragma unroll
                 for (int n = 0; n < NB_NODES; ++n)
-                    s += static_cast<T>(d_Dbar_3D[j * NB_NODES + n]) *
-                         u[n * NB_DOFS + i];
-                g[i][j] = s;
+                    sg += static_cast<T>(d_Dbar_3D[j * NB_NODES + n]) *
+                          u[n * NB_DOFS + i];
+                g[i][j] = sg;
             }
         T E[DIM][DIM];
         #pragma unroll
@@ -598,9 +634,52 @@ __global__ void isotropic_stiffness_3d_average_kernel(
                     static_cast<T>(2) * mu_val * E[i][j] +
                     (i == j ? lam * trE : T(0)));
     }
+
+    Index_t tid = threadIdx.x;
     #pragma unroll
-    for (int k = 0; k < DIM * DIM; ++k)
-        mugrid_atomic_add_double(&d_accum[k], acc[k]);
+    for (int k = 0; k < NCOMP; ++k) sh[k][tid] = acc[k];
+    __syncthreads();
+    for (int red = blockDim.x / 2; red > 0; red >>= 1) {
+        if (tid < red) {
+            #pragma unroll
+            for (int k = 0; k < NCOMP; ++k) sh[k][tid] += sh[k][tid + red];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        #pragma unroll
+        for (int k = 0; k < NCOMP; ++k)
+            partial[k * num_blocks + blockIdx.x] = sh[k][0];
+    }
+}
+
+// Final pass for the stress-average reduction: a single block sums each of the
+// NCOMP length-`nb` partial-sum segments produced above into out[0..NCOMP), so
+// the result is one contiguous NCOMP-element copy back to the host.
+template <int NCOMP>
+__global__ void isotropic_stiffness_average_final_kernel(
+    const Real * partial, Real * out, Index_t nb) {
+    __shared__ Real sh[NCOMP][AVERAGE_BLOCK_SIZE];
+    Index_t tid = threadIdx.x;
+    #pragma unroll
+    for (int seg = 0; seg < NCOMP; ++seg) {
+        Real sum = 0.0;
+        for (Index_t i = tid; i < nb; i += blockDim.x)
+            sum += partial[seg * nb + i];
+        sh[seg][tid] = sum;
+    }
+    __syncthreads();
+    for (int red = blockDim.x / 2; red > 0; red >>= 1) {
+        if (tid < red) {
+            #pragma unroll
+            for (int seg = 0; seg < NCOMP; ++seg) sh[seg][tid] += sh[seg][tid + red];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        #pragma unroll
+        for (int seg = 0; seg < NCOMP; ++seg) out[seg] = sh[seg][0];
+    }
 }
 
 // ============================================================================
@@ -939,30 +1018,40 @@ void isotropic_stiffness_2d_gpu_average(
     GPU_MEMCPY_TO_SYMBOL(d_Dbar_2D, Dbar, 8 * sizeof(Real));
     GPU_MEMCPY_TO_SYMBOL(d_Emacro_2D, E_macro, NCOMP * sizeof(Real));
 
-    // The volume integral is reduced in double (matches the host); allocate a
-    // double accumulator regardless of T.
-    Real * d_accum{nullptr};
-    GPU_MALLOC(reinterpret_cast<void **>(&d_accum), NCOMP * sizeof(Real));
-    GPU_MEMSET(d_accum, 0, NCOMP * sizeof(Real));
+    // Two-pass reduction (block tree-reduce -> per-block partials -> single
+    // final reduce), mirroring the CG dot-product reductions in linalg_gpu.cc.
+    // The volume integral is reduced in double (matches the host) regardless of
+    // T, so both scratch buffers are allocated in double.
+    constexpr int block = AVERAGE_BLOCK_SIZE;
+    Index_t nel = nelx * nely;
+    Index_t num_blocks = (nel + block - 1) / block;
+    if (num_blocks < 1) num_blocks = 1;  // one block still reduces an empty grid
 
-    // Fixed grid-stride launch: keeps the number of atomics bounded (one set
-    // of NCOMP per thread) regardless of grid size. Sized to fill the device.
-    int block = 256;
-    int grid = 1024;
+    Real * d_partial{nullptr};
+    Real * d_out{nullptr};
+    GPU_MALLOC(reinterpret_cast<void **>(&d_partial),
+               NCOMP * num_blocks * sizeof(Real));
+    GPU_MALLOC(reinterpret_cast<void **>(&d_out), NCOMP * sizeof(Real));
+
     auto kern = isotropic_stiffness_2d_average_kernel<T>;
-    GPU_LAUNCH_KERNEL(kern, grid, block,
+    GPU_LAUNCH_KERNEL(kern, static_cast<int>(num_blocks), block,
                       displacement, lambda, mu, nelx, nely, disp_stride_x,
                       disp_stride_y, disp_stride_d, mat_stride_x, mat_stride_y,
-                      d_accum);
+                      d_partial, num_blocks);
+    auto final_kern = isotropic_stiffness_average_final_kernel<NCOMP>;
+    GPU_LAUNCH_KERNEL(final_kern, 1, block, d_partial, d_out, num_blocks);
+
     const char * err{gpu_last_error()};
     if (err != nullptr) {
-        GPU_FREE(d_accum);
+        GPU_FREE(d_partial);
+        GPU_FREE(d_out);
         throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
 
     GPU_DEVICE_SYNCHRONIZE();
-    GPU_MEMCPY_D2H(accum_out, d_accum, NCOMP * sizeof(Real));
-    GPU_FREE(d_accum);
+    GPU_MEMCPY_D2H(accum_out, d_out, NCOMP * sizeof(Real));
+    GPU_FREE(d_partial);
+    GPU_FREE(d_out);
     for (int k = 0; k < NCOMP; ++k) accum_out[k] *= vol_elem;
 }
 
@@ -978,26 +1067,38 @@ void isotropic_stiffness_3d_gpu_average(
     GPU_MEMCPY_TO_SYMBOL(d_Dbar_3D, Dbar, 24 * sizeof(Real));
     GPU_MEMCPY_TO_SYMBOL(d_Emacro_3D, E_macro, NCOMP * sizeof(Real));
 
-    Real * d_accum{nullptr};
-    GPU_MALLOC(reinterpret_cast<void **>(&d_accum), NCOMP * sizeof(Real));
-    GPU_MEMSET(d_accum, 0, NCOMP * sizeof(Real));
+    // Two-pass reduction (see the 2D variant): block tree-reduce into per-block
+    // partials, then a single final reduce. No global atomics.
+    constexpr int block = AVERAGE_BLOCK_SIZE;
+    Index_t nel = nelx * nely * nelz;
+    Index_t num_blocks = (nel + block - 1) / block;
+    if (num_blocks < 1) num_blocks = 1;
 
-    int block = 256;
-    int grid = 1024;
+    Real * d_partial{nullptr};
+    Real * d_out{nullptr};
+    GPU_MALLOC(reinterpret_cast<void **>(&d_partial),
+               NCOMP * num_blocks * sizeof(Real));
+    GPU_MALLOC(reinterpret_cast<void **>(&d_out), NCOMP * sizeof(Real));
+
     auto kern = isotropic_stiffness_3d_average_kernel<T>;
-    GPU_LAUNCH_KERNEL(kern, grid, block,
+    GPU_LAUNCH_KERNEL(kern, static_cast<int>(num_blocks), block,
                       displacement, lambda, mu, nelx, nely, nelz, disp_stride_x,
                       disp_stride_y, disp_stride_z, disp_stride_d, mat_stride_x,
-                      mat_stride_y, mat_stride_z, d_accum);
+                      mat_stride_y, mat_stride_z, d_partial, num_blocks);
+    auto final_kern = isotropic_stiffness_average_final_kernel<NCOMP>;
+    GPU_LAUNCH_KERNEL(final_kern, 1, block, d_partial, d_out, num_blocks);
+
     const char * err{gpu_last_error()};
     if (err != nullptr) {
-        GPU_FREE(d_accum);
+        GPU_FREE(d_partial);
+        GPU_FREE(d_out);
         throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
 
     GPU_DEVICE_SYNCHRONIZE();
-    GPU_MEMCPY_D2H(accum_out, d_accum, NCOMP * sizeof(Real));
-    GPU_FREE(d_accum);
+    GPU_MEMCPY_D2H(accum_out, d_out, NCOMP * sizeof(Real));
+    GPU_FREE(d_partial);
+    GPU_FREE(d_out);
     for (int k = 0; k < NCOMP; ++k) accum_out[k] *= vol_elem;
 }
 

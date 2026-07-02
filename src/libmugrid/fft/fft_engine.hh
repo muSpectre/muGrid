@@ -625,7 +625,9 @@ class FFTEngine : public FFTEngineBase {
 
       CT * work_y_ptr{this->template get_work_buffer<CT>(1, ypencil_size)};
 
-      if (transpose_xy == nullptr && backend->supports_nd()) {
+      bool slab_done{false};
+      if (transpose_xy == nullptr && backend->supports_nd() &&
+          this->slab_nd_ok != 0) {
         // Slab fast path (P2 == 1: X and Y are both local). Transform the two
         // local axes (Y, and the half-complex X last) in a single planned
         // rank-2 r2c per component, batched over the local Z planes, written
@@ -637,13 +639,25 @@ class FFTEngine : public FFTEngineBase {
         std::vector<Index_t> in_strides{in_z_dist, in_y_dist, in_x_stride};
         std::vector<Index_t> out_strides{work_y_z_dist, work_y_y_dist,
                                          work_y_x_stride};
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
-          backend->r2c_nd(
-              shape, axes,
-              input_ptr + in_base_offset + comp * in_comp_factor, in_strides,
-              work_y_ptr + comp * work_y_comp_factor, out_strides);
+        try {
+          for (Index_t comp{0}; comp < nb_components; ++comp) {
+            backend->r2c_nd(
+                shape, axes,
+                input_ptr + in_base_offset + comp * in_comp_factor, in_strides,
+                work_y_ptr + comp * work_y_comp_factor, out_strides);
+          }
+          this->slab_nd_ok = 1;
+          slab_done = true;
+        } catch (const RuntimeError &) {
+          // The backend cannot plan this batched, strided, ghost-padded N-D
+          // real transform for the current size (observed with rocFFT). Plan
+          // creation fails before any output is written, so the Y-pencil buffer
+          // is intact for the pencil path below; remember the outcome so later
+          // transforms skip the (throwing) probe.
+          this->slab_nd_ok = 0;
         }
-      } else {
+      }
+      if (!slab_done) {
         // General pencil path: r2c along X into a Z-pencil, redistribute X<->Y,
         // then c2c along Y, axis-by-axis.
         Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
@@ -1093,7 +1107,9 @@ class FFTEngine : public FFTEngineBase {
         deep_copy<CT, MemorySpace>(work_y_ptr, temp_ptr, ypencil_size);
       }
 
-      if (transpose_xy == nullptr && backend->supports_nd()) {
+      bool slab_done{false};
+      if (transpose_xy == nullptr && backend->supports_nd() &&
+          this->slab_nd_ok != 0) {
         // Slab fast path (P2 == 1: X and Y both local). Fuse the inverse Y
         // (c2c) and X (c2r, half-complex) transforms into one planned rank-2
         // c2r per component, batched over the local Z planes, reading the
@@ -1104,14 +1120,26 @@ class FFTEngine : public FFTEngineBase {
         std::vector<Index_t> in_strides{work_y_z_dist, work_y_y_dist,
                                         work_y_x_stride};
         std::vector<Index_t> out_strides{out_z_dist, out_y_dist, out_x_stride};
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
-          backend->c2r_nd(
-              shape, axes,
-              work_y_ptr + comp * work_y_comp_factor, in_strides,
-              output_ptr + out_base_offset + comp * out_comp_factor,
-              out_strides);
+        try {
+          for (Index_t comp{0}; comp < nb_components; ++comp) {
+            backend->c2r_nd(
+                shape, axes,
+                work_y_ptr + comp * work_y_comp_factor, in_strides,
+                output_ptr + out_base_offset + comp * out_comp_factor,
+                out_strides);
+          }
+          this->slab_nd_ok = 1;
+          slab_done = true;
+        } catch (const RuntimeError &) {
+          // The backend cannot plan this batched, strided, ghost-padded N-D
+          // real transform for the current size (observed with rocFFT). Plan
+          // creation fails before any output is written and c2r_nd only reads
+          // the Y-pencil (staged through scratch), so both are intact for the
+          // pencil path below; remember so later transforms skip the probe.
+          this->slab_nd_ok = 0;
         }
-      } else {
+      }
+      if (!slab_done) {
         // Step 3: c2c IFFT along Y for each component
         for (Index_t comp{0}; comp < nb_components; ++comp) {
           Index_t comp_offset{comp * work_y_comp_factor};
@@ -1271,6 +1299,16 @@ class FFTEngine : public FFTEngineBase {
   std::array<WorkBuffer, 3> work_buffers{};
   //! Single-precision scratch buffers (parallel to work_buffers).
   std::array<Array<Complex32, MemorySpace>, 3> work_buffers32{};
+
+  //! Whether the backend can plan the batched, strided, ghost-padded N-D real
+  //! transform of the MPI slab fast path for THIS grid/decomposition. Some
+  //! backends (rocFFT) transform a whole local grid natively yet fail plan
+  //! creation for that layout at certain sizes (e.g. power-of-two 2D slabs).
+  //! Probed once, on the first slab transform: -1 unknown, 0 unsupported (use
+  //! the axis-by-axis pencil path), 1 supported (use the fast path). Grid size
+  //! and decomposition are fixed per engine, so one probe settles it; caching it
+  //! avoids paying the (throwing) failed plan creation on every iteration.
+  mutable signed char slab_nd_ok{-1};
 };
 
 // Explicit template instantiation declarations for common memory spaces
