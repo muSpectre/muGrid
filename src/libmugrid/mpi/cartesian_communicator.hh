@@ -140,11 +140,12 @@ namespace muGrid {
         /**
          * @brief Assignment operator.
          *
-         * @details Assigns the MPI communicator from another
-         * CartesianCommunicator. Note that other members (nb_subdivisions,
-         * coordinates, ranks) are not copied.
+         * @details Copies the full topology state (communicator handle,
+         * subdivisions, coordinates, neighbor ranks). Like the copy
+         * constructor, the assigned-to object shares the MPI communicator
+         * handle without taking ownership (only the original frees it).
          *
-         * @param other The CartesianCommunicator to copy the communicator from.
+         * @param other The CartesianCommunicator to copy from.
          * @return Reference to this CartesianCommunicator.
          */
         CartesianCommunicator & operator=(const CartesianCommunicator & other);
@@ -201,11 +202,12 @@ namespace muGrid {
          *                         Used in serial mode to select appropriate
          *                         memory copy method (CUDA/HIP for GPU).
          */
-        void sendrecv_right(int direction, int block_stride, int nb_send_blocks,
-                            int send_block_len, Index_t send_offset,
-                            int nb_recv_blocks, int recv_block_len,
-                            Index_t recv_offset, char * data,
-                            int stride_in_direction, int elem_size_in_bytes,
+        void sendrecv_right(int direction, Index_t block_stride,
+                            Index_t nb_send_blocks, Index_t send_block_len,
+                            Index_t send_offset, Index_t nb_recv_blocks,
+                            Index_t recv_block_len, Index_t recv_offset,
+                            char * data, Index_t stride_in_direction,
+                            Index_t elem_size_in_bytes,
                             TypeDescriptor type_desc,
                             bool is_device_memory = false) const;
 
@@ -244,11 +246,12 @@ namespace muGrid {
          *                         Used in serial mode to select appropriate
          *                         memory copy method (CUDA/HIP for GPU).
          */
-        void sendrecv_left(int direction, int block_stride, int nb_send_blocks,
-                           int send_block_len, Index_t send_offset,
-                           int nb_recv_blocks, int recv_block_len,
-                           Index_t recv_offset, char * data,
-                           int stride_in_direction, int elem_size_in_bytes,
+        void sendrecv_left(int direction, Index_t block_stride,
+                           Index_t nb_send_blocks, Index_t send_block_len,
+                           Index_t send_offset, Index_t nb_recv_blocks,
+                           Index_t recv_block_len, Index_t recv_offset,
+                           char * data, Index_t stride_in_direction,
+                           Index_t elem_size_in_bytes,
                            TypeDescriptor type_desc,
                            bool is_device_memory = false) const;
 
@@ -343,14 +346,13 @@ namespace muGrid {
          * @param type_desc TypeDescriptor identifying the element type.
          * @param is_device_memory If true, data is on GPU device memory.
          */
-        void sendrecv_right_accumulate(int direction, int block_stride,
-                                       int nb_send_blocks, int send_block_len,
-                                       Index_t send_offset, int nb_recv_blocks,
-                                       int recv_block_len, Index_t recv_offset,
-                                       char * data, int stride_in_direction,
-                                       int elem_size_in_bytes,
-                                       TypeDescriptor type_desc,
-                                       bool is_device_memory = false) const;
+        void sendrecv_right_accumulate(
+            int direction, Index_t block_stride, Index_t nb_send_blocks,
+            Index_t send_block_len, Index_t send_offset,
+            Index_t nb_recv_blocks, Index_t recv_block_len,
+            Index_t recv_offset, char * data, Index_t stride_in_direction,
+            Index_t elem_size_in_bytes, TypeDescriptor type_desc,
+            bool is_device_memory = false) const;
 
         /**
          * @brief Send to left neighbor, receive from right and accumulate (add).
@@ -373,14 +375,13 @@ namespace muGrid {
          * @param type_desc TypeDescriptor identifying the element type.
          * @param is_device_memory If true, data is on GPU device memory.
          */
-        void sendrecv_left_accumulate(int direction, int block_stride,
-                                      int nb_send_blocks, int send_block_len,
-                                      Index_t send_offset, int nb_recv_blocks,
-                                      int recv_block_len, Index_t recv_offset,
-                                      char * data, int stride_in_direction,
-                                      int elem_size_in_bytes,
-                                      TypeDescriptor type_desc,
-                                      bool is_device_memory = false) const;
+        void sendrecv_left_accumulate(
+            int direction, Index_t block_stride, Index_t nb_send_blocks,
+            Index_t send_block_len, Index_t send_offset,
+            Index_t nb_recv_blocks, Index_t recv_block_len,
+            Index_t recv_offset, char * data, Index_t stride_in_direction,
+            Index_t elem_size_in_bytes, TypeDescriptor type_desc,
+            bool is_device_memory = false) const;
 
        protected:
         //! The parent communicator from which this Cartesian communicator
@@ -426,10 +427,10 @@ namespace muGrid {
          * (device scatter). Used instead of strided derived datatypes for
          * device memory; see get_device_staging.
          */
-        void sendrecv_staged(int block_stride, int nb_send_blocks,
-                             int send_block_len, int nb_recv_blocks,
-                             int recv_block_len, void * send_addr,
-                             void * recv_addr, int elem_size_in_bytes,
+        void sendrecv_staged(Index_t block_stride, Index_t nb_send_blocks,
+                             Index_t send_block_len, Index_t nb_recv_blocks,
+                             Index_t recv_block_len, void * send_addr,
+                             void * recv_addr, Index_t elem_size_in_bytes,
                              MPI_Datatype mpi_datatype, int dest_rank,
                              int src_rank) const;
 

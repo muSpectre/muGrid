@@ -400,7 +400,11 @@ void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
         "(got " +
         std::to_string(in.stride) + "); the GPU field layout must be SoA.");
   }
-  this->check_complex_aligned(output, "r2c (N-D, fp32)");
+  // Like the double variant, the constrained pointer is the REAL side, and
+  // for fp32 the requirement is Complex32 alignment (8 bytes): the complex
+  // work buffers are addressed per component at Complex32 granularity, so
+  // demanding 16 bytes would spuriously reject valid odd-sized layouts.
+  this->check_complex_aligned(input, "r2c (N-D, fp32)", 2 * sizeof(Real32));
 
   cufftHandle plan =
       get_nd_plan(CUFFT_R2C, in.n, in.embed, in.stride, in.dist, out.embed,
@@ -430,7 +434,8 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
         "(got " +
         std::to_string(out.stride) + "); the GPU field layout must be SoA.");
   }
-  this->check_complex_aligned(input, "c2r (N-D, fp32)");
+  // See r2c_nd (fp32): check the real side with Complex32 alignment.
+  this->check_complex_aligned(output, "c2r (N-D, fp32)", 2 * sizeof(Real32));
 
   // C2R overwrites its input; stage through scratch (see the Z2D variant).
   const std::size_t span{static_cast<std::size_t>(shape[0]) *

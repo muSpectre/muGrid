@@ -144,8 +144,14 @@ namespace muGrid {
         //! Copy constructor
         FieldCollection(const FieldCollection & other) = delete;
 
-        //! Move constructor
-        FieldCollection(FieldCollection && other) = default;
+        /**
+         * Move constructor. Throws if fields or state fields have been
+         * registered: they hold plain references back to their collection
+         * which cannot be re-seated, so moving a populated collection would
+         * leave every registered field dangling. Moving an empty collection
+         * (e.g. a fresh get_empty_clone() result) is fine.
+         */
+        FieldCollection(FieldCollection && other);
 
         //! Destructor
         virtual ~FieldCollection() = default;
@@ -153,8 +159,9 @@ namespace muGrid {
         //! Copy assignment operator
         FieldCollection & operator=(const FieldCollection & other) = delete;
 
-        //! Move assignment operator
-        FieldCollection & operator=(FieldCollection && other) = default;
+        //! Move assignment operator. Same restriction as the move
+        //! constructor: both sides must be free of registered fields.
+        FieldCollection & operator=(FieldCollection && other);
 
         /**
          * place a new field in the responsibility of this collection (Note,
@@ -883,6 +890,13 @@ namespace muGrid {
             const Unit & unit, bool allow_existing = false);
 
        protected:
+        /**
+         * Throws unless the collection holds no registered fields or state
+         * fields (used to guard the move operations; see the move
+         * constructor).
+         */
+        void check_no_registered_fields(const char * context) const;
+
         /**
          * loop through all fields and allocate their memory. Is exclusively
          * called by the daughter classes' `initialise` member function.

@@ -64,7 +64,6 @@ import pytest
 
 import muGrid
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -357,3 +356,44 @@ def test_invalid_spatial_dimension():
     """Only 2D and 3D Laplace operators exist."""
     with pytest.raises(ValueError):
         muGrid.LaplaceOperator(4)
+
+
+def test_rejects_multicomponent_field():
+    """The Laplace kernels address one scalar per pixel; a multi-component
+    field would silently mix components with spatial neighbours, so it must
+    be rejected."""
+    fc, _ = _make_collection((5, 4))
+    op = muGrid.LaplaceOperator(2)
+    inp = fc.real_field("in", (2,))
+    out = fc.real_field("out", (2,))
+    with pytest.raises(RuntimeError):
+        op.apply(inp, out)
+
+
+def test_rejects_multi_subpoint_field():
+    """Same as above for sub-points: only one degree of freedom per pixel is
+    supported."""
+    fc = muGrid.GlobalFieldCollection(
+        [5, 4],
+        nb_ghosts_left=(1, 1),
+        nb_ghosts_right=(1, 1),
+        sub_pts={"quad": 2},
+    )
+    op = muGrid.LaplaceOperator(2)
+    inp = fc.real_field("in", (), "quad")
+    out = fc.real_field("out", (), "quad")
+    with pytest.raises(RuntimeError):
+        op.apply(inp, out)
+
+
+def test_rejects_transpose_weights():
+    """The Laplacian has no quadrature points; passing weights to
+    transpose() must raise instead of being silently ignored."""
+    fc, _ = _make_collection((5, 4))
+    op = muGrid.LaplaceOperator(2)
+    inp = fc.real_field("in")
+    out = fc.real_field("out")
+    # no weights (or empty weights) is fine
+    op.transpose(inp, out)
+    with pytest.raises(RuntimeError):
+        op.transpose(inp, out, [1.0])

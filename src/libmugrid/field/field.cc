@@ -289,6 +289,26 @@ namespace muGrid {
       } else {
         strides.push_back(this->get_nb_components() * element_size);
       }
+    } else if (this->get_nb_sub_pts() > 1) {
+      // Pixel iteration folds the sub-points into the last component axis
+      // (see get_sub_pt_shape), so the strides must describe that folded
+      // axis layout.
+      if (strides.size() == 0) {
+        // Scalar components: the folded axis is the sub-point axis itself.
+        // In both storage orders the per-pixel dof index is then just the
+        // sub-point index (dense).
+        strides.push_back(element_size);
+      } else if (this->get_storage_order() ==
+                 StorageOrder::StructureOfArrays) {
+        // SoA dof layout is d = c_rowmajor * nb_sub_pts + s: the folded
+        // last (fastest) axis enumerates (c_last, s) pairs with unchanged
+        // stride, but every slower component axis gains the sub-point
+        // factor. (AoS, d = c_colmajor + nb_components * s, folds without
+        // any stride adjustment.)
+        for (std::size_t i{0}; i + 1 < strides.size(); ++i) {
+          strides[i] *= this->get_nb_sub_pts();
+        }
+      }
     }
     return strides;
   }

@@ -157,34 +157,48 @@ void add_get_index(py::module & mod) {
 }
 
 void add_pixels(py::module & mod) {
+    // The range objects (Enumerator/Indices/Coordinates) and their iterators
+    // hold references to the Pixels object they were created from, so every
+    // method returning one carries keep_alive<0, 1> to pin its parent.
     py::class_<muGrid::CcoordOps::Pixels::Enumerator>(mod, "PixelEnumerator")
         .def("__len__", &muGrid::CcoordOps::Pixels::Enumerator::size)
-        .def("__iter__",
-             [](muGrid::CcoordOps::Pixels::Enumerator & enumerator) {
-                 return py::make_iterator(enumerator.begin(), enumerator.end());
-             });
+        .def(
+            "__iter__",
+            [](muGrid::CcoordOps::Pixels::Enumerator & enumerator) {
+                return py::make_iterator(enumerator.begin(), enumerator.end());
+            },
+            py::keep_alive<0, 1>());
     py::class_<muGrid::CcoordOps::Pixels::Indices>(mod, "PixelIndices")
         .def("__len__", &muGrid::CcoordOps::Pixels::Indices::size)
-        .def("__iter__",
-             [](muGrid::CcoordOps::Pixels::Indices & indices) {
-                 return py::make_iterator(indices.begin(), indices.end());
-             });
+        .def(
+            "__iter__",
+            [](muGrid::CcoordOps::Pixels::Indices & indices) {
+                return py::make_iterator(indices.begin(), indices.end());
+            },
+            py::keep_alive<0, 1>());
     py::class_<muGrid::CcoordOps::Pixels::Coordinates>(mod, "PixelCoordinates")
         .def("__len__", &muGrid::CcoordOps::Pixels::Coordinates::size)
-        .def("__iter__",
-             [](muGrid::CcoordOps::Pixels::Coordinates & coords) {
-                 return py::make_iterator(coords.begin(), coords.end());
-             });
+        .def(
+            "__iter__",
+            [](muGrid::CcoordOps::Pixels::Coordinates & coords) {
+                return py::make_iterator(coords.begin(), coords.end());
+            },
+            py::keep_alive<0, 1>());
     py::class_<muGrid::CcoordOps::Pixels>(mod, "Pixels")
         .def("__len__", &muGrid::CcoordOps::Pixels::size)
-        .def("__iter__",
-             [](muGrid::CcoordOps::Pixels & pixels) {
-                 auto coords = pixels.coordinates();
-                 return py::make_iterator(coords.begin(), coords.end());
-             })
-        .def("enumerate", &muGrid::CcoordOps::Pixels::enumerate)
-        .def("indices", &muGrid::CcoordOps::Pixels::indices)
-        .def("coordinates", &muGrid::CcoordOps::Pixels::coordinates);
+        .def(
+            "__iter__",
+            [](muGrid::CcoordOps::Pixels & pixels) {
+                auto coords = pixels.coordinates();
+                return py::make_iterator(coords.begin(), coords.end());
+            },
+            py::keep_alive<0, 1>())
+        .def("enumerate", &muGrid::CcoordOps::Pixels::enumerate,
+             py::keep_alive<0, 1>())
+        .def("indices", &muGrid::CcoordOps::Pixels::indices,
+             py::keep_alive<0, 1>())
+        .def("coordinates", &muGrid::CcoordOps::Pixels::coordinates,
+             py::keep_alive<0, 1>());
 }
 
 void add_unit(py::module & mod) {

@@ -194,13 +194,30 @@ namespace muGrid {
         }
 
         /**
+         * @brief Throws if quadrature weights are passed: the Laplace stencil
+         *        has no quadrature points, so accepting (and ignoring) them
+         *        would silently diverge from the other LinearOperator
+         *        implementations, which scale their transpose by the weights.
+         */
+        static void check_no_weights(const std::vector<Real> & weights) {
+            if (not weights.empty()) {
+                throw RuntimeError(
+                    std::string(operator_name()) +
+                    " does not support quadrature weights in "
+                    "transpose()/transpose_increment(); the Laplacian is "
+                    "self-adjoint and has no quadrature points, so weights "
+                    "would be silently ignored");
+            }
+        }
+
+        /**
          * @brief Apply the transpose (identical to apply for the self-adjoint
-         *        Laplacian; weights are ignored).
+         *        Laplacian).
          */
         void transpose(const TypedFieldBase<Real> & input_field,
                        TypedFieldBase<Real> & output_field,
                        const std::vector<Real> & weights = {}) const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply(input_field, output_field);
         }
 
@@ -213,7 +230,7 @@ namespace muGrid {
                                  TypedFieldBase<Real> & output_field,
                                  const std::vector<Real> & weights = {})
             const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply_increment(input_field, alpha, output_field);
         }
 
@@ -231,7 +248,7 @@ namespace muGrid {
         void transpose(const TypedFieldBase<Real32> & input_field,
                        TypedFieldBase<Real32> & output_field,
                        const std::vector<Real> & weights = {}) const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply(input_field, output_field);
         }
         void transpose_increment(const TypedFieldBase<Real32> & input_field,
@@ -239,7 +256,7 @@ namespace muGrid {
                                  TypedFieldBase<Real32> & output_field,
                                  const std::vector<Real> & weights = {})
             const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply_increment(input_field, alpha, output_field);
         }
 
@@ -343,6 +360,37 @@ namespace muGrid {
         }
 
         /**
+         * @brief Common validation for the apply paths. The traversal
+         *        addresses one scalar per pixel with dense column-major
+         *        pixel strides, so both fields must be scalar (a
+         *        multi-component field would silently mix components with
+         *        spatial neighbours) and the pixel layout must match.
+         */
+        const GlobalFieldCollection &
+        validate_fields(const Field & input_field,
+                        const Field & output_field) const {
+            const auto & collection =
+                this->check_fields(input_field, output_field, operator_name());
+            this->check_pixel_storage_order(collection, operator_name());
+            for (const Field * field : {&input_field, &output_field}) {
+                const Index_t nb_dof_per_pixel{field->get_nb_components() *
+                                               field->get_nb_sub_pts()};
+                if (nb_dof_per_pixel != 1) {
+                    std::stringstream err_msg{};
+                    err_msg << operator_name()
+                            << " only supports scalar fields (one degree of "
+                               "freedom per pixel), but field '"
+                            << field->get_name() << "' has "
+                            << field->get_nb_components()
+                            << " component(s) on "
+                            << field->get_nb_sub_pts() << " sub-point(s)";
+                    throw RuntimeError{err_msg.str()};
+                }
+            }
+            return collection;
+        }
+
+        /**
          * @brief Host apply with optional increment. The Laplacian is
          *        self-adjoint, so apply and transpose share this requirement.
          */
@@ -351,7 +399,7 @@ namespace muGrid {
                         TypedFieldBase<T> & output_field, T alpha,
                         bool increment) const {
             const auto & collection =
-                this->check_fields(input_field, output_field, operator_name());
+                this->validate_fields(input_field, output_field);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * input = input_field.data();
@@ -380,7 +428,7 @@ namespace muGrid {
             TypedFieldBase<T, DefaultDeviceSpace> & output_field, T alpha,
             bool increment) const {
             const auto & collection =
-                this->check_fields(input_field, output_field, operator_name());
+                this->validate_fields(input_field, output_field);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * input = input_field.view().data();

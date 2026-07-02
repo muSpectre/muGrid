@@ -1090,6 +1090,51 @@ class ConvolutionOperatorHostCheck(unittest.TestCase):
         )
 
 
+def test_rejects_soa_dof_storage_on_host():
+    """Host stencil traversal is compiled for array-of-structures dof
+    interleaving; a host collection storing multi-dof fields as
+    structure-of-arrays must be rejected instead of silently producing
+    wrong results."""
+    stencil = np.array([[[1.0, 0.0], [0.0, 1.0]]])
+    conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
+    fc = muGrid.GlobalFieldCollection(
+        [5, 4],
+        [],
+        [],
+        muGrid.StorageOrder.ArrayOfStructures,  # pixels: dense column-major
+        {"quad": 1},
+        muGrid.StorageOrder.StructureOfArrays,  # dof storage: SoA
+        [0, 0],
+        [1, 1],
+    )
+    nodal = fc.real_field("nodal", (2,))
+    quad = fc.real_field("quad", (2,), "quad")
+    with pytest.raises(RuntimeError):
+        conv_op.apply(nodal, quad)
+
+
+def test_rejects_row_major_pixel_storage():
+    """The stencil traversal hard-codes column-major (first index fastest)
+    pixel addressing; a collection with row-major pixel strides must be
+    rejected instead of silently producing wrong results."""
+    stencil = np.array([[[1.0, 0.0], [0.0, 1.0]]])
+    conv_op = muGrid.GenericLinearOperator([0, 0], stencil)
+    fc = muGrid.GlobalFieldCollection(
+        [5, 4],
+        [],
+        [],
+        muGrid.StorageOrder.StructureOfArrays,  # pixels: row-major
+        {"quad": 1},
+        muGrid.StorageOrder.ArrayOfStructures,  # dof storage: AoS
+        [0, 0],
+        [1, 1],
+    )
+    nodal = fc.real_field("nodal", (2,))
+    quad = fc.real_field("quad", (2,), "quad")
+    with pytest.raises(RuntimeError):
+        conv_op.apply(nodal, quad)
+
+
 @unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
 class ConvolutionOperatorDeviceCheck(unittest.TestCase):
     """Test suite for ConvolutionOperator on device (GPU) memory.

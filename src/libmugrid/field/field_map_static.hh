@@ -656,7 +656,11 @@ namespace muGrid {
         for (auto && val : *this) {
             mean += val;
         }
-        mean *= 1. / Real(this->size());
+        // Guard against empty maps (e.g. an MPI rank holding no pixels) to
+        // prevent 0/0 = NaN, mirroring the dynamic FieldMap::mean()
+        if (this->size() != 0) {
+            mean *= 1. / Real(this->size());
+        }
         return mean;
     }
 

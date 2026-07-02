@@ -465,6 +465,25 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  namespace internal {
+    //! Throws unless the two flat sizes match. The Eigen-based field
+    //! operators below assign through fixed-size Eigen maps whose bounds
+    //! check (eigen_assert) is compiled out in release builds, so a
+    //! mismatch must be caught explicitly to avoid out-of-bounds writes.
+    inline void check_eigen_op_size(Index_t nb_scalars, Index_t nb_other,
+                                    const std::string & name,
+                                    const char * op) {
+      if (nb_scalars != nb_other) {
+        std::stringstream error{};
+        error << "Size mismatch in '" << op << "' on field '" << name
+              << "': the field holds " << nb_scalars
+              << " scalar entries, but the right-hand side holds " << nb_other;
+        throw FieldError(error.str());
+      }
+    }
+  }  // namespace internal
+
+  /* ---------------------------------------------------------------------- */
   template <typename T, typename MemorySpace>
   TypedFieldBase<T, MemorySpace> &
   TypedFieldBase<T, MemorySpace>::operator=(const Negative & other) {
@@ -472,7 +491,11 @@ namespace muGrid {
     if constexpr (!is_host_space_v<MemorySpace>) {
       throw FieldError("Negative assignment only available for host-space fields");
     } else {
-      this->eigen_vec() = -other.field.eigen_vec();
+      auto lhs{this->eigen_vec()};
+      auto rhs{other.field.eigen_vec()};
+      internal::check_eigen_op_size(lhs.size(), rhs.size(), this->get_name(),
+                                    "= (negative)");
+      lhs = -rhs;
     }
     return *this;
   }
@@ -484,7 +507,10 @@ namespace muGrid {
     if constexpr (!is_host_space_v<MemorySpace>) {
       throw FieldError("Eigen assignment only available for host-space fields");
     } else {
-      this->eigen_vec() = other;
+      auto lhs{this->eigen_vec()};
+      internal::check_eigen_op_size(lhs.size(), other.size(),
+                                    this->get_name(), "= (Eigen)");
+      lhs = other;
     }
     return *this;
   }
@@ -502,7 +528,11 @@ namespace muGrid {
     if constexpr (!is_host_space_v<MemorySpace>) {
       throw FieldError("+= only available for host-space fields");
     } else {
-      this->eigen_vec() += other.eigen_vec();
+      auto lhs{this->eigen_vec()};
+      auto rhs{other.eigen_vec()};
+      internal::check_eigen_op_size(lhs.size(), rhs.size(), this->get_name(),
+                                    "+=");
+      lhs += rhs;
     }
     return *this;
   }
@@ -514,7 +544,11 @@ namespace muGrid {
     if constexpr (!is_host_space_v<MemorySpace>) {
       throw FieldError("-= only available for host-space fields");
     } else {
-      this->eigen_vec() -= other.eigen_vec();
+      auto lhs{this->eigen_vec()};
+      auto rhs{other.eigen_vec()};
+      internal::check_eigen_op_size(lhs.size(), rhs.size(), this->get_name(),
+                                    "-=");
+      lhs -= rhs;
     }
     return *this;
   }

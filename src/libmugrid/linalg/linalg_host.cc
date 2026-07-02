@@ -39,6 +39,7 @@
 #include "core/exception.hh"
 
 #include <complex>
+#include <sstream>
 
 namespace muGrid {
 namespace linalg {
@@ -80,6 +81,26 @@ inline bool has_ghosts(const GlobalFieldCollection& coll) {
  * reported squared norm carried an absolute error of order
  * eps * ||ghosts||^2 and could even go negative.
  */
+/**
+ * The interior traversal below addresses dofs as
+ * pixel_offset * nb_components_per_pixel + c, which is only valid for
+ * array-of-structures storage. Scalar fields are layout-independent.
+ */
+inline void check_interior_reduction_layout(const GlobalFieldCollection& coll,
+                                            Index_t nb_components_per_pixel,
+                                            const char* name) {
+    if (nb_components_per_pixel > 1 &&
+        coll.get_storage_order() != StorageOrder::ArrayOfStructures) {
+        std::stringstream error{};
+        error << name
+              << ": interior (ghost-skipping) reductions over fields with "
+                 "more than one degree of freedom per pixel require "
+                 "array-of-structures storage, but the field collection uses "
+              << coll.get_storage_order() << " storage order";
+        throw FieldError(error.str());
+    }
+}
+
 template <typename T>
 T interior_vecdot(const T* a_data, const T* b_data,
                   const GlobalFieldCollection& coll,
@@ -93,6 +114,8 @@ T interior_vecdot(const T* a_data, const T* b_data,
     if (spatial_dim < 1 || spatial_dim > 3) {
         throw FieldError("interior_vecdot only supports 1D, 2D and 3D fields");
     }
+    check_interior_reduction_layout(coll, nb_components_per_pixel,
+                                    "interior_vecdot");
 
     // Interior bounds; unused trailing dimensions degenerate to one pass
     Index_t start[3]{0, 0, 0};
@@ -139,6 +162,8 @@ std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
     if (spatial_dim < 1 || spatial_dim > 3) {
         throw FieldError("interior_three_dots only supports 1D, 2D and 3D fields");
     }
+    check_interior_reduction_layout(coll, nb_components_per_pixel,
+                                    "interior_three_dots");
 
     Index_t start[3]{0, 0, 0};
     Index_t end[3]{1, 1, 1};
@@ -418,6 +443,18 @@ template <>
 std::array<Real, 3> pipelined_cg_dots<Real, HostSpace>(
     const TypedField<Real, HostSpace>& r, const TypedField<Real, HostSpace>& u,
     const TypedField<Real, HostSpace>& w) {
+    for (const auto* other : {&u, &w}) {
+        if (&other->get_collection() != &r.get_collection()) {
+            throw FieldError(
+                "pipelined_cg_dots: fields must belong to the same collection");
+        }
+        if (other->get_nb_components() != r.get_nb_components() ||
+            other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
+            throw FieldError(
+                "pipelined_cg_dots: fields must have the same number of "
+                "components and sub-points");
+        }
+    }
     const auto& coll = r.get_collection();
     const Index_t nb_components_per_pixel =
         r.get_nb_components() * r.get_nb_sub_pts();

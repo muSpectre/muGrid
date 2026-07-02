@@ -258,9 +258,9 @@ def _unwrap(obj: Any) -> Any:
 
 # Valid real<->complex precision pairings for an FFT: the transform runs in the
 # precision of the fields, so a real field must be paired with the complex field
-# of matching precision. A mismatched pair (e.g. float32 real with complex128
-# Fourier) does not raise in the C++ layer -- it silently produces garbage/NaN
-# -- so it is caught here with an actionable message.
+# of matching precision. The C++ layer also rejects mismatched pairs
+# (RuntimeError); catching them here first gives a friendlier, numpy-dtype
+# based message.
 _FFT_REAL_TO_COMPLEX = {
     np.dtype(np.float32): np.dtype(np.complex64),
     np.dtype(np.float64): np.dtype(np.complex128),
@@ -531,6 +531,17 @@ class GlobalFieldCollection(FieldCollectionMixin):
             return
 
         # Otherwise, use keyword-based simplified API
+        known_kwargs = {
+            "nb_grid_pts", "nb_sub_pts", "sub_pts", "nb_ghosts_left",
+            "nb_ghosts_right", "ghosts", "device", "nb_subdomain_grid_pts",
+            "storage_order",
+        }
+        unknown_kwargs = set(kwargs) - known_kwargs
+        if unknown_kwargs:
+            raise TypeError(
+                "GlobalFieldCollection got unexpected keyword argument(s): "
+                + ", ".join(sorted(unknown_kwargs))
+            )
         nb_grid_pts = args[0] if args else kwargs.get("nb_grid_pts")
         if nb_grid_pts is None:
             raise TypeError("nb_grid_pts is required")
@@ -542,6 +553,7 @@ class GlobalFieldCollection(FieldCollectionMixin):
         ghosts = kwargs.get("ghosts")
         device = kwargs.get("device")
         nb_subdomain_grid_pts = kwargs.get("nb_subdomain_grid_pts")
+        storage_order = kwargs.get("storage_order")
 
         # Handle sub_pts alias
         if sub_pts is not None:
@@ -574,6 +586,11 @@ class GlobalFieldCollection(FieldCollectionMixin):
         # Handle nb_subdomain_grid_pts if provided
         if nb_subdomain_grid_pts is not None:
             cpp_kwargs["nb_subdomain_grid_pts"] = list(nb_subdomain_grid_pts)
+
+        # Handle storage_order if provided (note: the C++ constructor also
+        # derives the *pixel* storage order from this value)
+        if storage_order is not None:
+            cpp_kwargs["storage_order"] = storage_order
 
         self._cpp = _muGrid.GlobalFieldCollection(**cpp_kwargs)
         self._nb_grid_pts = list(nb_grid_pts)
@@ -1338,7 +1355,10 @@ class LaplaceOperator:
         output_field : Field
             Output field.
         weights : sequence of float, optional
-            Weights (unused for Laplacian, included for API compatibility).
+            Quadrature weights are not supported by the Laplacian (it has
+            no quadrature points); passing a non-empty sequence raises
+            RuntimeError. The parameter exists for API compatibility with
+            the other stencil operators.
         """
         if weights is None:
             weights = []

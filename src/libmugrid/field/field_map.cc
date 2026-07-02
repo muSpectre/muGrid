@@ -37,6 +37,7 @@
 #include "field/field_typed.hh"
 #include "collection/field_collection.hh"
 #include "grid/iterators.hh"
+#include "grid/strides.hh"
 
 #include <sstream>
 #include <iostream>
@@ -195,6 +196,17 @@ namespace muGrid {
     if (not(this->field.get_collection().is_initialised())) {
       throw FieldMapError("Can't initialise map before the field collection "
                           "has been initialised");
+    }
+    // operator[] addresses iterates as data_ptr + index * stride, i.e. it
+    // assumes the buffer is dense. A collection with custom (gapped) pixel
+    // strides breaks that assumption, so reject it like eigen_map does.
+    if (not CcoordOps::is_buffer_contiguous(this->field.get_pixels_shape(),
+                                            this->field.get_pixels_strides())) {
+      std::stringstream error{};
+      error << "FieldMap on field '" << this->field.get_name()
+            << "' requires contiguous pixel storage, but the field "
+               "collection uses non-contiguous custom pixel strides";
+      throw FieldMapError(error.str());
     }
     // For const fields, we need to cast away const since data_ptr is T*
     // This is safe because we only provide read access for const maps

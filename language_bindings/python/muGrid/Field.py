@@ -131,6 +131,29 @@ class Field:
         slices = self._make_slice(offsets, shape)
         return buf[slices]
 
+    def _pixel_view(self):
+        """
+        Pixel-layout view of the full buffer (components and sub-points
+        merged into one axis).
+
+        Built from the C++ pixel shape and strides so it is always a
+        zero-copy view with the C++ Pixel element order. A plain
+        ``reshape`` cannot do this: merging the component and sub-point
+        axes of the (Fortran-ordered) buffer in C order would silently
+        copy and permute elements whenever both counts exceed one.
+        """
+        buf = self._get_buffer()
+        shape = tuple(self._cpp.shape_pg)
+        strides = tuple(s * buf.itemsize for s in self._cpp.strides_p)
+        if self.is_on_gpu:
+            cp = _get_cupy()
+            return cp.lib.stride_tricks.as_strided(
+                buf, shape=shape, strides=strides
+            )
+        return np.lib.stride_tricks.as_strided(
+            buf, shape=shape, strides=strides
+        )
+
     @property
     def pg(self):
         """
@@ -138,9 +161,7 @@ class Field:
 
         Shape: (nb_components * nb_sub_pts, *spatial_dims_with_ghosts)
         """
-        buf = self._get_buffer()
-        shape_pg = self._cpp.shape_pg
-        return buf.reshape(shape_pg)
+        return self._pixel_view()
 
     @property
     def p(self):
@@ -149,9 +170,7 @@ class Field:
 
         Shape: (nb_components * nb_sub_pts, *spatial_dims_without_ghosts)
         """
-        buf = self._get_buffer()
-        shape_pg = self._cpp.shape_pg
-        pixel_buf = buf.reshape(shape_pg)
+        pixel_buf = self._pixel_view()
         offsets = self._cpp.offsets_p
         shape = self._cpp.shape_p
         slices = self._make_slice(offsets, shape)

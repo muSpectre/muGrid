@@ -49,13 +49,16 @@ namespace muGrid {
 // (LP64: MPI_LONG, LLP64: MPI_LONG_LONG_INT) and the reverse mapping must accept
 // both. To support a new scalar type over MPI, add a row here (and a row to
 // MUGRID_SCALAR_TYPES in core/type_descriptor.hh).
-#define MUGRID_MPI_TYPES(X)        \
-    X(Int, MPI_INT)                \
-    X(Uint, MPI_UNSIGNED)          \
-    X(Real, MPI_DOUBLE)            \
-    X(Complex, MPI_DOUBLE_COMPLEX) \
-    X(Real32, MPI_FLOAT)           \
-    X(Complex32, MPI_COMPLEX)
+// The complex rows use the C datatypes (MPI_C_*): the Fortran
+// MPI_DOUBLE_COMPLEX/MPI_COMPLEX are only guaranteed to exist when the MPI
+// library was built with Fortran support.
+#define MUGRID_MPI_TYPES(X)          \
+    X(Int, MPI_INT)                  \
+    X(Uint, MPI_UNSIGNED)            \
+    X(Real, MPI_DOUBLE)              \
+    X(Complex, MPI_C_DOUBLE_COMPLEX) \
+    X(Real32, MPI_FLOAT)             \
+    X(Complex32, MPI_C_FLOAT_COMPLEX)
 
 MPI_Datatype descriptor_to_mpi_type(TypeDescriptor td) {
     switch (td) {

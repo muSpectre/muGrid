@@ -342,8 +342,9 @@ class GpuFFTBackend : public FFT1DBackend {
     if (reinterpret_cast<std::uintptr_t>(ptr) % complex_align != 0) {
       throw RuntimeError(
           std::string("The real array passed to the ") + this->name() + " " +
-          operation +
-          " transform is not aligned to the complex type (16 bytes). muGrid "
+          operation + " transform is not aligned to the complex type (" +
+          std::to_string(complex_align) +
+          " bytes). muGrid "
           "pads the layout of FFT engine real-space fields so that this cannot "
           "happen; this error indicates a bug in muGrid's layout padding, or a "
           "field whose memory was not allocated through a muGrid FFT engine. "
