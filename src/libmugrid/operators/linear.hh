@@ -215,8 +215,14 @@ namespace muGrid {
      * is computed. Defined on quadrature points.
      * @param nodal_field The output field where the divergence is written.
      *                    Defined on nodal points.
-     * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
-     *                version of the discretised divergence is returned.
+     * @param weights Optional Gaussian quadrature weights.
+     *
+     * @warning The meaning of an OMITTED `weights` argument differs between
+     * implementations: `GenericLinearOperator` applies the plain (unweighted)
+     * adjoint, `FEMGradientOperator` applies its physical quadrature weights,
+     * and `LaplaceOperator` rejects non-empty weights outright (it has no
+     * quadrature points). Code that swaps operator implementations through
+     * this base class must account for the different default scaling.
      */
     virtual void
     transpose(const TypedFieldBase<Real> & quadrature_point_field,
@@ -245,8 +251,9 @@ namespace muGrid {
      * to the nodal_field.
      * @param nodal_field The field to which the scaled divergence is added.
      *                    Defined on nodal points.
-     * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
-     *                version of the discretised divergence is returned.
+     * @param weights Optional Gaussian quadrature weights. See the warning on
+     *                transpose(): the default-weights semantics differ
+     *                between implementations.
      */
     virtual void transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,

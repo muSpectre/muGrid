@@ -384,3 +384,16 @@ def test_rejects_multi_subpoint_field():
     out = fc.real_field("out", (), "quad")
     with pytest.raises(RuntimeError):
         op.apply(inp, out)
+
+
+def test_rejects_transpose_weights():
+    """The Laplacian has no quadrature points; passing weights to
+    transpose() must raise instead of being silently ignored."""
+    fc, _ = _make_collection((5, 4))
+    op = muGrid.LaplaceOperator(2)
+    inp = fc.real_field("in")
+    out = fc.real_field("out")
+    # no weights (or empty weights) is fine
+    op.transpose(inp, out)
+    with pytest.raises(RuntimeError):
+        op.transpose(inp, out, [1.0])

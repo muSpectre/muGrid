@@ -194,13 +194,30 @@ namespace muGrid {
         }
 
         /**
+         * @brief Throws if quadrature weights are passed: the Laplace stencil
+         *        has no quadrature points, so accepting (and ignoring) them
+         *        would silently diverge from the other LinearOperator
+         *        implementations, which scale their transpose by the weights.
+         */
+        static void check_no_weights(const std::vector<Real> & weights) {
+            if (not weights.empty()) {
+                throw RuntimeError(
+                    std::string(operator_name()) +
+                    " does not support quadrature weights in "
+                    "transpose()/transpose_increment(); the Laplacian is "
+                    "self-adjoint and has no quadrature points, so weights "
+                    "would be silently ignored");
+            }
+        }
+
+        /**
          * @brief Apply the transpose (identical to apply for the self-adjoint
-         *        Laplacian; weights are ignored).
+         *        Laplacian).
          */
         void transpose(const TypedFieldBase<Real> & input_field,
                        TypedFieldBase<Real> & output_field,
                        const std::vector<Real> & weights = {}) const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply(input_field, output_field);
         }
 
@@ -213,7 +230,7 @@ namespace muGrid {
                                  TypedFieldBase<Real> & output_field,
                                  const std::vector<Real> & weights = {})
             const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply_increment(input_field, alpha, output_field);
         }
 
@@ -231,7 +248,7 @@ namespace muGrid {
         void transpose(const TypedFieldBase<Real32> & input_field,
                        TypedFieldBase<Real32> & output_field,
                        const std::vector<Real> & weights = {}) const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply(input_field, output_field);
         }
         void transpose_increment(const TypedFieldBase<Real32> & input_field,
@@ -239,7 +256,7 @@ namespace muGrid {
                                  TypedFieldBase<Real32> & output_field,
                                  const std::vector<Real> & weights = {})
             const override {
-            (void)weights;
+            check_no_weights(weights);
             this->apply_increment(input_field, alpha, output_field);
         }
 

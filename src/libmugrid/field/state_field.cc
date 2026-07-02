@@ -136,6 +136,15 @@ namespace muGrid {
                                       const Unit & unit)
       : Parent{unique_prefix, collection,       nb_memory,
                nb_components, sub_division_tag, unit} {
+    if (collection.is_on_device()) {
+      // On a device collection, register_field<T> creates
+      // TypedField<T, DefaultDeviceSpace> sub-fields, for which the
+      // static_casts to the host type in current()/old() (and in the state
+      // field maps) would be undefined behaviour. State fields are a
+      // host-only feature.
+      throw FieldError(
+          "State fields are not supported on device (GPU) field collections");
+    }
     for (Index_t i{0}; i < nb_memory + 1; ++i) {
       std::stringstream unique_name_stream{};
       unique_name_stream << this->prefix << ", sub_field index " << i;

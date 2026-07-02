@@ -714,7 +714,19 @@ InteriorBox interior_box(const TypedField<T, DeviceSpace>& f,
     const auto field_strides = f.get_strides(IterUnit::Pixel);
 
     InteriorBox box;
-    box.stride_c = field_strides[0];
+    // The reduction kernels enumerate a pixel's dofs as d * stride_c with a
+    // UNIFORM stride: 1 for AoS (contiguous per-pixel block) and
+    // nb_buffer_pixels for SoA (dof planes). That uniform stride equals the
+    // smallest component-axis stride; field_strides[0] would be the
+    // SLOWEST component axis for multi-axis component shapes.
+    const Index_t nb_comp_axes{static_cast<Index_t>(field_strides.size()) -
+                               spatial_dim};
+    box.stride_c = 1;
+    for (Index_t i{0}; i < nb_comp_axes; ++i) {
+        if (i == 0 or field_strides[i] < box.stride_c) {
+            box.stride_c = field_strides[i];
+        }
+    }
     box.nb_components_per_pixel = f.get_nb_components() * f.get_nb_sub_pts();
     for (Dim_t d = 0; d < spatial_dim; ++d) {
         box.start[d] = nb_ghosts_left[d];

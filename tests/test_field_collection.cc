@@ -343,15 +343,18 @@ namespace muGrid {
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(init_test_loca_with_push_back, F,
                                    mult_collections_local, F) {
     constexpr int nb_pix{7};
-    testGoodies::RandRange<Int> rng{};
     using stype = Eigen::Array<Real, ipow(F::SpatialDimension, 4), 1>;
     auto & field{RealField::safe_cast(F::fc.get_field("Tensorfield real o4"),
                                       ipow(F::SpatialDimension, 4),
                                       this->sub_division_tag())};
     field.push_back(stype());
+    // global indices must be distinct: add_pixel rejects duplicates
     for (int i = 0; i < nb_pix; ++i) {
-      F::fc.add_pixel(rng.randval(0, nb_pix));
+      F::fc.add_pixel(static_cast<size_t>(i));
     }
+
+    // adding the same global index a second time must be rejected
+    BOOST_CHECK_THROW(F::fc.add_pixel(size_t{0}), FieldCollectionError);
 
     BOOST_CHECK_THROW(F::fc.initialise(), FieldCollectionError);
     for (int i = 0; i < nb_pix - 1; ++i) {

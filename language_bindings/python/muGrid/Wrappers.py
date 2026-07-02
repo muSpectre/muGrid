@@ -1355,7 +1355,10 @@ class LaplaceOperator:
         output_field : Field
             Output field.
         weights : sequence of float, optional
-            Weights (unused for Laplacian, included for API compatibility).
+            Quadrature weights are not supported by the Laplacian (it has
+            no quadrature points); passing a non-empty sequence raises
+            RuntimeError. The parameter exists for API compatibility with
+            the other stencil operators.
         """
         if weights is None:
             weights = []

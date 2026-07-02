@@ -60,8 +60,18 @@ namespace muGrid {
                                        "has been initialised (because "
                                        "the fields all have been allocated)");
         }
-        this->global_to_local_index_map.insert(
-            std::make_pair(global_index, pixel_indices.size()));
+        // std::map::insert does not overwrite: a duplicate global index would
+        // silently leave the index map pointing at the first slot while
+        // pixel_indices grows, desynchronising the two. Reject it instead.
+        auto && [it, inserted]{this->global_to_local_index_map.insert(
+            std::make_pair(global_index, pixel_indices.size()))};
+        if (not inserted) {
+            std::stringstream error{};
+            error << "The pixel with global index " << global_index
+                  << " has already been added to the local field collection '"
+                  << this->name << "'";
+            throw FieldCollectionError(error.str());
+        }
         this->pixel_indices.emplace_back(global_index);
     }
 

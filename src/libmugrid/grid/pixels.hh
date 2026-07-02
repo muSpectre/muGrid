@@ -183,7 +183,24 @@ namespace muGrid {
 
                 //! constructor
                 iterator(const Pixels & pixels, Size_t index)
-                    : pixels{pixels}, index{index} {}
+                    : pixels{pixels}, index{index} {
+                    // Iteration enumerates a dense pixel counter, but
+                    // get_coord()/indices() interpret it through the
+                    // strides, i.e. as a memory offset. For non-contiguous
+                    // (padded) strides — e.g. an interior view with
+                    // ghost-buffer strides — the two disagree and every
+                    // dereference would yield a wrong pixel, so reject
+                    // iteration outright.
+                    if (pixels.get_dim() != 0 and not pixels.contiguous) {
+                        throw RuntimeError(
+                            "Cannot iterate over pixels with non-contiguous "
+                            "(padded) strides: the linear iteration index "
+                            "would not correspond to a valid pixel. Iterate "
+                            "over the full (ghost-inclusive) pixels instead, "
+                            "or construct a Pixels object with dense "
+                            "strides.");
+                    }
+                }
 
                 //! Default constructor
                 iterator() = delete;
