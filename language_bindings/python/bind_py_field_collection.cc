@@ -485,14 +485,31 @@ void add_field_collection(py::module & mod) {
         .def(
             "pop_field",
             [](FieldCollection & collection, const std::string & unique_name) {
-                // Remove the field from the collection; dropping the returned
-                // owning pointer here frees its (host or device) buffer.
-                collection.pop_field(unique_name);
+                // Fetch (or create) the Python wrapper of the field before
+                // popping: arrays exported via DLPack pin that wrapper, so
+                // tying the popped field's ownership to it keeps the
+                // underlying buffer alive until the last consumer is gone.
+                py::object wrapper{
+                    py::cast(collection.get_field(unique_name),
+                             py::return_value_policy::reference)};
+                // Remove the field from the collection and free it once the
+                // wrapper is garbage collected. The lifetime tie goes
+                // through a weakref (the same mechanism as pybind11's
+                // keep_alive for classes without dynamic attributes).
+                auto * holder{new FieldCollection::Field_ptr{
+                    collection.pop_field(unique_name)}};
+                py::weakref wr{wrapper,
+                               py::cpp_function([holder](py::handle weakref) {
+                                   delete holder;
+                                   weakref.dec_ref();
+                               })};
+                wr.release();
             },
             "unique_name"_a,
-            "Remove a field from the collection and free its memory. Useful "
-            "for releasing temporary work fields once they are no longer "
-            "needed.")
+            "Remove a field from the collection. The field's memory is freed "
+            "once the last Python reference to it (including arrays exported "
+            "via DLPack) is gone; with no such references it is freed "
+            "immediately. Useful for releasing temporary work fields.")
         .def("state_field_exists", &FieldCollection::state_field_exists)
         .def_property_readonly("nb_pixels", &FieldCollection::get_nb_pixels)
         .def_property_readonly("nb_pixels_without_ghosts",

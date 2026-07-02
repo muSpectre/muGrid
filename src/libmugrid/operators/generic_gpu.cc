@@ -167,6 +167,12 @@ namespace muGrid {
                 d_weights.data(), weights.data(), weights.size());
             this->transpose_on_device<DefaultDeviceSpace, T>(
                 quad_data, nodal_data, alpha, params, d_weights.data());
+            // The kernel launch is asynchronous; synchronize before
+            // d_weights is destroyed. With an external device allocator
+            // (e.g. a cupy memory pool) deallocation does not synchronize
+            // the device, so the in-flight kernel would read recycled
+            // memory.
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
         }
     }
 

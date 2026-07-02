@@ -162,12 +162,17 @@ void add_file_io_base(py::module & mod) {
                     Communicator>(),
            "file_name"_a, "open_mode"_a = FileIOBase::OpenMode::Read,
            "communicator"_a = Communicator())
-      .def("__getitem__", &FileIOBase::operator[], "frame_index"_a)
+      // FileFrame objects hold a reference to their parent FileIOBase, so
+      // everything handing one out pins the file object (keep_alive<0, 1>).
+      .def("__getitem__", &FileIOBase::operator[], "frame_index"_a,
+           py::keep_alive<0, 1>())
       .def("__len__", &FileIOBase::size)
-      .def("__iter__",
-           [](FileIOBase & file_io_base) {
-             return py::make_iterator(file_io_base.begin(), file_io_base.end());
-           })
+      .def(
+          "__iter__",
+          [](FileIOBase & file_io_base) {
+            return py::make_iterator(file_io_base.begin(), file_io_base.end());
+          },
+          py::keep_alive<0, 1>())
       .def("append_frame", &FileIOBase::append_frame,
            py::return_value_policy::reference_internal)
       .def_property_readonly("communicator", &FileIOBase::get_communicator);
@@ -175,7 +180,11 @@ void add_file_io_base(py::module & mod) {
 
 void add_file_frame(py::module & mod) {
   py::class_<FileFrame> file_frame(mod, "FileFrame");
-  file_frame.def(py::init<FileIOBase &, Index_t>(), "parent"_a, "frame"_a)
+  // The frame references its parent FileIOBase; keep the parent alive for
+  // the frame's lifetime.
+  file_frame
+      .def(py::init<FileIOBase &, Index_t>(), "parent"_a, "frame"_a,
+           py::keep_alive<1, 2>())
       .def(
           "read",
           [](FileFrame & frame, const std::vector<std::string> & field_names) {

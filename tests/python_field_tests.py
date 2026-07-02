@@ -259,6 +259,40 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(field.pg.shape, (3,) + self.nb_grid_pts)
         self.assertEqual(field.p.shape, (3,) + self.nb_grid_pts)
 
+    def test_pop_field_keeps_dlpack_export_alive(self):
+        """Arrays exported via DLPack must survive pop_field.
+
+        pop_field removes the field from the collection, but the buffer must
+        stay alive as long as a DLPack consumer (e.g. a numpy array) still
+        references it.
+        """
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
+        field_cpp = fc.register_real_field("popped", 1, "pixel")
+        arr = np.from_dlpack(field_cpp)
+        arr[...] = 42.0
+        del field_cpp
+
+        fc.pop_field("popped")
+        self.assertFalse(fc.field_exists("popped"))
+        # The buffer must still be readable and writable through the array.
+        self.assertTrue(np.all(arr == 42.0))
+        arr[...] = 7.0
+        self.assertTrue(np.all(arr == 7.0))
+
+        # Popping a field with no outstanding references frees it right away
+        # (no way to observe the free directly; this is a smoke test that the
+        # immediate-release path does not crash).
+        fc.register_real_field("transient", 1, "pixel")
+        fc.pop_field("transient")
+        self.assertFalse(fc.field_exists("transient"))
+
+    def test_pixels_iterator_outlives_temporary(self):
+        """Iterating pixels of an expression temporary must be safe: the
+        iterator keeps the Pixels (and collection) alive."""
+        it = iter(muGrid.GlobalFieldCollection(self.nb_grid_pts).pixels)
+        coords = list(it)
+        self.assertEqual(len(coords), np.prod(self.nb_grid_pts))
+
 
 if __name__ == "__main__":
     unittest.main()

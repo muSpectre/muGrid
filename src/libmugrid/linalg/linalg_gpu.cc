@@ -736,6 +736,11 @@ InteriorBox interior_box(const TypedField<T, DeviceSpace>& f,
 //! Full-buffer reduction of conj_product(a, b) over `n` device-scalar elements.
 template <typename DS>
 DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
+    if (n <= 0) {
+        // e.g. an MPI rank with no local pixels; a zero-block kernel launch
+        // would be an invalid configuration
+        return DS{};
+    }
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
     DS* d_partial = scratch_as<DS>(0, num_blocks);
@@ -755,6 +760,11 @@ DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
 //! from `box`; the caller guarantees a and b share that layout.
 template <typename DS>
 DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
+    if (box.nb_interior_pixels <= 0) {
+        // e.g. an MPI rank with no local pixels; a zero-block kernel launch
+        // would be an invalid configuration
+        return DS{};
+    }
     const int num_blocks =
         (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
         gpu_kernels::REDUCE_BLOCK_SIZE;
@@ -847,6 +857,11 @@ void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
     // Total scalar elements in the full buffer (get_nb_entries already counts
     // sub-points, so multiply only by the number of components)
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    if (n <= 0) {
+        // e.g. an MPI rank with no local pixels; a zero-block kernel launch
+        // would be an invalid configuration
+        return;
+    }
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -859,6 +874,9 @@ template <typename T>
 void scal_device(T alpha, TypedField<T, DeviceSpace>& x) {
     using DS = DeviceScalar<T>;
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    if (n <= 0) {
+        return;
+    }
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -879,6 +897,9 @@ void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
     }
     using DS = DeviceScalar<T>;
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    if (n <= 0) {
+        return;
+    }
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -900,6 +921,9 @@ void copy_device(const TypedField<T, DeviceSpace>& src,
     }
     using DS = DeviceScalar<T>;
     const Index_t n = src.get_nb_entries() * src.get_nb_components();
+    if (n <= 0) {
+        return;
+    }
     const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                            gpu_kernels::BLOCK_SIZE;
 
@@ -923,6 +947,11 @@ T axpy_norm_sq_device(T alpha, const TypedField<T, DeviceSpace>& x,
     // Total scalar elements in the full buffer (get_nb_entries already counts
     // sub-points, so multiply only by the number of components)
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
+    if (n <= 0) {
+        // e.g. an MPI rank with no local pixels; a zero-block kernel launch
+        // would be an invalid configuration
+        return T{};
+    }
 
     // For GlobalFieldCollection with ghosts: update y over the full buffer
     // (ghost pixels included, keeping the buffer consistent), then sum the
@@ -1242,6 +1271,11 @@ void scal_complex_field_device(const TypedField<RT, DeviceSpace>& alpha,
     const Index_t npix = x.get_nb_entries();
     const Index_t ncomp = x.get_nb_components();
     const Index_t n2 = npix * ncomp * 2;
+    if (n2 <= 0) {
+        // e.g. an MPI rank with no local pixels; a zero-block kernel launch
+        // would be an invalid configuration
+        return;
+    }
     const bool soa =
         (x.get_storage_order() == StorageOrder::StructureOfArrays);
     const bool alpha_per_comp = (alpha.get_nb_components() == ncomp &&
@@ -1264,6 +1298,9 @@ void scal_real_field_device(const TypedField<RT, DeviceSpace>& alpha,
     const Index_t npix = x.get_nb_entries();
     const Index_t ncomp = x.get_nb_components();
     const Index_t n = npix * ncomp;
+    if (n <= 0) {
+        return;
+    }
     const bool soa =
         (x.get_storage_order() == StorageOrder::StructureOfArrays);
     const bool alpha_per_comp = (alpha.get_nb_components() == ncomp &&
@@ -1319,6 +1356,11 @@ void leray_project_device(const TypedField<RT, DeviceSpace>& k,
     internal::check_three_vector("leray_project", N, coll);
     internal::check_three_vector("leray_project", out, coll);
     const Index_t npix = out.get_nb_entries();
+    if (npix <= 0) {
+        // e.g. an MPI rank with no local pixels; a zero-block kernel launch
+        // would be an invalid configuration
+        return;
+    }
     const bool soa =
         (out.get_storage_order() == StorageOrder::StructureOfArrays);
     const int num_blocks =

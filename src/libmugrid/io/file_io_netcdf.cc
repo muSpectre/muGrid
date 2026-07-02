@@ -44,6 +44,8 @@
 
 #include "io/file_io_netcdf.hh"
 
+#include <cstdint>
+
 using muGrid::operator<<;
 
 namespace muGrid {
@@ -897,31 +899,66 @@ namespace muGrid {
          this->variables.set_var_vector()) {
       for (NetCDFAtt & att : var->set_netcdf_attributes()) {
         const std::string & name{att.get_name()};
-        // create a void * to a location with enough space to store the
-        // returned value
-        void * value{att.reserve_value_space()};
-        int status{
-            ncmu_get_att(this->netcdf_id, var->get_id(), name.c_str(), value)};
-        if (status != NC_NOERR) {
-          throw FileIOError(ncmu_strerror(status));
-        }
         if (att.is_value_initialised()) {
-          // the attribute has already a value and it is checked if it fitts
-          // with the read value from the NetCDF file
-          bool equal{att.equal_value(value)};
-          if (!equal) {
+          // The attribute already has a value from the registered field
+          // collection (e.g. 'unit'). The file's data type and length can
+          // differ from the registered ones, so they must be checked before
+          // reading: sizing the read buffer from the registered length
+          // would overflow it for a longer file attribute.
+          nc_type file_data_type{};
+          IOSize_t file_nelems{};
+          int status_inq{ncmu_inq_att(this->netcdf_id, var->get_id(),
+                                      name.c_str(), &file_data_type,
+                                      &file_nelems)};
+          if (status_inq != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status_inq));
+          }
+          if (file_data_type != att.get_data_type() ||
+              file_nelems != att.get_nelems()) {
             throw FileIOError(
-                "It seems like the registered attribute value originating from "
-                "the registered field collection is not equal to the value "
-                "read from the netcdf file.\nvariable name: " +
+                "It seems like the registered attribute value originating "
+                "from the registered field collection is not equal to the "
+                "value read from the netcdf file (the data type or length "
+                "differs).\nvariable name: " +
+                var->get_name() + "\nattribute name: " + name +
+                "\nattribute value from field collection: " +
+                att.get_value_as_string());
+          }
+          // Read into a temporary buffer, never into the attribute's own
+          // storage: reserve_value_space() would clobber the registered
+          // value and make the comparison below compare the file value
+          // with itself. (uint64_t elements give sufficient alignment for
+          // every supported attribute type.)
+          std::vector<std::uint64_t> file_value(
+              (static_cast<std::size_t>(att.get_data_size()) +
+               sizeof(std::uint64_t) - 1) /
+              sizeof(std::uint64_t));
+          int status{ncmu_get_att(this->netcdf_id, var->get_id(),
+                                  name.c_str(), file_value.data())};
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
+          if (!att.equal_value(file_value.data())) {
+            throw FileIOError(
+                "It seems like the registered attribute value originating "
+                "from the registered field collection is not equal to the "
+                "value read from the netcdf file.\nvariable name: " +
                 var->get_name() + "\nattribute name: " + name +
                 "\nattribute value from field collection: " +
                 att.get_value_as_string() +
                 "\nattribute value from NetCDF file:      " +
-                att.convert_void_value_to_string(value));
+                att.convert_void_value_to_string(file_value.data()));
           }
         } else {
-          // value was up to now not registered and is registered now
+          // Value not registered yet (attribute discovered in the file, so
+          // its data type and length come from the file): adopt the file's
+          // value.
+          void * value{att.reserve_value_space()};
+          int status{ncmu_get_att(this->netcdf_id, var->get_id(),
+                                  name.c_str(), value)};
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
           att.register_value(value);
         }
       }
