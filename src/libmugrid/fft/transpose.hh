@@ -321,9 +321,10 @@ namespace muGrid {
         //! a single complex scalar: 16 for Complex, 8 for Complex32).
         std::size_t elem_size{sizeof(Complex)};
 #ifdef WITH_MPI
-        //! MPI datatype of one complex scalar (MPI_DOUBLE_COMPLEX / MPI_COMPLEX);
-        //! the base from which the per-peer block datatypes are built.
-        MPI_Datatype elem_mpi_type{MPI_DOUBLE_COMPLEX};
+        //! MPI datatype of one complex scalar (MPI_C_DOUBLE_COMPLEX /
+        //! MPI_C_FLOAT_COMPLEX); the base from which the per-peer block
+        //! datatypes are built.
+        MPI_Datatype elem_mpi_type{MPI_C_DOUBLE_COMPLEX};
 #endif
 
         //! Flag indicating if datatypes have been initialized

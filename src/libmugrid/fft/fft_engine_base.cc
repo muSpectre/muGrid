@@ -42,6 +42,24 @@
 
 namespace muGrid {
 
+FFTEngineBase::~FFTEngineBase() {
+#ifdef WITH_MPI
+  // Free the MPI_Comm_split-created subcommunicators (unless MPI has
+  // already been shut down, in which case the handles are gone anyway).
+  int initialized{0}, finalized{0};
+  MPI_Initialized(&initialized);
+  MPI_Finalized(&finalized);
+  if (initialized && !finalized) {
+    for (MPI_Comm * handle :
+         {&this->row_mpi_comm_handle, &this->col_mpi_comm_handle}) {
+      if (*handle != MPI_COMM_NULL) {
+        MPI_Comm_free(handle);
+      }
+    }
+  }
+#endif
+}
+
 FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                              const Communicator & comm,
                              const DynGridIndex & nb_ghosts_left,
@@ -72,17 +90,15 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
   // Create row and column subcommunicators
   MPI_Comm mpi_comm = comm.get_mpi_comm();
   if (mpi_comm != MPI_COMM_NULL && num_ranks > 1) {
-    MPI_Comm row_mpi_comm, col_mpi_comm;
-
     // Row communicator: ranks with same p1 (for Y redistribution in 3D)
     MPI_Comm_split(mpi_comm, this->proc_coord_p1, this->proc_coord_p2,
-                   &row_mpi_comm);
-    this->row_comm = Communicator(row_mpi_comm);
+                   &this->row_mpi_comm_handle);
+    this->row_comm = Communicator(this->row_mpi_comm_handle);
 
     // Column communicator: ranks with same p2 (for Y<->Z transpose)
     MPI_Comm_split(mpi_comm, this->proc_coord_p2, this->proc_coord_p1,
-                   &col_mpi_comm);
-    this->col_comm = Communicator(col_mpi_comm);
+                   &this->col_mpi_comm_handle);
+    this->col_comm = Communicator(this->col_mpi_comm_handle);
   }
 #endif
 

@@ -85,7 +85,8 @@ class FFTEngineBase : public CartesianDecomposition {
   FFTEngineBase() = delete;
   FFTEngineBase(const FFTEngineBase &) = delete;
   FFTEngineBase(FFTEngineBase &&) = delete;
-  ~FFTEngineBase() override = default;
+  //! frees the row/column subcommunicators created in the constructor
+  ~FFTEngineBase() override;
 
   FFTEngineBase & operator=(const FFTEngineBase &) = delete;
   FFTEngineBase & operator=(FFTEngineBase &&) = delete;
@@ -225,6 +226,13 @@ class FFTEngineBase : public CartesianDecomposition {
 #ifdef WITH_MPI
   Communicator row_comm;  //!< Communicator for ranks with same p1 (3D only)
   Communicator col_comm;  //!< Communicator for ranks with same p2
+  //! Handles of the MPI_Comm_split-created subcommunicators above. The
+  //! engine owns them and frees them in the destructor (the Communicator
+  //! wrapper does not own its handle); MPI context IDs are a finite
+  //! resource, so leaking two per engine would eventually abort
+  //! applications that construct many engines.
+  MPI_Comm row_mpi_comm_handle{MPI_COMM_NULL};
+  MPI_Comm col_mpi_comm_handle{MPI_COMM_NULL};
 #endif
 
   // === Transpose operations ===

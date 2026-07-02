@@ -54,7 +54,10 @@ namespace muGrid {
         __global__ void accumulate_strided_kernel(
             T * dst, const T * src, std::size_t nb_blocks, std::size_t block_len,
             std::size_t dst_stride, std::size_t src_stride) {
-            std::size_t g{blockIdx.x * blockDim.x + threadIdx.x};
+            // Widen before multiplying: blockIdx.x * blockDim.x is computed
+            // in 32-bit unsigned and would wrap for regions > 2^32 elements.
+            std::size_t g{static_cast<std::size_t>(blockIdx.x) * blockDim.x +
+                          threadIdx.x};
             std::size_t total{nb_blocks * block_len};
             if (g < total) {
                 std::size_t b{g / block_len};
@@ -127,6 +130,20 @@ namespace muGrid {
             // counts and strides double.
             launch_accumulate(reinterpret_cast<Real *>(dst),
                               reinterpret_cast<const Real *>(src), nb_blocks,
+                              2 * block_len, 2 * dst_block_stride,
+                              2 * src_block_stride, src_on_device);
+            break;
+        case TypeDescriptor::Real32:
+            launch_accumulate(static_cast<Real32 *>(dst),
+                              static_cast<const Real32 *>(src), nb_blocks,
+                              block_len, dst_block_stride, src_block_stride,
+                              src_on_device);
+            break;
+        case TypeDescriptor::Complex32:
+            // Component-wise accumulation of the underlying fp32 reals (see
+            // the Complex case).
+            launch_accumulate(reinterpret_cast<Real32 *>(dst),
+                              reinterpret_cast<const Real32 *>(src), nb_blocks,
                               2 * block_len, 2 * dst_block_stride,
                               2 * src_block_stride, src_on_device);
             break;

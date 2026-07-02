@@ -145,6 +145,18 @@ namespace muGrid {
                                         nb_blocks, block_len, dst_block_stride,
                                         src_block_stride);
                 break;
+            case TypeDescriptor::Real32:
+                host_accumulate_strided(reinterpret_cast<Real32 *>(dst),
+                                        reinterpret_cast<const Real32 *>(src),
+                                        nb_blocks, block_len, dst_block_stride,
+                                        src_block_stride);
+                break;
+            case TypeDescriptor::Complex32:
+                host_accumulate_strided(
+                    reinterpret_cast<Complex32 *>(dst),
+                    reinterpret_cast<const Complex32 *>(src), nb_blocks,
+                    block_len, dst_block_stride, src_block_stride);
+                break;
             case TypeDescriptor::Int:
                 host_accumulate_strided(reinterpret_cast<Int *>(dst),
                                         reinterpret_cast<const Int *>(src),
@@ -174,11 +186,32 @@ namespace muGrid {
          *
          * Used when MPI is not available or not initialized.
          */
+#ifdef WITH_MPI
+        /**
+         * @brief Narrow an Index_t to the int range required by MPI counts,
+         * block lengths and strides; throws instead of silently truncating
+         * (a halo face of more than 2^31 elements would otherwise corrupt
+         * silently).
+         */
+        int checked_mpi_int(Index_t value, const char * what) {
+            if (value < std::numeric_limits<int>::min() ||
+                value > std::numeric_limits<int>::max()) {
+                std::stringstream error{};
+                error << what << " (" << value
+                      << ") exceeds the int range required by MPI; this "
+                         "halo exchange is too large for a single message";
+                throw RuntimeError(error.str());
+            }
+            return static_cast<int>(value);
+        }
+#endif  // WITH_MPI
+
         void serial_sendrecv(
-            int block_stride, int nb_send_blocks, int send_block_len,
-            Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-            Index_t recv_offset, char * data, int stride_in_direction,
-            int elem_size_in_bytes, bool is_device_memory) {
+            Index_t block_stride, Index_t nb_send_blocks,
+            Index_t send_block_len, Index_t send_offset,
+            Index_t nb_recv_blocks, Index_t recv_block_len,
+            Index_t recv_offset, char * data, Index_t stride_in_direction,
+            Index_t elem_size_in_bytes, bool is_device_memory) {
             if (nb_send_blocks != nb_recv_blocks) {
                 throw std::runtime_error(
                     "serial_sendrecv: nb_send_blocks != nb_recv_blocks");
@@ -205,10 +238,11 @@ namespace muGrid {
          * Used when MPI is not available or not initialized.
          */
         void serial_sendrecv_accumulate(
-            int block_stride, int nb_send_blocks, int send_block_len,
-            Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-            Index_t recv_offset, char * data, int stride_in_direction,
-            int elem_size_in_bytes, TypeDescriptor type_desc,
+            Index_t block_stride, Index_t nb_send_blocks,
+            Index_t send_block_len, Index_t send_offset,
+            Index_t nb_recv_blocks, Index_t recv_block_len,
+            Index_t recv_offset, char * data, Index_t stride_in_direction,
+            Index_t elem_size_in_bytes, TypeDescriptor type_desc,
             bool is_device_memory) {
             if (nb_send_blocks != nb_recv_blocks) {
                 throw std::runtime_error(
@@ -341,10 +375,10 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_staged(
-        int block_stride, int nb_send_blocks, int send_block_len,
-        int nb_recv_blocks, int recv_block_len, void * send_addr,
-        void * recv_addr, int elem_size_in_bytes, MPI_Datatype mpi_datatype,
-        int dest_rank, int src_rank) const {
+        Index_t block_stride, Index_t nb_send_blocks, Index_t send_block_len,
+        Index_t nb_recv_blocks, Index_t recv_block_len, void * send_addr,
+        void * recv_addr, Index_t elem_size_in_bytes,
+        MPI_Datatype mpi_datatype, int dest_rank, int src_rank) const {
         auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
                             elem_size_in_bytes};
         auto recv_row_bytes{static_cast<std::size_t>(recv_block_len) *
@@ -398,9 +432,15 @@ namespace muGrid {
 #endif
         }
         MPI_Status status;
-        MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
-                     mpi_datatype, dest_rank, 0, recv_buffer,
-                     nb_recv_blocks * recv_block_len, mpi_datatype, src_rank, 0,
+        // Compute the flat message sizes in Index_t and narrow with a range
+        // check: an int * int product would overflow for halo faces of more
+        // than 2^31 elements.
+        const int send_count{checked_mpi_int(nb_send_blocks * send_block_len,
+                                             "staged send message size")};
+        const int recv_count{checked_mpi_int(nb_recv_blocks * recv_block_len,
+                                             "staged recv message size")};
+        MPI_Sendrecv(send_buffer, send_count, mpi_datatype, dest_rank, 0,
+                     recv_buffer, recv_count, mpi_datatype, src_rank, 0,
                      this->comm, &status);
         if (bounce && recv_bytes > 0) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -435,15 +475,24 @@ namespace muGrid {
         this->comm = other.comm;
         // We only share the handle; ownership stays with the original.
         this->owns_comm = false;
+        // Copy the topology state as well: assigning only the handle would
+        // leave stale neighbor ranks/coordinates behind, and a subsequent
+        // sendrecv on a topology of different dimensionality would read the
+        // rank vectors out of bounds.
+        this->parent = other.parent;
+        this->nb_subdivisions = other.nb_subdivisions;
+        this->coordinates = other.coordinates;
+        this->left_ranks = other.left_ranks;
+        this->right_ranks = other.right_ranks;
         return *this;
     }
 
     void CartesianCommunicator::sendrecv_right(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         // Take the local-copy path when MPI is not initialized (comm is
         // NULL) or when this rank is its own neighbor (direction not
         // subdivided, periodic wrap). Self-communication through
@@ -480,10 +529,14 @@ namespace muGrid {
             return;
         }
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
-        MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
+        MPI_Type_vector(checked_mpi_int(nb_send_blocks, "number of send blocks"),
+                        checked_mpi_int(send_block_len, "send block length"),
+                        checked_mpi_int(block_stride, "block stride"),
                         mpi_datatype, &send_buffer_mpi_t);
         MPI_Type_commit(&send_buffer_mpi_t);
-        MPI_Type_vector(nb_recv_blocks, recv_block_len, block_stride,
+        MPI_Type_vector(checked_mpi_int(nb_recv_blocks, "number of recv blocks"),
+                        checked_mpi_int(recv_block_len, "recv block length"),
+                        checked_mpi_int(block_stride, "block stride"),
                         mpi_datatype, &recv_buffer_mpi_t);
         MPI_Type_commit(&recv_buffer_mpi_t);
 
@@ -496,11 +549,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_left(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         // Local-copy path when MPI is uninitialized or this rank is its own
         // neighbor (see sendrecv_right).
         if (this->comm == MPI_COMM_NULL ||
@@ -530,10 +583,14 @@ namespace muGrid {
             return;
         }
         MPI_Datatype send_buffer_mpi_t, recv_buffer_mpi_t;
-        MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
+        MPI_Type_vector(checked_mpi_int(nb_send_blocks, "number of send blocks"),
+                        checked_mpi_int(send_block_len, "send block length"),
+                        checked_mpi_int(block_stride, "block stride"),
                         mpi_datatype, &send_buffer_mpi_t);
         MPI_Type_commit(&send_buffer_mpi_t);
-        MPI_Type_vector(nb_recv_blocks, recv_block_len, block_stride,
+        MPI_Type_vector(checked_mpi_int(nb_recv_blocks, "number of recv blocks"),
+                        checked_mpi_int(recv_block_len, "recv block length"),
+                        checked_mpi_int(block_stride, "block stride"),
                         mpi_datatype, &recv_buffer_mpi_t);
         MPI_Type_commit(&recv_buffer_mpi_t);
 
@@ -546,11 +603,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_right_accumulate(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         // Local path when MPI is uninitialized or this rank is its own
         // neighbor (see sendrecv_right).
         if (this->comm == MPI_COMM_NULL ||
@@ -566,10 +623,17 @@ namespace muGrid {
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
-        // Number of (contiguous) elements / bytes received
+        // Number of (contiguous) elements / bytes received. The element
+        // count crosses the MPI boundary as an int, so narrow it with a
+        // range check rather than letting size_t->int truncate silently.
         auto total_recv_elems{static_cast<size_t>(nb_recv_blocks) *
                               static_cast<size_t>(recv_block_len)};
-        auto recv_bytes{total_recv_elems * elem_size_in_bytes};
+        const int recv_count{checked_mpi_int(nb_recv_blocks * recv_block_len,
+                                             "accumulate recv message size")};
+        const int send_count{checked_mpi_int(nb_send_blocks * send_block_len,
+                                             "accumulate send message size")};
+        auto recv_bytes{total_recv_elems *
+                        static_cast<size_t>(elem_size_in_bytes)};
 
         auto send_addr{static_cast<void *>(
             data + send_offset * stride_in_direction * elem_size_in_bytes)};
@@ -620,10 +684,10 @@ namespace muGrid {
                 host_recv.resize(recv_bytes);
                 recv_buffer_ptr = host_recv.data();
             }
-            MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
-                         mpi_datatype, this->right_ranks[direction], 0, recv_buffer_ptr,
-                         total_recv_elems, mpi_datatype, this->left_ranks[direction], 0, this->comm,
-                         &status);
+            MPI_Sendrecv(send_buffer, send_count, mpi_datatype,
+                         this->right_ranks[direction], 0, recv_buffer_ptr,
+                         recv_count, mpi_datatype,
+                         this->left_ranks[direction], 0, this->comm, &status);
             // Scatter-accumulate the contiguous receive buffer into the
             // strided destination; src is device memory (gpu-aware) or the
             // host bounce buffer.
@@ -639,11 +703,15 @@ namespace muGrid {
             // buffer.
             std::vector<char> recv_buffer(recv_bytes);
             MPI_Datatype send_buffer_mpi_t;
-            MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
-                            mpi_datatype, &send_buffer_mpi_t);
+            MPI_Type_vector(
+                checked_mpi_int(nb_send_blocks, "number of send blocks"),
+                checked_mpi_int(send_block_len, "send block length"),
+                checked_mpi_int(block_stride, "block stride"), mpi_datatype,
+                &send_buffer_mpi_t);
             MPI_Type_commit(&send_buffer_mpi_t);
-            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t, this->right_ranks[direction], 0,
-                         recv_buffer.data(), total_recv_elems, mpi_datatype,
+            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
+                         this->right_ranks[direction], 0, recv_buffer.data(),
+                         recv_count, mpi_datatype,
                          this->left_ranks[direction], 0, this->comm, &status);
             MPI_Type_free(&send_buffer_mpi_t);
             accumulate_blocks(dst_base, recv_buffer.data(),
@@ -656,11 +724,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_left_accumulate(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         // Local path when MPI is uninitialized or this rank is its own
         // neighbor (see sendrecv_right).
         if (this->comm == MPI_COMM_NULL ||
@@ -676,10 +744,17 @@ namespace muGrid {
         // Convert TypeDescriptor to MPI_Datatype
         MPI_Datatype mpi_datatype{descriptor_to_mpi_type(type_desc)};
 
-        // Number of (contiguous) elements / bytes received
+        // Number of (contiguous) elements / bytes received. The element
+        // count crosses the MPI boundary as an int, so narrow it with a
+        // range check rather than letting size_t->int truncate silently.
         auto total_recv_elems{static_cast<size_t>(nb_recv_blocks) *
                               static_cast<size_t>(recv_block_len)};
-        auto recv_bytes{total_recv_elems * elem_size_in_bytes};
+        const int recv_count{checked_mpi_int(nb_recv_blocks * recv_block_len,
+                                             "accumulate recv message size")};
+        const int send_count{checked_mpi_int(nb_send_blocks * send_block_len,
+                                             "accumulate send message size")};
+        auto recv_bytes{total_recv_elems *
+                        static_cast<size_t>(elem_size_in_bytes)};
 
         auto send_addr{static_cast<void *>(
             data + send_offset * stride_in_direction * elem_size_in_bytes)};
@@ -730,10 +805,10 @@ namespace muGrid {
                 host_recv.resize(recv_bytes);
                 recv_buffer_ptr = host_recv.data();
             }
-            MPI_Sendrecv(send_buffer, nb_send_blocks * send_block_len,
-                         mpi_datatype, this->left_ranks[direction], 0, recv_buffer_ptr,
-                         total_recv_elems, mpi_datatype, this->right_ranks[direction], 0, this->comm,
-                         &status);
+            MPI_Sendrecv(send_buffer, send_count, mpi_datatype,
+                         this->left_ranks[direction], 0, recv_buffer_ptr,
+                         recv_count, mpi_datatype,
+                         this->right_ranks[direction], 0, this->comm, &status);
             // Scatter-accumulate the contiguous receive buffer into the
             // strided destination; src is device memory (gpu-aware) or the
             // host bounce buffer.
@@ -749,11 +824,15 @@ namespace muGrid {
             // buffer.
             std::vector<char> recv_buffer(recv_bytes);
             MPI_Datatype send_buffer_mpi_t;
-            MPI_Type_vector(nb_send_blocks, send_block_len, block_stride,
-                            mpi_datatype, &send_buffer_mpi_t);
+            MPI_Type_vector(
+                checked_mpi_int(nb_send_blocks, "number of send blocks"),
+                checked_mpi_int(send_block_len, "send block length"),
+                checked_mpi_int(block_stride, "block stride"), mpi_datatype,
+                &send_buffer_mpi_t);
             MPI_Type_commit(&send_buffer_mpi_t);
-            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t, this->left_ranks[direction], 0,
-                         recv_buffer.data(), total_recv_elems, mpi_datatype,
+            MPI_Sendrecv(send_addr, 1, send_buffer_mpi_t,
+                         this->left_ranks[direction], 0, recv_buffer.data(),
+                         recv_count, mpi_datatype,
                          this->right_ranks[direction], 0, this->comm, &status);
             MPI_Type_free(&send_buffer_mpi_t);
             accumulate_blocks(dst_base, recv_buffer.data(),
@@ -787,11 +866,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_right(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         (void)type_desc;
         (void)direction;
         serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
@@ -801,11 +880,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_left(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         (void)type_desc;
         (void)direction;
         serial_sendrecv(block_stride, nb_send_blocks, send_block_len,
@@ -815,11 +894,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_right_accumulate(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         (void)direction;
         serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                    send_offset, nb_recv_blocks, recv_block_len,
@@ -829,11 +908,11 @@ namespace muGrid {
     }
 
     void CartesianCommunicator::sendrecv_left_accumulate(
-        int direction, int block_stride, int nb_send_blocks, int send_block_len,
-        Index_t send_offset, int nb_recv_blocks, int recv_block_len,
-        Index_t recv_offset, char * data, int stride_in_direction,
-        int elem_size_in_bytes, TypeDescriptor type_desc,
-        bool is_device_memory) const {
+        int direction, Index_t block_stride, Index_t nb_send_blocks,
+        Index_t send_block_len, Index_t send_offset, Index_t nb_recv_blocks,
+        Index_t recv_block_len, Index_t recv_offset, char * data,
+        Index_t stride_in_direction, Index_t elem_size_in_bytes,
+        TypeDescriptor type_desc, bool is_device_memory) const {
         (void)direction;
         serial_sendrecv_accumulate(block_stride, nb_send_blocks, send_block_len,
                                    send_offset, nb_recv_blocks, recv_block_len,

@@ -84,8 +84,10 @@ namespace muGrid {
                 "Input and output must have same dimensionality");
         }
 #ifdef WITH_MPI
+        // C complex datatypes: the Fortran MPI_COMPLEX/MPI_DOUBLE_COMPLEX
+        // may be MPI_DATATYPE_NULL on MPI builds without Fortran support.
         this->elem_mpi_type =
-            single_precision ? MPI_COMPLEX : MPI_DOUBLE_COMPLEX;
+            single_precision ? MPI_C_FLOAT_COMPLEX : MPI_C_DOUBLE_COMPLEX;
 #endif
 
         int comm_size{comm.size()};

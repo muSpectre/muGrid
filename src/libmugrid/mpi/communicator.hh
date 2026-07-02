@@ -37,6 +37,7 @@
 #define SRC_LIBMUGRID_COMMUNICATOR_HH_
 
 #include <cassert>
+#include <limits>
 #include <type_traits>
 
 #ifdef WITH_MPI
@@ -110,12 +111,15 @@ namespace muGrid {
     }
     template <>
     inline decltype(auto) mpi_type<Complex>() {
-        return MPI_DOUBLE_COMPLEX;
+        // Use the C complex datatype: the Fortran MPI_DOUBLE_COMPLEX is only
+        // guaranteed to exist when the MPI library was built with Fortran
+        // support (it may be MPI_DATATYPE_NULL otherwise). Same wire layout.
+        return MPI_C_DOUBLE_COMPLEX;
     }
     template <>
     inline decltype(auto) mpi_type<Complex32>() {
-        // 2-float layout, matching the MPI_DOUBLE_COMPLEX choice for Complex.
-        return MPI_COMPLEX;
+        // 2-float layout; C datatype for the same reason as for Complex.
+        return MPI_C_FLOAT_COMPLEX;
     }
 
     //! lightweight abstraction for the MPI communicator object
@@ -299,8 +303,19 @@ namespace muGrid {
             assert((nb_rows_loc == nb_rows_max) or (nb_rows_loc == 0));
 
             // gather the number of elements on each core to define the output
-            // shape (nb_cols = nb_entries/nb_rows_max) of the result
-            Index_t send_buf_size(arg.size());
+            // shape (nb_cols = nb_entries/nb_rows_max) of the result. MPI
+            // counts are int: send a true int (an Index_t reinterpreted as
+            // int would be byte-order dependent) and reject sizes beyond the
+            // int range instead of silently truncating.
+            constexpr Index_t int_max{std::numeric_limits<int>::max()};
+            if (static_cast<Index_t>(arg.size()) > int_max) {
+                std::stringstream error{};
+                error << "gather: the local buffer holds " << arg.size()
+                      << " entries, which exceeds the MPI count limit of "
+                      << int_max;
+                throw RuntimeError(error.str());
+            }
+            int send_buf_size{static_cast<int>(arg.size())};
             std::vector<int> arg_sizes(comm_size, 0);
             message =
                 MPI_Allgather(&send_buf_size, 1, mpi_type<int>(),
@@ -312,9 +327,19 @@ namespace muGrid {
                 throw RuntimeError(error.str());
             }
 
-            int nb_entries = 0;
+            // accumulate in Index_t: the total (and thus the displacements)
+            // must also fit the int range required by MPI_Allgatherv
+            Index_t nb_entries = 0;
             for (auto i = 0; i < comm_size; ++i) {
                 nb_entries += arg_sizes[i];
+            }
+            if (nb_entries > int_max) {
+                std::stringstream error{};
+                error << "gather: the gathered result holds " << nb_entries
+                      << " entries, which exceeds the MPI count/displacement "
+                         "limit of "
+                      << int_max;
+                throw RuntimeError(error.str());
             }
 
             // check if by accident a vector was handed over, rows=0, cols!=0.

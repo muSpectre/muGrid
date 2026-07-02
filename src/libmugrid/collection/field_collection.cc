@@ -67,6 +67,59 @@ namespace muGrid {
     }
 
     /* ---------------------------------------------------------------------- */
+    void
+    FieldCollection::check_no_registered_fields(const char * context) const {
+        if (not this->fields.empty() or not this->state_fields.empty()) {
+            std::stringstream error{};
+            error << "Cannot " << context
+                  << " a FieldCollection with registered fields: fields hold "
+                     "references to their collection that cannot be re-seated, "
+                     "so they would be left dangling ("
+                  << this->fields.size() << " field(s) and "
+                  << this->state_fields.size()
+                  << " state field(s) are registered)";
+            throw FieldCollectionError(error.str());
+        }
+    }
+
+    /* ---------------------------------------------------------------------- */
+    FieldCollection::FieldCollection(FieldCollection && other)
+        // the comma operator runs the guard before any member is moved
+        : fields{(other.check_no_registered_fields("move-construct from"),
+                  std::move(other.fields))},
+          state_fields{std::move(other.state_fields)},
+          init_callbacks{std::move(other.init_callbacks)},
+          domain{other.domain}, spatial_dim{other.spatial_dim},
+          nb_sub_pts{std::move(other.nb_sub_pts)},
+          nb_pixels{other.nb_pixels},
+          nb_buffer_pixels{other.nb_buffer_pixels},
+          storage_order{other.storage_order}, device{other.device},
+          initialised{other.initialised},
+          pixel_indices{std::move(other.pixel_indices)} {}
+
+    /* ---------------------------------------------------------------------- */
+    FieldCollection & FieldCollection::operator=(FieldCollection && other) {
+        if (this == &other) {
+            return *this;
+        }
+        other.check_no_registered_fields("move-assign from");
+        this->check_no_registered_fields("move-assign into");
+        this->fields = std::move(other.fields);
+        this->state_fields = std::move(other.state_fields);
+        this->init_callbacks = std::move(other.init_callbacks);
+        this->domain = other.domain;
+        this->spatial_dim = other.spatial_dim;
+        this->nb_sub_pts = std::move(other.nb_sub_pts);
+        this->nb_pixels = other.nb_pixels;
+        this->nb_buffer_pixels = other.nb_buffer_pixels;
+        this->storage_order = other.storage_order;
+        this->device = other.device;
+        this->initialised = other.initialised;
+        this->pixel_indices = std::move(other.pixel_indices);
+        return *this;
+    }
+
+    /* ---------------------------------------------------------------------- */
     Device FieldCollection::get_device() const { return this->device; }
 
     /* ---------------------------------------------------------------------- */
