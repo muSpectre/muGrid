@@ -101,6 +101,7 @@ DIM_IDS = ["1d", "2d", "3d"]
 # Reductions: vecdot / norm_sq  (interior only)  — Real and Complex, 1D/2D/3D
 # ===========================================================================
 
+
 class TestReductions:
     @pytest.mark.parametrize("nb_grid_pts", DIMS, ids=DIM_IDS)
     @pytest.mark.parametrize("complex_", [False, True], ids=["real", "complex"])
@@ -146,8 +147,8 @@ class TestReductions:
         # Independent left/right ghost widths exercise the ghost-bound
         # arithmetic in every dimension.
         dim = len(nb_grid_pts)
-        left = tuple(range(1, dim + 1))            # (1,), (1,2), (1,2,3)
-        right = tuple(range(dim, 0, -1))           # (1,), (2,1), (3,2,1)
+        left = tuple(range(1, dim + 1))  # (1,), (1,2), (1,2,3)
+        right = tuple(range(dim, 0, -1))  # (1,), (2,1), (3,2,1)
         fc = muGrid.GlobalFieldCollection(
             list(nb_grid_pts), nb_ghosts_left=left, nb_ghosts_right=right
         )
@@ -160,6 +161,7 @@ class TestReductions:
 # ===========================================================================
 # Updates: axpy / scal / axpby / copy  (FULL buffer, ghosts included)
 # ===========================================================================
+
 
 class TestUpdates:
     @pytest.mark.parametrize("complex_", [False, True], ids=["real", "complex"])
@@ -196,9 +198,7 @@ class TestUpdates:
         beta = (-0.5 - 0.25j) if complex_ else -0.5
 
         linalg.axpby(alpha, x, beta, y)
-        np.testing.assert_allclose(
-            np.array(y.sg), alpha * x0 + beta * y0, rtol=1e-12
-        )
+        np.testing.assert_allclose(np.array(y.sg), alpha * x0 + beta * y0, rtol=1e-12)
 
     @pytest.mark.parametrize("complex_", [False, True], ids=["real", "complex"])
     def test_copy_full_buffer(self, complex_, rng):
@@ -232,6 +232,7 @@ class TestUpdates:
 # Fused axpy_norm_sq:  y = alpha*x + y (full),  returns ||y||^2 (interior)
 # ===========================================================================
 
+
 class TestAxpyNormSq:
     @pytest.mark.parametrize("nb_grid_pts", DIMS, ids=DIM_IDS)
     @pytest.mark.parametrize("complex_", [False, True], ids=["real", "complex"])
@@ -256,6 +257,7 @@ class TestAxpyNormSq:
 # Input-validation error branches
 # ===========================================================================
 
+
 class TestErrors:
     def test_vecdot_different_collection(self, rng):
         fc1 = _collection((4, 4))
@@ -274,7 +276,9 @@ class TestErrors:
 
     def test_vecdot_subpt_mismatch(self):
         fc = muGrid.GlobalFieldCollection(
-            [4, 4], nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
+            [4, 4],
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
             sub_pts={"quad": 2},
         )
         nodal = fc.real_field("nodal", (1,))
@@ -304,6 +308,42 @@ class TestErrors:
         with pytest.raises(RuntimeError):
             linalg.axpby(1.0, x, 1.0, y)
 
+    def test_interior_reduction_rejects_multicomponent_soa(self):
+        """Ghosted interior reductions assume AoS dof interleaving; a host
+        SoA collection with multi-dof fields must be rejected rather than
+        silently miscomputing."""
+        fc = muGrid.GlobalFieldCollection(
+            [4, 4],
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
+            storage_order=muGrid.StorageOrder.StructureOfArrays,
+        )
+        a = fc.real_field("a", (2,))
+        b = fc.real_field("b", (2,))
+        with pytest.raises(RuntimeError):
+            linalg.vecdot(a, b)
+        with pytest.raises(RuntimeError):
+            linalg.norm_sq(a)
+
+    def test_interior_reduction_allows_scalar_soa(self):
+        """Scalar fields have identical AoS/SoA layouts, so ghosted
+        reductions on scalar SoA fields remain supported."""
+        fc = muGrid.GlobalFieldCollection(
+            [4, 4],
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
+            storage_order=muGrid.StorageOrder.StructureOfArrays,
+        )
+        x = fc.real_field("x")
+        x.sg[...] = 1.0
+        assert linalg.norm_sq(x) == pytest.approx(16.0)
+
+    def test_unknown_kwarg_rejected(self):
+        """The keyword construction path must not silently drop unknown
+        (e.g. misspelled) arguments."""
+        with pytest.raises(TypeError):
+            muGrid.GlobalFieldCollection([4, 4], nb_ghost_left=(1, 1))
+
 
 # ===========================================================================
 # GPU validation regression tests
@@ -327,7 +367,9 @@ class TestGPUValidation:
 
     def _device_collection(self):
         return muGrid.GlobalFieldCollection(
-            [4, 4], nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1),
+            [4, 4],
+            nb_ghosts_left=(1, 1),
+            nb_ghosts_right=(1, 1),
             device=muGrid.Device.gpu(),
         )
 
@@ -370,10 +412,13 @@ class TestGPUValidation:
 # the buffer once nb_sub_pts > 1 (harmless for the scalar/nodal fields the rest
 # of the suite uses).
 
+
 def _subpt_collection(nb_grid_pts, nb_quad=2):
     g = (1,) * len(nb_grid_pts)
     return muGrid.GlobalFieldCollection(
-        list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+        list(nb_grid_pts),
+        nb_ghosts_left=g,
+        nb_ghosts_right=g,
         sub_pts={"quad": nb_quad},
     )
 
@@ -415,18 +460,24 @@ class TestGPUSubPoints:
         if not muGrid.is_gpu_available():
             pytest.skip("No GPU device available at runtime")
         from conftest import HAS_CUPY
+
         if not HAS_CUPY:
             pytest.skip("CuPy not available for GPU array access")
 
     def _collections(self, nb_grid_pts=(8, 8), nb_quad=2):
         g = (1,) * len(nb_grid_pts)
         cpu = muGrid.GlobalFieldCollection(
-            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            list(nb_grid_pts),
+            nb_ghosts_left=g,
+            nb_ghosts_right=g,
             sub_pts={"quad": nb_quad},
         )
         gpu = muGrid.GlobalFieldCollection(
-            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
-            sub_pts={"quad": nb_quad}, device=muGrid.Device.gpu(),
+            list(nb_grid_pts),
+            nb_ghosts_left=g,
+            nb_ghosts_right=g,
+            sub_pts={"quad": nb_quad},
+            device=muGrid.Device.gpu(),
         )
         return cpu, gpu
 
@@ -472,20 +523,14 @@ class TestFieldScal:
 
     @pytest.mark.parametrize(
         "storage_order",
-        [muGrid.StorageOrder.ArrayOfStructures,
-         muGrid.StorageOrder.StructureOfArrays],
+        [muGrid.StorageOrder.ArrayOfStructures, muGrid.StorageOrder.StructureOfArrays],
     )
     @pytest.mark.parametrize("complex_", [False, True])
     @pytest.mark.parametrize("nb_alpha_components", [1, 2])
-    def test_scal_field_alpha(self, rng, storage_order, complex_,
-                              nb_alpha_components):
-        fc = muGrid.GlobalFieldCollection(
-            [7, 5], storage_order=storage_order
-        )
+    def test_scal_field_alpha(self, rng, storage_order, complex_, nb_alpha_components):
+        fc = muGrid.GlobalFieldCollection([7, 5], storage_order=storage_order)
         x = _make(fc, "x", components=(2,), complex_=complex_)
-        alpha = fc.real_field(
-            "alpha", () if nb_alpha_components == 1 else (2,)
-        )
+        alpha = fc.real_field("alpha", () if nb_alpha_components == 1 else (2,))
         x_before = _fill(x, rng, complex_=complex_)
         alpha_values = _fill(alpha, rng)
 
@@ -524,17 +569,19 @@ SO_IDS = ["aos", "soa"]
 # Fused per-pixel vector kernels: cross / leray_project
 # ===========================================================================
 
+
 class TestCross:
     @pytest.mark.parametrize("nb_grid_pts", DIMS, ids=DIM_IDS)
     @pytest.mark.parametrize("complex_", [False, True], ids=["real", "complex"])
     @pytest.mark.parametrize("storage_order", STORAGE_ORDERS, ids=SO_IDS)
-    def test_cross_matches_numpy(self, nb_grid_pts, complex_, storage_order,
-                                 rng):
+    def test_cross_matches_numpy(self, nb_grid_pts, complex_, storage_order, rng):
         # cross() operates on the FULL buffer (ghosts included), so compare
         # against numpy on the ghost-inclusive .sg view.
         g = (1,) * len(nb_grid_pts)
         fc = muGrid.GlobalFieldCollection(
-            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            list(nb_grid_pts),
+            nb_ghosts_left=g,
+            nb_ghosts_right=g,
             storage_order=storage_order,
         )
         a = _make(fc, "a", components=(3,), complex_=complex_)
@@ -575,7 +622,9 @@ class TestLerayProject:
     def test_leray_matches_numpy(self, nb_grid_pts, storage_order, rng):
         g = (1,) * len(nb_grid_pts)
         fc = muGrid.GlobalFieldCollection(
-            list(nb_grid_pts), nb_ghosts_left=g, nb_ghosts_right=g,
+            list(nb_grid_pts),
+            nb_ghosts_left=g,
+            nb_ghosts_right=g,
             storage_order=storage_order,
         )
         k = _make(fc, "k", components=(3,))
@@ -605,10 +654,9 @@ class TestLerayProject:
 
         k_val = rng.standard_normal(k.sg.shape) + 0.5  # avoid zero wavevectors
         k.sg[...] = k_val
-        ksq = np.sum(k_val ** 2, axis=0)
+        ksq = np.sum(k_val**2, axis=0)
         invk.sg[...] = k_val / ksq
-        N_val = (rng.standard_normal(N.sg.shape)
-                 + 1j * rng.standard_normal(N.sg.shape))
+        N_val = rng.standard_normal(N.sg.shape) + 1j * rng.standard_normal(N.sg.shape)
         N.sg[...] = N_val
         out.sg[...] = N_val  # out starts as N, projection makes it transverse
 

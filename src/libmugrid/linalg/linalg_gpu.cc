@@ -1153,6 +1153,18 @@ std::array<RT, 3> pipelined_cg_dots_device(
     const TypedField<RT, DeviceSpace>& r,
     const TypedField<RT, DeviceSpace>& u,
     const TypedField<RT, DeviceSpace>& w) {
+    for (const auto* other : {&u, &w}) {
+        if (&other->get_collection() != &r.get_collection()) {
+            throw FieldError(
+                "pipelined_cg_dots: fields must belong to the same collection");
+        }
+        if (other->get_nb_components() != r.get_nb_components() ||
+            other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
+            throw FieldError(
+                "pipelined_cg_dots: fields must have the same number of "
+                "components and sub-points");
+        }
+    }
     const auto& coll = r.get_collection();
 
     // The pipelined CG fields live on a decomposition (Global collection). For

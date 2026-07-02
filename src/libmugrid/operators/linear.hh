@@ -476,6 +476,76 @@ namespace muGrid {
         }
       }
     }
+
+    /**
+     * @brief Throws if the collection's pixels are not stored densely in
+     *        column-major (first index fastest) order.
+     *
+     * All stencil traversal code in the concrete operators addresses pixels
+     * as ix + iy * nx + iz * nx * ny over the ghost-padded subdomain. A
+     * collection constructed with row-major pixel storage order (or custom
+     * pixel strides) is laid out differently and would silently produce
+     * wrong results, so it must be rejected.
+     *
+     * @param collection The field collection holding the operator's fields.
+     * @param operator_name Name used in the error message.
+     */
+    void
+    check_pixel_storage_order(const GlobalFieldCollection & collection,
+                              const std::string & operator_name) const {
+      const auto & pixel_strides{
+          collection.get_pixels_with_ghosts().get_strides()};
+      const auto & nb_pts{
+          collection.get_nb_subdomain_grid_pts_with_ghosts()};
+      Index_t expected_stride{1};
+      for (Dim_t direction{0}; direction < collection.get_spatial_dim();
+           ++direction) {
+        if (pixel_strides[direction] != expected_stride) {
+          std::stringstream err_msg{};
+          err_msg << operator_name
+                  << " requires dense column-major (first index fastest) "
+                     "pixel storage, but the field collection has pixel "
+                     "stride "
+                  << pixel_strides[direction] << " on axis " << direction
+                  << " where " << expected_stride
+                  << " was expected. (Collections constructed with row-major "
+                     "pixel storage order or custom pixel strides are not "
+                     "supported by this operator.)";
+          throw RuntimeError{err_msg.str()};
+        }
+        expected_stride *= nb_pts[direction];
+      }
+    }
+
+    /**
+     * @brief Throws if the collection's dof (component/sub-point) storage
+     *        order differs from the layout the traversal code was compiled
+     *        for.
+     *
+     * Fields with a single degree of freedom per pixel are exempt: for them
+     * array-of-structures and structure-of-arrays coincide.
+     *
+     * @param collection The field collection holding the operator's fields.
+     * @param expected The storage order assumed by the traversal code.
+     * @param nb_dof_per_pixel Largest dof count among the fields involved.
+     * @param operator_name Name used in the error message.
+     */
+    void check_dof_storage_order(const GlobalFieldCollection & collection,
+                                 const StorageOrder expected,
+                                 const Index_t nb_dof_per_pixel,
+                                 const std::string & operator_name) const {
+      if (nb_dof_per_pixel > 1 &&
+          collection.get_storage_order() != expected) {
+        std::stringstream err_msg{};
+        err_msg << operator_name << " was compiled for " << expected
+                << " dof storage, but the field collection stores its "
+                   "fields in "
+                << collection.get_storage_order()
+                << " order (fields have " << nb_dof_per_pixel
+                << " degrees of freedom per pixel, so the layouts differ)";
+        throw RuntimeError{err_msg.str()};
+      }
+    }
   };
 
 }  // namespace muGrid

@@ -343,6 +343,37 @@ namespace muGrid {
         }
 
         /**
+         * @brief Common validation for the apply paths. The traversal
+         *        addresses one scalar per pixel with dense column-major
+         *        pixel strides, so both fields must be scalar (a
+         *        multi-component field would silently mix components with
+         *        spatial neighbours) and the pixel layout must match.
+         */
+        const GlobalFieldCollection &
+        validate_fields(const Field & input_field,
+                        const Field & output_field) const {
+            const auto & collection =
+                this->check_fields(input_field, output_field, operator_name());
+            this->check_pixel_storage_order(collection, operator_name());
+            for (const Field * field : {&input_field, &output_field}) {
+                const Index_t nb_dof_per_pixel{field->get_nb_components() *
+                                               field->get_nb_sub_pts()};
+                if (nb_dof_per_pixel != 1) {
+                    std::stringstream err_msg{};
+                    err_msg << operator_name()
+                            << " only supports scalar fields (one degree of "
+                               "freedom per pixel), but field '"
+                            << field->get_name() << "' has "
+                            << field->get_nb_components()
+                            << " component(s) on "
+                            << field->get_nb_sub_pts() << " sub-point(s)";
+                    throw RuntimeError{err_msg.str()};
+                }
+            }
+            return collection;
+        }
+
+        /**
          * @brief Host apply with optional increment. The Laplacian is
          *        self-adjoint, so apply and transpose share this requirement.
          */
@@ -351,7 +382,7 @@ namespace muGrid {
                         TypedFieldBase<T> & output_field, T alpha,
                         bool increment) const {
             const auto & collection =
-                this->check_fields(input_field, output_field, operator_name());
+                this->validate_fields(input_field, output_field);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * input = input_field.data();
@@ -380,7 +411,7 @@ namespace muGrid {
             TypedFieldBase<T, DefaultDeviceSpace> & output_field, T alpha,
             bool increment) const {
             const auto & collection =
-                this->check_fields(input_field, output_field, operator_name());
+                this->validate_fields(input_field, output_field);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * input = input_field.view().data();

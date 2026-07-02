@@ -867,5 +867,51 @@ class TestFFTGhostAlignment:
         assert storage_x == 10
 
 
+class TestFFTDtypeValidation:
+    """The transform paths cast raw data pointers based on the field dtypes,
+    so fft/ifft must reject any (real, Fourier) pairing other than
+    (float64, complex128) and (float32, complex64). The Python wrapper
+    raises ValueError with a dtype-based message; the C++ layer raises
+    RuntimeError for callers that bypass the wrapper."""
+
+    def test_mismatched_precision_rejected(self):
+        engine = muGrid.FFTEngine([8, 8])
+        real32 = engine.real_space_field("real32", dtype=np.float32)
+        fourier64 = engine.fourier_space_field("fourier64")  # complex128
+        with pytest.raises(ValueError):
+            engine.fft(real32, fourier64)
+        with pytest.raises(ValueError):
+            engine.ifft(fourier64, real32)
+
+    def test_mismatched_precision_rejected_other_way(self):
+        engine = muGrid.FFTEngine([8, 8])
+        real64 = engine.real_space_field("real64")  # float64
+        fourier32 = engine.fourier_space_field(
+            "fourier32", dtype=np.complex64
+        )
+        with pytest.raises(ValueError):
+            engine.fft(real64, fourier32)
+        with pytest.raises(ValueError):
+            engine.ifft(fourier32, real64)
+
+    def test_mismatched_precision_rejected_in_cpp(self):
+        """Bypass the wrapper's dtype check to exercise the C++ guard."""
+        engine = muGrid.FFTEngine([8, 8])
+        real32 = engine.real_space_field("real32", dtype=np.float32)
+        fourier64 = engine.fourier_space_field("fourier64")  # complex128
+        with pytest.raises(RuntimeError):
+            engine._cpp.fft(real32._cpp, fourier64._cpp)
+        with pytest.raises(RuntimeError):
+            engine._cpp.ifft(fourier64._cpp, real32._cpp)
+
+    def test_integer_field_rejected_in_cpp(self):
+        """Integer fields must not be silently reinterpreted as reals."""
+        engine = muGrid.FFTEngine([8, 8])
+        ints = engine.real_space_collection.int_field("ints")
+        fourier = engine.fourier_space_field("fourier")
+        with pytest.raises(RuntimeError):
+            engine._cpp.fft(ints._cpp, fourier._cpp)
+
+
 if __name__ == "__main__":
     unittest.main()
