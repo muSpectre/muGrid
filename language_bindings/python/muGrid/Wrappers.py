@@ -960,6 +960,17 @@ class FFTEngine:
                 decomposition,
             )
 
+        # Keep the (wrapped) communicator: consumers such as the
+        # preconditioners need it for collective decisions that must be
+        # consistent across ranks.
+        self._communicator = comm
+
+    @property
+    def communicator(self):
+        """The communicator this engine was constructed with (wrapped,
+        providing sum/max reductions)."""
+        return self._communicator
+
     def fft(self, input_field: Field, output_field: Field) -> None:
         """
         Forward FFT: real space -> Fourier space.

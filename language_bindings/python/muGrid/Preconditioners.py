@@ -405,6 +405,15 @@ class BlockFourierPreconditioner(Preconditioner):
             if blocks.size
             else 0.0
         )
+        # The detection must be COLLECTIVE: a rank whose Fourier subdomain is
+        # empty (more ranks than modes along the split direction) sees an
+        # empty slab and would conclude "Hermitian" while data-carrying ranks
+        # conclude the opposite, leaving per-rank state divergent -- and any
+        # rank-dependent branching downstream deadlocks the MPI run.
+        comm = getattr(engine, "communicator", None)
+        if comm is not None:
+            herm_scale = float(comm.max(herm_scale))
+            herm_asym = float(comm.max(herm_asym))
         self._hermitian = herm_scale == 0.0 or herm_asym <= 1e-10 * herm_scale
 
         # Store the symbol at the solve precision (real diagonals, complex
