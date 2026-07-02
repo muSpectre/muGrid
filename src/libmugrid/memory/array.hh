@@ -237,6 +237,11 @@ namespace muGrid {
             if (data_) {
                 this->prof_record_free(data_);
                 allocator_type::deallocate(data_);
+                // Clear before allocating: if the allocation below throws
+                // (e.g. GPU out of memory), the destructor must not
+                // deallocate the already-freed buffer a second time.
+                data_ = nullptr;
+                size_ = 0;
             }
             data_ = allocator_type::allocate(new_size);
             size_ = new_size;

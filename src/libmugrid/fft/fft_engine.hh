@@ -37,6 +37,7 @@
 #define SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 
 #include <array>
+#include <sstream>
 
 #include "fft_engine_base.hh"
 #include "fft_backend_traits.hh"
@@ -104,7 +105,36 @@ class FFTEngine : public FFTEngineBase {
 
   // === Transform operations ===
 
+  /**
+   * Throws unless the (real-space, Fourier-space) field pair is
+   * (Real, Complex) or (Real32, Complex32). The transform paths cast the
+   * raw data pointers to the element type implied by this pairing, so any
+   * other combination would read or write out of bounds.
+   */
+  static void check_transform_dtypes(const Field & real_field,
+                                     const Field & fourier_field,
+                                     const char * name) {
+    const auto real_td{real_field.get_type_descriptor()};
+    const auto fourier_td{fourier_field.get_type_descriptor()};
+    const bool valid_pair{(real_td == TypeDescriptor::Real &&
+                           fourier_td == TypeDescriptor::Complex) ||
+                          (real_td == TypeDescriptor::Real32 &&
+                           fourier_td == TypeDescriptor::Complex32)};
+    if (!valid_pair) {
+      std::stringstream error{};
+      error << name << ": unsupported field type combination; the "
+            << "real-space field has element type "
+            << type_descriptor_name(real_td)
+            << " and the Fourier-space field has element type "
+            << type_descriptor_name(fourier_td)
+            << ", but only the pairs (Real, Complex) and "
+               "(Real32, Complex32) are supported";
+      throw RuntimeError(error.str());
+    }
+  }
+
   void fft(const Field & input, Field & output) override {
+    check_transform_dtypes(input, output, "fft");
     // Verify fields belong to correct collections
     if (&input.get_collection() != &this->get_collection()) {
       throw RuntimeError(
@@ -157,6 +187,7 @@ class FFTEngine : public FFTEngineBase {
   }
 
   void ifft(const Field & input, Field & output) override {
+    check_transform_dtypes(output, input, "ifft");
     // Verify fields belong to correct collections
     if (&input.get_collection() != &this->get_fourier_space_collection()) {
       throw RuntimeError(

@@ -525,14 +525,28 @@ namespace muGrid {
         }
 
         //! Common validation plus the operator-specific component-count check.
+        //! `expected_storage_order` is the dof interleaving the calling
+        //! kernel was written for (AoS on host, SoA on device).
         const GlobalFieldCollection &
         validate_fields(const Field & nodal_field, const Field & gradient_field,
-                        Index_t & nb_components) const {
+                        Index_t & nb_components,
+                        const StorageOrder expected_storage_order) const {
             // Same collection, global, matching dimension, ghost layers (the
             // scatter-style transpose has the same requirement as apply).
             const auto & global_fc =
                 this->check_fields(nodal_field, gradient_field,
                                    operator_name());
+
+            // The traversal kernels hard-code dense column-major pixel
+            // addressing and a fixed dof interleaving.
+            this->check_pixel_storage_order(global_fc, operator_name());
+            this->check_dof_storage_order(
+                global_fc, expected_storage_order,
+                std::max(nodal_field.get_nb_components() *
+                             nodal_field.get_nb_sub_pts(),
+                         gradient_field.get_nb_components() *
+                             gradient_field.get_nb_sub_pts()),
+                operator_name());
 
             const Index_t nb_nodal_components = nodal_field.get_nb_components();
             const Index_t nb_grad_components =
@@ -560,7 +574,8 @@ namespace muGrid {
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
-                                      nb_components);
+                                      nb_components,
+                                      StorageOrder::ArrayOfStructures);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * nodal = nodal_field.data();
@@ -599,7 +614,8 @@ namespace muGrid {
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
-                                      nb_components);
+                                      nb_components,
+                                      StorageOrder::ArrayOfStructures);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * gradient = gradient_field.data();
@@ -644,7 +660,8 @@ namespace muGrid {
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
-                                      nb_components);
+                                      nb_components,
+                                      StorageOrder::StructureOfArrays);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * nodal = nodal_field.view().data();
@@ -685,7 +702,8 @@ namespace muGrid {
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
-                                      nb_components);
+                                      nb_components,
+                                      StorageOrder::StructureOfArrays);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * gradient = gradient_field.view().data();

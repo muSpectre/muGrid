@@ -215,8 +215,14 @@ namespace muGrid {
      * is computed. Defined on quadrature points.
      * @param nodal_field The output field where the divergence is written.
      *                    Defined on nodal points.
-     * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
-     *                version of the discretised divergence is returned.
+     * @param weights Optional Gaussian quadrature weights.
+     *
+     * @warning The meaning of an OMITTED `weights` argument differs between
+     * implementations: `GenericLinearOperator` applies the plain (unweighted)
+     * adjoint, `FEMGradientOperator` applies its physical quadrature weights,
+     * and `LaplaceOperator` rejects non-empty weights outright (it has no
+     * quadrature points). Code that swaps operator implementations through
+     * this base class must account for the different default scaling.
      */
     virtual void
     transpose(const TypedFieldBase<Real> & quadrature_point_field,
@@ -245,8 +251,9 @@ namespace muGrid {
      * to the nodal_field.
      * @param nodal_field The field to which the scaled divergence is added.
      *                    Defined on nodal points.
-     * @param weights Optional Gaussian quadrature weights. If omitted, a scaled
-     *                version of the discretised divergence is returned.
+     * @param weights Optional Gaussian quadrature weights. See the warning on
+     *                transpose(): the default-weights semantics differ
+     *                between implementations.
      */
     virtual void transpose_increment(
         const TypedFieldBase<Real> & quadrature_point_field, const Real & alpha,
@@ -474,6 +481,76 @@ namespace muGrid {
                   << nb_ghosts_right[direction] << " on the right.";
           throw RuntimeError{err_msg.str()};
         }
+      }
+    }
+
+    /**
+     * @brief Throws if the collection's pixels are not stored densely in
+     *        column-major (first index fastest) order.
+     *
+     * All stencil traversal code in the concrete operators addresses pixels
+     * as ix + iy * nx + iz * nx * ny over the ghost-padded subdomain. A
+     * collection constructed with row-major pixel storage order (or custom
+     * pixel strides) is laid out differently and would silently produce
+     * wrong results, so it must be rejected.
+     *
+     * @param collection The field collection holding the operator's fields.
+     * @param operator_name Name used in the error message.
+     */
+    void
+    check_pixel_storage_order(const GlobalFieldCollection & collection,
+                              const std::string & operator_name) const {
+      const auto & pixel_strides{
+          collection.get_pixels_with_ghosts().get_strides()};
+      const auto & nb_pts{
+          collection.get_nb_subdomain_grid_pts_with_ghosts()};
+      Index_t expected_stride{1};
+      for (Dim_t direction{0}; direction < collection.get_spatial_dim();
+           ++direction) {
+        if (pixel_strides[direction] != expected_stride) {
+          std::stringstream err_msg{};
+          err_msg << operator_name
+                  << " requires dense column-major (first index fastest) "
+                     "pixel storage, but the field collection has pixel "
+                     "stride "
+                  << pixel_strides[direction] << " on axis " << direction
+                  << " where " << expected_stride
+                  << " was expected. (Collections constructed with row-major "
+                     "pixel storage order or custom pixel strides are not "
+                     "supported by this operator.)";
+          throw RuntimeError{err_msg.str()};
+        }
+        expected_stride *= nb_pts[direction];
+      }
+    }
+
+    /**
+     * @brief Throws if the collection's dof (component/sub-point) storage
+     *        order differs from the layout the traversal code was compiled
+     *        for.
+     *
+     * Fields with a single degree of freedom per pixel are exempt: for them
+     * array-of-structures and structure-of-arrays coincide.
+     *
+     * @param collection The field collection holding the operator's fields.
+     * @param expected The storage order assumed by the traversal code.
+     * @param nb_dof_per_pixel Largest dof count among the fields involved.
+     * @param operator_name Name used in the error message.
+     */
+    void check_dof_storage_order(const GlobalFieldCollection & collection,
+                                 const StorageOrder expected,
+                                 const Index_t nb_dof_per_pixel,
+                                 const std::string & operator_name) const {
+      if (nb_dof_per_pixel > 1 &&
+          collection.get_storage_order() != expected) {
+        std::stringstream err_msg{};
+        err_msg << operator_name << " was compiled for " << expected
+                << " dof storage, but the field collection stores its "
+                   "fields in "
+                << collection.get_storage_order()
+                << " order (fields have " << nb_dof_per_pixel
+                << " degrees of freedom per pixel, so the layouts differ)";
+        throw RuntimeError{err_msg.str()};
       }
     }
   };

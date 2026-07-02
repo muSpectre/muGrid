@@ -428,6 +428,42 @@ class FileIOTest(unittest.TestCase):
         new_lmt = file_io_object_r2.read_global_attribute("last_modified_time")
         self.assertTrue(old_lmt != new_lmt)
 
+    def test_file_frame_outlives_file_handle_reference(self):
+        """FileFrame objects and frame iterators hold a reference to their
+        parent file object; they must keep it alive after the user's own
+        reference to the file object is dropped."""
+        fname = "python_binding_io_frame-lifetime-tests.nc"
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+        self.comm.barrier()
+
+        field_name = "frame-lifetime-field"
+        f = self.fc_glob.register_real_field(field_name, 1, "pixel")
+        a = np.from_dlpack(f)
+        a[...] = 1.5
+
+        fio_w = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Write, self.comm)
+        fio_w.register_field_collection(self.fc_glob)
+        fio_w.append_frame().write()
+        del fio_w  # no frames referenced; the file is closed here
+
+        fio_r = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read, self.comm)
+        fio_r.register_field_collection(self.fc_glob)
+        frame0 = fio_r[0]
+        frame_iter = iter(fio_r)
+        del fio_r  # frame0 and frame_iter must keep the file object alive
+
+        a[...] = 0.0
+        frame0.read()
+        self.assertTrue(np.all(np.from_dlpack(f) == 1.5))
+
+        # the iterator yields frames backed by the still-open file
+        first_frame = next(frame_iter)
+        a[...] = 0.0
+        first_frame.read()
+        self.assertTrue(np.all(np.from_dlpack(f) == 1.5))
+
 
 if __name__ == "__main__":
     unittest.main()

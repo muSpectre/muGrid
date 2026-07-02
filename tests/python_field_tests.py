@@ -259,6 +259,105 @@ class FieldCheck(unittest.TestCase):
         self.assertEqual(field.pg.shape, (3,) + self.nb_grid_pts)
         self.assertEqual(field.p.shape, (3,) + self.nb_grid_pts)
 
+    def test_pop_field_keeps_dlpack_export_alive(self):
+        """Arrays exported via DLPack must survive pop_field.
+
+        pop_field removes the field from the collection, but the buffer must
+        stay alive as long as a DLPack consumer (e.g. a numpy array) still
+        references it.
+        """
+        fc = muGrid.GlobalFieldCollection(self.nb_grid_pts)
+        field_cpp = fc.register_real_field("popped", 1, "pixel")
+        arr = np.from_dlpack(field_cpp)
+        arr[...] = 42.0
+        del field_cpp
+
+        fc.pop_field("popped")
+        self.assertFalse(fc.field_exists("popped"))
+        # The buffer must still be readable and writable through the array.
+        self.assertTrue(np.all(arr == 42.0))
+        arr[...] = 7.0
+        self.assertTrue(np.all(arr == 7.0))
+
+        # Popping a field with no outstanding references frees it right away
+        # (no way to observe the free directly; this is a smoke test that the
+        # immediate-release path does not crash).
+        fc.register_real_field("transient", 1, "pixel")
+        fc.pop_field("transient")
+        self.assertFalse(fc.field_exists("transient"))
+
+    def test_pixels_iterator_outlives_temporary(self):
+        """Iterating pixels of an expression temporary must be safe: the
+        iterator keeps the Pixels (and collection) alive."""
+        it = iter(muGrid.GlobalFieldCollection(self.nb_grid_pts).pixels)
+        coords = list(it)
+        self.assertEqual(len(coords), np.prod(self.nb_grid_pts))
+
+    def test_pixel_view_multicomponent_subpts(self):
+        """The pixel-layout accessors must be zero-copy views with the C++
+        Pixel element order, also for fields where both the component count
+        and the sub-point count exceed one (where a plain C-order reshape
+        would silently copy and permute)."""
+        fc = muGrid.GlobalFieldCollection(
+            self.nb_grid_pts, sub_pts={"quad": 2}
+        )
+        field = wrap_field(fc.register_real_field("tensor", (3, 3), "quad"))
+        sg = field.sg  # shape (3, 3, 2, *grid)
+        sg[...] = np.random.default_rng(42).standard_normal(sg.shape)
+
+        pg = field.pg  # shape (3, 6, *grid): sub-points folded into axis 1
+        self.assertTrue(np.shares_memory(pg, sg))
+        self.assertEqual(pg.shape, (3, 6) + tuple(self.nb_grid_pts))
+        # AoS folding: folded index v = c_last + nb_c_last * s
+        for c1 in range(3):
+            for s in range(2):
+                np.testing.assert_array_equal(
+                    pg[:, c1 + 3 * s], sg[:, c1, s]
+                )
+        # writes through the pixel view must hit the field buffer
+        pg[...] = 0.0
+        self.assertTrue(np.all(sg == 0.0))
+
+    def test_pixel_view_scalar_subpts(self):
+        """Scalar fields with several sub-points: shape_pg and strides_p
+        must be consistent (the folded sub-point axis needs a stride) and
+        the accessor must be a view."""
+        fc = muGrid.GlobalFieldCollection(
+            self.nb_grid_pts, sub_pts={"quad": 2}
+        )
+        field = wrap_field(fc.register_real_field("scalar", (), "quad"))
+        self.assertEqual(
+            len(field._cpp.shape_pg), len(field._cpp.strides_p)
+        )
+        sg = field.sg  # shape (2, *grid)
+        sg[...] = np.random.default_rng(3).standard_normal(sg.shape)
+        pg = field.pg
+        self.assertTrue(np.shares_memory(pg, sg))
+        np.testing.assert_array_equal(pg, sg)
+
+    def test_pixel_view_soa_host_multicomponent_subpts(self):
+        """Same as the AoS test for a host structure-of-arrays collection;
+        the SoA dof layout folds sub-point-fastest (v = c * nb_sub + s)."""
+        fc = muGrid.GlobalFieldCollection(
+            list(self.nb_grid_pts),
+            [],
+            [],
+            muGrid.StorageOrder.ArrayOfStructures,  # pixels: column-major
+            {"quad": 2},
+            muGrid.StorageOrder.StructureOfArrays,  # dof storage: SoA
+        )
+        field = wrap_field(fc.register_real_field("vec", (3,), "quad"))
+        sg = field.sg  # shape (3, 2, *grid)
+        sg[...] = np.random.default_rng(7).standard_normal(sg.shape)
+
+        pg = field.pg  # shape (6, *grid)
+        self.assertTrue(np.shares_memory(pg, sg))
+        for c in range(3):
+            for s in range(2):
+                np.testing.assert_array_equal(pg[c * 2 + s], sg[c, s])
+        pg[...] = 0.0
+        self.assertTrue(np.all(sg == 0.0))
+
 
 if __name__ == "__main__":
     unittest.main()

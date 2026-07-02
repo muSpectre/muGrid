@@ -239,6 +239,16 @@ namespace muGrid {
         Index_t nb_nodal_components,
         Index_t nb_quad_components,
         bool is_transpose) const {
+        // The traversal hard-codes dense column-major pixel addressing and
+        // the dof interleaving selected by the storage_order template
+        // parameter; reject collections laid out differently.
+        this->check_pixel_storage_order(collection, "GenericLinearOperator");
+        this->check_dof_storage_order(
+            collection, storage_order,
+            std::max(nb_nodal_components * this->nb_pixel_input_components_,
+                     nb_quad_components * this->nb_quad_pts_),
+            "GenericLinearOperator");
+
         GridTraversalParams params;
 
         // Get shape of the full grid including ghosts (pad to 3D)
