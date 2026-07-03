@@ -31,6 +31,7 @@ def conjugate_gradients(
     timer=None,
     rtol: float = None,
     atol: float = 0.0,
+    residual=None,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -85,6 +86,12 @@ def conjugate_gradients(
         Absolute tolerance: convergence when ``||b - Ax|| <= atol``,
         whichever of the two criteria is weaker. The default is 0 (purely
         relative convergence).
+    residual : muGrid.Field, optional
+        If given, the final residual ``r = b - Ax`` is copied into this field
+        on (converged) return -- CG maintains it anyway, so this costs one
+        field copy instead of an extra operator apply. Used e.g. for
+        adjoint-corrected (Lagrangian) objective evaluation with truncated
+        solves.
 
     Returns
     -------
@@ -175,6 +182,8 @@ def conjugate_gradients(
         rr_val = float(rr)
 
         if rr_val <= tol_sq:
+            if residual is not None:
+                linalg.copy(r, residual)
             return x
 
     with timed("iteration"):
@@ -229,6 +238,8 @@ def conjugate_gradients(
                 )
 
             if next_rr_val <= tol_sq:
+                if residual is not None:
+                    linalg.copy(r, residual)
                 return x
 
             # Compute beta
