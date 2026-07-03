@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-Unreleased
-----------
+v0.111.0 (03Jul26)
+------------------
 
 - ENH: Added fused `compute_sensitivity` (host + GPU) to the isotropic stiffness
   operator
@@ -23,7 +23,29 @@ Unreleased
 - MAINT: Reference preconditioner frees its impulse-response scratch after assembly and
   stores Hermitian symbols as a triangle, halving the symbol memory
 - MAINT: Reference preconditioner apply is now einsum-free
+- ENH: `conjugate_gradients` can return the final residual `b - Ax` (for
+  adjoint-corrected objectives) via an optional out-field
+- ENH: Input guards across operators and fields — dtype-matched `fft`/`ifft`,
+  scalar-only Laplace, storage-order/contiguity checks, size-checked Eigen
+  field operators, rejection of duplicate local pixels and device state fields
+- API: Python lifetime fixes — `keep_alive` on `Pixels`/`FileFrame` iterators,
+  and `pop_field` kept safe against live DLPack exports
 - BUG: `average_stress` integrates the owned region, not the padded one
+- BUG: Fixed np=8 deadlock in the block-Fourier preconditioner (Hermitian
+  detection diverged on ranks with empty Fourier subdomains)
+- BUG: `Field.p`/`.pg` pixel views are zero-copy and correctly ordered for
+  multi-component, multi-sub-point fields (were silently copied and permuted);
+  fixed the underlying `get_strides(Pixel)` for structure-of-arrays fields
+- BUG: `Array::resize` no longer double-frees when reallocation throws (GPU OOM)
+- BUG: Guard against zero-size GPU linalg kernel launches on empty MPI ranks
+- BUG: NetCDF attribute read no longer overflows on mismatched lengths, and the
+  registered-vs-file consistency check is now effective
+- BUG: `reduce_ghosts` supports single-precision (`Real32`/`Complex32`) fields
+- BUG: MPI ghost/gather paths use C complex datatypes and range-checked counts
+  (correct on Fortran-less MPI and halos above 2³¹ elements)
+- BUG: Fixed FFT-engine subcommunicator leak, `CartesianCommunicator`
+  copy-assignment, and unsafe `FieldCollection` moves of populated collections
+- BUG: Fixed non-contiguous `Pixels` iteration and cuFFT fp32 N-D alignment checks
 
 v0.110.0 (28Jun26)
 ------------------
