@@ -4,25 +4,12 @@ Change log for µGrid
 v0.111.0 (03Jul26)
 ------------------
 
-- ENH: Added fused `compute_sensitivity` (host + GPU) to the isotropic stiffness
-  operator
-- ENH: Added the Green-Jacobi (J-FFT) preconditioner
-- DOC: Documented that `FEMGradientOperator.transpose` is the quadrature-weighted
-  (Galerkin) adjoint `Bᵀ W`, not the bare matrix transpose — with no `weights`
-  it applies the physical quadrature weights, so `transpose(apply(u)) = Bᵀ W B u`
-  (the FE stiffness action); added tests pinning this convention (P1/Q1, 2D/3D)
 - ENH: Single-precision floating-point support
+- ENH: Added fused `compute_sensitivity` to the isotropic stiffness operator
+- ENH: Added the Green-Jacobi (J-FFT) preconditioner
 - ENH: Added Q1 (bilinear quad / trilinear hex) elements
 - ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
   operator, so FE homogenization needs no resident strain/stress fields
-- API: `dtype=` field-creation API
-- API: Bound `FieldCollection.pop_field` to free a field's memory from Python
-- MAINT: Unified FE shape-function tables into element traits
-- MAINT: Aliased the CG preconditioned-residual onto the residual when unpreconditioned,
-  saving one work vector
-- MAINT: Reference preconditioner frees its impulse-response scratch after assembly and
-  stores Hermitian symbols as a triangle, halving the symbol memory
-- MAINT: Reference preconditioner apply is now einsum-free
 - ENH: `conjugate_gradients` can return the final residual `b - Ax` (for
   adjoint-corrected objectives) via an optional out-field
 - ENH: Input guards across operators and fields — dtype-matched `fft`/`ifft`,
@@ -30,6 +17,13 @@ v0.111.0 (03Jul26)
   field operators, rejection of duplicate local pixels and device state fields
 - API: Python lifetime fixes — `keep_alive` on `Pixels`/`FileFrame` iterators,
   and `pop_field` kept safe against live DLPack exports
+- API: `dtype=` field-creation API
+- API: Bound `FieldCollection.pop_field` to free a field's memory from Python
+- MAINT: Unified FE shape-function tables into element traits
+- MAINT: Aliased the CG preconditioned-residual onto the residual when unpreconditioned
+- MAINT: Reference preconditioner frees its impulse-response scratch after assembly and
+  stores Hermitian symbols as a triangle
+- MAINT: Reference preconditioner apply is now einsum-free
 - BUG: `average_stress` integrates the owned region, not the padded one
 - BUG: Fixed np=8 deadlock in the block-Fourier preconditioner (Hermitian
   detection diverged on ranks with empty Fourier subdomains)
