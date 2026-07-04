@@ -826,7 +826,7 @@ def make_green_jacobi_preconditioner(
     void_tol=0.0,
     name="green-jacobi-preconditioner",
     timer=None,
-    dtype=np.float64,
+    dtype=None,
 ):
     r"""
     Assemble the Green-Jacobi (J-FFT) preconditioner for FFT-accelerated FE
@@ -874,11 +874,11 @@ def make_green_jacobi_preconditioner(
     timer : muTimer.Timer, optional
         Forwarded to both sub-preconditioners.
     dtype : data-type, optional
-        Real-space precision of the fields the preconditioner will be applied
-        to: ``np.float64`` (default) or ``np.float32``. Forwarded to the inner
-        Green preconditioner (whose FFT work buffer must pair with the solver
-        fields) and used for the Jacobi diagonal and ``J^{1/2}`` fields. Must
-        match the precision of ``lambda_field`` / ``mu_field``.
+        Real-space precision of the preconditioner (``np.float32`` or
+        ``np.float64``): sets the dtype of the Jacobi diagonal and the inner
+        Green preconditioner's fields so their transforms pair with the solver's
+        fields. Defaults to the dtype of ``lambda_field``, so a single-precision
+        material yields a single-precision preconditioner automatically.
 
     Returns
     -------
@@ -888,6 +888,16 @@ def make_green_jacobi_preconditioner(
         bound for in-place material updates.
     """
     n = int(nb_components)
+
+    # Match the Jacobi diagonal and the inner Green preconditioner to the
+    # precision of the material fields (the FFT engine and fused operators
+    # dispatch on the field dtype). Inferred from ``lambda_field`` when not
+    # given, so a single-precision (float32) material yields a single-precision
+    # preconditioner; float64 fields keep the previous default unchanged.
+    if dtype is None:
+        lam_p = lambda_field.s
+        dtype = (lam_p.get() if hasattr(lam_p, "get")
+                 else np.asarray(lam_p)).dtype
 
     # Global (count-weighted, MPI-reduced) means so the reference stiffness is
     # deterministic under domain decomposition; reduce_mean handles host and
