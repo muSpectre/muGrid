@@ -23,6 +23,20 @@ from . import linalg
 from .Field import wrap_field
 
 
+def _real_field_like(field, name):
+    """Get-or-create a real field on ``field``'s collection with the same
+    component shape and scalar precision (float64 or float32) as ``field``."""
+    coll = field.collection
+    components = tuple(field.components_shape)
+    if np.dtype(field.dtype) == np.dtype(np.float32):
+        # register_real32_field is register-only; mirror real_field's
+        # get-or-create semantics.
+        if coll.field_exists(name):
+            return wrap_field(coll.get_field(name))
+        return wrap_field(coll.register_real32_field(name, components))
+    return wrap_field(coll.real_field(name, components))
+
+
 def _fill_field(field, values):
     """Assign host values to the interior view of a host or device field."""
     s = field.s
@@ -562,11 +576,9 @@ class GreenJacobiPreconditioner(Preconditioner):
         safe = np.where(positive, vals, 1.0)
         jhalf = np.where(positive, 1.0 / np.sqrt(safe), 1.0)
         if self._jhalf is None:
-            self._jhalf = wrap_field(
-                diagonal.collection.real_field(
-                    f"{self._name}-jhalf", tuple(diagonal.components_shape)
-                )
-            )
+            # Match the diagonal's precision so linalg.scal pairs J^{1/2}
+            # with the solver fields in a single-precision solve.
+            self._jhalf = _real_field_like(diagonal, f"{self._name}-jhalf")
         # Zero the ghosts (as JacobiPreconditioner does); only the interior
         # participates in the CG inner products.
         self._jhalf.set_zero()
@@ -574,11 +586,7 @@ class GreenJacobiPreconditioner(Preconditioner):
 
     def _work_field(self, r):
         if self._work is None:
-            self._work = wrap_field(
-                r.collection.real_field(
-                    f"{self._name}-work", tuple(r.components_shape)
-                )
-            )
+            self._work = _real_field_like(r, f"{self._name}-work")
             self._work.set_zero()
         return self._work
 
@@ -738,7 +746,8 @@ def make_reference_stiffness_preconditioner(
     engine.fourier_space_collection.pop_field(column_hat_name)
     del impulse, column, column_hat
 
-    return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer)
+    return BlockFourierPreconditioner(
+        engine, K_inv, name=name, timer=timer, dtype=real_dtype)
 
 
 def make_green_jacobi_preconditioner(
@@ -752,6 +761,7 @@ def make_green_jacobi_preconditioner(
     void_tol=0.0,
     name="green-jacobi-preconditioner",
     timer=None,
+    dtype=np.float64,
 ):
     r"""
     Assemble the Green-Jacobi (J-FFT) preconditioner for FFT-accelerated FE
@@ -797,6 +807,12 @@ def make_green_jacobi_preconditioner(
         Prefix for the managed fields.
     timer : muTimer.Timer, optional
         Forwarded to both sub-preconditioners.
+    dtype : data-type, optional
+        Real-space precision of the fields the preconditioner will be applied
+        to: ``np.float64`` (default) or ``np.float32``. Forwarded to the inner
+        Green preconditioner (whose FFT work buffer must pair with the solver
+        fields) and used for the Jacobi diagonal and ``J^{1/2}`` fields. Must
+        match the precision of ``lambda_field`` / ``mu_field``.
 
     Returns
     -------
@@ -823,10 +839,12 @@ def make_green_jacobi_preconditioner(
         stiffness_op.apply_uniform(u, reference_lambda, reference_mu, f)
 
     green = make_reference_stiffness_preconditioner(
-        engine, apply_reference_stiffness, n, name=f"{name}-green", timer=timer
+        engine, apply_reference_stiffness, n, name=f"{name}-green",
+        timer=timer, dtype=dtype
     )
 
-    diagonal = engine.real_space_field(f"{name}-diagonal", components=(n,))
+    diagonal = engine.real_space_field(
+        f"{name}-diagonal", components=(n,), dtype=dtype)
     stiffness_op.assemble_diagonal(lambda_field, mu_field, diagonal)
 
     prec = GreenJacobiPreconditioner(
