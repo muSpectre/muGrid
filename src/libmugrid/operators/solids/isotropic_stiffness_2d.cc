@@ -37,6 +37,8 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
+#include <cassert>
+
 namespace muGrid {
 
     // Forward declarations of the (templated) host kernels defined at the
@@ -513,9 +515,146 @@ namespace muGrid {
         static const Index_t NODE_OFFSET_2D[4][2] = {
             {0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
-        // Shared kernel body for the per-pixel (Uniform == false) and the
-        // spatially-uniform (Uniform == true) stiffness apply. See the 3D
-        // counterpart for the rationale.
+        // Vectorized shared kernel body for the per-pixel (Uniform == false)
+        // and spatially-uniform (Uniform == true) stiffness apply.
+        //
+        // The nodal fields are AoS with the compile-time x-strides the entry
+        // points hard-code (component stride 1, node stride NB_DOFS, material
+        // stride 1); only the row pitches are runtime. Within one grid row
+        // every address is therefore affine in ix with a small constant
+        // offset, so the whole per-node computation — the four-element
+        // gather, the row contractions and the force write — is straight-line
+        // code the compiler vectorizes across ix (pragma below). The row
+        // contraction is factored as f += 2μ·(G_row·u) + λ·(V_row·u), which
+        // keeps the geometry coefficients loop-invariant broadcasts and
+        // halves the per-lane multiplies compared with forming
+        // (2μG + λV)[row][j] per pixel. Different ix are independent nodes,
+        // so vectorization reorders no floating-point sum; within a node the
+        // contraction is reassociated relative to the scalar kernel (a
+        // few-ulp difference on an 8-term sum).
+        template <typename T, bool Uniform, bool Increment>
+        static void isotropic_stiffness_2d_row_kernel(
+            const T * MUGRID_RESTRICT displacement,
+            const T * MUGRID_RESTRICT lambda,
+            const T * MUGRID_RESTRICT mu, T * MUGRID_RESTRICT force,
+            Index_t nnx, Index_t nny, Index_t disp_stride_y,
+            Index_t mat_stride_y, Index_t force_stride_y,
+            const T * MUGRID_RESTRICT G, const T * MUGRID_RESTRICT V, T alpha,
+            T lam_u, T mu_u) {
+
+            constexpr Index_t NB_DOFS = 2;
+            constexpr Index_t NB_ELEM_DOFS = 8;
+
+            // Signed strides: ghost rows/columns sit at negative offsets.
+            using SIndex_t = std::ptrdiff_t;
+            const SIndex_t dy = static_cast<SIndex_t>(disp_stride_y);
+            const SIndex_t my = static_cast<SIndex_t>(mat_stride_y);
+            const SIndex_t fy = static_cast<SIndex_t>(force_stride_y);
+
+            // One element's contribution to its local node `ln` (rows
+            // r0 = 2·ln, r0+1 of K_e = 2μG + λV applied to the element's
+            // gathered displacement). rowA/rowB are the nodal rows below and
+            // above the element; xb = NB_DOFS·(ix + element x-offset). The
+            // element's four nodes occupy 2·NB_DOFS consecutive values in
+            // each row, so the gather is two small contiguous loads.
+            const auto elem_contrib =
+                [G, V](const T * MUGRID_RESTRICT rowA,
+                       const T * MUGRID_RESTRICT rowB, SIndex_t xb,
+                       Index_t r0, T two_mu, T lam, T & f0, T & f1) {
+                    T u[NB_ELEM_DOFS];
+                    for (Index_t d = 0; d < 2 * NB_DOFS; ++d) {
+                        u[d] = rowA[xb + d];
+                        u[2 * NB_DOFS + d] = rowB[xb + d];
+                    }
+                    const T * MUGRID_RESTRICT Gr = G + r0 * NB_ELEM_DOFS;
+                    const T * MUGRID_RESTRICT Vr = V + r0 * NB_ELEM_DOFS;
+                    T g0{0}, v0{0}, g1{0}, v1{0};
+                    for (Index_t j = 0; j < NB_ELEM_DOFS; ++j) {
+                        g0 += Gr[j] * u[j];
+                        v0 += Vr[j] * u[j];
+                        g1 += Gr[NB_ELEM_DOFS + j] * u[j];
+                        v1 += Vr[NB_ELEM_DOFS + j] * u[j];
+                    }
+                    f0 += two_mu * g0 + lam * v0;
+                    f1 += two_mu * g1 + lam * v1;
+                };
+
+            for (SIndex_t iy = 0; iy < static_cast<SIndex_t>(nny); ++iy) {
+                // Nodal rows iy-1, iy, iy+1 and material rows iy-1, iy; the
+                // out-of-range rows are ghost rows guaranteed by the stencil
+                // requirement (one ghost cell on each side).
+                const T * MUGRID_RESTRICT dm = displacement + (iy - 1) * dy;
+                const T * MUGRID_RESTRICT dc = displacement + iy * dy;
+                const T * MUGRID_RESTRICT dp = displacement + (iy + 1) * dy;
+                const T * lm{nullptr};
+                const T * lc{nullptr};
+                const T * mm{nullptr};
+                const T * mc{nullptr};
+                if constexpr (!Uniform) {
+                    lm = lambda + (iy - 1) * my;
+                    lc = lambda + iy * my;
+                    mm = mu + (iy - 1) * my;
+                    mc = mu + iy * my;
+                }
+                T * MUGRID_RESTRICT f_row = force + iy * fy;
+
+                #if defined(_MSC_VER)
+                #pragma loop(ivdep)
+                #elif defined(__clang__)
+                #pragma clang loop vectorize(enable) interleave(enable)
+                #elif defined(__GNUC__)
+                #pragma GCC ivdep
+                #endif
+                for (SIndex_t ix = 0; ix < static_cast<SIndex_t>(nnx); ++ix) {
+                    // Lamé parameters of the four incident elements
+                    // (x-offset -1/0 × y-offset -1/0).
+                    T l00, m00, l10, m10, l01, m01, l11, m11;
+                    if constexpr (Uniform) {
+                        l00 = l10 = l01 = l11 = lam_u;
+                        m00 = m10 = m01 = m11 = mu_u;
+                    } else {
+                        l00 = lm[ix - 1];
+                        m00 = mm[ix - 1];
+                        l10 = lm[ix];
+                        m10 = mm[ix];
+                        l01 = lc[ix - 1];
+                        m01 = mc[ix - 1];
+                        l11 = lc[ix];
+                        m11 = mc[ix];
+                    }
+
+                    const SIndex_t xm = NB_DOFS * (ix - 1);
+                    const SIndex_t xc = NB_DOFS * ix;
+
+                    // The node (ix, iy) is local node 3/2/1/0 of the elements
+                    // at (ix-1, iy-1), (ix, iy-1), (ix-1, iy), (ix, iy).
+                    T f0{0}, f1{0};
+                    elem_contrib(dm, dc, xm, 6, static_cast<T>(2) * m00, l00,
+                                 f0, f1);
+                    elem_contrib(dm, dc, xc, 4, static_cast<T>(2) * m10, l10,
+                                 f0, f1);
+                    elem_contrib(dc, dp, xm, 2, static_cast<T>(2) * m01, l01,
+                                 f0, f1);
+                    elem_contrib(dc, dp, xc, 0, static_cast<T>(2) * m11, l11,
+                                 f0, f1);
+
+                    if constexpr (Increment) {
+                        f_row[xc + 0] += alpha * f0;
+                        f_row[xc + 1] += alpha * f1;
+                    } else {
+                        f_row[xc + 0] = alpha * f0;
+                        f_row[xc + 1] = alpha * f1;
+                    }
+                }
+            }
+        }
+
+        // Shared dispatcher for the per-pixel (Uniform == false) and the
+        // spatially-uniform (Uniform == true) stiffness apply: resolves the
+        // runtime `increment` flag to a compile-time branch so the row kernel
+        // stays branch-free (loop-unswitched by construction). The x-strides
+        // are the compile-time AoS constants asserted here; only the row
+        // pitches reach the kernel.
         template <typename T, bool Uniform>
         static void isotropic_stiffness_2d_host_tmpl(
             const T * MUGRID_RESTRICT displacement,
@@ -527,116 +666,23 @@ namespace muGrid {
             Index_t force_stride_y, Index_t force_stride_d, const T * G,
             const T * V, T alpha, bool increment, T lam_u,
             T mu_u) {
-
-            constexpr Index_t NB_NODES = 4;
             constexpr Index_t NB_DOFS = 2;
-            constexpr Index_t NB_ELEM_DOFS = NB_NODES * NB_DOFS;
-
-            // Use signed versions of strides to avoid unsigned overflow
-            // when accessing ghost cells at negative indices
-            using SIndex_t = std::ptrdiff_t;
-            SIndex_t s_disp_stride_x = static_cast<SIndex_t>(disp_stride_x);
-            SIndex_t s_disp_stride_y = static_cast<SIndex_t>(disp_stride_y);
-            SIndex_t s_disp_stride_d = static_cast<SIndex_t>(disp_stride_d);
-            [[maybe_unused]] SIndex_t s_mat_stride_x =
-                static_cast<SIndex_t>(mat_stride_x);
-            [[maybe_unused]] SIndex_t s_mat_stride_y =
-                static_cast<SIndex_t>(mat_stride_y);
-            SIndex_t s_force_stride_x = static_cast<SIndex_t>(force_stride_x);
-            SIndex_t s_force_stride_y = static_cast<SIndex_t>(force_stride_y);
-            SIndex_t s_force_stride_d = static_cast<SIndex_t>(force_stride_d);
-
-            // Neighboring element offsets and corresponding local node index
-            // Element at (ix + eox, iy + eoy) has this node as local node
-            // `local_node`. Offsets are signed because they can be -1.
-            static const SIndex_t ELEM_OFFSETS[4][3] = {
-                {-1, -1, 3},  // Element (ix-1, iy-1): this node is local node 3
-                { 0, -1, 2},  // Element (ix,   iy-1): this node is local node 2
-                {-1,  0, 1},  // Element (ix-1, iy  ): this node is local node 1
-                { 0,  0, 0}   // Element (ix,   iy  ): this node is local node 0
-            };
-
-            // Node offsets within element [node][dim]
-            static const SIndex_t NODE_OFFSET[4][2] = {
-                {0, 0}, {1, 0}, {0, 1}, {1, 1}};
-
-            // Iteration bounds: iterate over all computable nodes based on stencil
-            // requirements. The computable region is determined by where the stencil
-            // has valid input data, not by the ghost region size. This allows
-            // computing in ghost regions beyond the minimum stencil requirement.
-            SIndex_t ix_start = 0;
-            SIndex_t iy_start = 0;
-            SIndex_t ix_end = static_cast<SIndex_t>(nnx);
-            SIndex_t iy_end = static_cast<SIndex_t>(nny);
-
-            // Gather pattern: loop over all computable nodes, gather from neighboring
-            // elements. Ghost cells handle periodicity and MPI boundaries.
-            for (SIndex_t iy = iy_start; iy < iy_end; ++iy) {
-                for (SIndex_t ix = ix_start; ix < ix_end; ++ix) {
-                    // Accumulate force for this node
-                    T f[NB_DOFS] = {0, 0};
-
-                    // Loop over neighboring elements (all 4 elements guaranteed
-                    // to exist for nodes in this iteration range)
-                    for (Index_t elem = 0; elem < 4; ++elem) {
-                        // Element indices (can be -1 for periodic BC accessing ghost cells)
-                        SIndex_t ex = ix + ELEM_OFFSETS[elem][0];
-                        SIndex_t ey = iy + ELEM_OFFSETS[elem][1];
-                        Index_t local_node = ELEM_OFFSETS[elem][2];
-
-                        // Get material parameters for this element
-                        T lam, mu_val;
-                        if constexpr (Uniform) {
-                            lam = lam_u;
-                            mu_val = mu_u;
-                        } else {
-                            SIndex_t mat_idx =
-                                ex * s_mat_stride_x + ey * s_mat_stride_y;
-                            lam = lambda[mat_idx];
-                            mu_val = mu[mat_idx];
-                        }
-
-                        // Gather displacements from all 4 nodes of this element
-                        T u[NB_ELEM_DOFS];
-                        for (Index_t node = 0; node < NB_NODES; ++node) {
-                            SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
-                            SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
-                            SIndex_t disp_idx = nx_pos * s_disp_stride_x +
-                                                ny_pos * s_disp_stride_y;
-                            for (Index_t d = 0; d < NB_DOFS; ++d) {
-                                u[node * NB_DOFS + d] =
-                                    displacement[disp_idx + d * s_disp_stride_d];
-                            }
-                        }
-
-                        // Compute only the rows of K @ u that correspond to
-                        // this node
-                        for (Index_t d = 0; d < NB_DOFS; ++d) {
-                            Index_t row = local_node * NB_DOFS + d;
-                            T contrib = 0;
-                            for (Index_t j = 0; j < NB_ELEM_DOFS; ++j) {
-                                contrib +=
-                                    (static_cast<T>(2) * mu_val *
-                                         G[row * NB_ELEM_DOFS + j] +
-                                     lam * V[row * NB_ELEM_DOFS + j]) *
-                                    u[j];
-                            }
-                            f[d] += contrib;
-                        }
-                    }
-
-                    // Write force for this node
-                    SIndex_t base = ix * s_force_stride_x + iy * s_force_stride_y;
-                    if (increment) {
-                        for (Index_t d = 0; d < NB_DOFS; ++d) {
-                            force[base + d * s_force_stride_d] += alpha * f[d];
-                        }
-                    } else {
-                        for (Index_t d = 0; d < NB_DOFS; ++d) {
-                            force[base + d * s_force_stride_d] = alpha * f[d];
-                        }
-                    }
-                }
+            assert(disp_stride_d == 1 && force_stride_d == 1);
+            assert(disp_stride_x == NB_DOFS && force_stride_x == NB_DOFS);
+            assert(Uniform || mat_stride_x == 1);
+            (void)disp_stride_x;
+            (void)disp_stride_d;
+            (void)mat_stride_x;
+            (void)force_stride_x;
+            (void)force_stride_d;
+            if (increment) {
+                isotropic_stiffness_2d_row_kernel<T, Uniform, true>(
+                    displacement, lambda, mu, force, nnx, nny, disp_stride_y,
+                    mat_stride_y, force_stride_y, G, V, alpha, lam_u, mu_u);
+            } else {
+                isotropic_stiffness_2d_row_kernel<T, Uniform, false>(
+                    displacement, lambda, mu, force, nnx, nny, disp_stride_y,
+                    mat_stride_y, force_stride_y, G, V, alpha, lam_u, mu_u);
             }
         }
 
@@ -829,29 +875,44 @@ namespace muGrid {
             constexpr Index_t NB_DOFS = 2;
             constexpr Index_t NB_ELEM_DOFS = NB_NODES * NB_DOFS;
             using SIndex_t = std::ptrdiff_t;
-            SIndex_t s_disp_stride_x = static_cast<SIndex_t>(disp_stride_x);
-            SIndex_t s_disp_stride_y = static_cast<SIndex_t>(disp_stride_y);
-            SIndex_t s_disp_stride_d = static_cast<SIndex_t>(disp_stride_d);
-            SIndex_t s_out_stride_x = static_cast<SIndex_t>(out_stride_x);
-            SIndex_t s_out_stride_y = static_cast<SIndex_t>(out_stride_y);
-
-            static const SIndex_t NODE_OFFSET[4][2] = {
-                {0, 0}, {1, 0}, {0, 1}, {1, 1}};
+            const SIndex_t dy = static_cast<SIndex_t>(disp_stride_y);
+            const SIndex_t oy = static_cast<SIndex_t>(out_stride_y);
+            // AoS x-strides are the compile-time constants the caller
+            // hard-codes; only the row pitches are runtime (see the apply
+            // kernel for the vectorization rationale).
+            assert(disp_stride_d == 1 && disp_stride_x == NB_DOFS &&
+                   out_stride_x == 1);
+            (void)disp_stride_x;
+            (void)disp_stride_d;
+            (void)out_stride_x;
 
             for (SIndex_t ey = 0; ey < static_cast<SIndex_t>(nely); ++ey) {
+                // The element's nodes live on nodal rows ey and ey+1, DOFs
+                // r = 0..3 / 4..7, at 2·NB_DOFS consecutive values per row.
+                const T * MUGRID_RESTRICT f0 = fwd + ey * dy;
+                const T * MUGRID_RESTRICT f1 = fwd + (ey + 1) * dy;
+                const T * MUGRID_RESTRICT c0 = cos + ey * dy;
+                const T * MUGRID_RESTRICT c1 = cos + (ey + 1) * dy;
+                T * MUGRID_RESTRICT gs_row = g_shear + ey * oy;
+                T * MUGRID_RESTRICT gv_row = g_vol + ey * oy;
+
+                #if defined(_MSC_VER)
+                #pragma loop(ivdep)
+                #elif defined(__clang__)
+                #pragma clang loop vectorize(enable) interleave(enable)
+                #elif defined(__GNUC__)
+                #pragma GCC ivdep
+                #endif
                 for (SIndex_t ex = 0; ex < static_cast<SIndex_t>(nelx); ++ex) {
+                    const SIndex_t xb = NB_DOFS * ex;
                     T a[NB_ELEM_DOFS], b[NB_ELEM_DOFS];
-                    for (Index_t node = 0; node < NB_NODES; ++node) {
-                        SIndex_t nx_pos = ex + NODE_OFFSET[node][0];
-                        SIndex_t ny_pos = ey + NODE_OFFSET[node][1];
-                        SIndex_t disp_idx =
-                            nx_pos * s_disp_stride_x + ny_pos * s_disp_stride_y;
-                        for (Index_t d = 0; d < NB_DOFS; ++d) {
-                            Index_t r = node * NB_DOFS + d;
-                            SIndex_t k = disp_idx + d * s_disp_stride_d;
-                            a[r] = ustar_f[r] + fwd[k];
-                            b[r] = ustar_c[r] + cos[k];
-                        }
+                    for (Index_t d = 0; d < 2 * NB_DOFS; ++d) {
+                        a[d] = ustar_f[d] + f0[xb + d];
+                        a[2 * NB_DOFS + d] = ustar_f[2 * NB_DOFS + d] +
+                                             f1[xb + d];
+                        b[d] = ustar_c[d] + c0[xb + d];
+                        b[2 * NB_DOFS + d] = ustar_c[2 * NB_DOFS + d] +
+                                             c1[xb + d];
                     }
                     T gs = 0, gv = 0;
                     for (Index_t r = 0; r < NB_ELEM_DOFS; ++r) {
@@ -863,10 +924,8 @@ namespace muGrid {
                         gs += a[r] * Gr;
                         gv += a[r] * Vr;
                     }
-                    SIndex_t out_idx =
-                        ex * s_out_stride_x + ey * s_out_stride_y;
-                    g_shear[out_idx] = gs;
-                    g_vol[out_idx] = gv;
+                    gs_row[ex] = gs;
+                    gv_row[ex] = gv;
                 }
             }
         }

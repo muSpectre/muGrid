@@ -138,6 +138,31 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Optimize for the build machine's CPU. OFF by default: wheels and other
+# redistributable binaries must stay baseline-ISA portable. Turning it ON lets
+# the autovectorized kernels (stiffness apply, sensitivity, linalg) use the
+# full SIMD width of the local CPU (e.g. AVX2/AVX-512 on x86-64, where the
+# baseline is SSE2); on arm64, NEON is already baseline.
+option(MUGRID_NATIVE_ARCH
+       "Tune generated code for this machine's CPU (-march=native / -mcpu=native); resulting binaries are not portable"
+       OFF)
+if(MUGRID_NATIVE_ARCH)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-march=native" MUGRID_HAS_MARCH_NATIVE)
+    if(MUGRID_HAS_MARCH_NATIVE)
+        add_compile_options(-march=native)
+    else()
+        check_cxx_compiler_flag("-mcpu=native" MUGRID_HAS_MCPU_NATIVE)
+        if(MUGRID_HAS_MCPU_NATIVE)
+            add_compile_options(-mcpu=native)
+        else()
+            message(WARNING
+                "MUGRID_NATIVE_ARCH requested but the compiler supports "
+                "neither -march=native nor -mcpu=native; ignoring")
+        endif()
+    endif()
+endif()
+
 # Code coverage instrumentation (defines the MUGRID_ENABLE_COVERAGE option and
 # the mugrid::coverage interface target used by the library and test targets)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

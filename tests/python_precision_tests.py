@@ -116,3 +116,41 @@ def test_float32_cg_matches_float64():
     x64 = solve(np.float64)
     x32 = solve(np.float32)
     np.testing.assert_allclose(x32, x64, atol=1e-4)
+
+
+@serial_only
+@pytest.mark.parametrize("ghosts", [0, 1])
+def test_float32_reductions_accumulate_in_double(ghosts):
+    """vecdot / norm_sq / axpy_norm_sq on float32 fields accumulate in double
+    precision internally (only the final scalar is narrowed to float32).
+
+    A running float32 accumulation of N comparable values loses
+    O(N * ulp(sum)) — for the value 0.1 (inexact in binary) over ~1M entries
+    this is a relative error of 1e-4..1e-2 depending on lane count, which is
+    what inflated float32 CG termination decisions. Double accumulation
+    leaves only the final O(eps_f32) narrowing. Both reduction code paths are
+    exercised: the ghost-free Eigen path and the ghost-skipping interior
+    loop."""
+    from muGrid import linalg
+
+    n = (1024, 1024)
+    g = (ghosts, ghosts)
+    fc = GlobalFieldCollection(n, nb_ghosts_left=g, nb_ghosts_right=g)
+    x = fc.real_field("x", dtype=np.float32)
+    x.s[...] = np.float32(0.1)
+
+    nb_interior = n[0] * n[1]
+    # Reference: exact double sum of the float32-representable value 0.1f.
+    exact = float(np.float64(np.float32(0.1)) ** 2 * nb_interior)
+
+    rel = abs(float(linalg.norm_sq(x)) - exact) / exact
+    assert rel < 1e-6, f"norm_sq relative error {rel:.2e}"
+
+    y = fc.real_field("y", dtype=np.float32)
+    y.s[...] = np.float32(0.1)
+    rel = abs(float(linalg.vecdot(x, y)) - exact) / exact
+    assert rel < 1e-6, f"vecdot relative error {rel:.2e}"
+
+    # axpy_norm_sq(0, x, y) leaves y unchanged and returns ||y||^2.
+    rel = abs(float(linalg.axpy_norm_sq(0.0, x, y)) - exact) / exact
+    assert rel < 1e-6, f"axpy_norm_sq relative error {rel:.2e}"

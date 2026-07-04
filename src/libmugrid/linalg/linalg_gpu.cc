@@ -140,6 +140,51 @@ __host__ __device__ inline RT sq_norm(DeviceComplexT<RT> x) {
     return x.re * x.re + x.im * x.im;
 }
 
+/**
+ * Accumulator type for the dot reductions: single-precision partial sums are
+ * promoted to double precision (float -> Real, DeviceComplex32 ->
+ * DeviceComplex), mirroring internal::promoted in linalg_host.cc and the
+ * double accumulation already used by axpy_norm_sq_kernel and
+ * interior_three_dots_kernel. The launchers narrow the final value back to
+ * the device scalar — a single O(eps_f32) rounding, instead of a running
+ * float32 accumulation error over the whole field.
+ */
+template <typename T>
+struct reduce_acc {
+    using type = T;
+};
+template <>
+struct reduce_acc<float> {
+    using type = Real;
+};
+template <>
+struct reduce_acc<DeviceComplex32> {
+    using type = DeviceComplex;
+};
+template <typename T>
+using ReduceAcc = typename reduce_acc<T>::type;
+
+// Widen a device scalar to its accumulator type (identity in double).
+__host__ __device__ inline Real widen(Real x) { return x; }
+__host__ __device__ inline Real widen(float x) { return x; }
+__host__ __device__ inline DeviceComplex widen(DeviceComplex x) { return x; }
+__host__ __device__ inline DeviceComplex widen(DeviceComplex32 x) {
+    return {x.re, x.im};
+}
+
+// Narrow an accumulated value back to the device scalar type DS (host side,
+// after the reduction; identity in double).
+template <typename DS>
+inline DS narrow(ReduceAcc<DS> x) {
+    if constexpr (std::is_same_v<DS, float>) {
+        return static_cast<float>(x);
+    } else if constexpr (std::is_same_v<DS, DeviceComplex32>) {
+        return {static_cast<float>(x.re), static_cast<float>(x.im)};
+    } else {
+        return x;
+    }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Element-wise kernels (full buffer operations)                          */
 /*                                                                         */
@@ -228,21 +273,23 @@ __global__ void axpy_norm_sq_kernel(T alpha, const T* x, T* y,
 /**
  * Dot product reduction kernel (first pass) over the full buffer.
  * Computes per-block partial sums of conj_product(a, b). For real T this is
- * the bilinear a*b; for DeviceComplex it is the sesquilinear conj(a)*b, so
- * the partial sums (and the final result) are of device-scalar type T.
+ * the bilinear a*b; for DeviceComplex it is the sesquilinear conj(a)*b. The
+ * partial sums are of accumulator type ReduceAcc<T> (double precision for
+ * single-precision T).
  */
 template <typename T>
-__global__ void dot_reduce_kernel(const T* a, const T* b, T* partial_sums,
-                                  Index_t n) {
-    __shared__ T shared_data[REDUCE_BLOCK_SIZE];
+__global__ void dot_reduce_kernel(const T* a, const T* b,
+                                  ReduceAcc<T>* partial_sums, Index_t n) {
+    using Acc = ReduceAcc<T>;
+    __shared__ Acc shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
     Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Load and multiply
-    T sum{};
+    Acc sum{};
     while (idx < n) {
-        sum += conj_product(a[idx], b[idx]);
+        sum += widen(conj_product(a[idx], b[idx]));
         idx += blockDim.x * gridDim.x;
     }
     shared_data[tid] = sum;
@@ -284,19 +331,20 @@ __global__ void dot_reduce_kernel(const T* a, const T* b, T* partial_sums,
  */
 template <typename T>
 __global__ void interior_dot_kernel(
-    const T* a, const T* b, T* partial_sums,
+    const T* a, const T* b, ReduceAcc<T>* partial_sums,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t x0, Index_t y0, Index_t z0,
     Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
     Index_t nb_components) {
+    using Acc = ReduceAcc<T>;
 
-    __shared__ T shared_data[REDUCE_BLOCK_SIZE];
+    __shared__ Acc shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
     Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
     Index_t nb_pixels = nx * ny * nz;
 
-    T sum{};
+    Acc sum{};
     for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
          pixel_idx += blockDim.x * gridDim.x) {
         // x runs fastest (smallest stride) so consecutive threads make
@@ -309,7 +357,7 @@ __global__ void interior_dot_kernel(
         Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
         for (Index_t c = 0; c < nb_components; ++c) {
             const Index_t e = offset + c * stride_c;
-            sum += conj_product(a[e], b[e]);
+            sum += widen(conj_product(a[e], b[e]));
         }
     }
 
@@ -745,9 +793,13 @@ InteriorBox interior_box(const TypedField<T, DeviceSpace>& f,
 /* serves both reductions.                                                  */
 /* ---------------------------------------------------------------------- */
 
-//! Full-buffer reduction of conj_product(a, b) over `n` device-scalar elements.
+//! Full-buffer reduction of conj_product(a, b) over `n` device-scalar
+//! elements. Partial sums and the final reduction use the promoted
+//! accumulator type (double precision for single-precision DS); the result
+//! is narrowed back to DS.
 template <typename DS>
 DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
+    using Acc = gpu_kernels::ReduceAcc<DS>;
     if (n <= 0) {
         // e.g. an MPI rank with no local pixels; a zero-block kernel launch
         // would be an invalid configuration
@@ -755,23 +807,25 @@ DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
     }
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
-    DS* d_partial = scratch_as<DS>(0, num_blocks);
+    Acc* d_partial = scratch_as<Acc>(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel<DS>,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
                       a, b, d_partial, n);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<DS>,
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<Acc>,
                       1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
 
-    DS result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(DS));
-    return result;
+    Acc result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Acc));
+    return gpu_kernels::narrow<DS>(result);
 }
 
 //! Interior reduction of conj_product(a, b) (ghosts excluded). Strides come
-//! from `box`; the caller guarantees a and b share that layout.
+//! from `box`; the caller guarantees a and b share that layout. Accumulates
+//! in the promoted type like reduce_full_dot.
 template <typename DS>
 DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
+    using Acc = gpu_kernels::ReduceAcc<DS>;
     if (box.nb_interior_pixels <= 0) {
         // e.g. an MPI rank with no local pixels; a zero-block kernel launch
         // would be an invalid configuration
@@ -780,7 +834,7 @@ DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
     const int num_blocks =
         (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
         gpu_kernels::REDUCE_BLOCK_SIZE;
-    DS* d_partial = scratch_as<DS>(0, num_blocks);
+    Acc* d_partial = scratch_as<Acc>(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_kernel<DS>,
                       num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
@@ -788,12 +842,12 @@ DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
                       box.extent[2], box.start[0], box.start[1], box.start[2],
                       box.stride_c, box.stride[0], box.stride[1],
                       box.stride[2], box.nb_components_per_pixel);
-    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<DS>,
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<Acc>,
                       1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
 
-    DS result;
-    GPU_MEMCPY_D2H(&result, d_partial, sizeof(DS));
-    return result;
+    Acc result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Acc));
+    return gpu_kernels::narrow<DS>(result);
 }
 
 /* ---------------------------------------------------------------------- */

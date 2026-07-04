@@ -49,12 +49,38 @@ namespace internal {
 // Sesquilinear product: conj(a)*b for complex, a*b for real.
 template <typename T>
 inline T conj_product(T a, T b) {
-    if constexpr (std::is_same_v<T, Complex>) {
+    if constexpr (std::is_same_v<T, Complex> ||
+                  std::is_same_v<T, Complex32>) {
         return std::conj(a) * b;
     } else {
         return a * b;
     }
 }
+
+/**
+ * Accumulator type for reductions: single-precision sums are promoted to
+ * double precision (Real32 -> Real, Complex32 -> Complex) so a long running
+ * sum does not lose its small-magnitude tail. For CG this keeps rr/rz/pAp
+ * accurate enough that a float32 solve converges in the same number of
+ * iterations as a float64 one. The final result is narrowed back to T on
+ * return; that last rounding is a single O(eps_f32) relative error and
+ * harmless — it is the *running* float32 accumulation over millions of
+ * entries that loses ~1e-4 relative accuracy.
+ */
+template <typename T>
+struct promoted {
+    using type = T;
+};
+template <>
+struct promoted<Real32> {
+    using type = Real;
+};
+template <>
+struct promoted<Complex32> {
+    using type = Complex;
+};
+template <typename T>
+using promoted_t = typename promoted<T>::type;
 
 /**
  * True if the collection carries ghost buffers in any direction.
@@ -127,7 +153,34 @@ T interior_vecdot(const T* a_data, const T* b_data,
         stride[d] = strides[d];
     }
 
-    T result = T{0};
+    using Acc = promoted_t<T>;
+    Acc result{0};
+    if (stride[0] == 1) {
+        // x fastest with unit pixel stride: the interior of one grid row is a
+        // single contiguous segment of nnx * nb_components_per_pixel values.
+        // Reduce it with a vectorized Eigen dot (promoted accumulation) and
+        // sum the per-row results in the promoted type — the scalar
+        // pixel-by-pixel loop below runs ~4x under memory bandwidth.
+        const Index_t row_len = (end[0] - start[0]) * nb_components_per_pixel;
+        for (Index_t iz = start[2]; iz < end[2]; ++iz) {
+            for (Index_t iy = start[1]; iy < end[1]; ++iy) {
+                const Index_t offset =
+                    (start[0] + iy * stride[1] + iz * stride[2]) *
+                    nb_components_per_pixel;
+                Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, 1>> row_a(
+                    a_data + offset, row_len);
+                Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, 1>> row_b(
+                    b_data + offset, row_len);
+                if constexpr (std::is_same_v<Acc, T>) {
+                    result += row_a.dot(row_b);
+                } else {
+                    result += row_a.template cast<Acc>().dot(
+                        row_b.template cast<Acc>());
+                }
+            }
+        }
+        return static_cast<T>(result);
+    }
     for (Index_t iz = start[2]; iz < end[2]; ++iz) {
         for (Index_t iy = start[1]; iy < end[1]; ++iy) {
             for (Index_t ix = start[0]; ix < end[0]; ++ix) {
@@ -135,13 +188,13 @@ T interior_vecdot(const T* a_data, const T* b_data,
                     (ix * stride[0] + iy * stride[1] + iz * stride[2]) *
                     nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result +=
-                        conj_product(a_data[offset + c], b_data[offset + c]);
+                    result += static_cast<Acc>(
+                        conj_product(a_data[offset + c], b_data[offset + c]));
                 }
             }
         }
     }
-    return result;
+    return static_cast<T>(result);
 }
 
 /**
@@ -174,7 +227,8 @@ std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
         stride[d] = strides[d];
     }
 
-    T ru{0}, wu{0}, rr{0};
+    using Acc = promoted_t<T>;
+    Acc ru{0}, wu{0}, rr{0};
     for (Index_t iz = start[2]; iz < end[2]; ++iz) {
         for (Index_t iy = start[1]; iy < end[1]; ++iy) {
             for (Index_t ix = start[0]; ix < end[0]; ++ix) {
@@ -185,14 +239,42 @@ std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
                     const T rv = r_data[offset + c];
                     const T uv = u_data[offset + c];
                     const T wv = w_data[offset + c];
-                    ru += conj_product(rv, uv);
-                    wu += conj_product(wv, uv);
-                    rr += conj_product(rv, rv);
+                    ru += static_cast<Acc>(conj_product(rv, uv));
+                    wu += static_cast<Acc>(conj_product(wv, uv));
+                    rr += static_cast<Acc>(conj_product(rv, rv));
                 }
             }
         }
     }
-    return {ru, wu, rr};
+    return {static_cast<T>(ru), static_cast<T>(wu), static_cast<T>(rr)};
+}
+
+/**
+ * Full contiguous-buffer reductions with promoted accumulation (see
+ * promoted<T>): Eigen evaluates the cast lazily, so a single-precision
+ * reduction still streams fp32 from memory but accumulates in double.
+ */
+template <typename T>
+T full_vecdot(const TypedField<T, HostSpace>& a,
+              const TypedField<T, HostSpace>& b) {
+    using Acc = promoted_t<T>;
+    if constexpr (std::is_same_v<Acc, T>) {
+        return a.eigen_vec().dot(b.eigen_vec());
+    } else {
+        return static_cast<T>(a.eigen_vec().template cast<Acc>().dot(
+            b.eigen_vec().template cast<Acc>()));
+    }
+}
+
+template <typename T>
+T full_norm_sq(const TypedField<T, HostSpace>& x) {
+    using Acc = promoted_t<T>;
+    if constexpr (std::is_same_v<Acc, T>) {
+        return static_cast<T>(x.eigen_vec().squaredNorm());
+    } else {
+        return static_cast<T>(
+            x.eigen_vec().template cast<Acc>().squaredNorm());
+    }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -223,7 +305,7 @@ T vecdot_host(const TypedField<T, HostSpace>& a,
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (!has_ghosts(global_coll)) {
-            return a.eigen_vec().dot(b.eigen_vec());
+            return full_vecdot(a, b);
         }
         const Index_t nb_components_per_pixel =
             a.get_nb_components() * a.get_nb_sub_pts();
@@ -233,7 +315,7 @@ T vecdot_host(const TypedField<T, HostSpace>& a,
                                nb_components_per_pixel);
     }
     // LocalFieldCollection: no ghosts, use Eigen
-    return a.eigen_vec().dot(b.eigen_vec());
+    return full_vecdot(a, b);
 }
 
 template <typename T>
@@ -290,7 +372,7 @@ T norm_sq_host(const TypedField<T, HostSpace>& x) {
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (!has_ghosts(global_coll)) {
-            return x.eigen_vec().squaredNorm();
+            return full_norm_sq(x);
         }
         const Index_t nb_components_per_pixel =
             x.get_nb_components() * x.get_nb_sub_pts();
@@ -300,7 +382,7 @@ T norm_sq_host(const TypedField<T, HostSpace>& x) {
                                nb_components_per_pixel);
     }
     // LocalFieldCollection: no ghosts, use Eigen
-    return x.eigen_vec().squaredNorm();
+    return full_norm_sq(x);
 }
 
 template <typename T>
@@ -325,14 +407,14 @@ T axpy_norm_sq_host(T alpha, const TypedField<T, HostSpace>& x,
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (!has_ghosts(global_coll)) {
-            return y.eigen_vec().squaredNorm();
+            return full_norm_sq(y);
         }
         const Index_t nb_components_per_pixel =
             x.get_nb_components() * x.get_nb_sub_pts();
         return interior_vecdot(y.data(), y.data(), global_coll,
                                nb_components_per_pixel);
     }
-    return y.eigen_vec().squaredNorm();
+    return full_norm_sq(y);
 }
 
 // Field-valued scal: x[c, i] *= alpha[c, i], templated on x's scalar type.

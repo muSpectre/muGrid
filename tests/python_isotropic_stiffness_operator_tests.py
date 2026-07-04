@@ -2577,3 +2577,66 @@ class TestComputeSensitivity:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestSinglePrecisionMatchesDouble:
+    """The float32 kernels agree with the float64 reference to single-precision
+    accuracy. Nothing else in this suite compares the Real32 path against a
+    Real reference, so a float-summation-order regression in the vectorized
+    single-precision kernels would otherwise go unnoticed."""
+
+    @pytest.mark.parametrize(
+        "element", [muGrid.FEMElement.p1, muGrid.FEMElement.q1]
+    )
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_apply_diagonal_sensitivity(self, dim, element):
+        n = 8
+        h = [0.7, 1.3, 1.1][:dim]
+        Op = (
+            muGrid.IsotropicStiffnessOperator2D
+            if dim == 2
+            else muGrid.IsotropicStiffnessOperator3D
+        )
+        op = Op(tuple(h), element)
+
+        rng = np.random.default_rng(11)
+        u_vals = rng.standard_normal((dim,) + (n,) * dim)
+        lam_vals = 1.0 + rng.random((1,) + (n,) * dim)
+        mu_vals = 1.0 + rng.random((1,) + (n,) * dim)
+        E_f = list(rng.standard_normal(dim * dim))
+        E_c = list(rng.standard_normal(dim * dim))
+
+        def run(dtype):
+            ghosts = (1,) * dim
+            fc = muGrid.GlobalFieldCollection(
+                (n,) * dim, nb_ghosts_left=ghosts, nb_ghosts_right=ghosts
+            )
+            u = fc.real_field("u", (dim,), dtype=dtype)
+            f = fc.real_field("f", (dim,), dtype=dtype)
+            lam = fc.real_field("lam", (1,), dtype=dtype)
+            mu = fc.real_field("mu", (1,), dtype=dtype)
+            diag = fc.real_field("diag", (dim,), dtype=dtype)
+            gs = fc.real_field("gs", (1,), dtype=dtype)
+            gv = fc.real_field("gv", (1,), dtype=dtype)
+            u.p[...] = u_vals.astype(dtype)
+            lam.p[...] = lam_vals.astype(dtype)
+            mu.p[...] = mu_vals.astype(dtype)
+            for field in (u, lam, mu):
+                _fill_periodic(field, n, dim)
+            op.apply(u, lam, mu, f)
+            op.assemble_diagonal(lam, mu, diag)
+            op.compute_sensitivity(u, E_f, u, E_c, gs, gv)
+            return (
+                np.asarray(f.p, dtype=np.float64),
+                np.asarray(diag.p, dtype=np.float64),
+                np.asarray(gs.p, dtype=np.float64),
+                np.asarray(gv.p, dtype=np.float64),
+            )
+
+        ref = run(np.float64)
+        single = run(np.float32)
+        scale = np.abs(ref[0]).max()
+        for r, s in zip(ref, single):
+            np.testing.assert_allclose(
+                s, r, rtol=2e-5, atol=2e-5 * scale
+            )
