@@ -15,6 +15,7 @@ projects that mode out; in that case the right-hand side must not contain
 it.
 """
 
+import warnings
 from contextlib import nullcontext
 
 import numpy as np
@@ -547,14 +548,37 @@ class GreenJacobiPreconditioner(Preconditioner):
     timer : muTimer.Timer, optional
         When given, :meth:`apply` records the inner Green apply ("green") and the
         two diagonal scalings ("scale").
+    communicator : muGrid.Communicator, optional
+        Communicator of the parallel run (e.g. ``engine.communicator``). Used
+        only for the degenerate-diagonal diagnostic in
+        :meth:`update_diagonal`, which must be evaluated collectively so all
+        ranks agree; without it the check sees only the local subdomain.
+
+    Warns
+    -----
+    RuntimeWarning
+        When the diagonal makes Green-Jacobi degenerate to the plain Green
+        preconditioner: entirely void (typically material fields that were
+        never filled before assembly) or spatially constant (typically a
+        stale diagonal after an in-place material update without
+        :meth:`update_diagonal` / ``refresh()``).
     """
 
     def __init__(self, green, diagonal, void_tol=0.0,
-                 name="green-jacobi-preconditioner", timer=None):
+                 name="green-jacobi-preconditioner", timer=None,
+                 communicator=None):
         self._green = green
         self._name = name
         self._timer = timer
         self._void_tol = float(void_tol)
+        if communicator is not None:
+            # Accept raw C++ communicators too; the factory wraps them (and
+            # passes wrappers through) so the collective reductions below are
+            # available.
+            from .Parallel import Communicator
+
+            communicator = Communicator(communicator)
+        self._communicator = communicator
         self._jhalf = None
         self._work = None
         self.update_diagonal(diagonal)
@@ -571,6 +595,7 @@ class GreenJacobiPreconditioner(Preconditioner):
         s = diagonal.s
         vals = s.get() if hasattr(s, "get") else np.asarray(s)
         positive = vals > self._void_tol
+        self._check_degenerate(vals, positive)
         # Guard the sqrt against void/roundoff-negative entries; those DOFs get
         # J^{1/2} = 1 via the where() below regardless of the safe denominator.
         safe = np.where(positive, vals, 1.0)
@@ -583,6 +608,46 @@ class GreenJacobiPreconditioner(Preconditioner):
         # participates in the CG inner products.
         self._jhalf.set_zero()
         _fill_field(self._jhalf, jhalf)
+
+    def _check_degenerate(self, vals, positive):
+        """Warn when the diagonal makes ``J^{1/2} G J^{1/2}`` degenerate to
+        (a scalar multiple of) plain Green: entirely void, or constant with no
+        void entries. Both are usually accidents — material fields never
+        filled before assembly, or a stale diagonal after an in-place material
+        update — and silently forfeit the Jacobi acceleration.
+
+        With a communicator the verdict is formed COLLECTIVELY and
+        unconditionally on every rank (empty subdomains contribute reduction
+        identities), so all ranks warn — or stay silent — together."""
+        has_positive = bool(positive.any())
+        has_void = not bool(positive.all())
+        # Identity values for ranks holding no positive entries.
+        vmax = float(vals[positive].max()) if has_positive else -np.inf
+        vmin = float(vals[positive].min()) if has_positive else np.inf
+        comm = self._communicator
+        if comm is not None:
+            has_positive = bool(comm.any(has_positive))
+            has_void = bool(comm.any(has_void))
+            vmax = float(comm.reduce_max(np.asarray([vmax])))
+            vmin = float(comm.reduce_min(np.asarray([vmin])))
+        if not has_positive:
+            warnings.warn(
+                "Green-Jacobi diagonal is entirely void (all entries <= "
+                f"void_tol = {self._void_tol}): J^{{1/2}} = 1 everywhere, so "
+                "this preconditioner is identical to the plain Green "
+                "preconditioner. The material fields were probably not "
+                "filled before the diagonal was assembled.",
+                RuntimeWarning, stacklevel=3,
+            )
+        elif not has_void and vmax - vmin <= 1e-12 * abs(vmax):
+            warnings.warn(
+                "Green-Jacobi diagonal is spatially constant: the "
+                "preconditioner only rescales the plain Green preconditioner "
+                "and cannot accelerate convergence. If the material was "
+                "updated in place, re-assemble the diagonal and call "
+                "update_diagonal() (or refresh()).",
+                RuntimeWarning, stacklevel=3,
+            )
 
     def _work_field(self, r):
         if self._work is None:
@@ -798,9 +863,10 @@ def make_green_jacobi_preconditioner(
     nb_components : int
         Degrees of freedom per node (``dim`` for one node per pixel).
     reference_lambda, reference_mu : float, optional
-        Uniform reference Lamé parameters for the Green part. Default: the local
-        means of ``lambda_field`` / ``mu_field`` (not MPI-reduced; pass explicit
-        values for a deterministic reference under domain decomposition).
+        Uniform reference Lamé parameters for the Green part. Default: the
+        global (MPI-reduced) means of ``lambda_field`` / ``mu_field``, so the
+        reference — and hence the assembled Green symbol — is identical on
+        every rank regardless of the domain decomposition.
     void_tol : float, optional
         Passed to :class:`GreenJacobiPreconditioner`.
     name : str, optional
@@ -823,16 +889,22 @@ def make_green_jacobi_preconditioner(
     """
     n = int(nb_components)
 
+    # Global (count-weighted, MPI-reduced) means so the reference stiffness is
+    # deterministic under domain decomposition; reduce_mean handles host and
+    # device views alike. Engines without a communicator (serial stand-ins)
+    # fall back to the local mean, which is then the global one.
+    comm = getattr(engine, "communicator", None)
+
+    def _global_mean(field):
+        s = field.s
+        if comm is not None:
+            return float(comm.reduce_mean(s))
+        return float((s.get() if hasattr(s, "get") else np.asarray(s)).mean())
+
     if reference_lambda is None:
-        lam_s = lambda_field.s
-        reference_lambda = float(
-            (lam_s.get() if hasattr(lam_s, "get") else np.asarray(lam_s)).mean()
-        )
+        reference_lambda = _global_mean(lambda_field)
     if reference_mu is None:
-        mu_s = mu_field.s
-        reference_mu = float(
-            (mu_s.get() if hasattr(mu_s, "get") else np.asarray(mu_s)).mean()
-        )
+        reference_mu = _global_mean(mu_field)
 
     def apply_reference_stiffness(u, f):
         engine.communicate_ghosts(u)
@@ -848,7 +920,8 @@ def make_green_jacobi_preconditioner(
     stiffness_op.assemble_diagonal(lambda_field, mu_field, diagonal)
 
     prec = GreenJacobiPreconditioner(
-        green, diagonal, void_tol=void_tol, name=name, timer=timer
+        green, diagonal, void_tol=void_tol, name=name, timer=timer,
+        communicator=comm,
     )
 
     # Keep the ingredients so the Jacobi part can be recomputed in place when
@@ -857,6 +930,10 @@ def make_green_jacobi_preconditioner(
     prec._lambda_field = lambda_field
     prec._mu_field = mu_field
     prec._diagonal = diagonal
+    # Introspection (and MPI-determinism tests): the reference the Green
+    # symbol was built from.
+    prec._reference_lambda = reference_lambda
+    prec._reference_mu = reference_mu
 
     def refresh():
         """Re-assemble diag(K) from the (updated) material fields and refresh

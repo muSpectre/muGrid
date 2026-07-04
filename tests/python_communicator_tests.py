@@ -34,6 +34,8 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -44,6 +46,43 @@ def test_sum_default():
     # The default communicator is COMM_SELF, i.e. each process by itself
     comm = muGrid.Communicator()
     assert comm.sum(comm.rank + 3) == 3
+
+
+def test_serial_communicator_under_mpi_launcher_warns(monkeypatch):
+    """Constructing a serial (default) communicator inside a multi-rank MPI
+    launcher environment is almost always an accident (every rank solves the
+    full problem) and must warn; a single-rank or launcher-free environment
+    must stay silent."""
+    from muGrid.Parallel import _MPI_LAUNCHER_SIZE_VARS
+
+    for var in _MPI_LAUNCHER_SIZE_VARS:
+        monkeypatch.delenv(var, raising=False)
+
+    # No launcher detected: no warning.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        muGrid.Communicator()
+
+    # Single-rank launcher: no warning.
+    monkeypatch.setenv("OMPI_COMM_WORLD_SIZE", "1")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        muGrid.Communicator()
+
+    # Multi-rank launcher: warn.
+    monkeypatch.setenv("OMPI_COMM_WORLD_SIZE", "4")
+    with pytest.warns(RuntimeWarning, match="MPI launcher with 4 ranks"):
+        muGrid.Communicator()
+
+    # Explicitly passing a communicator never warns.
+    monkeypatch.setenv("OMPI_COMM_WORLD_SIZE", "4")
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        return
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        muGrid.Communicator(MPI.COMM_WORLD)
 
 
 @pytest.mark.skipif(

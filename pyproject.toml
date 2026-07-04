@@ -80,6 +80,13 @@ testpaths = ["tests"]
 # and crashes collection on recent pytest. Style checking is done via
 # pre-commit, not pytest.
 addopts = "-p no:flake8"
+filterwarnings = [
+    # Many tests deliberately construct serial communicators; when the suite
+    # itself runs under mpiexec (CI), the serial-under-launcher diagnostic
+    # would flood the summary. Tests that assert the warning use pytest.warns,
+    # which overrides this ignore.
+    "ignore:This process runs under an MPI launcher:RuntimeWarning",
+]
 
 
 [tool.black]

@@ -34,6 +34,9 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
+import os
+import warnings
+
 import numpy as np
 
 # Import the C++ extension module
@@ -556,6 +559,42 @@ class _Reduction:
         return self._comm.reduce_mean(a)
 
 
+#: Environment variables MPI launchers use to announce the world size.
+_MPI_LAUNCHER_SIZE_VARS = (
+    "OMPI_COMM_WORLD_SIZE",  # Open MPI
+    "PMI_SIZE",  # MPICH / Hydra
+    "MV2_COMM_WORLD_SIZE",  # MVAPICH2
+    "SLURM_NTASKS",  # srun
+)
+
+
+def _mpi_launcher_world_size():
+    """World size announced by an MPI launcher's environment, or 1 when not
+    running under a (detectable) launcher."""
+    for var in _MPI_LAUNCHER_SIZE_VARS:
+        value = os.environ.get(var)
+        if value:
+            try:
+                return int(value)
+            except ValueError:
+                pass
+    return 1
+
+
+def _warn_if_serial_under_launcher():
+    nb_ranks = _mpi_launcher_world_size()
+    if nb_ranks > 1:
+        warnings.warn(
+            f"This process runs under an MPI launcher with {nb_ranks} ranks, "
+            "but a serial muGrid Communicator is being constructed: every "
+            "rank will redundantly work on the full problem by itself. To "
+            "enable domain decomposition, pass mpi4py's MPI.COMM_WORLD to "
+            "muGrid.Communicator() (and to the FFT engine).",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+
 def Communicator(communicator=None):
     """
     Factory function for the communicator class.
@@ -569,10 +608,21 @@ def Communicator(communicator=None):
     -------
     CommunicatorWrapper
         A wrapped communicator with GPU-aware reduction operations
+
+    Warns
+    -----
+    RuntimeWarning
+        When a serial communicator is constructed (``communicator=None``)
+        while the environment indicates the process was started by a
+        multi-rank MPI launcher — usually an accident that makes every rank
+        solve the full problem independently. Intentional serial use under a
+        launcher keeps working; suppress the warning with
+        :func:`warnings.catch_warnings` if it is deliberate.
     """
     # If the communicator is None, we return a communicator that contains just
     # the present process.
     if communicator is None:
+        _warn_if_serial_under_launcher()
         cpp_comm = _muGrid.Communicator()
         return CommunicatorWrapper(cpp_comm, mpi_comm=None)
 

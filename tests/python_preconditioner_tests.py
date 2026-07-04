@@ -702,14 +702,18 @@ def _elasticity_reference_precond(comm, engine, n):
 
 def test_green_jacobi_identity_diagonal(comm):
     """With a unit diagonal, J^{1/2} = 1 and Green-Jacobi reduces exactly to the
-    inner Green preconditioner."""
+    inner Green preconditioner — and warns about it, since a constant diagonal
+    means the Jacobi part is doing nothing."""
     n = 2
     engine = make_engine(comm, (16, 16))
     _, green = _elasticity_reference_precond(comm, engine, n)
 
     diag = engine.real_space_field("diag", components=(n,))
     diag.p[...] = 1.0
-    gj = GreenJacobiPreconditioner(green, diag)
+    with pytest.warns(RuntimeWarning, match="constant"):
+        gj = GreenJacobiPreconditioner(
+            green, diag, communicator=engine.communicator
+        )
 
     r = engine.real_space_field("r", components=(n,))
     z_green = engine.real_space_field("z_green", components=(n,))
@@ -724,17 +728,53 @@ def test_green_jacobi_identity_diagonal(comm):
     )
 
 
+def test_green_jacobi_all_void_diagonal_warns(comm):
+    """An entirely void diagonal (typically: material fields never filled
+    before assembly) silently reduces Green-Jacobi to plain Green — this must
+    warn, and the apply must stay finite."""
+    n = 2
+    engine = make_engine(comm, (16, 16))
+    _, green = _elasticity_reference_precond(comm, engine, n)
+
+    diag = engine.real_space_field("diag", components=(n,))
+    diag.p[...] = 0.0
+    with pytest.warns(RuntimeWarning, match="entirely void"):
+        gj = GreenJacobiPreconditioner(
+            green, diag, communicator=engine.communicator
+        )
+
+    r = engine.real_space_field("r", components=(n,))
+    z = engine.real_space_field("z", components=(n,))
+    r.p[...] = 1.0
+    gj.apply(r, z)
+    assert np.all(np.isfinite(np.asarray(z.p)))
+
+
 def test_green_jacobi_void_diagonal_is_finite(comm):
     """Void entries in the diagonal (<= void_tol) must not produce NaN/Inf: they
-    are treated as J^{1/2} = 1 (those DOFs carry no stiffness)."""
+    are treated as J^{1/2} = 1 (those DOFs carry no stiffness). A partial void
+    with otherwise constant entries is legitimate (two-phase with voids) and
+    must NOT trigger the degenerate-diagonal warning — also under MPI, where
+    only one rank owns the void patch (exercises the collective verdict)."""
+    import warnings
+
     n = 2
     engine = make_engine(comm, (16, 16))
     _, green = _elasticity_reference_precond(comm, engine, n)
 
     diag = engine.real_space_field("diag", components=(n,))
     diag.p[...] = 1.0
-    diag.p[:, :4, :4] = 0.0  # a void patch
-    gj = GreenJacobiPreconditioner(green, diag)
+    ox, oy = engine.subdomain_locations
+    lx, ly = engine.nb_subdomain_grid_pts
+    x = np.arange(ox, ox + lx)
+    y = np.arange(oy, oy + ly)
+    void = (x[:, np.newaxis] < 4) & (y[np.newaxis, :] < 4)  # global [:4, :4]
+    diag.p[:, void] = 0.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        gj = GreenJacobiPreconditioner(
+            green, diag, communicator=engine.communicator
+        )
 
     r = engine.real_space_field("r", components=(n,))
     z = engine.real_space_field("z", components=(n,))
@@ -830,6 +870,119 @@ def test_green_jacobi_elasticity_homogenization(comm):
     # contrast (empirically ~20 vs several hundred iterations here).
     assert it_gj < it_green / 3
     assert it_gj < 60
+
+
+def _laminate_setup(comm, n):
+    """Engine, stiffness operator and (initially uniform) Lamé fields for the
+    paper's laminate experiment (Ladecký et al., Sec. 4.1.1)."""
+    op = muGrid.IsotropicStiffnessOperator2D(
+        [1 / n, 1 / n], muGrid.FEMElement.q1
+    )
+    engine = muGrid.FFTEngine(
+        (n, n), comm, nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
+    )
+    fc = engine.real_space_collection
+    lam = fc.real_field("lambda")
+    mu = fc.real_field("mu")
+    lam.p[...] = 1.0
+    mu.p[...] = 1.0
+    engine.communicate_ghosts(lam)
+    engine.communicate_ghosts(mu)
+    return engine, op, lam, mu
+
+
+def _laminate_density(engine, n, chi):
+    """Smooth pixel-wise linear density ramp from 1/chi to 1 along x."""
+    x = np.asarray(engine.coords)[0]
+    j = np.floor(x * n) / n
+    return 1 / chi + (1 - 1 / chi) * j / (1 - 1 / n)
+
+
+def _laminate_solve(comm, engine, op, lam, mu, prec):
+    """PCG iteration count for the shear-loaded laminate problem."""
+    s = 1 / np.sqrt(2)
+    E = [1.0, s, s, 1.0]
+    fc = engine.real_space_collection
+    rhs = engine.real_space_field("rhs", components=(2,))
+    op.apply_macro_rhs(lam, mu, E, rhs)
+    rhs.s[...] *= -1.0
+    sol = engine.real_space_field("solution", components=(2,))
+    sol.p[...] = 0.0
+
+    def hessp(u, Au):
+        engine.communicate_ghosts(u)
+        op.apply(u, lam, mu, Au)
+
+    iterations = []
+    conjugate_gradients(
+        comm, fc, rhs, sol, hessp=hessp, prec=prec,
+        rtol=1e-5, maxiter=2000,
+        callback=lambda it, state: iterations.append(it),
+    )
+    fc.pop_field("rhs")
+    fc.pop_field("solution")
+    return max(iterations)
+
+
+def test_green_jacobi_refresh_after_material_update(comm):
+    """Regression for the silent stale-diagonal trap: a Green-Jacobi
+    preconditioner built while the material is still uniform (it warns), then
+    used after an in-place material update WITHOUT refresh(), converges no
+    faster than plain Green; after refresh() it recovers the J-FFT speedup."""
+    n, chi = 64, 1e4
+    engine, op, lam, mu = _laminate_setup(comm, n)
+
+    # Built too early: the diagonal is constant -> warns.
+    with pytest.warns(RuntimeWarning, match="constant"):
+        prec = make_green_jacobi_preconditioner(
+            engine, op, lam, mu, 2, reference_lambda=1.0, reference_mu=1.0
+        )
+
+    # In-place material update to the smooth high-contrast ramp.
+    rho = _laminate_density(engine, n, chi)
+    lam.p[...] = rho
+    mu.p[...] = rho
+    engine.communicate_ghosts(lam)
+    engine.communicate_ghosts(mu)
+
+    it_stale = _laminate_solve(comm, engine, op, lam, mu, prec)
+    prec.refresh()
+    it_fresh = _laminate_solve(comm, engine, op, lam, mu, prec)
+
+    # Empirically (serial): stale = 41 (exactly the plain-Green count),
+    # fresh = 7.
+    assert it_fresh * 2 < it_stale
+    assert it_fresh < 20
+
+
+def test_green_jacobi_default_reference_mpi_deterministic(comm):
+    """The default reference Lamé parameters are global (MPI-reduced) means:
+    identical on every rank and equal to the mean over the whole domain,
+    regardless of the decomposition."""
+    n, chi = 32, 1e2
+    engine, op, lam, mu = _laminate_setup(comm, n)
+    rho = _laminate_density(engine, n, chi)
+    lam.p[...] = 2.0 * rho
+    mu.p[...] = rho
+    engine.communicate_ghosts(lam)
+    engine.communicate_ghosts(mu)
+
+    prec = make_green_jacobi_preconditioner(engine, op, lam, mu, 2)
+
+    # Expected global mean, computed redundantly on every rank from the
+    # global formula (pixel values j/n, j = 0 .. n-1).
+    j = np.arange(n) / n
+    rho_global = 1 / chi + (1 - 1 / chi) * j / (1 - 1 / n)
+    expected_mu = rho_global.mean()
+    np.testing.assert_allclose(prec._reference_mu, expected_mu, rtol=1e-12)
+    np.testing.assert_allclose(
+        prec._reference_lambda, 2.0 * expected_mu, rtol=1e-12
+    )
+
+    # Bitwise identical across ranks (Allreduce returns the same value
+    # everywhere).
+    assert comm.max(prec._reference_mu) == prec._reference_mu
+    assert comm.max(-prec._reference_mu) == -prec._reference_mu
 
 
 if __name__ == "__main__":
