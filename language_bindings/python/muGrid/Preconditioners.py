@@ -36,6 +36,31 @@ def _fill_field(field, values):
         s[...] = cupy.asarray(values)
 
 
+def _field_dtype(field):
+    """Scalar dtype of a (host or device) field, so managed scratch fields can
+    be allocated at the same precision as the data they operate on."""
+    return field.s.dtype
+
+
+def _real_field_like(collection, name, components, dtype):
+    """Get-or-create a real field of ``dtype`` on a (raw C++) field collection.
+
+    Mirrors the double/single dispatch of ``Wrappers._typed_field`` so managed
+    scratch fields (Jacobi ``J^{1/2}``, Green work buffer) match the precision
+    of the fields they operate on: ``float64`` via the collection's get-or-create
+    ``real_field``, ``float32`` via the register-only ``register_real32_field``.
+    """
+    dt = np.dtype(dtype)
+    if dt == np.dtype(np.float64):
+        return collection.real_field(name, components)
+    if dt == np.dtype(np.float32):
+        if collection.field_exists(name):
+            return collection.get_field(name)
+        return collection.register_real32_field(name, components, "pixel")
+    raise ValueError(f"managed real field dtype must be float32 or float64, "
+                     f"got {dt}")
+
+
 class Preconditioner:
     """
     Abstract base class for preconditioners.
@@ -563,8 +588,9 @@ class GreenJacobiPreconditioner(Preconditioner):
         jhalf = np.where(positive, 1.0 / np.sqrt(safe), 1.0)
         if self._jhalf is None:
             self._jhalf = wrap_field(
-                diagonal.collection.real_field(
-                    f"{self._name}-jhalf", tuple(diagonal.components_shape)
+                _real_field_like(
+                    diagonal.collection, f"{self._name}-jhalf",
+                    tuple(diagonal.components_shape), _field_dtype(diagonal),
                 )
             )
         # Zero the ghosts (as JacobiPreconditioner does); only the interior
@@ -575,8 +601,9 @@ class GreenJacobiPreconditioner(Preconditioner):
     def _work_field(self, r):
         if self._work is None:
             self._work = wrap_field(
-                r.collection.real_field(
-                    f"{self._name}-work", tuple(r.components_shape)
+                _real_field_like(
+                    r.collection, f"{self._name}-work",
+                    tuple(r.components_shape), _field_dtype(r),
                 )
             )
             self._work.set_zero()
@@ -738,7 +765,8 @@ def make_reference_stiffness_preconditioner(
     engine.fourier_space_collection.pop_field(column_hat_name)
     del impulse, column, column_hat
 
-    return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer)
+    return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer,
+                                      dtype=real_dtype)
 
 
 def make_green_jacobi_preconditioner(
@@ -752,6 +780,7 @@ def make_green_jacobi_preconditioner(
     void_tol=0.0,
     name="green-jacobi-preconditioner",
     timer=None,
+    dtype=None,
 ):
     r"""
     Assemble the Green-Jacobi (J-FFT) preconditioner for FFT-accelerated FE
@@ -797,6 +826,12 @@ def make_green_jacobi_preconditioner(
         Prefix for the managed fields.
     timer : muTimer.Timer, optional
         Forwarded to both sub-preconditioners.
+    dtype : data-type, optional
+        Real-space precision of the preconditioner (``np.float32`` or
+        ``np.float64``): sets the dtype of the Jacobi diagonal and the inner
+        Green preconditioner's fields so their transforms pair with the solver's
+        fields. Defaults to the dtype of ``lambda_field``, so a single-precision
+        material yields a single-precision preconditioner automatically.
 
     Returns
     -------
@@ -806,6 +841,16 @@ def make_green_jacobi_preconditioner(
         bound for in-place material updates.
     """
     n = int(nb_components)
+
+    # Match the Jacobi diagonal and the inner Green preconditioner to the
+    # precision of the material fields (the FFT engine and fused operators
+    # dispatch on the field dtype). Inferred from ``lambda_field`` when not
+    # given, so a single-precision (float32) material yields a single-precision
+    # preconditioner; float64 fields keep the previous default unchanged.
+    if dtype is None:
+        lam_p = lambda_field.s
+        dtype = (lam_p.get() if hasattr(lam_p, "get")
+                 else np.asarray(lam_p)).dtype
 
     if reference_lambda is None:
         lam_s = lambda_field.s
@@ -823,10 +868,12 @@ def make_green_jacobi_preconditioner(
         stiffness_op.apply_uniform(u, reference_lambda, reference_mu, f)
 
     green = make_reference_stiffness_preconditioner(
-        engine, apply_reference_stiffness, n, name=f"{name}-green", timer=timer
+        engine, apply_reference_stiffness, n, name=f"{name}-green", timer=timer,
+        dtype=dtype,
     )
 
-    diagonal = engine.real_space_field(f"{name}-diagonal", components=(n,))
+    diagonal = engine.real_space_field(f"{name}-diagonal", components=(n,),
+                                       dtype=dtype)
     stiffness_op.assemble_diagonal(lambda_field, mu_field, diagonal)
 
     prec = GreenJacobiPreconditioner(

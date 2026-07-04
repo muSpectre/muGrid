@@ -149,6 +149,71 @@ else:
     import cupy as xp
 ```
 
+## Device memory allocation
+
+By default µGrid allocates device memory with raw `cudaMalloc` / `hipMalloc`,
+while Python array libraries such as CuPy serve their allocations from a caching
+pool that does not return freed blocks to the driver. Two independent allocators
+on one device can starve each other: near capacity µGrid's raw allocation fails
+even though free blocks sit cached inside CuPy's pool. Route both through a
+single owner to remove this failure mode by construction:
+
+```python
+import muGrid
+
+muGrid.use_cupy_allocator()   # µGrid draws from CuPy's memory pool
+fc = muGrid.GlobalFieldCollection([512, 512, 512], device="gpu")
+```
+
+Call `use_cupy_allocator()` **once, before** creating any GPU field collection.
+The inverse, `muGrid.route_cupy_through_mugrid()`, instead makes µGrid the single
+owner of every device byte (and records CuPy's allocations in the allocation
+profiler alongside Fields); `muGrid.clear_device_allocator()` restores the raw
+default.
+
+### Unified-memory APUs and the full HBM
+
+On a unified-memory accelerator — an APU such as the **AMD Instinct MI300A**,
+where the CPU and GPU share one physical HBM stack — the default device
+allocator only reaches the *coarse-grained device-local window*, which is a
+fraction of the physical memory. On MI300A that window is ~62.8 GiB of the
+128 GB package. The remaining memory is **not** physically partitioned away: it
+is visible to the CPU and reachable from the GPU through managed memory (the
+same physical HBM, at native bandwidth). A plain `hipMalloc` nonetheless runs
+out of memory once allocations exceed that window.
+
+*Managed* (unified) memory — `hipMallocManaged` / `cudaMallocManaged` — draws
+from the whole shared pool instead. Point CuPy's default pool at managed memory
+and then route µGrid through it, so **fields, solver scratch and the
+preconditioner all use the full HBM**:
+
+```python
+import cupy, muGrid
+
+# CuPy's default pool -> managed (unified) memory ...
+cupy.cuda.set_allocator(cupy.cuda.MemoryPool(cupy.cuda.malloc_managed).malloc)
+# ... and µGrid draws from that same pool.
+muGrid.use_cupy_allocator()
+
+# A large double-precision grid that overflows the coarse-grained window now
+# allocates from the full unified HBM:
+fc = muGrid.GlobalFieldCollection([512, 512, 512], device="gpu")
+```
+
+!!! note "When this matters"
+    Only when a workload's device footprint exceeds the coarse-grained window
+    — e.g. a 512³ double-precision FFT-preconditioned solve on MI300A needs
+    ~70 GiB > 62.8 GiB, so it OOMs with the default allocator but fits with
+    managed memory. Grids that fit the window need no change. On a true APU
+    managed pages live in the same physical HBM as the default pool, so there is
+    no PCIe migration; a modest first-touch / page-fault overhead is still
+    possible and worth benchmarking for latency-sensitive runs.
+
+!!! warning "Install the allocator before the first device field"
+    `use_cupy_allocator()` and the managed pool must be set before any GPU field
+    is created. Re-registering the allocator while device fields are live drops
+    the keepalive of their buffers and can free them out from under µGrid.
+
 ## Zero-copy data exchange
 
 µGrid uses the [DLPack](https://github.com/dmlc/dlpack) protocol for zero-copy
