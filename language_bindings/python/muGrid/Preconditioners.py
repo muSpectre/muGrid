@@ -23,6 +23,20 @@ from . import linalg
 from .Field import wrap_field
 
 
+def _real_field_like(field, name):
+    """Get-or-create a real field on ``field``'s collection with the same
+    component shape and scalar precision (float64 or float32) as ``field``."""
+    coll = field.collection
+    components = tuple(field.components_shape)
+    if np.dtype(field.dtype) == np.dtype(np.float32):
+        # register_real32_field is register-only; mirror real_field's
+        # get-or-create semantics.
+        if coll.field_exists(name):
+            return wrap_field(coll.get_field(name))
+        return wrap_field(coll.register_real32_field(name, components))
+    return wrap_field(coll.real_field(name, components))
+
+
 def _fill_field(field, values):
     """Assign host values to the interior view of a host or device field."""
     s = field.s
@@ -34,31 +48,6 @@ def _fill_field(field, values):
         import cupy
 
         s[...] = cupy.asarray(values)
-
-
-def _field_dtype(field):
-    """Scalar dtype of a (host or device) field, so managed scratch fields can
-    be allocated at the same precision as the data they operate on."""
-    return field.s.dtype
-
-
-def _real_field_like(collection, name, components, dtype):
-    """Get-or-create a real field of ``dtype`` on a (raw C++) field collection.
-
-    Mirrors the double/single dispatch of ``Wrappers._typed_field`` so managed
-    scratch fields (Jacobi ``J^{1/2}``, Green work buffer) match the precision
-    of the fields they operate on: ``float64`` via the collection's get-or-create
-    ``real_field``, ``float32`` via the register-only ``register_real32_field``.
-    """
-    dt = np.dtype(dtype)
-    if dt == np.dtype(np.float64):
-        return collection.real_field(name, components)
-    if dt == np.dtype(np.float32):
-        if collection.field_exists(name):
-            return collection.get_field(name)
-        return collection.register_real32_field(name, components, "pixel")
-    raise ValueError(f"managed real field dtype must be float32 or float64, "
-                     f"got {dt}")
 
 
 class Preconditioner:
@@ -587,12 +576,9 @@ class GreenJacobiPreconditioner(Preconditioner):
         safe = np.where(positive, vals, 1.0)
         jhalf = np.where(positive, 1.0 / np.sqrt(safe), 1.0)
         if self._jhalf is None:
-            self._jhalf = wrap_field(
-                _real_field_like(
-                    diagonal.collection, f"{self._name}-jhalf",
-                    tuple(diagonal.components_shape), _field_dtype(diagonal),
-                )
-            )
+            # Match the diagonal's precision so linalg.scal pairs J^{1/2}
+            # with the solver fields in a single-precision solve.
+            self._jhalf = _real_field_like(diagonal, f"{self._name}-jhalf")
         # Zero the ghosts (as JacobiPreconditioner does); only the interior
         # participates in the CG inner products.
         self._jhalf.set_zero()
@@ -600,12 +586,7 @@ class GreenJacobiPreconditioner(Preconditioner):
 
     def _work_field(self, r):
         if self._work is None:
-            self._work = wrap_field(
-                _real_field_like(
-                    r.collection, f"{self._name}-work",
-                    tuple(r.components_shape), _field_dtype(r),
-                )
-            )
+            self._work = _real_field_like(r, f"{self._name}-work")
             self._work.set_zero()
         return self._work
 
@@ -765,8 +746,8 @@ def make_reference_stiffness_preconditioner(
     engine.fourier_space_collection.pop_field(column_hat_name)
     del impulse, column, column_hat
 
-    return BlockFourierPreconditioner(engine, K_inv, name=name, timer=timer,
-                                      dtype=real_dtype)
+    return BlockFourierPreconditioner(
+        engine, K_inv, name=name, timer=timer, dtype=real_dtype)
 
 
 def make_green_jacobi_preconditioner(
@@ -868,12 +849,12 @@ def make_green_jacobi_preconditioner(
         stiffness_op.apply_uniform(u, reference_lambda, reference_mu, f)
 
     green = make_reference_stiffness_preconditioner(
-        engine, apply_reference_stiffness, n, name=f"{name}-green", timer=timer,
-        dtype=dtype,
+        engine, apply_reference_stiffness, n, name=f"{name}-green",
+        timer=timer, dtype=dtype
     )
 
-    diagonal = engine.real_space_field(f"{name}-diagonal", components=(n,),
-                                       dtype=dtype)
+    diagonal = engine.real_space_field(
+        f"{name}-diagonal", components=(n,), dtype=dtype)
     stiffness_op.assemble_diagonal(lambda_field, mu_field, diagonal)
 
     prec = GreenJacobiPreconditioner(
