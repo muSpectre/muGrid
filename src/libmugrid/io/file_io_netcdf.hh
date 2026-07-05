@@ -686,11 +686,11 @@ namespace muGrid {
     IOSize_t get_nb_local_pixels() const;
 
     //! get a pointer to the raw data for the NetCDF variable
-    void * get_buf() const;
+    virtual void * get_buf() const;
 
     //! An integer indicates the number of MPI derived data type elements in the
     //! global variable buffer to be written to a file.
-    IOSize_t get_bufcount_mpi_global() const;
+    virtual IOSize_t get_bufcount_mpi_global() const;
 
     //! An integer indicates the number of MPI derived data type elements in the
     //! local variable buffer to be written to a file. (this is the buf count
@@ -716,7 +716,7 @@ namespace muGrid {
     //! A vector of IOSize_t values specifying the edge lengths along each
     //! dimension of the block of data values to be written. This function gives
     //! the count for contiguous global fields written with ncmu_put_varm_all
-    std::vector<IOSize_t> get_count_global() const;
+    virtual std::vector<IOSize_t> get_count_global() const;
 
     //! A vector of IOSize_t values specifying the edge lengths along each
     //! dimension of the block of data values to be written. This function gives
@@ -856,7 +856,9 @@ namespace muGrid {
     //! device is written/read in place (zero-copy), and host-resident fields
     //! never need a mirror. Throws for unsupported device variables (state
     //! fields, whose contiguous multi-history buffer cannot be reproduced).
-    bool needs_mirror() const;
+    //! Buffer-backed variables (which own no field) override this to return
+    //! false so the host-based I/O path operates on their buffer directly.
+    virtual bool needs_mirror() const;
 
     //! lazily build (if necessary) and return the host staging mirror for a
     //! device-resident field. Must not be called for host-resident fields.
@@ -1084,6 +1086,103 @@ namespace muGrid {
   };
 
   /**
+   * Class to store a single per-frame, grid-less NetCDF variable: a small
+   * quantity that is replicated (identical on every MPI rank) and carries only
+   * the unlimited `frame` dimension plus fixed component dimensions. Unlike
+   * NetCDFVarField it owns its own contiguous host buffer instead of delegating
+   * to a muGrid::Field, so it can represent quantities that are not defined on
+   * the grid -- e.g. an applied deformation gradient that is one tensor for the
+   * whole domain at each frame. The resulting variable has dimension order
+   * (frame, component_shape...).
+   **/
+  class NetCDFVarFrameData final : public NetCDFVarBase {
+   public:
+    //! Default constructor
+    NetCDFVarFrameData() = delete;
+
+    /**
+     * Constructor. `component_shape` is the shape of a single frame's value
+     * (e.g. {dim, dim}); `netcdf_var_dims` must be {frame, component_shape...}
+     * in that order and hence `var_ndims == component_shape.size() + 1`.
+     */
+    NetCDFVarFrameData(
+        const std::string & var_name, const nc_type & var_data_type,
+        const IOSize_t & var_ndims,
+        const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
+        const std::vector<IOSize_t> & component_shape);
+
+    //! Copy constructor (deleted: see NetCDFVarBase)
+    NetCDFVarFrameData(const NetCDFVarFrameData & other) = delete;
+
+    //! Move constructor
+    NetCDFVarFrameData(NetCDFVarFrameData && other) = delete;
+
+    //! Destructor
+    ~NetCDFVarFrameData() override = default;
+
+    //! Copy assignment operator
+    NetCDFVarFrameData & operator=(const NetCDFVarFrameData & other) = delete;
+
+    //! Move assignment operator
+    NetCDFVarFrameData & operator=(NetCDFVarFrameData && other) = delete;
+
+    //! this variable owns no field; calling this is a programming error
+    const muGrid::Field & get_field() const override;
+
+    //! host-resident buffer: never needs a device staging mirror
+    bool needs_mirror() const override { return false; }
+
+    //! start = {frame, 0, 0, ...}
+    std::vector<IOSize_t> get_start_global(const Index_t & frame) const override;
+
+    //! not a local (decomposed) variable
+    std::vector<IOSize_t>
+    get_start_local(const Index_t & frame,
+                    muGrid::Field & local_pixels) const override;
+
+    //! count = {1, component_shape...}
+    std::vector<IOSize_t> get_count_global() const override;
+
+    //! stride = {1, 1, ...}
+    std::vector<IODiff_t> get_nc_stride() const override;
+
+    //! row-major index map over the contiguous buffer
+    std::vector<IODiff_t> get_nc_imap_global() const override;
+    std::vector<IODiff_t> get_nc_imap_local() const override;
+
+    //! pointer to the owned buffer
+    void * get_buf() const override;
+
+    //! number of elements per frame (product of component_shape)
+    IOSize_t get_bufcount_mpi_global() const override;
+
+    //! Collective write: only rank 0 writes the (replicated) value, other ranks
+    //! issue a zero-size request so they still participate in the collective
+    //! call -- this avoids overlapping writes of the same region.
+    void write(const int netcdf_id, const Index_t & tot_nb_frames,
+               GlobalFieldCollection & GFC_local_pixels,
+               const Index_t & frame_index,
+               const Communicator & comm) override;
+
+    //! Collective read: every rank reads the full (replicated) value.
+    void read(const int netcdf_id, const Index_t & tot_nb_frames,
+              GlobalFieldCollection & GFC_local_pixels,
+              const Index_t & frame_index,
+              const Communicator & comm) override;
+
+    //! shape of a single frame's value (without the leading frame dimension)
+    const std::vector<IOSize_t> & get_component_shape() const;
+
+    //! size in bytes of one buffer element (derived from the data type)
+    IOSize_t get_element_size() const;
+
+   protected:
+    std::vector<IOSize_t> component_shape{};  // shape excluding the frame dim
+    IOSize_t element_size{0};                 // bytes per element
+    mutable std::vector<char> buffer{};       // owned contiguous host buffer
+  };
+
+  /**
    * Class to store the NetCDF dimensions
    * (dim_vector, global_domain_grid)
    **/
@@ -1283,6 +1382,15 @@ namespace muGrid {
         muGrid::StateField & var_state_field,
         const std::vector<std::shared_ptr<NetCDFDim>> & var_dims);
 
+    //! Add a per-frame, grid-less variable (a NetCDFVarFrameData owning its own
+    //! host buffer) and attach the dimensions to it. `component_shape` is the
+    //! shape of a single frame's value; `var_dims` must be
+    //! {frame, component_shape...}.
+    NetCDFVarFrameData &
+    add_frame_var(const std::string & var_name, const nc_type & var_data_type,
+                  const std::vector<IOSize_t> & component_shape,
+                  const std::vector<std::shared_ptr<NetCDFDim>> & var_dims);
+
     //! return a const reference on the var_vector which stores all variables
     const std::vector<std::shared_ptr<NetCDFVarBase>> & get_var_vector() const;
 
@@ -1425,6 +1533,36 @@ namespace muGrid {
         std::vector<std::string> field_names = {REGISTER_ALL_FIELDS},
         std::vector<std::string> state_field_unique_prefixes = {
             REGISTER_ALL_STATE_FIELDS}) final;
+
+    /**
+     * @brief Registers a per-frame, grid-less quantity to be written to the
+     * file.
+     *
+     * The quantity is a small tensor (scalar/vector/tensor of shape `shape`)
+     * that is replicated across all MPI ranks and stored once per frame,
+     * carrying the unlimited `frame` dimension plus fixed component dimensions.
+     * Unlike a field it is not tied to the grid. Must be called (like
+     * register_field_collection) before the first frame is written. The value
+     * for the current frame is set by writing into the buffer returned by
+     * `get_frame_variable_buffer` and then calling `write`/`append_frame`.
+     *
+     * @param name Unique variable name.
+     * @param shape Shape of a single frame's value (e.g. {dim, dim}).
+     * @param data_type NetCDF data type of the elements (e.g. NC_DOUBLE).
+     * @return Reference to the created variable (owns the host buffer).
+     */
+    NetCDFVarFrameData &
+    register_frame_variable(const std::string & name,
+                            const std::vector<IOSize_t> & shape,
+                            const nc_type & data_type);
+
+    /**
+     * @brief Returns the raw host buffer (and its byte size) of a registered
+     * frame variable, so a caller (e.g. the Python bindings) can view/set the
+     * current frame's value in place.
+     */
+    void * get_frame_variable_buffer(const std::string & name,
+                                     IOSize_t & size_in_bytes);
 
     /**
      * @brief Closes the file.

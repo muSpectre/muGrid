@@ -464,6 +464,52 @@ class FileIOTest(unittest.TestCase):
         first_frame.read()
         self.assertTrue(np.all(np.from_dlpack(f) == 1.5))
 
+    def test_FileIONetCDF_frame_variable(self):
+        """Round-trip a per-frame, grid-less quantity (a small replicated
+        tensor) written via register_frame_variable alongside a grid field."""
+        fname = "python_binding_io_frame-variable-tests.nc"
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+        self.comm.barrier()
+
+        # a per-pixel field so the file also carries grid data
+        field = self.fc_glob.register_real_field("frame-var-density", 1, "pixel")
+        np.from_dlpack(field)[...] = 3.0
+
+        nb_frames = 3
+        shape = [2, 2]
+        values = [np.eye(2) + 0.5 * k for k in range(nb_frames)]
+
+        fio_w = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Overwrite, self.comm)
+        fio_w.register_field_collection(self.fc_glob,
+                                        field_names=["frame-var-density"])
+        adg = fio_w.register_frame_variable(
+            "applied_deformation_gradient", shape, np.float64)
+        self.assertEqual(tuple(adg.shape), tuple(shape))
+        for k in range(nb_frames):
+            adg[...] = values[k]  # identical on every rank
+            fio_w.append_frame().write(
+                ["frame-var-density", "applied_deformation_gradient"])
+        del fio_w
+
+        self.comm.barrier()
+
+        # every rank reads back the full replicated value at each frame
+        fio_r = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read, self.comm)
+        self.assertEqual(len(fio_r), nb_frames)
+        adg_r = fio_r.register_frame_variable(
+            "applied_deformation_gradient", shape, np.float64)
+        for k in range(nb_frames):
+            fio_r.read(k, ["applied_deformation_gradient"])
+            self.assertTrue(np.allclose(np.array(adg_r), values[k]))
+        del fio_r
+
+        self.comm.barrier()
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+
 
 if __name__ == "__main__":
     unittest.main()

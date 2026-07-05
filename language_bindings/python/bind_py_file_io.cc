@@ -43,6 +43,7 @@
 #include <pybind11/stl.h>
 
 #include <pybind11/eigen.h>
+#include <pybind11/numpy.h>
 
 #include <string>
 #include <vector>
@@ -86,6 +87,26 @@ namespace {
           "Unknown data type of global attribute '" + att_name +
           "' value in the FileIONetCDF python bindings.");
     }
+  }
+
+  /**
+   * Map a numpy dtype to the matching NetCDF external data type, for
+   * per-frame variables.
+   */
+  nc_type numpy_dtype_to_nc_type(const py::dtype & dt) {
+    const char kind{dt.kind()};
+    const ssize_t size{dt.itemsize()};
+    if (kind == 'f' && size == 8) return NC_DOUBLE;
+    if (kind == 'f' && size == 4) return NC_FLOAT;
+    if (kind == 'i' && size == 8) return NC_INT64;
+    if (kind == 'i' && size == 4) return NC_INT;
+    if (kind == 'i' && size == 2) return NC_SHORT;
+    if (kind == 'u' && size == 8) return NC_UINT64;
+    if (kind == 'u' && size == 4) return NC_UINT;
+    if (kind == 'u' && size == 2) return NC_USHORT;
+    throw muGrid::FileIOError(
+        "Unsupported numpy dtype for a per-frame variable (kind '" +
+        std::string(1, kind) + "', itemsize " + std::to_string(size) + ").");
   }
 }  // namespace
 #endif  // WITH_NETCDF_IO
@@ -216,6 +237,39 @@ void add_file_io_netcdf(py::module & mod) {
                std::vector<std::string>{muGrid::REGISTER_ALL_FIELDS},
            "state_field_unique_prefixes"_a =
                std::vector<std::string>{muGrid::REGISTER_ALL_STATE_FIELDS})
+      .def(
+          "register_frame_variable",
+          [](FileIONetCDF & file_io_object, const std::string & name,
+             std::vector<IOSize_t> shape, py::object dtype) {
+            // Register the (grid-less) per-frame variable and return a numpy
+            // array that *views* its host buffer, so the caller sets the value
+            // for the current frame by writing into it and then calling
+            // write()/append_frame(). The array's base keeps the FileIONetCDF
+            // alive, so the view stays valid as long as it is used.
+            py::dtype dt{py::dtype::from_args(dtype)};
+            file_io_object.register_frame_variable(
+                name, shape, numpy_dtype_to_nc_type(dt));
+            IOSize_t nbytes{};
+            void * ptr{
+                file_io_object.get_frame_variable_buffer(name, nbytes)};
+            std::vector<py::ssize_t> np_shape(shape.begin(), shape.end());
+            std::vector<py::ssize_t> strides(np_shape.size());
+            py::ssize_t stride{dt.itemsize()};
+            for (size_t i{np_shape.size()}; i-- > 0;) {
+              strides[i] = stride;
+              stride *= np_shape[i];
+            }
+            return py::array(dt, np_shape, strides, ptr,
+                             py::cast(&file_io_object));
+          },
+          "name"_a, "shape"_a, "dtype"_a,
+          R"(Register a per-frame, grid-less quantity (a small tensor with one
+value for the whole domain per frame, replicated across MPI ranks) and return a
+numpy array that views its buffer. Call before the first frame is written; set
+the current frame's value by writing into the returned array, then flush it via
+write()/append_frame(). Args: name (str), shape (sequence of int, the shape of a
+single frame's value), dtype (numpy dtype). See also write_global_attribute for
+values that do not vary per frame.)")
       .def(
           "read",
           [](FileIONetCDF & file_io_object, const Index_t & frame,

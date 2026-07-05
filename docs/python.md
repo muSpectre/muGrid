@@ -488,6 +488,49 @@ append_frame()                           # -> frame object for writing
 
 `OpenMode` is an enum with values `Read`, `Write`, `Overwrite`, `Append`.
 
+#### Per-frame quantities
+
+Besides grid fields, a frame can carry small **grid-less** quantities — a
+scalar, vector, or tensor that has one value for the whole domain per frame
+(e.g. an applied deformation gradient, the physical time, or a load parameter).
+These are stored as their own NetCDF variables carrying the unlimited `frame`
+dimension plus fixed component dimensions, and are replicated (identical on
+every MPI rank).
+
+```python
+register_frame_variable(name, shape, dtype)   # -> numpy view of the buffer
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `name` | Unique variable name. |
+| `shape` | Shape of a single frame's value, e.g. `[3, 3]` for a tensor (`[]`/`[n]` for a scalar/vector). |
+| `dtype` | numpy dtype of the elements (e.g. `np.float64`). |
+
+Call it before the first frame is written (like `register_field_collection`).
+It returns a numpy array that **views** the variable's buffer: write the current
+frame's value into it, then flush it together with any fields in the same
+`write`. The view stays valid as long as the file object is alive.
+
+```python
+file = muGrid.FileIONetCDF("output.nc", open_mode="overwrite")
+file.register_field_collection(field_collection, field_names=["density"])
+F = file.register_frame_variable("applied_deformation_gradient", [3, 3], np.float64)
+for step in path:
+    F[...] = deformation_gradient(step)          # one tensor for the whole cell
+    field_collection.get_field("density").p[...] = density(step)
+    file.append_frame().write(["density", "applied_deformation_gradient"])
+```
+
+Reading back mirrors fields: register the same variable, then `read` it per
+frame and inspect the returned view. Under MPI only rank 0 writes the value
+(the others participate in the collective call with an empty request) and every
+rank reads the full value, so it round-trips identically in serial and parallel.
+
+For a single value that does **not** vary per frame (e.g. the physical cell
+size), use a global attribute instead — `write_global_attribute(name, value)`
+and `read_global_attribute(name)` — which is stored once per file.
+
 ## Linear algebra
 
 The `muGrid.Solvers` module provides simple parallel iterative solvers. See

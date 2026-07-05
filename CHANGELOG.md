@@ -1,6 +1,16 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- ENH: `FileIONetCDF.register_frame_variable` stores per-frame, grid-less
+  quantities (small replicated scalars/vectors/tensors) alongside fields
+- ENH: Double-precision accumulators even in single-precision runs
+- BUG: Fixed the Green-Jacobi preconditioner
+- BUG: Single-precision support in the preconditioner
+- BUG: Match field precision in Fourier space
+
 v0.111.0 (03Jul26)
 ------------------
 

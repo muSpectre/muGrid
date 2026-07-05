@@ -181,6 +181,93 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  NetCDFVarFrameData & FileIONetCDF::register_frame_variable(
+      const std::string & name, const std::vector<IOSize_t> & shape,
+      const nc_type & data_type) {
+    check_variable_not_registered(this->variables, name, "frame variable");
+
+    // dimensions: {frame, <name>-0, <name>-1, ...}. The component dimensions
+    // use a dedicated base name ("frame_dim") so they never trigger the
+    // grid/field logic keyed on nx/ny/nz/subpt/tensor_dim/pts base names.
+    std::vector<std::shared_ptr<NetCDFDim>> var_dims;
+    var_dims.push_back(dimensions.find_dim("frame", NC_UNLIMITED));
+    for (size_t i{0}; i < shape.size(); ++i) {
+      var_dims.push_back(dimensions.add_dim(
+          NetCDFDim::compute_dim_name("frame_dim",
+                                      name + "-" + std::to_string(i)),
+          shape[i]));
+    }
+
+    NetCDFVarFrameData & var{
+        this->variables.add_frame_var(name, data_type, shape, var_dims)};
+    var.consistency_check_global_var();
+
+    if (this->open_mode == FileIOBase::OpenMode::Write ||
+        this->open_mode == FileIOBase::OpenMode::Overwrite) {
+      // Define the newly added dimension(s) and variable in the header.
+      // Re-enter define mode if a previous register_* call already left it
+      // (mirrors the multiple-registration handling in
+      // register_field_collection). Must run before the first frame is written.
+      if (this->netcdf_mode != NetCDFMode::DefineMode) {
+        int status{ncmu_redef(this->netcdf_id)};
+        if (status != NC_NOERR) {
+          throw FileIOError(ncmu_strerror(status));
+        }
+        this->netcdf_mode = NetCDFMode::DefineMode;
+      }
+      define_netcdf_dimensions(this->dimensions);
+      define_netcdf_variables(this->variables);
+      define_netcdf_attributes(this->variables);
+      int status{ncmu_enddef(this->netcdf_id)};
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+      this->netcdf_mode = NetCDFMode::DataMode;
+      this->netcdf_file_changes();
+    } else if (this->open_mode == FileIOBase::OpenMode::Read ||
+               this->open_mode == FileIOBase::OpenMode::Append) {
+      // The variable already exists in the file: inquire the ids of the newly
+      // added dimensions and of the variable so that read()/write() can address
+      // it.
+      for (auto & dim : var_dims) {
+        if (dim->get_id() == DEFAULT_NETCDFDIM_ID) {
+          int dim_id{};
+          int status{
+              ncmu_inq_dimid(this->netcdf_id, dim->get_name().data(), &dim_id)};
+          if (status != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status));
+          }
+          dim->register_id(dim_id);
+        }
+      }
+      int var_id{};
+      int status{ncmu_inq_varid(this->netcdf_id, name.c_str(), &var_id)};
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+      var.register_id(var_id);
+    } else {
+      throw FileIOError("Unknown open mode!");
+    }
+
+    return var;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void * FileIONetCDF::get_frame_variable_buffer(const std::string & name,
+                                                 IOSize_t & size_in_bytes) {
+    NetCDFVarBase & var{this->variables.get_variable(name)};
+    auto * frame_var{dynamic_cast<NetCDFVarFrameData *>(&var)};
+    if (frame_var == nullptr) {
+      throw FileIOError("The variable '" + name +
+                        "' is not a per-frame variable.");
+    }
+    IOSize_t nb_elements{frame_var->get_bufcount_mpi_global()};
+    size_in_bytes = nb_elements * frame_var->get_element_size();
+    return frame_var->get_buf();
+  }
+
+  /* ---------------------------------------------------------------------- */
   void FileIONetCDF::open() {
     int err{};
 #ifdef WITH_MPI
@@ -2992,6 +3079,197 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  namespace {
+    //! size in bytes of one element of a NetCDF external data type
+    IOSize_t nc_type_element_size(const nc_type & data_type) {
+      switch (data_type) {
+      case NC_CHAR:
+      case NC_BYTE:
+        return 1;
+      case NC_SHORT:
+      case NC_USHORT:
+        return 2;
+      case NC_INT:
+      case NC_UINT:
+      case NC_FLOAT:
+        return 4;
+      case NC_DOUBLE:
+      case NC_INT64:
+      case NC_UINT64:
+        return 8;
+      default:
+        throw FileIOError("Unsupported NetCDF data type '" +
+                          std::to_string(data_type) +
+                          "' for a per-frame variable.");
+      }
+    }
+  }  // namespace
+
+  /* ---------------------------------------------------------------------- */
+  NetCDFVarFrameData::NetCDFVarFrameData(
+      const std::string & var_name, const nc_type & var_data_type,
+      const IOSize_t & var_ndims,
+      const std::vector<std::shared_ptr<NetCDFDim>> & netcdf_var_dims,
+      const std::vector<IOSize_t> & component_shape)
+      : NetCDFVarBase(var_name, var_data_type, var_ndims, netcdf_var_dims,
+                      muGrid::FieldCollection::ValidityDomain::Global,
+                      /*hidden=*/false),
+        component_shape{component_shape},
+        element_size{nc_type_element_size(var_data_type)} {
+    // netcdf_var_dims must be {frame, component_shape...}
+    if (netcdf_var_dims.size() != component_shape.size() + 1) {
+      throw FileIOError(
+          "A per-frame variable must have exactly one more dimension (the "
+          "frame dimension) than its component shape.");
+    }
+    IOSize_t nb_elements{1};
+    for (auto & n : component_shape) {
+      nb_elements *= n;
+    }
+    this->buffer.assign(static_cast<size_t>(nb_elements) * this->element_size,
+                        char{0});
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const muGrid::Field & NetCDFVarFrameData::get_field() const {
+    throw FileIOError(
+        "The per-frame variable '" + this->name +
+        "' is not backed by a muGrid::Field; get_field() must not be called.");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t>
+  NetCDFVarFrameData::get_start_global(const Index_t & frame) const {
+    if (frame < 0) {
+      throw FileIOError(
+          "Only positive frame values are allowed in "
+          "'NetCDFVarFrameData::get_start_global()'. You gave frame = " +
+          std::to_string(frame));
+    }
+    std::vector<IOSize_t> start(this->get_ndims(), IOSize_t{0});
+    start[0] = static_cast<IOSize_t>(frame);  // frame is the first dimension
+    return start;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t> NetCDFVarFrameData::get_start_local(
+      const Index_t & /*frame*/, muGrid::Field & /*local_pixels*/) const {
+    throw FileIOError("A per-frame variable is not a local (decomposed) "
+                      "variable; get_start_local() must not be called.");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IOSize_t> NetCDFVarFrameData::get_count_global() const {
+    std::vector<IOSize_t> count{};
+    count.reserve(this->get_ndims());
+    count.push_back(1);  // one frame
+    for (auto & n : this->component_shape) {
+      count.push_back(n);
+    }
+    return count;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarFrameData::get_nc_stride() const {
+    return std::vector<IODiff_t>(this->get_ndims(), IODiff_t{1});
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarFrameData::get_nc_imap_global() const {
+    // Row-major in-memory strides of the contiguous buffer, one entry per
+    // NetCDF dimension {frame, component_shape...}. The frame stride is the
+    // total number of elements per frame (irrelevant since count[frame]==1).
+    const size_t ndim{this->component_shape.size()};
+    std::vector<IODiff_t> imap(ndim + 1, IODiff_t{1});
+    IODiff_t stride{1};
+    for (size_t i{ndim}; i-- > 0;) {
+      imap[i + 1] = stride;
+      stride *= static_cast<IODiff_t>(this->component_shape[i]);
+    }
+    imap[0] = stride;  // elements per frame
+    return imap;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  std::vector<IODiff_t> NetCDFVarFrameData::get_nc_imap_local() const {
+    throw FileIOError("A per-frame variable is not a local (decomposed) "
+                      "variable; get_nc_imap_local() must not be called.");
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void * NetCDFVarFrameData::get_buf() const {
+    return static_cast<void *>(this->buffer.data());
+  }
+
+  /* ---------------------------------------------------------------------- */
+  IOSize_t NetCDFVarFrameData::get_bufcount_mpi_global() const {
+    IOSize_t nb_elements{1};
+    for (auto & n : this->component_shape) {
+      nb_elements *= n;
+    }
+    return nb_elements;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const std::vector<IOSize_t> & NetCDFVarFrameData::get_component_shape() const {
+    return this->component_shape;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  IOSize_t NetCDFVarFrameData::get_element_size() const {
+    return this->element_size;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarFrameData::write(const int netcdf_id,
+                                 const Index_t & tot_nb_frames,
+                                 GlobalFieldCollection & /*GFC_local_pixels*/,
+                                 const Index_t & frame_index,
+                                 const Communicator & comm) {
+    Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
+
+    // The value is replicated on every rank. To avoid several ranks writing
+    // the same region collectively (overlapping writes), only rank 0 writes
+    // the data; the other ranks issue a zero-size request so that they still
+    // participate in the collective call. In serial there is a single rank 0,
+    // so the full block is written.
+    std::vector<IOSize_t> start{this->get_start_global(frame)};
+    std::vector<IOSize_t> count{this->get_count_global()};
+    IOSize_t bufcount{this->get_bufcount_mpi_global()};
+    if (comm.rank() != 0) {
+      std::fill(count.begin(), count.end(), IOSize_t{0});
+      bufcount = 0;
+    }
+
+    int status{ncmu_put_varm_unified(
+        netcdf_id, this->get_id(), start.data(), count.data(),
+        this->get_nc_stride().data(), this->get_nc_imap_global().data(),
+        this->get_buf(), bufcount, this->get_buftype())};
+    if (status != NC_NOERR) {
+      throw FileIOError(ncmu_strerror(status));
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarFrameData::read(const int netcdf_id,
+                                const Index_t & tot_nb_frames,
+                                GlobalFieldCollection & /*GFC_local_pixels*/,
+                                const Index_t & frame_index,
+                                const Communicator & /*comm*/) {
+    Index_t frame{FileIONetCDF::handle_frame(frame_index, tot_nb_frames)};
+
+    // The quantity is replicated, so every rank reads the full block.
+    int status{ncmu_get_varm_unified(
+        netcdf_id, this->get_id(), this->get_start_global(frame).data(),
+        this->get_count_global().data(), this->get_nc_stride().data(),
+        this->get_nc_imap_global().data(), this->get_buf(),
+        this->get_bufcount_mpi_global(), this->get_buftype())};
+    if (status != NC_NOERR) {
+      throw FileIOError(ncmu_strerror(status));
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
   NetCDFVarStateField::NetCDFVarStateField(
       const std::string & var_name, const nc_type & var_data_type,
       const IOSize_t & var_ndims,
@@ -3254,6 +3532,20 @@ namespace muGrid {
         var_name, var_data_type, var_ndims, var_dims, var_state_field));
 
     return *this->var_vector.back();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  NetCDFVarFrameData & NetCDFVariables::add_frame_var(
+      const std::string & var_name, const nc_type & var_data_type,
+      const std::vector<IOSize_t> & component_shape,
+      const std::vector<std::shared_ptr<NetCDFDim>> & var_dims) {
+    IOSize_t var_ndims{static_cast<IOSize_t>(var_dims.size())};
+
+    auto var{std::make_shared<NetCDFVarFrameData>(
+        var_name, var_data_type, var_ndims, var_dims, component_shape)};
+    this->var_vector.push_back(var);
+
+    return *var;
   }
 
   /* ---------------------------------------------------------------------- */
