@@ -35,9 +35,11 @@
 
 #include "device.hh"
 
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <stdexcept>
 
 #if defined(MUGRID_ENABLE_CUDA)
 #include <cuda_runtime.h>
@@ -145,6 +147,56 @@ std::string Device::get_device_string() const {
         default:
             return "unknown";
     }
+}
+
+Device Device::from_string(const std::string & spec) {
+    // Lowercase copy so the parse is case-insensitive (get_device_string emits
+    // lowercase; users may type "ROCm:1").
+    std::string s{spec};
+    for (char & c : s) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+
+    const auto colon{s.find(':')};
+    const std::string kind{s.substr(0, colon)};
+    int id{0};
+    if (colon != std::string::npos) {
+        const std::string id_str{s.substr(colon + 1)};
+        // Require a non-empty, purely numeric id: std::stoi would otherwise
+        // silently accept "1abc" and reject an empty id with an opaque throw.
+        if (id_str.empty() ||
+            id_str.find_first_not_of("0123456789") != std::string::npos) {
+            throw std::invalid_argument(
+                "Device::from_string: invalid device id in '" + spec + "'");
+        }
+        try {
+            id = std::stoi(id_str);
+        } catch (const std::out_of_range &) {
+            throw std::invalid_argument(
+                "Device::from_string: device id out of range in '" + spec +
+                "'");
+        }
+    }
+
+    if (kind == "cpu") {
+        if (colon != std::string::npos) {
+            throw std::invalid_argument(
+                "Device::from_string: 'cpu' takes no device id in '" + spec +
+                "'");
+        }
+        return Device::cpu();
+    }
+    if (kind == "cuda") {
+        return Device::cuda(id);
+    }
+    if (kind == "rocm") {
+        return Device::rocm(id);
+    }
+    if (kind == "gpu") {
+        return Device::gpu(id);
+    }
+    throw std::invalid_argument("Device::from_string: unknown device '" + spec +
+                                "'");
 }
 
 const char * Device::get_type_name() const {

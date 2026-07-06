@@ -183,6 +183,23 @@ class Device {
      */
     static Device current_gpu();
 
+    /**
+     * Parse a device string into a Device (inverse of get_device_string()).
+     *
+     * Accepted spellings (case-insensitive), each with an optional ":<id>"
+     * suffix on the accelerator forms (id defaults to 0):
+     * - "cpu"                -> Device::cpu()
+     * - "cuda" / "cuda:<id>" -> Device::cuda(id)
+     * - "rocm" / "rocm:<id>" -> Device::rocm(id)
+     * - "gpu"  / "gpu:<id>"  -> Device::gpu(id) (compile-time backend)
+     *
+     * "gpu" is accepted as an input alias for the platform accelerator even
+     * though get_device_string() never emits it (it reports the concrete
+     * backend). Throws std::invalid_argument on an unrecognized device string
+     * or a malformed/out-of-range device id.
+     */
+    static Device from_string(const std::string & spec);
+
    protected:
     DeviceType device_type;  //!< Type of device (CPU, CUDA, ROCm, etc.)
     int device_id;           //!< Device ID for multi-GPU systems

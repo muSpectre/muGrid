@@ -251,6 +251,8 @@ void add_device_classes(py::module & mod) {
         - ``Device.cuda(id)`` - CUDA GPU memory (with optional device ID)
         - ``Device.rocm(id)`` - ROCm/HIP GPU memory (with optional device ID)
         - ``Device.gpu(id)`` - Auto-detect GPU backend (CUDA or ROCm)
+        - ``Device.from_string("rocm:1")`` - parse a device string
+          (inverse of the ``device_string`` property)
 
         Attributes
         ----------
@@ -299,6 +301,39 @@ void add_device_classes(py::module & mod) {
             -------
             Device
                 Device instance for the default GPU backend
+            )pbdoc")
+        .def_static("from_string", &Device::from_string, "spec"_a,
+                    R"pbdoc(
+            Parse a device string into a Device.
+
+            The inverse of the :attr:`device_string` property. Accepted
+            spellings are case-insensitive, each with an optional ``:<id>``
+            suffix on the accelerator forms (the id defaults to 0):
+
+            - ``"cpu"``
+            - ``"cuda"`` / ``"cuda:<id>"``
+            - ``"rocm"`` / ``"rocm:<id>"``
+            - ``"gpu"`` / ``"gpu:<id>"`` (resolves to the compiled GPU backend)
+
+            ``"gpu"`` is accepted as an input alias even though
+            ``device_string`` never emits it (it reports the concrete backend,
+            e.g. ``"rocm:0"``).
+
+            Parameters
+            ----------
+            spec : str
+                The device string to parse.
+
+            Returns
+            -------
+            Device
+                The parsed device.
+
+            Raises
+            ------
+            ValueError
+                If the string is not a recognized device or carries a
+                malformed/out-of-range device id.
             )pbdoc")
         // Read-only properties
         .def_property_readonly("is_device", &Device::is_device,
