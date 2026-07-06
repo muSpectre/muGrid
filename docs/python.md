@@ -510,7 +510,9 @@ register_frame_variable(name, shape, dtype)   # -> numpy view of the buffer
 Call it before the first frame is written (like `register_field_collection`).
 It returns a numpy array that **views** the variable's buffer: write the current
 frame's value into it, then flush it together with any fields in the same
-`write`. The view stays valid as long as the file object is alive.
+`write`. The view stays valid as long as the file object is alive — because it
+pins the file, call `file.close()` to flush and release it (a plain `del file`
+will not close the file while the view is still alive).
 
 ```python
 file = muGrid.FileIONetCDF("output.nc", open_mode="overwrite")

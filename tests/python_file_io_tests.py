@@ -491,7 +491,9 @@ class FileIOTest(unittest.TestCase):
             adg[...] = values[k]  # identical on every rank
             fio_w.append_frame().write(
                 ["frame-var-density", "applied_deformation_gradient"])
-        del fio_w
+        # `adg` views the writer's buffer and keeps fio_w alive, so `del fio_w`
+        # would not close the file. Close explicitly to flush the frames.
+        fio_w.close()
 
         self.comm.barrier()
 
@@ -503,7 +505,8 @@ class FileIOTest(unittest.TestCase):
         for k in range(nb_frames):
             fio_r.read(k, ["applied_deformation_gradient"])
             self.assertTrue(np.allclose(np.array(adg_r), values[k]))
-        del fio_r
+        # `adg_r` likewise pins fio_r; close explicitly before removing the file.
+        fio_r.close()
 
         self.comm.barrier()
         if self.comm.rank == 0:
