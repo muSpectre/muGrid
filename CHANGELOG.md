@@ -1,14 +1,17 @@
 Change log for µGrid
 ====================
 
-Unreleased
-----------
+v0.112.0 (06Jul26)
+------------------
 
+- ENH: Double-precision accumulators even in single-precision runs
 - ENH: `FileIONetCDF.register_frame_variable` stores per-frame, grid-less
   quantities (small replicated scalars/vectors/tensors) alongside fields
 - ENH: `version_string()` returns a one-line build/run diagnostic (version, MPI
   rank, GPU device, NetCDF backend); added `netcdf_backend`/`netcdf_version`
-- ENH: Double-precision accumulators even in single-precision runs
+- ENH: `MUGRID_NATIVE_ARCH` CMake option to tune code for the host CPU
+  (`-march=native`; non-portable, off by default)
+- ENH: Warn when a serial `Communicator` is built under an MPI launcher
 - BUG: Fixed the Green-Jacobi preconditioner
 - BUG: Single-precision support in the preconditioner
 - BUG: Match field precision in Fourier space
