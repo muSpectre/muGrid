@@ -58,7 +58,7 @@ namespace muGrid {
                 #pragma loop(ivdep)
                 #elif defined(__clang__)
                 #pragma clang loop vectorize(enable) interleave(enable)
-                #elif defined(__GNUC__)
+                #elif defined(__GNUC__) && !defined(__NVCOMPILER)
                 #pragma GCC ivdep
                 #endif
                 for (Index_t ix = 1; ix < nx - 1; ++ix) {
@@ -102,7 +102,7 @@ namespace muGrid {
                     #pragma loop(ivdep)
                     #elif defined(__clang__)
                     #pragma clang loop vectorize(enable) interleave(enable)
-                    #elif defined(__GNUC__)
+                    #elif defined(__GNUC__) && !defined(__NVCOMPILER)
                     #pragma GCC ivdep
                     #endif
                     for (Index_t ix = 1; ix < nx - 1; ++ix) {

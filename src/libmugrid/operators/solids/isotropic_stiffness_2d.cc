@@ -512,7 +512,7 @@ namespace muGrid {
     namespace isotropic_stiffness_kernels {
 
         // Node offsets for 2D [node][dim]
-        static const Index_t NODE_OFFSET_2D[4][2] = {
+        [[maybe_unused]] static const Index_t NODE_OFFSET_2D[4][2] = {
             {0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
         // Vectorized shared kernel body for the per-pixel (Uniform == false)
@@ -602,7 +602,7 @@ namespace muGrid {
                 #pragma loop(ivdep)
                 #elif defined(__clang__)
                 #pragma clang loop vectorize(enable) interleave(enable)
-                #elif defined(__GNUC__)
+                #elif defined(__GNUC__) && !defined(__NVCOMPILER)
                 #pragma GCC ivdep
                 #endif
                 for (SIndex_t ix = 0; ix < static_cast<SIndex_t>(nnx); ++ix) {
@@ -666,7 +666,7 @@ namespace muGrid {
             Index_t force_stride_y, Index_t force_stride_d, const T * G,
             const T * V, T alpha, bool increment, T lam_u,
             T mu_u) {
-            constexpr Index_t NB_DOFS = 2;
+            [[maybe_unused]] constexpr Index_t NB_DOFS = 2;
             assert(disp_stride_d == 1 && force_stride_d == 1);
             assert(disp_stride_x == NB_DOFS && force_stride_x == NB_DOFS);
             assert(Uniform || mat_stride_x == 1);
@@ -900,7 +900,7 @@ namespace muGrid {
                 #pragma loop(ivdep)
                 #elif defined(__clang__)
                 #pragma clang loop vectorize(enable) interleave(enable)
-                #elif defined(__GNUC__)
+                #elif defined(__GNUC__) && !defined(__NVCOMPILER)
                 #pragma GCC ivdep
                 #endif
                 for (SIndex_t ex = 0; ex < static_cast<SIndex_t>(nelx); ++ex) {
