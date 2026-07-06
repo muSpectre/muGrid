@@ -199,7 +199,10 @@ namespace muGrid {
       sizes[i] = rng.randval(2, 5);
     }
     Ccoord strides{CcoordOps::get_col_major_strides(sizes)};
-    if (dim > 2) {
+    // `if constexpr` so the `dim - 3` indexing is not compiled for the dim==2
+    // instantiation (where it would be strides[-1] and warn on the unsigned
+    // index conversion).
+    if constexpr (dim > 2) {
       strides[dim - 1] = strides[dim - 3] * sizes[dim - 3];
     } else {
       strides[dim - 1] = 1;

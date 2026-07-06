@@ -187,7 +187,7 @@ namespace muGrid {
 
     M4 mat;
     mat.setRandom();
-    M4c cmat{mat};
+    [[maybe_unused]] M4c cmat{mat};
     T4 tensor{mat.data()};
     T4c ctensor{mat.data()};
 

@@ -578,7 +578,7 @@ namespace muGrid {
     namespace isotropic_stiffness_kernels {
 
         // Node offsets for 3D [node][dim]
-        static const Index_t NODE_OFFSET_3D[8][3] = {
+        [[maybe_unused]] static const Index_t NODE_OFFSET_3D[8][3] = {
             {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
             {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}};
 
@@ -695,7 +695,7 @@ namespace muGrid {
                 #pragma loop(ivdep)
                 #elif defined(__clang__)
                 #pragma clang loop vectorize(assume_safety) interleave(enable)
-                #elif defined(__GNUC__)
+                #elif defined(__GNUC__) && !defined(__NVCOMPILER)
                 #pragma GCC ivdep
                 #endif
                 for (SIndex_t ix = 0; ix < static_cast<SIndex_t>(nx_count);
@@ -776,7 +776,7 @@ namespace muGrid {
                     #pragma loop(ivdep)
                     #elif defined(__clang__)
                     #pragma clang loop vectorize(enable) interleave(enable)
-                    #elif defined(__GNUC__)
+                    #elif defined(__GNUC__) && !defined(__NVCOMPILER)
                     #pragma GCC ivdep
                     #endif
                     for (SIndex_t i = 0;
@@ -808,7 +808,7 @@ namespace muGrid {
             Index_t force_stride_z, Index_t force_stride_d, const T * G,
             const T * V, T alpha, bool increment, T lam_u,
             T mu_u) {
-            constexpr Index_t NB_DOFS = 3;
+            [[maybe_unused]] constexpr Index_t NB_DOFS = 3;
             assert(disp_stride_d == 1 && force_stride_d == 1);
             assert(disp_stride_x == NB_DOFS && force_stride_x == NB_DOFS);
             assert(Uniform || mat_stride_x == 1);

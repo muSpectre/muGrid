@@ -820,10 +820,9 @@ namespace muGrid {
     // using the extracted helper methods. Verify it returns non-empty vector
     auto starts = var.get_start_global(0);
     BOOST_CHECK(!starts.empty());
-    // Verify that all start values are numeric (can be accessed)
-    for (size_t i = 0; i < starts.size(); ++i) {
-      BOOST_CHECK(starts[i] >= 0);  // Start indices should be non-negative
-    }
+    // Start indices are an unsigned type, so they are non-negative by
+    // construction; the frame dimension (first entry) is 0 for frame 0.
+    BOOST_CHECK_EQUAL(starts[0], 0u);
   }
 
   BOOST_AUTO_TEST_CASE(NetCDFAttributeTypeDetection) {

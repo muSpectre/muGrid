@@ -186,6 +186,16 @@ if(NOT Eigen3_FOUND)
     set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
     set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(eigen)
+    # Treat the fetched Eigen headers as SYSTEM includes so their (harmless)
+    # SIMD warnings do not flood our build log (e.g. the AVX sign-change
+    # remarks emitted by nvc++/GCC). find_package already marks them SYSTEM.
+    if(TARGET eigen)
+        get_target_property(_eigen_inc eigen INTERFACE_INCLUDE_DIRECTORIES)
+        if(_eigen_inc)
+            set_target_properties(eigen PROPERTIES
+                INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_eigen_inc}")
+        endif()
+    endif()
     # Restore BUILD_TESTING for muGrid's own tests
     set(BUILD_TESTING ON CACHE BOOL "" FORCE)
     set(MUGRID_EIGEN_FROM_FETCHCONTENT TRUE)

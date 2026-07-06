@@ -339,6 +339,14 @@ namespace muGrid {
         //! Scalar type the operator and its fields use.
         using Scalar = T;
 
+        // This operator overrides only the overloads matching its scalar type
+        // T; keep the other-precision base overloads (which throw) visible so
+        // they are not hidden by name lookup.
+        using Parent::apply;
+        using Parent::apply_increment;
+        using Parent::transpose;
+        using Parent::transpose_increment;
+
         //! Spatial dimension of the element.
         static constexpr Dim_t Dim = Element::SpatialDim;
         //! Number of nodes per pixel/voxel (4 in 2D, 8 in 3D)

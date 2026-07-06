@@ -88,6 +88,13 @@ class PyGradientOperator : public LinearOperator {
     // Inherit the constructors
     using LinearOperator::LinearOperator;
 
+    // Only the Real overloads are trampolined; keep the base Real32 overloads
+    // visible so they are not hidden by name lookup.
+    using LinearOperator::apply;
+    using LinearOperator::apply_increment;
+    using LinearOperator::transpose;
+    using LinearOperator::transpose_increment;
+
     // Trampoline (one for each virtual function)
 
     void apply(const TypedFieldBase<Real> & nodal_field,
