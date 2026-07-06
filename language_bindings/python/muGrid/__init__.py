@@ -74,7 +74,28 @@ from .DeviceMemory import (  # noqa: F401, E402
     set_device_allocator,
     use_cupy_allocator,
 )
+
+# Field classes and utilities
+from .Field import Field, wrap_field  # noqa: F401, E402
 from .MemoryProfiler import memory_profile  # noqa: F401, E402
+
+# MPI communicator and parallel utilities
+from .Parallel import Communicator, parprint  # noqa: F401, E402
+
+# Import Python wrappers for main classes (these accept wrapped Field objects)
+from .Wrappers import (  # noqa: F401, E402, E305
+    CartesianDecomposition,
+    FEMGradientOperator,
+    FFTEngine,
+    FileIONetCDF,
+    GenericLinearOperator,
+    GlobalFieldCollection,
+    IsotropicStiffnessOperator,
+    IsotropicStiffnessOperator2D,
+    IsotropicStiffnessOperator3D,
+    LaplaceOperator,
+    LocalFieldCollection,
+)
 
 # Cache for runtime GPU availability check
 _gpu_available_cache = None
@@ -131,20 +152,6 @@ def is_gpu_available():
         _gpu_available_cache = False
         return False
 
-# Import Python wrappers for main classes (these accept wrapped Field objects)
-from .Wrappers import (  # noqa: E402, E305
-    CartesianDecomposition,
-    FEMGradientOperator,
-    FFTEngine,
-    FileIONetCDF,
-    GenericLinearOperator,
-    GlobalFieldCollection,
-    IsotropicStiffnessOperator,
-    IsotropicStiffnessOperator2D,
-    IsotropicStiffnessOperator3D,
-    LaplaceOperator,
-    LocalFieldCollection,
-)
 
 # Expose OpenMode for FileIONetCDF if available
 if hasattr(_muGrid, "FileIONetCDF"):
@@ -194,15 +201,66 @@ get_hermitian_grid_pts = _muGrid.get_hermitian_grid_pts
 get_domain_ccoord = _muGrid.get_domain_ccoord
 get_domain_index = _muGrid.get_domain_index
 
-# Field classes and utilities
-from .Field import Field  # noqa: E402
-from .Field import wrap_field  # noqa: E402
-
-# MPI communicator and parallel utilities
-from .Parallel import Communicator, parprint  # noqa: E402
-
 # Version information
 __version__ = _muGrid.version.description()
+
+# NetCDF backend ("PnetCDF" with MPI, serial "NetCDF" otherwise) and its library
+# version string; None when muGrid was built without NetCDF support.
+netcdf_backend = getattr(_muGrid, "netcdf_backend", None)
+netcdf_version = getattr(_muGrid, "netcdf_version", None)
+
+
+def version_string(communicator=None, device=None):
+    """Return a one-line diagnostic describing the muGrid build and the current
+    run configuration, e.g.::
+
+        muGrid 0.111.1 (MPI: ON, rank 0/4; CUDA: ON, device cuda:2; PnetCDF 1.14.1)
+
+    Disabled features are reported as ``OFF`` (e.g. ``MPI: OFF``).
+
+    Parameters
+    ----------
+    communicator : Communicator or mpi4py communicator, optional
+        Reports the MPI rank and communicator size. Defaults to a serial
+        communicator (rank 0, size 1).
+    device : Device, optional
+        The compute device in use, reported in the GPU section. Defaults to
+        host (CPU), reported as the GPU backend being ``OFF``.
+    """
+    parts = []
+
+    # MPI
+    if has_mpi:
+        comm = communicator
+        if comm is None:
+            comm = _muGrid.Communicator()
+        elif MPI is not None and isinstance(comm, MPI.Comm):
+            comm = _muGrid.Communicator(comm)
+        parts.append(f"MPI: ON, rank {comm.rank}/{comm.size}")
+    else:
+        parts.append("MPI: OFF")
+
+    # GPU backend. The label reflects the build (CUDA / ROCm); a device that is
+    # actually a GPU also reports its id.
+    build_label = "CUDA" if has_cuda else "ROCm/HIP" if has_rocm else "GPU"
+    if device is not None and getattr(device, "is_device", False):
+        if device.device_type == DeviceType.CUDA:
+            parts.append(f"CUDA: ON, device cuda:{device.device_id}")
+        elif device.device_type == DeviceType.ROCm:
+            parts.append(f"ROCm/HIP: ON, device rocm:{device.device_id}")
+        else:
+            parts.append(f"{build_label}: ON, device gpu:{device.device_id}")
+    else:
+        parts.append(f"{build_label}: OFF")
+
+    # NetCDF
+    if has_netcdf:
+        parts.append(f"{netcdf_backend} {netcdf_version.split()[0]}")
+    else:
+        parts.append("NetCDF: OFF")
+
+    return f"muGrid {__version__} ({'; '.join(parts)})"
+
 
 # Define public API
 __all__ = [
@@ -212,6 +270,9 @@ __all__ = [
     "has_rocm",
     "has_gpu",
     "has_netcdf",
+    "netcdf_backend",
+    "netcdf_version",
+    "version_string",
     "host_arch",
     "device_arch",
     # Runtime checks

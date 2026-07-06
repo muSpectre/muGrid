@@ -650,6 +650,26 @@ Compile-time configuration flags:
 | `muGrid.has_rocm` | ROCm/HIP GPU support is compiled in. |
 | `muGrid.has_gpu` | Any GPU support is available. |
 | `muGrid.has_netcdf` | NetCDF I/O support is available. |
+| `muGrid.netcdf_backend` | `"PnetCDF"` (MPI) or `"NetCDF"` (serial); `None` if unavailable. |
+| `muGrid.netcdf_version` | NetCDF/PnetCDF library version string; `None` if unavailable. |
+| `muGrid.__version__` | µGrid version string. |
+
+## Diagnostics
+
+```python
+muGrid.version_string(communicator=None, device=None)
+```
+
+Returns a one-line summary of the build and the current run configuration, handy
+to print at program startup:
+
+```
+muGrid 0.111.1 (MPI: ON, rank 0/4; CUDA: ON, device cuda:2; PnetCDF 1.14.1)
+```
+
+Pass the run's `communicator` to report the MPI rank and size, and the `Device`
+in use to report the GPU backend and device id. Disabled features are shown as
+`OFF` (e.g. `MPI: OFF`, `GPU: OFF`, `NetCDF: OFF`).
 
 ## Timer
 

@@ -6,6 +6,8 @@ Unreleased
 
 - ENH: `FileIONetCDF.register_frame_variable` stores per-frame, grid-less
   quantities (small replicated scalars/vectors/tensors) alongside fields
+- ENH: `version_string()` returns a one-line build/run diagnostic (version, MPI
+  rank, GPU device, NetCDF backend); added `netcdf_backend`/`netcdf_version`
 - ENH: Double-precision accumulators even in single-precision runs
 - BUG: Fixed the Green-Jacobi preconditioner
 - BUG: Single-precision support in the preconditioner

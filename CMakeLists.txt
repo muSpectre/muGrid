@@ -315,9 +315,9 @@ endif()
 
 # HIP version
 if(MUGRID_ENABLE_HIP)
-    message(STATUS "  HIP            : ON - ${hip_VERSION}")
+    message(STATUS "  ROCm/HIP       : ON - ${hip_VERSION}")
 else()
-    message(STATUS "  HIP            : OFF")
+    message(STATUS "  ROCm/HIP       : OFF")
 endif()
 
 # MPI version

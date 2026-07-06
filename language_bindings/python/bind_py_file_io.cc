@@ -224,6 +224,16 @@ void add_file_frame(py::module & mod) {
 
 #ifdef WITH_NETCDF_IO
 void add_file_io_netcdf(py::module & mod) {
+  // The NetCDF library backend and its version string, for diagnostics. PnetCDF
+  // is used with MPI, serial Unidata NetCDF otherwise.
+#ifdef WITH_MPI
+  mod.attr("netcdf_backend") = std::string("PnetCDF");
+  mod.attr("netcdf_version") = std::string(ncmpi_inq_libvers());
+#else
+  mod.attr("netcdf_backend") = std::string("NetCDF");
+  mod.attr("netcdf_version") = std::string(nc_inq_libvers());
+#endif
+
   py::class_<FileIONetCDF, FileIOBase> file_io(mod, "FileIONetCDF");
   file_io
       .def(py::init<const std::string &, const FileIOBase::OpenMode &,
