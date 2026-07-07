@@ -95,7 +95,7 @@ namespace {
    */
   nc_type numpy_dtype_to_nc_type(const py::dtype & dt) {
     const char kind{dt.kind()};
-    const ssize_t size{dt.itemsize()};
+    const py::ssize_t size{dt.itemsize()};
     if (kind == 'f' && size == 8) return NC_DOUBLE;
     if (kind == 'f' && size == 4) return NC_FLOAT;
     if (kind == 'i' && size == 8) return NC_INT64;
