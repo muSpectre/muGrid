@@ -1,7 +1,7 @@
 Change log for µGrid
 ====================
 
-v0.112.0 (06Jul26)
+v0.112.0 (07Jul26)
 ------------------
 
 - ENH: Double-precision accumulators even in single-precision runs
