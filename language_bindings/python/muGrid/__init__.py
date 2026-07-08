@@ -224,8 +224,10 @@ def version_string(communicator=None, device=None):
         Reports the MPI rank and communicator size. Defaults to a serial
         communicator (rank 0, size 1).
     device : Device, optional
-        The compute device in use, reported in the GPU section. Defaults to
-        host (CPU), reported as the GPU backend being ``OFF``.
+        A GPU device in use for this run. When given, its id is appended to the
+        GPU section (e.g. ``device cuda:2``), analogous to the MPI rank. The GPU
+        backend itself is reported as ``ON``/``OFF`` based on the build,
+        independent of this argument.
     """
     parts = []
 
@@ -240,18 +242,23 @@ def version_string(communicator=None, device=None):
     else:
         parts.append("MPI: OFF")
 
-    # GPU backend. The label reflects the build (CUDA / ROCm); a device that is
-    # actually a GPU also reports its id.
-    build_label = "CUDA" if has_cuda else "ROCm/HIP" if has_rocm else "GPU"
-    if device is not None and getattr(device, "is_device", False):
-        if device.device_type == DeviceType.CUDA:
-            parts.append(f"CUDA: ON, device cuda:{device.device_id}")
-        elif device.device_type == DeviceType.ROCm:
-            parts.append(f"ROCm/HIP: ON, device rocm:{device.device_id}")
+    # GPU backend. Reported like the MPI/NetCDF sections: ON/OFF reflects the
+    # build (has_gpu), and the label names the compiled backend (CUDA / ROCm).
+    # When a GPU device is passed for this run, its id is appended (analogous to
+    # the MPI rank).
+    if has_gpu:
+        build_label = "CUDA" if has_cuda else "ROCm/HIP" if has_rocm else "GPU"
+        if device is not None and getattr(device, "is_device", False):
+            if device.device_type == DeviceType.CUDA:
+                parts.append(f"CUDA: ON, device cuda:{device.device_id}")
+            elif device.device_type == DeviceType.ROCm:
+                parts.append(f"ROCm/HIP: ON, device rocm:{device.device_id}")
+            else:
+                parts.append(f"{build_label}: ON, device gpu:{device.device_id}")
         else:
-            parts.append(f"{build_label}: ON, device gpu:{device.device_id}")
+            parts.append(f"{build_label}: ON")
     else:
-        parts.append(f"{build_label}: OFF")
+        parts.append("GPU: OFF")
 
     # NetCDF
     if has_netcdf:

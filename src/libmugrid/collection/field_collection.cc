@@ -40,6 +40,45 @@
 
 namespace muGrid {
 
+    namespace {
+        //! A collection placed on a GPU device requires that backend to be
+        //! compiled in. Otherwise the collection reports is_device() == true but
+        //! DefaultDeviceSpace folds to HostSpace, so field data is silently
+        //! allocated on the host — a mismatch that surfaces much later (or never)
+        //! as wrong results rather than a clear error. Reject it up front. This
+        //! also catches requesting the wrong backend (e.g. a ROCm device on a
+        //! CUDA build), which would otherwise be allocated in the CUDA space.
+        void assert_device_backend_available(const Device & device) {
+            if (not device.is_device()) {
+                return;  // host device: always available
+            }
+            bool supported{false};
+            const char * backend{"GPU"};
+            switch (device.get_type()) {
+                case DeviceType::CUDA:
+                    backend = "CUDA";
+#if defined(MUGRID_ENABLE_CUDA)
+                    supported = true;
+#endif
+                    break;
+                case DeviceType::ROCm:
+                    backend = "ROCm/HIP";
+#if defined(MUGRID_ENABLE_HIP)
+                    supported = true;
+#endif
+                    break;
+                default:
+                    break;
+            }
+            if (not supported) {
+                throw FieldCollectionError(
+                    "Cannot create a field collection on device '" +
+                    device.get_device_string() +
+                    "': muGrid was compiled without " + backend + " support.");
+            }
+        }
+    }  // namespace
+
     /* ---------------------------------------------------------------------- */
     template <class DefaultDestroyable>
     void FieldDestructor<DefaultDestroyable>::operator()(
@@ -63,6 +102,7 @@ namespace muGrid {
           storage_order{device.is_device() ? StorageOrder::StructureOfArrays
                                            : storage_order},
           device{device} {
+        assert_device_backend_available(device);
         this->set_nb_sub_pts(PixelTag, 1);
     }
 

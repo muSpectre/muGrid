@@ -1,6 +1,16 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- BUG: Reject creating a field collection on a GPU device whose backend was not
+  compiled in (e.g. `Device.cuda()` in a CPU-only build), instead of silently
+  allocating on the host while reporting `is_device() == true`
+- BUG: `version_string()` now reports the GPU backend as `ON`/`OFF` based on the
+  build (consistent with the MPI/NetCDF sections); a passed device appends its
+  id (e.g. `CUDA: ON, device cuda:2`)
+
 v0.112.0 (07Jul26)
 ------------------
 
