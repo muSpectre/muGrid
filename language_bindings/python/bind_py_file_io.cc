@@ -240,6 +240,12 @@ void add_file_io_netcdf(py::module & mod) {
                     Communicator>(),
            "file_name"_a, "open_mode"_a = FileIOBase::OpenMode::Read,
            "communicator"_a = Communicator())
+      .def("sync", &FileIONetCDF::sync,
+           "Flush buffered data to disk so a concurrent reader sees the "
+           "frames written so far. Call after append_frame() to checkpoint "
+           "incrementally; the PnetCDF backend already commits collective "
+           "writes, the classic/NetCDF-4 backend may otherwise buffer until "
+           "close().")
       .def("close", &FileIONetCDF::close)
       .def("register_field_collection",
            &FileIONetCDF::register_field_collection, "field_collection"_a,

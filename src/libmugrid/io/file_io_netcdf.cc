@@ -387,6 +387,27 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
+  void FileIONetCDF::sync() {
+    if (this->netcdf_id == -1) {
+      throw FileIOError("Cannot sync a closed file.");
+    }
+    // nc_sync/ncmpi_sync require the file to be in data mode; leave define
+    // mode first (a frame write already leaves it in data mode, but a sync
+    // right after registration/attribute writes might not).
+    if (this->netcdf_mode == NetCDFMode::DefineMode) {
+      int status_enddef{ncmu_enddef(this->netcdf_id)};
+      if (status_enddef != NC_NOERR && status_enddef != NC_ENOTINDEFINE) {
+        throw FileIOError(ncmu_strerror(status_enddef));
+      }
+      this->netcdf_mode = NetCDFMode::DataMode;
+    }
+    int err{ncmu_sync(this->netcdf_id)};
+    if (err != NC_NOERR) {
+      throw FileIOError(ncmu_strerror(err));
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
   void FileIONetCDF::close() {
     // write possibly not written global attributes if 'write()' was not called
     // even once
