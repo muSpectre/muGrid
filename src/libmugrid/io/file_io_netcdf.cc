@@ -2107,6 +2107,8 @@ namespace muGrid {
       switch (proto.get_type_descriptor()) {
       case muGrid::TypeDescriptor::Real:
         return coll.register_field<muGrid::Real>(name, shape, tag, unit);
+      case muGrid::TypeDescriptor::Real32:
+        return coll.register_field<muGrid::Real32>(name, shape, tag, unit);
       case muGrid::TypeDescriptor::Complex:
         return coll.register_field<muGrid::Complex>(name, shape, tag, unit);
       case muGrid::TypeDescriptor::Int:
