@@ -171,6 +171,46 @@ class FileIOTest(unittest.TestCase):
         self.assertTrue((a_glob == 1234).all())
         self.assertTrue((a_loc == 5678).all())
 
+    def test_FileIONetCDF_sync(self):
+        """sync() flushes appended frames to disk so a reader opening the file
+        while it is still being written sees the frames written so far
+        (without it the classic/NetCDF-4 backend may buffer until close())."""
+        fname = "python_binding_io_sync-tests.nc"
+        if self.comm.rank == 0 and os.path.exists(fname):
+            os.remove(fname)
+        self.comm.barrier()
+
+        fc = muGrid.GlobalFieldCollection(
+            self.nb_domain_grid_pts,
+            nb_subdomain_grid_pts=self.nb_subdomain_grid_pts,
+        )
+        field_name = "sync-test-field"
+        f = fc.register_real_field(field_name, 1, "pixel")
+        a = np.from_dlpack(f)
+
+        writer = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Write, self.comm)
+        writer.register_field_collection(fc)
+
+        for k in range(3):
+            a[:] = float(k + 1)
+            writer.append_frame().write([field_name])
+            writer.sync()  # must not raise, and must commit the frame
+            self.comm.barrier()
+            # Serial: verify a concurrent read-only handle sees the frames
+            # already written (the actual flush guarantee). Skipped under MPI
+            # to avoid parallel-open file locking on the still-open writer.
+            if self.comm.size == 1:
+                reader = muGrid.FileIONetCDF(
+                    fname, muGrid.OpenMode.Read, self.comm
+                )
+                reader.register_field_collection(fc)
+                self.assertEqual(len(reader), k + 1)
+                reader.close()
+
+        writer.close()
+        if self.comm.rank == 0 and os.path.exists(fname):
+            os.remove(fname)
+
     def test_FileIONetCDF_StateFields(self):
         if self.comm.rank == 0:
             if os.path.exists(self.file_sf_name):

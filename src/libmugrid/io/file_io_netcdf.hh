@@ -58,6 +58,7 @@ const auto ncmu_enddef = ncmpi_enddef;
 const auto ncmu_redef = ncmpi_redef;
 const auto ncmu_begin_indep_data = ncmpi_begin_indep_data;
 const auto ncmu_end_indep_data = ncmpi_end_indep_data;
+const auto ncmu_sync = ncmpi_sync;
 const auto ncmu_close = ncmpi_close;
 const auto ncmu_strerror = ncmpi_strerrno;
 const auto ncmu_def_dim = ncmpi_def_dim;
@@ -88,6 +89,7 @@ const auto ncmu_create = nc_create;
 const auto ncmu_open = nc_open;
 const auto ncmu_enddef = nc_enddef;
 const auto ncmu_redef = nc_redef;
+const auto ncmu_sync = nc_sync;
 const auto ncmu_close = nc_close;
 const auto ncmu_strerror = nc_strerror;
 const auto ncmu_def_dim = nc_def_dim;
@@ -1563,6 +1565,18 @@ namespace muGrid {
      */
     void * get_frame_variable_buffer(const std::string & name,
                                      IOSize_t & size_in_bytes);
+
+    /**
+     * @brief Flushes buffered data to disk.
+     *
+     * Forces all data written so far to be committed to the file on disk
+     * (``nc_sync`` / ``ncmpi_sync``), so a reader opening the file while the
+     * simulation is still running sees the frames written up to now. Without
+     * it the classic/NetCDF-4 backend may buffer frames until :func:`close`;
+     * the PnetCDF backend already commits collective writes. Call it after
+     * :func:`append_frame` to checkpoint incrementally.
+     */
+    void sync();
 
     /**
      * @brief Closes the file.
