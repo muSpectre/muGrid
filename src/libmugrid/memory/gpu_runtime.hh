@@ -41,6 +41,7 @@
 #define SRC_LIBMUGRID_MEMORY_GPU_RUNTIME_HH_
 
 #include <cstddef>
+#include <cstdio>
 #include <string>
 
 #include "core/exception.hh"
@@ -50,6 +51,8 @@
 #include <cuda_runtime.h>
 
 using gpuStream_t = cudaStream_t;
+using gpuError_t = cudaError_t;
+inline constexpr gpuError_t gpuSuccess{cudaSuccess};
 
 // Kernel launches (only valid in CUDA/HIP translation units).
 //
@@ -79,35 +82,58 @@ using gpuStream_t = cudaStream_t;
         GPU_KERNEL_DEBUG_SYNC(#kernel);                            \
     } while (0)
 
-// Host-callable runtime API (valid in any translation unit)
-#define GPU_DEVICE_SYNCHRONIZE() (void)cudaDeviceSynchronize()
+// Host-callable runtime API (valid in any translation unit).
+//
+// Every call is routed through gpu_check (throws) or gpu_check_nothrow so a
+// failing runtime call is reported at its own call site instead of being
+// discarded. Discarding was doubly harmful: the failure was lost, and because
+// the pending-error state is sticky it would resurface at the next kernel
+// launch's gpu_assert_last_error and be misreported as a kernel-launch failure.
+// GPU_MALLOC is the one exception: it stays raw because gpu_malloc_checked
+// wraps it with an allocation-specific message.
+#define GPU_CHECK(call) \
+    ::muGrid::gpu_check((call), #call, __FILE__, __LINE__)
+#define GPU_DEVICE_SYNCHRONIZE() GPU_CHECK(cudaDeviceSynchronize())
 // Block the host until all work on the legacy default stream (stream 0) — the
 // only stream muGrid uses — has completed. Cheaper than a full-device
 // synchronize and the correct barrier before handing a default-stream buffer
 // to something that is not stream-ordered (GPU-aware MPI, host reads).
-#define GPU_STREAM_SYNCHRONIZE_DEFAULT() (void)cudaStreamSynchronize(0)
+#define GPU_STREAM_SYNCHRONIZE_DEFAULT() GPU_CHECK(cudaStreamSynchronize(0))
 #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
-#define GPU_FREE(ptr) (void)cudaFree(ptr)
-#define GPU_MEMSET(ptr, value, size) (void)cudaMemset(ptr, value, size)
+// Deallocation runs on destructor/cleanup paths, where a throw would call
+// std::terminate; report without throwing.
+#define GPU_FREE(ptr) \
+    ::muGrid::gpu_check_nothrow(cudaFree(ptr), "cudaFree")
+#define GPU_MEMSET(ptr, value, size) GPU_CHECK(cudaMemset(ptr, value, size))
 #define GPU_MEMSET_2D(ptr, pitch, value, width, height) \
-    (void)cudaMemset2D(ptr, pitch, value, width, height)
+    GPU_CHECK(cudaMemset2D(ptr, pitch, value, width, height))
 #define GPU_MEMCPY_D2H(dst, src, size) \
-    (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
+    GPU_CHECK(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost))
 #define GPU_MEMCPY_H2D(dst, src, size) \
-    (void)cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice)
+    GPU_CHECK(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice))
 #define GPU_MEMCPY_D2D(dst, src, size) \
-    (void)cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice)
+    GPU_CHECK(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice))
 #define GPU_MEMCPY_2D_D2D(dst, dpitch, src, spitch, width, height) \
-    (void)cudaMemcpy2D(dst, dpitch, src, spitch, width, height, \
-                       cudaMemcpyDeviceToDevice)
+    GPU_CHECK(cudaMemcpy2D(dst, dpitch, src, spitch, width, height, \
+                           cudaMemcpyDeviceToDevice))
 #define GPU_MEMCPY_TO_SYMBOL(symbol, src, size) \
-    (void)cudaMemcpyToSymbol(symbol, src, size)
+    GPU_CHECK(cudaMemcpyToSymbol(symbol, src, size))
 
 namespace muGrid {
     //! nullptr if the last GPU runtime call succeeded, else the error string
     inline const char * gpu_last_error() {
         cudaError_t err{cudaGetLastError()};
         return err == cudaSuccess ? nullptr : cudaGetErrorString(err);
+    }
+    //! Human-readable message for a backend error code.
+    inline const char * gpu_error_string(gpuError_t err) {
+        return cudaGetErrorString(err);
+    }
+    //! Synchronize the whole device, ignoring the return code. Used by the
+    //! debug per-launch check, which attributes any surfaced fault to the
+    //! offending kernel by name rather than to the synchronize call site.
+    inline void gpu_device_synchronize_nothrow() {
+        (void)cudaDeviceSynchronize();
     }
     //! Index of the current device.
     inline int gpu_get_device() {
@@ -129,6 +155,8 @@ namespace muGrid {
 #include <hip/hip_runtime.h>
 
 using gpuStream_t = hipStream_t;
+using gpuError_t = hipError_t;
+inline constexpr gpuError_t gpuSuccess{hipSuccess};
 
 // See the CUDA branch above: each launch is checked immediately so that a
 // wrong-architecture build (or a bad launch configuration) raises instead of
@@ -152,30 +180,47 @@ using gpuStream_t = hipStream_t;
         GPU_KERNEL_DEBUG_SYNC(#kernel);                                  \
     } while (0)
 
-#define GPU_DEVICE_SYNCHRONIZE() (void)hipDeviceSynchronize()
-#define GPU_STREAM_SYNCHRONIZE_DEFAULT() (void)hipStreamSynchronize(0)
+// See the CUDA branch for the rationale behind routing every runtime call
+// through gpu_check / gpu_check_nothrow instead of discarding the return code.
+#define GPU_CHECK(call) \
+    ::muGrid::gpu_check((call), #call, __FILE__, __LINE__)
+#define GPU_DEVICE_SYNCHRONIZE() GPU_CHECK(hipDeviceSynchronize())
+#define GPU_STREAM_SYNCHRONIZE_DEFAULT() GPU_CHECK(hipStreamSynchronize(0))
 #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
-#define GPU_FREE(ptr) (void)hipFree(ptr)
-#define GPU_MEMSET(ptr, value, size) (void)hipMemset(ptr, value, size)
+// Deallocation runs on destructor/cleanup paths, where a throw would call
+// std::terminate; report without throwing.
+#define GPU_FREE(ptr) \
+    ::muGrid::gpu_check_nothrow(hipFree(ptr), "hipFree")
+#define GPU_MEMSET(ptr, value, size) GPU_CHECK(hipMemset(ptr, value, size))
 #define GPU_MEMSET_2D(ptr, pitch, value, width, height) \
-    (void)hipMemset2D(ptr, pitch, value, width, height)
+    GPU_CHECK(hipMemset2D(ptr, pitch, value, width, height))
 #define GPU_MEMCPY_D2H(dst, src, size) \
-    (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToHost)
+    GPU_CHECK(hipMemcpy(dst, src, size, hipMemcpyDeviceToHost))
 #define GPU_MEMCPY_H2D(dst, src, size) \
-    (void)hipMemcpy(dst, src, size, hipMemcpyHostToDevice)
+    GPU_CHECK(hipMemcpy(dst, src, size, hipMemcpyHostToDevice))
 #define GPU_MEMCPY_D2D(dst, src, size) \
-    (void)hipMemcpy(dst, src, size, hipMemcpyDeviceToDevice)
+    GPU_CHECK(hipMemcpy(dst, src, size, hipMemcpyDeviceToDevice))
 #define GPU_MEMCPY_2D_D2D(dst, dpitch, src, spitch, width, height) \
-    (void)hipMemcpy2D(dst, dpitch, src, spitch, width, height, \
-                      hipMemcpyDeviceToDevice)
+    GPU_CHECK(hipMemcpy2D(dst, dpitch, src, spitch, width, height, \
+                          hipMemcpyDeviceToDevice))
 #define GPU_MEMCPY_TO_SYMBOL(symbol, src, size) \
-    (void)hipMemcpyToSymbol(symbol, src, size)
+    GPU_CHECK(hipMemcpyToSymbol(symbol, src, size))
 
 namespace muGrid {
     //! nullptr if the last GPU runtime call succeeded, else the error string
     inline const char * gpu_last_error() {
         hipError_t err{hipGetLastError()};
         return err == hipSuccess ? nullptr : hipGetErrorString(err);
+    }
+    //! Human-readable message for a backend error code.
+    inline const char * gpu_error_string(gpuError_t err) {
+        return hipGetErrorString(err);
+    }
+    //! Synchronize the whole device, ignoring the return code. Used by the
+    //! debug per-launch check, which attributes any surfaced fault to the
+    //! offending kernel by name rather than to the synchronize call site.
+    inline void gpu_device_synchronize_nothrow() {
+        (void)hipDeviceSynchronize();
     }
     //! Index of the current device.
     inline int gpu_get_device() {
@@ -196,6 +241,37 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace muGrid {
+    /**
+     * Throw a RuntimeError if a runtime-API call returned an error.
+     *
+     * Backs the GPU_CHECK macro, which supplies `what` (the stringified call)
+     * and the source location. Checking at the call site both surfaces the
+     * failure and clears the pending-error state, so it cannot later be
+     * misattributed to an unrelated kernel launch.
+     */
+    inline void gpu_check(gpuError_t err, const char * what,
+                          const char * file, int line) {
+        if (err != gpuSuccess) {
+            throw RuntimeError(std::string("GPU runtime error in ") + what +
+                               " at " + file + ":" + std::to_string(line) +
+                               ": " + gpu_error_string(err));
+        }
+    }
+
+    /**
+     * Report a runtime-API error without throwing.
+     *
+     * For cleanup paths (device free) reached from destructors, where throwing
+     * would call std::terminate. There is nothing to recover, so the failure is
+     * written to stderr and execution continues.
+     */
+    inline void gpu_check_nothrow(gpuError_t err, const char * what) noexcept {
+        if (err != gpuSuccess) {
+            std::fprintf(stderr, "muGrid: GPU runtime error in %s: %s\n", what,
+                         gpu_error_string(err));
+        }
+    }
+
     /**
      * Throw a RuntimeError if a GPU kernel launch left a pending runtime error.
      *
@@ -223,7 +299,10 @@ namespace muGrid {
      * macros via GPU_KERNEL_DEBUG_SYNC, which is active in debug builds only.
      */
     inline void gpu_assert_device_synchronized(const char * context) {
-        GPU_DEVICE_SYNCHRONIZE();
+        // Deliberately the no-throw synchronize: a surfaced execution fault is
+        // reported by gpu_assert_last_error below, attributed to `context` (the
+        // kernel name) rather than to the synchronize call.
+        gpu_device_synchronize_nothrow();
         gpu_assert_last_error(context);
     }
 }  // namespace muGrid

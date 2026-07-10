@@ -64,23 +64,36 @@ option(MUGRID_ENABLE_HIP "Enable HIP GPU support (AMD ROCm)" OFF)
 if(MUGRID_ENABLE_CUDA)
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
-    # Set default CUDA architecture if not specified
-    # 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100), 90 = Hopper (H100)
-    # Use "native" on CMake 3.24+ to auto-detect, or set a default
+    # Default: autodetect the GPUs installed in this machine ("native", CMake 3.24+).
+    # Override with -DCMAKE_CUDA_ARCHITECTURES="80;90" for a portable/multi-arch build,
+    # or "all-major" for a distribution binary.
+    # 70 = Volta (V100), 75 = Turing, 80 = Ampere (A100), 90 = Hopper (H100),
+    # 120 = Blackwell (RTX 50xx / B100/B200).
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "70;80;90" CACHE STRING "CUDA architectures to compile for")
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+            set(CMAKE_CUDA_ARCHITECTURES "native" CACHE STRING "CUDA architectures to compile for")
+        else()
+            set(CMAKE_CUDA_ARCHITECTURES "70;80;90" CACHE STRING "CUDA architectures to compile for")
+        endif()
     endif()
+    message(STATUS "muGrid CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
 
 # Enable HIP language if requested
 # This must be after project() but before the first HIP target
 if(MUGRID_ENABLE_HIP)
     enable_language(HIP)
-    # Set default HIP architecture if not specified
+    # Default: autodetect the GPUs installed in this machine ("native", CMake 3.24+).
+    # Override with -DCMAKE_HIP_ARCHITECTURES="gfx90a;gfx942" for a portable/multi-arch build.
     # gfx906 = MI50/MI60, gfx908 = MI100, gfx90a = MI200 series, gfx942 = MI300 series
     if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
-        set(CMAKE_HIP_ARCHITECTURES "gfx906;gfx908;gfx90a" CACHE STRING "HIP architectures to compile for")
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+            set(CMAKE_HIP_ARCHITECTURES "native" CACHE STRING "HIP architectures to compile for")
+        else()
+            set(CMAKE_HIP_ARCHITECTURES "gfx906;gfx908;gfx90a" CACHE STRING "HIP architectures to compile for")
+        endif()
     endif()
+    message(STATUS "muGrid HIP architectures: ${CMAKE_HIP_ARCHITECTURES}")
 endif()
 
 # Require C++20

@@ -34,14 +34,34 @@ if(MUGRID_ENABLE_NETCDF)
     target_include_directories(_muGrid PRIVATE ${MUGRID_NETCDF_INCLUDE_DIRS})
 endif()
 
-# Pass device architecture information to Python bindings
+# Pass device architecture information to Python bindings (muGrid.device_arch).
+# CMAKE_{CUDA,HIP}_ARCHITECTURES may hold a special value ("native", "all",
+# "all-major"); CMake keeps that literal in the cache but exposes the concrete
+# arch list it detected in the companion *_NATIVE / *_ALL / *_ALL_MAJOR
+# variables. Resolve those so the attribute shows e.g. "120" rather than
+# "native", and strip the internal -real / -virtual suffixes.
+function(mugrid_resolve_device_arch out_var archs native all all_major)
+    if(archs STREQUAL "native" AND native)
+        set(archs "${native}")
+    elseif(archs STREQUAL "all" AND all)
+        set(archs "${all}")
+    elseif(archs STREQUAL "all-major" AND all_major)
+        set(archs "${all_major}")
+    endif()
+    string(REGEX REPLACE "-(real|virtual)" "" archs "${archs}")
+    string(REPLACE ";" "," archs "${archs}")
+    set(${out_var} "${archs}" PARENT_SCOPE)
+endfunction()
+
 if(MUGRID_ENABLE_CUDA AND CMAKE_CUDA_ARCHITECTURES)
-    # Convert list to semicolon-separated string for display
-    string(REPLACE ";" "," MUGRID_DEVICE_ARCH_STR "${CMAKE_CUDA_ARCHITECTURES}")
+    mugrid_resolve_device_arch(MUGRID_DEVICE_ARCH_STR "${CMAKE_CUDA_ARCHITECTURES}"
+        "${CMAKE_CUDA_ARCHITECTURES_NATIVE}" "${CMAKE_CUDA_ARCHITECTURES_ALL}"
+        "${CMAKE_CUDA_ARCHITECTURES_ALL_MAJOR}")
     target_compile_definitions(_muGrid PRIVATE MUGRID_DEVICE_ARCH=${MUGRID_DEVICE_ARCH_STR})
 elseif(MUGRID_ENABLE_HIP AND CMAKE_HIP_ARCHITECTURES)
-    # Convert list to semicolon-separated string for display
-    string(REPLACE ";" "," MUGRID_DEVICE_ARCH_STR "${CMAKE_HIP_ARCHITECTURES}")
+    mugrid_resolve_device_arch(MUGRID_DEVICE_ARCH_STR "${CMAKE_HIP_ARCHITECTURES}"
+        "${CMAKE_HIP_ARCHITECTURES_NATIVE}" "${CMAKE_HIP_ARCHITECTURES_ALL}"
+        "${CMAKE_HIP_ARCHITECTURES_ALL_MAJOR}")
     target_compile_definitions(_muGrid PRIVATE MUGRID_DEVICE_ARCH=${MUGRID_DEVICE_ARCH_STR})
 endif()
 
