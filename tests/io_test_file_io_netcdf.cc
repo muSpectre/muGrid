@@ -1006,6 +1006,90 @@ namespace muGrid {
     }
   }
 
+  // Reading a variable into a field of a different scalar type must
+  // *convert* between the file's external type and the memory type -- the
+  // PnetCDF flexible API does so natively and the serial backend dispatches
+  // to the typed nc_get_varm_* calls to match. Regression test: the serial
+  // backend used to call the untyped nc_get_varm, which performs no
+  // conversion, so reading a float variable into a double field silently
+  // reinterpreted the raw bytes.
+  BOOST_AUTO_TEST_CASE(DtypeConversionRead) {
+    auto & comm{MPIContext::get_context().comm};
+    const DynGridIndex nb_domain_grid_pts{3, 4};
+    const DynGridIndex nb_subdomain_grid_pts{3, 4};
+    const DynGridIndex subdomain_locations{0, 0};
+    const std::vector<std::string> field_names{"f"};
+
+    // write a float (NC_FLOAT) variable
+    muGrid::GlobalFieldCollection w_fc{nb_domain_grid_pts,
+                                       nb_subdomain_grid_pts,
+                                       subdomain_locations};
+    auto & w_field{dynamic_cast<muGrid::TypedField<float> &>(
+        w_fc.register_field<float>(field_names[0], 1))};
+    auto w_vec{w_field.eigen_vec()};
+    for (Index_t i{0}; i < w_vec.size(); ++i) {
+      w_vec(i) = static_cast<float>(i) + 0.25f;
+    }
+    const std::string file_name{"test_dtype_conversion_io.nc"};
+    {
+      muGrid::FileIONetCDF w(file_name,
+                             muGrid::FileIOBase::OpenMode::Overwrite, comm);
+      w.register_field_collection(w_fc, field_names);
+      w.append_frame().write(field_names);
+    }
+
+    // read it back into a double field: float -> double is exact
+    muGrid::GlobalFieldCollection r_fc{nb_domain_grid_pts,
+                                       nb_subdomain_grid_pts,
+                                       subdomain_locations};
+    auto & r_field{dynamic_cast<muGrid::TypedField<Real> &>(
+        r_fc.register_real_field(field_names[0], 1))};
+    {
+      muGrid::FileIONetCDF r(file_name, muGrid::FileIOBase::OpenMode::Read,
+                             comm);
+      r.register_field_collection(r_fc, field_names);
+      r.read(0, field_names);
+    }
+    auto r_vec{r_field.eigen_vec()};
+    for (Index_t i{0}; i < w_vec.size(); ++i) {
+      BOOST_CHECK_EQUAL(r_vec(i), static_cast<Real>(w_vec(i)));
+    }
+  }
+
+  // Registering a field collection whose fixed (grid) dimensions do not
+  // match the file must throw. Regression test: the dimension lookup used to
+  // resolve dimensions by name only, without comparing the stored length, so
+  // reading a 3x4 file into a 4x5 collection silently transferred a corner
+  // hyperslab of the stored variable.
+  BOOST_AUTO_TEST_CASE(GridMismatchThrows) {
+    auto & comm{MPIContext::get_context().comm};
+    const DynGridIndex nb_domain_grid_pts{3, 4};
+    const DynGridIndex nb_subdomain_grid_pts{3, 4};
+    const DynGridIndex subdomain_locations{0, 0};
+    const std::vector<std::string> field_names{"f"};
+
+    muGrid::GlobalFieldCollection w_fc{nb_domain_grid_pts,
+                                       nb_subdomain_grid_pts,
+                                       subdomain_locations};
+    w_fc.register_real_field(field_names[0], 1);
+    const std::string file_name{"test_grid_mismatch_io.nc"};
+    {
+      muGrid::FileIONetCDF w(file_name,
+                             muGrid::FileIOBase::OpenMode::Overwrite, comm);
+      w.register_field_collection(w_fc, field_names);
+      w.append_frame().write(field_names);
+    }
+
+    const DynGridIndex nb_wrong_grid_pts{4, 5};
+    muGrid::GlobalFieldCollection r_fc{nb_wrong_grid_pts, nb_wrong_grid_pts,
+                                       subdomain_locations};
+    r_fc.register_real_field(field_names[0], 1);
+    muGrid::FileIONetCDF r(file_name, muGrid::FileIOBase::OpenMode::Read,
+                           comm);
+    BOOST_CHECK_THROW(r.register_field_collection(r_fc, field_names),
+                      muGrid::FileIOError);
+  }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
   // Round-trip a device-resident field through NetCDF. On write the device
   // data is staged through a temporary host (AoS) mirror; on read it is staged

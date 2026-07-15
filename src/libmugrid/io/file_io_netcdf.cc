@@ -939,6 +939,29 @@ namespace muGrid {
             throw FileIOError(ncmu_strerror(status));
           }
           this->nb_frames = dim_len;
+        } else {
+          // A fixed dimension must have exactly the size the registered
+          // field collection expects: reads/writes address the file by
+          // hyperslabs sized from the *registered* dimensions, so a
+          // mismatch would not fail but silently transfer a corner of the
+          // stored variable.
+          IOSize_t dim_len{};
+          int status_len{
+              ncmu_inq_dimlen(this->netcdf_id, dim->get_id(), &dim_len)};
+          if (status_len != NC_NOERR) {
+            throw FileIOError(ncmu_strerror(status_len));
+          }
+          if (dim_len != dim->get_size()) {
+            throw FileIOError(
+                "The dimension '" + dim->get_name() + "' has " +
+                std::to_string(dim_len) +
+                " entries in the NetCDF file but the registered field "
+                "collection expects " +
+                std::to_string(dim->get_size()) +
+                " entries. Do you maybe try to read the file into a field "
+                "collection whose grid does not match the grid stored in "
+                "the file?");
+          }
         }
       }
     }

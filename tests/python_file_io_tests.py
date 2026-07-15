@@ -504,6 +504,87 @@ class FileIOTest(unittest.TestCase):
         first_frame.read()
         self.assertTrue(np.all(np.from_dlpack(f) == 1.5))
 
+    def test_FileIONetCDF_dtype_conversion(self):
+        """Reading a variable into a field of a different scalar type must
+        convert (both backends: PnetCDF's flexible API converts natively, the
+        serial backend via the typed nc_get_varm_* calls). Reading a float
+        variable into a double field used to silently reinterpret the raw
+        bytes in serial builds."""
+        fname = "python_binding_io_dtype-conversion-tests.nc"
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+        self.comm.barrier()
+
+        # write a *float* (NC_FLOAT) variable
+        fc_w = muGrid.GlobalFieldCollection(
+            self.nb_domain_grid_pts,
+            nb_subdomain_grid_pts=self.nb_subdomain_grid_pts,
+        )
+        f_w = fc_w.real_field("conversion-field", dtype=np.float32)
+        np.random.seed(31415)
+        values = np.random.random(self.nb_domain_grid_pts).astype(np.float32)
+        f_w.p[...] = values
+        fio_w = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Overwrite, self.comm)
+        fio_w.register_field_collection(fc_w, field_names=["conversion-field"])
+        fio_w.append_frame().write(["conversion-field"])
+        fio_w.close()
+
+        self.comm.barrier()
+
+        # read it back into a *double* field: float -> double is exact
+        fc_r = muGrid.GlobalFieldCollection(
+            self.nb_domain_grid_pts,
+            nb_subdomain_grid_pts=self.nb_subdomain_grid_pts,
+        )
+        f_r = fc_r.real_field("conversion-field", dtype=np.float64)
+        fio_r = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read, self.comm)
+        fio_r.register_field_collection(fc_r, field_names=["conversion-field"])
+        fio_r.read(0, ["conversion-field"])
+        self.assertTrue(
+            np.array_equal(np.array(f_r.p), values.astype(np.float64)))
+        fio_r.close()
+
+        self.comm.barrier()
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+
+    def test_FileIONetCDF_grid_mismatch_raises(self):
+        """Registering a field collection whose fixed (grid) dimensions do not
+        match the file must raise instead of silently reading a corner of the
+        stored variable."""
+        fname = "python_binding_io_grid-mismatch-tests.nc"
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+        self.comm.barrier()
+
+        field_name = "grid-mismatch-field"
+        f = self.fc_glob.register_real_field(field_name, 1, "pixel")
+        np.from_dlpack(f)[...] = 1.0
+        fio_w = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Overwrite, self.comm)
+        fio_w.register_field_collection(self.fc_glob, field_names=[field_name])
+        fio_w.append_frame().write([field_name])
+        fio_w.close()
+
+        self.comm.barrier()
+
+        nb_wrong_grid_pts = tuple(n + 1 for n in self.nb_domain_grid_pts)
+        fc_wrong = muGrid.GlobalFieldCollection(nb_wrong_grid_pts)
+        fc_wrong.register_real_field(field_name, 1, "pixel")
+        fio_r = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read, self.comm)
+        with self.assertRaises(RuntimeError) as cm:
+            fio_r.register_field_collection(fc_wrong,
+                                            field_names=[field_name])
+        self.assertIn("entries in the NetCDF file", str(cm.exception))
+        fio_r.close()
+
+        self.comm.barrier()
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+
     def test_FileIONetCDF_frame_variable(self):
         """Round-trip a per-frame, grid-less quantity (a small replicated
         tensor) written via register_frame_variable alongside a grid field."""

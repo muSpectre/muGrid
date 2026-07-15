@@ -120,20 +120,59 @@ using IODiff_t = ptrdiff_t;
 // the serial and the MPI/PnetCDF backends -- whether the transfer is
 // collective and carries an MPI buffer count and datatype -- to this single
 // location, so the read/write paths in file_io_netcdf.cc carry no #ifdef. The
-// `bufcount`/`buftype` arguments are honoured by PnetCDF's collective
-// `*_varm_all` and ignored by serial NetCDF's `*_varm`; callers always supply
-// them (computed via the existing Datatype_t abstraction, valid in both
-// builds).
+// `bufcount`/`buftype` arguments describe the *memory* buffer; both backends
+// convert between it and the variable's external (file) type: PnetCDF's
+// flexible `*_varm_all` API converts natively, and the serial branch
+// dispatches on `buftype` to the *typed* `nc_{get,put}_varm_<type>` calls to
+// match. (The untyped `nc_{get,put}_varm` must not be used here: it performs
+// no conversion and reinterprets the buffer as the file's external type, so a
+// float variable read into a double field silently produced garbage.)
 inline int ncmu_put_varm_unified(int ncid, int varid, const IOSize_t * start,
                                  const IOSize_t * count, const IODiff_t * stride,
                                  const IODiff_t * imap, const void * buf,
                                  [[maybe_unused]] IOSize_t bufcount,
-                                 [[maybe_unused]] Datatype_t buftype) {
+                                 Datatype_t buftype) {
 #ifdef WITH_MPI
   return ncmu_put_varm_all(ncid, varid, start, count, stride, imap, buf,
                            bufcount, buftype);
 #else   // WITH_MPI
-  return ncmu_put_varm_all(ncid, varid, start, count, stride, imap, buf);
+  switch (buftype) {
+  case NC_CHAR:
+    return nc_put_varm_text(ncid, varid, start, count, stride, imap,
+                            static_cast<const char *>(buf));
+  case NC_BYTE:
+    return nc_put_varm_schar(ncid, varid, start, count, stride, imap,
+                             static_cast<const signed char *>(buf));
+  case NC_UBYTE:
+    return nc_put_varm_uchar(ncid, varid, start, count, stride, imap,
+                             static_cast<const unsigned char *>(buf));
+  case NC_SHORT:
+    return nc_put_varm_short(ncid, varid, start, count, stride, imap,
+                             static_cast<const short *>(buf));
+  case NC_USHORT:
+    return nc_put_varm_ushort(ncid, varid, start, count, stride, imap,
+                              static_cast<const unsigned short *>(buf));
+  case NC_INT:
+    return nc_put_varm_int(ncid, varid, start, count, stride, imap,
+                           static_cast<const int *>(buf));
+  case NC_UINT:
+    return nc_put_varm_uint(ncid, varid, start, count, stride, imap,
+                            static_cast<const unsigned int *>(buf));
+  case NC_INT64:
+    return nc_put_varm_longlong(ncid, varid, start, count, stride, imap,
+                                static_cast<const long long *>(buf));
+  case NC_UINT64:
+    return nc_put_varm_ulonglong(ncid, varid, start, count, stride, imap,
+                                 static_cast<const unsigned long long *>(buf));
+  case NC_FLOAT:
+    return nc_put_varm_float(ncid, varid, start, count, stride, imap,
+                             static_cast<const float *>(buf));
+  case NC_DOUBLE:
+    return nc_put_varm_double(ncid, varid, start, count, stride, imap,
+                              static_cast<const double *>(buf));
+  default:
+    return NC_EBADTYPE;
+  }
 #endif  // WITH_MPI
 }
 
@@ -141,12 +180,48 @@ inline int ncmu_get_varm_unified(int ncid, int varid, const IOSize_t * start,
                                  const IOSize_t * count, const IODiff_t * stride,
                                  const IODiff_t * imap, void * buf,
                                  [[maybe_unused]] IOSize_t bufcount,
-                                 [[maybe_unused]] Datatype_t buftype) {
+                                 Datatype_t buftype) {
 #ifdef WITH_MPI
   return ncmu_get_varm_all(ncid, varid, start, count, stride, imap, buf,
                            bufcount, buftype);
 #else   // WITH_MPI
-  return ncmu_get_varm_all(ncid, varid, start, count, stride, imap, buf);
+  switch (buftype) {
+  case NC_CHAR:
+    return nc_get_varm_text(ncid, varid, start, count, stride, imap,
+                            static_cast<char *>(buf));
+  case NC_BYTE:
+    return nc_get_varm_schar(ncid, varid, start, count, stride, imap,
+                             static_cast<signed char *>(buf));
+  case NC_UBYTE:
+    return nc_get_varm_uchar(ncid, varid, start, count, stride, imap,
+                             static_cast<unsigned char *>(buf));
+  case NC_SHORT:
+    return nc_get_varm_short(ncid, varid, start, count, stride, imap,
+                             static_cast<short *>(buf));
+  case NC_USHORT:
+    return nc_get_varm_ushort(ncid, varid, start, count, stride, imap,
+                              static_cast<unsigned short *>(buf));
+  case NC_INT:
+    return nc_get_varm_int(ncid, varid, start, count, stride, imap,
+                           static_cast<int *>(buf));
+  case NC_UINT:
+    return nc_get_varm_uint(ncid, varid, start, count, stride, imap,
+                            static_cast<unsigned int *>(buf));
+  case NC_INT64:
+    return nc_get_varm_longlong(ncid, varid, start, count, stride, imap,
+                                static_cast<long long *>(buf));
+  case NC_UINT64:
+    return nc_get_varm_ulonglong(ncid, varid, start, count, stride, imap,
+                                 static_cast<unsigned long long *>(buf));
+  case NC_FLOAT:
+    return nc_get_varm_float(ncid, varid, start, count, stride, imap,
+                             static_cast<float *>(buf));
+  case NC_DOUBLE:
+    return nc_get_varm_double(ncid, varid, start, count, stride, imap,
+                              static_cast<double *>(buf));
+  default:
+    return NC_EBADTYPE;
+  }
 #endif  // WITH_MPI
 }
 
