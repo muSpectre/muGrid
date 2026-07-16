@@ -1,15 +1,18 @@
 Change log for µGrid
 ====================
 
-Unreleased
-----------
+v1.0rc (16Jul26)
+----------------
 
+- ENH: `FileIONetCDF.sync()` flushes buffered frames to disk for incremental
+  checkpointing of long runs
+- BUG: Autodetect GPU architecture; guard against GPU API failures
+- BUG: Guard NetCDF reads against dimension/data-type mismatch (were garbled)
+- BUG: `float32` field support in NetCDF I/O
 - BUG: Reject creating a field collection on a GPU device whose backend was not
-  compiled in (e.g. `Device.cuda()` in a CPU-only build), instead of silently
-  allocating on the host while reporting `is_device() == true`
-- BUG: `version_string()` now reports the GPU backend as `ON`/`OFF` based on the
-  build (consistent with the MPI/NetCDF sections); a passed device appends its
-  id (e.g. `CUDA: ON, device cuda:2`)
+  compiled in (e.g. `Device.cuda()` in a CPU-only build)
+- BUG: `version_string()` reports the GPU backend as `ON`/`OFF` from the build;
+  a passed device appends its id (e.g. `CUDA: ON, device cuda:2`)
 
 v0.112.0 (07Jul26)
 ------------------
