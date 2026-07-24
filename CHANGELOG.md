@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-v1.0rc (16Jul26)
-----------------
+v1.0 (16Jul26)
+--------------
 
 - ENH: `FileIONetCDF.sync()` flushes buffered frames to disk for incremental
   checkpointing of long runs
