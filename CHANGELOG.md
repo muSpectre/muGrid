@@ -1,6 +1,15 @@
 Change log for µGrid
 ====================
 
+v1.0.1 (02Sep26)
+----------------
+
+- BUG: `communicate_ghosts`/`reduce_ghosts` now reject fields that do not
+  belong to the decomposition's own field collection (issue #191). Ghost
+  communication is a real-space operation on the decomposed grid; applied to
+  e.g. a Fourier-space field of an FFT engine it silently overwrote the low-k
+  entries with unset ghost data.
+
 v1.0 (16Jul26)
 --------------
 

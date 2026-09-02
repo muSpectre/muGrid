@@ -149,6 +149,49 @@ def test_communicate_ghosts(comm, nb_subdivisions):
         )
 
 
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_ghost_communication_rejects_foreign_field(comm, nb_subdivisions):
+    """Ghost communication must reject fields from other collections
+    (issue #191).
+
+    communicate_ghosts/reduce_ghosts combine the decomposition's own grid
+    extents and ghost counts with the strides of the field they are handed.
+    For a field from any other collection (e.g. a Fourier-space field of an
+    FFT engine, or a stand-alone collection without ghosts) this scrambles
+    interior data, so such fields must be rejected up front.
+    """
+    spatial_dim = len(nb_subdivisions)
+    nb_domain_grid_pts = np.full(spatial_dim, 5)
+    nb_ghosts = np.full(spatial_dim, 1)
+    cart_decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghosts.tolist(),
+        nb_ghosts.tolist(),
+    )
+
+    # A field on a separate collection of the same subdomain shape but
+    # without ghost regions
+    foreign_collection = GlobalFieldCollection(
+        list(cart_decomp.nb_subdomain_grid_pts)
+    )
+    foreign_field = foreign_collection.real_field("foreign-field")
+
+    # The guard throws on every rank before any communication is issued,
+    # so this cannot deadlock under MPI.
+    with pytest.raises(RuntimeError):
+        cart_decomp.communicate_ghosts(foreign_field)
+    with pytest.raises(RuntimeError):
+        cart_decomp.reduce_ghosts(foreign_field)
+
+    # Fields of the decomposition's own collection keep working
+    own_field = cart_decomp.real_field("own-field")
+    own_field.sg[...] = 1.0
+    cart_decomp.communicate_ghosts(own_field)
+    cart_decomp.reduce_ghosts(own_field)
+
+
 def test_field_accessors(comm, nb_grid_pts=(128, 128)):
     s = suggest_subdivisions(len(nb_grid_pts), comm.size)
 
