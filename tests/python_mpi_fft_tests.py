@@ -546,6 +546,52 @@ class TestMPIFFTRoundtrip:
 
 
 @pytest.mark.parametrize("device", get_test_devices())
+class TestMPIFFTSubPointFields:
+    """MPI FFT of fields with multiple sub-points (issue #192).
+
+    Exercises the decomposed (transpose) path with the sub-point axis as an
+    additional batch axis alongside components.
+    """
+
+    @pytest.mark.parametrize(
+        "nb_grid_pts",
+        [
+            [16, 20],
+            [8, 10, 12],
+        ],
+    )
+    def test_roundtrip_quad_field(self, comm, device, nb_grid_pts):
+        skip_if_gpu_unavailable(device)
+        xp = get_array_module(device)
+
+        nb_grid_pts = [n * max(1, comm.size) for n in nb_grid_pts]
+        dev = get_device_for_rank(device, comm)
+        engine = FFTEngine(
+            nb_grid_pts, comm, nb_sub_pts={"quad": 2}, device=dev
+        )
+
+        real_field = engine.real_space_field(
+            "real-quad", components=(3,), sub_pt="quad"
+        )
+        fourier_field = engine.fourier_space_field(
+            "fourier-quad", components=(3,), sub_pt="quad"
+        )
+
+        np.random.seed(42 + comm.rank)
+        original = np.random.randn(3, 2, *engine.nb_subdomain_grid_pts)
+        real_field.s[...] = xp.asarray(original)
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.s[...] *= engine.normalisation
+
+        result = real_field.s
+        if device == "gpu":
+            result = result.get()
+        assert_allclose(result, original, atol=1e-13)
+
+
+@pytest.mark.parametrize("device", get_test_devices())
 class TestMPIFFTMultipleComponents:
     """Test FFT with multi-component fields."""
 

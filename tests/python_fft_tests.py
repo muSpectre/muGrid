@@ -867,6 +867,140 @@ class TestFFTGhostAlignment:
         assert storage_x == 10
 
 
+class TestFFTSubPointFields:
+    """FFT of fields with multiple sub-points (issue #192).
+
+    The sub-point axis is a pure batch axis, exactly like the component
+    axis: each (component, sub-point) slice must be transformed
+    independently. The transform paths used to batch over
+    ``get_nb_components()`` only, which excludes sub-points, so the strides
+    were wrong by a factor of ``nb_sub_pts`` and the transform returned
+    garbage.
+    """
+
+    nb_grid_pts = [8, 6]
+    nb_quad = 2
+
+    def make_engine(self):
+        return muGrid.FFTEngine(
+            self.nb_grid_pts, nb_sub_pts={"quad": self.nb_quad}
+        )
+
+    def fourier_reference(self, real_slice):
+        """muGrid convention: transform over all axes, half-complex along
+        the (first) x axis."""
+        nx = real_slice.shape[0]
+        return np.fft.fftn(real_slice)[: nx // 2 + 1, ...]
+
+    @pytest.mark.parametrize("components", [(), (3,)])
+    def test_forward_matches_numpy(self, components):
+        engine = self.make_engine()
+        real_field = engine.real_space_collection.real_field(
+            "real-field", components, sub_pt="quad"
+        )
+        fourier_field = engine.fourier_space_collection.complex_field(
+            "fourier-field", components, sub_pt="quad"
+        )
+
+        rng = np.random.default_rng(42)
+        real_field.s[...] = rng.random(real_field.s.shape)
+
+        engine.fft(real_field, fourier_field)
+
+        # Each (component, sub-point) slice must transform independently
+        flat_real = real_field.s.reshape((-1,) + tuple(self.nb_grid_pts))
+        nb_fourier_pts = fourier_field.s.shape[-2:]
+        flat_fourier = fourier_field.s.reshape((-1,) + nb_fourier_pts)
+        for dof in range(flat_real.shape[0]):
+            assert_allclose(
+                flat_fourier[dof],
+                self.fourier_reference(flat_real[dof]),
+                atol=1e-13,
+                err_msg=f"FFT of (component, sub-point) slice {dof} is wrong",
+            )
+
+    @pytest.mark.parametrize("components", [(), (3,)])
+    @pytest.mark.parametrize(
+        "real_dtype,cplx_dtype,tol",
+        [(np.float64, np.complex128, 1e-14), (np.float32, np.complex64, 1e-6)],
+    )
+    def test_roundtrip(self, components, real_dtype, cplx_dtype, tol):
+        engine = self.make_engine()
+        real_field = engine.real_space_collection.real_field(
+            "real-field", components, sub_pt="quad", dtype=real_dtype
+        )
+        fourier_field = engine.fourier_space_collection.complex_field(
+            "fourier-field", components, sub_pt="quad", dtype=cplx_dtype
+        )
+
+        rng = np.random.default_rng(123)
+        real_field.s[...] = rng.random(real_field.s.shape)
+        original = real_field.s.copy()
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.s[...] *= engine.normalisation
+
+        assert_allclose(real_field.s, original, atol=tol)
+
+    def test_sub_point_mismatch_rejected(self):
+        """A quad-point real field paired with a pixel Fourier field (or
+        vice versa) must be rejected, not silently produce garbage."""
+        engine = self.make_engine()
+        real_quad = engine.real_space_collection.real_field(
+            "real-quad", (), sub_pt="quad"
+        )
+        fourier_pixel = engine.fourier_space_field("fourier-pixel")
+        with pytest.raises(RuntimeError):
+            engine.fft(real_quad, fourier_pixel)
+        with pytest.raises(RuntimeError):
+            engine.ifft(fourier_pixel, real_quad)
+
+        real_pixel = engine.real_space_field("real-pixel")
+        fourier_quad = engine.fourier_space_collection.complex_field(
+            "fourier-quad", (), sub_pt="quad"
+        )
+        with pytest.raises(RuntimeError):
+            engine.fft(real_pixel, fourier_quad)
+        with pytest.raises(RuntimeError):
+            engine.ifft(fourier_quad, real_pixel)
+
+    def test_engine_helpers_accept_sub_pt(self):
+        """The engine's field helpers pass a sub_pt tag through."""
+        engine = self.make_engine()
+        real_field = engine.real_space_field(
+            "real-field", (3,), sub_pt="quad"
+        )
+        fourier_field = engine.fourier_space_field(
+            "fourier-field", (3,), sub_pt="quad"
+        )
+        assert real_field.s.shape[:2] == (3, self.nb_quad)
+        assert fourier_field.s.shape[:2] == (3, self.nb_quad)
+
+        # Get-or-create: same name returns the existing field
+        again = engine.real_space_field("real-field", (3,), sub_pt="quad")
+        assert again.s.shape == real_field.s.shape
+
+        # Register variants raise on duplicates
+        with pytest.raises(RuntimeError):
+            engine.register_real_space_field(
+                "real-field", (3,), sub_pt="quad"
+            )
+        with pytest.raises(RuntimeError):
+            engine.register_fourier_space_field(
+                "fourier-field", (3,), sub_pt="quad"
+            )
+
+        # The fields work in a transform
+        rng = np.random.default_rng(7)
+        real_field.s[...] = rng.random(real_field.s.shape)
+        original = real_field.s.copy()
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.s[...] *= engine.normalisation
+        assert_allclose(real_field.s, original, atol=1e-14)
+
+
 class TestFFTDtypeValidation:
     """The transform paths cast raw data pointers based on the field dtypes,
     so fft/ifft must reject any (real, Fourier) pairing other than

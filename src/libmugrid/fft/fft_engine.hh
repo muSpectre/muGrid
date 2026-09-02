@@ -133,6 +133,30 @@ class FFTEngine : public FFTEngineBase {
     }
   }
 
+  /**
+   * Transforms batch over all per-pixel degrees of freedom: the component
+   * and sub-point axes are both pure batch axes (issue #192 was these paths
+   * batching over the component count only, which scrambles fields with
+   * more than one sub-point). Input and output must agree in both counts
+   * strictly -- not just in their product -- so field shapes keep their
+   * meaning across the transform. Returns the batch size
+   * nb_dof_per_pixel = nb_components * nb_sub_pts.
+   */
+  static Index_t check_nb_dof(const Field & input, const Field & output) {
+    if (input.get_nb_components() != output.get_nb_components() ||
+        input.get_nb_sub_pts() != output.get_nb_sub_pts()) {
+      std::stringstream error{};
+      error << "Input and output fields must have the same number of "
+               "components and sub-points; the input field has "
+            << input.get_nb_components() << " component(s) on "
+            << input.get_nb_sub_pts() << " sub-point(s), the output field "
+            << output.get_nb_components() << " component(s) on "
+            << output.get_nb_sub_pts() << " sub-point(s)";
+      throw RuntimeError(error.str());
+    }
+    return input.get_nb_dof_per_pixel();
+  }
+
   void fft(const Field & input, Field & output) override {
     check_transform_dtypes(input, output, "fft");
     // Verify fields belong to correct collections
@@ -274,11 +298,7 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
-    const Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    const Index_t nb_dof{check_nb_dof(input, output)};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
     const Field & real_field{forward ? input : output};
@@ -305,23 +325,23 @@ class FFTEngine : public FFTEngineBase {
     const bool r_soa{real_field.get_storage_order() ==
                      StorageOrder::StructureOfArrays};
     const Index_t r_comp{r_soa ? nb_buf_pixels : Index_t{1}};
-    const Index_t r_x{r_soa ? Index_t{1} : nb_components};
-    const Index_t r_y{r_soa ? lwx : nb_components * lwx};
-    const Index_t r_z{r_soa ? lwx * lwy : nb_components * lwx * lwy};
+    const Index_t r_x{r_soa ? Index_t{1} : nb_dof};
+    const Index_t r_y{r_soa ? lwx : nb_dof * lwx};
+    const Index_t r_z{r_soa ? lwx * lwy : nb_dof * lwx * lwy};
     const Index_t r_base{r_soa ? ghost_pixel_offset
-                               : ghost_pixel_offset * nb_components};
+                               : ghost_pixel_offset * nb_dof};
 
     const bool f_soa{cplx_field.get_storage_order() ==
                      StorageOrder::StructureOfArrays};
     const Index_t f_comp{f_soa ? nb_fourier_pixels : Index_t{1}};
-    const Index_t f_x{f_soa ? Index_t{1} : nb_components};
-    const Index_t f_y{f_soa ? Fx : nb_components * Fx};
-    const Index_t f_z{f_soa ? Fx * Ny : nb_components * Fx * Ny};
+    const Index_t f_x{f_soa ? Index_t{1} : nb_dof};
+    const Index_t f_y{f_soa ? Fx : nb_dof * Fx};
+    const Index_t f_z{f_soa ? Fx * Ny : nb_dof * Fx * Ny};
 
     // shape/axes in row-major order: {component, [Nz,] [Ny,] Nx}; the
     // half-complex (x) axis is last, the component axis (0) is a batch axis.
     std::vector<Index_t> shape, axes, r_strides, f_strides;
-    shape.push_back(nb_components);
+    shape.push_back(nb_dof);
     r_strides.push_back(r_comp);
     f_strides.push_back(f_comp);
     if (dim > 2) {
@@ -362,11 +382,7 @@ class FFTEngine : public FFTEngineBase {
     const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
-    Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    Index_t nb_dof{check_nb_dof(input, output)};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
     const RT * input_ptr =
@@ -384,8 +400,8 @@ class FFTEngine : public FFTEngineBase {
     Index_t ghost_offset{ghosts_left[0]};
 
     if (is_soa) {
-      // SoA: components in separate blocks
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      // SoA: DOFs in separate blocks
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         backend->r2c(Nx, 1,
                      input_ptr + ghost_offset + comp * nb_buffer_pixels,
                      1, Nx,
@@ -393,13 +409,13 @@ class FFTEngine : public FFTEngineBase {
                      1, Fx);
       }
     } else {
-      // AoS: components interleaved
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      // AoS: DOFs interleaved
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         backend->r2c(Nx, 1,
-                     input_ptr + ghost_offset * nb_components + comp,
-                     nb_components, Nx * nb_components,
+                     input_ptr + ghost_offset * nb_dof + comp,
+                     nb_dof, Nx * nb_dof,
                      output_ptr + comp,
-                     nb_components, Fx * nb_components);
+                     nb_dof, Fx * nb_dof);
       }
     }
   }
@@ -411,11 +427,7 @@ class FFTEngine : public FFTEngineBase {
     const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
-    Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    Index_t nb_dof{check_nb_dof(input, output)};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
     const CT * input_ptr =
@@ -433,8 +445,8 @@ class FFTEngine : public FFTEngineBase {
     Index_t ghost_offset{ghosts_left[0]};
 
     if (is_soa) {
-      // SoA: components in separate blocks
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      // SoA: DOFs in separate blocks
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         backend->c2r(Nx, 1,
                      input_ptr + comp * Fx,
                      1, Fx,
@@ -442,13 +454,13 @@ class FFTEngine : public FFTEngineBase {
                      1, Nx);
       }
     } else {
-      // AoS: components interleaved
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      // AoS: DOFs interleaved
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         backend->c2r(Nx, 1,
                      input_ptr + comp,
-                     nb_components, Fx * nb_components,
-                     output_ptr + ghost_offset * nb_components + comp,
-                     nb_components, Nx * nb_components);
+                     nb_dof, Fx * nb_dof,
+                     output_ptr + ghost_offset * nb_dof + comp,
+                     nb_dof, Nx * nb_dof);
       }
     }
   }
@@ -461,11 +473,7 @@ class FFTEngine : public FFTEngineBase {
     const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
-    Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    Index_t nb_dof{check_nb_dof(input, output)};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
     const RT * input_ptr =
@@ -479,7 +487,7 @@ class FFTEngine : public FFTEngineBase {
 
     // Storage order: SoA on GPU, AoS on CPU
     // For SoA: components are in separate blocks, stride between X elements = 1
-    // For AoS: components are interleaved, stride between X elements = nb_components
+    // For AoS: components are interleaved, stride between X elements = nb_dof
     StorageOrder storage_order{input.get_storage_order()};
     bool is_soa{(storage_order == StorageOrder::StructureOfArrays)};
 
@@ -492,7 +500,7 @@ class FFTEngine : public FFTEngineBase {
 
     // Compute strides based on storage order
     // For SoA: consecutive X elements have stride 1, component offset = comp * nb_pixels
-    // For AoS: consecutive X elements have stride nb_components, component offset = comp
+    // For AoS: consecutive X elements have stride nb_dof, component offset = comp
     auto get_soa_strides = [&](Index_t nb_pixels, Index_t row_width) {
       // Returns: {comp_offset_factor, x_stride, row_dist}
       // comp_offset = comp * comp_offset_factor
@@ -500,26 +508,26 @@ class FFTEngine : public FFTEngineBase {
       return std::make_tuple(nb_pixels, Index_t{1}, row_width);
     };
     auto get_aos_strides = [&](Index_t /*nb_pixels*/, Index_t row_width) {
-      // For AoS: x_stride=nb_components, row_dist=row_width*nb_components
-      return std::make_tuple(Index_t{1}, nb_components, row_width * nb_components);
+      // For AoS: x_stride=nb_dof, row_dist=row_width*nb_dof
+      return std::make_tuple(Index_t{1}, nb_dof, row_width * nb_dof);
     };
 
     // Input field strides
     auto [in_comp_factor, in_x_stride, in_row_dist] =
         is_soa ? get_soa_strides(nb_buffer_pixels, local_with_ghosts[0])
                : get_aos_strides(nb_buffer_pixels, local_with_ghosts[0]);
-    Index_t in_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components};
+    Index_t in_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_dof};
 
     // Work buffer strides (same storage order as input/output)
     auto [work_comp_factor, work_x_stride, work_row_dist] =
         is_soa ? get_soa_strides(nb_work_pixels, Fx)
                : get_aos_strides(nb_work_pixels, Fx);
 
-    Index_t work_size{nb_work_pixels * nb_components};
+    Index_t work_size{nb_work_pixels * nb_dof};
     CT * work_ptr{this->template get_work_buffer<CT>(0, work_size)};
 
-    // Step 1: r2c FFT along X for each component
-    for (Index_t comp{0}; comp < nb_components; ++comp) {
+    // Step 1: r2c FFT along X for each DOF
+    for (Index_t comp{0}; comp < nb_dof; ++comp) {
       Index_t in_comp_offset{comp * in_comp_factor};
       Index_t work_comp_offset{comp * work_comp_factor};
       backend->r2c(Nx, local_real[1],
@@ -539,7 +547,7 @@ class FFTEngine : public FFTEngineBase {
                    : get_aos_strides(nb_fourier_pixels, Fx);
 
     // Step 2 & 3: Transpose/copy and c2c FFT along Y
-    Transpose * transpose = this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
+    Transpose * transpose = this->get_transpose_xy(nb_dof, storage_order, std::is_same_v<CT, Complex32>);
     if (transpose != nullptr) {
       // MPI path: transpose to output, then c2c on output
       transpose->forward(work_ptr, output_ptr);
@@ -554,7 +562,7 @@ class FFTEngine : public FFTEngineBase {
 
       // For c2c along Y: stride is between Y elements (row distance)
       // batch dimension is X
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t comp_offset{comp * mpi_out_comp_factor};
         backend->c2c_forward(Ny, local_fx,
                              output_ptr + comp_offset, mpi_out_row_dist, mpi_out_x_stride,
@@ -566,7 +574,7 @@ class FFTEngine : public FFTEngineBase {
 
       // Step 2: c2c FFT along Y on work buffer
       // For c2c along Y: stride is between Y elements, batch is X
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t work_comp_offset{comp * work_comp_factor};
         backend->c2c_forward(local_fy, Fx,
                              work_ptr + work_comp_offset, work_row_dist, work_x_stride,
@@ -586,11 +594,7 @@ class FFTEngine : public FFTEngineBase {
     const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
-    Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    Index_t nb_dof{check_nb_dof(input, output)};
 
     Index_t Nx{nb_grid_pts[0]};
     Index_t Ny{nb_grid_pts[1]};
@@ -608,9 +612,9 @@ class FFTEngine : public FFTEngineBase {
     bool is_soa{(storage_order == StorageOrder::StructureOfArrays)};
 
     Transpose * transpose_xy =
-        this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
+        this->get_transpose_xy(nb_dof, storage_order, std::is_same_v<CT, Complex32>);
     Transpose * transpose_yz =
-        this->get_transpose_yz(nb_components, storage_order, std::is_same_v<CT, Complex32>);
+        this->get_transpose_yz(nb_dof, storage_order, std::is_same_v<CT, Complex32>);
 
     bool need_mpi_path{(transpose_xy != nullptr || transpose_yz != nullptr)};
 
@@ -628,8 +632,8 @@ class FFTEngine : public FFTEngineBase {
     };
     auto get_aos_strides_3d = [&](Index_t /*nb_pixels*/, Index_t row_x, Index_t rows_y) {
       // AoS: x_stride=nb_comp, y_dist=row_x*nb_comp, z_dist=row_x*rows_y*nb_comp
-      return std::make_tuple(Index_t{1}, nb_components, row_x * nb_components,
-                             row_x * rows_y * nb_components);
+      return std::make_tuple(Index_t{1}, nb_dof, row_x * nb_dof,
+                             row_x * rows_y * nb_dof);
     };
 
     // Input field strides
@@ -638,7 +642,7 @@ class FFTEngine : public FFTEngineBase {
                                     local_with_ghosts[1])
                : get_aos_strides_3d(nb_buffer_pixels, local_with_ghosts[0],
                                     local_with_ghosts[1]);
-    Index_t in_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components};
+    Index_t in_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_dof};
 
     if (need_mpi_path) {
       // MPI path with transposes. Set up the Y-pencil layout [Fx/P2, Ny, Nz/P1]
@@ -648,7 +652,7 @@ class FFTEngine : public FFTEngineBase {
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
       Index_t local_yfx{ypencil_shape[0]};
       Index_t nb_ypencil_pixels{local_yfx * Ny * ypencil_shape[2]};
-      Index_t ypencil_size{nb_ypencil_pixels * nb_components};
+      Index_t ypencil_size{nb_ypencil_pixels * nb_dof};
 
       auto [work_y_comp_factor, work_y_x_stride, work_y_y_dist, work_y_z_dist] =
           is_soa ? get_soa_strides_3d(nb_ypencil_pixels, local_yfx, Ny)
@@ -671,7 +675,7 @@ class FFTEngine : public FFTEngineBase {
         std::vector<Index_t> out_strides{work_y_z_dist, work_y_y_dist,
                                          work_y_x_stride};
         try {
-          for (Index_t comp{0}; comp < nb_components; ++comp) {
+          for (Index_t comp{0}; comp < nb_dof; ++comp) {
             backend->r2c_nd(
                 shape, axes,
                 input_ptr + in_base_offset + comp * in_comp_factor, in_strides,
@@ -692,15 +696,15 @@ class FFTEngine : public FFTEngineBase {
         // General pencil path: r2c along X into a Z-pencil, redistribute X<->Y,
         // then c2c along Y, axis-by-axis.
         Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
-        Index_t zpencil_size{nb_zpencil_pixels * nb_components};
+        Index_t zpencil_size{nb_zpencil_pixels * nb_dof};
         auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist,
               work_z_z_dist] =
             is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
                    : get_aos_strides_3d(nb_zpencil_pixels, Fx, local_real[1]);
         CT * work_z_ptr{this->template get_work_buffer<CT>(0, zpencil_size)};
 
-        // Step 1: r2c FFT along X for each component
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        // Step 1: r2c FFT along X for each DOF
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t in_comp_offset{comp * in_comp_factor};
           Index_t work_comp_offset{comp * work_z_comp_factor};
           for (Index_t iz{0}; iz < local_real[2]; ++iz) {
@@ -721,8 +725,8 @@ class FFTEngine : public FFTEngineBase {
           deep_copy<CT, MemorySpace>(work_y_ptr, work_z_ptr, ypencil_size);
         }
 
-        // Step 2b: c2c FFT along Y for each component
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        // Step 2b: c2c FFT along Y for each DOF
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * work_y_comp_factor};
           for (Index_t iz{0}; iz < ypencil_shape[2]; ++iz) {
             Index_t idx{comp_offset + iz * work_y_z_dist};
@@ -738,7 +742,7 @@ class FFTEngine : public FFTEngineBase {
       // final Fourier X-pencil layout [Fx/P2, Ny/P1, Nz]
       const DynGridIndex & fourier_local = this->nb_fourier_subdomain_grid_pts;
       Index_t nb_fourier_pixels{fourier_local[0] * fourier_local[1] * fourier_local[2]};
-      Index_t fourier_size{nb_fourier_pixels * nb_components};
+      Index_t fourier_size{nb_fourier_pixels * nb_dof};
 
       // Output field strides
       StorageOrder out_storage_order{output.get_storage_order()};
@@ -757,12 +761,12 @@ class FFTEngine : public FFTEngineBase {
         deep_copy<CT, MemorySpace>(output_ptr, work_y_ptr, fourier_size);
       }
 
-      // Step 4: c2c FFT along Z for each component
+      // Step 4: c2c FFT along Z for each DOF
       // For SoA: Batch all local_fx * local_fy transforms together
       // For AoS: Batch local_fx transforms per Y row
       if (out_is_soa) {
         Index_t batch_z{fourier_local[0] * fourier_local[1]};
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * out_comp_factor};
           backend->c2c_forward(Nz, batch_z, output_ptr + comp_offset,
                                out_z_dist, Index_t{1},
@@ -771,7 +775,7 @@ class FFTEngine : public FFTEngineBase {
         }
       } else {
         // AoS: X elements are separated by out_x_stride
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * out_comp_factor};
           for (Index_t iy{0}; iy < fourier_local[1]; ++iy) {
             Index_t idx{comp_offset + iy * out_y_dist};
@@ -785,7 +789,7 @@ class FFTEngine : public FFTEngineBase {
     } else {
       // Serial path: all dimensions are local
       Index_t nb_fourier_pixels{Fx * Ny * Nz};
-      Index_t work_size{nb_fourier_pixels * nb_components};
+      Index_t work_size{nb_fourier_pixels * nb_dof};
 
       // Output (Fourier) field strides
       StorageOrder out_storage_order{output.get_storage_order()};
@@ -801,7 +805,7 @@ class FFTEngine : public FFTEngineBase {
         // (x) axis must be last in `axes`; the component axis (0) is a
         // non-transformed batch axis. Strides fold in the input ghost layout
         // and the AoS/SoA component layout, so no repacking is needed.
-        std::vector<Index_t> shape{nb_components, Nz, Ny, Nx};
+        std::vector<Index_t> shape{nb_dof, Nz, Ny, Nx};
         std::vector<Index_t> axes{1, 2, 3};
         std::vector<Index_t> in_strides{in_comp_factor, in_z_dist, in_y_dist,
                                         in_x_stride};
@@ -819,8 +823,8 @@ class FFTEngine : public FFTEngineBase {
 
       CT * work_ptr{this->template get_work_buffer<CT>(0, work_size)};
 
-      // Step 1: r2c FFT along X for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      // Step 1: r2c FFT along X for each DOF
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t in_comp_offset{comp * in_comp_factor};
         Index_t work_comp_offset{comp * work_comp_factor};
 
@@ -834,10 +838,10 @@ class FFTEngine : public FFTEngineBase {
         }
       }
 
-      // Step 2: c2c FFT along Y for each component
+      // Step 2: c2c FFT along Y for each DOF
       // Batch Fx transforms for each Z plane
       // n=Ny, batch=Fx, stride=work_y_dist (between Y elements), dist=work_x_stride (between X batches)
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t comp_offset{comp * work_comp_factor};
         for (Index_t iz{0}; iz < Nz; ++iz) {
           Index_t idx{comp_offset + iz * work_z_dist};
@@ -846,12 +850,12 @@ class FFTEngine : public FFTEngineBase {
         }
       }
 
-      // Step 3: c2c FFT along Z for each component
+      // Step 3: c2c FFT along Z for each DOF
       // For SoA: Batch all Fx*Ny transforms together with dist=1
       // For AoS: Batch Fx transforms per Y row with dist=work_x_stride
       if (is_soa) {
         // SoA: consecutive XY elements are separated by 1
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * work_comp_factor};
           backend->c2c_forward(Nz, Fx * Ny, work_ptr + comp_offset,
                                work_z_dist, Index_t{1},
@@ -859,9 +863,9 @@ class FFTEngine : public FFTEngineBase {
                                work_z_dist, Index_t{1});
         }
       } else {
-        // AoS: X elements are separated by work_x_stride (nb_components)
+        // AoS: X elements are separated by work_x_stride (nb_dof)
         // Batch Fx transforms per Y row
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * work_comp_factor};
           for (Index_t iy{0}; iy < Ny; ++iy) {
             Index_t idx{comp_offset + iy * work_y_dist};
@@ -886,11 +890,7 @@ class FFTEngine : public FFTEngineBase {
     const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
-    Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    Index_t nb_dof{check_nb_dof(input, output)};
 
     constexpr bool is_device = is_device_space_v<MemorySpace>;
     const CT * input_ptr =
@@ -915,24 +915,24 @@ class FFTEngine : public FFTEngineBase {
       return std::make_tuple(nb_pixels, Index_t{1}, row_width);
     };
     auto get_aos_strides = [&](Index_t /*nb_pixels*/, Index_t row_width) {
-      return std::make_tuple(Index_t{1}, nb_components, row_width * nb_components);
+      return std::make_tuple(Index_t{1}, nb_dof, row_width * nb_dof);
     };
 
     // Output field strides
     auto [out_comp_factor, out_x_stride, out_row_dist] =
         is_soa ? get_soa_strides(nb_buffer_pixels, local_with_ghosts[0])
                : get_aos_strides(nb_buffer_pixels, local_with_ghosts[0]);
-    Index_t out_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components};
+    Index_t out_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_dof};
 
     // Input (Fourier) field storage order should match
     StorageOrder in_storage_order{input.get_storage_order()};
     bool in_is_soa{(in_storage_order == StorageOrder::StructureOfArrays)};
 
-    Transpose * transpose = this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
+    Transpose * transpose = this->get_transpose_xy(nb_dof, storage_order, std::is_same_v<CT, Complex32>);
     if (transpose != nullptr) {
       Index_t local_fx{this->nb_fourier_subdomain_grid_pts[0]};
       Index_t local_fourier_pixels{local_fx * Ny};
-      Index_t local_fourier_size{local_fourier_pixels * nb_components};
+      Index_t local_fourier_size{local_fourier_pixels * nb_dof};
 
       // Input strides for MPI path
       auto [in_comp_factor, in_x_stride, in_row_dist] =
@@ -943,7 +943,7 @@ class FFTEngine : public FFTEngineBase {
       deep_copy<CT, MemorySpace>(temp_ptr, input_ptr, local_fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t comp_offset{comp * in_comp_factor};
         backend->c2c_backward(Ny, local_fx,
                               temp_ptr + comp_offset, in_row_dist, in_x_stride,
@@ -952,7 +952,7 @@ class FFTEngine : public FFTEngineBase {
 
       // Step 2: Transpose X<->Y backward
       Index_t nb_work_pixels{Fx * local_real[1]};
-      Index_t work_size{nb_work_pixels * nb_components};
+      Index_t work_size{nb_work_pixels * nb_dof};
       CT * work_buffer_ptr{this->template get_work_buffer<CT>(1, work_size)};
 
       transpose->backward(temp_ptr, work_buffer_ptr);
@@ -963,7 +963,7 @@ class FFTEngine : public FFTEngineBase {
                  : get_aos_strides(nb_work_pixels, Fx);
 
       // Step 3: c2r IFFT along X for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t work_comp_offset{comp * work_comp_factor};
         Index_t out_comp_offset{comp * out_comp_factor};
         backend->c2r(Nx, local_real[1],
@@ -976,7 +976,7 @@ class FFTEngine : public FFTEngineBase {
       // Serial path
       Index_t local_fy{local_real[1]};
       Index_t nb_fourier_pixels{Fx * local_fy};
-      Index_t fourier_size{nb_fourier_pixels * nb_components};
+      Index_t fourier_size{nb_fourier_pixels * nb_dof};
 
       // Input strides
       auto [in_comp_factor, in_x_stride, in_row_dist] =
@@ -988,7 +988,7 @@ class FFTEngine : public FFTEngineBase {
       deep_copy<CT, MemorySpace>(temp_ptr, input_ptr, fourier_size);
 
       // Step 1: c2c IFFT along Y for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t comp_offset{comp * in_comp_factor};
         backend->c2c_backward(local_fy, Fx,
                               temp_ptr + comp_offset, in_row_dist, in_x_stride,
@@ -996,7 +996,7 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 2: c2r IFFT along X for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t in_comp_offset{comp * in_comp_factor};
         Index_t out_comp_offset{comp * out_comp_factor};
         backend->c2r(Nx, local_fy,
@@ -1016,11 +1016,7 @@ class FFTEngine : public FFTEngineBase {
     const DynGridIndex & local_with_ghosts =
         this->get_nb_subdomain_grid_pts_with_ghosts();
 
-    Index_t nb_components{input.get_nb_components()};
-    if (output.get_nb_components() != nb_components) {
-      throw RuntimeError(
-          "Input and output fields must have the same number of components");
-    }
+    Index_t nb_dof{check_nb_dof(input, output)};
 
     Index_t Nx{nb_grid_pts[0]};
     Index_t Ny{nb_grid_pts[1]};
@@ -1048,8 +1044,8 @@ class FFTEngine : public FFTEngineBase {
       return std::make_tuple(nb_pixels, Index_t{1}, row_x, row_x * rows_y);
     };
     auto get_aos_strides_3d = [&](Index_t /*nb_pixels*/, Index_t row_x, Index_t rows_y) {
-      return std::make_tuple(Index_t{1}, nb_components, row_x * nb_components,
-                             row_x * rows_y * nb_components);
+      return std::make_tuple(Index_t{1}, nb_dof, row_x * nb_dof,
+                             row_x * rows_y * nb_dof);
     };
 
     // Output field strides
@@ -1058,16 +1054,16 @@ class FFTEngine : public FFTEngineBase {
                                     local_with_ghosts[1])
                : get_aos_strides_3d(nb_buffer_pixels, local_with_ghosts[0],
                                     local_with_ghosts[1]);
-    Index_t out_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_components};
+    Index_t out_base_offset{is_soa ? ghost_pixel_offset : ghost_pixel_offset * nb_dof};
 
     // Input (Fourier) field storage order should match
     StorageOrder in_storage_order{input.get_storage_order()};
     bool in_is_soa{(in_storage_order == StorageOrder::StructureOfArrays)};
 
     Transpose * transpose_xy =
-        this->get_transpose_xy(nb_components, storage_order, std::is_same_v<CT, Complex32>);
+        this->get_transpose_xy(nb_dof, storage_order, std::is_same_v<CT, Complex32>);
     Transpose * transpose_yz =
-        this->get_transpose_yz(nb_components, storage_order, std::is_same_v<CT, Complex32>);
+        this->get_transpose_yz(nb_dof, storage_order, std::is_same_v<CT, Complex32>);
 
     bool need_mpi_path{(transpose_xy != nullptr || transpose_yz != nullptr)};
 
@@ -1076,7 +1072,7 @@ class FFTEngine : public FFTEngineBase {
       const DynGridIndex & fourier_local = this->nb_fourier_subdomain_grid_pts;
       Index_t nb_fourier_pixels{fourier_local[0] * fourier_local[1] *
                                 fourier_local[2]};
-      Index_t fourier_size{nb_fourier_pixels * nb_components};
+      Index_t fourier_size{nb_fourier_pixels * nb_dof};
 
       // Input field strides
       auto [in_comp_factor, in_x_stride, in_y_dist, in_z_dist] =
@@ -1093,7 +1089,7 @@ class FFTEngine : public FFTEngineBase {
       // For AoS: Batch local_fx transforms per Y row
       if (in_is_soa) {
         Index_t batch_z{fourier_local[0] * fourier_local[1]};
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * in_comp_factor};
           backend->c2c_backward(Nz, batch_z, temp_ptr + comp_offset,
                                 in_z_dist, Index_t{1},
@@ -1102,7 +1098,7 @@ class FFTEngine : public FFTEngineBase {
         }
       } else {
         // AoS: X elements are separated by in_x_stride
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * in_comp_factor};
           for (Index_t iy{0}; iy < fourier_local[1]; ++iy) {
             Index_t idx{comp_offset + iy * in_y_dist};
@@ -1119,7 +1115,7 @@ class FFTEngine : public FFTEngineBase {
           this->work_ypencil->get_nb_subdomain_grid_pts_with_ghosts();
       Index_t local_yfx{ypencil_shape[0]};
       Index_t nb_ypencil_pixels{local_yfx * Ny * ypencil_shape[2]};
-      Index_t ypencil_size{nb_ypencil_pixels * nb_components};
+      Index_t ypencil_size{nb_ypencil_pixels * nb_dof};
 
       // Y-pencil strides
       auto [work_y_comp_factor, work_y_x_stride, work_y_y_dist, work_y_z_dist] =
@@ -1152,7 +1148,7 @@ class FFTEngine : public FFTEngineBase {
                                         work_y_x_stride};
         std::vector<Index_t> out_strides{out_z_dist, out_y_dist, out_x_stride};
         try {
-          for (Index_t comp{0}; comp < nb_components; ++comp) {
+          for (Index_t comp{0}; comp < nb_dof; ++comp) {
             backend->c2r_nd(
                 shape, axes,
                 work_y_ptr + comp * work_y_comp_factor, in_strides,
@@ -1172,7 +1168,7 @@ class FFTEngine : public FFTEngineBase {
       }
       if (!slab_done) {
         // Step 3: c2c IFFT along Y for each component
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * work_y_comp_factor};
           for (Index_t iz{0}; iz < ypencil_shape[2]; ++iz) {
             Index_t idx{comp_offset + iz * work_y_z_dist};
@@ -1185,7 +1181,7 @@ class FFTEngine : public FFTEngineBase {
 
         // Z-pencil work buffer [Fx, Ny/P2, Nz/P1]
         Index_t nb_zpencil_pixels{Fx * local_real[1] * local_real[2]};
-        Index_t zpencil_size{nb_zpencil_pixels * nb_components};
+        Index_t zpencil_size{nb_zpencil_pixels * nb_dof};
         auto [work_z_comp_factor, work_z_x_stride, work_z_y_dist,
               work_z_z_dist] =
             is_soa ? get_soa_strides_3d(nb_zpencil_pixels, Fx, local_real[1])
@@ -1200,7 +1196,7 @@ class FFTEngine : public FFTEngineBase {
         }
 
         // Step 4b: c2r IFFT along X for each component
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t work_comp_offset{comp * work_z_comp_factor};
           Index_t out_comp_offset{comp * out_comp_factor};
           for (Index_t iz{0}; iz < local_real[2]; ++iz) {
@@ -1216,7 +1212,7 @@ class FFTEngine : public FFTEngineBase {
     } else {
       // Serial path: all dimensions are local
       Index_t nb_fourier_pixels{Fx * Ny * Nz};
-      Index_t work_size{nb_fourier_pixels * nb_components};
+      Index_t work_size{nb_fourier_pixels * nb_dof};
 
       // Input strides
       auto [in_comp_factor, in_x_stride, in_y_dist, in_z_dist] =
@@ -1230,7 +1226,7 @@ class FFTEngine : public FFTEngineBase {
         // multi-axis c2r stages the non-real axes into its own temporary, so
         // the const Fourier input is not modified and no work-buffer copy is
         // needed. Output strides fold in the destination ghost layout.
-        std::vector<Index_t> shape{nb_components, Nz, Ny, Nx};
+        std::vector<Index_t> shape{nb_dof, Nz, Ny, Nx};
         std::vector<Index_t> axes{1, 2, 3};
         std::vector<Index_t> in_strides{in_comp_factor, in_z_dist, in_y_dist,
                                         in_x_stride};
@@ -1250,7 +1246,7 @@ class FFTEngine : public FFTEngineBase {
       // For AoS: Batch Fx transforms per Y row with dist=in_x_stride
       if (in_is_soa) {
         // SoA: consecutive XY elements are separated by 1
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * in_comp_factor};
           backend->c2c_backward(Nz, Fx * Ny, work_ptr + comp_offset,
                                 in_z_dist, Index_t{1},
@@ -1258,9 +1254,9 @@ class FFTEngine : public FFTEngineBase {
                                 in_z_dist, Index_t{1});
         }
       } else {
-        // AoS: X elements are separated by in_x_stride (nb_components)
+        // AoS: X elements are separated by in_x_stride (nb_dof)
         // Batch Fx transforms per Y row
-        for (Index_t comp{0}; comp < nb_components; ++comp) {
+        for (Index_t comp{0}; comp < nb_dof; ++comp) {
           Index_t comp_offset{comp * in_comp_factor};
           for (Index_t iy{0}; iy < Ny; ++iy) {
             Index_t idx{comp_offset + iy * in_y_dist};
@@ -1275,7 +1271,7 @@ class FFTEngine : public FFTEngineBase {
       // Step 2: c2c IFFT along Y for each component
       // Batch Fx transforms for each Z plane
       // n=Ny, batch=Fx, stride=in_y_dist (between Y elements), dist=in_x_stride (between X batches)
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t comp_offset{comp * in_comp_factor};
         for (Index_t iz{0}; iz < Nz; ++iz) {
           Index_t idx{comp_offset + iz * in_z_dist};
@@ -1285,7 +1281,7 @@ class FFTEngine : public FFTEngineBase {
       }
 
       // Step 3: c2r IFFT along X for each component
-      for (Index_t comp{0}; comp < nb_components; ++comp) {
+      for (Index_t comp{0}; comp < nb_dof; ++comp) {
         Index_t in_comp_offset{comp * in_comp_factor};
         Index_t out_comp_offset{comp * out_comp_factor};
 

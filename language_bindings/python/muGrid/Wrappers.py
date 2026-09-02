@@ -1036,7 +1036,11 @@ class FFTEngine:
         self._cpp.reduce_ghosts(_unwrap(field))
 
     def register_real_space_field(
-        self, name: str, components: Shape = (), dtype: Any = np.float64
+        self,
+        name: str,
+        components: Shape = (),
+        dtype: Any = np.float64,
+        sub_pt: str = "pixel",
     ) -> Field:
         """
         Register a new real-space field.
@@ -1053,6 +1057,10 @@ class FFTEngine:
             ``np.float64`` (default) or ``np.float32``. Single precision pairs
             with single-precision FFTs (the engine picks the transform
             precision from the field dtype) and halves the memory footprint.
+        sub_pt : str, optional
+            Sub-point type the field lives on (e.g. ``"quad"``); must have
+            been declared via the engine's ``nb_sub_pts`` argument. Default
+            is "pixel" (one point per pixel).
 
         Returns
         -------
@@ -1065,14 +1073,26 @@ class FFTEngine:
             If a field with the given name already exists.
         """
         if np.dtype(dtype) == np.float64:
-            return Field(self._cpp.register_real_space_field(name, components))
+            if sub_pt == "pixel":
+                return Field(
+                    self._cpp.register_real_space_field(name, components)
+                )
+            return Field(
+                self.real_space_collection._cpp.register_real_field(
+                    name, components, sub_pt
+                )
+            )
         # Single precision: register on the engine's real-space collection.
         return self.real_space_collection.real_field(
-            name, components, dtype=dtype
+            name, components, sub_pt, dtype=dtype
         )
 
     def register_fourier_space_field(
-        self, name: str, components: Shape = (), dtype: Any = np.complex128
+        self,
+        name: str,
+        components: Shape = (),
+        dtype: Any = np.complex128,
+        sub_pt: str = "pixel",
     ) -> Field:
         """
         Register a new Fourier-space field.
@@ -1088,6 +1108,10 @@ class FFTEngine:
         dtype : data-type, optional
             ``np.complex128`` (default) or ``np.complex64`` (single precision,
             the Fourier-space counterpart of a ``np.float32`` real field).
+        sub_pt : str, optional
+            Sub-point type the field lives on (e.g. ``"quad"``); must have
+            been declared via the engine's ``nb_sub_pts`` argument. Default
+            is "pixel" (one point per pixel).
 
         Returns
         -------
@@ -1100,15 +1124,25 @@ class FFTEngine:
             If a field with the given name already exists.
         """
         if np.dtype(dtype) == np.complex128:
+            if sub_pt == "pixel":
+                return Field(
+                    self._cpp.register_fourier_space_field(name, components)
+                )
             return Field(
-                self._cpp.register_fourier_space_field(name, components)
+                self.fourier_space_collection._cpp.register_complex_field(
+                    name, components, sub_pt
+                )
             )
         return self.fourier_space_collection.complex_field(
-            name, components, dtype=dtype
+            name, components, sub_pt, dtype=dtype
         )
 
     def real_space_field(
-        self, name: str, components: Shape = (), dtype: Any = np.float64
+        self,
+        name: str,
+        components: Shape = (),
+        dtype: Any = np.float64,
+        sub_pt: str = "pixel",
     ) -> Field:
         """
         Get or create a real-space field for FFT operations.
@@ -1124,21 +1158,29 @@ class FFTEngine:
             Shape of field components. Default is () for scalar.
         dtype : data-type, optional
             ``np.float64`` (default) or ``np.float32`` (single precision).
+        sub_pt : str, optional
+            Sub-point type the field lives on (e.g. ``"quad"``); must have
+            been declared via the engine's ``nb_sub_pts`` argument. Default
+            is "pixel" (one point per pixel).
 
         Returns
         -------
         Field
             Wrapped real-valued field with array accessors.
         """
-        if np.dtype(dtype) == np.float64:
+        if np.dtype(dtype) == np.float64 and sub_pt == "pixel":
             return Field(self._cpp.real_space_field(name, components))
         collection = self.real_space_collection
         if collection.field_exists(name):
             return Field(collection.get_field(name))
-        return collection.real_field(name, components, dtype=dtype)
+        return collection.real_field(name, components, sub_pt, dtype=dtype)
 
     def fourier_space_field(
-        self, name: str, components: Shape = (), dtype: Any = np.complex128
+        self,
+        name: str,
+        components: Shape = (),
+        dtype: Any = np.complex128,
+        sub_pt: str = "pixel",
     ) -> Field:
         """
         Get or create a Fourier-space field for FFT operations.
@@ -1154,18 +1196,22 @@ class FFTEngine:
             Shape of field components. Default is () for scalar.
         dtype : data-type, optional
             ``np.complex128`` (default) or ``np.complex64`` (single precision).
+        sub_pt : str, optional
+            Sub-point type the field lives on (e.g. ``"quad"``); must have
+            been declared via the engine's ``nb_sub_pts`` argument. Default
+            is "pixel" (one point per pixel).
 
         Returns
         -------
         Field
             Wrapped complex-valued field with array accessors.
         """
-        if np.dtype(dtype) == np.complex128:
+        if np.dtype(dtype) == np.complex128 and sub_pt == "pixel":
             return Field(self._cpp.fourier_space_field(name, components))
         collection = self.fourier_space_collection
         if collection.field_exists(name):
             return Field(collection.get_field(name))
-        return collection.complex_field(name, components, dtype=dtype)
+        return collection.complex_field(name, components, sub_pt, dtype=dtype)
 
     @property
     def real_space_collection(self) -> GlobalFieldCollection:

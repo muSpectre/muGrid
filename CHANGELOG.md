@@ -1,6 +1,18 @@
 Change log for µGrid
 ====================
 
+v1.0.1 (02Sep26)
+----------------
+
+- BUG: FFT of fields with multiple sub-points (e.g. quadrature-point fields)
+  returned garbage: the transform paths batched over the component count
+  only, ignoring the sub-point axis in the stride calculations (issue #192).
+  The sub-point axis is now a batch axis like components, and `fft`/`ifft`
+  reject input/output pairs whose component or sub-point counts differ.
+- ENH: The FFT engine's field helpers (`real_space_field`,
+  `fourier_space_field` and their `register_*` variants) accept a `sub_pt`
+  argument
+
 v1.0 (16Jul26)
 --------------
 
