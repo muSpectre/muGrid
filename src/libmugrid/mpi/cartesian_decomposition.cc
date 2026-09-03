@@ -202,7 +202,23 @@ namespace muGrid {
                          nb_ghosts_left, nb_ghosts_right);
     }
 
+    void CartesianDecomposition::check_field_is_of_this_collection(
+        const Field & field, const std::string & operation) const {
+        if (&field.get_collection() != &this->collection) {
+            std::stringstream s;
+            s << "Field `" << field.get_name() << "` does not belong to this "
+              << "decomposition's field collection. " << operation
+              << " is a real-space operation on the decomposed grid and is "
+                 "only defined for fields of this decomposition; applied to "
+                 "a field of another collection (e.g. a Fourier-space field "
+                 "of an FFT engine) it would scramble interior data.";
+            throw RuntimeError(s.str());
+        }
+    }
+
     void CartesianDecomposition::communicate_ghosts(const Field & field) const {
+        this->check_field_is_of_this_collection(field, "communicate_ghosts");
+
         // Get spatial dimensions
         auto spatial_dims{this->get_spatial_dim()};
 
@@ -388,6 +404,8 @@ namespace muGrid {
     }
 
     void CartesianDecomposition::reduce_ghosts(const Field & field) const {
+        this->check_field_is_of_this_collection(field, "reduce_ghosts");
+
         // Get spatial dimensions
         auto spatial_dims{this->get_spatial_dim()};
 

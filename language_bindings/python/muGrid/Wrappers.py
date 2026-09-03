@@ -810,6 +810,12 @@ class CartesianDecomposition(FieldCollectionMixin):
         ----------
         field : Field
             The field whose ghost buffers should be filled from neighbors.
+            Must belong to this decomposition's field collection.
+
+        Raises
+        ------
+        RuntimeError
+            If the field belongs to another field collection.
         """
         self._cpp.communicate_ghosts(_unwrap(field))
 
@@ -825,6 +831,12 @@ class CartesianDecomposition(FieldCollectionMixin):
         ----------
         field : Field
             The field whose ghost buffers should be reduced to interior.
+            Must belong to this decomposition's field collection.
+
+        Raises
+        ------
+        RuntimeError
+            If the field belongs to another field collection.
         """
         self._cpp.reduce_ghosts(_unwrap(field))
 
@@ -1019,6 +1031,13 @@ class FFTEngine:
         ----------
         field : Field
             The field whose ghost buffers should be filled from neighbors.
+            Must be a real-space field of this engine.
+
+        Raises
+        ------
+        RuntimeError
+            If the field is not part of this engine's real-space collection
+            (e.g. a Fourier-space field, which has no ghost regions).
         """
         self._cpp.communicate_ghosts(_unwrap(field))
 
@@ -1032,6 +1051,13 @@ class FFTEngine:
         ----------
         field : Field
             The field whose ghost buffers should be reduced to interior.
+            Must be a real-space field of this engine.
+
+        Raises
+        ------
+        RuntimeError
+            If the field is not part of this engine's real-space collection
+            (e.g. a Fourier-space field, which has no ghost regions).
         """
         self._cpp.reduce_ghosts(_unwrap(field))
 

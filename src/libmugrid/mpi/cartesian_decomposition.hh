@@ -143,6 +143,16 @@ namespace muGrid {
 
         void check_dimension(const DynGridIndex & n,
                              const std::string & name) const;
+
+        //! Ghost communication combines this decomposition's grid extents
+        //! and ghost counts with the strides of the field it is handed, so
+        //! it is only meaningful for fields of this decomposition's own
+        //! collection. Fields of any other collection (e.g. Fourier-space
+        //! fields of an FFT engine, which live on a half-complex grid
+        //! without ghost regions) would have interior data scrambled;
+        //! reject them up front.
+        void check_field_is_of_this_collection(
+            const Field & field, const std::string & operation) const;
     };
 }  // namespace muGrid
 

@@ -1079,5 +1079,50 @@ class TestFFTDtypeValidation:
             engine._cpp.fft(ints._cpp, fourier._cpp)
 
 
+class TestGhostCommunicationGuard:
+    """Ghost communication must reject Fourier-space fields (issue #191).
+
+    communicate_ghosts is a real-space operation on the decomposed grid: it
+    combines the decomposition's real-space subdomain extents and ghost
+    counts with the strides of the field it is handed. A Fourier-space field
+    lives on a different (half-complex, ghost-free) grid, so the operation
+    would copy unset ghost buffers over the low-k entries.
+    """
+
+    def make_engine(self):
+        return muGrid.FFTEngine(
+            [8, 8], nb_ghosts_left=(1, 1), nb_ghosts_right=(1, 1)
+        )
+
+    def test_communicate_ghosts_rejects_fourier_field(self):
+        engine = self.make_engine()
+        real_field = engine.real_space_field("real-field")
+        fourier_field = engine.fourier_space_field("fourier-field")
+
+        rng = np.random.default_rng(42)
+        real_field.p[...] = rng.random(real_field.p.shape)
+        engine.fft(real_field, fourier_field)
+        fourier_before = np.copy(fourier_field.p)
+
+        with pytest.raises(RuntimeError):
+            engine.communicate_ghosts(fourier_field)
+
+        # The rejected call must not have touched the spectral data
+        assert_array_equal(fourier_field.p, fourier_before)
+
+    def test_reduce_ghosts_rejects_fourier_field(self):
+        engine = self.make_engine()
+        fourier_field = engine.fourier_space_field("fourier-field")
+        with pytest.raises(RuntimeError):
+            engine.reduce_ghosts(fourier_field)
+
+    def test_ghost_communication_accepts_real_field(self):
+        engine = self.make_engine()
+        real_field = engine.real_space_field("real-field")
+        real_field.sg[...] = 1.0
+        engine.communicate_ghosts(real_field)
+        engine.reduce_ghosts(real_field)
+
+
 if __name__ == "__main__":
     unittest.main()
