@@ -38,7 +38,12 @@ import numpy as np
 import pytest
 
 # Import GPU testing utilities from conftest
-from conftest import get_array_module, get_test_devices, skip_if_gpu_unavailable
+from conftest import (
+    fft_nd_disabled,
+    get_array_module,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 from numpy.testing import assert_allclose
 
 from muGrid import FFTEngine, GlobalFieldCollection, linalg
@@ -184,7 +189,8 @@ class TestMPIFFTEngineConstruction:
         # Should be PocketFFT for CPU, and the native GPU backend for GPU
         # (cuFFT on NVIDIA, rocFFT on AMD).
         if device == "cpu":
-            assert engine.backend_name == "PocketFFT"
+            expected = "PocketFFT (axis-by-axis)" if fft_nd_disabled() else "PocketFFT"
+            assert engine.backend_name == expected
         else:
             assert engine.backend_name in ("cuFFT", "rocFFT")
 
@@ -941,6 +947,9 @@ class TestMPIFFTCollectionWrappers:
         assert_allclose(result, original, atol=1e-14)
 
 
+@pytest.mark.skipif(
+    fft_nd_disabled(), reason="single precision needs the N-D backend path"
+)
 @pytest.mark.parametrize("device", get_test_devices())
 class TestMPIFFTSinglePrecision:
     """Single-precision (float32 / complex64) MPI FFTs.

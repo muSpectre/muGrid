@@ -94,7 +94,7 @@ class cuFFTBackend : public GpuFFTBackend<cuFFTBackend, cufftHandle> {
               const std::vector<Index_t> & in_strides, Real32 * output,
               const std::vector<Index_t> & out_strides) override;
 
-  const char * name() const override { return "cufft"; }
+  const char * name() const override { return "cuFFT"; }
 
  protected:
   // ---- GpuFFTBackend hooks (cuFFT library calls) ----

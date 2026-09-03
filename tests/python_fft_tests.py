@@ -38,7 +38,12 @@ import unittest
 
 import numpy as np
 import pytest
-from conftest import get_array_module, get_test_devices, skip_if_gpu_unavailable
+from conftest import (
+    fft_nd_disabled,
+    get_array_module,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 from numpy.testing import assert_allclose, assert_array_equal
 
 import muGrid
@@ -112,7 +117,8 @@ class FFTEngineCreationTest(unittest.TestCase):
     def test_backend_name(self):
         """Test backend name is reported."""
         engine = muGrid.FFTEngine([8, 10])
-        self.assertEqual(engine.backend_name, "PocketFFT")
+        expected = "PocketFFT (axis-by-axis)" if fft_nd_disabled() else "PocketFFT"
+        self.assertEqual(engine.backend_name, expected)
 
 
 class FFT1DEngineTest(unittest.TestCase):
@@ -925,6 +931,8 @@ class TestFFTSubPointFields:
         [(np.float64, np.complex128, 1e-14), (np.float32, np.complex64, 1e-6)],
     )
     def test_roundtrip(self, components, real_dtype, cplx_dtype, tol):
+        if real_dtype == np.float32 and fft_nd_disabled():
+            pytest.skip("single precision needs the N-D backend path")
         engine = self.make_engine()
         real_field = engine.real_space_collection.real_field(
             "real-field", components, sub_pt="quad", dtype=real_dtype
@@ -999,6 +1007,30 @@ class TestFFTSubPointFields:
         engine.ifft(fourier_field, real_field)
         real_field.s[...] *= engine.normalisation
         assert_allclose(real_field.s, original, atol=1e-14)
+
+
+@pytest.mark.skipif(
+    not fft_nd_disabled(), reason="only meaningful with MUGRID_FFT_NO_ND=1"
+)
+class TestAxisByAxisBackend:
+    """With MUGRID_FFT_NO_ND=1 the host engine gets a pocketfft backend that
+    hides its N-D transforms, so the rest of this file runs the axis-by-axis
+    paths. These tests pin down the two observable differences."""
+
+    def test_backend_name(self):
+        engine = muGrid.FFTEngine([8, 8])
+        assert engine.backend_name == "PocketFFT (axis-by-axis)"
+
+    @pytest.mark.parametrize("nb_grid_pts", [[8], [8, 6], [8, 6, 4]])
+    def test_single_precision_rejected(self, nb_grid_pts):
+        """fp32 transforms exist only on top of the N-D entry point."""
+        engine = muGrid.FFTEngine(nb_grid_pts)
+        real32 = engine.real_space_field("real32", dtype=np.float32)
+        fourier32 = engine.fourier_space_field("fourier32", dtype=np.complex64)
+        with pytest.raises(RuntimeError, match="N-dimensional support"):
+            engine.fft(real32, fourier32)
+        with pytest.raises(RuntimeError, match="N-dimensional support"):
+            engine.ifft(fourier32, real32)
 
 
 class TestFFTDtypeValidation:

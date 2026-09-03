@@ -31,7 +31,7 @@ engine = muGrid.FFTEngine([16, 20])
 
 print(f"Real-space grid: {engine.nb_domain_grid_pts}")      # (16, 20)
 print(f"Fourier-space grid: {engine.nb_fourier_grid_pts}")  # (9, 20)
-print(f"Backend: {engine.backend_name}")                    # "pocketfft"
+print(f"Backend: {engine.backend_name}")                    # "PocketFFT"
 ```
 
 The Fourier-space grid has reduced dimensions due to the real-to-complex (r2c)

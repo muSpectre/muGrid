@@ -262,7 +262,9 @@ class FFTEngine : public FFTEngineBase {
   }
 
   const char * get_backend_name() const override {
-    return fft_backend_name<MemorySpace>();
+    // The live backend, not the compile-time selector: MUGRID_FFT_NO_ND=1
+    // swaps in a variant whose name reveals the mode.
+    return this->backend->name();
   }
 
  protected:
