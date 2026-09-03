@@ -215,7 +215,11 @@ reduce_ghosts(field)                       # accumulate ghosts back to interior
 
 `reduce_ghosts` is the adjoint of `communicate_ghosts`, needed for transpose
 operations (e.g. divergence) with periodic boundary conditions; it zeros the
-ghost buffers afterwards.
+ghost buffers afterwards. Both operations work for ghost halos of any width:
+when a halo is wider than a neighbouring rank's interior (or a rank owns no
+grid points at all), data is relayed through the intermediate ranks in
+several communication steps, so the ghost size can be chosen from the
+operator's stencil alone without regard to the number of ranks.
 
 ## Communicator
 

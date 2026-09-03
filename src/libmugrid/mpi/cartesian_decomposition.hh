@@ -73,7 +73,10 @@ namespace muGrid {
         //! accumulate ghost buffer contributions back to the interior domain.
         //! This is the adjoint operation of communicate_ghosts and is needed
         //! for transpose operations (e.g., divergence) with periodic BCs.
-        //! After the operation, ghost buffers are zeroed.
+        //! Each ghost slice is added to the interior slice it aliases, on
+        //! whichever rank owns it; halos wider than a neighbour's interior
+        //! are relayed through the intermediate ranks. After the operation,
+        //! ghost buffers are zeroed.
         void reduce_ghosts(const Field & field) const override;
 
         //! accumulate ghost buffer contributions back to the interior domain.
@@ -130,16 +133,23 @@ namespace muGrid {
         Communicator comm;
         std::unique_ptr<CartesianCommunicator> cart_comm;
         GlobalFieldCollection collection;
+        //! Ghost exchange schedule, per direction and per communication
+        //! step, in units of slices normal to the direction. Filling a halo
+        //! wider than a neighbour's interior takes several steps in which
+        //! ranks relay slices they received in the previous step; the
+        //! schedule is negotiated collectively in initialise() (so it is
+        //! identical on all ranks) and replayed by communicate_ghosts()
+        //! forwards and by reduce_ghosts() backwards.
+        //! Slices received from the right neighbour into the right ghost
         std::vector<std::vector<Index_t>> recv_right_sequence;
+        //! Slices received from the left neighbour into the left ghost
         std::vector<std::vector<Index_t>> recv_left_sequence;
+        //! Slices sent to the right neighbour (its left ghost)
+        std::vector<std::vector<Index_t>> send_right_sequence;
+        //! Slices sent to the left neighbour (its right ghost)
+        std::vector<std::vector<Index_t>> send_left_sequence;
+        //! Number of steps per direction
         std::vector<Index_t> nb_sendrecv_steps;
-
-        //! Global minimum (over all ranks) of the interior subdomain extent
-        //! per direction. Computed collectively in initialise(); used by
-        //! reduce_ghosts() so that support checks make the same decision on
-        //! every rank (a rank-local check would throw on some ranks only and
-        //! deadlock the others in the subsequent sendrecv).
-        DynGridIndex global_min_nb_subdomain_grid_pts{};
 
         void check_dimension(const DynGridIndex & n,
                              const std::string & name) const;

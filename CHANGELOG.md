@@ -9,6 +9,13 @@ v1.0.1 (02Sep26)
   communication is a real-space operation on the decomposed grid; applied to
   e.g. a Fourier-space field of an FFT engine it silently overwrote the low-k
   entries with unset ghost data.
+- ENH: `reduce_ghosts` supports ghost halos wider than the interior subdomain
+  of a rank (including ranks that own no grid points). Contributions are
+  relayed through the intermediate ranks by replaying the multi-step
+  exchange of `communicate_ghosts` in reverse, so `reduce_ghosts` is the exact
+  adjoint of `communicate_ghosts` for any decomposition. This removes the
+  `RuntimeError` previously raised in this case and lets ghost sizes derived
+  from an operator's stencil be used with any number of ranks.
 
 v1.0 (16Jul26)
 --------------

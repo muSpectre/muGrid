@@ -240,6 +240,64 @@ namespace muGrid {
 
       BOOST_CHECK_EQUAL(actual_value, expected_value);
     }
+
+    // Now the transpose: reduce_ghosts with a halo wider than the interior
+    // must relay contributions through the intermediate ranks. Put ones in
+    // the ghosts and zeros in the interior; after the reduction each
+    // interior cell holds the number of ghost cells (over all ranks) that
+    // alias it, and the ghosts are zero.
+    Index_t nb_global_pts{1};
+    for (int dim{0}; dim < spatial_dims; ++dim) {
+      nb_global_pts *= nb_domain_grid_pts[dim];
+    }
+    auto && global_index{[&nb_domain_grid_pts](const DynGridIndex & coords) {
+      Index_t index{0}, stride{1};
+      for (int dim{0}; dim < coords.size(); ++dim) {
+        index += coords[dim] * stride;
+        stride *= nb_domain_grid_pts[dim];
+      }
+      return index;
+    }};
+    auto && is_ghost{[&](const DynGridIndex & local_coords) {
+      for (int dim{0}; dim < spatial_dims; ++dim) {
+        if (local_coords[dim] < nb_ghosts_left[dim] ||
+            local_coords[dim] >=
+                nb_subdomain_grid_pts[dim] - nb_ghosts_right[dim]) {
+          return true;
+        }
+      }
+      return false;
+    }};
+
+    Eigen::Matrix<Index_t, Eigen::Dynamic, 1> nb_aliases{
+        Eigen::Matrix<Index_t, Eigen::Dynamic, 1>::Zero(nb_global_pts)};
+    for (auto && pixel_id_coords : pixels.enumerate()) {
+      auto && id{std::get<0>(pixel_id_coords)};
+      auto && local_coords{std::get<1>(pixel_id_coords)};
+      if (is_ghost(local_coords)) {
+        field_map[id] << 1;
+        auto && global_coords{(subdomain_locations + local_coords) %
+                              nb_domain_grid_pts};
+        nb_aliases[global_index(global_coords)] += 1;
+      } else {
+        field_map[id] << 0;
+      }
+    }
+    nb_aliases = comm.sum(nb_aliases);
+
+    cart_decomp.reduce_ghosts(field_name);
+
+    for (auto && pixel_id_coords : pixels.enumerate()) {
+      auto && id{std::get<0>(pixel_id_coords)};
+      auto && local_coords{std::get<1>(pixel_id_coords)};
+      auto && global_coords{(subdomain_locations + local_coords) %
+                            nb_domain_grid_pts};
+      Real expected{is_ghost(local_coords)
+                        ? 0.0
+                        : static_cast<Real>(
+                              nb_aliases[global_index(global_coords)])};
+      BOOST_CHECK_EQUAL(field_map[id].coeffRef(0, 0), expected);
+    }
   }
 
   // ----------------------------------------------------------------------

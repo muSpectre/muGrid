@@ -63,22 +63,6 @@ def make_subdivisions():
     return [(comm, s) for s in nb_subdivisions]
 
 
-def reduce_ghosts_supported(
-    nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
-):
-    """reduce_ghosts supports halos no wider than the smallest interior
-    subdomain extent (per direction, over all ranks); the multi-step
-    reduction cascade is not implemented. The smallest interior extent is
-    the floor division because muGrid assigns the residual points to the
-    lowest-coordinate ranks.
-    """
-    min_interior = np.asarray(nb_domain_grid_pts) // np.asarray(nb_subdivisions)
-    return bool(
-        np.all(np.asarray(nb_ghosts_left) <= min_interior)
-        and np.all(np.asarray(nb_ghosts_right) <= min_interior)
-    )
-
-
 @pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
 def test_communicate_ghosts(comm, nb_subdivisions):
     # Create a Cartesian decomposition
@@ -192,15 +176,7 @@ def test_ghost_communication_rejects_foreign_field(comm, nb_subdivisions):
     own_field = cart_decomp.real_field("own-field")
     own_field.sg[...] = 1.0
     cart_decomp.communicate_ghosts(own_field)
-    # Halos wider than the smallest interior subdomain are rejected (the
-    # error is raised consistently on all ranks, so this does not deadlock)
-    if reduce_ghosts_supported(
-        nb_domain_grid_pts, nb_subdivisions, nb_ghosts, nb_ghosts
-    ):
-        cart_decomp.reduce_ghosts(own_field)
-    else:
-        with pytest.raises(RuntimeError):
-            cart_decomp.reduce_ghosts(own_field)
+    cart_decomp.reduce_ghosts(own_field)
 
 
 def test_field_accessors(comm, nb_grid_pts=(128, 128)):
@@ -301,15 +277,6 @@ def test_reduce_ghosts(comm, nb_subdivisions):
     # Store original interior values for comparison
     interior_before = field.s.copy()
 
-    # Halos wider than the smallest interior subdomain are rejected (the
-    # error is raised consistently on all ranks, so this does not deadlock)
-    if not reduce_ghosts_supported(
-        nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
-    ):
-        with pytest.raises(RuntimeError):
-            cart_decomp.reduce_ghosts(field)
-        return
-
     # Perform ghost reduction
     cart_decomp.reduce_ghosts(field)
 
@@ -360,14 +327,6 @@ def test_reduce_ghosts_multicomponent(comm, nb_subdivisions):
     # Fill with component-dependent values
     for comp in range(nb_components):
         field.sg[comp, ...] = comp + 1.0
-
-    # Halos wider than the smallest interior subdomain are rejected
-    if not reduce_ghosts_supported(
-        nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
-    ):
-        with pytest.raises(RuntimeError):
-            cart_decomp.reduce_ghosts(field)
-        return
 
     # Reduce ghosts
     cart_decomp.reduce_ghosts(field)
@@ -438,14 +397,6 @@ def test_reduce_ghosts_asymmetric(comm, nb_subdivisions):
         else:
             field.sg[(..., *index)] = 1.0
 
-    # Halos wider than the smallest interior subdomain are rejected
-    if not reduce_ghosts_supported(
-        nb_domain_grid_pts, nb_subdivisions, nb_ghosts_left, nb_ghosts_right
-    ):
-        with pytest.raises(RuntimeError):
-            cart_decomp.reduce_ghosts(field)
-        return
-
     # Reduce
     cart_decomp.reduce_ghosts(field)
 
@@ -464,8 +415,19 @@ def test_reduce_ghosts_asymmetric(comm, nb_subdivisions):
             )
 
 
+# Halo geometries for the reduce_ghosts tests below: (grid points per
+# direction, left ghosts, right ghosts). With up to 8 ranks per direction the
+# small grids give ranks with a single interior point or none at all, so the
+# halo spans several ranks (or, for 3 points and 4 ghosts, wraps around the
+# whole periodic domain) and the multi-step reduction cascade is exercised.
+HALO_GEOMETRIES = [(8, 1, 1), (5, 2, 2), (5, 3, 1), (3, 4, 4)]
+
+
+@pytest.mark.parametrize("nb_pts_per_dim,ghosts_left,ghosts_right", HALO_GEOMETRIES)
 @pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
-def test_reduce_ghosts_adjoint_property(comm, nb_subdivisions):
+def test_reduce_ghosts_adjoint_property(
+    comm, nb_subdivisions, nb_pts_per_dim, ghosts_left, ghosts_right
+):
     """
     Test that reduce_ghosts is the adjoint of communicate_ghosts.
 
@@ -479,12 +441,9 @@ def test_reduce_ghosts_adjoint_property(comm, nb_subdivisions):
     where <.,.> is the inner product over the full domain (including ghosts).
     """
     spatial_dim = len(nb_subdivisions)
-    # Use enough points to ensure every rank has at least 1 interior point
-    # even with maximum subdivision (8 in any dimension for 8 processes)
-    nb_pts_per_dim = max(8, max(nb_subdivisions))
     nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
-    nb_ghosts_left = np.full(spatial_dim, 1)
-    nb_ghosts_right = np.full(spatial_dim, 1)
+    nb_ghosts_left = np.full(spatial_dim, ghosts_left)
+    nb_ghosts_right = np.full(spatial_dim, ghosts_right)
 
     cart_decomp = muGrid.CartesianDecomposition(
         comm,
@@ -539,6 +498,67 @@ def test_reduce_ghosts_adjoint_property(comm, nb_subdivisions):
         inner_x_Ry,
         rtol=1e-10,
         err_msg="reduce_ghosts is not adjoint of communicate_ghosts",
+    )
+
+
+@pytest.mark.parametrize("nb_pts_per_dim,ghosts_left,ghosts_right", HALO_GEOMETRIES)
+@pytest.mark.parametrize("comm,nb_subdivisions", make_subdivisions())
+def test_reduce_ghosts_multiplicity(
+    comm, nb_subdivisions, nb_pts_per_dim, ghosts_left, ghosts_right
+):
+    """Reducing all-ones ghosts yields, at each interior cell, the number of
+    ghost cells on all ranks that alias it.
+
+    Unlike the adjoint test this pins down the absolute result and is
+    sensitive to contributions being routed to the wrong owner when the halo
+    spans several ranks.
+    """
+    spatial_dim = len(nb_subdivisions)
+    nb_domain_grid_pts = np.full(spatial_dim, nb_pts_per_dim)
+    nb_ghosts_left = np.full(spatial_dim, ghosts_left)
+    nb_ghosts_right = np.full(spatial_dim, ghosts_right)
+    cart_decomp = muGrid.CartesianDecomposition(
+        comm,
+        nb_domain_grid_pts.tolist(),
+        nb_subdivisions,
+        nb_ghosts_left.tolist(),
+        nb_ghosts_right.tolist(),
+    )
+    field = cart_decomp.real_field("multiplicity")
+
+    # Mask of ghost cells on this rank (with-ghost local coordinates)
+    nb_with_ghosts = np.array(cart_decomp.nb_subdomain_grid_pts_with_ghosts)
+    local = np.indices(nb_with_ghosts)
+    is_ghost = np.zeros(nb_with_ghosts, dtype=bool)
+    for dim in range(spatial_dim):
+        is_ghost |= local[dim] < nb_ghosts_left[dim]
+        is_ghost |= local[dim] >= nb_with_ghosts[dim] - nb_ghosts_right[dim]
+
+    # Ones in the ghosts, zeros in the interior
+    field.sg[...] = 0.0
+    field.sg[..., is_ghost] = 1.0
+    cart_decomp.reduce_ghosts(field)
+
+    # Expected: global histogram of the periodic images of all ghost cells
+    location = np.array(cart_decomp.subdomain_locations_with_ghosts)
+    global_coords = (local + location.reshape(-1, *([1] * spatial_dim))) % (
+        nb_domain_grid_pts.reshape(-1, *([1] * spatial_dim))
+    )
+    counts = np.zeros(nb_domain_grid_pts, dtype=np.int64)
+    np.add.at(counts, tuple(global_coords[:, is_ghost]), 1)
+    counts = comm.sum(np.asfortranarray(counts.reshape(-1, 1))).reshape(
+        counts.shape
+    )
+
+    interior = ~is_ghost
+    expected = counts[tuple(global_coords[:, interior])]
+    np.testing.assert_array_equal(
+        field.sg[(..., *np.nonzero(interior))].reshape(-1, expected.size),
+        expected[np.newaxis, :],
+        err_msg="Ghost contributions were reduced to the wrong interior cells",
+    )
+    np.testing.assert_array_equal(
+        field.sg[..., is_ghost], 0.0, err_msg="Ghosts not zeroed after reduce"
     )
 
 
