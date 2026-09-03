@@ -171,10 +171,13 @@ def test_ghost_communication_rejects_foreign_field(comm, nb_subdivisions):
         nb_ghosts.tolist(),
     )
 
-    # A field on a separate collection of the same subdomain shape but
-    # without ghost regions
+    # A field on a separate collection of the same (ghost-padded) subdomain
+    # shape, but the collection itself has no ghost regions. NB: the shape
+    # must be non-zero on every rank. With more ranks than grid points some
+    # ranks own no interior points, and a zero-sized collection would throw
+    # on those ranks only, stranding the others in the MPI calls below.
     foreign_collection = GlobalFieldCollection(
-        list(cart_decomp.nb_subdomain_grid_pts)
+        list(cart_decomp.nb_subdomain_grid_pts_with_ghosts)
     )
     foreign_field = foreign_collection.real_field("foreign-field")
 
@@ -189,7 +192,15 @@ def test_ghost_communication_rejects_foreign_field(comm, nb_subdivisions):
     own_field = cart_decomp.real_field("own-field")
     own_field.sg[...] = 1.0
     cart_decomp.communicate_ghosts(own_field)
-    cart_decomp.reduce_ghosts(own_field)
+    # Halos wider than the smallest interior subdomain are rejected (the
+    # error is raised consistently on all ranks, so this does not deadlock)
+    if reduce_ghosts_supported(
+        nb_domain_grid_pts, nb_subdivisions, nb_ghosts, nb_ghosts
+    ):
+        cart_decomp.reduce_ghosts(own_field)
+    else:
+        with pytest.raises(RuntimeError):
+            cart_decomp.reduce_ghosts(own_field)
 
 
 def test_field_accessors(comm, nb_grid_pts=(128, 128)):
