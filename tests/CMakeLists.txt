@@ -64,18 +64,27 @@ if(Boost_FOUND)
     # When MPI and NetCDF are enabled, some tests (io_test_file_io_netcdf.cc) use
     # MPIContext which requires proper MPI initialization. With HPC-X/OpenMPI,
     # running without mpiexec causes collective operations to hang.
+    set(MUGRID_MAIN_TEST_LAUNCHER)
     if(MUGRID_ENABLE_MPI AND MUGRID_ENABLE_NETCDF)
         find_program(MPIEXEC_EXECUTABLE mpiexec)
         if(MPIEXEC_EXECUTABLE)
-            add_test(NAME mugrid_main_test_suite
-                COMMAND ${MPIEXEC_EXECUTABLE} -n 1 --oversubscribe $<TARGET_FILE:mugrid_main_test_suite>)
-        else()
-            add_test(NAME mugrid_main_test_suite COMMAND mugrid_main_test_suite)
+            set(MUGRID_MAIN_TEST_LAUNCHER ${MPIEXEC_EXECUTABLE} -n 1 --oversubscribe)
         endif()
-    else()
-        add_test(NAME mugrid_main_test_suite COMMAND mugrid_main_test_suite)
     endif()
+    add_test(NAME mugrid_main_test_suite
+        COMMAND ${MUGRID_MAIN_TEST_LAUNCHER} $<TARGET_FILE:mugrid_main_test_suite>)
     set_tests_properties(mugrid_main_test_suite PROPERTIES TIMEOUT 300)
+
+    # FFT engine tests again with the host backend's N-D transforms hidden
+    # (MUGRID_FFT_NO_ND=1 selects PocketFFTAxisBackend), which is the only way
+    # to reach the engine's axis-by-axis transform paths.
+    add_test(NAME mugrid_fft_no_nd_test_suite
+        COMMAND ${MUGRID_MAIN_TEST_LAUNCHER} $<TARGET_FILE:mugrid_main_test_suite>
+            --run_test=fft_engine_tests)
+    set_tests_properties(mugrid_fft_no_nd_test_suite PROPERTIES
+        TIMEOUT 300
+        ENVIRONMENT "MUGRID_FFT_NO_ND=1"
+    )
 
     # MPI test sources
     set(MUGRID_MPI_TEST_SOURCES
@@ -162,6 +171,19 @@ if(MUGRID_ENABLE_PYTHON)
             ENVIRONMENT "${PYTHON_TEST_ENV}"
         )
 
+        # FFT tests again on the axis-by-axis transform paths (see the C++
+        # mugrid_fft_no_nd_test_suite above). The MPI variants also reach the
+        # general pencil path, which needs more than one rank.
+        add_test(
+            NAME mugrid_python_fft_no_nd_tests
+            COMMAND ${MUGRID_PYTHON_EXECUTABLE} -m pytest -v -s
+                ${CMAKE_CURRENT_SOURCE_DIR}/python_fft_tests.py
+        )
+        set_tests_properties(mugrid_python_fft_no_nd_tests PROPERTIES
+            TIMEOUT 300
+            ENVIRONMENT "${PYTHON_TEST_ENV};MUGRID_FFT_NO_ND=1"
+        )
+
         # MPI Python tests
         if(MUGRID_ENABLE_MPI AND MPIEXEC_EXECUTABLE)
             foreach(NP 1 2 4 8)
@@ -177,6 +199,18 @@ if(MUGRID_ENABLE_PYTHON)
                     TIMEOUT 900
                     PROCESSORS ${NP}
                     ENVIRONMENT "${PYTHON_TEST_ENV}"
+                )
+
+                add_test(
+                    NAME mpi_mugrid_python_fft_no_nd_tests-np_${NP}
+                    COMMAND ${MPIEXEC_EXECUTABLE} -n ${NP} --oversubscribe
+                        ${MUGRID_PYTHON_EXECUTABLE} -m pytest -v -s
+                        ${CMAKE_CURRENT_SOURCE_DIR}/python_mpi_fft_tests.py
+                )
+                set_tests_properties(mpi_mugrid_python_fft_no_nd_tests-np_${NP} PROPERTIES
+                    TIMEOUT 300
+                    PROCESSORS ${NP}
+                    ENVIRONMENT "${PYTHON_TEST_ENV};MUGRID_FFT_NO_ND=1"
                 )
             endforeach()
         endif()

@@ -105,7 +105,25 @@ class PocketFFTBackend : public FFT1DBackend {
 
   bool supports_device_memory() const override { return false; }
 
-  const char * name() const override { return "pocketfft"; }
+  const char * name() const override { return "PocketFFT"; }
+};
+
+/**
+ * PocketFFT backend that hides its N-dimensional entry points.
+ *
+ * Reports `supports_nd() == false`, which steers the engine onto the
+ * axis-by-axis (1D r2c/c2c) transform paths and, under MPI, the general pencil
+ * path, exactly as with a backend lacking N-D transforms. The 1D primitives
+ * are the real pocketfft ones, so results are bit-for-bit those of
+ * `PocketFFTBackend`. Selected by setting the environment variable
+ * `MUGRID_FFT_NO_ND=1` before constructing a host `FFTEngine`; exists so the
+ * test suite can cover those paths, which no production backend reaches.
+ */
+class PocketFFTAxisBackend : public PocketFFTBackend {
+ public:
+  bool supports_nd() const override { return false; }
+
+  const char * name() const override { return "PocketFFT (axis-by-axis)"; }
 };
 
 }  // namespace muGrid

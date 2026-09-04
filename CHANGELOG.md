@@ -1,19 +1,25 @@
 Change log for µGrid
 ====================
 
-v1.0.1 (04Sep26)
+v1.1.0 (04Sep26)
 ----------------
 
 - ENH: `reduce_ghosts` supports halos wider than a rank's interior (and ranks
   without grid points) by relaying through intermediate ranks; it is now the
   exact adjoint of `communicate_ghosts` for any decomposition
+- ENH: The FFT engine's field helpers (`real_space_field`,
+  `fourier_space_field` and their `register_*` variants) accept `sub_pt`
+- BUG: FFT of fields with multiple sub-points returned garbage (issue #192);
+  `fft`/`ifft` now reject pairs with differing component or sub-point counts
 - BUG: `communicate_ghosts`/`reduce_ghosts` reject fields from a foreign field
   collection, e.g. Fourier-space fields (issue #191)
 - BUG: `Communicator::sum` on a dynamically sized `Eigen::Matrix` crashed
   under MPI (unsized result)
+- TST: `MUGRID_FFT_NO_ND=1` hides pocketfft's N-D transforms so the
+  axis-by-axis and general pencil FFT paths run in the test suite
 
-v1.0 (16Jul26)
---------------
+v1.0.0 (16Jul26)
+----------------
 
 - ENH: `FileIONetCDF.sync()` flushes buffered frames to disk for incremental
   checkpointing of long runs

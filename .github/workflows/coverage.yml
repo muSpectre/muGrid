@@ -90,6 +90,9 @@ jobs:
           source venv/bin/activate
           cmake --build build
 
+      # Includes the *_fft_no_nd_* tests (tests/CMakeLists.txt), which rerun
+      # the FFT tests with MUGRID_FFT_NO_ND=1 to reach the engine's
+      # axis-by-axis and general pencil paths. gcov counters accumulate.
       - name: Run test suite (populates coverage counters)
         run: |
           source venv/bin/activate
@@ -148,7 +151,7 @@ jobs:
           submodules: recursive
 
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.35
+        uses: Jimver/cuda-toolkit@v0.2.36
         id: cuda-toolkit
         with:
           cuda: '12.6.3'

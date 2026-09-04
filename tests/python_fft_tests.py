@@ -38,7 +38,12 @@ import unittest
 
 import numpy as np
 import pytest
-from conftest import get_array_module, get_test_devices, skip_if_gpu_unavailable
+from conftest import (
+    fft_nd_disabled,
+    get_array_module,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 from numpy.testing import assert_allclose, assert_array_equal
 
 import muGrid
@@ -112,7 +117,8 @@ class FFTEngineCreationTest(unittest.TestCase):
     def test_backend_name(self):
         """Test backend name is reported."""
         engine = muGrid.FFTEngine([8, 10])
-        self.assertEqual(engine.backend_name, "PocketFFT")
+        expected = "PocketFFT (axis-by-axis)" if fft_nd_disabled() else "PocketFFT"
+        self.assertEqual(engine.backend_name, expected)
 
 
 class FFT1DEngineTest(unittest.TestCase):
@@ -865,6 +871,166 @@ class TestFFTGhostAlignment:
         assert interior_x == 7
         # gl0: 1 -> 2, then Sx = 2 + 7 + 0 -> padded right to 10
         assert storage_x == 10
+
+
+class TestFFTSubPointFields:
+    """FFT of fields with multiple sub-points (issue #192).
+
+    The sub-point axis is a pure batch axis, exactly like the component
+    axis: each (component, sub-point) slice must be transformed
+    independently. The transform paths used to batch over
+    ``get_nb_components()`` only, which excludes sub-points, so the strides
+    were wrong by a factor of ``nb_sub_pts`` and the transform returned
+    garbage.
+    """
+
+    nb_grid_pts = [8, 6]
+    nb_quad = 2
+
+    def make_engine(self):
+        return muGrid.FFTEngine(
+            self.nb_grid_pts, nb_sub_pts={"quad": self.nb_quad}
+        )
+
+    def fourier_reference(self, real_slice):
+        """muGrid convention: transform over all axes, half-complex along
+        the (first) x axis."""
+        nx = real_slice.shape[0]
+        return np.fft.fftn(real_slice)[: nx // 2 + 1, ...]
+
+    @pytest.mark.parametrize("components", [(), (3,)])
+    def test_forward_matches_numpy(self, components):
+        engine = self.make_engine()
+        real_field = engine.real_space_collection.real_field(
+            "real-field", components, sub_pt="quad"
+        )
+        fourier_field = engine.fourier_space_collection.complex_field(
+            "fourier-field", components, sub_pt="quad"
+        )
+
+        rng = np.random.default_rng(42)
+        real_field.s[...] = rng.random(real_field.s.shape)
+
+        engine.fft(real_field, fourier_field)
+
+        # Each (component, sub-point) slice must transform independently
+        flat_real = real_field.s.reshape((-1,) + tuple(self.nb_grid_pts))
+        nb_fourier_pts = fourier_field.s.shape[-2:]
+        flat_fourier = fourier_field.s.reshape((-1,) + nb_fourier_pts)
+        for dof in range(flat_real.shape[0]):
+            assert_allclose(
+                flat_fourier[dof],
+                self.fourier_reference(flat_real[dof]),
+                atol=1e-13,
+                err_msg=f"FFT of (component, sub-point) slice {dof} is wrong",
+            )
+
+    @pytest.mark.parametrize("components", [(), (3,)])
+    @pytest.mark.parametrize(
+        "real_dtype,cplx_dtype,tol",
+        [(np.float64, np.complex128, 1e-14), (np.float32, np.complex64, 1e-6)],
+    )
+    def test_roundtrip(self, components, real_dtype, cplx_dtype, tol):
+        if real_dtype == np.float32 and fft_nd_disabled():
+            pytest.skip("single precision needs the N-D backend path")
+        engine = self.make_engine()
+        real_field = engine.real_space_collection.real_field(
+            "real-field", components, sub_pt="quad", dtype=real_dtype
+        )
+        fourier_field = engine.fourier_space_collection.complex_field(
+            "fourier-field", components, sub_pt="quad", dtype=cplx_dtype
+        )
+
+        rng = np.random.default_rng(123)
+        real_field.s[...] = rng.random(real_field.s.shape)
+        original = real_field.s.copy()
+
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.s[...] *= engine.normalisation
+
+        assert_allclose(real_field.s, original, atol=tol)
+
+    def test_sub_point_mismatch_rejected(self):
+        """A quad-point real field paired with a pixel Fourier field (or
+        vice versa) must be rejected, not silently produce garbage."""
+        engine = self.make_engine()
+        real_quad = engine.real_space_collection.real_field(
+            "real-quad", (), sub_pt="quad"
+        )
+        fourier_pixel = engine.fourier_space_field("fourier-pixel")
+        with pytest.raises(RuntimeError):
+            engine.fft(real_quad, fourier_pixel)
+        with pytest.raises(RuntimeError):
+            engine.ifft(fourier_pixel, real_quad)
+
+        real_pixel = engine.real_space_field("real-pixel")
+        fourier_quad = engine.fourier_space_collection.complex_field(
+            "fourier-quad", (), sub_pt="quad"
+        )
+        with pytest.raises(RuntimeError):
+            engine.fft(real_pixel, fourier_quad)
+        with pytest.raises(RuntimeError):
+            engine.ifft(fourier_quad, real_pixel)
+
+    def test_engine_helpers_accept_sub_pt(self):
+        """The engine's field helpers pass a sub_pt tag through."""
+        engine = self.make_engine()
+        real_field = engine.real_space_field(
+            "real-field", (3,), sub_pt="quad"
+        )
+        fourier_field = engine.fourier_space_field(
+            "fourier-field", (3,), sub_pt="quad"
+        )
+        assert real_field.s.shape[:2] == (3, self.nb_quad)
+        assert fourier_field.s.shape[:2] == (3, self.nb_quad)
+
+        # Get-or-create: same name returns the existing field
+        again = engine.real_space_field("real-field", (3,), sub_pt="quad")
+        assert again.s.shape == real_field.s.shape
+
+        # Register variants raise on duplicates
+        with pytest.raises(RuntimeError):
+            engine.register_real_space_field(
+                "real-field", (3,), sub_pt="quad"
+            )
+        with pytest.raises(RuntimeError):
+            engine.register_fourier_space_field(
+                "fourier-field", (3,), sub_pt="quad"
+            )
+
+        # The fields work in a transform
+        rng = np.random.default_rng(7)
+        real_field.s[...] = rng.random(real_field.s.shape)
+        original = real_field.s.copy()
+        engine.fft(real_field, fourier_field)
+        engine.ifft(fourier_field, real_field)
+        real_field.s[...] *= engine.normalisation
+        assert_allclose(real_field.s, original, atol=1e-14)
+
+
+@pytest.mark.skipif(
+    not fft_nd_disabled(), reason="only meaningful with MUGRID_FFT_NO_ND=1"
+)
+class TestAxisByAxisBackend:
+    """With MUGRID_FFT_NO_ND=1 the host engine gets a pocketfft backend that
+    hides its N-D transforms, so the rest of this file runs the axis-by-axis
+    paths. These tests pin down the two observable differences."""
+
+    def test_backend_name(self):
+        engine = muGrid.FFTEngine([8, 8])
+        assert engine.backend_name == "PocketFFT (axis-by-axis)"
+
+    @pytest.mark.parametrize("nb_grid_pts", [[8], [8, 6], [8, 6, 4]])
+    def test_single_precision_rejected(self, nb_grid_pts):
+        """fp32 transforms exist only on top of the N-D entry point."""
+        engine = muGrid.FFTEngine(nb_grid_pts)
+        real32 = engine.real_space_field("real32", dtype=np.float32)
+        fourier32 = engine.fourier_space_field("fourier32", dtype=np.complex64)
+        with pytest.raises(RuntimeError, match="N-dimensional support"):
+            engine.fft(real32, fourier32)
+        with pytest.raises(RuntimeError, match="N-dimensional support"):
+            engine.ifft(fourier32, real32)
 
 
 class TestFFTDtypeValidation:
