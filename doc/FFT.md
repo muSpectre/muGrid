@@ -200,6 +200,23 @@ This approach:
 - Works correctly for both SoA and AoS storage orders
 - Has minimal overhead (one kernel launch per component)
 
+## Testing the Axis-by-Axis Paths
+
+Both production backends (pocketfft, cuFFT/rocFFT) report `supports_nd() ==
+true`, so the serial engine always takes the single N-D backend call and the
+MPI engine always tries the slab fast path first. The per-axis fallbacks (1D
+r2c along X, then c2c along Y and Z through the work buffers, and the general
+pencil path with the X<->Y transpose) are therefore dead code in a normal run.
+
+Setting the environment variable `MUGRID_FFT_NO_ND=1` before constructing a
+host `FFTEngine` swaps in `PocketFFTAxisBackend`, a `PocketFFTBackend` that
+hides its N-D entry points. Results are identical (the 1D primitives are the
+same), but the engine runs the fallback paths, and `engine.backend_name`
+reports `PocketFFT (axis-by-axis)`. Single-precision transforms are only
+implemented on top of the N-D entry point and raise in this mode. CTest
+registers the FFT tests a second time with this variable set (the
+`*_fft_no_nd_*` tests), so every CI leg that runs `ctest` covers these paths.
+
 ## Normalization
 
 Like FFTW and cuFFT, the transforms are **unnormalized**. A forward FFT followed by an inverse FFT multiplies the result by N (the transform size). Users must explicitly normalize if needed.

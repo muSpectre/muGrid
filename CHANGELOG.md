@@ -1,17 +1,28 @@
 Change log for µGrid
 ====================
 
-v1.0.1 (02Sep26)
+v1.1.0 (02Sep26)
 ----------------
 
+- ENH: The FFT engine's field helpers (`real_space_field`,
+  `fourier_space_field` and their `register_*` variants) accept a `sub_pt`
+  argument
+- BUG: FFT of fields with multiple sub-points (e.g. quadrature-point fields)
+  returned garbage: the transform paths batched over the component count
+  only, ignoring the sub-point axis in the stride calculations (issue #192).
+  The sub-point axis is now a batch axis like components, and `fft`/`ifft`
+  reject input/output pairs whose component or sub-point counts differ.
+- TST: Setting `MUGRID_FFT_NO_ND=1` gives host FFT engines a pocketfft backend
+  without N-dimensional transforms, so the axis-by-axis and general pencil
+  transform paths (otherwise unreachable on CPU) run in the test suite
 - BUG: `communicate_ghosts`/`reduce_ghosts` now reject fields that do not
   belong to the decomposition's own field collection (issue #191). Ghost
   communication is a real-space operation on the decomposed grid; applied to
   e.g. a Fourier-space field of an FFT engine it silently overwrote the low-k
   entries with unset ghost data.
 
-v1.0 (16Jul26)
---------------
+v1.0.0 (16Jul26)
+----------------
 
 - ENH: `FileIONetCDF.sync()` flushes buffered frames to disk for incremental
   checkpointing of long runs

@@ -42,6 +42,7 @@
 #include "memory/memory_space.hh"
 
 #include <cmath>
+#include <cstdlib>
 
 namespace muGrid {
 
@@ -384,7 +385,11 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_backend_name) {
 
   const char * name = engine.get_backend_name();
   BOOST_CHECK(name != nullptr);
-  BOOST_CHECK(std::string(name) == "PocketFFT");
+  // MUGRID_FFT_NO_ND=1 (coverage runs) swaps in the axis-by-axis variant
+  const char * no_nd{std::getenv("MUGRID_FFT_NO_ND")};
+  const bool axis{no_nd != nullptr && no_nd[0] == '1'};
+  BOOST_CHECK(std::string(name) ==
+              (axis ? "PocketFFT (axis-by-axis)" : "PocketFFT"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

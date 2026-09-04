@@ -49,6 +49,7 @@
 #include "rocfft_backend.hh"
 #endif
 
+#include <cstdlib>
 #include <memory>
 
 namespace muGrid {
@@ -68,6 +69,13 @@ struct FFTBackendSelector<HostSpace> {
   using type = PocketFFTBackend;
 
   static std::unique_ptr<FFT1DBackend> create() {
+    // Testing hook: MUGRID_FFT_NO_ND=1 hides pocketfft's N-D transforms so the
+    // engine exercises its axis-by-axis and general pencil paths (cf.
+    // MUGRID_STAGED_TRANSPOSE in transpose.cc). Read per engine construction.
+    const char * env{std::getenv("MUGRID_FFT_NO_ND")};
+    if (env != nullptr && env[0] == '1') {
+      return std::make_unique<PocketFFTAxisBackend>();
+    }
     return std::make_unique<PocketFFTBackend>();
   }
 

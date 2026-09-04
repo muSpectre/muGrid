@@ -102,7 +102,7 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
               const std::vector<Index_t> & in_strides, Real32 * output,
               const std::vector<Index_t> & out_strides) override;
 
-  const char * name() const override { return "rocfft"; }
+  const char * name() const override { return "rocFFT"; }
 
  protected:
   /** Transform kind used when building a rocFFT plan from a PlanKey. */

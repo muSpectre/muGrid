@@ -7,6 +7,8 @@ This module provides:
 - CuPy availability checking
 """
 
+import os
+
 import pytest
 
 import muGrid
@@ -86,6 +88,17 @@ def skip_if_gpu_unavailable(device):
             pytest.skip("No GPU device available at runtime")
         if not HAS_CUPY:
             pytest.skip("CuPy not available for GPU array access")
+
+
+def fft_nd_disabled():
+    """True when MUGRID_FFT_NO_ND=1 hides the host backend's N-D transforms.
+
+    The FFT engine then runs its axis-by-axis paths (see
+    ``PocketFFTAxisBackend``). Single-precision transforms are only
+    implemented on top of the N-D entry point and raise in this mode, so
+    their tests skip.
+    """
+    return os.environ.get("MUGRID_FFT_NO_ND", "") == "1"
 
 
 def get_array_module(device):
