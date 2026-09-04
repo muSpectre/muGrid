@@ -208,8 +208,12 @@ namespace muGrid {
             const {
             if (this->comm == MPI_COMM_NULL)
                 return arg;
-            Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime> res;
-            res.setZero();
+            // Size the result explicitly: for a dynamically sized matrix a
+            // default-constructed `res` is empty and `res.data()` is null,
+            // so MPI_Allreduce would write through a null pointer.
+            Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime> res{
+                Eigen::Matrix<T, RowsAtCompileTime, ColsAtCompileTime>::Zero(
+                    arg.rows(), arg.cols())};
             const auto count{arg.size()};
             MPI_Allreduce(arg.data(), res.data(), count, mpi_type<T>(), MPI_SUM,
                           this->comm);

@@ -16,6 +16,9 @@ v1.0.1 (02Sep26)
   adjoint of `communicate_ghosts` for any decomposition. This removes the
   `RuntimeError` previously raised in this case and lets ghost sizes derived
   from an operator's stencil be used with any number of ranks.
+- BUG: `Communicator::sum` on a dynamically sized `Eigen::Matrix` (as opposed
+  to the `DynMatrix_t` overloads used by the Python bindings) wrote the
+  reduction into an unsized result and crashed under MPI
 
 v1.0 (16Jul26)
 --------------

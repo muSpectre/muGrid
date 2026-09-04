@@ -550,11 +550,14 @@ def test_reduce_ghosts_multiplicity(
         counts.shape
     )
 
+    # A rank that owns no grid points has an empty interior; the comparison
+    # below is then trivially empty (ravel rather than reshape, which cannot
+    # infer a dimension of an empty array), and only the ghosts are checked.
     interior = ~is_ghost
     expected = counts[tuple(global_coords[:, interior])]
     np.testing.assert_array_equal(
-        field.sg[(..., *np.nonzero(interior))].reshape(-1, expected.size),
-        expected[np.newaxis, :],
+        field.sg[(..., *np.nonzero(interior))].ravel(),
+        expected,
         err_msg="Ghost contributions were reduced to the wrong interior cells",
     )
     np.testing.assert_array_equal(
