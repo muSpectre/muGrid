@@ -1,24 +1,16 @@
 Change log for µGrid
 ====================
 
-v1.0.1 (02Sep26)
+v1.0.1 (04Sep26)
 ----------------
 
-- BUG: `communicate_ghosts`/`reduce_ghosts` now reject fields that do not
-  belong to the decomposition's own field collection (issue #191). Ghost
-  communication is a real-space operation on the decomposed grid; applied to
-  e.g. a Fourier-space field of an FFT engine it silently overwrote the low-k
-  entries with unset ghost data.
-- ENH: `reduce_ghosts` supports ghost halos wider than the interior subdomain
-  of a rank (including ranks that own no grid points). Contributions are
-  relayed through the intermediate ranks by replaying the multi-step
-  exchange of `communicate_ghosts` in reverse, so `reduce_ghosts` is the exact
-  adjoint of `communicate_ghosts` for any decomposition. This removes the
-  `RuntimeError` previously raised in this case and lets ghost sizes derived
-  from an operator's stencil be used with any number of ranks.
-- BUG: `Communicator::sum` on a dynamically sized `Eigen::Matrix` (as opposed
-  to the `DynMatrix_t` overloads used by the Python bindings) wrote the
-  reduction into an unsized result and crashed under MPI
+- ENH: `reduce_ghosts` supports halos wider than a rank's interior (and ranks
+  without grid points) by relaying through intermediate ranks; it is now the
+  exact adjoint of `communicate_ghosts` for any decomposition
+- BUG: `communicate_ghosts`/`reduce_ghosts` reject fields from a foreign field
+  collection, e.g. Fourier-space fields (issue #191)
+- BUG: `Communicator::sum` on a dynamically sized `Eigen::Matrix` crashed
+  under MPI (unsized result)
 
 v1.0 (16Jul26)
 --------------
