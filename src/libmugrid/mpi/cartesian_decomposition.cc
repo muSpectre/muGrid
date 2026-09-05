@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstring>
 #include <iterator>
+#include <vector>
 
 #ifdef WITH_MPI
 #include <mpi.h>
@@ -97,20 +98,11 @@ namespace muGrid {
                 subdomain_strides, nb_ghosts_left, nb_ghosts_right);
         }
 
-        // Compute the global minimum interior extent per direction. This is
-        // a collective operation; the result is identical on all ranks and
-        // lets reduce_ghosts() make rank-consistent support decisions.
-        this->global_min_nb_subdomain_grid_pts =
-            DynGridIndex(this->get_spatial_dim());
-        for (Dim_t direction{0}; direction < this->get_spatial_dim();
-             ++direction) {
-            this->global_min_nb_subdomain_grid_pts[direction] = this->comm.min(
-                nb_subdomain_grid_pts_without_ghosts[direction]);
-        }
-
         // Determine communication strategy
         this->recv_right_sequence.resize(this->get_spatial_dim());
         this->recv_left_sequence.resize(this->get_spatial_dim());
+        this->send_right_sequence.resize(this->get_spatial_dim());
+        this->send_left_sequence.resize(this->get_spatial_dim());
         this->nb_sendrecv_steps.resize(this->get_spatial_dim());
         for (Dim_t direction{0}; direction < this->get_spatial_dim();
              ++direction) {
@@ -118,6 +110,8 @@ namespace muGrid {
             // ghost buffer
             this->recv_right_sequence[direction].resize(0);
             this->recv_left_sequence[direction].resize(0);
+            this->send_right_sequence[direction].resize(0);
+            this->send_left_sequence[direction].resize(0);
             Index_t nb_cum_send_right{0}, nb_cum_send_left{0};
 
             // Ghost buffers in direction
@@ -145,6 +139,8 @@ namespace muGrid {
                     this->cart_comm->sendrecv_left(direction, nb_send_left)};
                 this->recv_left_sequence[direction].push_back(nb_recv_left);
                 this->recv_right_sequence[direction].push_back(nb_recv_right);
+                this->send_right_sequence[direction].push_back(nb_send_right);
+                this->send_left_sequence[direction].push_back(nb_send_left);
 
                 // Update how many slices we have already sent to the right/left
                 nb_cum_send_right += nb_send_right;
@@ -470,84 +466,93 @@ namespace muGrid {
             auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
             auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
 
-            // reduce_ghosts uses a single communication step (below), which is
-            // only correct when each ghost region maps into a single neighbor's
-            // interior, i.e. the halo does not exceed the interior extent on
-            // ANY rank. communicate_ghosts cascades for larger halos, but the
-            // reverse (reduce) cascade is not implemented; reject it rather
-            // than silently producing a wrong reduction.
+            // reduce_ghosts is the transpose of communicate_ghosts. Every
+            // step of the forward cascade is a copy "ghost slices B :=
+            // neighbour slices A"; its transpose is "A += B, then B := 0".
+            // The transpose of the whole cascade is therefore the sequence
+            // of transposed steps in REVERSE order, with the roles of
+            // sender and receiver swapped: what a rank received into its
+            // ghost in forward step k is sent back to the rank it came from,
+            // which adds it into the slices it sent in that step. For relay
+            // ranks those slices are themselves ghost slices (received in
+            // step k-1); they accumulate the downstream contributions on
+            // top of their own and are forwarded in the next (earlier)
+            // step, so contributions travel back along the exact path the
+            // data took forwards, however many ranks that path spans.
             //
-            // The check MUST be made against the global minimum interior
-            // extent (identical on all ranks, precomputed collectively in
-            // initialise): a rank-local check would throw on the small ranks
-            // only and deadlock the remaining ranks in the sendrecv below.
-            auto min_interior{
-                this->global_min_nb_subdomain_grid_pts[direction]};
-            if (nb_ghosts_left > min_interior ||
-                nb_ghosts_right > min_interior) {
-                throw RuntimeError(
-                    "reduce_ghosts does not support a ghost halo larger than "
-                    "the interior subdomain extent of any rank in a given "
-                    "direction (multi-step reduction is not implemented). "
-                    "Reduce the number of ghosts or the number of ranks in "
-                    "this direction.");
+            // Forward step k reads/writes at slice offsets that depend on
+            // the cumulative counts of the preceding steps; rebuild those
+            // prefix sums from the schedule recorded in initialise().
+            const auto nb_steps{this->nb_sendrecv_steps[direction]};
+            const auto & send_right{this->send_right_sequence[direction]};
+            const auto & send_left{this->send_left_sequence[direction]};
+            const auto & recv_left{this->recv_left_sequence[direction]};
+            const auto & recv_right{this->recv_right_sequence[direction]};
+            std::vector<Index_t> cum_send_right(nb_steps + 1, 0),
+                cum_send_left(nb_steps + 1, 0), cum_recv_left(nb_steps + 1, 0),
+                cum_recv_right(nb_steps + 1, 0);
+            for (Index_t step{0}; step < nb_steps; ++step) {
+                cum_send_right[step + 1] =
+                    cum_send_right[step] + send_right[step];
+                cum_send_left[step + 1] =
+                    cum_send_left[step] + send_left[step];
+                cum_recv_left[step + 1] =
+                    cum_recv_left[step] + recv_left[step];
+                cum_recv_right[step + 1] =
+                    cum_recv_right[step] + recv_right[step];
             }
 
-            // For reduce_ghosts, we reverse the communication direction:
-            // - Send our LEFT ghost to LEFT neighbor → they add to their RIGHT interior
-            // - Send our RIGHT ghost to RIGHT neighbor → they add to their LEFT interior
-            // - Receive from neighbors and add to our interior
+            for (Index_t step{nb_steps - 1}; step >= 0; --step) {
+                // Forward step `step`, send to the RIGHT / receive from the
+                // LEFT: this rank sent `send_right[step]` slices starting at
+                // `src_right` and received `recv_left[step]` slices into
+                // its left ghost starting at `dst_left`.
+                auto src_right{nb_ghosts_left +
+                               nb_subdomain_grid_pts_without_ghosts -
+                               cum_send_right[step] - send_right[step]};
+                auto dst_left{nb_ghosts_left - cum_recv_left[step] -
+                              recv_left[step]};
 
-            // For reduce_ghosts, we send ghost values to neighbors who add them
-            // to their interior. In single process mode, this is a local
-            // accumulation from ghost to interior.
-            //
-            // Unlike communicate_ghosts which uses multi-step communication for
-            // large ghost regions, reduce_ghosts can be done in a single step
-            // since we're always reducing the full ghost region.
+                // Forward step `step`, send to the LEFT / receive from the
+                // RIGHT: sent `send_left[step]` slices from `src_left`,
+                // received `recv_right[step]` slices into `dst_right`.
+                auto src_left{nb_ghosts_left + cum_send_left[step]};
+                auto dst_right{nb_ghosts_left +
+                               nb_subdomain_grid_pts_without_ghosts +
+                               cum_recv_right[step]};
 
-            // Send LEFT ghost to LEFT neighbor, receive from RIGHT neighbor
-            // (who is sending their LEFT ghost, same size as ours)
-            if (nb_ghosts_left > 0) {
-                this->cart_comm->sendrecv_left_accumulate(
-                    direction,
-                    block_stride,
-                    nb_blocks,
-                    // Send from LEFT ghost region
-                    nb_ghosts_left * block_len,
-                    0,  // Start of left ghost (always at 0)
-                    // Receive into RIGHT interior edge
-                    nb_blocks,
-                    nb_ghosts_left * block_len,
-                    nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts -
-                        nb_ghosts_left,
-                    data,
-                    block_len,
-                    element_size, type_desc,
-                    is_device_memory);
+                // Transposed step: return the left-ghost slices to the LEFT
+                // neighbour and add what the RIGHT neighbour returns into
+                // the slices we had sent it. The guard is on the (global)
+                // ghost count only: a rank-local skip would leave the
+                // neighbour's matching zero-length sendrecv unanswered.
+                if (nb_ghosts_left > 0) {
+                    this->cart_comm->sendrecv_left_accumulate(
+                        direction, block_stride, nb_blocks,
+                        // send: slices received in the forward step
+                        recv_left[step] * block_len, dst_left,
+                        // receive and accumulate: slices sent in the
+                        // forward step
+                        nb_blocks, send_right[step] * block_len, src_right,
+                        data, block_len, element_size, type_desc,
+                        is_device_memory);
+                }
+
+                // Mirror image for the right ghost.
+                if (nb_ghosts_right > 0) {
+                    this->cart_comm->sendrecv_right_accumulate(
+                        direction, block_stride, nb_blocks,
+                        recv_right[step] * block_len, dst_right, nb_blocks,
+                        send_left[step] * block_len, src_left, data,
+                        block_len, element_size, type_desc, is_device_memory);
+                }
             }
 
-            // Send RIGHT ghost to RIGHT neighbor, receive from LEFT neighbor
-            // (who is sending their RIGHT ghost, same size as ours)
-            if (nb_ghosts_right > 0) {
-                this->cart_comm->sendrecv_right_accumulate(
-                    direction,
-                    block_stride,
-                    nb_blocks,
-                    // Send from RIGHT ghost region
-                    nb_ghosts_right * block_len,
-                    nb_ghosts_left + nb_subdomain_grid_pts_without_ghosts,
-                    // Receive into LEFT interior edge
-                    nb_blocks,
-                    nb_ghosts_right * block_len,
-                    nb_ghosts_left,
-                    data,
-                    block_len,
-                    element_size, type_desc,
-                    is_device_memory);
-            }
-
-            // Zero out the ghost buffers after reduction. Within a block the
+            // Zero out the ghost buffers after reduction. Every ghost slice
+            // of this direction has been sent back exactly once above, and
+            // no transposed step accumulates into a ghost slice after it
+            // has been sent back, so the whole halo can be cleared in one
+            // go rather than per step. Within a block the
             // ghost slices are contiguous (slice s at s * block_len), so each
             // side's ghost region is one contiguous run of
             // nb_ghosts * block_len elements per block, repeated nb_blocks

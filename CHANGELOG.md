@@ -1,25 +1,22 @@
 Change log for µGrid
 ====================
 
-v1.1.0 (02Sep26)
+v1.1.0 (04Sep26)
 ----------------
 
+- ENH: `reduce_ghosts` supports halos wider than a rank's interior (and ranks
+  without grid points) by relaying through intermediate ranks; it is now the
+  exact adjoint of `communicate_ghosts` for any decomposition
 - ENH: The FFT engine's field helpers (`real_space_field`,
-  `fourier_space_field` and their `register_*` variants) accept a `sub_pt`
-  argument
-- BUG: FFT of fields with multiple sub-points (e.g. quadrature-point fields)
-  returned garbage: the transform paths batched over the component count
-  only, ignoring the sub-point axis in the stride calculations (issue #192).
-  The sub-point axis is now a batch axis like components, and `fft`/`ifft`
-  reject input/output pairs whose component or sub-point counts differ.
-- TST: Setting `MUGRID_FFT_NO_ND=1` gives host FFT engines a pocketfft backend
-  without N-dimensional transforms, so the axis-by-axis and general pencil
-  transform paths (otherwise unreachable on CPU) run in the test suite
-- BUG: `communicate_ghosts`/`reduce_ghosts` now reject fields that do not
-  belong to the decomposition's own field collection (issue #191). Ghost
-  communication is a real-space operation on the decomposed grid; applied to
-  e.g. a Fourier-space field of an FFT engine it silently overwrote the low-k
-  entries with unset ghost data.
+  `fourier_space_field` and their `register_*` variants) accept `sub_pt`
+- BUG: FFT of fields with multiple sub-points returned garbage (issue #192);
+  `fft`/`ifft` now reject pairs with differing component or sub-point counts
+- BUG: `communicate_ghosts`/`reduce_ghosts` reject fields from a foreign field
+  collection, e.g. Fourier-space fields (issue #191)
+- BUG: `Communicator::sum` on a dynamically sized `Eigen::Matrix` crashed
+  under MPI (unsized result)
+- TST: `MUGRID_FFT_NO_ND=1` hides pocketfft's N-D transforms so the
+  axis-by-axis and general pencil FFT paths run in the test suite
 
 v1.0.0 (16Jul26)
 ----------------
