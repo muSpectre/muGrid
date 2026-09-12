@@ -15,6 +15,9 @@ v1.1.1 (12Sep26)
 - ENH: GPU interior reductions (`vecdot`, `norm_sq`, `axpy_norm_sq`) cap their
   grid at 1024 blocks and use the grid-stride loop the kernels already had, so
   the shared-memory tree is amortised over many elements
+- MAINT: `GreenJacobiPreconditioner` scales into its output field and
+  applies the inner Green preconditioner in place, dropping a resident
+  vector-sized work buffer per solve
 - MAINT: `mpi4py` is imported only by MPI-enabled builds; a serial build no
   longer runs `MPI_Init` at `import muGrid`
 

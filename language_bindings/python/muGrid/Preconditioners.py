@@ -651,7 +651,6 @@ class GreenJacobiPreconditioner(Preconditioner):
             communicator = Communicator(communicator)
         self._communicator = communicator
         self._jhalf = None
-        self._work = None
         self.update_diagonal(diagonal)
 
     def _timed(self, name):
@@ -720,20 +719,19 @@ class GreenJacobiPreconditioner(Preconditioner):
                 RuntimeWarning, stacklevel=3,
             )
 
-    def _work_field(self, r):
-        if self._work is None:
-            self._work = _real_field_like(r, f"{self._name}-work")
-            self._work.set_zero()
-        return self._work
-
     def apply(self, r, z):
-        r"""Compute ``z = J^{1/2} G ( J^{1/2} r )``."""
-        w = self._work_field(r)
+        r"""Compute ``z = J^{1/2} G ( J^{1/2} r )``.
+
+        The output doubles as the scratch for the inner Green apply, which
+        needs no separate work field of its own: it consumes its input into
+        the Fourier work buffer (``fft(in, work)``) before writing its output
+        (``ifft(work, out)``), so it is safe in place.
+        """
         with self._timed("scale"):
-            linalg.copy(r, w)
-            linalg.scal(self._jhalf, w)  # w = J^{1/2} r
+            linalg.copy(r, z)
+            linalg.scal(self._jhalf, z)  # z = J^{1/2} r
         with self._timed("green"):
-            self._green.apply(w, z)  # z = G w
+            self._green.apply(z, z)  # z = G z, in place
         with self._timed("scale"):
             linalg.scal(self._jhalf, z)  # z = J^{1/2} z
 
