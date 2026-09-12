@@ -1,33 +1,22 @@
 Change log for µGrid
 ====================
 
-Unreleased
-----------
+v1.1.1 (12Sep26)
+----------------
 
-- ENH: The fused isotropic-stiffness kernels keep their G/V geometry matrices
-  in `__constant__` memory in the kernel's own working precision. A float32
-  apply previously converted a `double` entry for every inner-loop term; that
-  conversion issues on the fp64 pipe, which runs at a fraction of the fp32 rate
-  on most GPUs, and dominated the kernel (~1300 fp64 instructions per thread
-  against ~2250 fp32 FMAs). The single-precision 3D apply is ~15x faster
-  (4.97 ms -> 0.34 ms at 64^3 on an RTX PRO 500); double precision is
-  unchanged, and results are bit-identical
-- ENH: The 3D isotropic-stiffness kernel caps its register use so two
-  blocks fit per SM. Unbounded, the compiler used the whole register
-  file for one block (255 registers/thread, 16.7% occupancy) and the
-  kernel stalled with nothing to switch to; it now runs at 93% of DRAM
-  throughput instead of 1%
-- ENH: GPU interior reductions (`vecdot`, `norm_sq` and the fused
-  `axpy_norm_sq`) cap their grid at 1024 blocks and use the grid-stride
-  loop the kernels already had. One block per 256 elements gave every
-  thread a single element and a full shared-memory tree reduction to go
-  with it; the tree is now amortised over many elements. 5% per CG
-  iteration at 96^3, growing with grid size
-- ENH: `BlockFourierPreconditioner` applies its per-mode block product
-  in a single fused kernel on the GPU instead of one kernel per term
-  (nine multiplies, six adds and three copies for a 3-component field,
-  each with its own full-sized temporary). 10-22% per CG iteration in a
-  J-FFT-preconditioned solve. The host path is unchanged
+- ENH: The fused stiffness kernels keep their G/V geometry matrices in
+  `__constant__` memory at the kernel's working precision; a float32 apply no
+  longer converts a `double` per inner-loop term on the fp64 pipe (~15x faster
+  in 3D single precision, bit-identical results)
+- ENH: The 3D stiffness kernel bounds its registers so two blocks fit per SM,
+  lifting it from latency-bound at 17% occupancy to 93% of DRAM throughput
+- ENH: `BlockFourierPreconditioner` applies its per-mode block product in one
+  fused GPU kernel instead of a kernel per term (10-22% per CG iteration)
+- ENH: GPU interior reductions (`vecdot`, `norm_sq`, `axpy_norm_sq`) cap their
+  grid at 1024 blocks and use the grid-stride loop the kernels already had, so
+  the shared-memory tree is amortised over many elements
+- MAINT: `mpi4py` is imported only by MPI-enabled builds; a serial build no
+  longer runs `MPI_Init` at `import muGrid`
 
 v1.1.0 (04Sep26)
 ----------------
