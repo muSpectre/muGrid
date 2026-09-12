@@ -23,6 +23,11 @@ Unreleased
   thread a single element and a full shared-memory tree reduction to go
   with it; the tree is now amortised over many elements. 5% per CG
   iteration at 96^3, growing with grid size
+- ENH: `BlockFourierPreconditioner` applies its per-mode block product
+  in a single fused kernel on the GPU instead of one kernel per term
+  (nine multiplies, six adds and three copies for a 3-component field,
+  each with its own full-sized temporary). 10-22% per CG iteration in a
+  J-FFT-preconditioned solve. The host path is unchanged
 
 v1.1.0 (04Sep26)
 ----------------

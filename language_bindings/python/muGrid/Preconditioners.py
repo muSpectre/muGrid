@@ -452,6 +452,70 @@ class BlockFourierPreconditioner(Preconditioner):
             self._blocks = xp.asarray(
                 np.ascontiguousarray(blocks).astype(complex_dtype))
 
+        # Single fused kernel for the per-mode multiply, when the fields live
+        # on a device (None on the host, where apply() keeps the loop).
+        self._fused, self._fused_blocks = self._build_fused_kernel(n)
+
+    #: Largest `n` for which apply() uses the fused kernel. The fused variant
+    #: takes one kernel argument per stored block, so the parameter list grows
+    #: as n^2 and eventually runs into the kernel argument-space limit (and
+    #: into register pressure) for no gain. The vector-field cases this class
+    #: is used for are n = 2 and n = 3.
+    FUSED_MAX_COMPONENTS = 4
+
+    def _build_fused_kernel(self, n):
+        r"""Generate one elementwise kernel computing the whole per-mode
+        product ``z_i(q) = Σ_j K⁻¹_ij(q) r_j(q)``.
+
+        :meth:`apply`'s component-by-component form issues a kernel per term --
+        for n = 3 that is nine multiplies, six adds and three copies, each
+        reading and writing a full Fourier-sized array. Fusing them makes one
+        launch and one pass: the blocks and the input components are read once
+        and the result written once.
+
+        Returns ``(None, None)`` on the host (numpy has no equivalent
+        facility, and the loop's temporaries are cheap there) or when ``n``
+        exceeds :attr:`FUSED_MAX_COMPONENTS`.
+        """
+        xp = self._xp
+        if not xp.__name__.startswith("cupy") or n > self.FUSED_MAX_COMPONENTS:
+            return None, None
+
+        if self._hermitian:
+            # Real diagonals and the stored upper triangle; the lower triangle
+            # is the conjugate, exactly as _block() reconstructs it -- but here
+            # the conjugation happens in-register instead of materialising an
+            # array.
+            params = [f"R d{i}" for i in range(n)]
+            params += [f"C u{i}_{j}" for i in range(n) for j in range(i + 1, n)]
+            arrays = [self._diag[i] for i in range(n)]
+            arrays += [self._off[(i, j)]
+                       for i in range(n) for j in range(i + 1, n)]
+
+            def term(i, j):
+                if i == j:
+                    return f"d{i} * s{j}"
+                return f"u{i}_{j} * s{j}" if i < j else f"conj(u{j}_{i}) * s{j}"
+        else:
+            params = [f"C b{i}_{j}" for i in range(n) for j in range(n)]
+            arrays = [self._blocks[i, j] for i in range(n) for j in range(n)]
+
+            def term(i, j):
+                return f"b{i}_{j} * s{j}"
+
+        params += [f"C s{i}" for i in range(n)]
+        out_params = [f"C o{i}" for i in range(n)]
+        # apply() runs in place (the outputs are the inputs), and every output
+        # needs every input, so form all n results in registers before writing
+        # any of them back.
+        body = [f"C t{i} = " + " + ".join(term(i, j) for j in range(n)) + ";"
+                for i in range(n)]
+        body += [f"o{i} = t{i};" for i in range(n)]
+        kernel = xp.ElementwiseKernel(
+            ", ".join(params), ", ".join(out_params), "\n".join(body),
+            f"mugrid_block_matvec_{n}")
+        return kernel, arrays
+
     def _timed(self, name):
         return self._timer(name) if self._timer is not None else nullcontext()
 
@@ -490,18 +554,25 @@ class BlockFourierPreconditioner(Preconditioner):
             # size-1 sub-point axis between the component and Fourier axes; the
             # per-mode blocks (no sub-point axis) broadcast over it.
             n = self._n
-            new = []
-            for i in range(n - 1):
-                acc = self._block(i, 0) * s[0]
+            if self._fused is not None:
+                # One launch, one pass: the kernel forms every output in
+                # registers, so passing the components as both inputs and
+                # outputs updates the work buffer in place.
+                comps = [s[i] for i in range(n)]
+                self._fused(*self._fused_blocks, *comps, *comps)
+            else:
+                new = []
+                for i in range(n - 1):
+                    acc = self._block(i, 0) * s[0]
+                    for j in range(1, n):
+                        acc = acc + self._block(i, j) * s[j]
+                    new.append(acc)
+                last = self._block(n - 1, 0) * s[0]
                 for j in range(1, n):
-                    acc = acc + self._block(i, j) * s[j]
-                new.append(acc)
-            last = self._block(n - 1, 0) * s[0]
-            for j in range(1, n):
-                last = last + self._block(n - 1, j) * s[j]
-            s[n - 1] = last
-            for i in range(n - 1):
-                s[i] = new[i]
+                    last = last + self._block(n - 1, j) * s[j]
+                s[n - 1] = last
+                for i in range(n - 1):
+                    s[i] = new[i]
         with self._timed("ifft"):
             engine.ifft(work, z)
 
