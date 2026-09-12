@@ -17,6 +17,12 @@ Unreleased
   file for one block (255 registers/thread, 16.7% occupancy) and the
   kernel stalled with nothing to switch to; it now runs at 93% of DRAM
   throughput instead of 1%
+- ENH: GPU interior reductions (`vecdot`, `norm_sq` and the fused
+  `axpy_norm_sq`) cap their grid at 1024 blocks and use the grid-stride
+  loop the kernels already had. One block per 256 elements gave every
+  thread a single element and a full shared-memory tree reduction to go
+  with it; the tree is now amortised over many elements. 5% per CG
+  iteration at 96^3, growing with grid size
 
 v1.1.0 (04Sep26)
 ----------------
