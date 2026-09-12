@@ -277,7 +277,13 @@ __global__ void isotropic_stiffness_2d_kernel(
  * node occupies.
  */
 template <typename T, bool Uniform>
-__global__ void isotropic_stiffness_3d_kernel(
+// Cap registers so two blocks fit per SM. Without a bound the compiler spends
+// the whole register file on one block (255 registers/thread, one resident
+// block, 16.7% occupancy) and the kernel -- which is neither compute- nor
+// bandwidth-bound (measured 27% SM, 1% DRAM) -- stalls with nothing to switch
+// to. Two blocks is a deliberately mild cap: 3 or 4 spill and are much slower
+// (32% / 60% on an RTX PRO 500), while 2 is faster everywhere measured.
+__global__ __launch_bounds__(256, 2) void isotropic_stiffness_3d_kernel(
     const T* __restrict__ displacement,
     const T* __restrict__ lambda,
     const T* __restrict__ mu,

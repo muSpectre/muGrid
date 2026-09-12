@@ -12,6 +12,11 @@ Unreleased
   against ~2250 fp32 FMAs). The single-precision 3D apply is ~15x faster
   (4.97 ms -> 0.34 ms at 64^3 on an RTX PRO 500); double precision is
   unchanged, and results are bit-identical
+- ENH: The 3D isotropic-stiffness kernel caps its register use so two
+  blocks fit per SM. Unbounded, the compiler used the whole register
+  file for one block (255 registers/thread, 16.7% occupancy) and the
+  kernel stalled with nothing to switch to; it now runs at 93% of DRAM
+  throughput instead of 1%
 
 v1.1.0 (04Sep26)
 ----------------
