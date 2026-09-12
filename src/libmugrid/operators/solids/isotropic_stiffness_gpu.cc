@@ -33,6 +33,8 @@
  *
  */
 
+#include <type_traits>
+
 #include "isotropic_stiffness.hh"
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
@@ -54,6 +56,41 @@ __constant__ Real d_V_2D[64];
 // 3D: 24x24 matrices (8 nodes × 3 DOFs each)
 __constant__ Real d_G_3D[576];
 __constant__ Real d_V_3D[576];
+
+// Single-precision mirrors of the same matrices. A float32 solve reads these
+// instead of converting the double entries at every inner-loop term: the
+// conversion issues on the fp64 pipe, which is a fraction of the fp32 rate on
+// most GPUs, and dominated the kernel's run time (measured ~1300 fp64
+// instructions per thread against ~2250 fp32 FMAs). Only the precision the
+// kernel actually uses is uploaded, so this costs no extra transfer.
+__constant__ float d_G_2D_f[64];
+__constant__ float d_V_2D_f[64];
+__constant__ float d_G_3D_f[576];
+__constant__ float d_V_3D_f[576];
+
+// Pick the table matching the kernel's working precision. The discarded branch
+// of `if constexpr` is never instantiated, so each specialisation sees only its
+// own (correctly typed) symbol.
+template <typename T>
+__device__ inline const T * geom_G_2D() {
+    if constexpr (std::is_same_v<T, float>) { return d_G_2D_f; }
+    else { return d_G_2D; }
+}
+template <typename T>
+__device__ inline const T * geom_V_2D() {
+    if constexpr (std::is_same_v<T, float>) { return d_V_2D_f; }
+    else { return d_V_2D; }
+}
+template <typename T>
+__device__ inline const T * geom_G_3D() {
+    if constexpr (std::is_same_v<T, float>) { return d_G_3D_f; }
+    else { return d_G_3D; }
+}
+template <typename T>
+__device__ inline const T * geom_V_3D() {
+    if constexpr (std::is_same_v<T, float>) { return d_V_3D_f; }
+    else { return d_V_3D; }
+}
 
 // Node offsets for element local numbering
 __constant__ int d_NODE_OFFSET_2D[4][2] = {
@@ -189,9 +226,10 @@ __global__ void isotropic_stiffness_2d_kernel(
             }
         }
 
-        // Compute only the rows of K @ u that correspond to this node.
-        // The geometry stays in double __constant__ memory; cast each entry to
-        // T at load so the inner product runs in working precision T.
+        // Compute only the rows of K @ u that correspond to this node. The
+        // geometry is read in working precision T (see geom_G_2D).
+        const T * __restrict__ Gt = geom_G_2D<T>();
+        const T * __restrict__ Vt = geom_V_2D<T>();
         #pragma unroll
         for (int d = 0; d < NB_DOFS; ++d) {
             int row = local_node * NB_DOFS + d;
@@ -199,9 +237,8 @@ __global__ void isotropic_stiffness_2d_kernel(
             #pragma unroll
             for (int j = 0; j < NB_ELEM_DOFS; ++j) {
                 contrib += (static_cast<T>(2) * mu_val *
-                                static_cast<T>(d_G_2D[row * NB_ELEM_DOFS + j]) +
-                            lam *
-                                static_cast<T>(d_V_2D[row * NB_ELEM_DOFS + j])) *
+                                Gt[row * NB_ELEM_DOFS + j] +
+                            lam * Vt[row * NB_ELEM_DOFS + j]) *
                            u[j];
             }
             f[d] += contrib;
@@ -316,8 +353,10 @@ __global__ void isotropic_stiffness_3d_kernel(
             }
         }
 
-        // Compute only the rows of K @ u that correspond to this node; cast the
-        // double __constant__ geometry to T at load (see the 2D kernel).
+        // Compute only the rows of K @ u that correspond to this node; the
+        // geometry is read in working precision T (see the 2D kernel).
+        const T * __restrict__ Gt = geom_G_3D<T>();
+        const T * __restrict__ Vt = geom_V_3D<T>();
         #pragma unroll
         for (int d = 0; d < NB_DOFS; ++d) {
             int row = local_node * NB_DOFS + d;
@@ -325,9 +364,8 @@ __global__ void isotropic_stiffness_3d_kernel(
             #pragma unroll
             for (int j = 0; j < NB_ELEM_DOFS; ++j) {
                 contrib += (static_cast<T>(2) * mu_val *
-                                static_cast<T>(d_G_3D[row * NB_ELEM_DOFS + j]) +
-                            lam *
-                                static_cast<T>(d_V_3D[row * NB_ELEM_DOFS + j])) *
+                                Gt[row * NB_ELEM_DOFS + j] +
+                            lam * Vt[row * NB_ELEM_DOFS + j]) *
                            u[j];
             }
             f[d] += contrib;
@@ -806,10 +844,50 @@ __global__ void isotropic_stiffness_3d_sensitivity_kernel(
 
 namespace isotropic_stiffness_kernels {
 
-// The geometry matrices (G/V/Gu/Vu/Dbar/E_macro) stay in double __constant__
-// memory — uploaded here as `const Real*` regardless of T — and are cast to T
-// inside the kernels. Only the field data and the per-element arithmetic are
-// templated on T.
+// The geometry matrices (Gu/Vu/Dbar/E_macro) stay in double __constant__
+// memory — uploaded as `const Real*` regardless of T — and are cast to T
+// inside the kernels. The stiffness matrices G/V, which the hot kernels read
+// once per inner-loop term, are instead uploaded in the kernel's working
+// precision by the two helpers below. Only the field data and the per-element
+// arithmetic are templated on T.
+
+// Upload G/V in working precision T. Called before every launch because the
+// matrices depend on the operator's grid_spacing, so a one-shot upload would
+// let a second operator with a different spacing silently reuse the first
+// one's matrices. cudaMemcpyToSymbol is synchronous for pageable host memory,
+// so the local conversion buffers are safe to leave scope.
+template <typename T>
+void upload_geometry_2d(const Real * G, const Real * V) {
+    if constexpr (std::is_same_v<T, float>) {
+        float Gf[64], Vf[64];
+        for (int i = 0; i < 64; ++i) {
+            Gf[i] = static_cast<float>(G[i]);
+            Vf[i] = static_cast<float>(V[i]);
+        }
+        GPU_MEMCPY_TO_SYMBOL(d_G_2D_f, Gf, 64 * sizeof(float));
+        GPU_MEMCPY_TO_SYMBOL(d_V_2D_f, Vf, 64 * sizeof(float));
+    } else {
+        GPU_MEMCPY_TO_SYMBOL(d_G_2D, G, 64 * sizeof(Real));
+        GPU_MEMCPY_TO_SYMBOL(d_V_2D, V, 64 * sizeof(Real));
+    }
+}
+
+template <typename T>
+void upload_geometry_3d(const Real * G, const Real * V) {
+    if constexpr (std::is_same_v<T, float>) {
+        float Gf[576], Vf[576];
+        for (int i = 0; i < 576; ++i) {
+            Gf[i] = static_cast<float>(G[i]);
+            Vf[i] = static_cast<float>(V[i]);
+        }
+        GPU_MEMCPY_TO_SYMBOL(d_G_3D_f, Gf, 576 * sizeof(float));
+        GPU_MEMCPY_TO_SYMBOL(d_V_3D_f, Vf, 576 * sizeof(float));
+    } else {
+        GPU_MEMCPY_TO_SYMBOL(d_G_3D, G, 576 * sizeof(Real));
+        GPU_MEMCPY_TO_SYMBOL(d_V_3D, V, 576 * sizeof(Real));
+    }
+}
+
 template <typename T>
 void isotropic_stiffness_2d_gpu(
     const T* displacement, const T* lambda, const T* mu,
@@ -822,13 +900,7 @@ void isotropic_stiffness_2d_gpu(
     const Real* G, const Real* V,
     T alpha, bool increment) {
 
-    // Copy this instance's G and V to constant memory before every launch:
-    // the matrices depend on the operator's grid_spacing, so a one-shot upload
-    // would make a second operator with a different spacing silently use the
-    // first one's matrices. The default-stream ordering makes the copy safe
-    // (the kernel below runs after it).
-    GPU_MEMCPY_TO_SYMBOL(d_G_2D, G, 64 * sizeof(Real));
-    GPU_MEMCPY_TO_SYMBOL(d_V_2D, V, 64 * sizeof(Real));
+    upload_geometry_2d<T>(G, V);
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(16, 16);
@@ -861,8 +933,7 @@ void isotropic_stiffness_2d_gpu_uniform(
     const Real* G, const Real* V,
     T alpha, bool increment) {
 
-    GPU_MEMCPY_TO_SYMBOL(d_G_2D, G, 64 * sizeof(Real));
-    GPU_MEMCPY_TO_SYMBOL(d_V_2D, V, 64 * sizeof(Real));
+    upload_geometry_2d<T>(G, V);
 
     dim3 block(16, 16);
     dim3 grid((nnx + block.x - 1) / block.x, (nny + block.y - 1) / block.y);
@@ -896,11 +967,7 @@ void isotropic_stiffness_3d_gpu(
     const Real* G, const Real* V,
     T alpha, bool increment) {
 
-    // Copy this instance's G and V to constant memory before every launch (see
-    // the 2D variant: the matrices depend on grid_spacing, so a one-shot upload
-    // would let a second operator silently reuse the first one's matrices).
-    GPU_MEMCPY_TO_SYMBOL(d_G_3D, G, 576 * sizeof(Real));
-    GPU_MEMCPY_TO_SYMBOL(d_V_3D, V, 576 * sizeof(Real));
+    upload_geometry_3d<T>(G, V);
 
     // Launch stiffness kernel - one thread per interior NODE
     dim3 block(8, 8, 4);
@@ -935,8 +1002,7 @@ void isotropic_stiffness_3d_gpu_uniform(
     const Real* G, const Real* V,
     T alpha, bool increment) {
 
-    GPU_MEMCPY_TO_SYMBOL(d_G_3D, G, 576 * sizeof(Real));
-    GPU_MEMCPY_TO_SYMBOL(d_V_3D, V, 576 * sizeof(Real));
+    upload_geometry_3d<T>(G, V);
 
     dim3 block(8, 8, 4);
     dim3 grid((nnx + block.x - 1) / block.x,

@@ -4,12 +4,14 @@ Change log for µGrid
 Unreleased
 ----------
 
-- MAINT: `mpi4py` is imported only by MPI-enabled builds. A serial build no
-  longer runs `MPI_Init` at `import muGrid`, which saves startup time and
-  avoids pulling the MPI stack's transport and accelerator plugins into the
-  process — under WSL2, Open MPI's UCX transport loads an OpenCL ICD that
-  leaves the CUDA driver unusable, so `import muGrid` broke GPU support on
-  such systems
+- ENH: The fused isotropic-stiffness kernels keep their G/V geometry matrices
+  in `__constant__` memory in the kernel's own working precision. A float32
+  apply previously converted a `double` entry for every inner-loop term; that
+  conversion issues on the fp64 pipe, which runs at a fraction of the fp32 rate
+  on most GPUs, and dominated the kernel (~1300 fp64 instructions per thread
+  against ~2250 fp32 FMAs). The single-precision 3D apply is ~15x faster
+  (4.97 ms -> 0.34 ms at 64^3 on an RTX PRO 500); double precision is
+  unchanged, and results are bit-identical
 
 v1.1.0 (04Sep26)
 ----------------
