@@ -53,6 +53,12 @@ namespace muGrid {
 __constant__ Real d_G_2D[64];
 __constant__ Real d_V_2D[64];
 
+// Thread-block tile of the 3D stiffness kernel. Compile-time so the kernel can
+// size its shared-memory staging buffer; the two launchers use the same values.
+constexpr int STIFFNESS_TILE_X = 8;
+constexpr int STIFFNESS_TILE_Y = 8;
+constexpr int STIFFNESS_TILE_Z = 4;
+
 // 3D: 24x24 matrices (8 nodes × 3 DOFs each)
 __constant__ Real d_G_3D[576];
 __constant__ Real d_V_3D[576];
@@ -302,12 +308,54 @@ __global__ __launch_bounds__(256, 2) void isotropic_stiffness_3d_kernel(
 
     // Thread indexing for NODES - iterate over all interior nodes
     // Ghost cells handle periodicity and MPI boundaries
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
-    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
+    Index_t ix = blockIdx.x * STIFFNESS_TILE_X + threadIdx.x;
+    Index_t iy = blockIdx.y * STIFFNESS_TILE_Y + threadIdx.y;
+    Index_t iz = blockIdx.z * STIFFNESS_TILE_Z + threadIdx.z;
 
-    // Check bounds
-    if (ix >= nnx || iy >= nny || iz >= nnz) return;
+    // Stage this block's displacements, with their one-node halo, in shared
+    // memory. Each node's value is needed by the 27 threads whose stencils
+    // touch it; read it from global once per block and serve the reuse from
+    // shared memory rather than from L2.
+    //
+    // Threads outside the grid must not return yet: every thread takes part in
+    // the cooperative load and must reach __syncthreads(). The bounds check
+    // moves down to the store.
+    constexpr int SX = STIFFNESS_TILE_X + 2;
+    constexpr int SY = STIFFNESS_TILE_Y + 2;
+    constexpr int SZ = STIFFNESS_TILE_Z + 2;
+    __shared__ T s_u[NB_DOFS][SZ * SY * SX];
+
+    const int bx = blockIdx.x * STIFFNESS_TILE_X;
+    const int by = blockIdx.y * STIFFNESS_TILE_Y;
+    const int bz = blockIdx.z * STIFFNESS_TILE_Z;
+    const int tid = threadIdx.x + STIFFNESS_TILE_X *
+        (threadIdx.y + STIFFNESS_TILE_Y * threadIdx.z);
+    constexpr int NB_THREADS =
+        STIFFNESS_TILE_X * STIFFNESS_TILE_Y * STIFFNESS_TILE_Z;
+    for (int idx = tid; idx < SZ * SY * SX; idx += NB_THREADS) {
+        const int lx = idx % SX;
+        const int ly = (idx / SX) % SY;
+        const int lz = idx / (SX * SY);
+        // A field with one ghost layer is addressable over [-1, nn]. Clamp so
+        // a partially out-of-range block still reads real memory; its
+        // out-of-range threads discard their results anyway.
+        const int gx = min(max(bx - 1 + lx, -1), static_cast<int>(nnx));
+        const int gy = min(max(by - 1 + ly, -1), static_cast<int>(nny));
+        const int gz = min(max(bz - 1 + lz, -1), static_cast<int>(nnz));
+        const Index_t base =
+            gx * disp_stride_x + gy * disp_stride_y + gz * disp_stride_z;
+        #pragma unroll
+        for (int d = 0; d < NB_DOFS; ++d) {
+            s_u[d][idx] = displacement[base + d * disp_stride_d];
+        }
+    }
+    __syncthreads();
+
+    const bool in_grid = (ix < nnx && iy < nny && iz < nnz);
+    // This thread's own node, in tile coordinates.
+    const int lx0 = threadIdx.x + 1;
+    const int ly0 = threadIdx.y + 1;
+    const int lz0 = threadIdx.z + 1;
 
     // Neighboring element offsets and corresponding local node index
     const int ELEM_OFFSETS[8][4] = {
@@ -344,18 +392,22 @@ __global__ __launch_bounds__(256, 2) void isotropic_stiffness_3d_kernel(
             mu_val = mu[mat_idx];
         }
 
-        // Gather displacements from all 8 nodes of this element
+        // Gather displacements from all 8 nodes of this element. Element
+        // offsets are 0 or -1 and node offsets 0 or +1, so every index lands
+        // inside the staged tile: [lx0-1, lx0+1] is within [0, SX-1].
+        const int elx = lx0 + ELEM_OFFSETS[elem][0];
+        const int ely = ly0 + ELEM_OFFSETS[elem][1];
+        const int elz = lz0 + ELEM_OFFSETS[elem][2];
         T u[NB_ELEM_DOFS];
         #pragma unroll
         for (int node = 0; node < NB_NODES; ++node) {
-            int nix = ex + d_NODE_OFFSET_3D[node][0];
-            int niy = ey + d_NODE_OFFSET_3D[node][1];
-            int niz = ez + d_NODE_OFFSET_3D[node][2];
-            Index_t base = nix * disp_stride_x + niy * disp_stride_y +
-                           niz * disp_stride_z;
+            const int sidx =
+                (elx + d_NODE_OFFSET_3D[node][0]) +
+                SX * ((ely + d_NODE_OFFSET_3D[node][1]) +
+                      SY * (elz + d_NODE_OFFSET_3D[node][2]));
             #pragma unroll
             for (int d = 0; d < NB_DOFS; ++d) {
-                u[node * NB_DOFS + d] = displacement[base + d * disp_stride_d];
+                u[node * NB_DOFS + d] = s_u[d][sidx];
             }
         }
 
@@ -379,6 +431,7 @@ __global__ __launch_bounds__(256, 2) void isotropic_stiffness_3d_kernel(
     }
 
     // Write force to output (no atomics needed!)
+    if (!in_grid) { return; }
     Index_t base = ix * force_stride_x + iy * force_stride_y + iz * force_stride_z;
     if (increment) {
         #pragma unroll
@@ -976,7 +1029,7 @@ void isotropic_stiffness_3d_gpu(
     upload_geometry_3d<T>(G, V);
 
     // Launch stiffness kernel - one thread per interior NODE
-    dim3 block(8, 8, 4);
+    dim3 block(STIFFNESS_TILE_X, STIFFNESS_TILE_Y, STIFFNESS_TILE_Z);
     dim3 grid((nnx + block.x - 1) / block.x,
               (nny + block.y - 1) / block.y,
               (nnz + block.z - 1) / block.z);
@@ -1010,7 +1063,7 @@ void isotropic_stiffness_3d_gpu_uniform(
 
     upload_geometry_3d<T>(G, V);
 
-    dim3 block(8, 8, 4);
+    dim3 block(STIFFNESS_TILE_X, STIFFNESS_TILE_Y, STIFFNESS_TILE_Z);
     dim3 grid((nnx + block.x - 1) / block.x,
               (nny + block.y - 1) / block.y,
               (nnz + block.z - 1) / block.z);
