@@ -1,6 +1,16 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- MAINT: `mpi4py` is imported only by MPI-enabled builds. A serial build no
+  longer runs `MPI_Init` at `import muGrid`, which saves startup time and
+  avoids pulling the MPI stack's transport and accelerator plugins into the
+  process — under WSL2, Open MPI's UCX transport loads an OpenCL ICD that
+  leaves the CUDA driver unusable, so `import muGrid` broke GPU support on
+  such systems
+
 v1.1.0 (04Sep26)
 ----------------
 
