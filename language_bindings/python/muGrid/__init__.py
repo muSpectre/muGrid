@@ -34,11 +34,6 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-try:
-    from mpi4py import MPI
-except ModuleNotFoundError:
-    MPI = None
-
 # Import the C++ extension module
 # Try relative import first (for installed wheels where _muGrid.so is in the
 # package). Fall back to absolute import (for development where _muGrid.so is
@@ -49,8 +44,23 @@ except ImportError:
     import _muGrid
 
 has_mpi = _muGrid.Communicator.has_mpi
-if has_mpi and MPI is None:
-    raise RuntimeError("MPI support is enabled for muGrid but mpi4py is not available.")
+
+# mpi4py is imported only by MPI-enabled builds. Importing it runs MPI_Init,
+# which is not free and pulls the MPI stack's transport and accelerator
+# plugins into the process; on some systems those interfere with the GPU
+# driver (e.g. under WSL2, Open MPI's UCX transport loads an OpenCL ICD that
+# leaves the CUDA driver unusable for the rest of the run). A serial build
+# never calls into MPI, so it must not pay that cost. Every use of ``MPI``
+# here and in Parallel.py sits behind a ``has_mpi`` check.
+if has_mpi:
+    try:
+        from mpi4py import MPI
+    except ModuleNotFoundError:
+        raise RuntimeError(
+            "MPI support is enabled for muGrid but mpi4py is not available."
+        )
+else:
+    MPI = None
 
 # Feature flags for compile-time configuration
 has_cuda = _muGrid.has_cuda

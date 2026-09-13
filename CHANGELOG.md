@@ -1,6 +1,30 @@
 Change log for µGrid
 ====================
 
+v1.1.1 (12Sep26)
+----------------
+
+- ENH: The fused stiffness kernels keep their G/V geometry matrices in
+  `__constant__` memory at the kernel's working precision; a float32 apply no
+  longer converts a `double` per inner-loop term on the fp64 pipe (~15x faster
+  in 3D single precision, bit-identical results)
+- ENH: The 3D stiffness kernel bounds its registers so two blocks fit per SM,
+  lifting it from latency-bound at 17% occupancy to 93% of DRAM throughput
+- ENH: `BlockFourierPreconditioner` applies its per-mode block product in one
+  fused GPU kernel instead of a kernel per term (10-22% per CG iteration)
+- ENH: GPU interior reductions (`vecdot`, `norm_sq`, `axpy_norm_sq`) cap their
+  grid at 1024 blocks and use the grid-stride loop the kernels already had, so
+  the shared-memory tree is amortised over many elements
+- ENH: The 3D stiffness kernel stages its displacement tile, halo included,
+  in shared memory instead of re-reading each node from L2 for all 27
+  stencils that touch it (global load traffic down 29x; 8-9% per CG
+  iteration at 96-128^3, growing with grid size)
+- MAINT: `GreenJacobiPreconditioner` scales into its output field and
+  applies the inner Green preconditioner in place, dropping a resident
+  vector-sized work buffer per solve
+- MAINT: `mpi4py` is imported only by MPI-enabled builds; a serial build no
+  longer runs `MPI_Init` at `import muGrid`
+
 v1.1.0 (04Sep26)
 ----------------
 

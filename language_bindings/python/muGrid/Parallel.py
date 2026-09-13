@@ -47,9 +47,14 @@ try:
 except ImportError:
     import _muGrid
 
-try:
-    from mpi4py import MPI
-except ImportError:
+# Imported only by MPI-enabled builds -- see the note in __init__.py. Every
+# use of ``MPI`` below is guarded by a ``has_mpi`` check.
+if _muGrid.Communicator.has_mpi:
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        MPI = None
+else:
     MPI = None
 
 

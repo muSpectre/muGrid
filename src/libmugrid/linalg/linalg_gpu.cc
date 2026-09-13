@@ -73,6 +73,27 @@ namespace gpu_kernels {
 constexpr int BLOCK_SIZE = 256;
 constexpr int REDUCE_BLOCK_SIZE = 256;
 
+// Blocks to launch for a reduction over `n` elements.
+//
+// One block per REDUCE_BLOCK_SIZE elements gives every thread a single
+// element, so each thread pays a full shared-memory tree reduction
+// (log2(blockDim) __syncthreads rounds) to contribute its few loads. The
+// reduction kernels all carry a grid-stride loop, so launching fewer,
+// longer-lived blocks amortises that tree over many elements instead.
+//
+// The cap is a plain constant rather than a device query: it only has to be
+// large enough to fill any GPU (several blocks per SM even on a
+// many-hundred-SM device) and small enough to amortise the tree, and the
+// measured optimum is broad. Below the cap the sizing is unchanged, so small
+// grids -- and MPI ranks with few local pixels -- behave exactly as before.
+constexpr int REDUCE_MAX_BLOCKS = 1024;
+
+inline int reduction_blocks(Index_t n) {
+    const Index_t full = (n + REDUCE_BLOCK_SIZE - 1) / REDUCE_BLOCK_SIZE;
+    return static_cast<int>(full < REDUCE_MAX_BLOCKS ? full
+                                                     : REDUCE_MAX_BLOCKS);
+}
+
 /* ---------------------------------------------------------------------- */
 /* Device scalar abstraction                                              */
 /*                                                                        */
@@ -832,8 +853,7 @@ DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
         return DS{};
     }
     const int num_blocks =
-        (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-        gpu_kernels::REDUCE_BLOCK_SIZE;
+        gpu_kernels::reduction_blocks(box.nb_interior_pixels);
     Acc* d_partial = scratch_as<Acc>(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::interior_dot_kernel<DS>,
@@ -1276,8 +1296,7 @@ std::array<RT, 3> pipelined_cg_dots_device(
     }
 
     const int num_blocks =
-        (box.nb_interior_pixels + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-        gpu_kernels::REDUCE_BLOCK_SIZE;
+        gpu_kernels::reduction_blocks(box.nb_interior_pixels);
     // Slot 0: 3*num_blocks partial sums; slot 1: the 3 packed results. Both
     // accumulate in double (Real) regardless of the field precision.
     Real* d_partial = reduction_scratch(0, 3 * num_blocks);
