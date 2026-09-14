@@ -67,8 +67,8 @@ namespace {
     }
 }  // namespace
 
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 void check_gpu_runtime_version() {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     static const bool checked{[] {
         int runtime{0};
 #if defined(MUGRID_ENABLE_CUDA)
@@ -101,10 +101,12 @@ void check_gpu_runtime_version() {
         return true;
     }()};
     (void)checked;
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 }
 
 void assert_host_can_read_device_pointer(const void * ptr,
                                          const char * context) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // Checked once per process, not per call: the answer depends on the
     // allocator and the device, not on which buffer is passed, and both
     // inputs to the decision it guards (mpi_is_gpu_aware, is_host_accessible)
@@ -137,8 +139,14 @@ void assert_host_can_read_device_pointer(const void * ptr,
         return true;
     }()};
     (void)checked;
+#else
+    // No GPU backend: there are no device pointers to check.
+    (void)ptr;
+    (void)context;
+#endif
 }
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace {
     //! Query (once per device id, then cache) whether the GPU is an
     //! integrated / unified-memory device whose allocations are host-coherent.
