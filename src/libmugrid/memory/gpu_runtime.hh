@@ -99,6 +99,12 @@ inline constexpr gpuError_t gpuSuccess{cudaSuccess};
 // synchronize and the correct barrier before handing a default-stream buffer
 // to something that is not stream-ordered (GPU-aware MPI, host reads).
 #define GPU_STREAM_SYNCHRONIZE_DEFAULT() GPU_CHECK(cudaStreamSynchronize(0))
+// Nothrow counterpart, for destructor/cleanup paths that must drain the
+// stream before releasing memory or a library plan but cannot let a throw
+// escape (see GPU_FREE below).
+#define GPU_STREAM_SYNCHRONIZE_DEFAULT_NOTHROW() \
+    ::muGrid::gpu_check_nothrow(cudaStreamSynchronize(0), \
+                                "cudaStreamSynchronize")
 #define GPU_MALLOC(ptr, size) (void)cudaMalloc(ptr, size)
 // Deallocation runs on destructor/cleanup paths, where a throw would call
 // std::terminate; report without throwing.
@@ -186,6 +192,12 @@ inline constexpr gpuError_t gpuSuccess{hipSuccess};
     ::muGrid::gpu_check((call), #call, __FILE__, __LINE__)
 #define GPU_DEVICE_SYNCHRONIZE() GPU_CHECK(hipDeviceSynchronize())
 #define GPU_STREAM_SYNCHRONIZE_DEFAULT() GPU_CHECK(hipStreamSynchronize(0))
+// Nothrow counterpart, for destructor/cleanup paths that must drain the
+// stream before releasing memory or a library plan but cannot let a throw
+// escape (see GPU_FREE below).
+#define GPU_STREAM_SYNCHRONIZE_DEFAULT_NOTHROW() \
+    ::muGrid::gpu_check_nothrow(hipStreamSynchronize(0), \
+                                "hipStreamSynchronize")
 #define GPU_MALLOC(ptr, size) (void)hipMalloc(ptr, size)
 // Deallocation runs on destructor/cleanup paths, where a throw would call
 // std::terminate; report without throwing.

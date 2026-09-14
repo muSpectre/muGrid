@@ -306,6 +306,27 @@ class GpuFFTBackend : public FFT1DBackend {
   }
 
   /**
+   * Block until every transform launched from this backend has completed.
+   *
+   * Call this wherever backend-owned device memory or a plan reaches the end
+   * of its lifetime. The N-D transforms do not synchronise for a serial engine
+   * (see FFT1DBackend::set_nd_host_sync), so such a transform may still be
+   * reading the scratch buffer -- or running off a cached plan -- when the
+   * host frees it. Freeing is not a barrier: with a registered external
+   * allocator (e.g. a cupy memory pool) device_deallocate recycles the memory
+   * without synchronising the device, so the in-flight transform would read
+   * memory that has already been handed out again.
+   *
+   * Every call site is cold (the scratch is grow-only, teardown happens once
+   * per backend), so this costs nothing in the transform loop. Destructors
+   * take the `_nothrow` flavour, where a throw would call std::terminate.
+   */
+  void sync_in_flight() const { GPU_STREAM_SYNCHRONIZE_DEFAULT(); }
+  void sync_in_flight_nothrow() const noexcept {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT_NOTHROW();
+  }
+
+  /**
    * Grow-only device scratch buffer of at least `bytes`. Used to stage the
    * Fourier input of c2r_nd, since the multidimensional real-inverse transform
    * overwrites its input but the engine requires it preserved. Never shrinks;
@@ -314,6 +335,9 @@ class GpuFFTBackend : public FFT1DBackend {
   void * ensure_scratch(std::size_t bytes) {
     if (bytes > this->scratch_bytes) {
       if (this->scratch != nullptr) {
+        // A previous c2r_nd may still be reading the buffer we are about to
+        // release; see sync_in_flight().
+        this->sync_in_flight();
         device_deallocate(this->scratch);
         this->scratch = nullptr;
         this->scratch_bytes = 0;
@@ -359,7 +383,10 @@ class GpuFFTBackend : public FFT1DBackend {
    * MUST be called from the *derived* destructor: CRTP forbids dispatching to
    * a derived hook once the derived subobject has been destroyed, so the base
    * destructor cannot do this itself (it only frees the backend-agnostic
-   * scratch buffer).
+   * scratch buffer). The derived destructor must drain the stream first
+   * (sync_in_flight_nothrow()): a transform launched from one of these plans
+   * may still be running, and destroying its plan out from under it is no
+   * safer than freeing its input.
    */
   void destroy_all_plans() {
     for (auto & entry : this->plan_cache) {
@@ -373,9 +400,12 @@ class GpuFFTBackend : public FFT1DBackend {
   }
 
   ~GpuFFTBackend() override {
-    // Plans are released by the derived destructor (destroy_all_plans); only
-    // the backend-agnostic scratch remains to free here.
+    // Plans are released by the derived destructor (destroy_all_plans), which
+    // already synchronised; only the backend-agnostic scratch remains to free
+    // here. Synchronise again so the barrier holds however this base is
+    // reached -- the cost is one drain per backend destroyed.
     if (this->scratch != nullptr) {
+      this->sync_in_flight_nothrow();
       device_deallocate(this->scratch);
     }
   }
