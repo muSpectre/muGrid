@@ -1,9 +1,19 @@
 Change log for µGrid
 ====================
 
-v1.1.2 (14Sep26)
+v1.2.0 (14Sep26)
 ----------------
 
+- ENH: Device-to-device copies use a kernel instead of `Memcpy`/`Memcpy2D`,
+  which the HIP runtime services on the host CPU for managed allocations
+  (30x faster there, no slower on plain device memory); the serial ghost
+  exchange and the pencil transpose gain the most (30-38% per CG iteration)
+- ENH: N-D transforms only block the host when a decomposed engine hands
+  their output to GPU-aware MPI; a serial engine keeps the stream ordering
+  it already had (4-13% per CG iteration)
+- BUG: Device builds disable pybind11's LTO extras, which made the device
+  compiler silently drop every binding at link time (`import muGrid` then
+  failed with a missing module export function)
 - BUG: Throw on first GPU use when muGrid is linked against a CUDA/HIP runtime
   older than the headers it was compiled with. The mismatch does not fail at
   link time and reads device properties as garbage, which surfaced as a
