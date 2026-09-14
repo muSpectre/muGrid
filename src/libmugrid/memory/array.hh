@@ -342,7 +342,7 @@ namespace muGrid {
         // Device to device
         else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
                            std::is_same_v<DstSpace, DefaultDeviceSpace>) {
-            GPU_MEMCPY_D2D(dst.data(), src.data(), src.size() * sizeof(T));
+            device_copy_bytes(dst.data(), src.data(), src.size() * sizeof(T));
         }
 #endif
         else {
@@ -422,7 +422,7 @@ namespace muGrid {
         // Device to device
         else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
                            std::is_same_v<DstSpace, DefaultDeviceSpace>) {
-            GPU_MEMCPY_D2D(dst, src, count * sizeof(T));
+            device_copy_bytes(dst, src, count * sizeof(T));
             if (const char * err{gpu_last_error()}; err != nullptr) {
                 throw std::runtime_error(
                     std::string("GPU memcpy D2D failed: ") + err);

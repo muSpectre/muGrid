@@ -56,6 +56,8 @@
 #include "memory/gpu_runtime.hh"
 #include "memory/device_alloc.hh"
 
+#include <algorithm>
+#include <cstdint>
 #include <type_traits>
 
 #if defined(MUGRID_ENABLE_CUDA)
@@ -1475,4 +1477,62 @@ void leray_project<DeviceSpace>(const TypedField<Real32, DeviceSpace>& k,
 }
 
 }  // namespace linalg
+
+namespace {
+
+    //! 16-byte body of device_copy_bytes; grid-stride so the launch shape is
+    //! independent of the copy size.
+    __global__ void copy_bytes_vec_kernel(const uint4 * __restrict__ src,
+                                          uint4 * __restrict__ dst,
+                                          std::size_t n) {
+        std::size_t i{blockIdx.x * std::size_t(blockDim.x) + threadIdx.x};
+        const std::size_t stride{std::size_t(gridDim.x) * blockDim.x};
+        for (; i < n; i += stride) {
+            dst[i] = src[i];
+        }
+    }
+
+    //! Byte-wise fallback, for unaligned pointers and for the ragged tail.
+    __global__ void copy_bytes_kernel(const char * __restrict__ src,
+                                      char * __restrict__ dst,
+                                      std::size_t n) {
+        std::size_t i{blockIdx.x * std::size_t(blockDim.x) + threadIdx.x};
+        const std::size_t stride{std::size_t(gridDim.x) * blockDim.x};
+        for (; i < n; i += stride) {
+            dst[i] = src[i];
+        }
+    }
+
+}  // namespace
+
+void device_copy_bytes(void * dst, const void * src, std::size_t bytes) {
+    if (bytes == 0) {
+        return;
+    }
+    constexpr std::size_t BLOCK{256};
+    constexpr std::size_t MAX_BLOCKS{4096};
+    // Allocations from device_allocate() are hundreds of bytes aligned, so the
+    // vector path is the normal one; a caller copying from an interior offset
+    // falls back to the byte kernel.
+    const bool aligned{
+        reinterpret_cast<std::uintptr_t>(dst) % sizeof(uint4) == 0 &&
+        reinterpret_cast<std::uintptr_t>(src) % sizeof(uint4) == 0};
+    const std::size_t nb_vec{aligned ? bytes / sizeof(uint4) : 0};
+    if (nb_vec > 0) {
+        const std::size_t blocks{
+            std::min(MAX_BLOCKS, (nb_vec + BLOCK - 1) / BLOCK)};
+        GPU_LAUNCH_KERNEL(copy_bytes_vec_kernel, blocks, BLOCK,
+                          static_cast<const uint4 *>(src),
+                          static_cast<uint4 *>(dst), nb_vec);
+    }
+    const std::size_t done{nb_vec * sizeof(uint4)};
+    if (const std::size_t rest{bytes - done}; rest > 0) {
+        const std::size_t blocks{
+            std::min(MAX_BLOCKS, (rest + BLOCK - 1) / BLOCK)};
+        GPU_LAUNCH_KERNEL(copy_bytes_kernel, blocks, BLOCK,
+                          static_cast<const char *>(src) + done,
+                          static_cast<char *>(dst) + done, rest);
+    }
+}
+
 }  // namespace muGrid

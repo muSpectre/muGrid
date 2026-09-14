@@ -339,6 +339,28 @@ namespace muGrid {
         }
         return ptr;
     }
+
+    /**
+     * Device-to-device copy of `bytes` bytes, performed by a kernel rather
+     * than by GPU_MEMCPY_D2D.
+     *
+     * Prefer this over the memcpy macro for device memory. On a unified-memory
+     * APU (MI300A) the runtime services hipMemcpy between *managed*
+     * allocations on the host CPU: measured on gfx942, a 25.6 MB copy runs at
+     * 43 GB/s that way (and hipMemcpyAsync is no faster -- a host memmove
+     * cannot be made asynchronous), against 1285 GB/s for a kernel touching
+     * the same managed memory, and 1834 GB/s for either method on plain
+     * hipMalloc memory. A kernel is therefore never slower and is 30x faster
+     * in the case muGrid actually runs in.
+     *
+     * Unlike the macro this is stream-ordered rather than host-blocking: it
+     * returns once the copy is enqueued on the default stream. Anything that
+     * consumes the destination on that stream is ordered after it; a consumer
+     * outside the stream must synchronise.
+     *
+     * Implemented in linalg/linalg_gpu.cc, which the device compiler builds.
+     */
+    void device_copy_bytes(void * dst, const void * src, std::size_t bytes);
 }  // namespace muGrid
 #endif  // MUGRID_ENABLE_CUDA / MUGRID_ENABLE_HIP
 

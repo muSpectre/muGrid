@@ -365,7 +365,7 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
                          static_cast<std::size_t>(in.dist)};
   auto * scratch = static_cast<cufftDoubleComplex *>(
       this->ensure_scratch(span * sizeof(cufftDoubleComplex)));
-  GPU_MEMCPY_D2D(scratch, reinterpret_cast<const cufftDoubleComplex *>(input),
+  device_copy_bytes(scratch, reinterpret_cast<const cufftDoubleComplex *>(input),
                  span * sizeof(cufftDoubleComplex));
 
   cufftHandle plan =
@@ -442,7 +442,7 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
                          static_cast<std::size_t>(in.dist)};
   auto * scratch = static_cast<cufftComplex *>(
       this->ensure_scratch(span * sizeof(cufftComplex)));
-  GPU_MEMCPY_D2D(scratch, reinterpret_cast<const cufftComplex *>(input),
+  device_copy_bytes(scratch, reinterpret_cast<const cufftComplex *>(input),
                  span * sizeof(cufftComplex));
 
   cufftHandle plan =
