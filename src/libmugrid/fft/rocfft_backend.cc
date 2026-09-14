@@ -413,7 +413,7 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   const std::size_t in_dist{static_cast<std::size_t>(in_strides[0])};
   const std::size_t span{static_cast<std::size_t>(shape[0]) * in_dist};
   void * scratch = this->ensure_scratch(span * sizeof(Complex));
-  GPU_MEMCPY_D2D(scratch, input, span * sizeof(Complex));
+  device_copy_bytes(scratch, input, span * sizeof(Complex));
 
   RocfftCachedPlan & cached =
       get_nd_plan(C2R, rocfft_precision_double, lengths, in_str, in_dist,
@@ -480,7 +480,7 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   const std::size_t in_dist{static_cast<std::size_t>(in_strides[0])};
   const std::size_t span{static_cast<std::size_t>(shape[0]) * in_dist};
   void * scratch = this->ensure_scratch(span * sizeof(Complex32));
-  GPU_MEMCPY_D2D(scratch, input, span * sizeof(Complex32));
+  device_copy_bytes(scratch, input, span * sizeof(Complex32));
 
   RocfftCachedPlan & cached =
       get_nd_plan(C2R, rocfft_precision_single, lengths, in_str, in_dist,

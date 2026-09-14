@@ -33,8 +33,11 @@ namespace muGrid {
          * strided layout into a contiguous buffer (dst_pitch == block_len)
          * and unpacking it again.
          *
-         * For GPU memory, uses hipMemcpy2D/cudaMemcpy2D for efficiency.
-         * For host memory, falls back to individual memcpy calls.
+         * For GPU memory, uses a copy kernel (device_copy_strided_bytes):
+         * the runtime services a strided memcpy between managed allocations
+         * on the host CPU, one short row at a time, and a halo slab
+         * perpendicular to the fastest axis is thousands of single-element
+         * rows. For host memory, falls back to individual memcpy calls.
          *
          * @param dst Destination address
          * @param src Source address
@@ -50,8 +53,8 @@ namespace muGrid {
                                    bool is_device_memory) {
             if (is_device_memory) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-                GPU_MEMCPY_2D_D2D(dst, dst_pitch, src, src_pitch, block_len,
-                                  nb_blocks);
+                device_copy_strided_bytes(dst, dst_pitch, src, src_pitch,
+                                          block_len, nb_blocks);
 #else
                 // GCOVR_EXCL_START -- unreachable: device fields cannot be
                 // created in a build without a GPU backend
@@ -455,6 +458,15 @@ namespace muGrid {
                                   nb_recv_blocks, pitch_bytes, recv_row_bytes,
                                   true);
         }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // One synchronisation for the whole exchange, not one per copy.
+        // Stream order already covers every consumer of the halo, but not the
+        // *lifetime* of the staging buffers: they are owned outside this call
+        // and an external device allocator (the supported cupy path) does not
+        // synchronise on release, so a free or resize between calls could
+        // recycle memory under the scatter kernel still reading it.
+        GPU_STREAM_SYNCHRONIZE_DEFAULT();
+#endif
     }
 
     CartesianCommunicator &

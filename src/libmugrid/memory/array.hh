@@ -342,7 +342,12 @@ namespace muGrid {
         // Device to device
         else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
                            std::is_same_v<DstSpace, DefaultDeviceSpace>) {
-            GPU_MEMCPY_D2D(dst.data(), src.data(), src.size() * sizeof(T));
+            device_copy_bytes(dst.data(), src.data(), src.size() * sizeof(T));
+            // deep_copy is host-blocking on every other path, and callers may
+            // free or reuse either array as soon as it returns; keep that
+            // contract rather than exporting a stream-ordered copy under the
+            // same name.
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
         }
 #endif
         else {
@@ -422,7 +427,9 @@ namespace muGrid {
         // Device to device
         else if constexpr (std::is_same_v<SrcSpace, DefaultDeviceSpace> &&
                            std::is_same_v<DstSpace, DefaultDeviceSpace>) {
-            GPU_MEMCPY_D2D(dst, src, count * sizeof(T));
+            device_copy_bytes(dst, src, count * sizeof(T));
+            // Blocking, as on every other path of this overload; see above.
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
             if (const char * err{gpu_last_error()}; err != nullptr) {
                 throw std::runtime_error(
                     std::string("GPU memcpy D2D failed: ") + err);
