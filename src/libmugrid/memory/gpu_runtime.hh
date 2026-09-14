@@ -361,6 +361,20 @@ namespace muGrid {
      * Implemented in linalg/linalg_gpu.cc, which the device compiler builds.
      */
     void device_copy_bytes(void * dst, const void * src, std::size_t bytes);
+
+    /**
+     * Strided device-to-device copy of `height` rows of `width` bytes, the
+     * rows `dst_pitch`/`src_pitch` bytes apart, performed by a kernel rather
+     * than by GPU_MEMCPY_2D_D2D.
+     *
+     * Same reason as device_copy_bytes(), and the case is sharper: a halo
+     * slab perpendicular to the fastest axis is thousands of rows of a single
+     * element each, which the host path walks one short memcpy at a time.
+     * Stream-ordered, as device_copy_bytes().
+     */
+    void device_copy_strided_bytes(void * dst, std::size_t dst_pitch,
+                                   const void * src, std::size_t src_pitch,
+                                   std::size_t width, std::size_t height);
 }  // namespace muGrid
 #endif  // MUGRID_ENABLE_CUDA / MUGRID_ENABLE_HIP
 

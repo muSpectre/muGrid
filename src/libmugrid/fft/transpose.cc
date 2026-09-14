@@ -428,8 +428,8 @@ namespace muGrid {
                                  std::size_t dst_pitch_bytes,
                                  std::size_t src_pitch_bytes) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-            GPU_MEMCPY_2D_D2D(dst, dst_pitch_bytes, src, src_pitch_bytes,
-                              width_bytes, nb_rows);
+            device_copy_strided_bytes(dst, dst_pitch_bytes, src,
+                                      src_pitch_bytes, width_bytes, nb_rows);
 #else
             // GCOVR_EXCL_START -- unreachable: device transposes require
             // device fields, which cannot exist in a non-GPU build

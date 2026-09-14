@@ -1503,6 +1503,23 @@ namespace {
         }
     }
 
+    //! Body of device_copy_strided_bytes. Flattened over (row, column) so
+    //! the launch shape does not depend on how wide the rows happen to be --
+    //! halo slabs range from one element per row to a whole plane.
+    __global__ void copy_strided_kernel(const char * __restrict__ src,
+                                        std::size_t src_pitch,
+                                        char * __restrict__ dst,
+                                        std::size_t dst_pitch,
+                                        std::size_t width, std::size_t total) {
+        std::size_t i{blockIdx.x * std::size_t(blockDim.x) + threadIdx.x};
+        const std::size_t stride{std::size_t(gridDim.x) * blockDim.x};
+        for (; i < total; i += stride) {
+            const std::size_t row{i / width};
+            const std::size_t col{i % width};
+            dst[row * dst_pitch + col] = src[row * src_pitch + col];
+        }
+    }
+
 }  // namespace
 
 void device_copy_bytes(void * dst, const void * src, std::size_t bytes) {
@@ -1533,6 +1550,21 @@ void device_copy_bytes(void * dst, const void * src, std::size_t bytes) {
                           static_cast<const char *>(src) + done,
                           static_cast<char *>(dst) + done, rest);
     }
+}
+
+void device_copy_strided_bytes(void * dst, std::size_t dst_pitch,
+                               const void * src, std::size_t src_pitch,
+                               std::size_t width, std::size_t height) {
+    if (width == 0 || height == 0) {
+        return;
+    }
+    constexpr std::size_t BLOCK{256};
+    constexpr std::size_t MAX_BLOCKS{4096};
+    const std::size_t total{width * height};
+    const std::size_t blocks{std::min(MAX_BLOCKS, (total + BLOCK - 1) / BLOCK)};
+    GPU_LAUNCH_KERNEL(copy_strided_kernel, blocks, BLOCK,
+                      static_cast<const char *>(src), src_pitch,
+                      static_cast<char *>(dst), dst_pitch, width, total);
 }
 
 }  // namespace muGrid
