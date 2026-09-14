@@ -334,7 +334,9 @@ void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
       plan, const_cast<cufftDoubleReal *>(input),
       reinterpret_cast<cufftDoubleComplex *>(output));
   check_cufft_result(result, "D2Z (N-D) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
@@ -374,7 +376,9 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   cufftResult result = cufftExecZ2D(
       plan, scratch, reinterpret_cast<cufftDoubleReal *>(output));
   check_cufft_result(result, "Z2D (N-D) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 // ---- Single-precision (Real32/Complex32) N-D transforms ----
@@ -413,7 +417,9 @@ void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
       cufftExecR2C(plan, const_cast<cufftReal *>(input),
                    reinterpret_cast<cufftComplex *>(output));
   check_cufft_result(result, "R2C (N-D) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
@@ -451,7 +457,9 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   cufftResult result =
       cufftExecC2R(plan, scratch, reinterpret_cast<cufftReal *>(output));
   check_cufft_result(result, "C2R (N-D) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 }  // namespace muGrid

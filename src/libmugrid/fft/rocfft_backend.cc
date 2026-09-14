@@ -387,7 +387,9 @@ void rocFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "R2C (N-D) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
@@ -425,7 +427,9 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "C2R (N-D) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 // ---- Single-precision (Real32/Complex32) N-D transforms ----
@@ -458,7 +462,9 @@ void rocFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "R2C (N-D, fp32) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
@@ -492,7 +498,9 @@ void rocFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
   rocfft_status status =
       rocfft_execute(cached.plan, in_buffer, out_buffer, cached.info);
   check_rocfft_result(status, "C2R (N-D, fp32) execution");
-  GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  if (this->nd_host_sync_needed()) {
+    GPU_STREAM_SYNCHRONIZE_DEFAULT();
+  }
 }
 
 }  // namespace muGrid

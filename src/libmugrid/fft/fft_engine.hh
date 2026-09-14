@@ -93,7 +93,11 @@ class FFTEngine : public FFTEngineBase {
             const std::string & decomposition = "auto")
       : Parent_t{nb_domain_grid_pts, comm, nb_ghosts_left, nb_ghosts_right,
                  nb_sub_pts, device, decomposition},
-        backend{create_fft_backend<MemorySpace>()} {}
+        backend{create_fft_backend<MemorySpace>()} {
+    // Only a decomposed engine hands transform output to MPI, which is not
+    // ordered against the FFT stream; see FFT1DBackend::set_nd_host_sync.
+    this->backend->set_nd_host_sync(comm.size() > 1);
+  }
 
   FFTEngine() = delete;
   FFTEngine(const FFTEngine &) = delete;
