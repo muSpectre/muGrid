@@ -254,6 +254,14 @@ constexpr Device memory_space_to_device<ROCmSpace>() {
      * definition for why the mismatch is otherwise silent and lethal.
      */
     void check_gpu_runtime_version();
+
+    /**
+     * Throw if `ptr` has no host mapping. Guards the one place that hands a
+     * device pointer to a non-GPU-aware MPI on the strength of the device
+     * reporting itself host-coherent. Checked once per process.
+     */
+    void assert_host_can_read_device_pointer(const void * ptr,
+                                             const char * context);
 #endif
 
 }  // namespace muGrid

@@ -434,6 +434,16 @@ namespace muGrid {
             recv_buffer = host_recv.data();
 #endif
         }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        if (!bounce && !mpi_is_gpu_aware() && send_bytes > 0) {
+            // Not bouncing only because the device claims to be host-coherent.
+            // Verify that before MPI reads the pointer, so a wrong claim fails
+            // here with a reason instead of as a segfault inside MPI's memcpy.
+            assert_host_can_read_device_pointer(send_buffer,
+                                                "CartesianCommunicator::"
+                                                "sendrecv_staged");
+        }
+#endif
         MPI_Status status;
         // Compute the flat message sizes in Index_t and narrow with a range
         // check: an int * int product would overflow for halo faces of more

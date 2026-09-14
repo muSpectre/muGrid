@@ -8,6 +8,9 @@ Unreleased
   older than the headers it was compiled with. The mismatch does not fail at
   link time and reads device properties as garbage, which surfaced as a
   segfault inside MPI
+- BUG: `sendrecv_staged` verifies that a device pointer really has a host
+  mapping before handing it to an MPI that does not report GPU support,
+  instead of faulting inside MPI's memcpy
 
 v1.1.1 (12Sep26)
 ----------------
