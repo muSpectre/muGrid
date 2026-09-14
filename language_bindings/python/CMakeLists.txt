@@ -15,7 +15,17 @@ set(MUGRID_PYTHON_SOURCES
 )
 
 # Create Python module
-pybind11_add_module(_muGrid MODULE ${MUGRID_PYTHON_SOURCES})
+# pybind11's "extras" turn on link-time optimization, which with GCC means
+# `-flto -fno-fat-lto-objects`, i.e. object files that carry no real symbols.
+# With a device backend enabled, libmuGrid contains HIP/CUDA sources, so CMake
+# drives the final link with the device compiler (clang++), which cannot read
+# GCC's LTO bytecode. The link then succeeds but silently drops every binding,
+# producing a module without PyInit__muGrid. Skip the extras in that case.
+if(MUGRID_ENABLE_HIP OR MUGRID_ENABLE_CUDA)
+    pybind11_add_module(_muGrid MODULE NO_EXTRAS ${MUGRID_PYTHON_SOURCES})
+else()
+    pybind11_add_module(_muGrid MODULE ${MUGRID_PYTHON_SOURCES})
+endif()
 
 # Link against muGrid library
 target_link_libraries(_muGrid PRIVATE muGrid)
