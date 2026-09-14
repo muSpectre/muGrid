@@ -1,6 +1,14 @@
 Change log for µGrid
 ====================
 
+Unreleased
+----------
+
+- BUG: Throw on first GPU use when muGrid is linked against a CUDA/HIP runtime
+  older than the headers it was compiled with. The mismatch does not fail at
+  link time and reads device properties as garbage, which surfaced as a
+  segfault inside MPI
+
 v1.1.1 (12Sep26)
 ----------------
 

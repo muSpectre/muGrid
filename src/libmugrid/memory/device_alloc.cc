@@ -32,6 +32,7 @@
  * Program grant you additional permission to convey the resulting work.
  */
 
+#include "device.hh"
 #include "memory/device_alloc.hh"
 
 #include <mutex>
@@ -88,6 +89,9 @@ namespace muGrid {
     }
 
     void * device_allocate(std::size_t bytes, const char * label) {
+        // First GPU use: fail loudly on a header/runtime version mismatch
+        // rather than far away on garbage device properties.
+        check_gpu_runtime_version();
         if (bytes == 0) {
             return nullptr;
         }

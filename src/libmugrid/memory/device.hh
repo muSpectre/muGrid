@@ -246,6 +246,16 @@ constexpr Device memory_space_to_device<ROCmSpace>() {
 }
 #endif
 
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    /**
+     * Throw if muGrid is linked against a GPU runtime older than the headers
+     * it was compiled with. Checked once, on first device use; see the
+     * definition for why the mismatch is otherwise silent and lethal.
+     */
+    void check_gpu_runtime_version();
+#endif
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_MEMORY_DEVICE_HH_
