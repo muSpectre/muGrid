@@ -246,6 +246,25 @@ constexpr Device memory_space_to_device<ROCmSpace>() {
 }
 #endif
 
+
+    /**
+     * Throw if muGrid is linked against a GPU runtime older than the headers
+     * it was compiled with. Checked once, on first device use; see the
+     * definition for why the mismatch is otherwise silent and lethal.
+     *
+     * Declared unconditionally and a no-op in a build without a GPU backend,
+     * so callers need no #ifdef of their own.
+     */
+    void check_gpu_runtime_version();
+
+    /**
+     * Throw if `ptr` has no host mapping. Guards the one place that hands a
+     * device pointer to a non-GPU-aware MPI on the strength of the device
+     * reporting itself host-coherent. Checked once per process.
+     */
+    void assert_host_can_read_device_pointer(const void * ptr,
+                                             const char * context);
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_MEMORY_DEVICE_HH_

@@ -34,10 +34,12 @@
  */
 
 #include "device.hh"
+#include "core/exception.hh"
 
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <map>
 #include <stdexcept>
 
@@ -65,11 +67,91 @@ namespace {
     }
 }  // namespace
 
+void check_gpu_runtime_version() {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    static const bool checked{[] {
+        int runtime{0};
+#if defined(MUGRID_ENABLE_CUDA)
+        const char * name{"CUDA"};
+        const int compiled{CUDART_VERSION};
+        const bool ok{cudaRuntimeGetVersion(&runtime) == cudaSuccess};
+#else
+        const char * name{"HIP"};
+        const int compiled{HIP_VERSION_MAJOR * 10000000 +
+                           HIP_VERSION_MINOR * 100000};
+        const bool ok{hipRuntimeGetVersion(&runtime) == hipSuccess};
+#endif
+        if (ok && runtime < compiled) {
+            std::stringstream msg{};
+            msg << "muGrid was compiled against " << name << " headers "
+                << compiled / 1000 << "." << (compiled % 1000) / 10
+                << " but is linked against the older runtime "
+                << runtime / 1000 << "." << (runtime % 1000) / 10
+                << ". Struct layouts differ between major versions, so this "
+                   "does not fail at link time: the runtime fills the layout "
+                   "it knows and muGrid reads the one its headers describe, "
+                   "leaving every field past the first divergence garbage "
+                   "(cudaDeviceProp::integrated came back as 14 on a discrete "
+                   "GPU, which sent a device pointer to an MPI that could not "
+                   "read it). Point the build at one installation -- e.g. "
+                   "-DCUDAToolkit_ROOT matching -DCMAKE_CUDA_COMPILER -- and "
+                   "rebuild.";
+            throw RuntimeError(msg.str());
+        }
+        return true;
+    }()};
+    (void)checked;
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
+}
+
+void assert_host_can_read_device_pointer(const void * ptr,
+                                         const char * context) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    // Checked once per process, not per call: the answer depends on the
+    // allocator and the device, not on which buffer is passed, and both
+    // inputs to the decision it guards (mpi_is_gpu_aware, is_host_accessible)
+    // are themselves cached.
+    static const bool checked{[ptr, context] {
+        bool host_readable{false};
+#if defined(MUGRID_ENABLE_CUDA)
+        cudaPointerAttributes attr{};
+        if (cudaPointerGetAttributes(&attr, ptr) == cudaSuccess) {
+            host_readable = (attr.hostPointer != nullptr);
+        }
+#else   // MUGRID_ENABLE_HIP
+        hipPointerAttribute_t attr{};
+        if (hipPointerGetAttributes(&attr, ptr) == hipSuccess) {
+            host_readable = (attr.hostPointer != nullptr);
+        }
+#endif
+        if (!host_readable) {
+            std::stringstream msg{};
+            msg << context << ": about to hand a device pointer to an MPI "
+                   "that does not report GPU support, because the device "
+                   "reports itself host-coherent -- but the runtime says the "
+                   "pointer has no host mapping, so MPI would fault reading "
+                   "it. Either the device property is wrong (see "
+                   "check_gpu_runtime_version) or MUGRID_UNIFIED_MEMORY "
+                   "forces the wrong answer; set MUGRID_UNIFIED_MEMORY=0 to "
+                   "take the host-staging path.";
+            throw RuntimeError(msg.str());
+        }
+        return true;
+    }()};
+    (void)checked;
+#else
+    // No GPU backend: there are no device pointers to check.
+    (void)ptr;
+    (void)context;
+#endif
+}
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace {
     //! Query (once per device id, then cache) whether the GPU is an
     //! integrated / unified-memory device whose allocations are host-coherent.
     bool gpu_is_integrated(int device_id) {
+        check_gpu_runtime_version();
         static std::map<int, bool> cache{};
         auto it{cache.find(device_id)};
         if (it != cache.end()) {
