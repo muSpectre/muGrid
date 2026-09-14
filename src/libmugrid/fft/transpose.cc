@@ -734,6 +734,17 @@ namespace muGrid {
                 }
             }
         }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // One synchronisation after the whole unpack, not one per row or
+        // component. The output is consumed on the default stream and so is
+        // already ordered; what is not ordered is the staging buffers' own
+        // lifetime -- ~Transpose frees them, and an external device allocator
+        // does not synchronise on release, so the free could recycle memory
+        // under an unpack kernel still reading it.
+        if (dev) {
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
+        }
+#endif
     }
 #endif  // WITH_MPI
 

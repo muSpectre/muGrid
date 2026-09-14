@@ -344,19 +344,26 @@ namespace muGrid {
      * Device-to-device copy of `bytes` bytes, performed by a kernel rather
      * than by GPU_MEMCPY_D2D.
      *
-     * Prefer this over the memcpy macro for device memory. On a unified-memory
-     * APU (MI300A) the runtime services hipMemcpy between *managed*
-     * allocations on the host CPU: measured on gfx942, a 25.6 MB copy runs at
-     * 43 GB/s that way (and hipMemcpyAsync is no faster -- a host memmove
-     * cannot be made asynchronous), against 1285 GB/s for a kernel touching
-     * the same managed memory, and 1834 GB/s for either method on plain
-     * hipMalloc memory. A kernel is therefore never slower and is 30x faster
-     * in the case muGrid actually runs in.
+     * Prefer this over the memcpy macro for the device copies muGrid makes.
+     * On a unified-memory APU (MI300A) the runtime services hipMemcpy between
+     * *managed* allocations on the host CPU: measured on gfx942, a 25.6 MB
+     * copy runs at 43 GB/s that way (and hipMemcpyAsync is no faster -- a
+     * host memmove cannot be made asynchronous), against 1285 GB/s for a
+     * kernel touching the same managed memory, and 1834 GB/s for either
+     * method on plain hipMalloc memory. That is the configuration muGrid runs
+     * in on such a device, and there the kernel is ~30x faster.
+     *
+     * The claim is scoped to that case. On a discrete GPU copying
+     * non-managed memory the runtime path is already a DMA copy and the two
+     * are comparable; for a copy small enough that the launch dominates, the
+     * kernel is slower. muGrid's device copies are field- and halo-sized, so
+     * the kernel is the right default here, not universally.
      *
      * Unlike the macro this is stream-ordered rather than host-blocking: it
      * returns once the copy is enqueued on the default stream. Anything that
      * consumes the destination on that stream is ordered after it; a consumer
-     * outside the stream must synchronise.
+     * outside the stream, and any caller that may free or recycle either
+     * buffer, must synchronise first.
      *
      * Implemented in linalg/linalg_gpu.cc, which the device compiler builds.
      */

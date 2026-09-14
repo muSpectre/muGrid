@@ -458,6 +458,15 @@ namespace muGrid {
                                   nb_recv_blocks, pitch_bytes, recv_row_bytes,
                                   true);
         }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // One synchronisation for the whole exchange, not one per copy.
+        // Stream order already covers every consumer of the halo, but not the
+        // *lifetime* of the staging buffers: they are owned outside this call
+        // and an external device allocator (the supported cupy path) does not
+        // synchronise on release, so a free or resize between calls could
+        // recycle memory under the scatter kernel still reading it.
+        GPU_STREAM_SYNCHRONIZE_DEFAULT();
+#endif
     }
 
     CartesianCommunicator &
