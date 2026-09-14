@@ -78,7 +78,14 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
 
  public:
   rocFFTBackend();
-  ~rocFFTBackend() override { this->destroy_all_plans(); }
+  ~rocFFTBackend() override {
+    // An N-D transform launched from one of these plans may still be in
+    // flight (a serial engine does not synchronise; see
+    // FFT1DBackend::set_nd_host_sync), so drain before the plans and, in the
+    // base destructor, the scratch buffer go away.
+    this->sync_in_flight_nothrow();
+    this->destroy_all_plans();
+  }
 
   void r2c_nd(const std::vector<Index_t> & shape,
               const std::vector<Index_t> & axes, const Real * input,

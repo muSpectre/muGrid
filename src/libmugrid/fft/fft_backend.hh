@@ -241,6 +241,22 @@ class FFT1DBackend {
 
   /** Returns the name of this backend */
   virtual const char * name() const = 0;
+
+  /**
+   * Whether an N-D transform must block the host until its result is complete.
+   *
+   * Only a decomposed (multi-rank) engine needs this: it hands the transform's
+   * output buffer straight to GPU-aware MPI, which is not ordered against the
+   * FFT stream. A serial engine keeps the transform and everything that
+   * consumes it on one stream, where that ordering already holds, so blocking
+   * there merely drains the pipeline once per transform. The engine sets this
+   * from its communicator; the default is the safe answer.
+   */
+  void set_nd_host_sync(bool needed) { this->nd_host_sync = needed; }
+  bool nd_host_sync_needed() const { return this->nd_host_sync; }
+
+ protected:
+  bool nd_host_sync{true};
 };
 
 }  // namespace muGrid

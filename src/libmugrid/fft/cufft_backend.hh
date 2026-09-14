@@ -64,7 +64,14 @@ class cuFFTBackend : public GpuFFTBackend<cuFFTBackend, cufftHandle> {
 
  public:
   cuFFTBackend() = default;
-  ~cuFFTBackend() override { this->destroy_all_plans(); }
+  ~cuFFTBackend() override {
+    // An N-D transform launched from one of these plans may still be in
+    // flight (a serial engine does not synchronise; see
+    // FFT1DBackend::set_nd_host_sync), so drain before the plans and, in the
+    // base destructor, the scratch buffer go away.
+    this->sync_in_flight_nothrow();
+    this->destroy_all_plans();
+  }
 
   //! cuFFT does not support a non-unit element stride on the real side of
   //! r2c/c2r (a documented limitation); the base throws when this is violated.
