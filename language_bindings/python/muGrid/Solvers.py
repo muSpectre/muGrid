@@ -2,9 +2,8 @@
 Collection of simple parallel solvers
 """
 
-import warnings
-
 import numpy as np
+import warnings
 
 from . import linalg
 
@@ -19,19 +18,19 @@ class ConvergenceError(RuntimeError):
 
 
 def conjugate_gradients(
-    comm,
-    fc,
-    b,
-    x,
-    hessp: callable,
-    prec: callable = None,
-    tol: float = None,
-    maxiter: int = 1000,
-    callback: callable = None,
-    timer=None,
-    rtol: float = None,
-    atol: float = 0.0,
-    residual=None,
+        comm,
+        fc,
+        b,
+        x,
+        hessp: callable,
+        prec: callable = None,
+        tol: float = None,
+        maxiter: int = 1000,
+        callback: callable = None,
+        timer=None,
+        rtol: float = None,
+        atol: float = 0.0,
+        residual=None,
 ):
     """
     Conjugate gradient method for matrix-free solution of the linear problem
@@ -143,15 +142,15 @@ def conjugate_gradients(
         # p: search direction field
         # z: preconditioned search direction field (aliased to r if no prec)
         # Ap: Hessian product field
-        r = fc.real_field("cg-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        p = fc.real_field("cg-search-direction", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        r = fc.real_field("cg-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        p = fc.real_field("cg-search-direction", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
         if unpreconditioned:
             z = r
         else:
             z = fc.real_field(
-                "cg-preconditioned-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype
+                "cg-preconditioned-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype
             )
-        Ap = fc.real_field("cg-hessian-product", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        Ap = fc.real_field("cg-hessian-product", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
 
         # Initial residual: r = b - A*x
         hessp(x, Ap)
@@ -257,18 +256,18 @@ def conjugate_gradients(
 
 
 def conjugate_gradients_pipelined(
-    comm,
-    fc,
-    b,
-    x,
-    hessp: callable,
-    prec: callable = None,
-    tol: float = None,
-    maxiter: int = 1000,
-    callback: callable = None,
-    timer=None,
-    rtol: float = None,
-    atol: float = 0.0,
+        comm,
+        fc,
+        b,
+        x,
+        hessp: callable,
+        prec: callable = None,
+        tol: float = None,
+        maxiter: int = 1000,
+        callback: callable = None,
+        timer=None,
+        rtol: float = None,
+        atol: float = 0.0,
 ):
     """
     Pipelined preconditioned conjugate gradients (Ghysels & Vanroose, 2014).
@@ -334,15 +333,15 @@ def conjugate_gradients_pipelined(
 
     with timed("startup"):
         # Work fields (zero-initialised by the collection)
-        r = fc.real_field("pcg-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        u = fc.real_field("pcg-prec-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        w = fc.real_field("pcg-w", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        m = fc.real_field("pcg-m", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        n = fc.real_field("pcg-n", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        p = fc.real_field("pcg-p", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        s = fc.real_field("pcg-s", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        q = fc.real_field("pcg-q", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
-        z = fc.real_field("pcg-z", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        r = fc.real_field("pcg-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        u = fc.real_field("pcg-prec-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        w = fc.real_field("pcg-w", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        m = fc.real_field("pcg-m", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        n = fc.real_field("pcg-n", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        p = fc.real_field("pcg-p", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        s = fc.real_field("pcg-s", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        q = fc.real_field("pcg-q", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        z = fc.real_field("pcg-z", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
 
         # r = b - A x
         hessp(x, r)
