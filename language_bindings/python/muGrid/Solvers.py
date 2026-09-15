@@ -143,15 +143,15 @@ def conjugate_gradients(
         # p: search direction field
         # z: preconditioned search direction field (aliased to r if no prec)
         # Ap: Hessian product field
-        r = fc.real_field("cg-residual", b.components_shape, dtype=dtype)
-        p = fc.real_field("cg-search-direction", b.components_shape, dtype=dtype)
+        r = fc.real_field("cg-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        p = fc.real_field("cg-search-direction", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
         if unpreconditioned:
             z = r
         else:
             z = fc.real_field(
-                "cg-preconditioned-residual", b.components_shape, dtype=dtype
+                "cg-preconditioned-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype
             )
-        Ap = fc.real_field("cg-hessian-product", b.components_shape, dtype=dtype)
+        Ap = fc.real_field("cg-hessian-product", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
 
         # Initial residual: r = b - A*x
         hessp(x, Ap)
@@ -334,15 +334,15 @@ def conjugate_gradients_pipelined(
 
     with timed("startup"):
         # Work fields (zero-initialised by the collection)
-        r = fc.real_field("pcg-residual", b.components_shape, dtype=dtype)
-        u = fc.real_field("pcg-prec-residual", b.components_shape, dtype=dtype)
-        w = fc.real_field("pcg-w", b.components_shape, dtype=dtype)
-        m = fc.real_field("pcg-m", b.components_shape, dtype=dtype)
-        n = fc.real_field("pcg-n", b.components_shape, dtype=dtype)
-        p = fc.real_field("pcg-p", b.components_shape, dtype=dtype)
-        s = fc.real_field("pcg-s", b.components_shape, dtype=dtype)
-        q = fc.real_field("pcg-q", b.components_shape, dtype=dtype)
-        z = fc.real_field("pcg-z", b.components_shape, dtype=dtype)
+        r = fc.real_field("pcg-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        u = fc.real_field("pcg-prec-residual", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        w = fc.real_field("pcg-w", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        m = fc.real_field("pcg-m", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        n = fc.real_field("pcg-n", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        p = fc.real_field("pcg-p", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        s = fc.real_field("pcg-s", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        q = fc.real_field("pcg-q", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
+        z = fc.real_field("pcg-z", b.components_shape,sub_pt=b.sub_division,  dtype=dtype)
 
         # r = b - A x
         hessp(x, r)
