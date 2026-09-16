@@ -10,7 +10,8 @@ Linear operators in µGrid fall into three categories:
 
 1. **Generic operators**: flexible, user-defined stencils for arbitrary convolutions
 2. **Gradient/divergence operators**: FEM-based operators for computing derivatives
-3. **Fused operators**: highly optimized operators for specific PDEs (Laplace, elasticity)
+3. **Fused operators**: highly optimized kernels for specific problems (Laplace,
+   elasticity, nodal moments)
 
 Prefer fused operators when available, as they provide the best performance.
 Generic operators are useful for prototyping or implementing custom stencils.
@@ -21,6 +22,7 @@ Generic operators are useful for prototyping or implementing custom stencils.
 | `FEMGradientOperator` | Gradient/divergence with FEM | 2-3× faster than generic |
 | `LaplaceOperator` | Scalar Poisson problems | 2-4× faster than generic |
 | `IsotropicStiffnessOperator` | Linear elasticity (isotropic) | 5-10× faster than unfused |
+| `NodalMomentOperator` | Polynomial functionals of a nodal field | O(1) scratch instead of one grid copy per quadrature point |
 
 ## Generic Linear Operators
 
@@ -369,6 +371,92 @@ def apply_stiffness(u, f):
 # conjugate_gradients(comm, decomposition, rhs, u_field, hessp=apply_stiffness, ...)
 ```
 
+## Nodal Moment Operator
+
+`NodalMomentOperator{2,3}D` computes, for every cell, the moments of a nodal
+scalar field's finite-element interpolant
+
+$$ M_k(e) = \int_e \rho(x)^k \, dx , \qquad k = 2, 3, 4 $$
+
+together with the derivative of their sum with respect to each nodal value.
+
+### Why moments rather than an energy
+
+A polynomial function of the interpolant is a fixed combination of these. The
+phase-field double well of a topology optimisation,
+$W(\rho) = \rho^2 (1-\rho)^2 = \rho^2 - 2\rho^3 + \rho^4$, has cell integral
+`M2 - 2*M3 + M4` and nodal gradient the same combination of the moment
+gradients. Keeping moments as the interface leaves the choice of energy to the
+caller, so no material model is compiled into µGrid — the same split
+`IsotropicStiffnessOperator.compute_sensitivity` uses.
+
+### Why it is fused
+
+Evaluated array-at-a-time, this computation materialises the interpolant at
+every quadrature point of every cell at once: with the 3-point-per-axis rule
+in 3D that is a 27-fold copy of the grid, plus a temporary per term of the
+polynomial. The kernel consumes each quadrature point in registers instead, so
+the pass is **O(1)** in scratch memory. One thread owns one node and the cell
+of the same index, the block's tile plus its one-node halo is staged in shared
+memory, and each thread writes only its own entries — so there are no atomics
+and no scatter or ghost-reduction pass.
+
+### Quadrature
+
+| Element | Rule | Points per cell |
+|---------|------|-----------------|
+| Q1 (bilinear quad / trilinear hex) | 3-point-per-axis tensor Gauss | 9 (2D), 27 (3D) |
+| P1 (triangles / tetrahedra) | the same rule placed on each sub-simplex | 18 (2D), 135 (3D) |
+
+Both are exact for the quartic integrand. The simplex rules use **Gauss-Jacobi**
+rather than Gauss-Legendre points: the collapsed (Duffy) map from the cube
+carries a Jacobian — $(1-u)$ in 2D, $(1-u)^2(1-v)$ in 3D — and folding it into
+the weight function keeps 3 points per axis sufficient. Leaving it in the
+integrand instead inflates the degree by up to 2, and a 3-point
+Gauss-Legendre rule is then exact for `M2` and `M3` but wrong for `M4`. Every
+weight is positive, so a cell's double-well energy can never come out negative.
+
+### Creating the operator
+
+```python
+import muGrid
+
+# Q1 is the default; pass muGrid.FEMElement.p1 for simplices
+moment_op = muGrid.NodalMomentOperator3D(grid_spacing=[h, h, h])
+moment_op = muGrid.NodalMomentOperator3D([h, h, h], muGrid.FEMElement.p1)
+
+moment_op.nb_quad      # quadrature points per cell (27 for Q1 in 3D)
+moment_op.cell_volume  # h_x h_y h_z
+```
+
+### Applying the operator
+
+`rho` is a scalar field whose ghosts have been communicated; `moments` (a cell
+quantity) and `moment_gradients` (a nodal one) each carry
+`NodalMomentOperator3D.nb_moments` components and must live on the same
+collection. Only the interior (owned) region is written.
+
+```python
+rho = fc.real_field("rho")
+moments = fc.real_field("moments", (3,))
+moment_gradients = fc.real_field("moment_gradients", (3,))
+
+decomposition.communicate_ghosts(rho)
+moment_op.compute(rho, moments, moment_gradients)
+
+# Double-well energy and its nodal gradient
+import numpy as np
+c = np.array([1.0, -2.0, 1.0])            # coefficients on M2, M3, M4
+m = np.asarray(moments.p).reshape((3, -1))
+g = np.asarray(moment_gradients.p).reshape((3, -1))
+energy = comm.sum(float(c @ m.sum(axis=1)))
+grad = (c @ g)
+```
+
+Component `j` holds the moment for `k = j + NodalMomentOperator3D.first_moment`,
+i.e. `k = 2, 3, 4`. Both `float64` and `float32` fields are supported, on host
+and on device.
+
 ## Performance Comparison
 
 The fused `IsotropicStiffnessOperator` provides significant performance
@@ -405,6 +493,7 @@ Typical GPU speedups are 5-10× over unfused approaches on modern NVIDIA and AMD
 | `FEMGradientOperator` | Computing gradients/divergence, anisotropic materials |
 | `LaplaceOperator` | Scalar Poisson problems, diffusion equations |
 | `IsotropicStiffnessOperator` | Linear elasticity with isotropic materials |
+| `NodalMomentOperator` | Integrals of a polynomial in a nodal field, e.g. a phase-field double well |
 
 For production code solving standard PDEs, always prefer the fused operators
 when available. They provide the best performance while maintaining numerical
