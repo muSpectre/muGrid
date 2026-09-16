@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-unreleased
-----------
+v1.3.0 (16Sep26)
+----------------
 
 - ENH: New `NodalMomentOperator{2,3}D`: the cell moments `∫_e rho^k dx`
   (k = 2, 3, 4) of a nodal scalar field's FE interpolant and their nodal
