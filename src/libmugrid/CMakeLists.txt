@@ -185,8 +185,6 @@ endif()
 
 # HIP/ROCm support
 if(MUGRID_ENABLE_HIP)
-    find_package(hip REQUIRED)
-    find_package(rocfft REQUIRED)
     target_compile_definitions(muGrid PUBLIC MUGRID_ENABLE_HIP)
     # HIP headers require the platform to be defined when not using hipcc
     target_compile_definitions(muGrid PUBLIC __HIP_PLATFORM_AMD__)

@@ -82,7 +82,33 @@ endif()
 # Enable HIP language if requested
 # This must be after project() but before the first HIP target
 if(MUGRID_ENABLE_HIP)
+    # Add ROCm path to CMAKE_PREFIX_PATH so CMake can find hip and rocfft packages
+    if(DEFINED ENV{ROCM_PATH} AND NOT "$ENV{ROCM_PATH}" IN_LIST CMAKE_PREFIX_PATH)
+        list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
+    elseif(EXISTS "/opt/rocm" AND NOT "/opt/rocm" IN_LIST CMAKE_PREFIX_PATH)
+        list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
+    endif()
+
+    # If the host C++ compiler is GCC, hint Clang to use the matching GCC installation.
+    # This prevents Clang from picking a newer GCC version that lacks C++ development headers
+    # (e.g. gfortran-16 installed without libstdc++-16-dev alongside GCC 15).
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        execute_process(
+            COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so
+            OUTPUT_VARIABLE _mugrid_libstdcxx_so
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(EXISTS "${_mugrid_libstdcxx_so}")
+            get_filename_component(_mugrid_gcc_dir "${_mugrid_libstdcxx_so}" DIRECTORY)
+            if(IS_DIRECTORY "${_mugrid_gcc_dir}" AND NOT CMAKE_HIP_FLAGS MATCHES "--gcc-install-dir")
+                set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} --gcc-install-dir=${_mugrid_gcc_dir}" CACHE STRING "Flags used by the HIP compiler" FORCE)
+            endif()
+        endif()
+    endif()
+
     enable_language(HIP)
+    find_package(hip REQUIRED)
+    find_package(rocfft REQUIRED)
     # Default: autodetect the GPUs installed in this machine ("native", CMake 3.24+).
     # Override with -DCMAKE_HIP_ARCHITECTURES="gfx90a;gfx942" for a portable/multi-arch build.
     # gfx906 = MI50/MI60, gfx908 = MI100, gfx90a = MI200 series, gfx942 = MI300 series
@@ -338,7 +364,15 @@ endif()
 
 # HIP version
 if(MUGRID_ENABLE_HIP)
-    message(STATUS "  ROCm/HIP       : ON - ${hip_VERSION}")
+    if(hip_VERSION)
+        message(STATUS "  ROCm/HIP       : ON - ${hip_VERSION}")
+    elseif(HIP_VERSION)
+        message(STATUS "  ROCm/HIP       : ON - ${HIP_VERSION}")
+    elseif(CMAKE_HIP_COMPILER_VERSION)
+        message(STATUS "  ROCm/HIP       : ON - ${CMAKE_HIP_COMPILER_VERSION}")
+    else()
+        message(STATUS "  ROCm/HIP       : ON")
+    endif()
 else()
     message(STATUS "  ROCm/HIP       : OFF")
 endif()
