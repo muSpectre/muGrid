@@ -619,11 +619,19 @@ muGrid.Solvers.conjugate_gradients_pipelined(comm, fc, b, x, hessp, prec=None,
                                              rtol=None, atol=0.0)
 ```
 
-!!! warning "Prototype"
+!!! warning "Prototype — not usable in single precision"
 
-    This solver is marked a prototype in the source. Prefer
-    `conjugate_gradients` unless the global reduction is measurably limiting
-    you.
+    In `float32` this solver stagnates well above the tolerance standard CG
+    reaches: measured on a 48² periodic Poisson problem it floors at
+    `||r||/||b|| ≈ 1.2e-5` and never converges below `rtol = 1e-5`, where
+    `conjugate_gradients` reaches `9e-9` in 151 iterations. The auxiliary
+    recurrences lose orthogonality faster than the standard three-term one,
+    and no residual-replacement strategy is implemented. In `float64` the two
+    agree iteration for iteration.
+
+    Its motivating feature, the non-blocking reduction, also has no MPI test.
+    Prefer `conjugate_gradients` unless you are in double precision *and* have
+    measured the global reduction to be limiting.
 
 Pipelined preconditioned CG (Ghysels & Vanroose, 2014). Same problem and the
 same arguments as `conjugate_gradients` (minus `residual`), but reorganised so
