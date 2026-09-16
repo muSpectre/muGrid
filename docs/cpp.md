@@ -213,15 +213,20 @@ Low-level frequency helpers are also available (prefer the `fftfreq` /
 
 ## Operators
 
-Discrete operators for stencil-based computations such as gradients and the
-Laplacian. See [operators.md](operators.md) for usage and theory.
+Discrete operators for stencil-based computations, and fused kernels for
+specific problems. See [operators.md](operators.md) for usage and theory.
 
-- `muGrid::ConvolutionOperatorBase` — abstract base for convolution-style
-  stencil operators.
-- `muGrid::ConvolutionOperator` — generic convolution operator applying a
-  stencil to a field.
+- `muGrid::LinearOperator` — abstract base for operators applying a stencil to
+  a field. (Python exposes this under the legacy alias
+  `ConvolutionOperatorBase`; the C++ class was renamed.)
+- `muGrid::GenericLinearOperator` — generic convolution operator applying a
+  user-supplied stencil. (Python legacy alias: `ConvolutionOperator`.)
 - `muGrid::LaplaceOperator` — discrete Laplacian.
 - `muGrid::FEMGradientOperator` — finite-element gradient operator.
+- `muGrid::IsotropicStiffnessOperator` — fused matrix-free isotropic linear
+  elasticity, with diagonal assembly and sensitivity contraction.
+- `muGrid::NodalMomentOperator` — fused cell moments of a nodal field's FE
+  interpolant and their nodal gradients.
 
 ## File I/O
 
