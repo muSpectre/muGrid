@@ -11,12 +11,27 @@ with support for MPI parallelization and GPU acceleration.
   grids with flexible memory layouts
 - **Domain decomposition**: Cartesian decomposition with ghost cell communication
   for stencil operations
-- **Linear operators**: Discrete differential operators including Laplacian
-  and FEM gradient operators for spectral methods
+- **Linear operators**: Stencil convolutions, a hard-coded Laplacian, and FEM
+  gradient/divergence operators for linear simplex (P1) and multilinear (Q1)
+  elements
+- **Fused matrix-free operators**: Problem-specific kernels that apply an
+  operator, assemble its diagonal, or contract a sensitivity without ever
+  forming a matrix or storing an intermediate field — for example isotropic
+  linear elasticity on a regular grid
+- **Iterative solvers**: Preconditioned conjugate gradients, in a standard and
+  a pipelined variant that overlaps its reductions
+- **Preconditioners**: Jacobi, Fourier (reference-stiffness/Green), its
+  per-mode block form, and the combined Green-Jacobi preconditioner
+- **Vector algebra**: BLAS-like kernels on host and device (dot products,
+  norms, axpy, scaling), including fused variants that return a reduction and
+  update a vector in one pass
 - **FFT engine**: Built-in Fast Fourier Transform with MPI-parallel support
   (auto-selected slab or pencil decomposition) and native cuFFT/rocFFT N-D
   transforms on the GPU
-- **GPU support**: Optional CUDA and HIP backends for GPU-accelerated computation
+- **GPU support**: Optional CUDA and HIP backends. Fields, operators, solvers
+  and preconditioners all run on device, so a solve need not return to the
+  host; on unified-memory accelerators the allocator can be routed through
+  managed memory
 - **NetCDF I/O**: Serial and parallel file I/O for checkpointing and analysis
 
 µGrid is written in C++20 and has language bindings for
@@ -55,4 +70,4 @@ This development has received funding from the
 the
 [European Research Council](https://erc.europa.eu),
 and the
-[Deutsche Foschungsgemeinschaft](https://www.dfg.de/).
+[Deutsche Forschungsgemeinschaft](https://www.dfg.de/).
