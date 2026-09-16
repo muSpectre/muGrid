@@ -505,6 +505,68 @@ namespace muGrid {
     struct MomentQuadrature<P1Tet3D>
         : P1MomentQuadrature<P1Tet3D, P1Tet3DMomentRef> {};
 
+
+    /* ----------------------------------------------------------------------
+     * Cross-check: the moment tables and the gradient tables encode the same
+     * sub-simplex decomposition, from two independent sets of numbers. Tie
+     * them together at compile time so an edit to one that contradicts the
+     * other cannot build.
+     * ------------------------------------------------------------------- */
+
+    //! Sub-simplex volume fractions must equal the gradient rule's weights
+    //! (one quadrature point per sub-simplex, same order).
+    template <class Element, class Ref>
+    constexpr bool moment_fracs_match_weights() {
+        for (Index_t s = 0; s < Ref::NbSimplices; ++s) {
+            const Real d{Ref::Frac[s] - Element::Wfrac[s]};
+            if (d > 1e-15 || d < -1e-15) { return false; }
+        }
+        return true;
+    }
+
+    //! A node that is not a corner of sub-simplex s has no shape function
+    //! there, so its gradient at quadrature point s must vanish -- which is
+    //! what the Nodes table asserts from the other side.
+    template <class Element, class Ref>
+    constexpr bool moment_nodes_match_gradients() {
+        for (Index_t s = 0; s < Ref::NbSimplices; ++s) {
+            for (Index_t n = 0; n < Element::NbNodes; ++n) {
+                bool corner{false};
+                for (Index_t i = 0; i < Ref::NbCorners; ++i) {
+                    if (Ref::Nodes[s][i] == n) { corner = true; }
+                }
+                if (corner) { continue; }
+                for (Dim_t d = 0; d < Element::SpatialDim; ++d) {
+                    const Real g{Element::B[s][d][n]};
+                    if (g > 1e-15 || g < -1e-15) { return false; }
+                }
+            }
+        }
+        return true;
+    }
+
+    static_assert(moment_fracs_match_weights<P1Tri2D, P1Tri2DMomentRef>(),
+                  "P1Tri2D moment volume fractions disagree with Wfrac");
+    static_assert(moment_nodes_match_gradients<P1Tri2D, P1Tri2DMomentRef>(),
+                  "P1Tri2D moment sub-simplex nodes disagree with B");
+    static_assert(moment_fracs_match_weights<P1Tet3D, P1Tet3DMomentRef>(),
+                  "P1Tet3D moment volume fractions disagree with Wfrac");
+    static_assert(moment_nodes_match_gradients<P1Tet3D, P1Tet3DMomentRef>(),
+                  "P1Tet3D moment sub-simplex nodes disagree with B");
+
+    //! Both moment rules must be partitions of the cell: weights summing to 1.
+    template <class Q>
+    constexpr bool moment_weights_sum_to_one() {
+        Real sum{0.0};
+        for (Index_t q = 0; q < Q::NbQuad; ++q) { sum += Q::weight(q); }
+        const Real d{sum - 1.0};
+        return d < 1e-14 && d > -1e-14;
+    }
+    static_assert(moment_weights_sum_to_one<MomentQuadrature<Q1Quad2D>>());
+    static_assert(moment_weights_sum_to_one<MomentQuadrature<Q1Hex3D>>());
+    static_assert(moment_weights_sum_to_one<MomentQuadrature<P1Tri2D>>());
+    static_assert(moment_weights_sum_to_one<MomentQuadrature<P1Tet3D>>());
+
 }  // namespace muGrid
 
 #endif  // SRC_LIBMUGRID_OPERATORS_FEM_ELEMENT_HH_
