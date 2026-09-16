@@ -16,10 +16,18 @@ with MPI parallelization and GPU acceleration.
 - **FFT engine.** A built-in FFT using [PocketFFT](https://github.com/mreineck/pocketfft)
   on the CPU and native cuFFT/rocFFT N-D transforms on the GPU, with
   MPI-parallel slab or pencil decomposition (auto-selected).
-- **Operators.** Discrete differential operators — convolution stencils, a
-  hard-coded Laplacian, and FEM gradient operators for spectral methods.
+- **Operators.** Convolution stencils, a hard-coded Laplacian, and FEM
+  gradient/divergence operators for linear simplex (P1) and multilinear (Q1)
+  elements — plus fused matrix-free kernels for specific problems, such as
+  isotropic linear elasticity, that never form a matrix or store an
+  intermediate field.
+- **Solvers and preconditioners.** Matrix-free preconditioned conjugate
+  gradients, with Jacobi, Fourier (reference-stiffness/Green), block-Fourier
+  and Green-Jacobi preconditioners. Everything runs on device, so a solve need
+  not return to the host.
 - **Linear algebra.** Ghost-aware reductions and vector updates (`vecdot`,
-  `norm_sq`, `axpy`, …) that run on the same CPU/GPU fields.
+  `norm_sq`, `axpy`, …) that run on the same CPU/GPU fields, including fused
+  variants that reduce and update in one pass.
 - **NetCDF I/O.** Serial (Unidata NetCDF) and parallel (PnetCDF) file I/O for
   checkpointing and analysis.
 
@@ -41,8 +49,12 @@ field.p[...] = 0.0
 - [Installation](installation.md) — install the wheel or build the C++ core and
   the optional MPI/GPU backends.
 - [Python API](python.md) — field collections, array views, decomposition, the
-  FFT engine, and device selection.
+  FFT engine, solvers and preconditioners, and device selection.
 - [C++ API](cpp.md) — the Python-free core in namespace `muGrid`.
+- [Operators](operators.md) — stencils, FEM gradients and the fused kernels.
+- [Linear algebra](linalg.md) — the vector kernels the solvers are built on.
+- [GPU](gpu.md) — building with CUDA/HIP and running fields on device.
+- [Examples](examples.md) — worked Poisson and linear-elasticity solvers.
 - [FFT](fft.md), [Operators](operators.md), [Linear algebra](linalg.md),
   [GPU](gpu.md) — the topic guides.
 - [Examples](examples.md) and [Benchmark](benchmark.md) — a Poisson solver and
