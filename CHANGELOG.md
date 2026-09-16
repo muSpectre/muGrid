@@ -26,6 +26,12 @@ unreleased
 - ENH: The P1 sub-simplex decompositions are now data in `fem_element.hh`
   (`Nodes`/`Frac`) rather than only comments, so downstream code need not keep
   its own copy
+- TST: `fem_element.hh` now encodes each simplex decomposition twice — as the
+  gradient tables (`B`/`Wfrac`) and as the moment tables (`Nodes`/`Frac`) — so
+  `static_assert`s tie the two together: the volume fractions must equal the
+  gradient rule's weights, and a node the moment tables omit from a
+  sub-simplex must have a vanishing gradient at that quadrature point. All
+  four moment rules are also asserted to be partitions of the cell
 
 v1.2.0 (14Sep26)
 ----------------
