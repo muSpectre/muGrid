@@ -384,6 +384,39 @@ apply(displacement, lam, mu, force)
 apply_increment(displacement, lam, mu, alpha, force)   # force += alpha * K @ u
 ```
 
+### NodalMomentOperator2D / 3D
+
+```python
+muGrid.NodalMomentOperator3D(grid_spacing, element=muGrid.FEMElement.q1)
+```
+
+Cell moments `M_k = ∫_e rho^k dx` for `k = 2, 3, 4` of a nodal scalar field's
+finite-element interpolant, plus the derivative of their sum with respect to
+each nodal value, in one fused pass. A polynomial energy is a fixed combination
+of them: the double well `rho^2 (1-rho)^2` has cell integral `M2 - 2*M3 + M4`.
+See [Operators](operators.md#nodal-moment-operator).
+
+| Parameter | Description |
+|-----------|-------------|
+| `grid_spacing` | Per-axis cell size; only the cell volume enters. |
+| `element` | `muGrid.FEMElement.q1` (default) or `.p1`. Selects the quadrature. |
+
+```python
+moment_op.compute(rho, moments, moment_gradients)
+```
+
+`rho` is a 1-component field with communicated ghosts; `moments` (cell) and
+`moment_gradients` (nodal) each have `nb_moments` components and live on the
+same collection. Only the interior region is written. `float64` and `float32`,
+host and device.
+
+| Property | Description |
+|----------|-------------|
+| `nb_moments` | Number of moments returned (3). |
+| `first_moment` | Lowest power computed (2), so component `j` is `k = j + 2`. |
+| `nb_quad` | Quadrature points per cell, for the chosen element. |
+| `cell_volume` | Product of the grid spacings. |
+
 ## FFT engine
 
 `FFTEngine` provides distributed FFTs on structured grids, MPI-parallelized with
@@ -539,20 +572,24 @@ and `read_global_attribute(name)` — which is stored once per file.
 
 ## Linear algebra
 
-The `muGrid.Solvers` module provides simple parallel iterative solvers. See
-[Linear algebra](linalg.md) for more.
+The `muGrid.Solvers` module provides matrix-free parallel iterative solvers and
+`muGrid.Preconditioners` the preconditioners they take. The BLAS-like kernels
+they are built on are documented separately — see
+[Linear algebra](linalg.md).
 
 ### conjugate_gradients
 
 ```python
 muGrid.Solvers.conjugate_gradients(comm, fc, b, x, hessp, prec=None,
-                                   tol=1e-6, maxiter=1000,
-                                   callback=None, timer=None)
+                                   tol=None, maxiter=1000,
+                                   callback=None, timer=None,
+                                   rtol=None, atol=0.0, residual=None)
 ```
 
 Matrix-free conjugate-gradient solution of `Ax = b`, where `A` is represented by
 `hessp` (which computes the product of `A` with a vector). The solution `x` is
-refined in place until `||Ax - b|| < tol` or `maxiter` iterations are reached.
+refined in place until `||b - Ax|| <= max(rtol * ||b||, atol)` or `maxiter`
+iterations are reached.
 
 | Parameter | Description |
 |-----------|-------------|
@@ -561,14 +598,74 @@ refined in place until `||Ax - b|| < tol` or `maxiter` iterations are reached.
 | `b` | Right-hand-side field. |
 | `x` | Initial guess; modified in place. |
 | `hessp` | Callable `hessp(input_field, output_field)` computing `A @ x`. |
-| `prec` | Optional preconditioner `prec(input_field, output_field)`. Default `None`. |
-| `tol` | Convergence tolerance. Default `1e-6`. |
+| `prec` | Optional preconditioner `prec(input_field, output_field)`. Default `None`. See [Preconditioners](#preconditioners). |
+| `tol` | **Deprecated**; passing it warns and is treated as `atol`. Use `rtol`/`atol`. |
+| `rtol` | Relative tolerance against `\|\|b\|\|`. Defaults to `1e-6` when neither `tol` nor `rtol` is given. |
+| `atol` | Absolute tolerance. Default `0.0`. |
+| `residual` | Optional field receiving the final true residual `b - Ax`. |
 | `maxiter` | Maximum iterations. Default `1000`. |
 | `callback` | Called as `callback(iteration, state_dict)`, where `state_dict` has keys `"x"`, `"r"`, `"p"`, `"rr"` (squared residual norm). |
 | `timer` | Optional `muTimer.Timer` for profiling. |
 
 Returns the solution field `x`. Raises `RuntimeError` if it fails to converge
 within `maxiter`, or if the Hessian is not positive definite.
+
+### conjugate_gradients_pipelined
+
+```python
+muGrid.Solvers.conjugate_gradients_pipelined(comm, fc, b, x, hessp, prec=None,
+                                             tol=None, maxiter=1000,
+                                             callback=None, timer=None,
+                                             rtol=None, atol=0.0)
+```
+
+!!! warning "Prototype"
+
+    This solver is marked a prototype in the source. Prefer
+    `conjugate_gradients` unless the global reduction is measurably limiting
+    you.
+
+Pipelined preconditioned CG (Ghysels & Vanroose, 2014). Same problem and the
+same arguments as `conjugate_gradients` (minus `residual`), but reorganised so
+that an iteration's three inner products — `(r,u)`, `(w,u)` and the residual
+norm — are computed by one fused kernel and combined into a **single
+non-blocking** global reduction, where standard PCG performs three blocking
+ones on the critical path. Auxiliary recurrences make the preconditioner and
+operator applications of the step independent of that reduction's result, so
+they run while it is in flight and hide the synchronisation latency. That is
+the multi-node payoff; the cost is more resident vectors, and round-off differs
+from the standard variant because the recurrences differ.
+
+### Preconditioners
+
+`muGrid.Preconditioners` supplies ready-made `prec` arguments for both solvers.
+Each is a callable object with an `apply(r, z)` method computing `z = M⁻¹ r`.
+
+| Class | Description |
+|-------|-------------|
+| `IdentityPreconditioner()` | No-op; equivalent to `prec=None`. |
+| `JacobiPreconditioner(diagonal)` | Divides by the operator diagonal. |
+| `FourierPreconditioner(engine, kernel, dtype=...)` | Applies a spectral symbol: `z = F⁻¹[k(q) · F r]`. |
+| `BlockFourierPreconditioner(engine, blocks, dtype=...)` | Per-Fourier-mode block inverse for coupled vector fields, `z = F⁻¹[K⁻¹(q) · F r]`. |
+| `GreenJacobiPreconditioner(green, diagonal, ...)` | `z = J^{1/2} G (J^{1/2} r)`: a Green's-function preconditioner scaled by the per-pixel Jacobi diagonal. Strong for high-contrast heterogeneous materials. |
+
+Two factories build the common combinations, taking the reference material from
+the operator itself:
+
+```python
+muGrid.Preconditioners.make_reference_stiffness_preconditioner(
+    engine, apply_reference_stiffness, nb_components, dtype=...)
+
+muGrid.Preconditioners.make_green_jacobi_preconditioner(
+    engine, stiffness_op, lambda_field, mu_field, nb_components,
+    reference_lambda=None, reference_mu=None, dtype=...)
+```
+
+`make_green_jacobi_preconditioner` returns an object with an extra `refresh()`
+method, to be called after the material fields change in place. Pass
+`dtype=numpy.float32` to keep a single-precision solve single-precision
+throughout. See [Examples](examples.md#preconditioning) for a worked Poisson
+case.
 
 ## Device selection
 
