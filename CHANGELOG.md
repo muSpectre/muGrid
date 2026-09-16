@@ -1,6 +1,38 @@
 Change log for µGrid
 ====================
 
+unreleased
+----------
+
+- ENH: New `NodalMomentOperator{2,3}D`: the cell moments `∫_e rho^k dx`
+  (k = 2, 3, 4) of a nodal scalar field's FE interpolant and their nodal
+  gradients, in one fused host/GPU pass. A polynomial phase-field energy is a
+  fixed combination of these — the double well `rho^2 (1-rho)^2` has cell
+  integral `M2 - 2 M3 + M4` — so the energy stays with the caller and µGrid
+  stays material-model-agnostic, as `compute_sensitivity` already is. The
+  array-at-a-time form of this computation materialises the interpolant at
+  every quadrature point of every cell at once (a 27-fold copy of the grid in
+  3D, plus a temporary per polynomial term); here every quadrature point is
+  consumed in registers and the pass is O(1) in scratch memory
+- ENH: `fem_element.hh` gains shape-function *values* and a moment quadrature
+  per element, alongside the existing gradient tables: 3-point-per-axis tensor
+  Gauss for Q1, and the same rule placed on each sub-simplex for P1. The
+  simplex rules are Gauss-Jacobi, not Gauss-Legendre: the collapsed map's
+  Jacobian is folded into the weight function, which keeps 3 points per axis
+  exact for the quartic integrand (leaving it in the integrand needs 4, and a
+  3-point Gauss-Legendre rule is exact for M2 and M3 but wrong for M4) and
+  makes every weight positive, so a cell's double-well energy is never
+  negative
+- ENH: The P1 sub-simplex decompositions are now data in `fem_element.hh`
+  (`Nodes`/`Frac`) rather than only comments, so downstream code need not keep
+  its own copy
+- TST: `fem_element.hh` now encodes each simplex decomposition twice — as the
+  gradient tables (`B`/`Wfrac`) and as the moment tables (`Nodes`/`Frac`) — so
+  `static_assert`s tie the two together: the volume fractions must equal the
+  gradient rule's weights, and a node the moment tables omit from a
+  sub-simplex must have a vanishing gradient at that quadrature point. All
+  four moment rules are also asserted to be partitions of the cell
+
 v1.2.0 (14Sep26)
 ----------------
 

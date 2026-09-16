@@ -1693,6 +1693,73 @@ class IsotropicStiffnessOperator3D(IsotropicStiffnessOperator):
         super().__init__(3, grid_spacing, element)
 
 
+
+class NodalMomentOperator:
+    """
+    Python wrapper for the fused nodal-moment operator.
+
+    For each cell of a Q1 (bi/trilinear) discretisation, computes the moments
+    ``M_k = ∫_e rho(x)^k dx`` for ``k = 2, 3, 4`` of the finite-element
+    interpolant of a nodal scalar field, and the derivative of their sum with
+    respect to each nodal value. The quadrature (3 points per axis) is exact
+    for the quartic integrand.
+
+    A polynomial phase-field energy is a fixed combination of these: the double
+    well ``W(rho) = rho^2 (1-rho)^2 = rho^2 - 2 rho^3 + rho^4`` has cell
+    integral ``M2 - 2 M3 + M4`` and the same combination of the moment
+    gradients. Keeping moments as the interface leaves the energy to the
+    caller, so a different well needs no kernel change.
+
+    ``rho`` must be a 1-component field whose ghosts have been communicated;
+    ``moments`` and ``moment_gradients`` must have 3 components and live on the
+    same collection. Only the interior (owned) region is written.
+    """
+
+    def __init__(self, dim: int, grid_spacing: Sequence[float],
+                 element=_muGrid.FEMElement.q1) -> None:
+        if dim not in (2, 3):
+            raise ValueError("NodalMomentOperator supports 2D and 3D only")
+        cls = (_muGrid.NodalMomentOperator2D if dim == 2
+               else _muGrid.NodalMomentOperator3D)
+        self._cpp = cls([float(h) for h in grid_spacing], element)
+        self.dim = dim
+
+    #: Number of moments computed, and the lowest power.
+    nb_moments = _muGrid.NodalMomentOperator3D.nb_moments
+    first_moment = _muGrid.NodalMomentOperator3D.first_moment
+
+    def compute(self, rho, moments, moment_gradients) -> None:
+        """Compute the moments and their nodal gradients in one pass."""
+        self._cpp.compute(_unwrap(rho), _unwrap(moments),
+                          _unwrap(moment_gradients))
+
+    @property
+    def cell_volume(self) -> float:
+        return self._cpp.cell_volume
+
+    @property
+    def nb_quad(self) -> int:
+        """Quadrature points per cell: 3^dim for Q1, and the per-sub-simplex
+        rule times the number of sub-simplices for P1."""
+        return self._cpp.nb_quad
+
+
+class NodalMomentOperator2D(NodalMomentOperator):
+    """Convenience wrapper fixing the spatial dimension to 2."""
+
+    def __init__(self, grid_spacing: Sequence[float],
+                 element=_muGrid.FEMElement.q1) -> None:
+        super().__init__(2, grid_spacing, element)
+
+
+class NodalMomentOperator3D(NodalMomentOperator):
+    """Convenience wrapper fixing the spatial dimension to 3."""
+
+    def __init__(self, grid_spacing: Sequence[float],
+                 element=_muGrid.FEMElement.q1) -> None:
+        super().__init__(3, grid_spacing, element)
+
+
 # FileIONetCDF wrapper (only if NetCDF is available)
 if hasattr(_muGrid, "FileIONetCDF"):
     _OpenMode = _muGrid.FileIONetCDF.OpenMode

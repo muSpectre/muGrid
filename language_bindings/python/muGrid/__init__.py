@@ -105,6 +105,8 @@ from .Wrappers import (  # noqa: F401, E402, E305
     IsotropicStiffnessOperator3D,
     LaplaceOperator,
     LocalFieldCollection,
+    NodalMomentOperator2D,
+    NodalMomentOperator3D,
 )
 
 # Cache for runtime GPU availability check
@@ -319,6 +321,8 @@ __all__ = [
     "IsotropicStiffnessOperator",
     "IsotropicStiffnessOperator2D",
     "IsotropicStiffnessOperator3D",
+    "NodalMomentOperator2D",
+    "NodalMomentOperator3D",
     "Decomposition",
     "DynCoord",
     "DynRcoord",

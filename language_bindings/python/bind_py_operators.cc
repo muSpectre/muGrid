@@ -40,6 +40,7 @@
 #include "operators/laplace.hh"
 #include "operators/fem_gradient.hh"
 #include "operators/solids/isotropic_stiffness.hh"
+#include "operators/nodal_moments.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -1315,6 +1316,90 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
 #endif
 }
 
+
+// Bind NodalMomentOperator{2,3}D. Templated over the dimension here because,
+// unlike the operators above, the two differ only in the grid-spacing arity.
+template <muGrid::Dim_t Dim>
+void add_nodal_moment_operator(py::module & mod, const char * name) {
+    using Op = muGrid::NodalMomentOperator<Dim>;
+    using FH = TypedFieldBase<Real, HostSpace>;
+    using FH32 = TypedFieldBase<Real32, HostSpace>;
+
+    auto cls = py::class_<Op>(mod, name, R"pbdoc(
+        Cell moments of a nodal scalar field and their nodal gradients.
+
+        For each cell e of a Q1 (bi/trilinear) discretisation, computes
+
+            M_k(e) = ∫_e rho(x)^k dx ,   k = 2, 3, 4
+
+        of the finite-element interpolant of the nodal field ``rho``, together
+        with the derivative of their sum with respect to each nodal value.
+        Quadrature is the 3-point-per-axis tensor Gauss rule, exact for the
+        quartic integrand.
+
+        These are the building blocks of a polynomial phase-field energy: the
+        double well W(rho) = rho^2 (1-rho)^2 expands as rho^2 - 2 rho^3 + rho^4,
+        so its integral is ``M2 - 2 M3 + M4`` and its gradient the same
+        combination of the moment gradients. Keeping the moments as the
+        interface leaves the choice of energy to the caller.
+
+        ``rho`` must be a scalar field with its ghosts already communicated;
+        ``moments`` (a cell quantity) and ``moment_gradients`` (a nodal one)
+        must have 3 components each and live on the same collection. Only the
+        interior (owned) region is written.
+        )pbdoc")
+        .def(py::init([](const std::vector<Real> & grid_spacing,
+                         muGrid::FEMElementKind element) {
+                 if (static_cast<muGrid::Dim_t>(grid_spacing.size()) != Dim) {
+                     throw muGrid::RuntimeError{
+                         std::string("NodalMomentOperator") +
+                         std::to_string(Dim) + "D needs " +
+                         std::to_string(Dim) + " grid spacings"};
+                 }
+                 std::array<Real, Dim> h{};
+                 for (muGrid::Dim_t d = 0; d < Dim; ++d) {
+                     h[d] = grid_spacing[d];
+                 }
+                 return std::make_unique<Op>(h, element);
+             }),
+             "grid_spacing"_a, "element"_a = muGrid::FEMElementKind::Q1,
+             "Construct from the per-axis grid spacing and element family")
+        .def("compute",
+             static_cast<void (Op::*)(const FH &, FH &, FH &) const>(
+                 &Op::compute),
+             "rho"_a, "moments"_a, "moment_gradients"_a,
+             "Compute the moments and their nodal gradients (host, float64)")
+        .def("compute",
+             static_cast<void (Op::*)(const FH32 &, FH32 &, FH32 &) const>(
+                 &Op::compute),
+             "rho"_a, "moments"_a, "moment_gradients"_a,
+             "Compute the moments and their nodal gradients (host, float32)")
+        .def_property_readonly("cell_volume", &Op::get_cell_volume)
+        .def_property_readonly("element", &Op::get_element)
+        .def_property_readonly("nb_quad", &Op::get_nb_quad)
+        .def_property_readonly_static(
+            "nb_moments",
+            [](py::object) { return muGrid::NB_NODAL_MOMENTS; })
+        .def_property_readonly_static(
+            "first_moment",
+            [](py::object) { return muGrid::FIRST_NODAL_MOMENT; });
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using FD = TypedFieldBase<Real, muGrid::DefaultDeviceSpace>;
+    using FD32 = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    cls.def("compute",
+            static_cast<void (Op::*)(const FD &, FD &, FD &) const>(
+                &Op::compute),
+            "rho"_a, "moments"_a, "moment_gradients"_a,
+            "Compute the moments and their nodal gradients (device, float64)");
+    cls.def("compute",
+            static_cast<void (Op::*)(const FD32 &, FD32 &, FD32 &) const>(
+                &Op::compute),
+            "rho"_a, "moments"_a, "moment_gradients"_a,
+            "Compute the moments and their nodal gradients (device, float32)");
+#endif
+}
+
 void add_convolution_operator_classes(py::module & mod) {
     add_gradient_operator(mod);
     add_stencil_gradient_operator(mod);
@@ -1324,6 +1409,8 @@ void add_convolution_operator_classes(py::module & mod) {
     add_fem_gradient_operator_3d(mod);
     add_isotropic_stiffness_operator_2d(mod);
     add_isotropic_stiffness_operator_3d(mod);
+    add_nodal_moment_operator<2>(mod, "NodalMomentOperator2D");
+    add_nodal_moment_operator<3>(mod, "NodalMomentOperator3D");
 
     // Backwards compatibility aliases
     mod.attr("ConvolutionOperatorBase") = mod.attr("GradientOperator");
