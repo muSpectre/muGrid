@@ -30,8 +30,8 @@ Read §7 before planning Stage 4: it changes what a single-node MPI run can be
 used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
 default of 2 at every grid measured. **Read §9 before starting Stage 4 at all**:
 a Fourier/tridiagonal hybrid reaches the FFT preconditioner's iteration count
-exactly, without transforming the distributed axis, and may be the better
-design.
+exactly, without transforming the distributed axis, and §10 costs out its
+tridiagonal solve. On present evidence it is the better design.
 
 - **PR #206** — `feat/multigrid-reference-preconditioner`, one commit, open
   against `main`, mergeable. Contains `GridTransfer{2,3}D` (host kernels +
@@ -962,3 +962,100 @@ What is new is the parallel tridiagonal solve.
 Worth noting it is not exotic: this is the classical partial-diagonalisation /
 Fourier-tridiagonal fast solver (FISHPACK and most spectral codes), with the
 elastic generalisation to `dim × dim` blocks.
+
+---
+
+## 10. Costing the parallel tridiagonal solve
+
+§9 settled convergence: the hybrid reproduces the FFT preconditioner's CG count
+exactly. What it left open was cost. Measured with `mg_tridiag_bench.py`, one
+MI300A, 256³, double precision.
+
+### 10.1 Per apply, on one device
+
+| term | reference (measured) | hybrid |
+|---|---|---|
+| transform pair | 2982 µs (3D) | **2207 µs** (2D; ratio 0.74 measured) |
+| mode / z solve | 2653 µs (`scale`) | **724 µs** (fused block-Thomas) |
+| periodic correction | — | 310–1085 µs (from the decay below) |
+| **total** | **5658 µs** | **≈3240–4020 µs** |
+
+Dropping the distributed axis from the transform saves a measured 26% of the
+pair. The sweep is a real HIP kernel — one thread per `(qₓ, q_y)` mode marching
+the z line with the 3×3 blocks in registers — and reaches **2255 GB/s**.
+
+**Read that advantage with care.** The reference's `scale` step moves ~2 GB in
+2653 µs, i.e. ~765 GB/s, against the sweep's 2255 GB/s. Bring `scale` to the
+same bandwidth and it would cost ~900 µs, putting the reference near 3900 µs and
+the two within noise of each other. So per apply on one device the honest claim
+is **comparable**, not "twice as fast": part of the measured gap is headroom in
+the existing `scale` step, not an algorithmic win. The algorithmic win is
+communication.
+
+### 10.2 Communication per apply
+
+Four all-to-alls per reference apply against two interface exchanges per hybrid
+apply, the latter by recursive doubling — a gather to one rank is an `O(P)`
+bottleneck and is not what would be implemented.
+
+| P | all-to-all | interface | MB/apply (a2a) | MB/apply (iface) | ratio |
+|---|---|---|---|---|---|
+| 2 | 42.7 ms | 0.34 ms | 1623 | 13 | 126× |
+| 4 | 39.2 ms | 0.84 ms | 1623 | 25 | 47× |
+| 8 | 51.9 ms | 3.9 ms | 1623 | 51 | 13× |
+| 16 | 30.0 ms | 5.3 ms | 1623 | 101 | 5.7× |
+
+The volume ratio is the robust part, and it is structural: the all-to-all moves
+the whole field (`N_z` planes) regardless of `P`, while the interface moves `2P`
+planes. They meet only at `P = N_z/2` — 128 ranks at 256³, past the slab's own
+`P ≤ N_z` ceiling. **Within the usable rank range the hybrid always moves
+strictly less, and by one to two orders of magnitude at the rank counts that
+matter now.**
+
+These are shared-memory numbers, and §7 showed such numbers understate
+inter-device penalties, so treat the advantage as a lower bound.
+
+### 10.3 Two objections that measurement dissolved
+
+**Factor storage.** §9.4 put the Thomas factors at ~5 GB. But the blocks are
+constant in z, so `D_k = A₀ − A₊₁ D_{k-1}⁻¹ A₋₁` is a fixed-point iteration, and
+it converges: at 64³, median **9** steps to 1e-12, 90th percentile 14. Only
+21 modes of 4096 fail to converge within 64 steps — the near-singular low-`q`
+ones. So ~16 distinct blocks per mode need storing rather than `N_z`, and the
+5 GB becomes a few hundred MB.
+
+**The periodic correction.** The system is circulant in z, so Thomas needs a
+Woodbury correction, whose cost is dominated by reading `T⁻¹E`. Those columns
+are boundary Green's functions and decay: at 64³, median 18 planes of 64 to
+reach 1e-12, 90th percentile 29. 36 of 403 sampled modes need the full line.
+Hence the 310–1085 µs range above — the low end assumes the decay is exploited,
+the high end assumes it is not.
+
+Both exceptions are the same modes: low `(qₓ, q_y)`, where the z-operator is
+nearly singular. They are few, and can simply be stored in full.
+
+### 10.4 Implementation risks, in order
+
+1. **Layout.** The sweep needs `(z, mode, component)` so a wavefront reads
+   contiguous bytes at each z step. The natural `(mode, z, component)` strides
+   by `nz*3` between neighbouring threads and gives up most of the bandwidth.
+   This is the same trap `cuSPARSE gtsv2StridedBatch` documents.
+2. **The Woodbury correction** is the largest cost uncertainty and the fiddliest
+   code. A first implementation could skip it by treating z as non-periodic and
+   accepting the error, purely to get an end-to-end number.
+3. **The near-singular modes** need a fallback path in both the factor
+   recurrence and the decay truncation.
+4. **The reduced system** wants recursive doubling, not a gather.
+
+### 10.5 Verdict
+
+On convergence the hybrid strictly dominates the V-cycle: identical iteration
+counts to `-P reference`, against the V-cycle's 1.5× penalty. On per-apply cost
+it is comparable to `-P reference` on one device. On communication it moves one
+to two orders of magnitude less than the all-to-all across the whole usable
+rank range.
+
+The V-cycle has to climb out of a 3.8× whole-solve hole (§8.2) using
+communication savings alone. The hybrid starts level and needs the all-to-all to
+cost merely *something*. Unless the Woodbury correction proves far worse than
+the decay measurements suggest, this is the better Stage 4.
