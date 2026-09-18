@@ -46,6 +46,14 @@ unreleased
   smoother is a single scaled `axpy`, while 2D P1 — whose two-triangle Kuhn
   split leaves `K01 = λ + μ` — is refused with an explanatory error instead of
   being smoothed with the wrong diagonal
+- BUILD: Clang's `--gcc-install-dir` is now derived from the directory holding
+  `crtbegin.o` rather than the one holding `libstdc++.so`. The two coincide on
+  many installations but not all: where `libstdc++.so` sits in `<prefix>/lib64`
+  — as it does on an EasyBuild GCCcore toolchain — the hint named a directory
+  that is not a GCC installation at all, and configuring a HIP build died with
+  `does not contain a GCC installation` before compiling a line. The reported
+  path is also normalised, since GCC returns it relative to its own driver
+  location with `..` components left in
 
 
 v1.3.0 (16Sep26)

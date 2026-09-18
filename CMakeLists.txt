@@ -92,14 +92,21 @@ if(MUGRID_ENABLE_HIP)
     # If the host C++ compiler is GCC, hint Clang to use the matching GCC installation.
     # This prevents Clang from picking a newer GCC version that lacks C++ development headers
     # (e.g. gfortran-16 installed without libstdc++-16-dev alongside GCC 15).
+    # Clang identifies a GCC installation by the directory that holds crtbegin.o
+    # (typically <prefix>/lib/gcc/<triple>/<version>). Ask GCC for that file rather
+    # than for libstdc++.so, which may live in <prefix>/lib64 and is therefore not a
+    # GCC installation directory as far as Clang is concerned. The path GCC reports
+    # is relative to its own driver location and contains ".." components, so
+    # normalise it before handing it to Clang.
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         execute_process(
-            COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so
-            OUTPUT_VARIABLE _mugrid_libstdcxx_so
+            COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=crtbegin.o
+            OUTPUT_VARIABLE _mugrid_gcc_crtbegin
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        if(EXISTS "${_mugrid_libstdcxx_so}")
-            get_filename_component(_mugrid_gcc_dir "${_mugrid_libstdcxx_so}" DIRECTORY)
+        if(EXISTS "${_mugrid_gcc_crtbegin}")
+            get_filename_component(_mugrid_gcc_dir "${_mugrid_gcc_crtbegin}" DIRECTORY)
+            get_filename_component(_mugrid_gcc_dir "${_mugrid_gcc_dir}" REALPATH)
             if(IS_DIRECTORY "${_mugrid_gcc_dir}" AND NOT CMAKE_HIP_FLAGS MATCHES "--gcc-install-dir")
                 set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} --gcc-install-dir=${_mugrid_gcc_dir}" CACHE STRING "Flags used by the HIP compiler" FORCE)
             endif()
