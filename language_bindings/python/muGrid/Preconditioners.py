@@ -1934,7 +1934,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         patched.reshape(-1, self.dim, self.dim)[self._picked] = self._exc[k]
         return patched
 
-    def _solve_local(self, rhs):
+    def _solve_local(self, rhs, fused=True):
         """``T_local x = rhs`` with the stored factors.
 
         ``T_local`` is this rank's slab with no wrap-around and no coupling to
@@ -1942,13 +1942,15 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         ``(nz, *modes, dim, ncols)``, so one code path serves the residual
         (``ncols = 1``) and the spikes (``ncols = dim``).
 
-        On a device with a single column this hands over to a fused kernel. The
-        loop below issues four kernels per plane, which on a device measures
-        launch latency rather than the sweep; it stays as the host path, as the
-        setup path for the spikes, and as the reference the fused kernel is
-        tested against.
+        With a single column this hands over to a fused kernel -- the C++ one on
+        the host, the device kernel on a device. The loop below issues four
+        array products per plane, each streaming the whole mode array, so it
+        costs ``4 * nz`` passes over memory where the sweeps cost two. It
+        remains the setup path for the spikes, which have ``dim`` columns, and
+        the reference both fused kernels are tested against; pass
+        ``fused=False`` to take it deliberately.
         """
-        if rhs.shape[-1] == 1 and self.Dinv is None:
+        if fused and rhs.shape[-1] == 1 and self.Dinv is None:
             if self._on_device:
                 return self._solve_local_fused(rhs)
             return self._solve_local_fused_host(rhs)

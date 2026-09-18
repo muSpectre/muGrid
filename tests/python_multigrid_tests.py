@@ -642,6 +642,72 @@ def test_hybrid_rejects_a_non_slab_decomposition(comm):
             decomp, (1 / 16,) * 3, 1.3, 0.7, communicator=comm)
 
 
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_host_fused_kernel_matches_the_loop(comm, dim, n):
+    """The host C++ sweep agrees with the elementwise one it replaces.
+
+    This is the counterpart of `test_hybrid_fused_kernel_matches_the_loop` for
+    the host, and unlike it this one runs everywhere. Without it the C++ kernel
+    -- which carries the whole cost of the preconditioner on the host, and
+    reimplements the recurrence in another language -- would only ever be
+    checked on a machine with a GPU.
+    """
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+
+    if comm is not None and comm.size > 1:
+        pytest.skip("single-rank comparison; the MPI path has its own tests")
+    decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * dim,
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
+    prec = HybridFourierTridiagonalPreconditioner(
+        decomp, (1.0 / n,) * dim, 1.3, 0.7, communicator=comm)
+
+    rng = np.random.default_rng(11)
+    shape = (prec.nz_local,) + tuple(prec._mode_shape) + (dim, 1)
+    rhs = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+           ).astype(prec._cdtype)
+
+    fused = prec._solve_local_fused_host(rhs)
+    loop = prec._solve_local(rhs, fused=False)
+
+    scale = float(np.abs(loop).max())
+    assert float(np.abs(fused - loop).max()) <= 1e-11 * scale
+
+
+def test_hybrid_host_fused_kernel_handles_the_exception_table(comm):
+    """Modes whose factor recurrence has not converged take a separate path.
+
+    The compressed factors are a head plus a table of full lines for the
+    slow-converging low-`q` modes, and the kernel selects between them per
+    mode. The table is only ever populated when the axis is longer than the
+    head, so a grid with `nz <= HEAD_LENGTH` stores every factor in the head
+    and leaves that branch untested; 2D at 64 is the cheapest size that does
+    populate it. The assertion below pins that, so the test cannot quietly
+    stop covering what it is named for.
+    """
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+
+    if comm is not None and comm.size > 1:
+        pytest.skip("single-rank comparison")
+    dim, n = 2, 64
+    decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * dim,
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
+    prec = HybridFourierTridiagonalPreconditioner(
+        decomp, (1.0 / n,) * dim, 1.3, 0.7, communicator=comm)
+    assert prec._nb_exc > 0, "expected some modes to need the exception table"
+
+    rng = np.random.default_rng(12)
+    shape = (prec.nz_local,) + tuple(prec._mode_shape) + (dim, 1)
+    rhs = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+           ).astype(prec._cdtype)
+
+    fused = prec._solve_local_fused_host(rhs)
+    loop = prec._solve_local(rhs, fused=False)
+    scale = float(np.abs(loop).max())
+    assert float(np.abs(fused - loop).max()) <= 1e-11 * scale
+
+
 def _has_gpu():
     try:
         import cupy
@@ -655,12 +721,13 @@ def _has_gpu():
 def test_hybrid_device_matches_host(comm, dim, n):
     """The device path computes the same thing as the host path.
 
-    Host and device share one implementation and differ only in which array
-    module runs it, so this is the test that keeps them from drifting apart --
-    and it compares against the host *result*, not merely against a residual,
-    which would pass for any exact inverse.
+    Host and device run *different* implementations of the sweep -- a C++
+    kernel and a device kernel -- so this is the test that keeps the two from
+    drifting apart, and it compares against the host *result* rather than
+    merely a residual, which would pass for any exact inverse.
     """
     import cupy as cp
+
     from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
 
     if comm is not None and comm.size > 1:
@@ -720,11 +787,7 @@ def test_hybrid_fused_kernel_matches_the_loop(comm, dim, n):
            ).astype(prec._cdtype)
 
     fused = prec._solve_local_fused(rhs)
-    prec._on_device = False          # take the elementwise path on the device
-    try:
-        loop = prec._solve_local(rhs)
-    finally:
-        prec._on_device = True
+    loop = prec._solve_local(rhs, fused=False)
 
     scale = float(cp.abs(loop).max())
     assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
