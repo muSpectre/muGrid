@@ -271,6 +271,18 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--decomposition",
+    choices=["auto", "cartesian", "fft"],
+    default="auto",
+    help="Domain decomposition: 'auto' follows the preconditioner (FFT engine "
+    "for 'reference', 3D Cartesian otherwise), 'cartesian' forces a genuine 3D "
+    "split, 'fft' forces the FFT engine's, in which the transformed axis is "
+    "never distributed. Use the explicit forms to measure what the "
+    "decomposition alone costs, independently of the preconditioner "
+    "(default: auto)",
+)
+
+parser.add_argument(
     "--sync-timers",
     action="store_true",
     help="Synchronise the device at both ends of every timed region, so that "
@@ -419,6 +431,17 @@ quad_weights = np.array(gradient_op.quadrature_weights)
 # Determine MPI decomposition using NuMPI's suggest_subdivisions
 s = suggest_subdivisions(dim, comm.size)
 
+# 'auto' ties the decomposition to the preconditioner, which is what every run
+# wants except a baseline measurement that is trying to tell the two apart.
+if args.decomposition == "auto":
+    use_fft_decomposition = args.preconditioner == "reference"
+else:
+    use_fft_decomposition = args.decomposition == "fft"
+    if args.preconditioner == "reference" and not use_fft_decomposition:
+        parser.error("--preconditioner reference needs the FFT engine's "
+                     "decomposition; --decomposition cartesian cannot provide "
+                     "the transforms it applies")
+
 # Create the decomposition for ghost handling. The FEM gradient kernel requires
 # ghosts on BOTH sides (left and right) for accessing neighbour nodes, so that
 # interior nodes receive all element contributions directly (no ghost reduction).
@@ -429,7 +452,15 @@ s = suggest_subdivisions(dim, comm.size)
 # communicate_ghosts / coords / ghosts), but additionally provides the forward
 # and inverse transforms the preconditioner applies. The solver work fields are
 # then created on the engine's real-space collection (`fc`).
-if args.preconditioner == "reference":
+#
+# --decomposition overrides that coupling. The FFT engine does not merely add
+# transforms: it also dictates how the domain is split, and its split is not a
+# 3D one -- the transformed axis is never distributed. So an FFT preconditioner
+# costs both an all-to-all *and* a worse surface-to-volume ratio for every halo
+# exchange in the matvec, and a measurement that swaps the preconditioner alone
+# cannot say which of the two it moved. Forcing '-P none' onto each
+# decomposition in turn separates them.
+if use_fft_decomposition:
     decomposition = muGrid.FFTEngine(
         args.nb_grid_pts,
         comm,
@@ -1267,6 +1298,13 @@ if args.json or args.json_out:
             "kernel": args.kernel,
             "preconditioner": args.preconditioner,
             "precision": args.precision,
+            # How the domain was actually split, not how it was asked for: the
+            # FFT engine picks its own split and ignores suggest_subdivisions.
+            "decomposition": "fft" if use_fft_decomposition else "cartesian",
+            "nb_ranks": int(comm.size),
+            "nb_subdivisions": [int(x) for x in decomposition.nb_subdivisions],
+            "nb_subdomain_grid_pts": [
+                int(x) for x in decomposition.nb_subdomain_grid_pts],
         },
         "results": {
             "total_cg_iterations": int(total_iterations),

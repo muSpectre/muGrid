@@ -86,6 +86,13 @@ unreleased
   matvec alone, priced from the cycle's parts as timed on a GPU, and measured
   end to end wherever the cycle runs. The script also carries the iteration
   penalty, since a cheaper apply that needs more CG iterations is not cheaper
+- ENH: `examples/homogenization.py --decomposition` unties the domain split
+  from the preconditioner. `muGrid.FFTEngine` does not merely add transforms to
+  a `CartesianDecomposition`, it also dictates how the domain is divided, so a
+  measurement that swaps the preconditioner alone moves both at once and cannot
+  say which it moved. The JSON output now also records the split that was
+  actually used -- rank count, subdivisions and subdomain extents -- since the
+  FFT engine picks its own and ignores `suggest_subdivisions`
 
 
 v1.3.0 (16Sep26)
