@@ -1578,12 +1578,23 @@ __device__ __forceinline__ cplx csub(cplx a, cplx b) {{
  * is nx * (ny/2 + 1) and therefore ample.
  */
 extern "C" __global__ void block_thomas(
-    const cplx * __restrict__ rhs, const cplx * __restrict__ Dinv,
+    const cplx * __restrict__ rhs, const cplx * __restrict__ head,
+    const cplx * __restrict__ exc, const int * __restrict__ exc_index,
     const cplx * __restrict__ A0, const cplx * __restrict__ A2,
-    cplx * __restrict__ y, cplx * __restrict__ out, int nz, int nmodes)
+    cplx * __restrict__ y, cplx * __restrict__ out,
+    int nz, int nmodes, int nb_head, int nb_exc)
 {{
     int m = blockIdx.x * blockDim.x + threadIdx.x;
     if (m >= nmodes) return;
+
+    /* D_k = A1 - A2 D_{{k-1}}^-1 A0 is a fixed-point iteration, because the
+     * coupling blocks do not vary along the axis. Most modes reach it within a
+     * few steps, so only the first nb_head factors are stored and everything
+     * beyond reuses the last of them. The minority that converge too slowly --
+     * the near-singular low-q modes -- keep a full line in `exc`, found
+     * through `exc_index`, which is read once per thread rather than per step.
+     */
+    int slot = exc_index[m];
 
     cplx a0[DIM * DIM], a2[DIM * DIM], prev[DIM], cur[DIM];
     for (int i = 0; i < DIM * DIM; ++i) {{
@@ -1598,7 +1609,11 @@ extern "C" __global__ void block_thomas(
         prev[i] = v;
     }}
     for (int k = 1; k < nz; ++k) {{
-        size_t dof = ((size_t)(k - 1) * nmodes + m) * DIM * DIM;
+        int kh = (k - 1 < nb_head) ? (k - 1) : (nb_head - 1);
+        const cplx * Dinv = (slot >= 0)
+            ? exc + ((size_t)(k - 1) * nb_exc + slot) * DIM * DIM
+            : head + ((size_t)kh * nmodes + m) * DIM * DIM;
+        size_t dof = 0;
         cplx tmp[DIM];
         for (int i = 0; i < DIM; ++i) {{
             cplx acc = MAKE_CPLX(0, 0);
@@ -1619,7 +1634,11 @@ extern "C" __global__ void block_thomas(
     /* backward: out_k = Dinv_k (y_k - A0 out_{{k+1}}) */
     for (int k = nz - 1; k >= 0; --k) {{
         size_t off = ((size_t)k * nmodes + m) * DIM;
-        size_t dof = ((size_t)k * nmodes + m) * DIM * DIM;
+        int kh = (k < nb_head) ? k : (nb_head - 1);
+        const cplx * Dinv = (slot >= 0)
+            ? exc + ((size_t)k * nb_exc + slot) * DIM * DIM
+            : head + ((size_t)kh * nmodes + m) * DIM * DIM;
+        size_t dof = 0;
         cplx rhs_k[DIM];
         for (int i = 0; i < DIM; ++i) {{
             cplx acc = y[off + i];
@@ -1824,6 +1843,80 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         # corrected at the two ends, which is one extra sweep instead of a pass
         # over both of them.
         self._spike_ends = xp.stack([V[0], V[-1], W[0], W[-1]], axis=-3)
+        if self._on_device:
+            self._compress_factors()
+
+    #: Factors kept per mode before the fixed point takes over. The
+    #: convergence distribution is a property of the operator, not the grid --
+    #: median 10 steps, 90th percentile 16, and only ~0.65% of modes need more
+    #: than 64 at any size measured -- so this trades a dense head against a
+    #: sparse exception table. Around 32 minimises the total.
+    HEAD_LENGTH = 32
+
+    def _compress_factors(self):
+        """Replace the factor array by a head plus an exception table.
+
+        ``D_k = A1 - A2 D_{k-1}^-1 A0`` has constant coefficients, so it is a
+        fixed-point iteration and its factors stop changing after a few steps.
+        Storing the first ``HEAD_LENGTH`` of them and reusing the last for the
+        rest is exact for every mode that has converged by then; the few that
+        have not keep a full line.
+
+        This is not only memory. The sweep *streams* these factors, so the
+        traffic falls with the storage.
+        """
+        xp = self._xp
+        nz = self.nz_local
+        head_len = min(self.HEAD_LENGTH, nz)
+        head = xp.ascontiguousarray(self.Dinv[:head_len])
+
+        # A mode is exceptional if reusing the last head factor would be wrong
+        # anywhere along the remaining axis.
+        tail = self.Dinv[head_len:]
+        if tail.shape[0]:
+            deviation = xp.abs(tail - head[-1]).max(axis=(0, -2, -1))
+            scale = xp.maximum(xp.abs(head[-1]).max(axis=(-2, -1)), 1e-300)
+            exceptional = (deviation / scale) > 1e-12
+        else:
+            exceptional = xp.zeros(self._mode_shape, dtype=bool)
+
+        flat = exceptional.reshape(-1)
+        nb_modes = int(flat.size)
+        index = xp.full(nb_modes, -1, dtype=xp.int32)
+        picked = xp.flatnonzero(flat)
+        nb_exc = int(picked.size)
+        index[picked] = xp.arange(nb_exc, dtype=xp.int32)
+
+        dim = self.dim
+        full = self.Dinv.reshape(nz, nb_modes, dim, dim)
+        self._head = head
+        self._exc = (xp.ascontiguousarray(full[:, picked])
+                     if nb_exc else xp.empty((nz, 1, dim, dim),
+                                             dtype=self._cdtype))
+        self._exc_index = index
+        self._picked = picked
+        self._nb_exc = nb_exc
+        self._head_length = head_len
+        # The full array is what this exists to get rid of.
+        self.Dinv = None
+
+    def _dinv_at(self, k):
+        """``D_k^-1``, from whichever representation is in use.
+
+        Before compression -- and always on the host -- this is a plain slice.
+        Afterwards it rebuilds the plane from the head and the exception table,
+        which is why the elementwise path stays usable on a device: it is the
+        reference the fused kernel is tested against, and a reference that
+        could not run would be no reference at all.
+        """
+        if self.Dinv is not None:
+            return self.Dinv[k]
+        base = self._head[min(k, self._head_length - 1)]
+        if not self._nb_exc:
+            return base
+        patched = base.copy()
+        patched.reshape(-1, self.dim, self.dim)[self._picked] = self._exc[k]
+        return patched
 
     def _solve_local(self, rhs):
         """``T_local x = rhs`` with the stored factors.
@@ -1850,12 +1943,12 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         y[0] = rhs[0]
         for k in range(1, nz):
             y[k] = rhs[k] - matmul(self.A[2],
-                                   matmul(self.Dinv[k - 1], y[k - 1]))
+                                   matmul(self._dinv_at(k - 1), y[k - 1]))
 
         out = xp.empty_like(rhs)
-        out[nz - 1] = matmul(self.Dinv[nz - 1], y[nz - 1])
+        out[nz - 1] = matmul(self._dinv_at(nz - 1), y[nz - 1])
         for k in range(nz - 2, -1, -1):
-            out[k] = matmul(self.Dinv[k],
+            out[k] = matmul(self._dinv_at(k),
                             y[k] - matmul(self.A[0], out[k + 1]))
         return out
 
@@ -1872,10 +1965,12 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         blocks = (nb_modes + threads - 1) // threads
         _block_thomas_kernel(dim, self._cdtype)(
             (blocks,), (threads,),
-            (flat, self.Dinv.reshape(nz, nb_modes, dim, dim),
+            (flat, self._head.reshape(self._head_length, nb_modes, dim, dim),
+             self._exc, self._exc_index,
              self.A[0].reshape(nb_modes, dim, dim),
              self.A[2].reshape(nb_modes, dim, dim),
-             scratch, out, np.int32(nz), np.int32(nb_modes)))
+             scratch, out, np.int32(nz), np.int32(nb_modes),
+             np.int32(self._head_length), np.int32(max(self._nb_exc, 1))))
         return out.reshape(rhs.shape)
 
     def _build_reduced_system(self):

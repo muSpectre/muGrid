@@ -30,7 +30,8 @@ all-to-all. The V-cycle remains serial and host-only.
 
 Before running anything on more than one GPU, read §12.2: it needs two
 environment variables, and without them even `-P none` aborts. §13 covers the
-fused sweep kernel and what it exposed once the sweep stopped dominating.
+fused sweep kernel and what it exposed once the sweep stopped dominating, and
+§14 the factor compression that followed from it.
 
 Read §7 before planning Stage 4: it changes what a single-node MPI run can be
 used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
@@ -1297,3 +1298,64 @@ buys it back.
 - **No multi-GPU timings.** Correctness is established at 1, 2 and 4 ranks over
   2 devices; the crossover this design exists for needs more devices than this
   box has.
+
+---
+
+## 14. Compressing the factor storage
+
+§13.4 called this the biggest remaining win, because the sweep *streams* the
+factors: compressing them cuts bandwidth as well as memory.
+
+### 14.1 The convergence distribution does not depend on the grid
+
+`D_k = A₁ − A₂ D_{k-1}⁻¹ A₀` has constant coefficients, so it is a fixed-point
+iteration. Measured on the hybrid's own modes:
+
+| n | modes | median | p90 | p99 | > 16 | > 32 | > 64 |
+|---|---|---|---|---|---|---|---|
+| 64 | 2112 | 10 | 16 | 57 | 9.5% | 2.7% | 0.0% |
+| 128 | 8320 | 10 | 16 | 52 | 9.5% | 2.6% | 0.7% |
+| 256 | 33024 | 10 | 16 | 52 | 9.3% | 2.6% | 0.7% |
+
+Flat across a 64× range in volume — it is a property of the operator, not of
+the discretisation. So the *fraction* of the axis that must be stored falls as
+`N_z` grows, and compression improves with problem size.
+
+That also fixes the cutoff. Total storage in units of one plane is
+`K + f(K)·N_z`, minimised near `K = 32`: `32 + 0.026 × 256 ≈ 39` against 256.
+
+### 14.2 Head plus exceptions
+
+The first `K = 32` factors are stored densely and everything beyond reuses the
+last of them. The ~2% of modes that have not converged by then keep a full
+line, reached through an index read once per thread rather than per step. A
+mode is exceptional when reusing the last head factor would be wrong *anywhere*
+along the remaining axis, so this is exact rather than approximate — which is
+what lets the existing exactness tests stand as the check.
+
+| grid | modes | exceptional | full | kept | ratio | sweep |
+|---|---|---|---|---|---|---|
+| 128³ | 8320 | 169 (2.0%) | 153 MB | 41 MB | 3.7× | 435 → 409 µs |
+| 256³ | 33024 | 665 (2.0%) | 1217 MB | **177 MB** | **6.9×** | 1619 → **1280 µs** |
+
+The sweep gains 21% at 256³ for free, because the factor traffic it streams
+falls with the storage.
+
+### 14.3 Where the apply now stands
+
+| | `-P reference` | `-P hybrid` | ratio |
+|---|---|---|---|
+| 128³ | 690 µs | 2955 µs | 4.28× |
+| 256³ | 5688 µs | 12183 µs | **2.14×** |
+
+At 256³: fft 3545, tridiag 1444, interface 479, ifft 2782, and 3934 µs reading
+and writing the Field. The sweep is now the *smallest* of the four regions.
+What remains is transform and data movement, not the tridiagonal solve, so
+further work belongs there rather than here.
+
+### 14.4 Note on the elementwise path
+
+The loop that the kernel replaced now reaches the factors through an accessor
+that understands both representations, so it still runs on a device after
+compression. That is deliberate: it is the reference the fused kernel is tested
+against, and a reference that could not run would be no reference at all.

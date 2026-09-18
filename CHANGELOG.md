@@ -146,6 +146,15 @@ unreleased
   are no longer stored at all, since correcting the right-hand side at its two
   end planes and solving again is the same thing for one extra sweep instead of
   a pass over 2.4 GB
+- PERF: The hybrid's Thomas factors are stored compressed. Their recurrence has
+  constant coefficients and is therefore a fixed-point iteration whose
+  convergence distribution turns out to be independent of the grid -- median 10
+  steps, 90th percentile 16 at every size measured -- so the first 32 factors
+  are kept densely, everything beyond reuses the last, and the ~2% of modes that
+  have not converged by then keep a full line. Exact rather than approximate: a
+  mode is exceptional when reusing the last factor would be wrong anywhere along
+  the remaining axis. 6.9x less storage at 256 cubed, 1217 MB down to 177 MB,
+  and the sweep gains 21% because it streams those factors
 
 
 v1.3.0 (16Sep26)
