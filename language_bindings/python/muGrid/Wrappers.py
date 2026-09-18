@@ -1693,7 +1693,6 @@ class IsotropicStiffnessOperator3D(IsotropicStiffnessOperator):
         super().__init__(3, grid_spacing, element)
 
 
-
 class NodalMomentOperator:
     """
     Python wrapper for the fused nodal-moment operator.

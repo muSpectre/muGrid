@@ -35,7 +35,6 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import importlib
 import unittest
 
 import numpy as np
