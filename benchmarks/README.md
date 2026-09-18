@@ -31,8 +31,8 @@ the file. Columns:
 - `version` is `git describe --tags --always --dirty`; `commit` is the short
   hash; `dirty=1` flags an uncommitted working tree (avoid for runs you intend
   to keep).
-- `precision` is `double` (fp64) or `single` (fp32). Legacy rows predate this
-  column and are blank; they are read as `double`. Each benchmark is run once
+- `precision` is `double` (fp64) or `single` (fp32); a blank cell reads as
+  `double`. Each benchmark is run once
   per precision (separate jobs, hence separate `timestamp`s); the pages overlay
   whatever precisions are present — latest run *per precision* — with fp64 drawn
   solid and fp32 dashed.

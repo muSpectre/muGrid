@@ -1009,10 +1009,9 @@ namespace muGrid {
   // Reading a variable into a field of a different scalar type must
   // *convert* between the file's external type and the memory type -- the
   // PnetCDF flexible API does so natively and the serial backend dispatches
-  // to the typed nc_get_varm_* calls to match. Regression test: the serial
-  // backend used to call the untyped nc_get_varm, which performs no
-  // conversion, so reading a float variable into a double field silently
-  // reinterpreted the raw bytes.
+  // to the typed nc_get_varm_* calls to match. The untyped nc_get_varm
+  // performs no conversion, so dispatching to it instead would make reading a
+  // float variable into a double field silently reinterpret the raw bytes.
   BOOST_AUTO_TEST_CASE(DtypeConversionRead) {
     auto & comm{MPIContext::get_context().comm};
     const DynGridIndex nb_domain_grid_pts{3, 4};

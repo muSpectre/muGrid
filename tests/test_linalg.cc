@@ -589,12 +589,13 @@ BOOST_AUTO_TEST_CASE(axpy_norm_sq_device_with_ghosts_2d) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 3D GPU tests - critical regression tests for 3D ghost subtraction       */
+/* 3D GPU tests - interior-only reductions next to large ghost buffers     */
 /* ---------------------------------------------------------------------- */
 
 /**
  * Test norm_sq on GPU with ghosts in 3D.
- * This is the critical regression test for the 3D ghost subtraction bug.
+ * The reduction must cover the interior only, whatever the ghost buffers
+ * hold; in 3D the ghost region is the bulk of the buffer.
  */
 BOOST_AUTO_TEST_CASE(norm_sq_device_with_ghosts_3d) {
     constexpr Index_t len{8};
@@ -769,7 +770,8 @@ BOOST_AUTO_TEST_CASE(axpy_norm_sq_device_with_ghosts_3d) {
 
 /**
  * Test that CPU and GPU produce identical results for norm_sq in 3D.
- * This is the critical regression test for the bug that caused CG divergence.
+ * A Krylov solver steers on these norms, so a backend that disagrees here
+ * converges on one device and diverges on the other.
  */
 BOOST_AUTO_TEST_CASE(norm_sq_cpu_gpu_match_3d) {
     constexpr Index_t len{8};
@@ -1203,7 +1205,8 @@ BOOST_AUTO_TEST_CASE(deep_copy_cpu_to_gpu_varying_values) {
 
 /**
  * Test that CPU and GPU produce identical results for norm_sq with ghosts.
- * This is a critical regression test for the SoA memory layout fix.
+ * Covers the SoA memory layout, where the component stride is the pixel
+ * count rather than 1, so the two backends must still agree.
  */
 BOOST_AUTO_TEST_CASE(norm_sq_cpu_gpu_match_2d) {
     constexpr Index_t len{16};

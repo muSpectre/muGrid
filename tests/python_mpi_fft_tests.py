@@ -954,12 +954,12 @@ class TestMPIFFTCollectionWrappers:
 class TestMPIFFTSinglePrecision:
     """Single-precision (float32 / complex64) MPI FFTs.
 
-    Regression tests for the multi-GPU single-precision path. The GPU FFT
-    backends (rocFFT, cuFFT) originally implemented only double precision, so
-    every fp32 transform that went through the MPI pencil path (the 1D r2c/c2r/
-    c2c primitives) or the serial N-D path raised "single-precision … not
-    supported by this FFT backend". These tests drive a real fp32 transform end
-    to end and compare against a float64 numpy reference.
+    Covers the multi-GPU single-precision path. fp32 transforms reach the GPU
+    FFT backends (rocFFT, cuFFT) through the MPI pencil path (the 1D r2c/c2r/
+    c2c primitives) and through the serial N-D path; a backend that implements
+    only double precision raises "single-precision … not supported by this FFT
+    backend" on either. These tests drive a real fp32 transform end to end and
+    compare against a float64 numpy reference.
 
     The tolerance is scaled by the grid size: the float32 r2c relative error
     grows with the transform length, and the Fourier coefficients of unit-
@@ -1092,12 +1092,13 @@ class TestMPIEmptySubdomainKernels:
     def test_cross_on_empty_fourier_subdomain(self, comm, device):
         """``linalg.cross`` must be a no-op, not raise, on a rank with no pixels.
 
-        Regression test for the pseudo-spectral ``cross(ik, u)`` call on the
-        Fourier-space velocity. On an empty subdomain the three fields share a
-        null data buffer, so ``cross``'s output-aliasing guard ("output must be
-        a field distinct from both inputs") used to fire on CPU (and the kernel
-        launch failed on GPU). The empty ranks then died while the ranks that
-        owned data hung in the following collective.
+        This is the pseudo-spectral ``cross(ik, u)`` call on the Fourier-space
+        velocity. On an empty subdomain the three fields share a null data
+        buffer, so ``cross``'s output-aliasing guard ("output must be a field
+        distinct from both inputs") must not fire on CPU, and the GPU kernel
+        launch must be skipped rather than attempted. An empty rank that
+        raises here dies while the ranks that own data hang in the following
+        collective.
 
         The engine decomposes Fourier space along its first axis, so a first
         grid axis of 1 gives a Fourier extent of ``1 // 2 + 1 == 1`` there:

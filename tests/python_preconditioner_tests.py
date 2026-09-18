@@ -925,7 +925,7 @@ def _laminate_solve(comm, engine, op, lam, mu, prec):
 
 
 def test_green_jacobi_refresh_after_material_update(comm):
-    """Regression for the silent stale-diagonal trap: a Green-Jacobi
+    """The silent stale-diagonal trap: a Green-Jacobi
     preconditioner built while the material is still uniform (it warns), then
     used after an in-place material update WITHOUT refresh(), converges no
     faster than plain Green; after refresh() it recovers the J-FFT speedup."""

@@ -24,8 +24,7 @@ Generic operators are useful for prototyping or implementing custom stencils.
 
 ## Generic Linear Operators
 
-The `GenericLinearOperator` class (formerly `StencilGradientOperator`)
-implements arbitrary convolution stencils. It is the most flexible operator
+The `GenericLinearOperator` class implements arbitrary convolution stencils. It is the most flexible operator
 type but also the slowest due to indirect memory access patterns.
 
 ### Creating a generic operator
