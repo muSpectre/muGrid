@@ -59,6 +59,7 @@ set(MUGRID_SOURCES
     # util/
     # linalg/
     linalg/linalg_host.cc
+    linalg/block_thomas.cc
     # fft/
     fft/pocketfft_backend.cc
     fft/transpose.cc

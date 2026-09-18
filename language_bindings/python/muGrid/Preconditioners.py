@@ -1843,8 +1843,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         # corrected at the two ends, which is one extra sweep instead of a pass
         # over both of them.
         self._spike_ends = xp.stack([V[0], V[-1], W[0], W[-1]], axis=-3)
-        if self._on_device:
-            self._compress_factors()
+        # Host and device alike: the fused sweeps on both stream these factors,
+        # so compressing them cuts traffic as well as storage. It runs after the
+        # spikes, which are built through the elementwise path and want the
+        # uncompressed array.
+        self._compress_factors()
 
     #: Factors kept per mode before the fixed point takes over. The
     #: convergence distribution is a property of the operator, not the grid --
@@ -1932,8 +1935,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         setup path for the spikes, and as the reference the fused kernel is
         tested against.
         """
-        if self._on_device and rhs.shape[-1] == 1:
-            return self._solve_local_fused(rhs)
+        if rhs.shape[-1] == 1 and self.Dinv is None:
+            if self._on_device:
+                return self._solve_local_fused(rhs)
+            return self._solve_local_fused_host(rhs)
 
         xp = self._xp
         nz = self.nz_local
@@ -1951,6 +1956,38 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             out[k] = matmul(self._dinv_at(k),
                             y[k] - matmul(self.A[0], out[k + 1]))
         return out
+
+    def _solve_local_fused_host(self, rhs):
+        """The same solve as one C++ call instead of ``4 * nz`` array products.
+
+        The elementwise path streams the whole mode array four times per plane,
+        so a solve costs ``4 * nz`` passes over memory where this costs two.
+        Measured on the host that was the dominant cost of the preconditioner
+        by an order of magnitude -- far more than the transform it replaces.
+
+        The kernel runs plane-outer, mode-inner, which is the opposite of the
+        device's one-thread-per-mode march: a single host thread walking one
+        mode would stride by ``nb_modes * dim`` between planes, where this way
+        every access is contiguous.
+        """
+        xp = self._xp
+        nz, dim = self.nz_local, self.dim
+        nb_modes = int(np.prod(self._mode_shape))
+
+        flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
+        scratch = xp.empty_like(flat)
+        out = xp.empty_like(flat)
+        single = np.dtype(self._cdtype) == np.dtype(np.complex64)
+        kernel = getattr(
+            linalg, f"block_thomas_{dim}d" + ("_f32" if single else ""))
+        kernel(flat,
+               self._head.reshape(self._head_length, nb_modes, dim, dim),
+               self._exc.reshape(nz, max(self._nb_exc, 1), dim, dim),
+               self._exc_index,
+               self.A[0].reshape(nb_modes, dim, dim),
+               self.A[2].reshape(nb_modes, dim, dim),
+               scratch, out)
+        return out.reshape(rhs.shape)
 
     def _solve_local_fused(self, rhs):
         """The same solve as one kernel launch instead of ``4 * nz``."""

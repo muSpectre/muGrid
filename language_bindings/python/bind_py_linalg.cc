@@ -36,8 +36,10 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "linalg/linalg.hh"
+#include "linalg/block_thomas.hh"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 #include <pybind11/complex.h>
 #include <pybind11/stl.h>
 
@@ -65,6 +67,81 @@ using Real32FieldDevice = TypedField<Real32, DeviceSpace>;
 using Complex32FieldDevice = TypedField<Complex32, DeviceSpace>;
 #endif
 
+namespace {
+
+    /**
+     * Bind the fused block-Thomas sweep for one block size and precision.
+     *
+     * The arrays are handed over as buffers rather than muGrid fields: they
+     * live in Fourier space with a mode axis rather than a pixel axis, so no
+     * field collection describes them. Shapes are checked here so a mismatch
+     * fails with a message instead of walking off the end of a buffer.
+     */
+    template <muGrid::Dim_t Dim, typename T>
+    void bind_block_thomas(py::module & mod, const char * name) {
+        using Arr = py::array_t<std::complex<T>,
+                                py::array::c_style | py::array::forcecast>;
+        mod.def(
+            name,
+            [](Arr rhs, Arr head, Arr exc,
+               py::array_t<int, py::array::c_style | py::array::forcecast>
+                   exc_index,
+               Arr A0, Arr A2, Arr y, Arr out) {
+                // Every buffer_info must be taken while the GIL is held:
+                // `request()` reenters the Python buffer protocol.
+                const auto r = rhs.request();
+                const auto h = head.request();
+                const auto e = exc.request();
+                const auto xi = exc_index.request();
+                const auto a0 = A0.request();
+                const auto a2 = A2.request();
+                const auto ys = y.request();
+                const auto os = out.request();
+
+                if (r.ndim != 3 || r.shape[2] != Dim) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: rhs must be (nz, nb_modes, Dim)"};
+                }
+                const muGrid::Index_t nz{r.shape[0]};
+                const muGrid::Index_t nb_modes{r.shape[1]};
+                const muGrid::Index_t nb_head{h.shape[0]};
+                const muGrid::Index_t nb_exc{e.shape[1]};
+                if (ys.size != r.size || os.size != r.size) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: y and out must match rhs in size"};
+                }
+                if (xi.shape[0] != nb_modes) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: exc_index must have one entry per mode"};
+                }
+                if (e.shape[0] != nz) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: exc must span the whole axis"};
+                }
+
+                const auto * rhs_p = static_cast<const std::complex<T> *>(r.ptr);
+                const auto * head_p = static_cast<const std::complex<T> *>(h.ptr);
+                const auto * exc_p = static_cast<const std::complex<T> *>(e.ptr);
+                const auto * idx_p = static_cast<const int *>(xi.ptr);
+                const auto * a0_p = static_cast<const std::complex<T> *>(a0.ptr);
+                const auto * a2_p = static_cast<const std::complex<T> *>(a2.ptr);
+                auto * y_p = static_cast<std::complex<T> *>(ys.ptr);
+                auto * out_p = static_cast<std::complex<T> *>(os.ptr);
+
+                py::gil_scoped_release release{};
+                muGrid::block_thomas::sweep<Dim, T>(
+                    rhs_p, head_p, exc_p, idx_p, a0_p, a2_p, y_p, out_p, nz,
+                    nb_modes, nb_head, nb_exc);
+            },
+            "rhs"_a, "head"_a, "exc"_a, "exc_index"_a, "A0"_a, "A2"_a, "y"_a,
+            "out"_a,
+            "Fused block-Thomas sweep along the distributed axis, batched over "
+            "Fourier modes. Host counterpart of the device kernel: two passes "
+            "over memory instead of the 4*nz an elementwise formulation costs.");
+    }
+
+}  // namespace
+
 void add_linalg_functions(py::module &mod) {
     // Create linalg submodule
     auto linalg = mod.def_submodule("linalg",
@@ -84,6 +161,11 @@ void add_linalg_functions(py::module &mod) {
         Note: These functions return local (process-local) results for parallel
         computations. Use comm.sum() to reduce across MPI ranks.
         )pbdoc");
+
+    bind_block_thomas<2, Real>(linalg, "block_thomas_2d");
+    bind_block_thomas<3, Real>(linalg, "block_thomas_3d");
+    bind_block_thomas<2, Real32>(linalg, "block_thomas_2d_f32");
+    bind_block_thomas<3, Real32>(linalg, "block_thomas_3d_f32");
 
     // --- Real field operations (host) ---
 
