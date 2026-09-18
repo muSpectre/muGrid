@@ -28,7 +28,10 @@ taken (§7.4: `R = 4.1–4.8`, go). Stages 3 (GPU) and 4 (MPI) remain.
 
 Read §7 before planning Stage 4: it changes what a single-node MPI run can be
 used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
-default of 2 at every grid measured.
+default of 2 at every grid measured. **Read §9 before starting Stage 4 at all**:
+a Fourier/tridiagonal hybrid reaches the FFT preconditioner's iteration count
+exactly, without transforming the distributed axis, and may be the better
+design.
 
 - **PR #206** — `feat/multigrid-reference-preconditioner`, one commit, open
   against `main`, mergeable. Contains `GridTransfer{2,3}D` (host kernels +
@@ -855,3 +858,107 @@ where the cycle is doing its easiest work. §6.5's sharp-interface results belon
 to the J-FFT scheme rather than to the cycle, but `ν=1` has the least margin if
 that ever stops being true, so re-measure §8.2 if the coarse level is ever
 given the heterogeneous operator (§5).
+
+---
+
+## 9. The Fourier/tridiagonal hybrid — prototyped, and it is exact
+
+An alternative to replacing the FFT entirely. Under the slab split `[1, 1, P]`
+only z is distributed, so: **FFT the local axes, solve tridiagonally along the
+distributed one.** Prototyped in `mg_prototype.py --hybrid`.
+
+### 9.1 Why it works, and why the obvious argument is the wrong one
+
+Two facts suffice, and neither requires the operator to separate:
+
+1. `Kʳᵉᶠ` is translation-invariant in x and y — it is *uniform* by construction
+   — so transforming those axes block-diagonalises it and every `(qₓ, q_y)` mode
+   decouples exactly.
+2. The stencil reaches exactly one node in z. Measured: 27 nodes for Q1 and 19
+   for P1, extent `(1, 1, 1)` in both. So what remains along z is
+   block-tridiagonal with `dim × dim` blocks.
+
+The tempting argument — "the Laplacian factorises as a Kronecker sum" — is not
+the one to lean on. Q1 elasticity is *not* a Kronecker sum, yet the conclusion
+holds anyway, because (2) is a statement about stencil support rather than
+separability. It also means the construction covers P1, including 2D P1, where
+the V-cycle's smoother refuses to run at all (§6.1).
+
+Verified numerically: the three blocks reconstruct the full 3D symbol to
+`4.4e-16`, the coupling blocks satisfy `A₋₁ = A₊₁ᴴ` and `A₀` is Hermitian, so
+each mode's z-operator is Hermitian and the preconditioner stays symmetric.
+
+### 9.2 With an exact z-solve it *is* the reference preconditioner
+
+Not "close to" — the same operator, reached without ever transforming z:
+
+| check | 2D n=32 | 3D n=16 |
+|---|---|---|
+| `‖hybrid − reference‖ / ‖reference‖` | 2.7e-14 | 2.6e-15 |
+| `‖K M⁻¹r − r‖ / ‖r‖` | 7.2e-15 | 9.9e-16 |
+| symmetry `⟨M⁻¹a,b⟩` vs `⟨a,M⁻¹b⟩` | 1.1e-13 | 7.8e-16 |
+
+And the CG counts follow, on the sharp inclusion at contrast 10:
+
+| | 3D 16 | 3D 32 | 3D 64 | 2D 64 | 2D 128 |
+|---|---|---|---|---|---|
+| FFT | 23 | 23 | 22 | 21 | 20 |
+| 3D V-cycle | 36 | 36 | 36 | 37 | 36 |
+| **hybrid, exact z** | **23** | **23** | **22** | **21** | **20** |
+| hybrid, z-cycle (2) | 27 | 27 | 27 | 28 | 27 |
+
+`J`-scaled, the exact hybrid also tracks the FFT exactly — 25/25, 35/35, 52/52,
+54/54 — the one exception being 2D n=128 (83 vs 86), where the scaled system is
+ill-conditioned enough for a 1e-14 difference in the operator to move the count
+by a few.
+
+**This is the result that matters.** The V-cycle's weakness was never its cost
+per apply; it was the 1.5× iteration penalty of being an approximate inverse
+(§8). The hybrid has none of it, while still never transforming the distributed
+axis — so no all-to-all.
+
+### 9.3 The z-only V-cycle is the weaker fallback
+
+If even the interface solve is unwanted, semi-coarsening multigrid in z alone is
+halo-only. It costs 27 iterations against 22–23, grid-independent, with
+diminishing returns per extra cycle (32 → 27 → 26 for 1 → 2 → 3 cycles at
+3D n=32). It is clearly better than the 3D V-cycle's 36, but the `J`-scaled
+column degrades more sharply (64 against 52 at 3D n=64), so the approximation
+interacts badly with the scaling on sharp interfaces.
+
+**Prefer the exact z-solve.**
+
+### 9.4 What this does not settle
+
+The prototype measures *iterations*, not communication or time. The cost claims
+below are analysis and want measuring before any of this is committed to:
+
+- The exact z-solve needs a parallel tridiagonal algorithm along the distributed
+  axis — partitioned Thomas with a reduced interface system of size `2P` per
+  mode, or cyclic reduction. Its communication is the *interface* (`2P` planes)
+  rather than the *volume* (`N_z` planes), so the advantage over the all-to-all
+  scales as `2P / N_z` and narrows as `P` approaches the slab ceiling.
+- The z-operator is periodic tridiagonal, since `Kʳᵉᶠ` is circulant in z too, so
+  Thomas needs a Sherman–Morrison correction.
+- Thomas factors are not circulant in z, so storing them is `O(N_z)` per mode
+  (~5 GB at 256³); recompute per apply, or use the z-cycle, which needs only the
+  three repeating blocks.
+- The `(0,…,0)` mode keeps the constant-in-z nullspace — the rigid translation
+  the reference preconditioner already pseudo-inverts at `q = 0`. The prototype
+  projects it out explicitly; production must too.
+- This removes the *communication*, not the slab. The `P ≤ N_z` ceiling stands.
+
+### 9.5 Consequence for the plan
+
+This is a serious alternative to Stage 4 as specified, and on convergence it
+strictly dominates: the V-cycle starts 3.8× behind on whole-solve cost (§8.2)
+and has to make that up from communication alone, whereas the hybrid starts
+level with `-P reference` and needs only the all-to-all to cost *anything*.
+
+It is also less work than it looks. It reuses the existing symbol assembly, adds
+no new smoother, and the 2D transform is the one the FFT engine already issues.
+What is new is the parallel tridiagonal solve.
+
+Worth noting it is not exotic: this is the classical partial-diagonalisation /
+Fourier-tridiagonal fast solver (FISHPACK and most spectral codes), with the
+elastic generalisation to `dim × dim` blocks.

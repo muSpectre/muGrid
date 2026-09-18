@@ -394,6 +394,278 @@ def cmd_rho(args):
               f"{mg.omega:>7.4f} {rho:>9.4f} {it + 1:>14}")
 
 
+# --------------------------------------------------------------------------- #
+# Hybrid preconditioner: FFT in the *local* axes, block-tridiagonal solve along
+# the *distributed* one.
+#
+# Under the slab decomposition [1, 1, P] that muGrid's FFT engine imposes, x and
+# y are rank-local and only z is divided. That split is deliberate -- leaving two
+# axes local is what allows a batched 2D rocFFT/cuFFT call instead of 1D
+# transforms plus a transpose -- but it is also what forces the all-to-all, since
+# the third transform needs data the rank does not hold.
+#
+# The hybrid keeps the cheap half and replaces the expensive half. Two facts make
+# it exact rather than approximate:
+#
+#   1. K_ref is translation-invariant in x and y (it is *uniform* by
+#      construction), so transforming those axes block-diagonalises it: each
+#      (qx, qy) mode decouples completely.
+#   2. The stencil reaches exactly one node in z -- measured, for Q1 (27 nodes)
+#      and P1 (19 nodes) alike -- so what is left along z after that transform is
+#      block-tridiagonal, with dim x dim blocks and dim*dim entries per mode.
+#
+# Neither fact needs the operator to separate as a Kronecker sum. Q1 elasticity
+# does not, which is why the "the Laplacian factorises" argument is the wrong one
+# to lean on even though it points at the right answer.
+#
+# Solve that tridiagonal system exactly and the result *is* K_ref^-1 -- the same
+# operator `-P reference` applies, reached without ever transforming z. So the
+# CG count should be the FFT column's, not the V-cycle's, which is the whole
+# point: the V-cycle's 1.5x iteration penalty disappears.
+#
+# The catch is that z is both the tridiagonal direction and the distributed one.
+# `z_solve="mg"` models the cheapest answer to that -- semi-coarsening multigrid
+# in z alone, halo-only and free of the log P that cyclic reduction would cost.
+# --------------------------------------------------------------------------- #
+
+
+def _stencil(dim, spacing, element, lam, mu, n=8):
+    """The uniform operator's stencil, by impulse response.
+
+    Returns S with ``f(y) = sum_d S[d] u(y - d)``, indexed ``S[dx+1, dy+1, ...]``.
+    `n` only has to be large enough that a one-node-wide stencil cannot wrap.
+    """
+    decomp = muGrid.CartesianDecomposition(
+        muGrid.Communicator(), (n,) * dim, nb_subdivisions=(1,) * dim,
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
+    cls = (muGrid.IsotropicStiffnessOperator2D if dim == 2
+           else muGrid.IsotropicStiffnessOperator3D)
+    op = cls(tuple(spacing), element)
+    u = decomp.collection.real_field("stencil-u", (dim,))
+    f = decomp.collection.real_field("stencil-f", (dim,))
+
+    S = np.zeros((3,) * dim + (dim, dim))
+    c = n // 2
+    for beta in range(dim):
+        u.set_zero()
+        u.s[(beta, 0) + (c,) * dim] = 1.0
+        decomp.communicate_ghosts(u)
+        op.apply_uniform(u, lam, mu, f)
+        arr = np.asarray(f.s)[:, 0]
+        for off in np.ndindex((3,) * dim):
+            S[off + (slice(None), beta)] = arr[
+                (slice(None),) + tuple(c + o - 1 for o in off)]
+    return S
+
+
+def _z_blocks(S, dim, local_shape):
+    """Transform the local axes; return the three z-coupling blocks per mode.
+
+    ``A[m]`` for ``m = dz + 1`` has shape ``(*local_shape, dim, dim)``, and the
+    z-operator for each mode is
+    ``(T v)(k) = A[0] v(k+1) + A[1] v(k) + A[2] v(k-1)``.
+    """
+    qs = [2 * np.pi * np.fft.fftfreq(n) for n in local_shape]
+    grids = np.meshgrid(*qs, indexing="ij") if local_shape else []
+    A = np.zeros((3,) + tuple(local_shape) + (dim, dim), dtype=complex)
+    for off in np.ndindex((3,) * dim):
+        phase = np.ones(local_shape, dtype=complex)
+        for ax in range(dim - 1):
+            phase = phase * np.exp(-1j * grids[ax] * (off[ax] - 1))
+        A[off[-1]] += phase[..., None, None] * S[off]
+    return A
+
+
+def _apply_T(A, v):
+    """``(T v)(k) = A[0] v(k+1) + A[1] v(k) + A[2] v(k-1)``, batched over modes.
+
+    `v` has shape ``(*modes, nz, dim)``; the blocks broadcast along z.
+    """
+    def mul(block, w):
+        return np.einsum("...ij,...j->...i", block[..., None, :, :], w)
+    return (mul(A[0], np.roll(v, -1, axis=-2))
+            + mul(A[1], v)
+            + mul(A[2], np.roll(v, 1, axis=-2)))
+
+
+def _dense_T(A, nz):
+    """The z-operator as an explicit ``(*modes, nz*dim, nz*dim)`` matrix."""
+    dim = A.shape[-1]
+    modes = A.shape[1:-2]
+    M = np.zeros(modes + (nz * dim, nz * dim), dtype=complex)
+    for k in range(nz):
+        sl = slice(k * dim, (k + 1) * dim)
+        M[..., sl, slice(((k + 1) % nz) * dim, ((k + 1) % nz) * dim + dim)] += A[0]
+        M[..., sl, sl] += A[1]
+        M[..., sl, slice(((k - 1) % nz) * dim, ((k - 1) % nz) * dim + dim)] += A[2]
+    return M
+
+
+def _invert_modes(M):
+    """Batched inverse, with a pseudo-inverse wherever the mode is singular.
+
+    Only the all-zero local mode is singular: there the z-operator still has the
+    constant-in-z nullspace, which is exactly the rigid translation the reference
+    preconditioner also pseudo-inverts at q = 0.
+    """
+    flat = M.reshape((-1,) + M.shape[-2:])
+    out = np.empty_like(flat)
+    eye = np.eye(flat.shape[-1], dtype=flat.dtype)
+    for i in range(flat.shape[0]):
+        try:
+            out[i] = np.linalg.inv(flat[i])
+        except np.linalg.LinAlgError:
+            out[i] = np.linalg.pinv(flat[i])
+            continue
+        # inv() does not always raise on a singular mode; it returns garbage.
+        # Checking the residual is cheaper than a condition number and catches
+        # both cases.
+        residual = np.abs(flat[i] @ out[i] - eye).max()
+        if not np.isfinite(residual) or residual > 1e-6:
+            out[i] = np.linalg.pinv(flat[i])
+    return out.reshape(M.shape)
+
+
+def _prolong_z(coarse):
+    """Linear interpolation along z, ``(*modes, nz, dim) -> (*modes, 2nz, dim)``."""
+    nz = coarse.shape[-2]
+    fine = np.empty(coarse.shape[:-2] + (2 * nz, coarse.shape[-1]),
+                    dtype=coarse.dtype)
+    fine[..., 0::2, :] = coarse
+    fine[..., 1::2, :] = 0.5 * (coarse + np.roll(coarse, -1, axis=-2))
+    return fine
+
+
+def _restrict_z(fine):
+    """The exact adjoint of :func:`_prolong_z`, which keeps the cycle symmetric."""
+    even = fine[..., 0::2, :]
+    odd = fine[..., 1::2, :]
+    return even + 0.5 * (odd + np.roll(odd, 1, axis=-2))
+
+
+class HybridFourierTridiagonal:
+    """``K_ref^-1`` by FFT in the local axes and a tridiagonal solve in z.
+
+    Parameters
+    ----------
+    z_solve : {"exact", "mg"}
+        ``"exact"`` factorises each mode's z-operator once and is therefore the
+        exact inverse -- the ceiling this design can reach, and what a parallel
+        partitioned-Thomas or cyclic-reduction solver would compute. ``"mg"``
+        replaces it with semi-coarsening multigrid in z, which needs only halo
+        exchange and is the variant that would actually run under MPI.
+    """
+
+    SAFETY = 1.7
+
+    def __init__(self, dim, n, spacing, element, lam, mu,
+                 z_solve="exact", nu=2, cycles=1, coarsest=4):
+        self.dim, self.n, self.nz = dim, n, n
+        self.z_solve, self.nu, self.cycles = z_solve, nu, cycles
+        self.local_shape = (n,) * (dim - 1)
+        self.local_axes = tuple(range(1, dim))
+
+        spacing = np.asarray(spacing, dtype=float)
+        self.A = _z_blocks(_stencil(dim, spacing, element, lam, mu),
+                           dim, self.local_shape)
+
+        if z_solve == "exact":
+            self.Tinv = _invert_modes(_dense_T(self.A, n))
+            self.nb_z_levels = 1
+            return
+
+        # Semi-coarsening: z halves, the local axes do not, so each level is a
+        # rediscretisation of the same operator at a doubled z spacing.
+        self.levels = []
+        nz, nb = n, 1
+        while nz // 2 >= coarsest and nz % 2 == 0:
+            nb, nz = nb + 1, nz // 2
+        self.nb_z_levels = nb
+        for lvl in range(nb):
+            h = spacing.copy()
+            h[-1] *= 2 ** lvl
+            A = _z_blocks(_stencil(dim, h, element, lam, mu),
+                          dim, self.local_shape)
+            self.levels.append({"A": A, "nz": n // 2 ** lvl,
+                                "Dinv": _invert_modes(A[1])})
+        self.levels[-1]["Tinv"] = _invert_modes(
+            _dense_T(self.levels[-1]["A"], self.levels[-1]["nz"]))
+        for level in self.levels[:-1]:
+            level["omega"] = self.SAFETY / self._lambda_max(level)
+
+    # -- smoother ---------------------------------------------------------- #
+
+    def _lambda_max(self, level, nb_it=40):
+        """Largest eigenvalue of ``D^-1 T``, per mode, by power iteration.
+
+        Per-mode rather than global: the modes are decoupled, and a single
+        damping that suited the stiffest of them would badly under-relax the
+        rest. A real per-mode omega keeps the smoother linear and symmetric.
+        """
+        rng = np.random.default_rng(0)
+        shape = self.local_shape + (level["nz"], self.dim)
+        v = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape))
+        lam = np.ones(self.local_shape)
+        for _ in range(nb_it):
+            w = self._apply_Dinv(level, _apply_T(level["A"], v))
+            lam = np.sqrt((np.abs(w) ** 2).sum(axis=(-2, -1)))
+            v = w / np.maximum(lam, 1e-300)[..., None, None]
+        return np.maximum(lam, 1e-12)
+
+    @staticmethod
+    def _apply_Dinv(level, v):
+        return np.einsum("...ij,...j->...i", level["Dinv"][..., None, :, :], v)
+
+    def _smooth(self, level, r, z, nb_steps):
+        omega = level["omega"][..., None, None]
+        for _ in range(nb_steps):
+            z = z + omega * self._apply_Dinv(
+                level, r - _apply_T(level["A"], z))
+        return z
+
+    # -- the z-cycle ------------------------------------------------------- #
+
+    def _z_vcycle(self, r, lvl=0):
+        level = self.levels[lvl]
+        if lvl == self.nb_z_levels - 1:
+            flat = r.reshape(self.local_shape + (-1,))
+            out = np.einsum("...ij,...j->...i", level["Tinv"], flat)
+            return out.reshape(r.shape)
+        z = self._smooth(level, r, np.zeros_like(r), self.nu)
+        residual = r - _apply_T(level["A"], z)
+        z = z + _prolong_z(self._z_vcycle(_restrict_z(residual), lvl + 1))
+        return self._smooth(level, r, z, self.nu)
+
+    def _solve_z(self, v):
+        if self.z_solve == "exact":
+            flat = v.reshape(self.local_shape + (-1,))
+            out = np.einsum("...ij,...j->...i", self.Tinv, flat)
+            return out.reshape(v.shape)
+        z = np.zeros_like(v)
+        for _ in range(self.cycles):
+            z = z + self._z_vcycle(v - _apply_T(self.levels[0]["A"], z))
+        return z
+
+    # -- the preconditioner ------------------------------------------------ #
+
+    def apply(self, r):
+        """``M^-1 r`` for a real ``(dim, *spatial)`` array."""
+        r = project_mean_out(r)
+        rh = np.fft.fftn(r, axes=self.local_axes)
+        v = np.moveaxis(rh, 0, -1)
+
+        # The all-zero local mode keeps the constant-in-z nullspace -- the rigid
+        # translation. Hold the solve orthogonal to it rather than letting the
+        # cycle wander along it.
+        zero = (0,) * (self.dim - 1)
+        v[zero] -= v[zero].mean(axis=0, keepdims=True)
+        z = self._solve_z(v)
+        z[zero] -= z[zero].mean(axis=0, keepdims=True)
+
+        out = np.fft.ifftn(np.moveaxis(z, -1, 0), axes=self.local_axes)
+        return project_mean_out(np.real(out))
+
+
 class Heterogeneous:
     """The actual homogenization system: K(lambda(x), mu(x)) with a spherical
     inclusion, plus the diagonal needed for the J^{1/2} . G . J^{1/2} scaling.
@@ -521,6 +793,71 @@ def cmd_cg(args):
               + "".join(f"{v:>9}" for v in res[3:]))
 
 
+def cmd_hybrid(args):
+    """Does the hybrid keep the FFT preconditioner's CG count?
+
+    The V-cycle's weakness is not its cost per apply but that it is an
+    *approximate* inverse: it buys a cheaper apply with ~1.5x the iterations.
+    The hybrid is exact whenever its z-solve is, so the question is what an
+    affordable, halo-only z-solve costs in iterations.
+
+    Columns: no preconditioner; the exact fine-grid FFT; the 3D V-cycle; the
+    hybrid with an exact z-solve; the hybrid with a z-only V-cycle. Then the
+    same five wrapped in the J^{1/2} . G . J^{1/2} scaling.
+    """
+    rng = np.random.default_rng(2)
+    print(f"PCG on the heterogeneous problem, {args.dim}D {args.element}, "
+          f"contrast={args.contrast}, material={args.material}, "
+          f"tol={args.tol}")
+    print(f"3D V-cycle: nu=({args.nu1},{args.nu2}) cycles={args.cycles}   "
+          f"hybrid z-cycle: nu={args.nu1} cycles={args.z_cycles}\n")
+    print(f"  {'n':>5} {'zlvl':>5} {'none':>7} {'FFT':>7} {'MG':>7} "
+          f"{'HybEx':>7} {'HybMG':>7}   {'J.FFT.J':>9} {'J.MG.J':>9} "
+          f"{'J.HybEx.J':>10} {'J.HybMG.J':>10}")
+
+    el = getattr(muGrid.FEMElement, args.element)
+    for n in args.sizes:
+        h = (1.0 / n,) * args.dim
+        base = _build(args, n)
+        het = Heterogeneous(base.levels[0], args.contrast, args.material)
+
+        kw = dict(nb_levels=args.levels, coarsest=args.coarsest,
+                  nu1=args.nu1, nu2=args.nu2, omega=args.omega)
+        mg = MultigridReference(args.dim, n, h, el,
+                                het.lam_ref, het.mu_ref, **kw)
+        exact = MultigridReference(args.dim, n, h, el, het.lam_ref,
+                                   het.mu_ref, **{**kw, "nb_levels": 1})
+        hyb_exact = HybridFourierTridiagonal(
+            args.dim, n, h, el, het.lam_ref, het.mu_ref, z_solve="exact")
+        hyb_mg = HybridFourierTridiagonal(
+            args.dim, n, h, el, het.lam_ref, het.mu_ref, z_solve="mg",
+            nu=args.nu1, cycles=args.z_cycles, coarsest=args.z_coarsest)
+
+        b = project_mean_out(rng.standard_normal(base.levels[0].shape))
+        op = lambda v: project_mean_out(het.apply(v))  # noqa: E731
+
+        greens = [
+            lambda r: exact._solve_coarsest(project_mean_out(r)),
+            lambda r: mg.apply(r, nb_cycles=args.cycles),
+            hyb_exact.apply,
+            hyb_mg.apply,
+        ]
+
+        def jacobi_wrap(green):
+            def inner(r):
+                return het.jhalf * green(het.jhalf * r)
+            return inner
+
+        plain = [_cg(op, b, project_mean_out, args.tol, args.maxiter)]
+        plain += [_cg(op, b, g, args.tol, args.maxiter) for g in greens]
+        scaled = [_cg(op, b, jacobi_wrap(g), args.tol, args.maxiter)
+                  for g in greens]
+        print(f"  {n:>5} {hyb_mg.nb_z_levels:>5} "
+              + "".join(f"{v:>7}" for v in plain)
+              + "  " + "".join(f"{v:>9}" for v in scaled[:2])
+              + "".join(f"{v:>10}" for v in scaled[2:]))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -528,6 +865,12 @@ def main():
     p.add_argument("--check", action="store_true", help="transfer + symmetry")
     p.add_argument("--rho", action="store_true", help="V-cycle factor vs n")
     p.add_argument("--cg", action="store_true", help="CG iteration count vs n")
+    p.add_argument("--hybrid", action="store_true",
+                   help="CG counts for the FFT-in-xy / tridiagonal-in-z hybrid")
+    p.add_argument("--z-cycles", type=int, default=1,
+                   help="z-only V-cycles per hybrid apply (default: 1)")
+    p.add_argument("--z-coarsest", type=int, default=4,
+                   help="coarsest z extent for the hybrid's cycle (default: 4)")
     p.add_argument("--dim", type=int, default=2, choices=(2, 3))
     p.add_argument("--element", default="q1", choices=("q1", "p1"))
     p.add_argument("-n", type=int, default=64, help="fine grid points/direction")
@@ -552,8 +895,9 @@ def main():
         args.sizes = [args.n] if (args.probe or args.check) else (
             [32, 64, 128, 256] if args.dim == 2 else [16, 32, 64])
 
-    if not any((args.probe, args.check, args.rho, args.cg)):
-        p.error("pick at least one of --probe / --check / --rho / --cg")
+    if not any((args.probe, args.check, args.rho, args.cg, args.hybrid)):
+        p.error("pick at least one of --probe / --check / --rho / --cg / "
+                "--hybrid")
     if args.probe:
         cmd_probe(args)
     if args.check:
@@ -562,6 +906,8 @@ def main():
         cmd_rho(args)
     if args.cg:
         cmd_cg(args)
+    if args.hybrid:
+        cmd_hybrid(args)
 
 
 if __name__ == "__main__":
