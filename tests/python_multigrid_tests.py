@@ -640,3 +640,52 @@ def test_hybrid_rejects_a_non_slab_decomposition(comm):
     with pytest.raises(ValueError, match="slab decomposition"):
         HybridFourierTridiagonalPreconditioner(
             decomp, (1 / 16,) * 3, 1.3, 0.7, communicator=comm)
+
+
+def _has_gpu():
+    try:
+        import cupy
+        return cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _has_gpu(), reason="needs a GPU")
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_device_matches_host(comm, dim, n):
+    """The device path computes the same thing as the host path.
+
+    Host and device share one implementation and differ only in which array
+    module runs it, so this is the test that keeps them from drifting apart --
+    and it compares against the host *result*, not merely against a residual,
+    which would pass for any exact inverse.
+    """
+    import cupy as cp
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+
+    if comm is not None and comm.size > 1:
+        pytest.skip("single-rank comparison; the MPI path has its own tests")
+    spacing = (1.0 / n,) * dim
+    glob = _zero_mean_global(dim, n, 7)
+
+    host_decomp, _, host_prec, _, _ = _slab_setup(comm, dim, n)
+    hr, hz = (host_decomp.collection.real_field(f"hyb-dev-h{s}", (dim,))
+              for s in "rz")
+    hr.p[...] = glob
+    host_prec.apply(hr, hz)
+
+    device = muGrid.Device.gpu(0)
+    cp.cuda.Device(0).use()
+    dev_decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * dim,
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim, device=device)
+    dev_prec = HybridFourierTridiagonalPreconditioner(
+        dev_decomp, spacing, 1.3, 0.7, communicator=comm)
+    dr, dz = (dev_decomp.collection.real_field(f"hyb-dev-d{s}", (dim,))
+              for s in "rz")
+    dr.p[...] = cp.asarray(glob)
+    dev_prec.apply(dr, dz)
+
+    want = np.asarray(hz.p)
+    got = cp.asnumpy(cp.asarray(dz.p))
+    assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()

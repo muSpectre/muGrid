@@ -23,10 +23,13 @@ what you need to *operate*.
 
 ### 0.1 Current state
 
-Stages 0, 1, 2 and **4** are done. Stage 4 was taken via the
-Fourier/tridiagonal hybrid (§9–§11) rather than the V-cycle: it reaches the FFT
-preconditioner's iteration count *exactly* at every rank count, with no
-all-to-all. Stage 3 (GPU) remains, and the V-cycle remains serial.
+Stages 0, 1, 2, **3** and **4** are done, all via the Fourier/tridiagonal
+hybrid (§9–§12) rather than the V-cycle: it reaches the FFT preconditioner's
+iteration count *exactly*, on host and device, at every rank count, with no
+all-to-all. The V-cycle remains serial and host-only.
+
+Before running anything on more than one GPU, read §12.2: it needs two
+environment variables, and without them even `-P none` aborts.
 
 Read §7 before planning Stage 4: it changes what a single-node MPI run can be
 used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
@@ -1142,3 +1145,76 @@ at a relative error of 2e-4.
   roughly an order of magnitude; not yet done.
 - **The per-apply sweep loops over `nz_local` in Python.** Fine on the host,
   and it is exactly what the fused kernel replaces on the device.
+
+---
+
+## 12. Stage 3 — the hybrid on the GPU
+
+Host and device now share one implementation: the array module follows the
+decomposition, so `numpy` and `cupy` take the identical path. Validated on
+2 x MI300A.
+
+### 12.1 The result
+
+| | ranks | CG iterations | E_eff |
+|---|---|---|---|
+| `-P reference` | 1 GPU | 96 | 1.3607 |
+| `-P hybrid` | 1 GPU | **96** | 1.3607 |
+| `-P reference` | 2 GPUs | 96 | 1.3607 |
+| `-P hybrid` | 2 GPUs | **96** | 1.3607 |
+
+Exactness at 16³, `‖K M⁻¹r − r‖/‖r‖`: 8.4e-16 at 1, 2 and 4 ranks over 2 GPUs.
+The gathered solution's checksum is identical to twelve decimals across every
+rank count **and identical to the host result** — so the device path is not
+merely exact, it is the same computation.
+
+### 12.2 Multi-GPU MPI needs two environment variables here
+
+This cost most of the session's debugging and is not specific to the hybrid:
+**`-P none` aborts on 2 GPUs too.** Any multi-GPU muGrid run on this machine
+needs
+
+```bash
+mpirun -n 2 -x MUGRID_UNIFIED_MEMORY=0 -x MUGRID_GPU_AWARE_MPI=0 ...
+```
+
+Without them, `communicate_ghosts` aborts in `sendrecv_staged`. muGrid's own
+diagnostic explains it exactly: MI300A reports itself host-coherent, so muGrid
+hands raw device pointers to MPI, but the runtime says those pointers have no
+host mapping and MPI faults reading them. Underneath, UCX's `rocm_ipc` transport
+logs `Failed to create ipc` for every buffer.
+
+So the APU's unified memory is the trap: the property that makes MI300A
+attractive is exactly what makes the default path wrong. `MUGRID_UNIFIED_MEMORY=0`
+forces host staging and everything works.
+
+### 12.3 What the port needed
+
+Very little, which is the useful finding: the Spike formulation is array-library
+agnostic. Two real changes:
+
+- **An array-module dispatch**, chosen once from `decomposition.device`, and
+  `_batched_inverse` taking it as an argument. The singular-mode repair loop now
+  brings its indices back to the host in one transfer rather than one per mode.
+- **Interface exchange staged through the host.** Device buffers are copied down
+  before `Allgather` and back after, so the preconditioner does not depend on the
+  MPI build being GPU-aware — which, per §12.2, would not have worked anyway. The
+  payload is interface planes only, a few MB at 256³, so the round trip is cheap
+  next to the all-to-all it replaces.
+
+The stencil probe stays on the host: it is a tiny impulse response on an 8³ grid,
+and it now suppresses muGrid's "serial communicator under MPI" warning, which
+here describes the intent rather than a mistake.
+
+### 12.4 Still open
+
+- **The per-apply sweep loops over `nz_local` in Python**, one batched matmul per
+  plane. Correct but launch-bound on a device: this is exactly what the fused
+  kernel of §10.1 (2255 GB/s, `(z, mode, component)` layout) replaces. The port
+  deliberately did not do that — correctness first, and the kernel is already
+  measured.
+- No GPU **timings** are quoted here. §10 costed the algorithm; turning that into
+  an end-to-end device measurement wants the fused kernel first, otherwise it
+  measures the Python loop.
+- The reduced system's `(2·dim·P)²` growth and the uncompressed Thomas factors
+  (§11.5) are unchanged.

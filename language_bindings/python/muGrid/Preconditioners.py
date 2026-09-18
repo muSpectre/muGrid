@@ -1444,7 +1444,15 @@ class MultigridReferencePreconditioner(Preconditioner):
 # --------------------------------------------------------------------------- #
 
 
-def _batched_inverse(matrices):
+def _array_module(on_device):
+    """``cupy`` for device arrays, ``numpy`` for host ones."""
+    if on_device:
+        import cupy
+        return cupy
+    return np
+
+
+def _batched_inverse(matrices, xp=np):
     """Inverse per mode, falling back to a pseudo-inverse where one is singular.
 
     Only the all-zero mode is genuinely singular -- it keeps the rigid
@@ -1454,26 +1462,27 @@ def _batched_inverse(matrices):
     """
     flat_in = matrices.reshape((-1,) + matrices.shape[-2:])
     try:
-        with np.errstate(all="ignore"):
-            flat_out = np.linalg.inv(flat_in)
-    except np.linalg.LinAlgError:
+        flat_out = xp.linalg.inv(flat_in)
+    except xp.linalg.LinAlgError:
         # inv() refuses the whole batch if any one mode is exactly singular.
-        flat_out = np.empty_like(flat_in)
+        flat_out = xp.empty_like(flat_in)
         for i in range(flat_in.shape[0]):
             try:
-                flat_out[i] = np.linalg.inv(flat_in[i])
-            except np.linalg.LinAlgError:
-                flat_out[i] = np.linalg.pinv(flat_in[i])
+                flat_out[i] = xp.linalg.inv(flat_in[i])
+            except xp.linalg.LinAlgError:
+                flat_out[i] = xp.linalg.pinv(flat_in[i])
 
     # inv() does not always fail on a singular mode; more often it returns
     # something large and finite. Only the residual catches that, and it is one
     # batched matmul.
-    eye = np.eye(flat_in.shape[-1], dtype=flat_in.dtype)
-    with np.errstate(all="ignore"):
-        residual = np.abs(flat_in @ flat_out - eye).max(axis=(-2, -1))
-    bad = ~np.isfinite(residual) | (residual > 1e-8)
-    for i in np.flatnonzero(bad):
-        flat_out[i] = np.linalg.pinv(flat_in[i])
+    eye = xp.eye(flat_in.shape[-1], dtype=flat_in.dtype)
+    residual = xp.abs(flat_in @ flat_out - eye).max(axis=(-2, -1))
+    bad = ~xp.isfinite(residual) | (residual > 1e-8)
+    # The indices come back to the host because the repair loop is Python; on a
+    # device this is one small transfer, not one per mode.
+    indices = xp.flatnonzero(bad)
+    for i in (indices.get() if hasattr(indices, "get") else indices):
+        flat_out[int(i)] = xp.linalg.pinv(flat_in[int(i)])
     return flat_out.reshape(matrices.shape)
 
 
@@ -1488,9 +1497,15 @@ def _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref, probe=8):
     from .Parallel import Communicator
     from .Wrappers import CartesianDecomposition, IsotropicStiffnessOperator
 
-    decomposition = CartesianDecomposition(
-        Communicator(), [probe] * dim, nb_subdivisions=[1] * dim,
-        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
+    with warnings.catch_warnings():
+        # A serial communicator under an MPI launcher is exactly the intent:
+        # the operator is uniform, so every rank probes the same stencil for
+        # itself and nothing is exchanged. muGrid warns about the redundancy,
+        # which here is the point rather than a mistake.
+        warnings.filterwarnings("ignore", message=".*serial muGrid Communicator.*")
+        decomposition = CartesianDecomposition(
+            Communicator(), [probe] * dim, nb_subdivisions=[1] * dim,
+            nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
     op = IsotropicStiffnessOperator(dim, tuple(grid_spacing), element)
     collection = decomposition.collection
     u = collection.real_field("hybrid-stencil-u", (dim,))
@@ -1511,7 +1526,7 @@ def _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref, probe=8):
 
 
 def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
-                       local_shape, cdtype):
+                       local_shape, cdtype, xp=np):
     """Transform the rank-local axes; return the three coupling blocks per mode.
 
     ``A[m]``, ``m = dz + 1``, has shape ``(*mode_shape, dim, dim)`` and the
@@ -1521,18 +1536,20 @@ def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
     The frequencies match ``numpy.fft.rfftn`` over those axes: the last of them
     is a real transform, the rest are complex.
     """
+    # The stencil probe is a tiny host computation whatever the target is; only
+    # the per-mode blocks are big enough to want to live on the device.
     S = _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
-    qs = [2 * np.pi * np.fft.fftfreq(n) for n in local_shape[:-1]]
-    qs.append(2 * np.pi * np.fft.rfftfreq(local_shape[-1]))
-    grids = np.meshgrid(*qs, indexing="ij")
+    qs = [2 * xp.pi * xp.fft.fftfreq(n) for n in local_shape[:-1]]
+    qs.append(2 * xp.pi * xp.fft.rfftfreq(local_shape[-1]))
+    grids = xp.meshgrid(*qs, indexing="ij")
     mode_shape = grids[0].shape
 
-    A = np.zeros((3,) + mode_shape + (dim, dim), dtype=cdtype)
+    A = xp.zeros((3,) + mode_shape + (dim, dim), dtype=cdtype)
     for offset in np.ndindex((3,) * dim):
-        phase = np.ones(mode_shape, dtype=cdtype)
+        phase = xp.ones(mode_shape, dtype=cdtype)
         for axis in range(dim - 1):
-            phase = phase * np.exp(-1j * grids[axis] * (offset[axis] - 1))
-        A[offset[-1]] += phase[..., None, None] * S[offset]
+            phase = phase * xp.exp(-1j * grids[axis] * (offset[axis] - 1))
+        A[offset[-1]] += phase[..., None, None] * xp.asarray(S[offset])
     return A
 
 
@@ -1571,6 +1588,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     Per apply this exchanges only interface planes -- ``2 * dim`` complex numbers
     per mode per rank -- against an all-to-all of the entire field.
 
+    Host and device are the same code: the array module follows the
+    decomposition, so ``numpy`` and ``cupy`` take the identical path. Only the
+    interface exchange differs, and only in staging the buffers through the host
+    so that a non-GPU-aware MPI build still works.
+
     Parameters
     ----------
     decomposition : muGrid.CartesianDecomposition
@@ -1603,11 +1625,9 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         self._timer = timer
         self._name = name
 
-        if not decomposition.device.is_host:
-            raise NotImplementedError(
-                "the hybrid preconditioner is host-only for now: its transform "
-                "and its tridiagonal solve both run through numpy. The device "
-                "path is stage 3 of docs/multigrid_preconditioner_plan.md.")
+        self._on_device = not decomposition.device.is_host
+        xp = _array_module(self._on_device)
+        self._xp = xp
 
         dim = len(tuple(decomposition.nb_domain_grid_pts))
         self.dim = dim
@@ -1647,7 +1667,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
                 f"{tuple(decomposition.nb_domain_grid_pts)[-1] // 2} ranks.")
 
         self.A = _z_coupling_blocks(dim, grid_spacing, element, lambda_ref,
-                                    mu_ref, self.local_shape, self._cdtype)
+                                    mu_ref, self.local_shape, self._cdtype, xp)
         self._mode_shape = self.A.shape[1:-2]
 
         self.nz_global = nz_global
@@ -1664,20 +1684,21 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         interface plane. They do not depend on the residual, so they and the
         reduced system they build are computed once here, not per apply.
         """
+        xp = self._xp
         dim, nz = self.dim, self.nz_local
         A0, A1, A2 = self.A[0], self.A[1], self.A[2]
 
-        Dinv = np.empty(self._mode_shape + (nz, dim, dim), dtype=self._cdtype)
-        Dinv[..., 0, :, :] = _batched_inverse(A1)
+        Dinv = xp.empty(self._mode_shape + (nz, dim, dim), dtype=self._cdtype)
+        Dinv[..., 0, :, :] = _batched_inverse(A1, xp)
         for k in range(1, nz):
             Dinv[..., k, :, :] = _batched_inverse(
-                A1 - A2 @ Dinv[..., k - 1, :, :] @ A0)
+                A1 - A2 @ Dinv[..., k - 1, :, :] @ A0, xp)
         self.Dinv = Dinv
 
-        eye = np.broadcast_to(np.eye(dim, dtype=self._cdtype),
+        eye = xp.broadcast_to(xp.eye(dim, dtype=self._cdtype),
                               self._mode_shape + (dim, dim))
-        left = np.zeros(self._mode_shape + (nz, dim, dim), dtype=self._cdtype)
-        right = np.zeros_like(left)
+        left = xp.zeros(self._mode_shape + (nz, dim, dim), dtype=self._cdtype)
+        right = xp.zeros_like(left)
         left[..., 0, :, :] = -A2 @ eye
         right[..., nz - 1, :, :] = -A0 @ eye
         self.V = self._solve_local(left)
@@ -1691,17 +1712,18 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         ``(*modes, nz, dim, ncols)``, so one code path serves the residual
         (``ncols = 1``) and the spikes (``ncols = dim``).
         """
+        xp = self._xp
         nz = self.nz_local
-        matmul = np.matmul
+        matmul = xp.matmul
 
-        y = np.empty_like(rhs)
+        y = xp.empty_like(rhs)
         y[..., 0, :, :] = rhs[..., 0, :, :]
         for k in range(1, nz):
             y[..., k, :, :] = rhs[..., k, :, :] - matmul(
                 self.A[2], matmul(self.Dinv[..., k - 1, :, :],
                                   y[..., k - 1, :, :]))
 
-        out = np.empty_like(rhs)
+        out = xp.empty_like(rhs)
         out[..., nz - 1, :, :] = matmul(self.Dinv[..., nz - 1, :, :],
                                         y[..., nz - 1, :, :])
         for k in range(nz - 2, -1, -1):
@@ -1718,14 +1740,15 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         block-cyclic system of size ``2 * dim * nb_ranks`` per mode. Being small
         and dense it swallows the periodic wrap-around for free.
         """
+        xp = self._xp
         dim, P = self.dim, self.nb_ranks
-        ends = np.stack([self.V[..., 0, :, :], self.V[..., -1, :, :],
+        ends = xp.stack([self.V[..., 0, :, :], self.V[..., -1, :, :],
                          self.W[..., 0, :, :], self.W[..., -1, :, :]], axis=-3)
-        gathered = self._allgather(np.ascontiguousarray(ends))
+        gathered = self._allgather(xp.ascontiguousarray(ends))
 
         size = 2 * dim * P
-        M = np.zeros(self._mode_shape + (size, size), dtype=self._cdtype)
-        diagonal = np.arange(size)
+        M = xp.zeros(self._mode_shape + (size, size), dtype=self._cdtype)
+        diagonal = xp.arange(size)
         M[..., diagonal, diagonal] = 1.0
         for p in range(P):
             V0, V1, W0, W1 = (gathered[p][..., i, :, :] for i in range(4))
@@ -1739,7 +1762,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             M[..., row_l, next_l] -= W0
             M[..., row_r, prev_r] -= V1
             M[..., row_r, next_l] -= W1
-        self._reduced_inv = _batched_inverse(M)
+        self._reduced_inv = _batched_inverse(M, xp)
 
     def _build_zero_mode(self):
         """The all-zero mode, which the tridiagonal path cannot solve.
@@ -1751,21 +1774,22 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         rescue the general path: that is the same treatment
         :func:`make_reference_stiffness_preconditioner` gives ``q = 0``.
         """
+        xp = self._xp
         dim, nz = self.dim, self.nz_global
         self._zero_index = (0,) * len(self._mode_shape)
         A0, A1, A2 = (self.A[i][self._zero_index] for i in range(3))
-        T = np.zeros((nz * dim, nz * dim), dtype=self._cdtype)
+        T = xp.zeros((nz * dim, nz * dim), dtype=self._cdtype)
         for k in range(nz):
             row = slice(k * dim, (k + 1) * dim)
             T[row, ((k + 1) % nz) * dim:((k + 1) % nz) * dim + dim] += A0
             T[row, row] += A1
             T[row, ((k - 1) % nz) * dim:((k - 1) % nz) * dim + dim] += A2
-        self._zero_pinv = np.linalg.pinv(T)
+        self._zero_pinv = xp.linalg.pinv(T)
 
     def _solve_zero_mode(self, v):
         """``T^+ v`` for the all-zero mode, over the whole distributed axis."""
         dim = self.dim
-        local = np.ascontiguousarray(v[self._zero_index][..., 0])
+        local = self._xp.ascontiguousarray(v[self._zero_index][..., 0])
         full = self._allgather(local).reshape(-1)
         solution = (self._zero_pinv @ full).reshape(-1, dim)
         start = self.rank * self.nz_local
@@ -1774,12 +1798,19 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     # -- collectives -------------------------------------------------------- #
 
     def _allgather(self, local):
-        """Gather one array per rank along a new leading axis."""
+        """Gather one array per rank along a new leading axis.
+
+        Device buffers are staged through the host rather than handed to MPI
+        directly, so this does not depend on the MPI build being GPU-aware. The
+        payload is the interface planes only -- a few MB even at 256**3 -- so
+        the round trip is cheap next to the all-to-all it replaces.
+        """
         if self._mpi is None:
             return local[None]
-        out = np.empty((self.nb_ranks,) + local.shape, dtype=local.dtype)
-        self._mpi.Allgather(local, out)
-        return out
+        host = local.get() if self._on_device else local
+        out = np.empty((self.nb_ranks,) + host.shape, dtype=host.dtype)
+        self._mpi.Allgather(np.ascontiguousarray(host), out)
+        return self._xp.asarray(out) if self._on_device else out
 
     def _timed(self, label):
         return self._timer(label) if self._timer is not None else nullcontext()
@@ -1791,44 +1822,45 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         if self._comm.size > 1:
             totals = [float(self._comm.sum(t)) for t in totals]
             count = float(self._comm.sum(count))
-        return (np.asarray(totals) / count).reshape(
-            (self.dim,) + (1,) * self.dim)
+        return self._xp.asarray(
+            np.asarray(totals) / count).reshape((self.dim,) + (1,) * self.dim)
 
     # -- the preconditioner ------------------------------------------------- #
 
     def apply(self, r, z):
         """``z = M⁻¹ r``."""
+        xp = self._xp
         dim = self.dim
         axes = tuple(range(1, dim))
 
-        local = np.asarray(r.p)
+        local = xp.asarray(r.p)
         local = local - self._global_mean(local)
 
         with self._timed("fft"):
-            hat = np.fft.rfftn(local, axes=axes).astype(self._cdtype)
-            v = np.moveaxis(hat, 0, -1)[..., None]   # (*modes, nz, dim, 1)
+            hat = xp.fft.rfftn(local, axes=axes).astype(self._cdtype)
+            v = xp.moveaxis(hat, 0, -1)[..., None]   # (*modes, nz, dim, 1)
 
         with self._timed("tridiag"):
-            x = self._solve_local(np.ascontiguousarray(v))
+            x = self._solve_local(xp.ascontiguousarray(v))
 
         with self._timed("interface"):
-            ends = np.stack([x[..., 0, :, 0], x[..., -1, :, 0]], axis=-2)
-            gathered = self._allgather(np.ascontiguousarray(ends))
-            rhs = np.moveaxis(gathered, 0, -3).reshape(
+            ends = xp.stack([x[..., 0, :, 0], x[..., -1, :, 0]], axis=-2)
+            gathered = self._allgather(xp.ascontiguousarray(ends))
+            rhs = xp.moveaxis(gathered, 0, -3).reshape(
                 self._mode_shape + (2 * dim * self.nb_ranks,))
-            lam = np.einsum("...ij,...j->...i", self._reduced_inv, rhs)
+            lam = xp.einsum("...ij,...j->...i", self._reduced_inv, rhs)
             lam = lam.reshape(self._mode_shape + (self.nb_ranks, 2, dim))
             left = lam[..., (self.rank - 1) % self.nb_ranks, 1, :]
             right = lam[..., (self.rank + 1) % self.nb_ranks, 0, :]
 
         with self._timed("ifft"):
             sol = (x[..., 0]
-                   + np.einsum("...kij,...j->...ki", self.V, left)
-                   + np.einsum("...kij,...j->...ki", self.W, right))
+                   + xp.einsum("...kij,...j->...ki", self.V, left)
+                   + xp.einsum("...kij,...j->...ki", self.W, right))
             sol[self._zero_index] = self._solve_zero_mode(v)
-            out = np.fft.irfftn(np.moveaxis(sol, -1, 0), axes=axes,
+            out = xp.fft.irfftn(xp.moveaxis(sol, -1, 0), axes=axes,
                                 s=self.local_shape)
 
-        out = np.real(out)
+        out = xp.real(out)
         out = out - self._global_mean(out)
-        z.p[...] = out.astype(np.asarray(z.p).dtype)
+        z.p[...] = out.astype(xp.asarray(z.p).dtype)

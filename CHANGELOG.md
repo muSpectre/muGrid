@@ -126,7 +126,14 @@ unreleased
   reaches one node along the distributed axis for Q1 and P1 alike. The
   distributed solve is the Spike/partitioned-Thomas scheme, whose small reduced
   interface system also absorbs the periodic wrap-around. Slab decomposition
-  only, host only for now
+  only
+- ENH: `HybridFourierTridiagonalPreconditioner` runs on the GPU. Host and device
+  share one implementation -- the array module follows the decomposition -- so
+  the two cannot drift apart, and a test asserts the device reproduces the host
+  *result* rather than merely a small residual. Validated on 2x MI300A at 1, 2
+  and 4 ranks: the solve is exact to 8e-16 and its checksum matches the host's
+  to twelve decimals. The interface exchange stages device buffers through the
+  host, so this does not require a GPU-aware MPI build
 
 
 v1.3.0 (16Sep26)
