@@ -1283,9 +1283,28 @@ class MultigridReferencePreconditioner(Preconditioner):
         self._name = name
 
         nb_levels = self._resolve_nb_levels(nb_grid_pts, nb_levels, min_coarse)
+        if nb_levels < 2:
+            # A single level is the coarsest level, which is solved by FFT --
+            # so there is no cycle left, only the plain Fourier preconditioner,
+            # and the fine decomposition handed in would have to be an FFT
+            # engine for it to work at all. Say so here rather than failing
+            # later on a missing `real_space_collection`.
+            raise ValueError(
+                f"a V-cycle needs at least two levels, but {nb_grid_pts} "
+                f"cannot be coarsened towards min_coarse={min_coarse}: every "
+                "extent must stay even and at least that wide. Use a finer "
+                "grid, lower min_coarse, or -- if one level is really what you "
+                "want -- make_reference_stiffness_preconditioner, which is "
+                "exactly that."
+            )
         self.nb_levels = nb_levels
 
-        ghosts = {"nb_ghosts_left": (1,) * dim, "nb_ghosts_right": (1,) * dim}
+        # Coarse levels must live where the fine one does: the cycle moves
+        # fields straight between levels (restrict/prolong), so a host coarse
+        # grid under a device fine grid is a device mismatch, not a slow path.
+        level_kwargs = {"nb_ghosts_left": (1,) * dim,
+                        "nb_ghosts_right": (1,) * dim,
+                        "device": decomposition.device}
         comm = communicator if communicator is not None else Communicator()
 
         self.levels = []
@@ -1298,12 +1317,12 @@ class MultigridReferencePreconditioner(Preconditioner):
             elif with_fft:
                 # The coarsest level is solved exactly in Fourier space, so its
                 # decomposition has to be an FFT engine.
-                level_decomp = FFTEngine(level_pts, comm, **ghosts)
+                level_decomp = FFTEngine(level_pts, comm, **level_kwargs)
             else:
                 level_decomp = CartesianDecomposition(
                     comm, list(level_pts),
                     nb_subdivisions=list(decomposition.nb_subdivisions),
-                    **ghosts)
+                    **level_kwargs)
             self.levels.append(_MultigridLevel(
                 level_decomp, spacing * coarsening, element, lambda_ref,
                 mu_ref, dim, f"{name}-l{lvl}", dtype, with_fft=with_fft))
@@ -1312,6 +1331,7 @@ class MultigridReferencePreconditioner(Preconditioner):
                       else self.SAFETY / self.levels[-1].lambda_max(comm))
 
         self.transfer = GridTransfer(dim)
+        self._on_device = not decomposition.device.is_host
 
         # Coarsest level: the exact block-Fourier inverse of Kʳᵉᶠ, reusing the
         # impulse-response assembly. It already replaces the singular q = 0
@@ -1375,6 +1395,21 @@ class MultigridReferencePreconditioner(Preconditioner):
 
     def apply(self, r, z):
         """``z = M⁻¹ r``."""
+        if self._on_device:
+            # Everything else in the cycle runs on the device; the two grid
+            # transfers do not, because GridTransfer declares host-space
+            # overloads only (src/libmugrid/operators/transfer.hh). Say so
+            # here, rather than letting pybind report an overload mismatch
+            # from three frames down. Construction is deliberately still
+            # allowed: the per-level pieces are individually timeable on the
+            # device, which is how examples/vcycle_vs_fft.py prices a cycle
+            # there.
+            raise NotImplementedError(
+                "the V-cycle cannot run on the device yet: restrict/prolong "
+                "have no device kernels, only host ones. Run the solve on the "
+                "CPU, or use make_reference_stiffness_preconditioner, which is "
+                "GPU-capable."
+            )
         fine = self.levels[0]
         with self._timed("vcycle"):
             linalg.copy(r, fine.r)

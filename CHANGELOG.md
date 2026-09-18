@@ -54,6 +54,19 @@ unreleased
   `does not contain a GCC installation` before compiling a line. The reported
   path is also normalised, since GCC returns it relative to its own driver
   location with `..` components left in
+- BUG: `MultigridReferencePreconditioner` now builds its coarse levels on the
+  same device as the fine one. They were created without a device argument and
+  so always landed on the host, which under a device fine grid is a mismatch
+  rather than a slow path: the cycle moves fields straight between levels. The
+  V-cycle still cannot run on a device end to end, because `GridTransfer` has
+  host-space overloads only, but every other part of it now can — which is
+  what lets the cycle be priced on a GPU a piece at a time
+- BUG: Two failures that used to surface far from their cause now say what is
+  wrong. A grid too coarse to halve even once produced an `AttributeError`
+  about a missing `real_space_collection`, and is now rejected on the grounds
+  that a V-cycle needs at least two levels. Applying the cycle to device fields
+  produced a pybind overload mismatch from three frames down, and now names the
+  missing device grid-transfer kernels
 
 
 v1.3.0 (16Sep26)
