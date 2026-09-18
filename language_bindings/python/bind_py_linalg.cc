@@ -40,6 +40,8 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+
+#include <cstdint>
 #include <pybind11/complex.h>
 #include <pybind11/stl.h>
 
@@ -140,6 +142,45 @@ namespace {
             "over memory instead of the 4*nz an elementwise formulation costs.");
     }
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    /**
+     * Bind the device sweep for one block size and precision.
+     *
+     * Unlike the host binding this takes raw device addresses as integers,
+     * because the buffers are CuPy arrays rather than muGrid fields and nothing
+     * in the buffer protocol describes device memory. The caller passes
+     * `array.data.ptr`. Nothing here can validate those addresses, so the
+     * Python side is responsible for the shapes -- which is why this stays
+     * behind an opt-in and the tested CuPy kernel remains the default.
+     */
+    template <muGrid::Dim_t Dim, typename T>
+    void bind_block_thomas_gpu(py::module & mod, const char * name) {
+        mod.def(
+            name,
+            [](std::uintptr_t rhs, std::uintptr_t head, std::uintptr_t exc,
+               std::uintptr_t exc_index, std::uintptr_t A0, std::uintptr_t A2,
+               std::uintptr_t y, std::uintptr_t out, muGrid::Index_t nz,
+               muGrid::Index_t nb_modes, muGrid::Index_t nb_head,
+               muGrid::Index_t nb_exc) {
+                py::gil_scoped_release release{};
+                muGrid::block_thomas::sweep_gpu<Dim, T>(
+                    reinterpret_cast<const std::complex<T> *>(rhs),
+                    reinterpret_cast<const std::complex<T> *>(head),
+                    reinterpret_cast<const std::complex<T> *>(exc),
+                    reinterpret_cast<const int *>(exc_index),
+                    reinterpret_cast<const std::complex<T> *>(A0),
+                    reinterpret_cast<const std::complex<T> *>(A2),
+                    reinterpret_cast<std::complex<T> *>(y),
+                    reinterpret_cast<std::complex<T> *>(out), nz, nb_modes,
+                    nb_head, nb_exc);
+            },
+            "rhs"_a, "head"_a, "exc"_a, "exc_index"_a, "A0"_a, "A2"_a, "y"_a,
+            "out"_a, "nz"_a, "nb_modes"_a, "nb_head"_a, "nb_exc"_a,
+            "Fused block-Thomas sweep on the device. Arguments are device "
+            "addresses (CuPy `array.data.ptr`), not buffers.");
+    }
+#endif
+
 }  // namespace
 
 void add_linalg_functions(py::module &mod) {
@@ -166,6 +207,12 @@ void add_linalg_functions(py::module &mod) {
     bind_block_thomas<3, Real>(linalg, "block_thomas_3d");
     bind_block_thomas<2, Real32>(linalg, "block_thomas_2d_f32");
     bind_block_thomas<3, Real32>(linalg, "block_thomas_3d_f32");
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    bind_block_thomas_gpu<2, Real>(linalg, "block_thomas_gpu_2d");
+    bind_block_thomas_gpu<3, Real>(linalg, "block_thomas_gpu_3d");
+    bind_block_thomas_gpu<2, Real32>(linalg, "block_thomas_gpu_2d_f32");
+    bind_block_thomas_gpu<3, Real32>(linalg, "block_thomas_gpu_3d_f32");
+#endif
 
     // --- Real field operations (host) ---
 

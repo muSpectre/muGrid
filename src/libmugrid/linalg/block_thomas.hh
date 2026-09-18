@@ -94,6 +94,23 @@ namespace muGrid {
                    Index_t nz, Index_t nb_modes, Index_t nb_head,
                    Index_t nb_exc);
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        /**
+         * @brief Device counterpart of `sweep`, with identical semantics.
+         *
+         * Defined in `block_thomas_gpu.cc`. The loop order differs from the
+         * host: one thread per mode marching the axis in registers, which is
+         * what the z-major layout is for. Pointers are device pointers.
+         */
+        template <Dim_t Dim, typename T>
+        void sweep_gpu(const std::complex<T> * rhs,
+                       const std::complex<T> * head,
+                       const std::complex<T> * exc, const int * exc_index,
+                       const std::complex<T> * A0, const std::complex<T> * A2,
+                       std::complex<T> * y, std::complex<T> * out, Index_t nz,
+                       Index_t nb_modes, Index_t nb_head, Index_t nb_exc);
+#endif
+
     }  // namespace block_thomas
 
 }  // namespace muGrid

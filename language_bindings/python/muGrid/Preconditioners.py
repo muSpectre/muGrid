@@ -15,6 +15,7 @@ projects that mode out; in that case the right-hand side must not contain
 it.
 """
 
+import os
 import warnings
 from contextlib import nullcontext
 
@@ -2004,11 +2005,23 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
                scratch, out)
         return out.reshape(rhs.shape)
 
+    #: Route the device sweep through the compiled kernel in libmuGrid rather
+    #: than the CuPy one built here. Both implement the same recurrence; the
+    #: compiled one shares its source tree with the host kernel and needs no
+    #: runtime compilation, but the CuPy one is what has been measured on
+    #: hardware, so it stays the default until the compiled path has been run
+    #: on a device. `test_hybrid_device_matches_host` is what settles that.
+    _USE_COMPILED_DEVICE_SWEEP = os.environ.get(
+        "MUGRID_BLOCK_THOMAS_COMPILED", "") not in ("", "0")
+
     def _solve_local_fused(self, rhs):
         """The same solve as one kernel launch instead of ``4 * nz``."""
         xp = self._xp
         nz, dim = self.nz_local, self.dim
         nb_modes = int(np.prod(self._mode_shape))
+
+        if self._USE_COMPILED_DEVICE_SWEEP:
+            return self._solve_local_compiled_device(rhs)
 
         flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
         scratch = xp.empty_like(flat)
@@ -2055,6 +2068,37 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             M[..., row_r, prev_r] -= V1
             M[..., row_r, next_l] -= W1
         self._reduced_inv = _batched_inverse(M, xp)
+
+    def _solve_local_compiled_device(self, rhs):
+        """The device sweep through libmuGrid instead of the CuPy kernel.
+
+        The binding takes device addresses rather than buffers, since nothing
+        in the Python buffer protocol describes device memory, so every array
+        handed over must be contiguous and of the exact shape the kernel
+        indexes. Nothing on the C++ side can check that.
+        """
+        xp = self._xp
+        nz, dim = self.nz_local, self.dim
+        nb_modes = int(np.prod(self._mode_shape))
+        nb_exc = max(self._nb_exc, 1)
+
+        flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
+        head = xp.ascontiguousarray(
+            self._head.reshape(self._head_length, nb_modes, dim, dim))
+        exc = xp.ascontiguousarray(self._exc.reshape(nz, nb_exc, dim, dim))
+        index = xp.ascontiguousarray(self._exc_index.astype(xp.int32))
+        a0 = xp.ascontiguousarray(self.A[0].reshape(nb_modes, dim, dim))
+        a2 = xp.ascontiguousarray(self.A[2].reshape(nb_modes, dim, dim))
+        scratch = xp.empty_like(flat)
+        out = xp.empty_like(flat)
+
+        single = np.dtype(self._cdtype) == np.dtype(np.complex64)
+        kernel = getattr(
+            linalg, f"block_thomas_gpu_{dim}d" + ("_f32" if single else ""))
+        kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
+               a0.data.ptr, a2.data.ptr, scratch.data.ptr, out.data.ptr,
+               nz, nb_modes, self._head_length, nb_exc)
+        return out.reshape(rhs.shape)
 
     def _build_pcr(self):
         """Precompute the parallel-cyclic-reduction coefficients.
