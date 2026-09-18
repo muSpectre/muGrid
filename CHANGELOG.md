@@ -77,6 +77,15 @@ unreleased
   synchronisation -- usually a CG dot product pulling a scalar back. Totals are
   unaffected; the breakdown is not, and the symptom is a sub-timer that stops
   growing with the grid or shrinks
+- ENH: New `examples/vcycle_vs_fft.py`, which measures the one number that
+  decides whether the V-cycle is worth having: R, the cost of a V-cycle apply
+  over the cost of an FFT apply, on a single device. The two scale in opposite
+  directions -- a cycle is halo-only, an FFT's all-to-all is not -- so R at one
+  rank predicts the crossover instead of waiting to observe it. R > 1 is
+  expected and is not a failure. It is reported three ways: modelled from the
+  matvec alone, priced from the cycle's parts as timed on a GPU, and measured
+  end to end wherever the cycle runs. The script also carries the iteration
+  penalty, since a cheaper apply that needs more CG iterations is not cheaper
 
 
 v1.3.0 (16Sep26)
