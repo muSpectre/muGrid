@@ -281,7 +281,7 @@ def probe(nb_grid_pts, device, args):
     if args.measure:
         multigrid = run(nb_grid_pts, device, "multigrid", args.kernel,
                         args.precision, args.tol, args.maxiter, args.python,
-                        extra)
+                        (*extra, "--mg-nu", str(args.nu)))
         mg_timing = multigrid["timing"]
         row["iterations_multigrid"] = multigrid["results"][
             "total_cg_iterations"]

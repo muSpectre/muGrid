@@ -381,7 +381,7 @@ def _serial_only(comm):
         pytest.skip("MultigridReferencePreconditioner is serial for now")
 
 
-def _uniform_setup(comm, dim, n, min_coarse=8):
+def _uniform_setup(comm, dim, n, min_coarse=8, nu=2):
     from muGrid.Preconditioners import MultigridReferencePreconditioner
 
     h = 1.0 / n
@@ -393,7 +393,7 @@ def _uniform_setup(comm, dim, n, min_coarse=8):
         nb_ghosts_right=(1,) * dim,
     )
     prec = MultigridReferencePreconditioner(
-        decomp, (h,) * dim, 1.3, 0.7, min_coarse=min_coarse, nu=2
+        decomp, (h,) * dim, 1.3, 0.7, min_coarse=min_coarse, nu=nu
     )
     return decomp, prec
 
@@ -407,19 +407,24 @@ def _zero_mean_field(collection, name, dim, seed):
     return field
 
 
+@pytest.mark.parametrize("nu", [1, 2, 3])
 @pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
-def test_preconditioner_is_symmetric(comm, dim, n):
+def test_preconditioner_is_symmetric(comm, dim, n, nu):
     """<M⁻¹a, b> == <a, M⁻¹b>.
 
     Plain CG requires the preconditioner to be a fixed symmetric operator. The
     V-cycle is symmetric only because the pre- and post-smoothing counts are
     equal, the cycle count is fixed, and R is exactly Pᵀ -- so this test is what
     protects all three from being "optimised" apart.
+
+    Swept over nu because nu is a tuning parameter: the cost measurements
+    favour nu = 1, and a symmetry guarantee that held only at the value that
+    happened to be the default would be worth very little.
     """
     _serial_only(comm)
     from muGrid import linalg
 
-    decomp, prec = _uniform_setup(comm, dim, n)
+    decomp, prec = _uniform_setup(comm, dim, n, nu=nu)
     fc = decomp.collection
     a = _zero_mean_field(fc, "sym-a", dim, 0)
     b = _zero_mean_field(fc, "sym-b", dim, 1)
@@ -434,18 +439,20 @@ def test_preconditioner_is_symmetric(comm, dim, n):
     assert abs(lhs - rhs) <= 1e-10 * max(abs(lhs), abs(rhs))
 
 
+@pytest.mark.parametrize("nu", [1, 2, 3])
 @pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
-def test_vcycle_converges_on_the_reference_operator(comm, dim, n):
+def test_vcycle_converges_on_the_reference_operator(comm, dim, n, nu):
     """Used as a stationary iteration, the cycle contracts the residual.
 
-    The measured factor is ~0.355 in both 2D and 3D; 0.6 leaves room for the
-    smoother's damping to be retuned without the test becoming a tripwire,
-    while still failing loudly if the cycle stops working.
+    The measured factor is ~0.355 at nu = 2 in both 2D and 3D and degrades to
+    ~0.5 at nu = 1; 0.6 covers the whole useful range of nu while still failing
+    loudly if the cycle stops working. A weaker smoother contracts more slowly
+    but costs proportionally less, which is the trade §8 of the plan measures.
     """
     _serial_only(comm)
     from muGrid import linalg
 
-    decomp, prec = _uniform_setup(comm, dim, n)
+    decomp, prec = _uniform_setup(comm, dim, n, nu=nu)
     fc = decomp.collection
     level = prec.levels[0]
 

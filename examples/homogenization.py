@@ -271,6 +271,25 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--mg-nu",
+    type=int,
+    default=2,
+    help="Pre- and post-smoothing steps per level for '-P multigrid'. The two "
+    "are always equal, because M-inverse has to stay symmetric for plain CG. "
+    "Raising it costs (2*nu+1) matvecs per level and buys fewer CG iterations; "
+    "the two do not trade evenly, so it is worth measuring (default: 2)",
+)
+
+parser.add_argument(
+    "--mg-cycles",
+    type=int,
+    default=1,
+    help="V-cycles per '-P multigrid' apply. The right knob to reach for if "
+    "the cycle is too weak, since unlike an inner convergence test it keeps "
+    "the preconditioner linear and symmetric (default: 1)",
+)
+
+parser.add_argument(
     "--decomposition",
     choices=["auto", "cartesian", "fft"],
     default="auto",
@@ -1048,6 +1067,7 @@ elif args.preconditioner == "multigrid":
         prec = MultigridReferencePreconditioner(
             decomposition, grid_spacing, lam_ref, mu_ref,
             communicator=comm, element=_elem, timer=timer, dtype=dtype,
+            nu=args.mg_nu, nb_cycles=args.mg_cycles,
         )
 
     if not args.quiet:
@@ -1301,6 +1321,8 @@ if args.json or args.json_out:
             # How the domain was actually split, not how it was asked for: the
             # FFT engine picks its own split and ignores suggest_subdivisions.
             "decomposition": "fft" if use_fft_decomposition else "cartesian",
+            "mg_nu": int(args.mg_nu),
+            "mg_cycles": int(args.mg_cycles),
             "nb_ranks": int(comm.size),
             "nb_subdivisions": [int(x) for x in decomposition.nb_subdivisions],
             "nb_subdomain_grid_pts": [

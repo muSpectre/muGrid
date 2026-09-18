@@ -101,6 +101,19 @@ unreleased
   single shared-memory node it nonetheless costs nothing measurable, and its
   halo exchange is the faster of the two, because it has 2 MPI neighbours where
   a 3D split has 6 and per-message latency beats volume there
+- ENH: `examples/homogenization.py --mg-nu` and `--mg-cycles` expose the
+  V-cycle's smoothing and cycle counts, so the cost/convergence trade can be
+  measured rather than guessed. Measured, `nu = 1` beats the default of 2 at
+  every grid tried: smoothing costs `2*nu+1` per level while iterations fall
+  far more slowly, so the whole-solve penalty against the FFT preconditioner
+  drops from 4.5x to 3.8x at 256 cubed. Raising `nb_cycles` instead is strictly
+  worse -- `nu=1, cycles=2` buys exactly the iteration count of `nu=2` for about
+  27% more work
+- TST: `test_preconditioner_is_symmetric` and
+  `test_vcycle_converges_on_the_reference_operator` now sweep `nu` over
+  {1, 2, 3} in both dimensions. Symmetry is what allows plain CG to be used at
+  all, and a guarantee that held only at whichever `nu` happened to be the
+  default would be worth little now that `nu` is a tuning parameter
 
 
 v1.3.0 (16Sep26)

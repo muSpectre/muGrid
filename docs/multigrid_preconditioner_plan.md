@@ -27,7 +27,8 @@ Stages 0, 1 and 2 are **done**, and the gating measurement of §0.4 has been
 taken (§7.4: `R = 4.1–4.8`, go). Stages 3 (GPU) and 4 (MPI) remain.
 
 Read §7 before planning Stage 4: it changes what a single-node MPI run can be
-used for.
+used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
+default of 2 at every grid measured.
 
 - **PR #206** — `feat/multigrid-reference-preconditioner`, one commit, open
   against `main`, mergeable. Contains `GridTransfer{2,3}D` (host kernels +
@@ -691,7 +692,18 @@ in either arm, so every difference is the domain split alone.
 | 16 | `2x2x4` | `1x1x16` |
 
 Only the last axis is ever divided. §1 said "pencil at best"; it is one step
-worse than that. Two consequences, both structural rather than measured:
+worse than that — **and deliberately so**. A slab leaves two whole axes local,
+so each rank transforms its planes with a *batched 2D* rocFFT/cuFFT call, which
+is substantially faster than the 1D transforms plus an extra transpose that a
+pencil forces. The FFT engine is buying transform speed and paying in rank
+ceiling; the ceiling is a consequence of that choice, not an oversight.
+
+This matters for how every `R` in §7.4 should be read: the FFT arm is not a
+strawman. It is the vendor's fast path, on one device where it also has no
+communication at all. A V-cycle that loses to it by a factor of a few is losing
+to the best case the FFT will ever have.
+
+Two consequences, both structural rather than measured:
 
 - **Halo volume grows twice as fast.** At 128³ the slab's one-deep halo is
   1.00 / 1.20 / 1.66 / 2.23× the Cartesian one at 2 / 4 / 8 / 16 ranks.
@@ -760,3 +772,86 @@ on a bandwidth-bound device, because it omits the smoother's vector operations.
 §1 and §0.4 both cite `384³` OOMing on one GPU with `-P reference`. It no longer
 does: the run completes using 16.8 GB of 67.4 GB. There is no standalone memory
 result for multigrid to win here.
+
+---
+
+## 8. Choosing ν — measured before Stage 4
+
+§7.4 left `ν` open, with the effective ratio near the ">8: revisit ν" boundary.
+Swept here across `ν ∈ {1,2,3,4}` (always `ν₁ = ν₂`, as symmetry requires).
+
+### 8.1 Iterations fall much more slowly than cost rises
+
+CG iterations, grid-independent in both the oracle and production:
+
+| ν | oracle (n=32, 64) | production (64³, 6 cases) | relative to ν=2 |
+|---|---|---|---|
+| 1 | 47, 47 | 180 | 1.28 (oracle 1.31) |
+| 2 | 36, 36 | 141 | 1.00 |
+| 3 | 32, 32 | 126 | 0.89 (oracle 0.89) |
+| 4 | 30, 30 | 120 | 0.85 (oracle 0.83) |
+
+The production path and `mg_prototype.py` agree on the *shape* of the response
+to within 2%, which is a useful independent check of both.
+
+Cost per cycle rises as `2ν+1`, i.e. 1.00 / 1.67 / 2.33 / 3.00 relative to ν=1,
+while iterations fall only to 0.78 / 0.70 / 0.67. **Smoothing buys less than it
+costs, everywhere in the range.**
+
+### 8.2 Whole-solve cost, measured
+
+`n_iter × (t_matvec + t_preconditioner)`, against the same quantity for `-P
+reference`. Cycle costs priced on the GPU from parts (§7.4); iteration counts
+from production.
+
+| ν | 128³ | 256³ | FFT degradation needed to break even (256³) |
+|---|---|---|---|
+| **1** | **4.52×** | **3.81×** | **5.8×** |
+| 2 | 5.22× | 4.54× | 7.1× |
+| 3 | 6.01× | — | — |
+| 4 | 7.51× | — | — |
+
+`ν = 1` is best at both grids and the ordering is monotone. It lowers the
+required FFT degradation from 7.1× to 5.8×, an 18% easier target, and the
+whole-solve penalty on one device from 4.5× to 3.8×.
+
+Note the trend with size: the V-cycle's relative cost *falls* as the grid grows
+(R_parts 3.53 → 2.77 from 128³ to 256³ at ν=1), so larger problems favour the
+cycle. The 4-GPU benchmark should be run at the largest grid that fits, not the
+most convenient one.
+
+### 8.3 More cycles is strictly worse than more smoothing
+
+The class docstring suggests raising `nb_cycles` rather than the smoothing count
+if the cycle is too weak. On cost that is the wrong way round:
+
+| configuration | iterations (64³) | cycle cost (128³) |
+|---|---|---|
+| ν=1, cycles=1 | 180 | 2406 µs |
+| ν=2, cycles=1 | 141 | 3801 µs |
+| ν=1, cycles=2 | 141 | ~4812 µs |
+| ν=1, cycles=3 | 123 | ~7218 µs |
+
+`ν=1, cycles=2` buys *exactly* the same 141 iterations as `ν=2, cycles=1` for
+about 27% more work, and `ν=1, cycles=3` is worse than `ν=3`. The docstring's
+advice is sound about *symmetry* — `nb_cycles` cannot break it, whereas
+`ν₁ ≠ ν₂` would — but it should not be read as cost guidance.
+
+### 8.4 Recommendation
+
+**Default `ν = 1` for Stage 4**, not 2. It is the cheapest configuration at
+every grid measured, it makes the FFT's required degradation 18% smaller, and
+it reduces the cycle's memory traffic — which is what the halo-bound regime
+Stage 4 is aiming at will be sensitive to.
+
+The SPD requirement is checked, not assumed: `test_preconditioner_is_symmetric`
+and `test_vcycle_converges_on_the_reference_operator` are now swept over
+`ν ∈ {1,2,3}` in both dimensions, and pass. A symmetry guarantee that held only
+at whichever `ν` happened to be the default would have been worth little once
+`ν` became a tuning parameter.
+
+One caveat remains. The sweep is on the smooth/uniform reference operator,
+where the cycle is doing its easiest work. §6.5's sharp-interface results belong
+to the J-FFT scheme rather than to the cycle, but `ν=1` has the least margin if
+that ever stops being true, so re-measure §8.2 if the coarse level is ever
+given the heterogeneous operator (§5).
