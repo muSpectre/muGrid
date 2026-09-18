@@ -1191,10 +1191,18 @@ class MultigridReferencePreconditioner(Preconditioner):
     that trades the fine-grid FFT for a V-cycle. The motivation is parallel
     scaling: an FFT-based apply costs two all-to-all transposes per transform
     (four per apply), each a full barrier across all ranks, and it forces the
-    solver onto the FFT engine's pencil decomposition in which the x axis is
-    never distributed. A V-cycle needs only nearest-neighbour halo exchange at
-    every level plus one small collective at the bottom, and it leaves the
-    solver free to use a genuine 3D Cartesian decomposition.
+    solver onto the FFT engine's slab decomposition, ``[1, 1, P]``, in which
+    only the last axis is ever distributed -- so every rank holds the full
+    extent of the other two, and no run can use more ranks than the grid has
+    planes. A V-cycle needs only nearest-neighbour halo exchange at every level
+    plus one small collective at the bottom, and it leaves the solver free to
+    use a genuine 3D Cartesian decomposition.
+
+    On a single shared-memory node the slab is not itself a cost -- it moves
+    more halo bytes but through 2 neighbours rather than 6, and latency wins;
+    see the Stage 0 measurements in ``docs/multigrid_preconditioner_plan.md``.
+    Its liability is the rank ceiling and the halo volume, both of which bite
+    only where messages stop being latency-bound.
 
     The cycle runs on the **uniform** reference operator only, so no material
     field is ever restricted and every level is a plain rediscretisation of

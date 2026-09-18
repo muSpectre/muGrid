@@ -23,8 +23,11 @@ what you need to *operate*.
 
 ### 0.1 Current state
 
-Stages 1 and 2 are **done**. Stages 3 (GPU) and 4 (MPI) remain, and one
-gating measurement is outstanding (§0.4).
+Stages 0, 1 and 2 are **done**, and the gating measurement of §0.4 has been
+taken (§7.4: `R = 4.1–4.8`, go). Stages 3 (GPU) and 4 (MPI) remain.
+
+Read §7 before planning Stage 4: it changes what a single-node MPI run can be
+used for.
 
 - **PR #206** — `feat/multigrid-reference-preconditioner`, one commit, open
   against `main`, mergeable. Contains `GridTransfer{2,3}D` (host kernels +
@@ -208,10 +211,12 @@ nb_subdivisions[0] = 1;  // X is not distributed in real space
 
 1. **Two all-to-alls per transform, four per preconditioner apply.** All-to-all is
    latency- and bisection-bandwidth-bound and is a full barrier across all ranks.
-2. **X is never distributed**, so every rank holds the full X extent — a memory
-   floor per device, and the reason `384³` OOMs on a single GPU.
-3. The real-space decomposition is pencil at best, never 3D, because the
-   preconditioner owns it.
+2. **Two of the three axes are never distributed.** Measured in Stage 0 (§7):
+   the split is a *slab*, `[1, 1, P]`, not a pencil — only the last axis is
+   ever divided. Every rank holds the full extent of the other two, a memory
+   floor per device, and a hard ceiling of `P ≤ N` ranks.
+3. The real-space decomposition is never 3D, because the preconditioner owns
+   it.
 
 Measured (`docs/benchmark_homogenization_preconditioner.md`, MI300A):
 
@@ -440,8 +445,8 @@ Nothing in `Solvers.py` changes: the result conforms to the existing
 
 **Stage 0 — measurement baseline.**
 Add `-P multigrid` plumbing and timers. Separately measure `-P none` on a *3D*
-`CartesianDecomposition` versus the FFT engine's pencil, to separate "removed the
-FFT" from "removed the pencil" in every later number.
+`CartesianDecomposition` versus the FFT engine's split, to separate "removed the
+FFT" from "removed the decomposition" in every later number. **Done — see §7.**
 
 **Stage 1 — serial host prototype, 2D, pure Python.**
 Whole V-cycle on `.s` views with numpy, `apply_uniform` for matvecs, existing
@@ -655,8 +660,9 @@ Allreduce. Do not read it as an argument for stopping early.
 - `L` is a parallel-tuning parameter, not a numerical one (§6.6), so it can be
   chosen in Stage 4 from measured per-rank sizes rather than fixed now.
 - Nothing here contradicts the design, but §2.8 now says plainly that MG trades
-  flops for communication. Stage 0's baseline (3D decomposition vs pencil,
-  unpreconditioned) is what will make the Stage 4 numbers interpretable.
+  flops for communication. Stage 0's baseline (3D decomposition vs the FFT
+  engine's, unpreconditioned) is what will make the Stage 4 numbers
+  interpretable; it has now been measured, in §7.
 
 ### 6.8 Unrelated papercut found on the way
 
@@ -665,3 +671,92 @@ automatic" but passes `[0] * nb_dims` to C++, which rejects it with
 *"The total number of subdivisions (0) does not match the size of the
 communicator (1)"*. Every caller must pass `nb_subdivisions` explicitly. Worth a
 small separate fix in `Wrappers.py`.
+
+---
+
+## 7. Stage 0 findings
+
+Measured on one MI300A node (23 Zen4 cores, 1 GPU) with
+`examples/decomposition_baseline.py`, which holds the preconditioner fixed at
+`-P none` and varies only `homogenization.py --decomposition`. No transform runs
+in either arm, so every difference is the domain split alone.
+
+### 7.1 The FFT engine's split is a slab, not a pencil
+
+| ranks | Cartesian | FFT engine |
+|---|---|---|
+| 2 | `2x1x1` | `1x1x2` |
+| 4 | `2x2x1` | `1x1x4` |
+| 8 | `2x2x2` | `1x1x8` |
+| 16 | `2x2x4` | `1x1x16` |
+
+Only the last axis is ever divided. §1 said "pencil at best"; it is one step
+worse than that. Two consequences, both structural rather than measured:
+
+- **Halo volume grows twice as fast.** At 128³ the slab's one-deep halo is
+  1.00 / 1.20 / 1.66 / 2.23× the Cartesian one at 2 / 4 / 8 / 16 ranks.
+- **A hard rank ceiling of `P ≤ N`** — 128 ranks on a 128³ grid, against
+  2,097,152 for a 3D split. Well before the ceiling the slab is a few planes
+  thick and its two ghost planes rival its interior.
+
+### 7.2 On one node the slab costs nothing — and its halo is *faster*
+
+This is the result Stage 0 existed to get, and it is not the expected one.
+
+| ranks | halo points | matvec | halo time |
+|---|---|---|---|
+| 2 | 1.00× | 1.02× | 0.76× |
+| 4 | 1.20× | 1.03× | 0.75× |
+| 8 | 1.66× | 1.03× | 0.80× |
+| 16 | 2.23× | 1.02× | 0.90× |
+
+(128³, FFT-engine split relative to Cartesian; 64³ agrees.)
+
+The matvec penalty is a flat 1.02–1.03×, which is noise. The halo *time* goes
+the other way from the halo *volume*: the slab is consistently the faster of the
+two despite moving up to 2.23× the bytes. The mechanism is message count — a
+slab has **2** MPI neighbours where a 3D split has **6**, and its non-distributed
+axes wrap locally with no MPI at all. On shared memory, per-message latency beats
+volume.
+
+Halo exchange is 0.1% of the matvec at one rank and still only 2% at 16, and
+both arms strong-scale at 15.6–15.7× on 16 ranks.
+
+### 7.3 Consequence for Stage 4
+
+**Attribute nothing to the decomposition yet.** On a single node essentially
+100% of any multigrid-versus-FFT difference is the all-to-all; the slab's
+liability is a *scaling* one — growing halo volume and a rank ceiling — that
+appears only where per-message latency stops dominating, i.e. across devices or
+nodes. The crossover in this trade runs the opposite way to the FFT's, so the
+two must keep being measured separately.
+
+This also sharpens §0.4's warning. Shared-memory ranks understate the
+all-to-all penalty, and they *invert* the decomposition penalty. A single-node
+MPI run is therefore a correctness vehicle for Stage 4 and not a performance
+one — more strongly than §0.4 says.
+
+### 7.4 The gating measurement of §0.4 is done
+
+`R = 4.1–4.8` on one MI300A at 128³/192³/256³, stable across grid sizes — the
+"3–5: go, but 4 GPUs may only just show it" band. Two refinements:
+
+- **`--sync-timers` is mandatory** and §0.4's command omits it. muGrid never
+  synchronises the device, so an unsynchronised host-side timer measures kernel
+  *launch* time and charges the work to whichever region is open at the next
+  implicit sync. Without it this measurement returned `R = 5.5 / 12.5 / 28` with
+  an FFT apply that was *cheaper* at 256³ than at 128³.
+- **The per-apply `R` is not the whole cost.** The V-cycle needs 1.50× the CG
+  iterations in production (144 vs 96), matching the prototype's 1.57 (36 vs 23,
+  §6.5). The effective ratio is therefore ~6–8, against a ">8: revisit ν"
+  boundary. `ν` is worth a look before Stage 4, not after.
+
+Measured with `examples/vcycle_vs_fft.py`, which also prices a V-cycle from its
+parts on the GPU — the matvec-only model of §0.4 understates the cycle by ~25%
+on a bandwidth-bound device, because it omits the smoother's vector operations.
+
+### 7.5 The `384³` OOM motivation is gone
+
+§1 and §0.4 both cite `384³` OOMing on one GPU with `-P reference`. It no longer
+does: the run completes using 16.8 GB of 67.4 GB. There is no standalone memory
+result for multigrid to win here.
