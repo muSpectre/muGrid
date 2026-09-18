@@ -93,6 +93,14 @@ unreleased
   say which it moved. The JSON output now also records the split that was
   actually used -- rank count, subdivisions and subdomain extents -- since the
   FFT engine picks its own and ignores `suggest_subdivisions`
+- ENH: New `examples/decomposition_baseline.py`, which measures what the FFT
+  engine's domain split costs on its own, with the preconditioner held at
+  `-P none` so that no transform runs in either arm. The split turns out to be
+  a *slab*, `[1, 1, P]` -- only the last axis is ever distributed -- which caps
+  a run at `P <= N` ranks and grows its halo twice as fast as a 3D split. On a
+  single shared-memory node it nonetheless costs nothing measurable, and its
+  halo exchange is the faster of the two, because it has 2 MPI neighbours where
+  a 3D split has 6 and per-message latency beats volume there
 
 
 v1.3.0 (16Sep26)
