@@ -35,6 +35,7 @@ import numpy as np
 import muGrid
 from muGrid import parprint
 from muGrid.Preconditioners import (
+    HybridFourierTridiagonalPreconditioner,
     MultigridReferencePreconditioner,
     make_reference_stiffness_preconditioner,
 )
@@ -349,7 +350,7 @@ parser.add_argument(
 parser.add_argument(
     "-P",
     "--preconditioner",
-    choices=["none", "reference", "multigrid"],
+    choices=["none", "reference", "multigrid", "hybrid"],
     default="none",
     help="Preconditioner for the PCG solver: 'none', 'reference' or "
     "'multigrid'. 'reference' is the reference-material Green's-function "
@@ -359,7 +360,11 @@ parser.add_argument(
     "fine-grid FFT (and its all-to-all transposes) by halo exchange, with an "
     "exact FFT solve only on the coarsest grid. Both pair with either matvec "
     "kernel, except that 'multigrid' needs the per-pixel Lame fields of the "
-    "'fused' kernel (default: none)",
+    "'fused' kernel. 'hybrid' applies the same reference operator exactly, by "
+    "transforming only the rank-local axes and solving tridiagonally along the "
+    "distributed one -- so it costs 'reference' iteration counts with no "
+    "all-to-all. It also needs the fused kernel, and forces a slab "
+    "decomposition (default: none)",
 )
 
 args = parser.parse_args()
@@ -371,8 +376,9 @@ if args.json or args.json_out:
 # The V-cycle drives the *uniform* reference operator from two scalar Lame
 # parameters, which only the fused kernel's per-pixel Lame fields provide; the
 # generic kernel carries the full C tensor instead.
-if args.preconditioner == "multigrid" and args.kernel != "fused":
-    parser.error("--preconditioner multigrid requires --kernel fused")
+if args.preconditioner in ("multigrid", "hybrid") and args.kernel != "fused":
+    parser.error(
+        f"--preconditioner {args.preconditioner} requires --kernel fused")
 
 # Select array library based on memory location
 if args.device == "cpu":
@@ -449,6 +455,12 @@ quad_weights = np.array(gradient_op.quadrature_weights)
 
 # Determine MPI decomposition using NuMPI's suggest_subdivisions
 s = suggest_subdivisions(dim, comm.size)
+
+# The hybrid preconditioner needs the same slab the FFT engine picks: every axis
+# but the last held whole by each rank, so those can be transformed without
+# communication and only the last needs a distributed solve.
+if args.preconditioner == "hybrid":
+    s = [1] * (dim - 1) + [comm.size]
 
 # 'auto' ties the decomposition to the preconditioner, which is what every run
 # wants except a baseline measurement that is trying to tell the two apart.
@@ -1053,6 +1065,26 @@ if args.preconditioner == "reference":
         else:
             parprint(f"  Reference stiffness Cʳᵉᶠ (mean): diag = "
                      f"{np.diag(C_ref)}", comm=comm)
+elif args.preconditioner == "hybrid":
+    # Same operator M = Kʳᵉᶠ again, and unlike the V-cycle this applies it
+    # *exactly* -- so it costs the same CG iterations as `-P reference` while
+    # never transforming the distributed axis, hence no all-to-all.
+    n_global = comm.sum(int(lambda_field.p.size))
+    lam_ref = comm.sum(float(lambda_field.p.sum())) / n_global
+    mu_ref = comm.sum(float(mu_field.p.sum())) / n_global
+
+    with timer("preconditioner_setup"):
+        prec = HybridFourierTridiagonalPreconditioner(
+            decomposition, grid_spacing, lam_ref, mu_ref,
+            communicator=comm, element=_elem, timer=timer, dtype=dtype,
+        )
+
+    if not args.quiet:
+        parprint("Using hybrid Fourier/tridiagonal preconditioner", comm=comm)
+        parprint(f"  Reference Lamé (mean): λ = {lam_ref:.4f}, "
+                 f"μ = {mu_ref:.4f}", comm=comm)
+        parprint(f"  Slab: {comm.size} rank(s) along the last axis, "
+                 f"{prec.nz_local} planes each", comm=comm)
 elif args.preconditioner == "multigrid":
     # Same operator M = Kʳᵉᶠ as above, same uniform reference material -- only
     # the way M⁻¹ is applied changes: a V-cycle over rediscretised levels

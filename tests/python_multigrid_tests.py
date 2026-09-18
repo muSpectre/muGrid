@@ -512,3 +512,131 @@ def test_rejects_2d_p1_nodal_block(comm):
             decomp, (1 / 32, 1 / 32), 1.3, 0.7,
             element=muGrid._muGrid.FEMElement.p1, min_coarse=8,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Hybrid Fourier/tridiagonal preconditioner
+#
+# Unlike the V-cycle this one runs under MPI, and unlike the V-cycle it is
+# *exact* -- so the tests assert equality with K_ref^-1 rather than a
+# convergence rate, and they run at whatever rank count the suite is given.
+# --------------------------------------------------------------------------- #
+
+
+def _slab_setup(comm, dim, n, lam=1.3, mu=0.7):
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+    from muGrid.Wrappers import IsotropicStiffnessOperator
+
+    nb_ranks = 1 if comm is None else comm.size
+    spacing = (1.0 / n,) * dim
+    decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * (dim - 1) + [nb_ranks],
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
+    op = IsotropicStiffnessOperator(dim, spacing, muGrid.FEMElement.q1)
+    prec = HybridFourierTridiagonalPreconditioner(
+        decomp, spacing, lam, mu, communicator=comm)
+    return decomp, op, prec, lam, mu
+
+
+def _slab_slice(decomposition, glob):
+    """This rank's slab of a global (dim, *nb_grid_pts) array."""
+    start = int(decomposition.subdomain_locations[-1])
+    return glob[..., start:start + int(decomposition.nb_subdomain_grid_pts[-1])]
+
+
+def _zero_mean_global(dim, n, seed):
+    rng = np.random.default_rng(seed)
+    glob = rng.standard_normal((dim,) + (n,) * dim)
+    return glob - glob.mean(axis=tuple(range(1, dim + 1)), keepdims=True)
+
+
+def _global_sum(comm, value):
+    return float(value if comm is None or comm.size == 1
+                 else comm.sum(float(value)))
+
+
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_is_the_exact_reference_inverse(comm, dim, n):
+    """K (M^-1 r) == r.
+
+    The point of the hybrid over the V-cycle: it does not approximate K_ref^-1,
+    it computes it -- without ever transforming the distributed axis. An
+    approximate inverse would still converge, so only equality tests the claim.
+    """
+    if comm is not None and n % comm.size:
+        pytest.skip(f"{n} planes do not divide among {comm.size} ranks")
+    decomp, op, prec, lam, mu = _slab_setup(comm, dim, n)
+    fc = decomp.collection
+    r, z, f = (fc.real_field(f"hyb-{s}", (dim,)) for s in "rzf")
+
+    r.p[...] = _slab_slice(decomp, _zero_mean_global(dim, n, 0))
+    prec.apply(r, z)
+    decomp.communicate_ghosts(z)
+    op.apply_uniform(z, lam, mu, f)
+
+    err = _global_sum(comm, ((np.asarray(f.p) - np.asarray(r.p)) ** 2).sum())
+    ref = _global_sum(comm, (np.asarray(r.p) ** 2).sum())
+    assert np.sqrt(err / ref) < 1e-11
+
+
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_is_symmetric(comm, dim, n):
+    """<M^-1 a, b> == <a, M^-1 b>, which is what lets plain CG use it."""
+    if comm is not None and n % comm.size:
+        pytest.skip(f"{n} planes do not divide among {comm.size} ranks")
+    decomp, _, prec, _, _ = _slab_setup(comm, dim, n)
+    fc = decomp.collection
+    a, b = (fc.real_field(f"hyb-sym-{s}", (dim,)) for s in "ab")
+    ma, mb = (fc.real_field(f"hyb-sym-m{s}", (dim,)) for s in "ab")
+
+    a.p[...] = _slab_slice(decomp, _zero_mean_global(dim, n, 1))
+    b.p[...] = _slab_slice(decomp, _zero_mean_global(dim, n, 2))
+    prec.apply(a, ma)
+    prec.apply(b, mb)
+
+    lhs = _global_sum(comm, (np.asarray(ma.p) * np.asarray(b.p)).sum())
+    rhs = _global_sum(comm, (np.asarray(a.p) * np.asarray(mb.p)).sum())
+    assert abs(lhs - rhs) <= 1e-10 * max(abs(lhs), abs(rhs))
+
+
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_is_rank_independent(comm, dim, n):
+    """The answer does not depend on how the domain was cut.
+
+    The strongest statement available about the distributed solve: the reduced
+    interface system either reproduces the serial result exactly or it does not.
+    """
+    if comm is not None and n % comm.size:
+        pytest.skip(f"{n} planes do not divide among {comm.size} ranks")
+    decomp, _, prec, _, _ = _slab_setup(comm, dim, n)
+    fc = decomp.collection
+    r, z = (fc.real_field(f"hyb-ri-{s}", (dim,)) for s in "rz")
+    glob = _zero_mean_global(dim, n, 3)
+    r.p[...] = _slab_slice(decomp, glob)
+    prec.apply(r, z)
+
+    # Compare against a preconditioner built on a serial decomposition, which
+    # every rank can construct for itself.
+    serial_decomp, _, serial_prec, _, _ = _slab_setup(None, dim, n)
+    sr, sz = (serial_decomp.collection.real_field(f"hyb-ri-s{s}", (dim,))
+              for s in "rz")
+    sr.p[...] = glob
+    serial_prec.apply(sr, sz)
+
+    want = _slab_slice(decomp, np.asarray(sz.p))
+    got = np.asarray(z.p)
+    assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()
+
+
+def test_hybrid_rejects_a_non_slab_decomposition(comm):
+    """A 3D split leaves no axis rank-local, so there is nothing to transform."""
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+
+    if comm is not None and comm.size != 8:
+        pytest.skip("needs exactly 8 ranks to build a 2x2x2 split")
+    decomp = muGrid.CartesianDecomposition(
+        comm, [16] * 3, nb_subdivisions=[2, 2, 2],
+        nb_ghosts_left=(1,) * 3, nb_ghosts_right=(1,) * 3)
+    with pytest.raises(ValueError, match="slab decomposition"):
+        HybridFourierTridiagonalPreconditioner(
+            decomp, (1 / 16,) * 3, 1.3, 0.7, communicator=comm)

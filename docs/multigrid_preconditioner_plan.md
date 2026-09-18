@@ -23,8 +23,10 @@ what you need to *operate*.
 
 ### 0.1 Current state
 
-Stages 0, 1 and 2 are **done**, and the gating measurement of §0.4 has been
-taken (§7.4: `R = 4.1–4.8`, go). Stages 3 (GPU) and 4 (MPI) remain.
+Stages 0, 1, 2 and **4** are done. Stage 4 was taken via the
+Fourier/tridiagonal hybrid (§9–§11) rather than the V-cycle: it reaches the FFT
+preconditioner's iteration count *exactly* at every rank count, with no
+all-to-all. Stage 3 (GPU) remains, and the V-cycle remains serial.
 
 Read §7 before planning Stage 4: it changes what a single-node MPI run can be
 used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
@@ -1059,3 +1061,84 @@ The V-cycle has to climb out of a 3.8× whole-solve hole (§8.2) using
 communication savings alone. The hybrid starts level and needs the all-to-all to
 cost merely *something*. Unless the Woodbury correction proves far worse than
 the decay measurements suggest, this is the better Stage 4.
+
+---
+
+## 11. Stage 4, done — via the hybrid
+
+Implemented as `HybridFourierTridiagonalPreconditioner` in `Preconditioners.py`
+and reachable as `examples/homogenization.py -P hybrid`. It runs under MPI; the
+V-cycle still does not.
+
+### 11.1 The result
+
+CG iterations on 64³, six strain cases, against `-P reference`:
+
+| ranks | `-P reference` | `-P hybrid` |
+|---|---|---|
+| 1 | 96 | **96** |
+| 2 | 96 | **96** |
+| 4 | 96 | **96** |
+| 8 | 96 | **96** |
+
+Identical at every rank count, with `E_eff = 1.3607` throughout — and no
+all-to-all anywhere in the hybrid. Set against the V-cycle's 141 at `ν=2`, this
+is the 1.5× iteration penalty gone.
+
+Correctness, 16³ in 3D at 1/2/4/8 ranks: `‖K M⁻¹r − r‖/‖r‖ ≈ 9e-16`, symmetry
+`≈ 7e-15`, and the gathered solution's checksum agrees **to twelve decimals
+across all four rank counts**. Rank-independence is the sharpest available
+statement about a distributed solve, and it is exact rather than approximate.
+
+### 11.2 What made it work
+
+The Spike/partitioned-Thomas scheme. Each rank eliminates its own slab against
+three right-hand sides — the residual, and the unit responses to its two
+neighbours' interface planes — leaving a reduced system in the `2·dim` interface
+unknowns per rank. Two consequences worth recording:
+
+- **The reduced system absorbs the periodic wrap-around.** §10.4 called the
+  Woodbury correction the largest cost uncertainty and the fiddliest code. In
+  the partitioned formulation it does not exist: the reduced system is dense,
+  small and block-cyclic, so periodicity is one more entry in it.
+- **The spikes do not depend on the residual**, so they and the reduced system's
+  inverse are built once at setup. Per apply the only communication is the
+  interface planes — `2·dim` complex numbers per mode per rank.
+
+### 11.3 The zero mode needs its own path
+
+The all-zero mode keeps the constant-in-z nullspace, so its z-operator is
+singular and both the local Thomas factors and the reduced system degenerate
+there. It is one mode, so its whole z-line is gathered and a pseudo-inverse
+applied — the same treatment `make_reference_stiffness_preconditioner` gives
+`q = 0`. The gather is ~12 KB at 256³.
+
+This cost two debugging rounds and is worth flagging for the GPU port. `inv()`
+does *not* reliably fail on a singular mode — more often it returns something
+large and finite — so `_batched_inverse` checks the residual `‖M M⁻¹ − I‖`
+rather than trusting `isfinite`. With the zero mode silently wrong the
+preconditioner still converged; it just was not the reference operator any more,
+at a relative error of 2e-4.
+
+### 11.4 Constraints, all checked with a clear error
+
+- Slab decomposition only: one subdivision in every axis but the last.
+- The distributed axis must divide evenly among the ranks — the interface
+  exchange and the zero-mode gather both assume equal slabs.
+- At least two planes per rank, so the slab caps at `N_z / 2` ranks.
+- Ranks laid out in order along the distributed axis.
+- Fused kernel, for the per-pixel Lamé fields.
+
+### 11.5 What is left
+
+- **GPU.** Host-only for now: the transform and the tridiagonal solve both go
+  through numpy. That is stage 3, and §10.1 already measured the kernel it
+  needs — 2255 GB/s, with the `(z, mode, component)` layout the trap to avoid.
+- **The reduced system grows as `(2·dim·P)²` per mode**, which is dense-inverted
+  at setup: ~300 MB at P=4 on 256³, ~5 GB at P=16. It is block-cyclic, so
+  exploiting that structure is the fix when P grows.
+- **The Thomas factors are stored in full** (`O(N_z)` per mode). §10.3 showed
+  they reach a fixed point in a median of 9 steps, so this is compressible by
+  roughly an order of magnitude; not yet done.
+- **The per-apply sweep loops over `nz_local` in Python.** Fine on the host,
+  and it is exactly what the fused kernel replaces on the device.

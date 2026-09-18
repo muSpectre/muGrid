@@ -114,6 +114,19 @@ unreleased
   {1, 2, 3} in both dimensions. Symmetry is what allows plain CG to be used at
   all, and a guarantee that held only at whichever `nu` happened to be the
   default would be worth little now that `nu` is a tuning parameter
+- ENH: New `HybridFourierTridiagonalPreconditioner`, reachable as
+  `examples/homogenization.py -P hybrid`. It applies the same reference
+  operator as `-P reference` but transforms only the rank-local axes, solving
+  block-tridiagonally along the distributed one -- so it never performs the
+  all-to-all a full FFT forces, and unlike the V-cycle it is *exact*. Measured
+  at 1, 2, 4 and 8 ranks it reproduces `-P reference`'s CG count to the
+  iteration, where the V-cycle costs about 1.5x of it. Two properties make it
+  work, and neither is separability: the reference operator is uniform, so
+  transforming the local axes decouples every mode exactly, and the stencil
+  reaches one node along the distributed axis for Q1 and P1 alike. The
+  distributed solve is the Spike/partitioned-Thomas scheme, whose small reduced
+  interface system also absorbs the periodic wrap-around. Slab decomposition
+  only, host only for now
 
 
 v1.3.0 (16Sep26)
