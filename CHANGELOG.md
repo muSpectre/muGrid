@@ -67,6 +67,16 @@ unreleased
   that a V-cycle needs at least two levels. Applying the cycle to device fields
   produced a pybind overload mismatch from three frames down, and now names the
   missing device grid-transfer kernels
+- ENH: `examples/homogenization.py` gained `-P multigrid`, which applies the
+  same reference operator as `-P reference` by a V-cycle instead of a fine-grid
+  FFT, and `--sync-timers`, which brackets every timed region with a device
+  synchronisation. The latter is needed for any GPU cost attribution from this
+  example: kernel launches are asynchronous, so an unsynchronised host-side
+  timer around a region that only launches work measures the launch, and the
+  work is charged to whichever region is open at the next implicit
+  synchronisation -- usually a CG dot product pulling a scalar back. Totals are
+  unaffected; the breakdown is not, and the symptom is a sub-timer that stops
+  growing with the grid or shrinks
 
 
 v1.3.0 (16Sep26)

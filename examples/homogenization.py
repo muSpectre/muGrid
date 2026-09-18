@@ -34,7 +34,10 @@ import numpy as np
 
 import muGrid
 from muGrid import parprint
-from muGrid.Preconditioners import make_reference_stiffness_preconditioner
+from muGrid.Preconditioners import (
+    MultigridReferencePreconditioner,
+    make_reference_stiffness_preconditioner,
+)
 from muGrid.Solvers import conjugate_gradients
 
 try:
@@ -268,6 +271,17 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--sync-timers",
+    action="store_true",
+    help="Synchronise the device at both ends of every timed region, so that "
+    "the per-region breakdown attributes GPU work to the region that issued "
+    "it. Without this, host-side timers around asynchronous kernel launches "
+    "measure the launch only, and the work is charged to whichever region is "
+    "open at the next implicit synchronisation. Slows the run down and is "
+    "meant for attribution, not for quoting throughput (default: off)",
+)
+
+parser.add_argument(
     "--profile-memory",
     action="store_true",
     help="Print a GPU memory breakdown at the end: muGrid Fields (per buffer) "
@@ -304,13 +318,17 @@ parser.add_argument(
 parser.add_argument(
     "-P",
     "--preconditioner",
-    choices=["none", "reference"],
+    choices=["none", "reference", "multigrid"],
     default="none",
-    help="Preconditioner for the PCG solver: 'none' or 'reference' "
-    "(reference-material Green's-function preconditioner of Ladecky et al. "
-    "2023, applied in Fourier space; makes the iteration count nearly "
-    "independent of grid size). 'reference' requires the 'generic' kernel "
-    "(default: none)",
+    help="Preconditioner for the PCG solver: 'none', 'reference' or "
+    "'multigrid'. 'reference' is the reference-material Green's-function "
+    "preconditioner of Ladecky et al. (2023), applied in Fourier space; it "
+    "makes the iteration count nearly independent of grid size. 'multigrid' "
+    "approximates the same operator's inverse by a V-cycle, replacing the "
+    "fine-grid FFT (and its all-to-all transposes) by halo exchange, with an "
+    "exact FFT solve only on the coarsest grid. Both pair with either matvec "
+    "kernel, except that 'multigrid' needs the per-pixel Lame fields of the "
+    "'fused' kernel (default: none)",
 )
 
 args = parser.parse_args()
@@ -318,6 +336,12 @@ args = parser.parse_args()
 # JSON output (to stdout or a file) implies quiet mode
 if args.json or args.json_out:
     args.quiet = True
+
+# The V-cycle drives the *uniform* reference operator from two scalar Lame
+# parameters, which only the fused kernel's per-pixel Lame fields provide; the
+# generic kernel carries the full C tensor instead.
+if args.preconditioner == "multigrid" and args.kernel != "fused":
+    parser.error("--preconditioner multigrid requires --kernel fused")
 
 # Select array library based on memory location
 if args.device == "cpu":
@@ -570,6 +594,56 @@ if args.kernel == "fused":
 
 # Create global timer for hierarchical timing (MPI-aware: prints on rank 0)
 timer = muTimer.Timer(comm=comm)
+
+
+class _SyncRegion:
+    """One timed region, with a device synchronisation at each end."""
+
+    def __init__(self, region, sync):
+        self._region = region
+        self._sync = sync
+
+    def __enter__(self):
+        self._sync()
+        return self._region.__enter__()
+
+    def __exit__(self, *exc_info):
+        self._sync()
+        return self._region.__exit__(*exc_info)
+
+
+class _SyncTimer:
+    """A timer that brackets every region with a device synchronisation.
+
+    GPU kernel launches are asynchronous, so a host-side clock around a region
+    that only launches work measures the launch, not the work. The totals still
+    come out right -- something eventually synchronises, usually the next dot
+    product pulling a scalar back to the host -- but the *breakdown* does not:
+    the time lands in whichever region happens to be open when that implicit
+    synchronisation occurs. The symptom is a sub-timer that stops growing with
+    the grid, or shrinks.
+
+    Synchronising removes the overlap between regions, so the total gets
+    slower and more honest. Use this to attribute cost, not to quote a
+    throughput.
+    """
+
+    def __init__(self, timer, sync):
+        self._timer = timer
+        self._sync = sync
+
+    def __call__(self, *args, **kwargs):
+        return _SyncRegion(self._timer(*args, **kwargs), self._sync)
+
+    def __getattr__(self, name):
+        return getattr(self._timer, name)
+
+
+if args.sync_timers:
+    if device.is_host:
+        parprint("--sync-timers has no effect on the CPU; ignoring", comm=comm)
+    else:
+        timer = _SyncTimer(timer, arr.cuda.runtime.deviceSynchronize)
 
 # Performance counters
 nb_grid_pts_total = np.prod(args.nb_grid_pts)
@@ -929,6 +1003,28 @@ if args.preconditioner == "reference":
         else:
             parprint(f"  Reference stiffness Cʳᵉᶠ (mean): diag = "
                      f"{np.diag(C_ref)}", comm=comm)
+elif args.preconditioner == "multigrid":
+    # Same operator M = Kʳᵉᶠ as above, same uniform reference material -- only
+    # the way M⁻¹ is applied changes: a V-cycle over rediscretised levels
+    # instead of one fine-grid FFT pair. The cycle needs nothing but the two
+    # reference Lamé scalars, because every level rebuilds Kʳᵉᶠ at its own
+    # spacing rather than restricting a material field.
+    n_global = comm.sum(int(lambda_field.p.size))
+    lam_ref = comm.sum(float(lambda_field.p.sum())) / n_global
+    mu_ref = comm.sum(float(mu_field.p.sum())) / n_global
+
+    with timer("preconditioner_setup"):
+        prec = MultigridReferencePreconditioner(
+            decomposition, grid_spacing, lam_ref, mu_ref,
+            communicator=comm, element=_elem, timer=timer, dtype=dtype,
+        )
+
+    if not args.quiet:
+        parprint("Using multigrid reference-stiffness preconditioner", comm=comm)
+        parprint(f"  Reference Lamé (mean): λ = {lam_ref:.4f}, "
+                 f"μ = {mu_ref:.4f}", comm=comm)
+        parprint(f"  Levels: {prec.nb_levels}, ν = {prec.nu}, "
+                 f"ω = {prec.omega:.4f}, cycles = {prec.nb_cycles}", comm=comm)
 
 
 # Storage for homogenized stiffness
