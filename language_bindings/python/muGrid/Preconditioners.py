@@ -1024,3 +1024,373 @@ def make_green_jacobi_preconditioner(
 
     prec.refresh = refresh
     return prec
+
+
+def _project_constants_out(field):
+    """Remove the nullspace of the periodic stiffness operator: the ``dim``
+    constant translations. (Rigid rotations are not periodic, so they are not
+    in it.)
+
+    Done on the array view because ``linalg`` has no interior-only sum and no
+    add-a-constant kernel -- the one place this preconditioner still touches an
+    array library in its hot path. Two calls per apply, not per level.
+    """
+    values = field.s
+    spatial = tuple(range(1, values.ndim))
+    values -= values.mean(axis=spatial, keepdims=True)
+
+
+# --------------------------------------------------------------------------- #
+# Multigrid approximation of the reference-stiffness inverse
+# --------------------------------------------------------------------------- #
+
+
+class _MultigridLevel:
+    """One level of the hierarchy, carrying the *uniform* reference operator.
+
+    Every level runs the same spatially uniform ``Kʳᵉᶠ`` at its own grid
+    spacing, so no material field is ever restricted and the coarse operator is
+    a plain rediscretisation rather than a Galerkin product. Heterogeneity is
+    handled outside the cycle, by the symmetric Jacobi scaling of
+    :class:`GreenJacobiPreconditioner`.
+    """
+
+    def __init__(self, decomposition, spacing, element, lam, mu, dim,
+                 name, dtype, with_fft=False):
+        from .Wrappers import IsotropicStiffnessOperator
+
+        self.dim = dim
+        self.decomp = decomposition
+        self.lam = lam
+        self.mu = mu
+        self.op = IsotropicStiffnessOperator(dim, tuple(spacing), element)
+        self.fc = (decomposition.real_space_collection if with_fft
+                   else decomposition.collection)
+
+        def field(suffix):
+            if np.dtype(dtype) == np.dtype(np.float32):
+                return wrap_field(self.fc.register_real32_field(
+                    f"{name}-{suffix}", (dim,)))
+            return wrap_field(self.fc.real_field(f"{name}-{suffix}", (dim,)))
+
+        self.r = field("r")
+        self.z = field("z")
+        self.t = field("t")
+        self.inv_diag = field("inv-diag")
+
+        self.node_block = self._probe_node_block()
+        self._set_inverse_diagonal(name)
+
+    # -- operator ---------------------------------------------------------- #
+
+    def apply(self, u, f):
+        """``f = Kʳᵉᶠ u``, ghosts of ``u`` refreshed first."""
+        self.decomp.communicate_ghosts(u)
+        self.op.apply_uniform(u, self.lam, self.mu, f)
+
+    # -- setup -------------------------------------------------------------- #
+
+    def _probe_node_block(self):
+        """The nodal ``dim x dim`` block of the uniform operator.
+
+        On a uniform grid every node has an identical element neighbourhood, so
+        one matrix describes the whole level and a single impulse response per
+        direction recovers it. Rank-local by construction: every rank probes
+        its own interior and gets the same answer, so this needs no
+        communication.
+        """
+        interior = tuple(self.decomp.nb_subdomain_grid_pts)
+        node = tuple(n // 2 for n in interior)
+        block = np.zeros((self.dim, self.dim))
+        for beta in range(self.dim):
+            self.z.set_zero()
+            self.z.s[(beta, 0) + node] = 1.0
+            self.apply(self.z, self.t)
+            response = self.t.s[(slice(None), 0) + node]
+            block[:, beta] = (response.get() if hasattr(response, "get")
+                              else np.asarray(response))
+        self.z.set_zero()
+        self.t.set_zero()
+        return block
+
+    def _set_inverse_diagonal(self, name):
+        """Store ``D⁻¹`` as a per-component field.
+
+        For Q1 in any dimension, and for P1 in 3D, the nodal block is diagonal
+        (``c·I`` at isotropic grid spacing), so the smoother is a component-wise
+        scaling that ``linalg.scal`` applies directly. 2D P1 is the exception:
+        the two-triangle Kuhn split breaks the x-y symmetry that cancels the
+        off-diagonal, leaving ``K01 = λ + μ``. That needs a component-mixing
+        smoother, which is not implemented.
+        """
+        off_diagonal = np.abs(
+            self.node_block - np.diag(np.diag(self.node_block))).max()
+        scale = np.abs(np.diag(self.node_block)).max()
+        if off_diagonal > 1e-10 * max(scale, 1.0):
+            raise NotImplementedError(
+                "the multigrid smoother needs a diagonal nodal block, but the "
+                f"probed block is\n{self.node_block}\n(largest off-diagonal "
+                f"{off_diagonal:.3e}). This happens for P1 elements in 2D, "
+                "whose two-triangle split breaks the symmetry that cancels "
+                "the off-diagonal term; use Q1, or 3D."
+            )
+        diagonal = np.diag(self.node_block)
+        if not (np.abs(diagonal) > 0).all():
+            raise ValueError(
+                f"the uniform operator has a zero nodal diagonal: {diagonal}")
+        self.inv_diag.set_zero()
+        values = np.broadcast_to(
+            (1.0 / diagonal).reshape((self.dim,) + (1,) * (self.dim + 1)),
+            self.inv_diag.s.shape)
+        _fill_field(self.inv_diag, values)
+
+    def lambda_max(self, communicator=None, nb_it=100):
+        """Largest eigenvalue of ``D⁻¹K`` by power iteration.
+
+        ``D⁻¹K`` is invariant under uniform refinement — ``D`` and ``K`` carry
+        the same power of ``h`` — so one level's estimate serves the whole
+        hierarchy, and the coarsest is the cheapest place to measure it.
+        """
+        rng = np.random.default_rng(0)
+        _fill_field(self.z, rng.standard_normal(self.z.s.shape))
+
+        def norm(field):
+            local = linalg.norm_sq(field)
+            if communicator is not None:
+                local = float(communicator.sum(float(local)))
+            return np.sqrt(local)
+
+        linalg.scal(1.0 / norm(self.z), self.z)
+        eigenvalue = 0.0
+        for _ in range(nb_it):
+            self.apply(self.z, self.t)
+            linalg.scal(self.inv_diag, self.t)
+            eigenvalue = norm(self.t)
+            linalg.copy(self.t, self.z)
+            linalg.scal(1.0 / eigenvalue, self.z)
+        self.z.set_zero()
+        self.t.set_zero()
+        return eigenvalue
+
+    # -- smoother ----------------------------------------------------------- #
+
+    def smooth(self, nb_steps, omega):
+        """``nb_steps`` damped-Jacobi sweeps of ``z += ω D⁻¹ (r - K z)``."""
+        for _ in range(nb_steps):
+            self.apply(self.z, self.t)
+            linalg.axpby(1.0, self.r, -1.0, self.t)   # t = r - K z
+            linalg.scal(self.inv_diag, self.t)        # t = D⁻¹ t
+            linalg.axpy(omega, self.t, self.z)        # z += ω t
+
+
+class MultigridReferencePreconditioner(Preconditioner):
+    r"""Multigrid approximation of ``Kʳᵉᶠ⁻¹``, with an exact FFT solve at the
+    coarsest level.
+
+    A drop-in replacement for :func:`make_reference_stiffness_preconditioner`
+    that trades the fine-grid FFT for a V-cycle. The motivation is parallel
+    scaling: an FFT-based apply costs two all-to-all transposes per transform
+    (four per apply), each a full barrier across all ranks, and it forces the
+    solver onto the FFT engine's pencil decomposition in which the x axis is
+    never distributed. A V-cycle needs only nearest-neighbour halo exchange at
+    every level plus one small collective at the bottom, and it leaves the
+    solver free to use a genuine 3D Cartesian decomposition.
+
+    The cycle runs on the **uniform** reference operator only, so no material
+    field is ever restricted and every level is a plain rediscretisation of
+    ``Kʳᵉᶠ`` at its own grid spacing. Heterogeneity belongs outside: wrap this
+    in :class:`GreenJacobiPreconditioner` exactly as you would wrap the FFT
+    version, by passing it as the ``green`` argument.
+
+    The preconditioner is a **fixed** linear operator — a fixed cycle count and
+    a fixed number of smoothing steps, with symmetric pre- and post-smoothing
+    and ``R = Pᵀ`` — because plain CG requires ``M⁻¹`` to be symmetric positive
+    definite. Do not replace the cycle count by an inner convergence test; that
+    would make the preconditioner non-linear and require a flexible Krylov
+    method.
+
+    Parameters
+    ----------
+    decomposition : muGrid.CartesianDecomposition
+        The solver's (fine) decomposition. Its collection must be the one the
+        fields passed to :meth:`apply` live on, and it needs one ghost layer
+        per side — which the stiffness stencil already requires.
+    grid_spacing : sequence of float
+        Fine-level grid spacing, one entry per direction.
+    lambda_ref, mu_ref : float
+        Uniform reference Lamé parameters. The volume means of the actual
+        material are the usual choice, as in ``examples/homogenization.py``.
+    communicator : muGrid.Communicator, optional
+        Communicator of the parallel run. MPI is not yet supported; passing a
+        communicator of size > 1 raises.
+    element : muGrid.FEMElement, optional
+        Finite element, default Q1. P1 in 2D is rejected by the smoother (see
+        :class:`_MultigridLevel`).
+    nb_levels : int, optional
+        Number of levels including the coarsest. Default: coarsen while every
+        direction stays even and at least ``min_coarse`` points wide.
+    min_coarse : int, optional
+        Smallest coarse grid to coarsen towards. Convergence is insensitive to
+        this over a wide range, so the choice is a parallel one; default 32.
+    nu : int, optional
+        Pre- and post-smoothing steps per level (equal, to keep ``M⁻¹``
+        symmetric). Default 2.
+    omega : float, optional
+        Jacobi damping. Default ``1.7 / λ_max(D⁻¹K)``, measured by power
+        iteration at setup. A hardcoded value is unsafe: the stability limit is
+        ``2/λ_max`` and ``λ_max`` moves with dimension and element kind, so a
+        value that is optimal in 2D diverges in 3D.
+    nb_cycles : int, optional
+        V-cycles per apply, default 1. Raise it (never the smoothing count
+        alone) if the cycle turns out too weak; it stays linear and symmetric.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records ``"vcycle"`` and ``"coarse"``.
+    """
+
+    #: ω = SAFETY / λ_max(D⁻¹K). The measured optimum is 1.7 across
+    #: {2D, 3D} x {Q1, P1}; the stability limit is 2.0 and divergence sets in
+    #: sharply at 1.9, so this keeps ~15% margin.
+    SAFETY = 1.7
+
+    def __init__(self, decomposition, grid_spacing, lambda_ref, mu_ref,
+                 communicator=None, element=None, nb_levels=None,
+                 min_coarse=32, nu=2, omega=None, nb_cycles=1, timer=None,
+                 dtype=np.float64,
+                 name="multigrid-reference-preconditioner"):
+        from .Parallel import Communicator
+        from .Wrappers import CartesianDecomposition, FFTEngine, GridTransfer, _muGrid
+
+        if element is None:
+            element = _muGrid.FEMElement.q1
+        if communicator is not None and communicator.size > 1:
+            raise NotImplementedError(
+                "MultigridReferencePreconditioner is serial for now. The MPI "
+                "path needs nested power-of-two subdivisions pinned across "
+                "levels and a redundant coarsest level; see "
+                "docs/multigrid_preconditioner_plan.md, stage 4."
+            )
+
+        nb_grid_pts = tuple(decomposition.nb_domain_grid_pts)
+        dim = len(nb_grid_pts)
+        spacing = np.asarray(grid_spacing, dtype=float)
+        if spacing.size != dim:
+            raise ValueError(
+                f"grid_spacing has {spacing.size} entries for a {dim}D grid")
+
+        self.nu = int(nu)
+        self.nb_cycles = int(nb_cycles)
+        self._timer = timer
+        self._name = name
+
+        nb_levels = self._resolve_nb_levels(nb_grid_pts, nb_levels, min_coarse)
+        self.nb_levels = nb_levels
+
+        ghosts = {"nb_ghosts_left": (1,) * dim, "nb_ghosts_right": (1,) * dim}
+        comm = communicator if communicator is not None else Communicator()
+
+        self.levels = []
+        for lvl in range(nb_levels):
+            coarsening = 2 ** lvl
+            level_pts = tuple(n // coarsening for n in nb_grid_pts)
+            with_fft = lvl == nb_levels - 1
+            if lvl == 0:
+                level_decomp = decomposition
+            elif with_fft:
+                # The coarsest level is solved exactly in Fourier space, so its
+                # decomposition has to be an FFT engine.
+                level_decomp = FFTEngine(level_pts, comm, **ghosts)
+            else:
+                level_decomp = CartesianDecomposition(
+                    comm, list(level_pts),
+                    nb_subdivisions=list(decomposition.nb_subdivisions),
+                    **ghosts)
+            self.levels.append(_MultigridLevel(
+                level_decomp, spacing * coarsening, element, lambda_ref,
+                mu_ref, dim, f"{name}-l{lvl}", dtype, with_fft=with_fft))
+
+        self.omega = (float(omega) if omega is not None
+                      else self.SAFETY / self.levels[-1].lambda_max(comm))
+
+        self.transfer = GridTransfer(dim)
+
+        # Coarsest level: the exact block-Fourier inverse of Kʳᵉᶠ, reusing the
+        # impulse-response assembly. It already replaces the singular q = 0
+        # block by its pseudo-inverse, which is the nullspace handling the
+        # bottom of the cycle needs.
+        bottom = self.levels[-1]
+        self._coarse_prec = make_reference_stiffness_preconditioner(
+            bottom.decomp,
+            lambda u_in, f_out: bottom.apply(u_in, f_out),
+            dim, name=f"{name}-coarse", timer=timer, dtype=dtype)
+
+    # -- setup helpers ------------------------------------------------------ #
+
+    @staticmethod
+    def _resolve_nb_levels(nb_grid_pts, nb_levels, min_coarse):
+        """Coarsen while every direction stays even and wide enough."""
+        if nb_levels is not None:
+            nb_levels = int(nb_levels)
+            for lvl in range(nb_levels):
+                if any(n % (2 ** lvl) for n in nb_grid_pts):
+                    raise ValueError(
+                        f"{nb_levels} levels need every grid extent divisible "
+                        f"by {2 ** (nb_levels - 1)}, got {nb_grid_pts}")
+            return nb_levels
+        nb_levels = 1
+        while (all(n % (2 ** nb_levels) == 0 for n in nb_grid_pts) and
+               all(n // (2 ** nb_levels) >= min_coarse for n in nb_grid_pts)):
+            nb_levels += 1
+        return nb_levels
+
+    def _timed(self, label):
+        return self._timer(label) if self._timer is not None else nullcontext()
+
+    # -- the cycle ---------------------------------------------------------- #
+
+    def _vcycle(self, lvl):
+        level = self.levels[lvl]
+        if lvl == self.nb_levels - 1:
+            with self._timed("coarse"):
+                self._coarse_prec.apply(level.r, level.z)
+            return
+
+        coarser = self.levels[lvl + 1]
+        level.z.set_zero()
+        level.smooth(self.nu, self.omega)
+
+        # Residual r - K z, restricted to the coarser level.
+        level.apply(level.z, level.t)
+        linalg.axpby(1.0, level.r, -1.0, level.t)
+        level.decomp.communicate_ghosts(level.t)
+        self.transfer.restrict(level.t, coarser.r)
+
+        self._vcycle(lvl + 1)
+
+        # Coarse-grid correction, interpolated back and added.
+        coarser.decomp.communicate_ghosts(coarser.z)
+        self.transfer.prolong(coarser.z, level.t)
+        linalg.axpy(1.0, level.t, level.z)
+
+        level.smooth(self.nu, self.omega)
+
+    def apply(self, r, z):
+        """``z = M⁻¹ r``."""
+        fine = self.levels[0]
+        with self._timed("vcycle"):
+            linalg.copy(r, fine.r)
+            _project_constants_out(fine.r)
+            if self.nb_cycles == 1:
+                self._vcycle(0)
+                linalg.copy(fine.z, z)
+            else:
+                z.set_zero()
+                for cycle in range(self.nb_cycles):
+                    if cycle:
+                        # Re-form the residual against the accumulated z.
+                        fine.apply(z, fine.t)
+                        linalg.copy(r, fine.r)
+                        _project_constants_out(fine.r)
+                        linalg.axpy(-1.0, fine.t, fine.r)
+                    self._vcycle(0)
+                    linalg.axpy(1.0, fine.z, z)
+            _project_constants_out(z)

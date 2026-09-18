@@ -1879,3 +1879,80 @@ else:
                 "muGrid was installed without NetCDF support. "
                 "Rebuild with NetCDF libraries available."
             )
+
+
+class GridTransfer:
+    """
+    Multigrid grid transfer between two nested nodal grids.
+
+    ``prolong`` is multilinear (bi/trilinear) interpolation from a coarse grid
+    to a fine grid of exactly twice the extent; ``restrict`` is its exact
+    adjoint ``Pᵀ``, the tensor product of the ``[1/2, 1, 1/2]`` stencil.
+
+    Both act component-wise and never mix the components of a vector field.
+    Because multilinear interpolation reproduces linear displacement fields
+    exactly, ``range(P)`` contains every rigid-body mode and every constant
+    strain -- the near-nullspace property a geometric hierarchy gets for free.
+
+    The two grids must be **nested**: the fine subdomain must have twice the
+    extent of the coarse one and start at twice its global location, so that no
+    transfer crosses a rank boundary. Build every level with the same
+    power-of-two ``nb_subdivisions``. A violation raises rather than silently
+    corrupting the subdomain seams.
+
+    The caller owns the ghost exchange: ``prolong`` reads the coarse field's
+    ghosts and ``restrict`` reads the fine field's, so call
+    ``communicate_ghosts`` on the *input* field first. Neither writes ghosts,
+    so neither needs ``reduce_ghosts``.
+
+    Parameters
+    ----------
+    spatial_dim : int
+        Spatial dimension (2 or 3).
+
+    Examples
+    --------
+    >>> transfer = GridTransfer(3)
+    >>> coarse_decomposition.communicate_ghosts(coarse)
+    >>> transfer.prolong(coarse, fine)
+    """
+
+    def __init__(self, spatial_dim: int) -> None:
+        if spatial_dim == 2:
+            self._cpp = _muGrid.GridTransfer2D()
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.GridTransfer3D()
+        else:
+            raise ValueError(
+                f"GridTransfer supports 2 or 3 spatial dimensions, got "
+                f"{spatial_dim}"
+            )
+
+    def prolong(self, coarse: Any, fine: Any) -> None:
+        """Interpolate: ``fine = P coarse``. Reads the coarse field's ghosts."""
+        self._cpp.prolong(_unwrap(coarse), _unwrap(fine))
+
+    def restrict(self, fine: Any, coarse: Any) -> None:
+        """Restrict: ``coarse = Pᵀ fine``. Reads the fine field's ghosts."""
+        self._cpp.restrict(_unwrap(fine), _unwrap(coarse))
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying C++ object."""
+        return getattr(self._cpp, name)
+
+    def __repr__(self) -> str:
+        return f"GridTransfer({self._cpp.spatial_dim})"
+
+
+class GridTransfer2D(GridTransfer):
+    """Convenience wrapper fixing the spatial dimension to 2."""
+
+    def __init__(self) -> None:
+        super().__init__(2)
+
+
+class GridTransfer3D(GridTransfer):
+    """Convenience wrapper fixing the spatial dimension to 3."""
+
+    def __init__(self) -> None:
+        super().__init__(3)

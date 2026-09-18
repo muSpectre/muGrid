@@ -45,6 +45,7 @@ set(MUGRID_SOURCES
         operators/generic.cc
         operators/laplace.cc
         operators/nodal_moments.cc
+        operators/transfer.cc
         operators/solids/isotropic_stiffness_2d.cc
         operators/solids/isotropic_stiffness_3d.cc
     # io/

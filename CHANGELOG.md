@@ -1,6 +1,53 @@
 Change log for µGrid
 ====================
 
+unreleased
+----------
+
+- ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between two
+  nested nodal grids differing by a factor of two in every direction, and its
+  exact adjoint `R = Pᵀ`, the tensor product of the `[1/2, 1, 1/2]` stencil.
+  These are the grid-transfer half of a geometric multigrid hierarchy. Both act
+  component-wise and never mix the components of a vector field, which is what
+  makes them right for elasticity: multilinear interpolation reproduces linear
+  displacement fields exactly, so `range(P)` contains every rigid-body mode and
+  every constant strain — the near-nullspace property an algebraic multigrid
+  must be told about explicitly. `R = Pᵀ` rather than the `1/2^dim`-normalised
+  full weighting, because the restricted residual is a force (a functional) and
+  carries no measure factor; that pairing is also what keeps a V-cycle built
+  from these operators symmetric, as plain CG requires of a preconditioner
+- ENH: The transfers require the two decompositions to be *nested* — the fine
+  subdomain twice the coarse one in extent and starting at twice its global
+  location — so no transfer crosses a rank boundary and both directions are
+  pure local work plus the caller's existing halo exchange. A violation is
+  rejected with an error naming the offending axis and both extents rather than
+  silently corrupting the subdomain seams, which is the failure mode that would
+  otherwise only show up as a slightly wrong convergence rate under MPI
+- ENH: New `MultigridReferencePreconditioner`: a V-cycle approximation of the
+  reference-stiffness inverse `Kʳᵉᶠ⁻¹`, with the existing FFT block symbol
+  solving the coarsest level exactly. A drop-in for
+  `make_reference_stiffness_preconditioner`, and usable as the `green` argument
+  of `GreenJacobiPreconditioner` exactly as the FFT version is. The motivation
+  is parallel scaling: an FFT apply costs four all-to-all transposes, each a
+  full barrier across all ranks, and forces the solver onto the FFT engine's
+  pencil decomposition in which the x axis is never distributed; a V-cycle needs
+  only nearest-neighbour halo exchange per level. The cycle runs on the
+  *uniform* reference operator, so no material field is restricted and every
+  level is a rediscretisation rather than a Galerkin product — heterogeneity
+  stays where it already is, in the `J^{1/2} · G · J^{1/2}` scaling. Serial for
+  now; the MPI path raises rather than returning a wrong answer
+- ENH: The Jacobi damping is derived, not configured: `ω = 1.7 / λ_max(D⁻¹K)`
+  with `λ_max` measured by power iteration at setup. The stability limit is
+  `2/λ_max` and `λ_max` moves with dimension and element kind, so a hardcoded
+  value that is optimal in 2D (0.7) diverges outright in 3D. `D⁻¹K` is
+  invariant under uniform refinement, so one estimate on the coarsest level
+  serves the whole hierarchy. The nodal block is likewise probed rather than
+  assumed: it is `c·I` for Q1 in either dimension and for P1 in 3D, so the
+  smoother is a single scaled `axpy`, while 2D P1 — whose two-triangle Kuhn
+  split leaves `K01 = λ + μ` — is refused with an explanatory error instead of
+  being smoothed with the wrong diagonal
+
+
 v1.3.0 (16Sep26)
 ----------------
 
