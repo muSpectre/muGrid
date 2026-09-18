@@ -134,6 +134,18 @@ unreleased
   and 4 ranks: the solve is exact to 8e-16 and its checksum matches the host's
   to twelve decimals. The interface exchange stages device buffers through the
   host, so this does not require a GPU-aware MPI build
+- PERF: The hybrid's tridiagonal sweep is a fused HIP/CUDA kernel -- one thread
+  per Fourier mode, marching the distributed axis with the coupling blocks in
+  registers -- replacing a Python loop that issued four kernels per plane. It is
+  52x faster at 256 cubed and 119x at 64 cubed, reaching 1755 GB/s, and agrees
+  with the loop to round-off. The internal layout is now z-major so a wavefront
+  reads contiguous bytes, which cost nothing to adopt because a permutation was
+  already being materialised. Two consequences of making the sweep fast: the
+  real-space mean projection is gone, since projecting off the rigid
+  translations is just zeroing the all-zero mode's z-mean, and the spike arrays
+  are no longer stored at all, since correcting the right-hand side at its two
+  end planes and solving again is the same thing for one extra sweep instead of
+  a pass over 2.4 GB
 
 
 v1.3.0 (16Sep26)

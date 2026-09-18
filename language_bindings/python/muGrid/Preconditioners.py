@@ -1553,6 +1553,112 @@ def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
     return A
 
 
+_BLOCK_THOMAS_SOURCE = r"""
+typedef {scalar}2 cplx;
+#define MAKE_CPLX make_{scalar}2
+#define DIM {dim}
+
+__device__ __forceinline__ cplx cmul(cplx a, cplx b) {{
+    return MAKE_CPLX(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}}
+__device__ __forceinline__ cplx csub(cplx a, cplx b) {{
+    return MAKE_CPLX(a.x - b.x, a.y - b.y);
+}}
+
+/* Block-Thomas along the distributed axis: one thread per Fourier mode,
+ * marching the whole axis with the two constant coupling blocks in registers.
+ *
+ * Arrays are z-major -- rhs and out are (nz, nmodes, DIM), Dinv is
+ * (nz, nmodes, DIM, DIM) -- so at each step the threads of a wavefront touch
+ * consecutive modes and therefore consecutive bytes. In the mode-major layout
+ * neighbouring threads would be nz*DIM elements apart, which is the trap
+ * cuSPARSE's gtsv2StridedBatch documents.
+ *
+ * The sweep is serial in z by nature; the parallelism is the mode count, which
+ * is nx * (ny/2 + 1) and therefore ample.
+ */
+extern "C" __global__ void block_thomas(
+    const cplx * __restrict__ rhs, const cplx * __restrict__ Dinv,
+    const cplx * __restrict__ A0, const cplx * __restrict__ A2,
+    cplx * __restrict__ y, cplx * __restrict__ out, int nz, int nmodes)
+{{
+    int m = blockIdx.x * blockDim.x + threadIdx.x;
+    if (m >= nmodes) return;
+
+    cplx a0[DIM * DIM], a2[DIM * DIM], prev[DIM], cur[DIM];
+    for (int i = 0; i < DIM * DIM; ++i) {{
+        a0[i] = A0[m * DIM * DIM + i];
+        a2[i] = A2[m * DIM * DIM + i];
+    }}
+
+    /* forward: y_0 = rhs_0,  y_k = rhs_k - A2 (Dinv_{{k-1}} y_{{k-1}}) */
+    for (int i = 0; i < DIM; ++i) {{
+        cplx v = rhs[(size_t)m * DIM + i];
+        y[(size_t)m * DIM + i] = v;
+        prev[i] = v;
+    }}
+    for (int k = 1; k < nz; ++k) {{
+        size_t dof = ((size_t)(k - 1) * nmodes + m) * DIM * DIM;
+        cplx tmp[DIM];
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = MAKE_CPLX(0, 0);
+            for (int j = 0; j < DIM; ++j)
+                acc = csub(acc, cmul(Dinv[dof + i * DIM + j], prev[j]));
+            tmp[i] = MAKE_CPLX(-acc.x, -acc.y);
+        }}
+        size_t off = ((size_t)k * nmodes + m) * DIM;
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = rhs[off + i];
+            for (int j = 0; j < DIM; ++j)
+                acc = csub(acc, cmul(a2[i * DIM + j], tmp[j]));
+            cur[i] = acc;
+        }}
+        for (int i = 0; i < DIM; ++i) {{ y[off + i] = cur[i]; prev[i] = cur[i]; }}
+    }}
+
+    /* backward: out_k = Dinv_k (y_k - A0 out_{{k+1}}) */
+    for (int k = nz - 1; k >= 0; --k) {{
+        size_t off = ((size_t)k * nmodes + m) * DIM;
+        size_t dof = ((size_t)k * nmodes + m) * DIM * DIM;
+        cplx rhs_k[DIM];
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = y[off + i];
+            if (k < nz - 1)
+                for (int j = 0; j < DIM; ++j)
+                    acc = csub(acc, cmul(a0[i * DIM + j], prev[j]));
+            rhs_k[i] = acc;
+        }}
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = MAKE_CPLX(0, 0);
+            for (int j = 0; j < DIM; ++j) {{
+                cplx t = cmul(Dinv[dof + i * DIM + j], rhs_k[j]);
+                acc = MAKE_CPLX(acc.x + t.x, acc.y + t.y);
+            }}
+            cur[i] = acc;
+        }}
+        for (int i = 0; i < DIM; ++i) {{ out[off + i] = cur[i]; prev[i] = cur[i]; }}
+    }}
+}}
+"""
+
+_BLOCK_THOMAS_CACHE = {}
+
+
+def _block_thomas_kernel(dim, cdtype):
+    """Compile (once per dim and precision) the fused block-Thomas sweep."""
+    key = (dim, np.dtype(cdtype).name)
+    if key not in _BLOCK_THOMAS_CACHE:
+        import cupy
+
+        scalar = "float" if np.dtype(cdtype) == np.dtype(np.complex64) \
+            else "double"
+        source = _BLOCK_THOMAS_SOURCE.format(scalar=scalar, dim=dim)
+        _BLOCK_THOMAS_CACHE[key] = cupy.RawKernel(
+            source, "block_thomas",
+            backend="hiprtc" if cupy.cuda.runtime.is_hip else "nvrtc")
+    return _BLOCK_THOMAS_CACHE[key]
+
+
 class HybridFourierTridiagonalPreconditioner(Preconditioner):
     r"""``Kʳᵉᶠ⁻¹`` by FFT in the rank-local axes and a tridiagonal solve in the
     distributed one.
@@ -1688,49 +1794,89 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         dim, nz = self.dim, self.nz_local
         A0, A1, A2 = self.A[0], self.A[1], self.A[2]
 
-        Dinv = xp.empty(self._mode_shape + (nz, dim, dim), dtype=self._cdtype)
-        Dinv[..., 0, :, :] = _batched_inverse(A1, xp)
+        # Everything along the distributed axis is stored z-major,
+        # ``(nz, *modes, ...)``. Neighbouring modes are then adjacent in memory
+        # at each step, which is what lets a wavefront in the fused kernel read
+        # contiguous bytes; the mode-major alternative strides by ``nz * dim``
+        # between neighbouring threads and gives up most of the bandwidth. It
+        # costs nothing to choose: the transform emits ``(dim, *modes, nz)`` and
+        # a permutation has to be materialised either way.
+        Dinv = xp.empty((nz,) + self._mode_shape + (dim, dim),
+                        dtype=self._cdtype)
+        Dinv[0] = _batched_inverse(A1, xp)
         for k in range(1, nz):
-            Dinv[..., k, :, :] = _batched_inverse(
-                A1 - A2 @ Dinv[..., k - 1, :, :] @ A0, xp)
+            Dinv[k] = _batched_inverse(A1 - A2 @ Dinv[k - 1] @ A0, xp)
         self.Dinv = Dinv
 
         eye = xp.broadcast_to(xp.eye(dim, dtype=self._cdtype),
                               self._mode_shape + (dim, dim))
-        left = xp.zeros(self._mode_shape + (nz, dim, dim), dtype=self._cdtype)
+        left = xp.zeros((nz,) + self._mode_shape + (dim, dim),
+                        dtype=self._cdtype)
         right = xp.zeros_like(left)
-        left[..., 0, :, :] = -A2 @ eye
-        right[..., nz - 1, :, :] = -A0 @ eye
-        self.V = self._solve_local(left)
-        self.W = self._solve_local(right)
+        left[0] = -A2 @ eye
+        right[nz - 1] = -A0 @ eye
+        V = self._solve_local(left)
+        W = self._solve_local(right)
+        # Only the four interface blocks outlive setup. The full spikes are the
+        # largest arrays here -- two more copies of the factor storage -- and
+        # apply() does not need them: adding ``V left + W right`` to the
+        # solution is the same as solving once more against a right-hand side
+        # corrected at the two ends, which is one extra sweep instead of a pass
+        # over both of them.
+        self._spike_ends = xp.stack([V[0], V[-1], W[0], W[-1]], axis=-3)
 
     def _solve_local(self, rhs):
         """``T_local x = rhs`` with the stored factors.
 
         ``T_local`` is this rank's slab with no wrap-around and no coupling to
         its neighbours; both enter through the spikes. `rhs` is
-        ``(*modes, nz, dim, ncols)``, so one code path serves the residual
+        ``(nz, *modes, dim, ncols)``, so one code path serves the residual
         (``ncols = 1``) and the spikes (``ncols = dim``).
+
+        On a device with a single column this hands over to a fused kernel. The
+        loop below issues four kernels per plane, which on a device measures
+        launch latency rather than the sweep; it stays as the host path, as the
+        setup path for the spikes, and as the reference the fused kernel is
+        tested against.
         """
+        if self._on_device and rhs.shape[-1] == 1:
+            return self._solve_local_fused(rhs)
+
         xp = self._xp
         nz = self.nz_local
         matmul = xp.matmul
 
         y = xp.empty_like(rhs)
-        y[..., 0, :, :] = rhs[..., 0, :, :]
+        y[0] = rhs[0]
         for k in range(1, nz):
-            y[..., k, :, :] = rhs[..., k, :, :] - matmul(
-                self.A[2], matmul(self.Dinv[..., k - 1, :, :],
-                                  y[..., k - 1, :, :]))
+            y[k] = rhs[k] - matmul(self.A[2],
+                                   matmul(self.Dinv[k - 1], y[k - 1]))
 
         out = xp.empty_like(rhs)
-        out[..., nz - 1, :, :] = matmul(self.Dinv[..., nz - 1, :, :],
-                                        y[..., nz - 1, :, :])
+        out[nz - 1] = matmul(self.Dinv[nz - 1], y[nz - 1])
         for k in range(nz - 2, -1, -1):
-            out[..., k, :, :] = matmul(
-                self.Dinv[..., k, :, :],
-                y[..., k, :, :] - matmul(self.A[0], out[..., k + 1, :, :]))
+            out[k] = matmul(self.Dinv[k],
+                            y[k] - matmul(self.A[0], out[k + 1]))
         return out
+
+    def _solve_local_fused(self, rhs):
+        """The same solve as one kernel launch instead of ``4 * nz``."""
+        xp = self._xp
+        nz, dim = self.nz_local, self.dim
+        nb_modes = int(np.prod(self._mode_shape))
+
+        flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
+        scratch = xp.empty_like(flat)
+        out = xp.empty_like(flat)
+        threads = 256
+        blocks = (nb_modes + threads - 1) // threads
+        _block_thomas_kernel(dim, self._cdtype)(
+            (blocks,), (threads,),
+            (flat, self.Dinv.reshape(nz, nb_modes, dim, dim),
+             self.A[0].reshape(nb_modes, dim, dim),
+             self.A[2].reshape(nb_modes, dim, dim),
+             scratch, out, np.int32(nz), np.int32(nb_modes)))
+        return out.reshape(rhs.shape)
 
     def _build_reduced_system(self):
         """The interface system, assembled once and inverted.
@@ -1742,9 +1888,8 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         """
         xp = self._xp
         dim, P = self.dim, self.nb_ranks
-        ends = xp.stack([self.V[..., 0, :, :], self.V[..., -1, :, :],
-                         self.W[..., 0, :, :], self.W[..., -1, :, :]], axis=-3)
-        gathered = self._allgather(xp.ascontiguousarray(ends))
+        gathered = self._allgather(
+            xp.ascontiguousarray(self._spike_ends))
 
         size = 2 * dim * P
         M = xp.zeros(self._mode_shape + (size, size), dtype=self._cdtype)
@@ -1789,9 +1934,15 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     def _solve_zero_mode(self, v):
         """``T^+ v`` for the all-zero mode, over the whole distributed axis."""
         dim = self.dim
-        local = self._xp.ascontiguousarray(v[self._zero_index][..., 0])
-        full = self._allgather(local).reshape(-1)
-        solution = (self._zero_pinv @ full).reshape(-1, dim)
+        local = self._xp.ascontiguousarray(
+            v[(slice(None),) + self._zero_index][..., 0])
+        full = self._allgather(local).reshape(-1, dim)
+        # Both ends of the projection: the right-hand side must be orthogonal
+        # to the nullspace for the system to be consistent, and the solution is
+        # only defined up to it.
+        full = self._project_constants(full)
+        solution = self._project_constants(
+            (self._zero_pinv @ full.reshape(-1)).reshape(-1, dim))
         start = self.rank * self.nz_local
         return solution[start:start + self.nz_local]
 
@@ -1815,15 +1966,22 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     def _timed(self, label):
         return self._timer(label) if self._timer is not None else nullcontext()
 
-    def _global_mean(self, local):
-        """Each component's mean over the whole domain, not just this slab."""
-        totals = [float(local[c].sum()) for c in range(self.dim)]
-        count = float(local[0].size)
-        if self._comm.size > 1:
-            totals = [float(self._comm.sum(t)) for t in totals]
-            count = float(self._comm.sum(count))
-        return self._xp.asarray(
-            np.asarray(totals) / count).reshape((self.dim,) + (1,) * self.dim)
+    @staticmethod
+    def _project_constants(line):
+        """Remove the constant-along-z part of the all-zero mode.
+
+        This *is* the projection off the nullspace, done where it costs
+        nothing. The rigid translations are exactly the ``q = 0`` coefficient,
+        and under this transform that is the z-mean of the all-zero mode's
+        line -- ``nz * dim`` numbers rather than the whole field.
+
+        Doing it in real space instead needs a reduction over every point,
+        which is the one thing to avoid here: cupy reductions on this ROCm
+        build run at ~6 GB/s against ~3200 GB/s for elementwise work, so a
+        global mean of a 256**3 field costs more than the rest of the apply put
+        together.
+        """
+        return line - line.mean(axis=0, keepdims=True)
 
     # -- the preconditioner ------------------------------------------------- #
 
@@ -1833,18 +1991,20 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         dim = self.dim
         axes = tuple(range(1, dim))
 
-        local = xp.asarray(r.p)
-        local = local - self._global_mean(local)
-
         with self._timed("fft"):
-            hat = xp.fft.rfftn(local, axes=axes).astype(self._cdtype)
-            v = xp.moveaxis(hat, 0, -1)[..., None]   # (*modes, nz, dim, 1)
+            hat = xp.fft.rfftn(xp.asarray(r.p), axes=axes).astype(
+                self._cdtype, copy=False)
+            # (dim, *modes, nz) -> (nz, *modes, dim); see _factorise_local for
+            # why the distributed axis leads. The permutation is materialised
+            # either way, so this choice is free.
+            v = xp.ascontiguousarray(
+                xp.moveaxis(hat, (0, -1), (-1, 0)))[..., None]
 
         with self._timed("tridiag"):
-            x = self._solve_local(xp.ascontiguousarray(v))
+            x = self._solve_local(v)
 
         with self._timed("interface"):
-            ends = xp.stack([x[..., 0, :, 0], x[..., -1, :, 0]], axis=-2)
+            ends = xp.stack([x[0, ..., 0], x[-1, ..., 0]], axis=-2)
             gathered = self._allgather(xp.ascontiguousarray(ends))
             rhs = xp.moveaxis(gathered, 0, -3).reshape(
                 self._mode_shape + (2 * dim * self.nb_ranks,))
@@ -1852,15 +2012,24 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             lam = lam.reshape(self._mode_shape + (self.nb_ranks, 2, dim))
             left = lam[..., (self.rank - 1) % self.nb_ranks, 1, :]
             right = lam[..., (self.rank + 1) % self.nb_ranks, 0, :]
+            # From the *uncorrected* right-hand side: the all-zero mode is
+            # solved globally rather than through the interface system, so the
+            # end corrections below would double-count it.
+            zero_solution = self._solve_zero_mode(v)
+
+        with self._timed("tridiag"):
+            # z_local = T^-1 (rhs - A2 left e_0 - A0 right e_last): the
+            # neighbours' interface planes enter as a correction to the two end
+            # planes of the right-hand side, so the spikes never have to be
+            # stored or re-read.
+            v[0] -= xp.matmul(self.A[2], left[..., None])
+            v[-1] -= xp.matmul(self.A[0], right[..., None])
+            sol = self._solve_local(v)[..., 0]
 
         with self._timed("ifft"):
-            sol = (x[..., 0]
-                   + xp.einsum("...kij,...j->...ki", self.V, left)
-                   + xp.einsum("...kij,...j->...ki", self.W, right))
-            sol[self._zero_index] = self._solve_zero_mode(v)
-            out = xp.fft.irfftn(xp.moveaxis(sol, -1, 0), axes=axes,
-                                s=self.local_shape)
+            sol[(slice(None),) + self._zero_index] = zero_solution
+            out = xp.fft.irfftn(xp.moveaxis(sol, (0, -1), (-1, 0)),
+                                axes=axes, s=self.local_shape)
 
-        out = xp.real(out)
-        out = out - self._global_mean(out)
-        z.p[...] = out.astype(xp.asarray(z.p).dtype)
+        # irfftn already returns a real array, so no xp.real() copy is needed.
+        z.p[...] = out.astype(xp.asarray(z.p).dtype, copy=False)

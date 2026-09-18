@@ -29,7 +29,8 @@ iteration count *exactly*, on host and device, at every rank count, with no
 all-to-all. The V-cycle remains serial and host-only.
 
 Before running anything on more than one GPU, read §12.2: it needs two
-environment variables, and without them even `-P none` aborts.
+environment variables, and without them even `-P none` aborts. §13 covers the
+fused sweep kernel and what it exposed once the sweep stopped dominating.
 
 Read §7 before planning Stage 4: it changes what a single-node MPI run can be
 used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
@@ -1218,3 +1219,81 @@ here describes the intent rather than a mistake.
   measures the Python loop.
 - The reduced system's `(2·dim·P)²` growth and the uncompressed Thomas factors
   (§11.5) are unchanged.
+
+---
+
+## 13. The fused kernel
+
+§12.4 left the per-apply sweep looping over planes in Python. Replaced by a HIP
+kernel: one thread per Fourier mode, marching the whole distributed axis with
+the two constant coupling blocks in registers.
+
+### 13.1 The sweep
+
+| grid | modes | Python loop | fused | speedup | GB/s |
+|---|---|---|---|---|---|
+| 64³ | 2112 | 21661 µs | **182 µs** | 119× | 250 |
+| 128³ | 8320 | 44397 µs | **435 µs** | 102× | 822 |
+| 192³ | 18624 | 66759 µs | **909 µs** | 73× | 1321 |
+| 256³ | 33024 | 84651 µs | **1619 µs** | 52× | 1755 |
+
+Agreement with the loop: 8e-16 to 2e-15. The speedup falls with size because the
+loop is launch-bound — roughly constant per plane — while the kernel is
+bandwidth-bound; the bandwidth rises with size because small grids cannot fill
+the device.
+
+The internal layout is now z-major, `(nz, *modes, ...)`, so a wavefront reads
+contiguous bytes at each step. This cost nothing to adopt: the transform emits
+`(dim, *modes, nz)` and a permutation was already being materialised.
+
+### 13.2 Three things the kernel exposed
+
+Making the sweep fast made everything around it visible, and the first
+end-to-end measurement was **32× slower than `-P reference`**, not faster.
+
+- **cupy reductions on this ROCm build run at ~6 GB/s**, against ~3200 GB/s for
+  elementwise work — a 500× gap, unrelated to muGrid's allocator. The
+  real-space mean projection was therefore costing 89 ms, dwarfing everything.
+  It is also unnecessary: projecting off the rigid translations is exactly
+  zeroing the `q = 0` coefficient, which under this transform is the z-mean of
+  the all-zero mode's line, `nz * dim` numbers rather than the whole field.
+  32× → 5.4×.
+- **The spikes did not need to be stored.** Adding `V left + W right` reads the
+  two largest arrays the preconditioner holds (1.2 GB each at 256³). Solving
+  once more against a right-hand side corrected at its two end planes is the
+  same thing, and costs one extra sweep instead of a 2.4 GB pass. Only the four
+  interface blocks outlive setup. 5.4× → 2.27×, and 2.4 GB freed.
+- **`einsum` was replaced by `matmul`** where it maps to a batched GEMV.
+
+### 13.3 Where it now stands, on one device
+
+| | `-P reference` | `-P hybrid` | ratio |
+|---|---|---|---|
+| 128³ | 690 µs | 3069 µs | 4.45× |
+| 256³ | 5708 µs | 12953 µs | **2.27×** |
+
+96 CG iterations either way. At 256³ the breakdown is fft 3676, tridiag 1690,
+interface 483, ifft 2919, and **4185 µs reading and writing the Field** — a
+third of the total, and layout-bound rather than algorithm-bound: `.p` is a
+strided view over the ghosted buffer, so every apply gathers on the way in and
+scatters on the way out.
+
+So the hybrid is not yet cheaper per apply than the FFT on a single device.
+That was never the claim — §10.2 is: the reference pays four all-to-alls per
+apply, 1623 MB at 256³, where the hybrid pays an interface exchange of 13–101 MB.
+On this node that all-to-all costs 30–52 ms against the hybrid's whole 13 ms
+apply. The arithmetic gap of 2.27× is the price, and the communication is what
+buys it back.
+
+### 13.4 Still open
+
+- **The two transposes and the Field gather/scatter** are now the largest terms.
+  The transposes are inherent to taking the transform in one order and the sweep
+  in another; the Field traffic is not the preconditioner's to fix.
+- **Factor storage** is still `O(N_z)` per mode (1.2 GB at 256³). §10.3 measured
+  the fixed point at a median of 9 steps, so ~10× remains on the table — and it
+  would now be the single biggest remaining win, since `Dinv` is what the sweep
+  streams.
+- **No multi-GPU timings.** Correctness is established at 1, 2 and 4 ranks over
+  2 devices; the crossover this design exists for needs more devices than this
+  box has.

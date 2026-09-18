@@ -689,3 +689,42 @@ def test_hybrid_device_matches_host(comm, dim, n):
     want = np.asarray(hz.p)
     got = cp.asnumpy(cp.asarray(dz.p))
     assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()
+
+
+@pytest.mark.skipif(not _has_gpu(), reason="needs a GPU")
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_fused_kernel_matches_the_loop(comm, dim, n):
+    """The fused sweep agrees with the elementwise one it replaces.
+
+    `test_hybrid_device_matches_host` also covers this, but only together with
+    the array module: if both drifted the same way it would still pass. This
+    compares the two solvers on the same device and the same data, so it fails
+    for the kernel alone.
+    """
+    import cupy as cp
+
+    if comm is not None and comm.size > 1:
+        pytest.skip("single-rank comparison")
+    cp.cuda.Device(0).use()
+    decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * dim,
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim,
+        device=muGrid.Device.gpu(0))
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+    prec = HybridFourierTridiagonalPreconditioner(
+        decomp, (1.0 / n,) * dim, 1.3, 0.7, communicator=comm)
+
+    rng = cp.random.default_rng(11)
+    shape = (prec.nz_local,) + prec._mode_shape + (dim, 1)
+    rhs = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+           ).astype(prec._cdtype)
+
+    fused = prec._solve_local_fused(rhs)
+    prec._on_device = False          # take the elementwise path on the device
+    try:
+        loop = prec._solve_local(rhs)
+    finally:
+        prec._on_device = True
+
+    scale = float(cp.abs(loop).max())
+    assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
