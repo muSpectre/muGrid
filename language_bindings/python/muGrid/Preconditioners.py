@@ -1797,7 +1797,20 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         self.nz_global = nz_global
         self._factorise_local()
-        self._build_reduced_system()
+        # Parallel cyclic reduction needs a power-of-two rank count for the
+        # stride doubling to close on the cyclic wrap. Where it does not apply,
+        # fall back to assembling and inverting the reduced system densely --
+        # correct either way, but O(P) in communication and O(P^2) in work per
+        # mode, which dominates the apply by eight ranks.
+        self._pcr_nb_levels = (self.nb_ranks.bit_length() - 1
+                               if self.nb_ranks > 1
+                               and self.nb_ranks & (self.nb_ranks - 1) == 0
+                               else 0)
+        self._use_pcr = self._pcr_nb_levels > 0
+        if self._use_pcr:
+            self._build_pcr()
+        else:
+            self._build_reduced_system()
         self._build_zero_mode()
 
     # -- setup -------------------------------------------------------------- #
@@ -2041,6 +2054,110 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             M[..., row_r, next_l] -= W1
         self._reduced_inv = _batched_inverse(M, xp)
 
+    def _build_pcr(self):
+        """Precompute the parallel-cyclic-reduction coefficients.
+
+        The reduced system is block-circulant: every rank holds the same number
+        of planes and the operator is uniform, so each rank's spike blocks are
+        *bit-identical* (verified, not assumed -- the constructor checks it).
+        The elimination coefficients at every level are therefore the same on
+        every rank and can be built here without communication, leaving only
+        right-hand sides to exchange per apply.
+
+        Writing the system as ``u_p + A u_{p-s} + C u_{p+s} = x_p`` with stride
+        ``s = 2^k``, one elimination step against the neighbours at ``±s`` gives
+
+            D       = I - A C - C A
+            A'      = -D^-1 A^2 ,   C' = -D^-1 C^2
+            x'_p    = D^-1 (x_p - A x_{p-s} - C x_{p+s})
+
+        and doubles the stride. After ``log2(P)`` steps the stride reaches ``P``,
+        where the cyclic wrap makes ``u_{p±P} = u_p`` and the equation closes
+        locally as ``(I + A + C) u_p = x_p``.
+
+        Cost per apply falls from one all-gather of ``P`` interface planes and a
+        dense ``(2 d P)^2`` solve per mode, to ``log2(P) + 1`` neighbour
+        exchanges and ``log2(P)`` products of ``2d x 2d`` blocks.
+        """
+        xp = self._xp
+        dim = self.dim
+        m = 2 * dim
+
+        # A and C from this rank's spikes; identical everywhere by construction.
+        V0, V1, W0, W1 = (self._spike_ends[..., i, :, :] for i in range(4))
+        zero = xp.zeros_like(V0)
+        # u_p = (L_p, R_p); L_p couples to R_{p-1} and L_{p+1}, likewise R_p.
+        A = -xp.concatenate([xp.concatenate([zero, V0], axis=-1),
+                             xp.concatenate([zero, V1], axis=-1)], axis=-2)
+        C = -xp.concatenate([xp.concatenate([W0, zero], axis=-1),
+                             xp.concatenate([W1, zero], axis=-1)], axis=-2)
+
+        identity = xp.zeros(self._mode_shape + (m, m), dtype=self._cdtype)
+        diagonal = xp.arange(m)
+        identity[..., diagonal, diagonal] = 1.0
+
+        self._pcr_levels = []
+        matmul = xp.matmul
+        for _ in range(self._pcr_nb_levels):
+            D_inv = _batched_inverse(
+                identity - matmul(A, C) - matmul(C, A), xp)
+            # The level keeps the coefficients it eliminates *with*, so store
+            # them before the stride doubles.
+            self._pcr_levels.append((A, C, D_inv))
+            A, C = (-matmul(D_inv, matmul(A, A)),
+                    -matmul(D_inv, matmul(C, C)))
+        self._pcr_final_inv = _batched_inverse(identity + A + C, xp)
+
+    def _exchange(self, local, distance):
+        """Send ``local`` to the ranks at ``±distance`` and receive theirs.
+
+        Returns ``(from_left, from_right)``: the buffers of ranks ``p-distance``
+        and ``p+distance``, wrapping cyclically. Staged through the host for the
+        same reason :meth:`_allgather` is.
+        """
+        if self._mpi is None:
+            return local, local
+        P = self.nb_ranks
+        host = local.get() if self._on_device else local
+        host = np.ascontiguousarray(host)
+        left = np.empty_like(host)
+        right = np.empty_like(host)
+        lo = (self.rank - distance) % P
+        hi = (self.rank + distance) % P
+        # Receive from the low side while sending to the high side, then the
+        # reverse; two Sendrecvs rather than four blocking calls.
+        self._mpi.Sendrecv(host, dest=hi, sendtag=0,
+                           recvbuf=left, source=lo, recvtag=0)
+        self._mpi.Sendrecv(host, dest=lo, sendtag=1,
+                           recvbuf=right, source=hi, recvtag=1)
+        to_xp = self._xp.asarray if self._on_device else (lambda a: a)
+        return to_xp(left), to_xp(right)
+
+    def _solve_reduced_pcr(self, ends):
+        """The interface unknowns by parallel cyclic reduction.
+
+        ``ends`` is this rank's two interface planes; the return is the pair
+        ``(R_{p-1}, L_{p+1})`` the sweep correction needs.
+        """
+        xp = self._xp
+        dim = self.dim
+        x = xp.ascontiguousarray(
+            ends.reshape(self._mode_shape + (2 * dim,)))
+
+        matvec = (lambda M, v:
+                  xp.einsum("...ij,...j->...i", M, v))
+        for level, (A, C, D_inv) in enumerate(self._pcr_levels):
+            from_left, from_right = self._exchange(x, 1 << level)
+            x = matvec(D_inv,
+                       x - matvec(A, from_left) - matvec(C, from_right))
+        u = matvec(self._pcr_final_inv, x)
+
+        # One last neighbour exchange for the two blocks the correction reads.
+        u = xp.ascontiguousarray(u)
+        from_left, from_right = self._exchange(u, 1)
+        return (from_left.reshape(self._mode_shape + (2, dim))[..., 1, :],
+                from_right.reshape(self._mode_shape + (2, dim))[..., 0, :])
+
     def _build_zero_mode(self):
         """The all-zero mode, which the tridiagonal path cannot solve.
 
@@ -2137,13 +2254,16 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         with self._timed("interface"):
             ends = xp.stack([x[0, ..., 0], x[-1, ..., 0]], axis=-2)
-            gathered = self._allgather(xp.ascontiguousarray(ends))
-            rhs = xp.moveaxis(gathered, 0, -3).reshape(
-                self._mode_shape + (2 * dim * self.nb_ranks,))
-            lam = xp.einsum("...ij,...j->...i", self._reduced_inv, rhs)
-            lam = lam.reshape(self._mode_shape + (self.nb_ranks, 2, dim))
-            left = lam[..., (self.rank - 1) % self.nb_ranks, 1, :]
-            right = lam[..., (self.rank + 1) % self.nb_ranks, 0, :]
+            if self._use_pcr:
+                left, right = self._solve_reduced_pcr(ends)
+            else:
+                gathered = self._allgather(xp.ascontiguousarray(ends))
+                rhs = xp.moveaxis(gathered, 0, -3).reshape(
+                    self._mode_shape + (2 * dim * self.nb_ranks,))
+                lam = xp.einsum("...ij,...j->...i", self._reduced_inv, rhs)
+                lam = lam.reshape(self._mode_shape + (self.nb_ranks, 2, dim))
+                left = lam[..., (self.rank - 1) % self.nb_ranks, 1, :]
+                right = lam[..., (self.rank + 1) % self.nb_ranks, 0, :]
             # From the *uncorrected* right-hand side: the all-zero mode is
             # solved globally rather than through the interface system, so the
             # end corrections below would double-count it.
