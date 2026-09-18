@@ -75,10 +75,10 @@ namespace muGrid {
     // declarations and the shape-function tables below.
     namespace fem_gradient_kernels {
 
-        // Element data (B, weights, node layout) now lives in fem_element.hh,
-        // and the host gradient/divergence kernels are the element-generic
-        // templates defined further below; the old per-dimension host kernel
-        // declarations and shape-function tables have been removed.
+        // Element data (B, weights, node layout) lives in fem_element.hh;
+        // the host gradient/divergence kernels are the element-generic
+        // templates defined further below. Neither per-dimension host kernel
+        // declarations nor shape-function tables belong here.
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // Element-generic device launch wrappers (defined and explicitly

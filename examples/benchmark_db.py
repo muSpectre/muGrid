@@ -29,7 +29,7 @@ Identity of the data point:
              "gpuN"), a rank count, or a preconditioner name
 Run parameters:
   device nranks dim n npts precond precision maxiter tol
-  (`precision` is "double"/"single"; blank on legacy rows, read as "double")
+  (`precision` is "double"/"single"; a blank cell reads as "double")
 Results:
   iters secs gbps E
 Unused columns for a given row are left blank.
@@ -384,8 +384,8 @@ def select_studies(rows, benchmark, studies, timestamp=None):
     return out
 
 
-# Floating-point precision names. Legacy rows predate the `precision` column and
-# were all measured in double precision, so a blank cell reads as "double".
+# Floating-point precision names. A blank `precision` cell denotes a row
+# measured in double precision.
 PRECISIONS = ["double", "single"]
 
 # When both precisions are overlaid on one plot, the device config sets the

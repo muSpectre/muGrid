@@ -410,7 +410,8 @@ def _resolve_ghosts(
         - A pair (left, right), each an int or a per-dimension sequence:
           explicit ghost counts (expert override).
     nb_ghosts_left, nb_ghosts_right : sequence of int, optional
-        Legacy explicit ghost counts; mutually exclusive with `ghosts`.
+        Explicit ghost counts passed directly rather than through `ghosts`;
+        mutually exclusive with it.
     nb_dims : int
         Spatial dimension of the grid, used for validation.
 

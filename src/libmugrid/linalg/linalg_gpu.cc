@@ -565,9 +565,8 @@ __global__ void field_scal_real_kernel(RT* x, const RT* a,
 // Per-pixel three-vector cross product out = a x b. One thread per pixel;
 // `soa` selects the component stride (npix for SoA, 1 with a pixel-stride of 3
 // for AoS). A single template serves both real and complex fields: the complex
-// multiplies are handled by DeviceComplex's operator*/operator-, so the body
-// is identical to the real case (which previously needed its own hand-unrolled
-// re/im kernel).
+// multiplies are handled by DeviceComplex's operator*/operator-, so one body
+// serves both and the complex case needs no hand-unrolled re/im kernel.
 template <typename T>
 __global__ void cross_kernel(const T* a, const T* b, T* out, Index_t npix,
                              bool soa) {

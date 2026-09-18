@@ -632,10 +632,10 @@ class FFTFrequencyTest(unittest.TestCase):
     def test_coords_2d_with_ghosts(self):
         """Test 2D coords/coordsg with ghost cells.
 
-        Regression test: pixels_without_ghosts carries the ghost-buffer strides
-        (e.g. [1, 6] for a 4x4 grid in a 6x6 buffer). The old code used those
-        strides for the numpy layout, leaving the last column of coords
-        uninitialized (garbage).
+        pixels_without_ghosts carries the ghost-buffer strides (e.g. [1, 6]
+        for a 4x4 grid in a 6x6 buffer), which are not the strides of the
+        interior numpy view. Using them for the numpy layout leaves the last
+        column of coords uninitialized (garbage).
         """
         nb_grid_pts = [4, 4]
         nx, ny = nb_grid_pts

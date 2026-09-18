@@ -46,9 +46,10 @@ class StarImportTest(unittest.TestCase):
     def test_star_import(self):
         """`from muGrid import *` must not reference undefined names.
 
-        __all__ previously listed "Verbosity" (never defined) and
-        unconditionally listed "OpenMode" (only defined on NetCDF builds),
-        either of which broke a star import.
+        Every name in `__all__` must exist in the module for the build at
+        hand. A name that is never defined, or one that exists only on an
+        optional backend ("OpenMode" needs NetCDF) yet is listed
+        unconditionally, breaks a star import.
         """
         namespace = {}
         exec("from muGrid import *", namespace)  # noqa: S102
@@ -92,8 +93,7 @@ class FEMGradientIncrementTest(unittest.TestCase):
 
         op.apply(displacement, grad_a)
         grad_b.s[...] = 0.0
-        # apply_increment from zero must reproduce apply (it was bound to the
-        # wrong C++ method before the fix).
+        # apply_increment starting from zero must reproduce apply.
         op.apply_increment(displacement, 1.0, grad_b)
         np.testing.assert_allclose(grad_a.s, grad_b.s, atol=1e-12)
 
@@ -102,8 +102,8 @@ class IsotropicStiffnessWrapperTest(unittest.TestCase):
     def test_accepts_wrapped_fields(self):
         """The exported IsotropicStiffnessOperator must accept wrapped Fields.
 
-        The raw pybind classes reject the pure-Python Field wrapper; the
-        package now exports unwrapping wrappers.
+        The raw pybind classes reject the pure-Python Field wrapper, so the
+        package exports wrappers that unwrap their arguments.
         """
         nx, ny = 6, 6
         grid_spacing = [1.0 / (nx - 1), 1.0 / (ny - 1)]
@@ -123,7 +123,8 @@ class IsotropicStiffnessWrapperTest(unittest.TestCase):
         mu.pg[...] = 1.0
         displacement.pg[...] = 0.0
 
-        # Should not raise (previously a TypeError on the raw pybind class).
+        # Must not raise: the exported wrapper unwraps its Field arguments
+        # before handing them to the raw pybind class.
         op.apply(displacement, lam, mu, force)
         # Zero displacement -> zero force.
         np.testing.assert_allclose(force.s, 0.0, atol=1e-12)

@@ -12,8 +12,9 @@
  * kernels are templated on it. The contraction is unrolled at compile time via
  * `if constexpr` recursion, so B[q][d][n] is a constant expression — the
  * compiler folds the structural zeros / ±1 of a simplex (and skips the global
- * loads multiplied by a zero coefficient), reproducing the old hand-unrolled
- * kernels while also supporting any new element (e.g. Q1) with no new code.
+ * loads multiplied by a zero coefficient), so the generated code matches a
+ * hand-unrolled per-element kernel while one template still covers any
+ * element (e.g. Q1) with no new code.
  *
  * Both apply (gradient, nodal → quadrature) and transpose (divergence,
  * quadrature → nodal) use a gather pattern — one thread per output point —

@@ -32,8 +32,8 @@ cmake -DMUGRID_ENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES="gfx906;gfx90a" ..
     built only for an architecture the device cannot run **raises a
     `RuntimeError` on the first kernel launch**: µGrid checks every launch, so a
     mismatch fails loudly rather than leaving hand-written kernels as silent
-    no-ops (which previously let runtime-API calls keep working and reductions
-    silently return zero).
+    no-ops. Without that check the runtime-API calls keep working while the
+    hand-written kernels do nothing, so reductions simply return zero.
 
 ## Installing CuPy
 

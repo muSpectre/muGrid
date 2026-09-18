@@ -211,13 +211,12 @@ class TestLinalgGhostExclusion:
 class TestLinalgInteriorAccuracy:
     """Test that interior reductions stay accurate next to large ghost data.
 
-    The reductions used to be computed as full-buffer result minus ghost
-    contribution. Stencil operators write results into ghost pixels, so the
-    ghost buffers hold large stale data; once the interior values are small
-    (e.g. a converged CG residual), the subtraction cancels catastrophically
-    and the reported squared norm carried an absolute error of order
-    eps * ||ghosts||^2 — it could even go negative. The reductions must sum
-    the interior directly.
+    The reductions must sum the interior directly, not compute a full-buffer
+    result minus the ghost contribution. Stencil operators write results into
+    ghost pixels, so the ghost buffers hold large stale data; once the
+    interior values are small (e.g. a converged CG residual), such a
+    subtraction cancels catastrophically and the reported squared norm carries
+    an absolute error of order eps * ||ghosts||^2 — it can even go negative.
     """
 
     interior_value = 1e-6
@@ -298,7 +297,9 @@ class TestLinalgInteriorAccuracy:
 class TestCPUGPULinalgComparison:
     """Test that CPU and GPU linalg operations produce identical results.
 
-    These tests are critical regression tests for the SoA memory layout fix.
+    The two backends lay components out differently (SoA on device, where the
+    component stride is the pixel count), so agreement here is what makes a
+    result independent of where it was computed.
     """
 
     def setup_method(self, method):
