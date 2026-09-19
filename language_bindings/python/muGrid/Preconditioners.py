@@ -15,6 +15,7 @@ projects that mode out; in that case the right-hand side must not contain
 it.
 """
 
+import os
 import warnings
 from contextlib import nullcontext
 
@@ -1024,3 +1025,1409 @@ def make_green_jacobi_preconditioner(
 
     prec.refresh = refresh
     return prec
+
+
+def _project_constants_out(field):
+    """Remove the nullspace of the periodic stiffness operator: the ``dim``
+    constant translations. (Rigid rotations are not periodic, so they are not
+    in it.)
+
+    Done on the array view because ``linalg`` has no interior-only sum and no
+    add-a-constant kernel -- the one place this preconditioner still touches an
+    array library in its hot path. Two calls per apply, not per level.
+    """
+    values = field.s
+    spatial = tuple(range(1, values.ndim))
+    values -= values.mean(axis=spatial, keepdims=True)
+
+
+# --------------------------------------------------------------------------- #
+# Multigrid approximation of the reference-stiffness inverse
+# --------------------------------------------------------------------------- #
+
+
+class _MultigridLevel:
+    """One level of the hierarchy, carrying the *uniform* reference operator.
+
+    Every level runs the same spatially uniform ``Kʳᵉᶠ`` at its own grid
+    spacing, so no material field is ever restricted and the coarse operator is
+    a plain rediscretisation rather than a Galerkin product. Heterogeneity is
+    handled outside the cycle, by the symmetric Jacobi scaling of
+    :class:`GreenJacobiPreconditioner`.
+    """
+
+    def __init__(self, decomposition, spacing, element, lam, mu, dim,
+                 name, dtype, with_fft=False):
+        from .Wrappers import IsotropicStiffnessOperator
+
+        self.dim = dim
+        self.decomp = decomposition
+        self.lam = lam
+        self.mu = mu
+        self.op = IsotropicStiffnessOperator(dim, tuple(spacing), element)
+        self.fc = (decomposition.real_space_collection if with_fft
+                   else decomposition.collection)
+
+        def field(suffix):
+            if np.dtype(dtype) == np.dtype(np.float32):
+                return wrap_field(self.fc.register_real32_field(
+                    f"{name}-{suffix}", (dim,)))
+            return wrap_field(self.fc.real_field(f"{name}-{suffix}", (dim,)))
+
+        self.r = field("r")
+        self.z = field("z")
+        self.t = field("t")
+        self.inv_diag = field("inv-diag")
+
+        self.node_block = self._probe_node_block()
+        self._set_inverse_diagonal(name)
+
+    # -- operator ---------------------------------------------------------- #
+
+    def apply(self, u, f):
+        """``f = Kʳᵉᶠ u``, ghosts of ``u`` refreshed first."""
+        self.decomp.communicate_ghosts(u)
+        self.op.apply_uniform(u, self.lam, self.mu, f)
+
+    # -- setup -------------------------------------------------------------- #
+
+    def _probe_node_block(self):
+        """The nodal ``dim x dim`` block of the uniform operator.
+
+        On a uniform grid every node has an identical element neighbourhood, so
+        one matrix describes the whole level and a single impulse response per
+        direction recovers it. Rank-local by construction: every rank probes
+        its own interior and gets the same answer, so this needs no
+        communication.
+        """
+        interior = tuple(self.decomp.nb_subdomain_grid_pts)
+        node = tuple(n // 2 for n in interior)
+        block = np.zeros((self.dim, self.dim))
+        for beta in range(self.dim):
+            self.z.set_zero()
+            self.z.s[(beta, 0) + node] = 1.0
+            self.apply(self.z, self.t)
+            response = self.t.s[(slice(None), 0) + node]
+            block[:, beta] = (response.get() if hasattr(response, "get")
+                              else np.asarray(response))
+        self.z.set_zero()
+        self.t.set_zero()
+        return block
+
+    def _set_inverse_diagonal(self, name):
+        """Store ``D⁻¹`` as a per-component field.
+
+        For Q1 in any dimension, and for P1 in 3D, the nodal block is diagonal
+        (``c·I`` at isotropic grid spacing), so the smoother is a component-wise
+        scaling that ``linalg.scal`` applies directly. 2D P1 is the exception:
+        the two-triangle Kuhn split breaks the x-y symmetry that cancels the
+        off-diagonal, leaving ``K01 = λ + μ``. That needs a component-mixing
+        smoother, which is not implemented.
+        """
+        off_diagonal = np.abs(
+            self.node_block - np.diag(np.diag(self.node_block))).max()
+        scale = np.abs(np.diag(self.node_block)).max()
+        if off_diagonal > 1e-10 * max(scale, 1.0):
+            raise NotImplementedError(
+                "the multigrid smoother needs a diagonal nodal block, but the "
+                f"probed block is\n{self.node_block}\n(largest off-diagonal "
+                f"{off_diagonal:.3e}). This happens for P1 elements in 2D, "
+                "whose two-triangle split breaks the symmetry that cancels "
+                "the off-diagonal term; use Q1, or 3D."
+            )
+        diagonal = np.diag(self.node_block)
+        if not (np.abs(diagonal) > 0).all():
+            raise ValueError(
+                f"the uniform operator has a zero nodal diagonal: {diagonal}")
+        self.inv_diag.set_zero()
+        values = np.broadcast_to(
+            (1.0 / diagonal).reshape((self.dim,) + (1,) * (self.dim + 1)),
+            self.inv_diag.s.shape)
+        _fill_field(self.inv_diag, values)
+
+    def lambda_max(self, communicator=None, nb_it=100):
+        """Largest eigenvalue of ``D⁻¹K`` by power iteration.
+
+        ``D⁻¹K`` is invariant under uniform refinement — ``D`` and ``K`` carry
+        the same power of ``h`` — so one level's estimate serves the whole
+        hierarchy, and the coarsest is the cheapest place to measure it.
+        """
+        rng = np.random.default_rng(0)
+        _fill_field(self.z, rng.standard_normal(self.z.s.shape))
+
+        def norm(field):
+            local = linalg.norm_sq(field)
+            if communicator is not None:
+                local = float(communicator.sum(float(local)))
+            return np.sqrt(local)
+
+        linalg.scal(1.0 / norm(self.z), self.z)
+        eigenvalue = 0.0
+        for _ in range(nb_it):
+            self.apply(self.z, self.t)
+            linalg.scal(self.inv_diag, self.t)
+            eigenvalue = norm(self.t)
+            linalg.copy(self.t, self.z)
+            linalg.scal(1.0 / eigenvalue, self.z)
+        self.z.set_zero()
+        self.t.set_zero()
+        return eigenvalue
+
+    # -- smoother ----------------------------------------------------------- #
+
+    def smooth(self, nb_steps, omega):
+        """``nb_steps`` damped-Jacobi sweeps of ``z += ω D⁻¹ (r - K z)``."""
+        for _ in range(nb_steps):
+            self.apply(self.z, self.t)
+            linalg.axpby(1.0, self.r, -1.0, self.t)   # t = r - K z
+            linalg.scal(self.inv_diag, self.t)        # t = D⁻¹ t
+            linalg.axpy(omega, self.t, self.z)        # z += ω t
+
+
+class MultigridReferencePreconditioner(Preconditioner):
+    r"""Multigrid approximation of ``Kʳᵉᶠ⁻¹``, with an exact FFT solve at the
+    coarsest level.
+
+    A drop-in replacement for :func:`make_reference_stiffness_preconditioner`
+    that trades the fine-grid FFT for a V-cycle. The motivation is parallel
+    scaling: an FFT-based apply costs two all-to-all transposes per transform
+    (four per apply), each a full barrier across all ranks, and it forces the
+    solver onto the FFT engine's slab decomposition, ``[1, 1, P]``, in which
+    only the last axis is ever distributed -- so every rank holds the full
+    extent of the other two, and no run can use more ranks than the grid has
+    planes. A V-cycle needs only nearest-neighbour halo exchange at every level
+    plus one small collective at the bottom, and it leaves the solver free to
+    use a genuine 3D Cartesian decomposition.
+
+    On a single shared-memory node the slab is not itself a cost -- it moves
+    more halo bytes but through 2 neighbours rather than 6, and latency wins;
+    see the Stage 0 measurements in ``docs/multigrid_preconditioner_plan.md``.
+    Its liability is the rank ceiling and the halo volume, both of which bite
+    only where messages stop being latency-bound.
+
+    The cycle runs on the **uniform** reference operator only, so no material
+    field is ever restricted and every level is a plain rediscretisation of
+    ``Kʳᵉᶠ`` at its own grid spacing. Heterogeneity belongs outside: wrap this
+    in :class:`GreenJacobiPreconditioner` exactly as you would wrap the FFT
+    version, by passing it as the ``green`` argument.
+
+    The preconditioner is a **fixed** linear operator — a fixed cycle count and
+    a fixed number of smoothing steps, with symmetric pre- and post-smoothing
+    and ``R = Pᵀ`` — because plain CG requires ``M⁻¹`` to be symmetric positive
+    definite. Do not replace the cycle count by an inner convergence test; that
+    would make the preconditioner non-linear and require a flexible Krylov
+    method.
+
+    Parameters
+    ----------
+    decomposition : muGrid.CartesianDecomposition
+        The solver's (fine) decomposition. Its collection must be the one the
+        fields passed to :meth:`apply` live on, and it needs one ghost layer
+        per side — which the stiffness stencil already requires.
+    grid_spacing : sequence of float
+        Fine-level grid spacing, one entry per direction.
+    lambda_ref, mu_ref : float
+        Uniform reference Lamé parameters. The volume means of the actual
+        material are the usual choice, as in ``examples/homogenization.py``.
+    communicator : muGrid.Communicator, optional
+        Communicator of the parallel run. MPI is not yet supported; passing a
+        communicator of size > 1 raises.
+    element : muGrid.FEMElement, optional
+        Finite element, default Q1. P1 in 2D is rejected by the smoother (see
+        :class:`_MultigridLevel`).
+    nb_levels : int, optional
+        Number of levels including the coarsest. Default: coarsen while every
+        direction stays even and at least ``min_coarse`` points wide.
+    min_coarse : int, optional
+        Smallest coarse grid to coarsen towards. Convergence is insensitive to
+        this over a wide range, so the choice is a parallel one; default 32.
+    nu : int, optional
+        Pre- and post-smoothing steps per level (equal, to keep ``M⁻¹``
+        symmetric). Default 2.
+    omega : float, optional
+        Jacobi damping. Default ``1.7 / λ_max(D⁻¹K)``, measured by power
+        iteration at setup. A hardcoded value is unsafe: the stability limit is
+        ``2/λ_max`` and ``λ_max`` moves with dimension and element kind, so a
+        value that is optimal in 2D diverges in 3D.
+    nb_cycles : int, optional
+        V-cycles per apply, default 1. Raise it (never the smoothing count
+        alone) if the cycle turns out too weak; it stays linear and symmetric.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records ``"vcycle"`` and ``"coarse"``.
+    """
+
+    #: ω = SAFETY / λ_max(D⁻¹K). The measured optimum is 1.7 across
+    #: {2D, 3D} x {Q1, P1}; the stability limit is 2.0 and divergence sets in
+    #: sharply at 1.9, so this keeps ~15% margin.
+    SAFETY = 1.7
+
+    def __init__(self, decomposition, grid_spacing, lambda_ref, mu_ref,
+                 communicator=None, element=None, nb_levels=None,
+                 min_coarse=32, nu=2, omega=None, nb_cycles=1, timer=None,
+                 dtype=np.float64,
+                 name="multigrid-reference-preconditioner"):
+        from .Parallel import Communicator
+        from .Wrappers import CartesianDecomposition, FFTEngine, GridTransfer, _muGrid
+
+        if element is None:
+            element = _muGrid.FEMElement.q1
+        if communicator is not None and communicator.size > 1:
+            raise NotImplementedError(
+                "MultigridReferencePreconditioner is serial for now. The MPI "
+                "path needs nested power-of-two subdivisions pinned across "
+                "levels and a redundant coarsest level; see "
+                "docs/multigrid_preconditioner_plan.md, stage 4."
+            )
+
+        nb_grid_pts = tuple(decomposition.nb_domain_grid_pts)
+        dim = len(nb_grid_pts)
+        spacing = np.asarray(grid_spacing, dtype=float)
+        if spacing.size != dim:
+            raise ValueError(
+                f"grid_spacing has {spacing.size} entries for a {dim}D grid")
+
+        self.nu = int(nu)
+        self.nb_cycles = int(nb_cycles)
+        self._timer = timer
+        self._name = name
+
+        nb_levels = self._resolve_nb_levels(nb_grid_pts, nb_levels, min_coarse)
+        if nb_levels < 2:
+            # A single level is the coarsest level, which is solved by FFT --
+            # so there is no cycle left, only the plain Fourier preconditioner,
+            # and the fine decomposition handed in would have to be an FFT
+            # engine for it to work at all. Say so here rather than failing
+            # later on a missing `real_space_collection`.
+            raise ValueError(
+                f"a V-cycle needs at least two levels, but {nb_grid_pts} "
+                f"cannot be coarsened towards min_coarse={min_coarse}: every "
+                "extent must stay even and at least that wide. Use a finer "
+                "grid, lower min_coarse, or -- if one level is really what you "
+                "want -- make_reference_stiffness_preconditioner, which is "
+                "exactly that."
+            )
+        self.nb_levels = nb_levels
+
+        # Coarse levels must live where the fine one does: the cycle moves
+        # fields straight between levels (restrict/prolong), so a host coarse
+        # grid under a device fine grid is a device mismatch, not a slow path.
+        level_kwargs = {"nb_ghosts_left": (1,) * dim,
+                        "nb_ghosts_right": (1,) * dim,
+                        "device": decomposition.device}
+        comm = communicator if communicator is not None else Communicator()
+
+        self.levels = []
+        for lvl in range(nb_levels):
+            coarsening = 2 ** lvl
+            level_pts = tuple(n // coarsening for n in nb_grid_pts)
+            with_fft = lvl == nb_levels - 1
+            if lvl == 0:
+                level_decomp = decomposition
+            elif with_fft:
+                # The coarsest level is solved exactly in Fourier space, so its
+                # decomposition has to be an FFT engine.
+                level_decomp = FFTEngine(level_pts, comm, **level_kwargs)
+            else:
+                level_decomp = CartesianDecomposition(
+                    comm, list(level_pts),
+                    nb_subdivisions=list(decomposition.nb_subdivisions),
+                    **level_kwargs)
+            self.levels.append(_MultigridLevel(
+                level_decomp, spacing * coarsening, element, lambda_ref,
+                mu_ref, dim, f"{name}-l{lvl}", dtype, with_fft=with_fft))
+
+        self.omega = (float(omega) if omega is not None
+                      else self.SAFETY / self.levels[-1].lambda_max(comm))
+
+        self.transfer = GridTransfer(dim)
+        self._on_device = not decomposition.device.is_host
+
+        # Coarsest level: the exact block-Fourier inverse of Kʳᵉᶠ, reusing the
+        # impulse-response assembly. It already replaces the singular q = 0
+        # block by its pseudo-inverse, which is the nullspace handling the
+        # bottom of the cycle needs.
+        bottom = self.levels[-1]
+        self._coarse_prec = make_reference_stiffness_preconditioner(
+            bottom.decomp,
+            lambda u_in, f_out: bottom.apply(u_in, f_out),
+            dim, name=f"{name}-coarse", timer=timer, dtype=dtype)
+
+    # -- setup helpers ------------------------------------------------------ #
+
+    @staticmethod
+    def _resolve_nb_levels(nb_grid_pts, nb_levels, min_coarse):
+        """Coarsen while every direction stays even and wide enough."""
+        if nb_levels is not None:
+            nb_levels = int(nb_levels)
+            for lvl in range(nb_levels):
+                if any(n % (2 ** lvl) for n in nb_grid_pts):
+                    raise ValueError(
+                        f"{nb_levels} levels need every grid extent divisible "
+                        f"by {2 ** (nb_levels - 1)}, got {nb_grid_pts}")
+            return nb_levels
+        nb_levels = 1
+        while (all(n % (2 ** nb_levels) == 0 for n in nb_grid_pts) and
+               all(n // (2 ** nb_levels) >= min_coarse for n in nb_grid_pts)):
+            nb_levels += 1
+        return nb_levels
+
+    def _timed(self, label):
+        return self._timer(label) if self._timer is not None else nullcontext()
+
+    # -- the cycle ---------------------------------------------------------- #
+
+    def _vcycle(self, lvl):
+        level = self.levels[lvl]
+        if lvl == self.nb_levels - 1:
+            with self._timed("coarse"):
+                self._coarse_prec.apply(level.r, level.z)
+            return
+
+        coarser = self.levels[lvl + 1]
+        level.z.set_zero()
+        level.smooth(self.nu, self.omega)
+
+        # Residual r - K z, restricted to the coarser level.
+        level.apply(level.z, level.t)
+        linalg.axpby(1.0, level.r, -1.0, level.t)
+        level.decomp.communicate_ghosts(level.t)
+        self.transfer.restrict(level.t, coarser.r)
+
+        self._vcycle(lvl + 1)
+
+        # Coarse-grid correction, interpolated back and added.
+        coarser.decomp.communicate_ghosts(coarser.z)
+        self.transfer.prolong(coarser.z, level.t)
+        linalg.axpy(1.0, level.t, level.z)
+
+        level.smooth(self.nu, self.omega)
+
+    def apply(self, r, z):
+        """``z = M⁻¹ r``."""
+        if self._on_device:
+            # Everything else in the cycle runs on the device; the two grid
+            # transfers do not, because GridTransfer declares host-space
+            # overloads only (src/libmugrid/operators/transfer.hh). Say so
+            # here, rather than letting pybind report an overload mismatch
+            # from three frames down. Construction is deliberately still
+            # allowed: the per-level pieces are individually timeable on the
+            # device, which is how examples/vcycle_vs_fft.py prices a cycle
+            # there.
+            raise NotImplementedError(
+                "the V-cycle cannot run on the device yet: restrict/prolong "
+                "have no device kernels, only host ones. Run the solve on the "
+                "CPU, or use make_reference_stiffness_preconditioner, which is "
+                "GPU-capable."
+            )
+        fine = self.levels[0]
+        with self._timed("vcycle"):
+            linalg.copy(r, fine.r)
+            _project_constants_out(fine.r)
+            if self.nb_cycles == 1:
+                self._vcycle(0)
+                linalg.copy(fine.z, z)
+            else:
+                z.set_zero()
+                for cycle in range(self.nb_cycles):
+                    if cycle:
+                        # Re-form the residual against the accumulated z.
+                        fine.apply(z, fine.t)
+                        linalg.copy(r, fine.r)
+                        _project_constants_out(fine.r)
+                        linalg.axpy(-1.0, fine.t, fine.r)
+                    self._vcycle(0)
+                    linalg.axpy(1.0, fine.z, z)
+            _project_constants_out(z)
+
+
+# --------------------------------------------------------------------------- #
+# Hybrid: FFT in the rank-local axes, tridiagonal solve in the distributed one
+# --------------------------------------------------------------------------- #
+
+
+def _array_module(on_device):
+    """``cupy`` for device arrays, ``numpy`` for host ones."""
+    if on_device:
+        import cupy
+        return cupy
+    return np
+
+
+#: Tolerance on ``|A A^-1 - I|``, in units of the working precision's eps. Both
+#: ends are measured: a healthy block lands within a few eps of zero (5.9e-16 in
+#: double, 4.6e-7 in single) and a singular one at 6e-4 and above, so this sits
+#: a couple of orders clear of each in single and ten or more in double. It is
+#: deliberately *not* an absolute number -- the hybrid runs at complex64
+#: whenever the solver does, where the 1e-8 this used to carry is below the
+#: noise floor and condemns healthy blocks by the hundred.
+_INVERSE_RESIDUAL_EPS = 1e3
+
+
+def _batched_inverse(matrices, xp=np, singular_mode=None):
+    """Inverse per mode; the one mode that has no inverse is zeroed, not fudged.
+
+    ``singular_mode`` is the index of the all-zero mode, where every matrix
+    built along the distributed axis inherits the reference operator's rigid
+    translation and may therefore be singular. Its inverse is set to zero --
+    unconditionally, whether or not that particular matrix turned out to be
+    invertible, because nothing reads it either way -- rather than approximated,
+    which is what
+    :func:`make_reference_stiffness_preconditioner` does with the same block at
+    ``q = 0``, and is safe here for a stronger reason: :meth:`apply` replaces
+    that mode's entire solve with :meth:`_solve_zero_mode`, so nothing computed
+    from it is ever read. Passing ``None`` states that no mode may be singular.
+
+    What this deliberately does not do is *discover* the singular mode by the
+    size of its residual and repair it with a pseudo-inverse. That is the trap
+    :meth:`_build_zero_mode` documents -- a pseudo-inverse separates kernel from
+    range by a magnitude threshold, and at complex64 the threshold that used to
+    live here sat below the rounding noise of a perfectly healthy block, so it
+    fired on hundreds of them and replaced each one, in a Python loop, with a
+    pseudo-inverse computed at that same precision.
+
+    Everything else is verified instead: a mode that is singular and not
+    declared so raises, because the alternative is a preconditioner that is
+    quietly wrong in one mode rather than one that stops.
+    """
+    index = (None if singular_mode is None
+             else int(np.ravel_multi_index(singular_mode, matrices.shape[:-2])))
+    flat_in = matrices.reshape((-1,) + matrices.shape[-2:])
+    eye = xp.eye(flat_in.shape[-1], dtype=flat_in.dtype)
+
+    def refuse(what):
+        return RuntimeError(
+            f"{what}, in a batch of {flat_in.shape[-1]}x{flat_in.shape[-1]} "
+            "Fourier-mode blocks. Only the all-zero mode may be singular here, "
+            "where the reference operator keeps the rigid translation and the "
+            "hybrid replaces that mode's whole solve with _solve_zero_mode. "
+            "Anything else is a nullspace this preconditioner does not know "
+            "about, and using it would be silently wrong rather than slow.")
+
+    try:
+        flat_out = xp.linalg.inv(flat_in)
+    except xp.linalg.LinAlgError as error:
+        # inv() refuses the whole batch if any one member is exactly singular,
+        # and says only "Singular matrix". Substituting the identity for the
+        # mode that is allowed to be singular -- on a copy, since `matrices`
+        # may be the caller's live array -- takes the batch through in one
+        # call. If some other mode was the singular one, it refuses again, and
+        # that is the answer.
+        if index is None:
+            raise refuse("LAPACK rejected a block as exactly singular") \
+                from error
+        patched = flat_in.copy()
+        patched[index] = eye
+        try:
+            flat_out = xp.linalg.inv(patched)
+        except xp.linalg.LinAlgError:
+            raise refuse(
+                "LAPACK rejected a block as exactly singular, and it was not "
+                f"the declared mode {tuple(singular_mode)}") from error
+
+    # inv() does not always fail on a singular mode; more often it returns
+    # something large and finite. Only the residual catches that, and it is one
+    # batched matmul.
+    residual = xp.abs(flat_in @ flat_out - eye).max(axis=(-2, -1))
+    if index is not None:
+        flat_out[index] = 0
+        residual[index] = 0
+
+    # np.finfo, not xp.finfo: the dtype of a device array is a numpy dtype
+    # either way, and this does not depend on cupy mirroring the call.
+    tolerance = _INVERSE_RESIDUAL_EPS * float(np.finfo(flat_in.dtype).eps)
+    finite = xp.isfinite(residual)
+    bad = ~finite | (residual > tolerance)
+    nb_bad = int(bad.sum())
+    if nb_bad:
+        measured = bad & finite
+        worst = (float(residual[measured].max())
+                 if bool(measured.any()) else float("inf"))
+        raise refuse(
+            f"{nb_bad} of {residual.size} Fourier modes invert to "
+            f"|A A^-1 - I| as large as {worst:.3e}, past a tolerance of "
+            f"{tolerance:.3e}")
+    return flat_out.reshape(matrices.shape)
+
+
+def _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref, probe=8):
+    """The uniform operator's stencil, by impulse response.
+
+    Returns ``S`` with ``f(y) = sum_d S[d] u(y - d)``, indexed ``S[dx+1, ...]``.
+    Measured on a small *serial* grid: the operator is uniform, so every rank
+    gets the same answer and this needs no communication. `probe` only has to
+    exceed the stencil's reach.
+    """
+    from .Parallel import Communicator
+    from .Wrappers import CartesianDecomposition, IsotropicStiffnessOperator
+
+    with warnings.catch_warnings():
+        # A serial communicator under an MPI launcher is exactly the intent:
+        # the operator is uniform, so every rank probes the same stencil for
+        # itself and nothing is exchanged. muGrid warns about the redundancy,
+        # which here is the point rather than a mistake.
+        warnings.filterwarnings("ignore", message=".*serial muGrid Communicator.*")
+        decomposition = CartesianDecomposition(
+            Communicator(), [probe] * dim, nb_subdivisions=[1] * dim,
+            nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
+    op = IsotropicStiffnessOperator(dim, tuple(grid_spacing), element)
+    collection = decomposition.collection
+    u = collection.real_field("hybrid-stencil-u", (dim,))
+    f = collection.real_field("hybrid-stencil-f", (dim,))
+
+    S = np.zeros((3,) * dim + (dim, dim))
+    centre = probe // 2
+    for beta in range(dim):
+        u.set_zero()
+        u.s[(beta, 0) + (centre,) * dim] = 1.0
+        decomposition.communicate_ghosts(u)
+        op.apply_uniform(u, lambda_ref, mu_ref, f)
+        response = np.asarray(f.s)[:, 0]
+        for offset in np.ndindex((3,) * dim):
+            S[offset + (slice(None), beta)] = response[
+                (slice(None),) + tuple(centre + o - 1 for o in offset)]
+    return S
+
+
+def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
+                       local_shape, cdtype, xp=np):
+    """Transform the rank-local axes; return the three coupling blocks per mode.
+
+    ``A[m]``, ``m = dz + 1``, has shape ``(*mode_shape, dim, dim)`` and the
+    operator along the distributed axis is
+    ``(T v)[k] = A[0] v[k+1] + A[1] v[k] + A[2] v[k-1]``.
+
+    The frequencies match ``numpy.fft.rfftn`` over those axes: the last of them
+    is a real transform, the rest are complex.
+    """
+    # The stencil probe is a tiny host computation whatever the target is; only
+    # the per-mode blocks are big enough to want to live on the device.
+    S = _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
+    qs = [2 * xp.pi * xp.fft.fftfreq(n) for n in local_shape[:-1]]
+    qs.append(2 * xp.pi * xp.fft.rfftfreq(local_shape[-1]))
+    grids = xp.meshgrid(*qs, indexing="ij")
+    mode_shape = grids[0].shape
+
+    A = xp.zeros((3,) + mode_shape + (dim, dim), dtype=cdtype)
+    for offset in np.ndindex((3,) * dim):
+        phase = xp.ones(mode_shape, dtype=cdtype)
+        for axis in range(dim - 1):
+            phase = phase * xp.exp(-1j * grids[axis] * (offset[axis] - 1))
+        A[offset[-1]] += phase[..., None, None] * xp.asarray(S[offset])
+    return A
+
+
+_BLOCK_THOMAS_SOURCE = r"""
+typedef {scalar}2 cplx;
+#define MAKE_CPLX make_{scalar}2
+#define DIM {dim}
+
+__device__ __forceinline__ cplx cmul(cplx a, cplx b) {{
+    return MAKE_CPLX(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}}
+__device__ __forceinline__ cplx csub(cplx a, cplx b) {{
+    return MAKE_CPLX(a.x - b.x, a.y - b.y);
+}}
+
+/* Block-Thomas along the distributed axis: one thread per Fourier mode,
+ * marching the whole axis with the two constant coupling blocks in registers.
+ *
+ * Arrays are z-major -- rhs and out are (nz, nmodes, DIM), Dinv is
+ * (nz, nmodes, DIM, DIM) -- so at each step the threads of a wavefront touch
+ * consecutive modes and therefore consecutive bytes. In the mode-major layout
+ * neighbouring threads would be nz*DIM elements apart, which is the trap
+ * cuSPARSE's gtsv2StridedBatch documents.
+ *
+ * The sweep is serial in z by nature; the parallelism is the mode count, which
+ * is nx * (ny/2 + 1) and therefore ample.
+ */
+extern "C" __global__ void block_thomas(
+    const cplx * __restrict__ rhs, const cplx * __restrict__ head,
+    const cplx * __restrict__ exc, const int * __restrict__ exc_index,
+    const cplx * __restrict__ A0, const cplx * __restrict__ A2,
+    cplx * __restrict__ y, cplx * __restrict__ out,
+    int nz, int nmodes, int nb_head, int nb_exc)
+{{
+    int m = blockIdx.x * blockDim.x + threadIdx.x;
+    if (m >= nmodes) return;
+
+    /* D_k = A1 - A2 D_{{k-1}}^-1 A0 is a fixed-point iteration, because the
+     * coupling blocks do not vary along the axis. Most modes reach it within a
+     * few steps, so only the first nb_head factors are stored and everything
+     * beyond reuses the last of them. The minority that converge too slowly --
+     * the near-singular low-q modes -- keep a full line in `exc`, found
+     * through `exc_index`, which is read once per thread rather than per step.
+     */
+    int slot = exc_index[m];
+
+    cplx a0[DIM * DIM], a2[DIM * DIM], prev[DIM], cur[DIM];
+    for (int i = 0; i < DIM * DIM; ++i) {{
+        a0[i] = A0[m * DIM * DIM + i];
+        a2[i] = A2[m * DIM * DIM + i];
+    }}
+
+    /* forward: y_0 = rhs_0,  y_k = rhs_k - A2 (Dinv_{{k-1}} y_{{k-1}}) */
+    for (int i = 0; i < DIM; ++i) {{
+        cplx v = rhs[(size_t)m * DIM + i];
+        y[(size_t)m * DIM + i] = v;
+        prev[i] = v;
+    }}
+    for (int k = 1; k < nz; ++k) {{
+        int kh = (k - 1 < nb_head) ? (k - 1) : (nb_head - 1);
+        const cplx * Dinv = (slot >= 0)
+            ? exc + ((size_t)(k - 1) * nb_exc + slot) * DIM * DIM
+            : head + ((size_t)kh * nmodes + m) * DIM * DIM;
+        size_t dof = 0;
+        cplx tmp[DIM];
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = MAKE_CPLX(0, 0);
+            for (int j = 0; j < DIM; ++j)
+                acc = csub(acc, cmul(Dinv[dof + i * DIM + j], prev[j]));
+            tmp[i] = MAKE_CPLX(-acc.x, -acc.y);
+        }}
+        size_t off = ((size_t)k * nmodes + m) * DIM;
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = rhs[off + i];
+            for (int j = 0; j < DIM; ++j)
+                acc = csub(acc, cmul(a2[i * DIM + j], tmp[j]));
+            cur[i] = acc;
+        }}
+        for (int i = 0; i < DIM; ++i) {{ y[off + i] = cur[i]; prev[i] = cur[i]; }}
+    }}
+
+    /* backward: out_k = Dinv_k (y_k - A0 out_{{k+1}}) */
+    for (int k = nz - 1; k >= 0; --k) {{
+        size_t off = ((size_t)k * nmodes + m) * DIM;
+        int kh = (k < nb_head) ? k : (nb_head - 1);
+        const cplx * Dinv = (slot >= 0)
+            ? exc + ((size_t)k * nb_exc + slot) * DIM * DIM
+            : head + ((size_t)kh * nmodes + m) * DIM * DIM;
+        size_t dof = 0;
+        cplx rhs_k[DIM];
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = y[off + i];
+            if (k < nz - 1)
+                for (int j = 0; j < DIM; ++j)
+                    acc = csub(acc, cmul(a0[i * DIM + j], prev[j]));
+            rhs_k[i] = acc;
+        }}
+        for (int i = 0; i < DIM; ++i) {{
+            cplx acc = MAKE_CPLX(0, 0);
+            for (int j = 0; j < DIM; ++j) {{
+                cplx t = cmul(Dinv[dof + i * DIM + j], rhs_k[j]);
+                acc = MAKE_CPLX(acc.x + t.x, acc.y + t.y);
+            }}
+            cur[i] = acc;
+        }}
+        for (int i = 0; i < DIM; ++i) {{ out[off + i] = cur[i]; prev[i] = cur[i]; }}
+    }}
+}}
+"""
+
+_BLOCK_THOMAS_CACHE = {}
+
+
+def _block_thomas_kernel(dim, cdtype):
+    """Compile (once per dim and precision) the fused block-Thomas sweep."""
+    key = (dim, np.dtype(cdtype).name)
+    if key not in _BLOCK_THOMAS_CACHE:
+        import cupy
+
+        scalar = "float" if np.dtype(cdtype) == np.dtype(np.complex64) \
+            else "double"
+        source = _BLOCK_THOMAS_SOURCE.format(scalar=scalar, dim=dim)
+        _BLOCK_THOMAS_CACHE[key] = cupy.RawKernel(
+            source, "block_thomas",
+            backend="hiprtc" if cupy.cuda.runtime.is_hip else "nvrtc")
+    return _BLOCK_THOMAS_CACHE[key]
+
+
+class HybridFourierTridiagonalPreconditioner(Preconditioner):
+    r"""``Kʳᵉᶠ⁻¹`` by FFT in the rank-local axes and a tridiagonal solve in the
+    distributed one.
+
+    The same operator :func:`make_reference_stiffness_preconditioner` applies,
+    reached without ever transforming the distributed axis -- and so without the
+    all-to-all that forces. Unlike :class:`MultigridReferencePreconditioner`
+    this is *exact*, so it costs the FFT preconditioner's iteration count rather
+    than roughly 1.5x of it.
+
+    Two properties make it work, and neither is separability:
+
+    1. ``Kʳᵉᶠ`` is translation-invariant in the undistributed axes -- it is
+       uniform by construction -- so transforming them decouples every mode
+       exactly.
+    2. The stencil reaches exactly one node along the distributed axis, for Q1
+       and P1 alike, so what remains there is block-tridiagonal with
+       ``dim x dim`` blocks.
+
+    Q1 elasticity is not a Kronecker sum, so the usual "the Laplacian
+    factorises" argument does not apply here; (2) is a statement about stencil
+    support, and it does.
+
+    The distributed solve is the Spike/partitioned-Thomas scheme. Each rank
+    eliminates its own slab against three right-hand sides -- the residual, and
+    the unit responses to its two neighbours' interface planes -- which leaves a
+    reduced system in the ``2 * dim`` interface unknowns per rank. That reduced
+    system is small (``2 * dim * nb_ranks`` per mode), is assembled and inverted
+    once at setup, and **absorbs the periodic wrap-around**, so the
+    Sherman-Morrison correction a periodic tridiagonal would otherwise need
+    disappears.
+
+    Per apply this exchanges only interface planes -- ``2 * dim`` complex numbers
+    per mode per rank -- against an all-to-all of the entire field.
+
+    Host and device are the same code: the array module follows the
+    decomposition, so ``numpy`` and ``cupy`` take the identical path. Only the
+    interface exchange differs, and only in staging the buffers through the host
+    so that a non-GPU-aware MPI build still works.
+
+    Parameters
+    ----------
+    decomposition : muGrid.CartesianDecomposition
+        The solver's decomposition, which must be a **slab**: one subdivision in
+        every axis but the last. That is the split ``muGrid.FFTEngine`` itself
+        chooses, and it is what leaves the other axes rank-local.
+    grid_spacing : sequence of float
+        Grid spacing, one entry per direction.
+    lambda_ref, mu_ref : float
+        Uniform reference Lame parameters; normally the volume means.
+    communicator : muGrid.Communicator, optional
+    element : muGrid.FEMElement, optional
+        Default Q1.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records ``"fft"``, ``"tridiag"``,
+        ``"interface"`` and ``"ifft"``.
+    """
+
+    def __init__(self, decomposition, grid_spacing, lambda_ref, mu_ref,
+                 communicator=None, element=None, timer=None,
+                 dtype=np.float64, name="hybrid-fourier-tridiagonal"):
+        from .Parallel import Communicator
+        from .Wrappers import _muGrid
+
+        if element is None:
+            element = _muGrid.FEMElement.q1
+        comm = communicator if communicator is not None else Communicator()
+        self._comm = comm
+        self._mpi = comm.mpi4py_comm if comm.size > 1 else None
+        self._timer = timer
+        self._name = name
+
+        self._on_device = not decomposition.device.is_host
+        xp = _array_module(self._on_device)
+        self._xp = xp
+
+        dim = len(tuple(decomposition.nb_domain_grid_pts))
+        self.dim = dim
+        subdivisions = tuple(int(x) for x in decomposition.nb_subdivisions)
+        if subdivisions[:-1] != (1,) * (dim - 1):
+            raise ValueError(
+                "the hybrid preconditioner needs a slab decomposition -- one "
+                "subdivision in every axis but the last -- but got "
+                f"{list(subdivisions)}. That is the split muGrid.FFTEngine "
+                "chooses; build the solver's CartesianDecomposition with "
+                f"nb_subdivisions={[1] * (dim - 1) + [comm.size]}.")
+
+        self.decomposition = decomposition
+        self.nb_ranks = subdivisions[-1]
+        self.rank = comm.rank
+        interior = tuple(int(x) for x in decomposition.nb_subdomain_grid_pts)
+        self.local_shape = interior[:-1]
+        self.nz_local = interior[-1]
+        self._cdtype = (np.complex64 if np.dtype(dtype) == np.dtype(np.float32)
+                        else np.complex128)
+
+        nz_global = tuple(decomposition.nb_domain_grid_pts)[-1]
+        if nz_global % self.nb_ranks:
+            raise ValueError(
+                f"the distributed axis ({nz_global} points) must divide evenly "
+                f"among {self.nb_ranks} ranks: the interface exchange and the "
+                "zero-mode gather both assume every rank holds the same number "
+                "of planes.")
+        if int(decomposition.subdomain_locations[-1]) != self.rank * self.nz_local:
+            raise ValueError(
+                "ranks are not laid out in order along the distributed axis, "
+                "which the zero-mode gather assumes.")
+        if self.nz_local < 2:
+            raise ValueError(
+                "each rank needs at least two planes of the distributed axis, "
+                f"but rank {comm.rank} has {self.nz_local}. The slab caps at "
+                f"{tuple(decomposition.nb_domain_grid_pts)[-1] // 2} ranks.")
+
+        self.A = _z_coupling_blocks(dim, grid_spacing, element, lambda_ref,
+                                    mu_ref, self.local_shape, self._cdtype, xp)
+        self._mode_shape = self.A.shape[1:-2]
+        # The one mode whose blocks may be singular, and the only one whose
+        # solve is thrown away and redone by _solve_zero_mode. Every inverse
+        # taken below is told about it rather than left to discover it.
+        self._zero_index = (0,) * len(self._mode_shape)
+
+        self.nz_global = nz_global
+        self._factorise_local()
+        # Parallel cyclic reduction needs a power-of-two rank count for the
+        # stride doubling to close on the cyclic wrap. Where it does not apply,
+        # fall back to assembling and inverting the reduced system densely --
+        # correct either way, but O(P) in communication and O(P^2) in work per
+        # mode, which dominates the apply by eight ranks.
+        self._pcr_nb_levels = (self.nb_ranks.bit_length() - 1
+                               if self.nb_ranks > 1
+                               and self.nb_ranks & (self.nb_ranks - 1) == 0
+                               else 0)
+        self._use_pcr = self._pcr_nb_levels > 0
+        if self._use_pcr:
+            self._build_pcr()
+        else:
+            self._build_reduced_system()
+        self._build_zero_mode()
+
+    # -- setup -------------------------------------------------------------- #
+
+    def _factorise_local(self):
+        """Thomas factors of this rank's slab, plus its two spikes.
+
+        The spikes are the slab's response to a unit value on each neighbour's
+        interface plane. They do not depend on the residual, so they and the
+        reduced system they build are computed once here, not per apply.
+        """
+        xp = self._xp
+        dim, nz = self.dim, self.nz_local
+        A0, A1, A2 = self.A[0], self.A[1], self.A[2]
+
+        # Everything along the distributed axis is stored z-major,
+        # ``(nz, *modes, ...)``. Neighbouring modes are then adjacent in memory
+        # at each step, which is what lets a wavefront in the fused kernel read
+        # contiguous bytes; the mode-major alternative strides by ``nz * dim``
+        # between neighbouring threads and gives up most of the bandwidth. It
+        # costs nothing to choose: the transform emits ``(dim, *modes, nz)`` and
+        # a permutation has to be materialised either way.
+        Dinv = xp.empty((nz,) + self._mode_shape + (dim, dim),
+                        dtype=self._cdtype)
+        zero = self._zero_index
+        Dinv[0] = _batched_inverse(A1, xp, singular_mode=zero)
+        for k in range(1, nz):
+            Dinv[k] = _batched_inverse(A1 - A2 @ Dinv[k - 1] @ A0, xp,
+                                       singular_mode=zero)
+        self.Dinv = Dinv
+
+        eye = xp.broadcast_to(xp.eye(dim, dtype=self._cdtype),
+                              self._mode_shape + (dim, dim))
+        left = xp.zeros((nz,) + self._mode_shape + (dim, dim),
+                        dtype=self._cdtype)
+        right = xp.zeros_like(left)
+        left[0] = -A2 @ eye
+        right[nz - 1] = -A0 @ eye
+        V = self._solve_local(left)
+        W = self._solve_local(right)
+        # Only the four interface blocks outlive setup. The full spikes are the
+        # largest arrays here -- two more copies of the factor storage -- and
+        # apply() does not need them: adding ``V left + W right`` to the
+        # solution is the same as solving once more against a right-hand side
+        # corrected at the two ends, which is one extra sweep instead of a pass
+        # over both of them.
+        self._spike_ends = xp.stack([V[0], V[-1], W[0], W[-1]], axis=-3)
+        # Host and device alike: the fused sweeps on both stream these factors,
+        # so compressing them cuts traffic as well as storage. It runs after the
+        # spikes, which are built through the elementwise path and want the
+        # uncompressed array.
+        self._compress_factors()
+
+    #: Factors kept per mode before the fixed point takes over. The
+    #: convergence distribution is a property of the operator, not the grid --
+    #: median 10 steps, 90th percentile 16, and only ~0.65% of modes need more
+    #: than 64 at any size measured -- so this trades a dense head against a
+    #: sparse exception table. Around 32 minimises the total.
+    HEAD_LENGTH = 32
+
+    def _compress_factors(self):
+        """Replace the factor array by a head plus an exception table.
+
+        ``D_k = A1 - A2 D_{k-1}^-1 A0`` has constant coefficients, so it is a
+        fixed-point iteration and its factors stop changing after a few steps.
+        Storing the first ``HEAD_LENGTH`` of them and reusing the last for the
+        rest is exact for every mode that has converged by then; the few that
+        have not keep a full line.
+
+        This is not only memory. The sweep *streams* these factors, so the
+        traffic falls with the storage.
+        """
+        xp = self._xp
+        nz = self.nz_local
+        head_len = min(self.HEAD_LENGTH, nz)
+        head = xp.ascontiguousarray(self.Dinv[:head_len])
+
+        # A mode is exceptional if reusing the last head factor would be wrong
+        # anywhere along the remaining axis.
+        tail = self.Dinv[head_len:]
+        if tail.shape[0]:
+            deviation = xp.abs(tail - head[-1]).max(axis=(0, -2, -1))
+            scale = xp.abs(head[-1]).max(axis=(-2, -1))
+            # Multiplied through rather than divided: `scale` is real32 when
+            # the solve is, where a guard floor like 1e-300 is not a small
+            # number but zero, and the all-zero factor line of the singular
+            # mode then divides 0 by 0. This form needs no floor -- a constant
+            # line, zero included, is exactly what the head reproduces.
+            exceptional = deviation > 1e-12 * scale
+        else:
+            exceptional = xp.zeros(self._mode_shape, dtype=bool)
+
+        flat = exceptional.reshape(-1)
+        nb_modes = int(flat.size)
+        index = xp.full(nb_modes, -1, dtype=xp.int32)
+        picked = xp.flatnonzero(flat)
+        nb_exc = int(picked.size)
+        index[picked] = xp.arange(nb_exc, dtype=xp.int32)
+
+        dim = self.dim
+        full = self.Dinv.reshape(nz, nb_modes, dim, dim)
+        self._head = head
+        self._exc = (xp.ascontiguousarray(full[:, picked])
+                     if nb_exc else xp.empty((nz, 1, dim, dim),
+                                             dtype=self._cdtype))
+        self._exc_index = index
+        self._picked = picked
+        self._nb_exc = nb_exc
+        self._head_length = head_len
+        # The full array is what this exists to get rid of.
+        self.Dinv = None
+
+    def _dinv_at(self, k):
+        """``D_k^-1``, from whichever representation is in use.
+
+        Before compression -- and always on the host -- this is a plain slice.
+        Afterwards it rebuilds the plane from the head and the exception table,
+        which is why the elementwise path stays usable on a device: it is the
+        reference the fused kernel is tested against, and a reference that
+        could not run would be no reference at all.
+        """
+        if self.Dinv is not None:
+            return self.Dinv[k]
+        base = self._head[min(k, self._head_length - 1)]
+        if not self._nb_exc:
+            return base
+        patched = base.copy()
+        patched.reshape(-1, self.dim, self.dim)[self._picked] = self._exc[k]
+        return patched
+
+    def _solve_local(self, rhs, fused=True):
+        """``T_local x = rhs`` with the stored factors.
+
+        ``T_local`` is this rank's slab with no wrap-around and no coupling to
+        its neighbours; both enter through the spikes. `rhs` is
+        ``(nz, *modes, dim, ncols)``, so one code path serves the residual
+        (``ncols = 1``) and the spikes (``ncols = dim``).
+
+        With a single column this hands over to a fused kernel -- the C++ one on
+        the host, the device kernel on a device. The loop below issues four
+        array products per plane, each streaming the whole mode array, so it
+        costs ``4 * nz`` passes over memory where the sweeps cost two. It
+        remains the setup path for the spikes, which have ``dim`` columns, and
+        the reference both fused kernels are tested against; pass
+        ``fused=False`` to take it deliberately.
+        """
+        if fused and rhs.shape[-1] == 1 and self.Dinv is None:
+            if self._on_device:
+                return self._solve_local_fused(rhs)
+            return self._solve_local_fused_host(rhs)
+
+        xp = self._xp
+        nz = self.nz_local
+        matmul = xp.matmul
+
+        y = xp.empty_like(rhs)
+        y[0] = rhs[0]
+        for k in range(1, nz):
+            y[k] = rhs[k] - matmul(self.A[2],
+                                   matmul(self._dinv_at(k - 1), y[k - 1]))
+
+        out = xp.empty_like(rhs)
+        out[nz - 1] = matmul(self._dinv_at(nz - 1), y[nz - 1])
+        for k in range(nz - 2, -1, -1):
+            out[k] = matmul(self._dinv_at(k),
+                            y[k] - matmul(self.A[0], out[k + 1]))
+        return out
+
+    def _solve_local_fused_host(self, rhs):
+        """The same solve as one C++ call instead of ``4 * nz`` array products.
+
+        The elementwise path streams the whole mode array four times per plane,
+        so a solve costs ``4 * nz`` passes over memory where this costs two.
+        Measured on the host that was the dominant cost of the preconditioner
+        by an order of magnitude -- far more than the transform it replaces.
+
+        The kernel runs plane-outer, mode-inner, which is the opposite of the
+        device's one-thread-per-mode march: a single host thread walking one
+        mode would stride by ``nb_modes * dim`` between planes, where this way
+        every access is contiguous.
+        """
+        xp = self._xp
+        nz, dim = self.nz_local, self.dim
+        nb_modes = int(np.prod(self._mode_shape))
+
+        flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
+        scratch = xp.empty_like(flat)
+        out = xp.empty_like(flat)
+        single = np.dtype(self._cdtype) == np.dtype(np.complex64)
+        kernel = getattr(
+            linalg, f"block_thomas_{dim}d" + ("_f32" if single else ""))
+        kernel(flat,
+               self._head.reshape(self._head_length, nb_modes, dim, dim),
+               self._exc.reshape(nz, max(self._nb_exc, 1), dim, dim),
+               self._exc_index,
+               self.A[0].reshape(nb_modes, dim, dim),
+               self.A[2].reshape(nb_modes, dim, dim),
+               scratch, out)
+        return out.reshape(rhs.shape)
+
+    #: Route the device sweep through the compiled kernel in libmuGrid rather
+    #: than the CuPy one built here. Both implement the same recurrence; the
+    #: compiled one shares its source tree with the host kernel and needs no
+    #: runtime compilation, but the CuPy one is what has been measured on
+    #: hardware, so it stays the default until the compiled path has been run
+    #: on a device. `test_hybrid_device_matches_host` is what settles that.
+    _USE_COMPILED_DEVICE_SWEEP = os.environ.get(
+        "MUGRID_BLOCK_THOMAS_COMPILED", "") not in ("", "0")
+
+    def _solve_local_fused(self, rhs):
+        """The same solve as one kernel launch instead of ``4 * nz``."""
+        xp = self._xp
+        nz, dim = self.nz_local, self.dim
+        nb_modes = int(np.prod(self._mode_shape))
+
+        if self._USE_COMPILED_DEVICE_SWEEP:
+            return self._solve_local_compiled_device(rhs)
+
+        flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
+        scratch = xp.empty_like(flat)
+        out = xp.empty_like(flat)
+        threads = 256
+        blocks = (nb_modes + threads - 1) // threads
+        _block_thomas_kernel(dim, self._cdtype)(
+            (blocks,), (threads,),
+            (flat, self._head.reshape(self._head_length, nb_modes, dim, dim),
+             self._exc, self._exc_index,
+             self.A[0].reshape(nb_modes, dim, dim),
+             self.A[2].reshape(nb_modes, dim, dim),
+             scratch, out, np.int32(nz), np.int32(nb_modes),
+             np.int32(self._head_length), np.int32(max(self._nb_exc, 1))))
+        return out.reshape(rhs.shape)
+
+    def _build_reduced_system(self):
+        """The interface system, assembled once and inverted.
+
+        Rank ``p`` satisfies ``lambda_p = x_p + V_p lambda_{p-1}^R +
+        W_p lambda_{p+1}^L`` at both of its ends, which closes into a
+        block-cyclic system of size ``2 * dim * nb_ranks`` per mode. Being small
+        and dense it swallows the periodic wrap-around for free.
+        """
+        xp = self._xp
+        dim, P = self.dim, self.nb_ranks
+        gathered = self._allgather(
+            xp.ascontiguousarray(self._spike_ends))
+
+        size = 2 * dim * P
+        M = xp.zeros(self._mode_shape + (size, size), dtype=self._cdtype)
+        diagonal = xp.arange(size)
+        M[..., diagonal, diagonal] = 1.0
+        for p in range(P):
+            V0, V1, W0, W1 = (gathered[p][..., i, :, :] for i in range(4))
+            row_l = slice(2 * dim * p, 2 * dim * p + dim)
+            row_r = slice(2 * dim * p + dim, 2 * dim * (p + 1))
+            prev_r = slice(2 * dim * ((p - 1) % P) + dim,
+                           2 * dim * ((p - 1) % P + 1))
+            next_l = slice(2 * dim * ((p + 1) % P),
+                           2 * dim * ((p + 1) % P) + dim)
+            M[..., row_l, prev_r] -= V0
+            M[..., row_l, next_l] -= W0
+            M[..., row_r, prev_r] -= V1
+            M[..., row_r, next_l] -= W1
+        self._reduced_inv = _batched_inverse(
+            M, xp, singular_mode=self._zero_index)
+
+    def _solve_local_compiled_device(self, rhs):
+        """The device sweep through libmuGrid instead of the CuPy kernel.
+
+        The binding takes device addresses rather than buffers, since nothing
+        in the Python buffer protocol describes device memory, so every array
+        handed over must be contiguous and of the exact shape the kernel
+        indexes. Nothing on the C++ side can check that.
+        """
+        xp = self._xp
+        nz, dim = self.nz_local, self.dim
+        nb_modes = int(np.prod(self._mode_shape))
+        nb_exc = max(self._nb_exc, 1)
+
+        flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
+        head = xp.ascontiguousarray(
+            self._head.reshape(self._head_length, nb_modes, dim, dim))
+        exc = xp.ascontiguousarray(self._exc.reshape(nz, nb_exc, dim, dim))
+        index = xp.ascontiguousarray(self._exc_index.astype(xp.int32))
+        a0 = xp.ascontiguousarray(self.A[0].reshape(nb_modes, dim, dim))
+        a2 = xp.ascontiguousarray(self.A[2].reshape(nb_modes, dim, dim))
+        scratch = xp.empty_like(flat)
+        out = xp.empty_like(flat)
+
+        single = np.dtype(self._cdtype) == np.dtype(np.complex64)
+        kernel = getattr(
+            linalg, f"block_thomas_gpu_{dim}d" + ("_f32" if single else ""))
+        kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
+               a0.data.ptr, a2.data.ptr, scratch.data.ptr, out.data.ptr,
+               nz, nb_modes, self._head_length, nb_exc)
+        return out.reshape(rhs.shape)
+
+    def _build_pcr(self):
+        """Precompute the parallel-cyclic-reduction coefficients.
+
+        The reduced system is block-circulant: every rank holds the same number
+        of planes and the operator is uniform, so each rank's spike blocks are
+        *bit-identical* (verified, not assumed -- the constructor checks it).
+        The elimination coefficients at every level are therefore the same on
+        every rank and can be built here without communication, leaving only
+        right-hand sides to exchange per apply.
+
+        Writing the system as ``u_p + A u_{p-s} + C u_{p+s} = x_p`` with stride
+        ``s = 2^k``, one elimination step against the neighbours at ``±s`` gives
+
+            D       = I - A C - C A
+            A'      = -D^-1 A^2 ,   C' = -D^-1 C^2
+            x'_p    = D^-1 (x_p - A x_{p-s} - C x_{p+s})
+
+        and doubles the stride. After ``log2(P)`` steps the stride reaches ``P``,
+        where the cyclic wrap makes ``u_{p±P} = u_p`` and the equation closes
+        locally as ``(I + A + C) u_p = x_p``.
+
+        Cost per apply falls from one all-gather of ``P`` interface planes and a
+        dense ``(2 d P)^2`` solve per mode, to ``log2(P) + 1`` neighbour
+        exchanges and ``log2(P)`` products of ``2d x 2d`` blocks.
+        """
+        xp = self._xp
+        dim = self.dim
+        m = 2 * dim
+
+        # A and C from this rank's spikes; identical everywhere by construction.
+        V0, V1, W0, W1 = (self._spike_ends[..., i, :, :] for i in range(4))
+        zero = xp.zeros_like(V0)
+        # u_p = (L_p, R_p); L_p couples to R_{p-1} and L_{p+1}, likewise R_p.
+        A = -xp.concatenate([xp.concatenate([zero, V0], axis=-1),
+                             xp.concatenate([zero, V1], axis=-1)], axis=-2)
+        C = -xp.concatenate([xp.concatenate([W0, zero], axis=-1),
+                             xp.concatenate([W1, zero], axis=-1)], axis=-2)
+
+        identity = xp.zeros(self._mode_shape + (m, m), dtype=self._cdtype)
+        diagonal = xp.arange(m)
+        identity[..., diagonal, diagonal] = 1.0
+
+        self._pcr_levels = []
+        matmul = xp.matmul
+        for _ in range(self._pcr_nb_levels):
+            D_inv = _batched_inverse(
+                identity - matmul(A, C) - matmul(C, A), xp,
+                singular_mode=self._zero_index)
+            # The level keeps the coefficients it eliminates *with*, so store
+            # them before the stride doubles.
+            self._pcr_levels.append((A, C, D_inv))
+            A, C = (-matmul(D_inv, matmul(A, A)),
+                    -matmul(D_inv, matmul(C, C)))
+        self._pcr_final_inv = _batched_inverse(
+            identity + A + C, xp, singular_mode=self._zero_index)
+
+    def _exchange(self, local, distance):
+        """Send ``local`` to the ranks at ``±distance`` and receive theirs.
+
+        Returns ``(from_left, from_right)``: the buffers of ranks ``p-distance``
+        and ``p+distance``, wrapping cyclically. Staged through the host for the
+        same reason :meth:`_allgather` is.
+        """
+        if self._mpi is None:
+            return local, local
+        P = self.nb_ranks
+        host = local.get() if self._on_device else local
+        host = np.ascontiguousarray(host)
+        left = np.empty_like(host)
+        right = np.empty_like(host)
+        lo = (self.rank - distance) % P
+        hi = (self.rank + distance) % P
+        # Receive from the low side while sending to the high side, then the
+        # reverse; two Sendrecvs rather than four blocking calls.
+        self._mpi.Sendrecv(host, dest=hi, sendtag=0,
+                           recvbuf=left, source=lo, recvtag=0)
+        self._mpi.Sendrecv(host, dest=lo, sendtag=1,
+                           recvbuf=right, source=hi, recvtag=1)
+        to_xp = self._xp.asarray if self._on_device else (lambda a: a)
+        return to_xp(left), to_xp(right)
+
+    def _solve_reduced_pcr(self, ends):
+        """The interface unknowns by parallel cyclic reduction.
+
+        ``ends`` is this rank's two interface planes; the return is the pair
+        ``(R_{p-1}, L_{p+1})`` the sweep correction needs.
+        """
+        xp = self._xp
+        dim = self.dim
+        x = xp.ascontiguousarray(
+            ends.reshape(self._mode_shape + (2 * dim,)))
+
+        matvec = (lambda M, v:
+                  xp.einsum("...ij,...j->...i", M, v))
+        for level, (A, C, D_inv) in enumerate(self._pcr_levels):
+            from_left, from_right = self._exchange(x, 1 << level)
+            x = matvec(D_inv,
+                       x - matvec(A, from_left) - matvec(C, from_right))
+        u = matvec(self._pcr_final_inv, x)
+
+        # One last neighbour exchange for the two blocks the correction reads.
+        u = xp.ascontiguousarray(u)
+        from_left, from_right = self._exchange(u, 1)
+        return (from_left.reshape(self._mode_shape + (2, dim))[..., 1, :],
+                from_right.reshape(self._mode_shape + (2, dim))[..., 0, :])
+
+    def _build_zero_mode(self):
+        """The all-zero mode, which the tridiagonal path cannot solve.
+
+        Its z-operator keeps the constant-in-z nullspace -- the rigid
+        translation -- so it is singular, and both the local Thomas factors and
+        the reduced system degenerate there. It is a single mode, so it is
+        cheaper to gather its whole z-line and solve it directly than to rescue
+        the general path: that is the same treatment
+        :func:`make_reference_stiffness_preconditioner` gives ``q = 0``.
+
+        The nullspace is *deflated* rather than discovered. ``T`` is Hermitian
+        and its kernel is known exactly -- the ``dim`` constant-in-z
+        translations, which :meth:`_project_constants` already removes from both
+        ends -- so adding ``shift`` times the orthogonal projector onto them
+        moves the kernel to ``shift`` and leaves the complement untouched. A
+        plain inverse of that then reproduces ``T^+`` on every right-hand side
+        this is given, and is better conditioned than ``T`` restricted to its
+        range.
+
+        ``pinv`` cannot do the same job reliably, because it has to separate
+        kernel from range by magnitude and the gap is not one it can resolve:
+        the computed zeros sit at ``~1e-16 * sigma_max``, one digit below the
+        ``1e-15 * sigma_max`` cutoff. Which side of it they land on is a
+        property of the LAPACK build, not of the problem -- numpy 2.5 returns
+        ``3.8e-14`` for one of them at 32 planes, which keeps a kernel direction
+        scaled by ``1e13`` and silently costs the preconditioner four digits of
+        exactness. Nor would a looser threshold settle it: the smallest singular
+        value it must *not* cut is the longest-wavelength mode along the axis,
+        ``2.5e-3 * sigma_max`` at 32 planes and falling as the square of the
+        grid, so the safe window closes as the problem grows.
+        """
+        xp = self._xp
+        dim, nz = self.dim, self.nz_global
+        A0, A1, A2 = (self.A[i][self._zero_index] for i in range(3))
+        T = xp.zeros((nz * dim, nz * dim), dtype=self._cdtype)
+        for k in range(nz):
+            row = slice(k * dim, (k + 1) * dim)
+            T[row, ((k + 1) % nz) * dim:((k + 1) % nz) * dim + dim] += A0
+            T[row, row] += A1
+            T[row, ((k - 1) % nz) * dim:((k - 1) % nz) * dim + dim] += A2
+
+        projector = xp.zeros_like(T)
+        for component in range(dim):
+            projector[component::dim, component::dim] = 1.0 / nz
+        self._zero_inv = xp.linalg.inv(T + xp.abs(T).max() * projector)
+
+    def _solve_zero_mode(self, v):
+        """``T^+ v`` for the all-zero mode, over the whole distributed axis."""
+        dim = self.dim
+        local = self._xp.ascontiguousarray(
+            v[(slice(None),) + self._zero_index][..., 0])
+        full = self._allgather(local).reshape(-1, dim)
+        # Both ends of the projection: the right-hand side must be orthogonal
+        # to the nullspace for the system to be consistent, and the solution is
+        # only defined up to it.
+        full = self._project_constants(full)
+        solution = self._project_constants(
+            (self._zero_inv @ full.reshape(-1)).reshape(-1, dim))
+        start = self.rank * self.nz_local
+        return solution[start:start + self.nz_local]
+
+    # -- collectives -------------------------------------------------------- #
+
+    def _allgather(self, local):
+        """Gather one array per rank along a new leading axis.
+
+        Device buffers are staged through the host rather than handed to MPI
+        directly, so this does not depend on the MPI build being GPU-aware. The
+        payload is the interface planes only -- a few MB even at 256**3 -- so
+        the round trip is cheap next to the all-to-all it replaces.
+        """
+        if self._mpi is None:
+            return local[None]
+        host = local.get() if self._on_device else local
+        out = np.empty((self.nb_ranks,) + host.shape, dtype=host.dtype)
+        self._mpi.Allgather(np.ascontiguousarray(host), out)
+        return self._xp.asarray(out) if self._on_device else out
+
+    def _timed(self, label):
+        return self._timer(label) if self._timer is not None else nullcontext()
+
+    @staticmethod
+    def _project_constants(line):
+        """Remove the constant-along-z part of the all-zero mode.
+
+        This *is* the projection off the nullspace, done where it costs
+        nothing. The rigid translations are exactly the ``q = 0`` coefficient,
+        and under this transform that is the z-mean of the all-zero mode's
+        line -- ``nz * dim`` numbers rather than the whole field.
+
+        Doing it in real space instead needs a reduction over every point,
+        which is the one thing to avoid here: cupy reductions on this ROCm
+        build run at ~6 GB/s against ~3200 GB/s for elementwise work, so a
+        global mean of a 256**3 field costs more than the rest of the apply put
+        together.
+        """
+        return line - line.mean(axis=0, keepdims=True)
+
+    # -- the preconditioner ------------------------------------------------- #
+
+    def apply(self, r, z):
+        """``z = M⁻¹ r``."""
+        xp = self._xp
+        dim = self.dim
+        axes = tuple(range(1, dim))
+
+        with self._timed("fft"):
+            hat = xp.fft.rfftn(xp.asarray(r.p), axes=axes).astype(
+                self._cdtype, copy=False)
+            # (dim, *modes, nz) -> (nz, *modes, dim); see _factorise_local for
+            # why the distributed axis leads. The permutation is materialised
+            # either way, so this choice is free.
+            v = xp.ascontiguousarray(
+                xp.moveaxis(hat, (0, -1), (-1, 0)))[..., None]
+
+        with self._timed("tridiag"):
+            x = self._solve_local(v)
+
+        with self._timed("interface"):
+            ends = xp.stack([x[0, ..., 0], x[-1, ..., 0]], axis=-2)
+            if self._use_pcr:
+                left, right = self._solve_reduced_pcr(ends)
+            else:
+                gathered = self._allgather(xp.ascontiguousarray(ends))
+                rhs = xp.moveaxis(gathered, 0, -3).reshape(
+                    self._mode_shape + (2 * dim * self.nb_ranks,))
+                lam = xp.einsum("...ij,...j->...i", self._reduced_inv, rhs)
+                lam = lam.reshape(self._mode_shape + (self.nb_ranks, 2, dim))
+                left = lam[..., (self.rank - 1) % self.nb_ranks, 1, :]
+                right = lam[..., (self.rank + 1) % self.nb_ranks, 0, :]
+            # From the *uncorrected* right-hand side: the all-zero mode is
+            # solved globally rather than through the interface system, so the
+            # end corrections below would double-count it.
+            zero_solution = self._solve_zero_mode(v)
+
+        with self._timed("tridiag"):
+            # z_local = T^-1 (rhs - A2 left e_0 - A0 right e_last): the
+            # neighbours' interface planes enter as a correction to the two end
+            # planes of the right-hand side, so the spikes never have to be
+            # stored or re-read.
+            v[0] -= xp.matmul(self.A[2], left[..., None])
+            v[-1] -= xp.matmul(self.A[0], right[..., None])
+            sol = self._solve_local(v)[..., 0]
+
+        with self._timed("ifft"):
+            sol[(slice(None),) + self._zero_index] = zero_solution
+            out = xp.fft.irfftn(xp.moveaxis(sol, (0, -1), (-1, 0)),
+                                axes=axes, s=self.local_shape)
+
+        # irfftn already returns a real array, so no xp.real() copy is needed.
+        z.p[...] = out.astype(xp.asarray(z.p).dtype, copy=False)

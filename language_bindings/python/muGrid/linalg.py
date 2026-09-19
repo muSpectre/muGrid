@@ -247,3 +247,23 @@ def leray_project(k, invk, N, out):
 
 __all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy", "axpy_norm_sq",
            "cross", "leray_project"]
+
+
+# Fused block-Thomas sweeps, one per block size and precision. These operate on
+# buffers rather than muGrid fields: they act in Fourier space, where the array
+# has a mode axis rather than a pixel axis and no field collection describes it.
+# Used by the hybrid Fourier/tridiagonal preconditioner; see
+# muGrid.Preconditioners.HybridFourierTridiagonalPreconditioner.
+block_thomas_2d = _linalg.block_thomas_2d
+block_thomas_3d = _linalg.block_thomas_3d
+block_thomas_2d_f32 = _linalg.block_thomas_2d_f32
+block_thomas_3d_f32 = _linalg.block_thomas_3d_f32
+
+# The device sweeps are present only in a CUDA/HIP build, and take device
+# addresses rather than buffers. Opt in with MUGRID_BLOCK_THOMAS_COMPILED=1;
+# see HybridFourierTridiagonalPreconditioner.
+for _name in ("block_thomas_gpu_2d", "block_thomas_gpu_3d",
+              "block_thomas_gpu_2d_f32", "block_thomas_gpu_3d_f32"):
+    if hasattr(_linalg, _name):
+        globals()[_name] = getattr(_linalg, _name)
+del _name

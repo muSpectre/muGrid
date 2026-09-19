@@ -1,0 +1,1361 @@
+# Multigrid-accelerated reference preconditioner — implementation plan
+
+Target: replace the fine-grid FFT in the reference-material (Green) preconditioner
+with a multigrid V-cycle whose **coarsest level** is solved by the existing
+FFT-based block symbol. Motivation is multi-GPU MPI scaling; see
+[Why](#1-why-the-current-preconditioner-does-not-scale).
+
+**Status:** Stages 1 and 2 complete (PR #206). Stage 3 (GPU) and Stage 4 (MPI)
+remain, and one gating measurement is outstanding.
+
+**If you are picking this up cold, read [§0 Start here](#0-start-here) first** —
+current state, where the code lives, how to build and test in this repo, what to
+do next, and the traps that have already cost time. Sections 1–6 are the design
+and the measurements behind it; they explain *why*, and can be read on demand.
+
+---
+
+## 0. Start here
+
+Self-contained orientation for someone (or something) picking this up cold.
+Sections 1–6 are the design and the measurements behind it; this section is
+what you need to *operate*.
+
+### 0.1 Current state
+
+Stages 0, 1, 2, **3** and **4** are done, all via the Fourier/tridiagonal
+hybrid (§9–§12) rather than the V-cycle: it reaches the FFT preconditioner's
+iteration count *exactly*, on host and device, at every rank count, with no
+all-to-all. The V-cycle remains serial and host-only.
+
+Before running anything on more than one GPU, read §12.2: it needs two
+environment variables, and without them even `-P none` aborts. §13 covers the
+fused sweep kernel and what it exposed once the sweep stopped dominating, and
+§14 the factor compression that followed from it.
+
+Read §7 before planning Stage 4: it changes what a single-node MPI run can be
+used for. Read §8 before setting any cycle parameter: `ν = 1` beats the current
+default of 2 at every grid measured. **Read §9 before starting Stage 4 at all**:
+a Fourier/tridiagonal hybrid reaches the FFT preconditioner's iteration count
+exactly, without transforming the distributed axis, and §10 costs out its
+tridiagonal solve. On present evidence it is the better design.
+
+- **PR #206** — `feat/multigrid-reference-preconditioner`, one commit, open
+  against `main`, mergeable. Contains `GridTransfer{2,3}D` (host kernels +
+  bindings + wrapper), `MultigridReferencePreconditioner` (serial),
+  19 tests, CHANGELOG entries.
+- **Not in the PR, local and untracked**: this document, and
+  `mg_prototype.py` at the repo root. Both are deliberate — the repo's
+  convention is that planning docs stay untracked (cf.
+  `docs/homogenization_memory_migration.md`), and an unlisted page under
+  `docs/` risks the `mkdocs build --strict` job. Add them if you disagree; it
+  is one commit.
+- The branch was rebased onto `main` to drop two unrelated commits from
+  `doc/history-independent-comments`. Do not branch from that branch.
+
+### 0.2 Where the code lives
+
+| path | what |
+|---|---|
+| `src/libmugrid/operators/transfer.{hh,cc}` | `GridTransfer<Dim>` + host kernels, `Real`/`Real32` |
+| `language_bindings/python/bind_py_operators.cc` | `add_grid_transfer<Dim>`, near the end |
+| `language_bindings/python/muGrid/Wrappers.py` | `GridTransfer` wrapper, at EOF |
+| `language_bindings/python/muGrid/Preconditioners.py` | `_MultigridLevel`, `MultigridReferencePreconditioner`, at EOF |
+| `tests/python_multigrid_tests.py` | 19 tests (13 transfer, 6 preconditioner) |
+| `mg_prototype.py` (repo root, untracked) | **the NumPy oracle** — `--probe`, `--check`, `--rho`, `--cg` |
+
+`mg_prototype.py` is the reference implementation that validated everything in
+§6. Keep it working: it is how Stage 3 and Stage 4 will be checked, because it
+shares nothing with the production path but the mathematics.
+
+### 0.3 Build and test — read before running anything
+
+```bash
+source benchenv.sh          # from the workspace root: venv + homebrew libmpi
+cd muGrid
+```
+
+**The workspace venv will not see your build tree.** It carries a
+scikit-build-core *editable* install of muGrid whose
+`ScikitBuildRedirectingFinder` sits on `sys.meta_path` and therefore beats
+`PYTHONPATH`; its `rebuild()` hook also fails ("no persistent build
+directory"). Two ways out — either
+
+```bash
+pip install -e . -Cbuild-dir=build     # gives the editable install a rebuild hook
+```
+
+or keep site-packages untouched and drop the finder in the test process:
+
+```python
+# runtests.py
+import sys
+sys.meta_path = [f for f in sys.meta_path
+                 if type(f).__name__ != "ScikitBuildRedirectingFinder"]
+import pytest
+sys.exit(pytest.main(sys.argv[1:]))
+```
+
+Configure a build that reuses the already-fetched dependencies:
+
+```bash
+cmake -S . -B cmake-build-mg -DCMAKE_BUILD_TYPE=Release \
+  -DPython_EXECUTABLE=$(which python3) -DMUGRID_ENABLE_TESTS=ON \
+  -DFETCHCONTENT_SOURCE_DIR_EIGEN=$PWD/cmake-build-debug/_deps/eigen-src \
+  -DFETCHCONTENT_SOURCE_DIR_PYBIND11=$PWD/cmake-build-debug/_deps/pybind11-src \
+  -DFETCHCONTENT_SOURCE_DIR_DLPACK=$PWD/cmake-build-debug/_deps/dlpack-src
+cmake --build cmake-build-mg -j8
+```
+
+Run the tests:
+
+```bash
+export PYTHONPATH=$PWD/cmake-build-mg/language_bindings/python:$PWD/language_bindings/python
+python runtests.py tests/ -q                                    # 546 passed, 68 skipped
+mpiexec -n 4 --oversubscribe python runtests.py tests/python_multigrid_tests.py -q
+cd cmake-build-mg && ctest --output-on-failure                  # C++
+```
+
+### 0.4 What to do next, in order
+
+**1. The gating measurement — needs one GPU, not four.** Nothing else should be
+built until this number exists.
+
+A V-cycle replaces exactly one thing, the FFT pair, and costs about 5.7 uniform
+matvecs to do it. The decisive quantity is therefore
+
+```
+R  =  5.7 × t(fused_kernel) / [ t(fft) + t(scale) + t(ifft) ]
+```
+
+on a single device, because a V-cycle's cost is halo-only and scales well with
+ranks while the FFT's all-to-all scales badly — so `R` at P=1 plus that
+asymmetry predicts the crossover without observing it. Every term is already
+instrumented; one `-P reference` GPU run gives all four:
+
+- `total_solve/iteration/hessp/apply_stiffness/fused_kernel`
+- `total_solve/iteration/prec/fft`, `/prec/scale`, `/prec/ifft`
+
+```bash
+for N in 128 192 256; do
+  python examples/homogenization.py -n $N,$N,$N -d gpu -k fused -P reference
+done
+```
+
+No GPU multigrid code is needed: the V-cycle's cost is dominated by
+`apply_uniform`, which is already GPU-enabled.
+
+**`R > 1` on one device is expected and is not a failure signal** — there the
+FFT has no communication at all and rocFFT's native 3-D transform is excellent.
+Read it as the deficit the all-to-all must make up:
+
+| `R` | reading |
+|---|---|
+| 1–2 | wins at modest rank counts — clear go |
+| 3–5 | needs the FFT to degrade 3–5×, i.e. roughly 8–32 ranks — go, but 4 GPUs may only just show it |
+| > 8 | flop cost too steep — revisit `ν`, or push the coarse level cheaper |
+
+Two more single-GPU results worth taking in the same session: whether multigrid
+reaches `384³` on one device where `-P reference` OOMs (see the table in
+`docs/benchmark_homogenization_preconditioner.md`), and **Stage 0**, which needs
+no GPU at all — `-P none` on a 3D `CartesianDecomposition` versus the FFT
+engine's pencil, so the eventual multi-GPU numbers can separate "removed the
+FFT" from "removed the pencil".
+
+Running several MPI ranks on a single device will produce numbers, but they are
+meaningless for this question: the all-to-all never leaves one device's memory.
+That configuration is useful for Stage 4 *correctness* only.
+
+**2. Stage 3 — GPU transfers and Chebyshev.** `transfer_gpu.cc` mirroring
+`transfer.cc`. The kernels already take explicit strides, so only the caller's
+stride computation changes: host is array-of-structures (`stride_dof = 1`,
+`stride_x = nb_dof`), device is structure-of-arrays (`stride_dof = nb_pixels`,
+`stride_x = 1`). This is the likeliest source of a silent bug and will not show
+up on the host. Then Chebyshev, reusing the `λ_max` the damping rule already
+computes.
+
+**3. Stage 4 — MPI.** Power-of-two subdivisions pinned across levels (see the
+nesting precondition, §2.3, and `_power_of_two_subdivisions` in the tests), the
+redundant coarsest level via `comm.sum` (§2.6), and lifting the
+`NotImplementedError` in `MultigridReferencePreconditioner.__init__`.
+
+**Acceptance, at every stage: the production path must reproduce
+`mg_prototype.py`'s CG iteration counts to the digit** — 36/36/36 and 26/35/53
+on the sharp inclusion at contrast 10, 35/36/37 and 15/15/15 on smooth, for
+n = 16/32/64 in 3D. That is a far sharper criterion than "it converges", and it
+is why the prototype exists.
+
+### 0.5 Traps that have already cost time
+
+- `CartesianDecomposition(nb_subdivisions=None)` documents "Default is
+  automatic" but passes `[0]*dim` and raises *"The total number of subdivisions
+  (0) does not match the size of the communicator"*. Always pass it explicitly.
+- `Communicator.sum` is bound through Eigen and takes **only** scalars and 2D
+  Fortran-contiguous `float64`. A 3D or C-contiguous array raises `TypeError`.
+  Reshape to `(nb_dof, -1)` and `np.asfortranarray` — see `_gather_interior` in
+  the tests. This matters for the redundant coarsest level.
+- `collection.register_real32_field(...)` returns the **bare C++ field**;
+  `real_field(...)` returns the Python wrapper. Wrap it with `muGrid.wrap_field`
+  or `.s` / `.p` will not exist.
+- Test files must match `python_*_tests.py` or pytest silently skips them —
+  `tests/python_solvers_test.py` (singular) is not collected today.
+- A new `.cc` must be added to `src/libmugrid/CMakeLists.txt` in
+  `MUGRID_SOURCES`, in **both** the CUDA and HIP branches, **and** in the
+  matching `set_source_files_properties(... LANGUAGE ...)` lists. Missing the
+  last one compiles it as plain C++ and fails obscurely.
+- pre-commit runs flake8 *before* isort, so isort's rewrite is unchecked. Run
+  flake8 again after a commit that isort modified.
+- `Solvers.py` has pre-existing E501 warnings. They are not yours.
+
+---
+
+## 1. Why the current preconditioner does not scale
+
+With `-P reference` the solver fields live on the FFT engine's collection
+(`examples/homogenization.py:408-422`), and the engine pins
+
+```cpp
+nb_subdivisions[0] = 1;  // X is not distributed in real space
+```
+
+(`src/libmugrid/fft/fft_engine_base.cc:110`). Three consequences:
+
+1. **Two all-to-alls per transform, four per preconditioner apply.** All-to-all is
+   latency- and bisection-bandwidth-bound and is a full barrier across all ranks.
+2. **Two of the three axes are never distributed.** Measured in Stage 0 (§7):
+   the split is a *slab*, `[1, 1, P]`, not a pencil — only the last axis is
+   ever divided. Every rank holds the full extent of the other two, a memory
+   floor per device, and a hard ceiling of `P ≤ N` ranks.
+3. The real-space decomposition is never 3D, because the preconditioner owns
+   it.
+
+Measured (`docs/benchmark_homogenization_preconditioner.md`, MI300A):
+
+| grid | 1 GPU | 4 GPUs | speedup |
+|---|---|---|---|
+| 128³ | 1.99 s | 1.73 s | 1.15× |
+| 192³ | 5.89 s | 5.12 s | 1.15× |
+| 256³ | 13.2 s | 10.2 s | 1.29× |
+
+---
+
+## 2. The design
+
+### 2.1 Key decision: the cycle runs on the *reference* operator only
+
+The preconditioner being approximated is `Kʳᵉᶠ` — **spatially uniform** Lamé
+parameters (the volume means). The multigrid cycle therefore never sees the
+heterogeneous material. Heterogeneity is handled exactly where it is handled
+today: by the symmetric Jacobi scaling of `GreenJacobiPreconditioner`
+(Ladecký et al., J-FFT).
+
+```
+M⁻¹  =  J^{1/2} · V-cycle(Kʳᵉᶠ) · J^{1/2}
+                  ^^^^^^^^^^^^^
+                  replaces the fine-grid FFT solve
+```
+
+This is the decision that collapses most of the work:
+
+| Would have been needed | Status under this design |
+|---|---|
+| Material restriction (coarse λ, μ) | **Not needed** — every level is uniform |
+| Galerkin/RAP coarse operator | **Not needed** — rediscretize `Kʳᵉᶠ` with `2h` |
+| Contrast-robust interpolation | **Not needed** — cycle sees no contrast |
+| `assemble_block_diagonal` field + per-node inverse kernel | **Collapses to one constant `dim×dim` matrix per level** (§2.4) |
+| Operator-dependent smoothers | **Not needed** — textbook constant-coefficient MG |
+
+The coarse operator at level `l` is just
+
+```python
+muGrid.IsotropicStiffnessOperator(dim, 2**l * grid_spacing, element)
+```
+
+applied through `apply_uniform` / `apply_uniform_increment`
+(`src/libmugrid/operators/solids/isotropic_stiffness.hh:392,399`), which already
+exist on host and device.
+
+### 2.2 Level structure
+
+| Level | Grid | Decomposition | Operator | Role |
+|---|---|---|---|---|
+| `0` | `N³` | 3D `CartesianDecomposition`, `nb_subdivisions = s` | `Kʳᵉᶠ(h)` | smoothed |
+| `1 … L-1` | `N/2^l` | same `s`, nested | `Kʳᵉᶠ(2^l h)` | smoothed |
+| `L` | `N/2^L` | **serial, redundant on every rank** | FFT block symbol | solved exactly |
+
+**Choosing `L` is not a numerical decision** (§6.6): ρ and the CG count are flat
+in the coarsest grid size across an 8–32× range, so nothing in the numerics
+prefers one `L` over another. Pick it from the *parallel* side instead:
+
+> Go redundant at the first level where the local subdomain would fall below
+> ~8 points per direction.
+
+That keeps every distributed level out of the latency-dominated regime — where a
+1-layer ghost halo costs more than the interior — and makes the choice
+rank-count-aware rather than a hardcoded constant. The Allreduce is negligible at
+any resulting size (`512³`: `32³` coarsest is 0.79 MB/rank, `64³` is 6.3 MB).
+
+**The coarsest level is the reason this is worth doing.** Today the block symbol
+is stored on the fine grid: `n² = 9` reals per Fourier mode over `N³/2` modes
+≈ `4.5 N³` reals, i.e. 1.5 fine solution vectors. Moving it to level `L` shrinks
+it by `8^L` — 512× at `L = 3` — and the transform it drives becomes rank-local.
+
+### 2.3 Nesting precondition (must be asserted at setup)
+
+Grid transfers are rank-local iff coarse subdomains are exactly half the fine
+ones. The default constructor
+(`src/libmugrid/mpi/cartesian_decomposition.cc:182-193`) computes
+`N / P` and distributes the remainder, so nesting holds **iff `P_d` divides
+`N_d / 2^l` exactly at every level**.
+
+With power-of-two grids this reduces to: **every subdivision count must be a power
+of two.** Note `suggest_subdivisions(dim, comm.size)` does *not* guarantee this —
+`comm.size = 12` gives `[2, 2, 3]`. So:
+
+- factor the rank count into powers of two per direction explicitly, and
+- assert `N_d % (P_d << L) == 0` at construction, with a clear error.
+
+If non-power-of-two rank counts must be supported later, the C++
+`CartesianDecomposition::initialise` overload taking explicit
+`nb_subdomain_grid_pts` / `subdomain_locations`
+(`src/libmugrid/mpi/cartesian_decomposition.hh:51`) already exists but is **not
+bound to Python** — only the subdivisions-based constructor is
+(`language_bindings/python/bind_py_decomposition.cc:184`). Binding it is the
+escape hatch.
+
+### 2.4 Smoother
+
+For a **uniform** operator on a regular periodic grid every node has an identical
+element neighbourhood, so the nodal `dim×dim` block `K_nn` is **one constant
+matrix for the whole level**, not a field.
+
+**Measured** (§6.1): for the production configuration — 3D, Q1, isotropic `h` — it
+is `c·I`, so damped Jacobi is `z += (ω/c) · t`, a scalar `linalg.axpy`, and the
+smoother needs **no kernel of its own**. Only 2D P1 needs the general
+`dim×dim` path. Recover the block at setup with `dim` applies of `apply_uniform`
+to unit impulses, reading the response at the impulse node — the impulse-response
+trick already used in `make_reference_stiffness_preconditioner`
+(`language_bindings/python/muGrid/Preconditioners.py:836-856`).
+
+**The damping `ω` must be derived, not tuned** (§6.3). The stability limit is
+`ω < 2/λ_max(D⁻¹K)`, and `λ_max` moves with dimension and element kind, so a
+hardcoded value that is optimal in 2D *diverges* in 3D. Use
+
+```
+ω = 1.7 / λ_max(D⁻¹K)
+```
+
+with `λ_max` from ~100 power iterations at setup. `D⁻¹K` is invariant under
+uniform refinement — `D` and `K` carry the same power of `h` — so one estimate on
+the *coarsest* level serves the whole hierarchy.
+
+**Chebyshev** (Stage 3) remains preferable to plain damped Jacobi: no ordering, no
+halo serialization, only matvecs and axpys — and it needs the same `λ_max` that
+the damping rule already computes, so the machinery is shared.
+
+### 2.5 Grid transfer
+
+Standard multilinear (2:1) prolongation on nodal fields; `R = Pᵀ` full weighting.
+Transfers act component-wise — no coupling between displacement components.
+
+**Write both in gather form.** Then each needs only `communicate_ghosts` on its
+*input* and no `reduce_ghosts`:
+
+- **Prolongation** — loop over fine nodes, gather from 1–2^d coarse nodes.
+  Needs 1 coarse ghost layer.
+- **Restriction** — loop over coarse nodes, gather the surrounding 3^d fine nodes
+  with full-weighting coefficients. Needs 1 fine ghost layer, which the stiffness
+  stencil already requires.
+
+(`reduce_ghosts` — `cartesian_decomposition.hh:80` — remains the tool if a scatter
+formulation is ever preferred.)
+
+Because multilinear interpolation reproduces linear displacement fields exactly,
+its range contains all rigid-body modes and all constant strains. This is the
+near-nullspace property AMG must be told explicitly; geometric MG gets it free.
+
+### 2.6 The redundant coarsest level
+
+Level `L` uses a **serial** `muGrid.Communicator()` on every rank. This is
+explicitly supported — `Parallel.py:588-598` warns that "every rank will
+redundantly work on the full problem by itself", which is precisely the intent
+(the warning is already filtered in `pyproject.toml`).
+
+- **Restrict into it:** each rank restricts its own piece into a zero-padded full
+  coarse array, then one `comm.sum(array)` — GPU-aware, already implemented
+  (`Parallel.py:159-183`). No new redistribution code. Note the binding is via
+  Eigen and accepts only scalars and **2D Fortran-contiguous** `float64`
+  arrays, so the coarse array has to be reshaped to `(nb_dof, -1)` and passed
+  through `np.asfortranarray` — see `_gather_interior` in
+  `tests/python_multigrid_tests.py`. A 3D or C-contiguous array raises
+  `TypeError`.
+- **Solve:** `make_reference_stiffness_preconditioner` **verbatim**, on a small
+  serial `FFTEngine` at level `L`. The `q = 0` block is already replaced by its
+  pseudo-inverse there, which is exactly the nullspace handling needed.
+- **Prolong out of it:** purely local — every rank already holds the whole coarse
+  solution and reads its own part.
+
+This replaces 4 fine-grid all-to-alls per apply with **one Allreduce of a few MB**.
+
+### 2.7 Symmetry — a hard requirement
+
+Standard CG requires `M⁻¹` to be a fixed, symmetric, positive-definite linear
+operator. Therefore:
+
+- **fixed** cycle count and **fixed** smoothing-step count (no inner
+  convergence test — that would make `M⁻¹` nonlinear and require flexible CG);
+- `ν₁ = ν₂` with a symmetric smoother, and `R = Pᵀ` exactly.
+
+The nullspace (the `dim` constant translations under periodic BCs; rigid rotations
+are not periodic, so they are *not* in it) is projected out on entry and exit — one
+global reduction per apply, against today's four all-to-alls.
+
+### 2.8 Cost
+
+**Measured** (§6.4, §6.5): one V-cycle with `ν = (2,2)` gives `ρ ≈ 0.355`,
+independent of grid size *and* of dimension. In the J-scaled configuration that
+production actually uses, replacing the exact fine-grid FFT by that V-cycle
+changes the CG count by **0–4%**.
+
+Per apply, a V-cycle costs `(ν₁ + ν₂ + 1) × 1.14 ≈ 5.7` fine matvecs against the
+FFT's one forward/inverse pair, so **this trades flops for communication**. On a
+single device the FFT wins; the crossover is a rank-count question that only
+Stage 4 answers. That is what makes the Stage 0 baseline worth measuring first.
+
+V-cycle communication is a geometric series: `1 + 1/8 + 1/64 + … ≈ 1.14×` the
+fine-level halo exchange, plus the coarse Allreduce.
+
+---
+
+## 3. What has to be written
+
+| # | Item | Where | Effort |
+|---|---|---|---|
+| 1 | ~~`prolong` / `restrict` kernels, host~~ | `src/libmugrid/operators/transfer.{hh,cc}` | **done** |
+| 2 | Same, device | `transfer_gpu.cc`, via `KernelDispatcher` | medium |
+| 3 | ~~Python bindings + wrappers~~ | `bind_py_operators.cc`, `Wrappers.py` | **done** |
+| 4 | ~~`MultigridReferencePreconditioner(Preconditioner)`~~ | `muGrid/Preconditioners.py` | **done (serial)** |
+| 5 | `linalg.sum` (interior-only) + `linalg.add_constant` | `linalg/linalg.hh` + `_gpu.cc` | small — **still open**: `_project_constants_out` is the one remaining array-library call in the hot path (twice per apply, not per level) |
+| 6 | Power-of-two subdivision helper + nesting assertions | `Preconditioners.py` | small |
+| 7 | `-P multigrid` flag and timers | `examples/homogenization.py` | small |
+
+Item 5 is optional for a prototype (do the mean projection with `comm.sum` and
+numpy/cupy on `.s`), but the hot loop should not depend on an array library —
+that discipline is kept everywhere else in `Preconditioners.py`.
+
+**Not needed:** material restriction, block-diagonal *fields*, per-node block
+inverse kernels, Galerkin coarsening, agglomeration/sub-communicators.
+
+Nothing in `Solvers.py` changes: the result conforms to the existing
+`apply(r, z)` contract and drops straight into `conjugate_gradients`, and into
+`GreenJacobiPreconditioner` as its `green` argument.
+
+---
+
+## 4. Staging
+
+**Stage 0 — measurement baseline.**
+Add `-P multigrid` plumbing and timers. Separately measure `-P none` on a *3D*
+`CartesianDecomposition` versus the FFT engine's split, to separate "removed the
+FFT" from "removed the decomposition" in every later number. **Done — see §7.**
+
+**Stage 1 — serial host prototype, 2D, pure Python.**
+Whole V-cycle on `.s` views with numpy, `apply_uniform` for matvecs, existing
+`make_reference_stiffness_preconditioner` at the coarsest level. Confirm before
+writing any C++:
+- two-grid convergence factor `ρ` on uniform material;
+- iteration count independent of `N`;
+- `K_nn` really is `c·I` for Q1 (and what it is for P1).
+
+**Stage 2 — transfer kernels in C++ (host, then GPU).**
+`tests/python_multigrid_tests.py`. Three tests catch nearly everything:
+- **adjointness** `⟨P c, f⟩ = ⟨c, Pᵀ f⟩` to round-off;
+- **polynomial reproduction** — a linear displacement field prolongs exactly;
+- **preconditioner symmetry** `⟨M⁻¹a, b⟩ = ⟨a, M⁻¹b⟩` (§2.7), the one that
+  protects CG.
+
+**Stage 3 — Chebyshev smoother**, spectral bound from the symbol or power
+iteration.
+
+**Stage 4 — MPI.** Power-of-two subdivisions pinned across levels, nesting
+assertions, redundant coarse level via `comm.sum`. Re-run the 4-GPU benchmark;
+this is where the design either pays off or does not.
+
+**Stage 5 — compose with `GreenJacobiPreconditioner`** and measure against
+contrast on the real microstructures (inclusions, SIMP near-void).
+
+---
+
+## 5. Open questions
+
+- ~~**Q1 vs P1.**~~ **Resolved in Stage 1** (§6.1): Q1 gives `c·I` in both
+  dimensions and 3D P1 does too; only 2D P1 needs the general constant-matrix
+  multiply, and it is not a production target.
+- **Where to stop coarsening.** Trade the Allreduce volume at level `L` against
+  the extra smoothing work of more levels. `64³` and `32³` are both cheap;
+  measure.
+- **Does the coarse level want the heterogeneous operator?** Solving the *actual*
+  coarse system (rediscretized λ, μ) by CG-preconditioned-by-FFT would capture
+  long-wavelength heterogeneity that `Kʳᵉᶠ` misses, at the price of an inner
+  iteration — which breaks linearity unless the count is fixed. Stage 1 (§6.5)
+  makes this concrete: on a *sharp* interface the J-scaled preconditioner loses
+  grid-independence (25 → 35 → 52) whether the inner solve is FFT or MG, so the
+  ceiling there belongs to the J-FFT scheme, not to the V-cycle. If sharp
+  high-contrast microstructures matter, this is the lever — and it would improve
+  the existing FFT preconditioner just as much.
+- **Is the iteration growth on sharp interfaces worth attacking separately?**
+  It is a property of the preconditioner already in production and is orthogonal
+  to the parallel-scaling work this plan is about. Flagged here because Stage 1
+  measured it, not because this plan should fix it.
+
+---
+
+## 6. Stage 1 findings
+
+Measured with `mg_prototype.py` (serial, host, NumPy; muGrid's own
+`apply_uniform` for every matvec). Reproduce with `--probe`, `--check`, `--rho`,
+`--cg`.
+
+### 6.1 The nodal block `K_nn` — question 1
+
+λ = 1.3, μ = 0.7, probed by impulse response:
+
+| config | isotropic `h` | anisotropic `h` |
+|---|---|---|
+| 2D Q1 | `c·I` | diagonal, unequal entries |
+| **2D P1** | **full block**, `K₀₁ = λ + μ` exactly | **full block** |
+| 3D Q1 | `c·I` | diagonal, unequal entries |
+| 3D P1 | `c·I` | diagonal, unequal entries |
+
+- **The production configuration (3D, Q1, isotropic `h`) gives `c·I`**, so the
+  smoother is a scalar `axpy` and needs no new kernel.
+- The exception is **2D P1**, not 3D P1 as this plan originally guessed. The
+  off-diagonal is exactly `λ + μ` for every `(λ, μ)` tested, which confirms the
+  mechanism: the two-triangle Kuhn split breaks the `x ↔ y` symmetry that
+  cancels `∫ N_n,x N_n,y`. The 3D five-tetrahedron decomposition keeps enough
+  symmetry for the cancellation to survive. 2D P1 is a test configuration, so
+  this is not on the critical path — but keep the general constant-matrix path.
+- Anisotropic spacing keeps the block diagonal but with **unequal** entries, so
+  store a `dim`-vector rather than a scalar. Still no kernel.
+
+### 6.2 Transfer and symmetry checks — question 2
+
+2D, fine `n = 32`. All three of the tests earmarked for Stage 2 already pass:
+
+| check | relative error |
+|---|---|
+| adjointness `⟨Pc, f⟩ = ⟨c, Pᵀf⟩` | `2.9e-16` |
+| linear-field reproduction `P(lin_H) = lin_h` | `1.4e-14` |
+| preconditioner symmetry `⟨M⁻¹a, b⟩ = ⟨a, M⁻¹b⟩` | `7.2e-16` |
+
+The prototype's `_prolong_axis` / `_restrict_axis` are a direct specification for
+the C++ kernels: a tensor product of one 1D pass per spatial axis, with the
+component axis untouched.
+
+### 6.3 Damping — question 3, and an unanticipated result
+
+`λ_max(D⁻¹K)`: 2D Q1 **2.38**, 2D P1 **2.45**, 3D Q1 **2.96**, 3D P1 **1.78**.
+
+The measured divergence threshold matches `2/λ_max` in every case. Consequently
+**a hardcoded `ω` is unsafe**: `ω = 0.7` is the 2D Q1 optimum and makes 3D Q1
+diverge outright (`ρ = 1.33`). Normalising by `λ_max` collapses all
+configurations onto one curve:
+
+| `ω · λ_max` | 1.5 | 1.6 | **1.7** | 1.8 | 1.9 |
+|---|---|---|---|---|---|
+| ρ, 2D Q1 | 0.411 | 0.384 | **0.360** | 0.395 | 0.657 |
+| ρ, 3D Q1 | 0.406 | 0.380 | **0.355** | 0.388 | 0.664 |
+| ρ, 3D P1 | 0.456 | 0.430 | **0.406** | 0.404 | 0.663 |
+
+Hence `ω = 1.7 / λ_max`, with ~15% margin to the cliff at 1.9.
+
+### 6.4 V-cycle convergence factor — question 3
+
+With the derived `ω` and `ν = (2,2)`:
+
+| `n` | 2D | | `n` | 3D |
+|---|---|---|---|---|
+| 32 | 0.356 | | 16 | 0.354 |
+| 64 | 0.363 | | 32 | 0.352 |
+| 128 | 0.365 | | 64 | 0.355 |
+| 256 | 0.367 | | | |
+
+**ρ ≈ 0.355, flat in `n` and identical in 2D and 3D.** This is worse than the
+`ρ ≈ 0.1` this plan assumed, but grid-independence — the property the design
+needs — holds exactly. More smoothing lowers ρ (ν=4 reaches 0.165) but
+work-normalised efficiency is flat at ≈0.82 per matvec across ν = 1…4, so
+ν = 2 is the right default.
+
+### 6.5 CG iteration count — question 4
+
+The decisive measurement: PCG on the **heterogeneous** system (spherical
+inclusion or a smooth sinusoidal field), tolerance `1e-8`. Both `FFT` and `MG`
+approximate the same `Kʳᵉᶠ` built from the volume-mean Lamé parameters; `J·…·J`
+is the Green-Jacobi composition that production uses.
+
+3D Q1, iterations (`-1` = no convergence in 200):
+
+| material | contrast | `n` | none | FFT | MG | J·FFT·J | J·MG·J |
+|---|---|---|---|---|---|---|---|
+| inclusion | 10 | 16/32/64 | – | 23/23/22 | **36/36/36** | 25/35/52 | 26/35/53 |
+| inclusion | 1000 | 16/32/64 | – | 45/45/46 | **144/145/147** | 56/81/136 | 56/85/137 |
+| smooth | 10 | 16/32/64 | 180/–/– | 29/29/29 | **35/36/37** | 14/14/13 | 15/15/15 |
+| smooth | 1000 | 16/32/64 | – | – | – | 33/42/49 | 33/41/49 |
+
+Five readings:
+
+1. **MG alone is exactly grid-independent** — 36/36/36, 144/145/147, 35/36/37.
+   The core claim of the design holds.
+2. Against the *unscaled* Green preconditioner, MG costs 1.6× the iterations at
+   contrast 10 and 3.2× at contrast 1000.
+3. **`J·MG·J` tracks `J·FFT·J` to within 0–4% in every regime.** Since production
+   is the J-scaled form, the V-cycle is a faithful drop-in there — the penalty in
+   the configuration that matters is a few percent, not the 60% the unscaled
+   column suggests.
+4. In the hardest regime — smooth data at contrast 1000 — **plain Green fails
+   entirely (no convergence in 200 iterations) whether it is applied by FFT or by
+   MG, and only the J-scaled form converges at all**, where MG again matches the
+   FFT exactly (33/41/49 vs 33/42/49). This is the clearest evidence that the
+   V-cycle is interchangeable with the exact transform: the two agree even where
+   the thing they approximate is, on its own, useless.
+5. Independent of this project: **J-scaling breaks grid-independence on sharp
+   interfaces** (25 → 35 → 52) while being indispensable on smooth high-contrast
+   data. That matches the stated scope of Ladecký et al. — *smooth* high-contrast
+   data — and is worth knowing about the preconditioner already in production.
+
+### 6.6 Coarsest-level size — how to pick `L`
+
+ρ is essentially independent of where the hierarchy stops. 2D `n=256` and 3D
+`n=64`, `ν=(2,2)`, derived `ω`:
+
+| coarsest | 4 | 8 | 16 | 32 | 64 | 128 |
+|---|---|---|---|---|---|---|
+| ρ, 2D `n=256` | 0.3710 | 0.3704 | 0.3694 | 0.3664 | 0.3622 | 0.3592 |
+| ρ, 3D `n=64` | 0.3639 | 0.3610 | 0.3580 | 0.3528 | — | — |
+
+A 32× change in the coarsest grid moves ρ by 3%. That is textbook behaviour —
+the two-grid factor propagates through the hierarchy — and it holds here even
+though the bottom solve is *exact* rather than approximate.
+
+The production configuration does not move **at all**. 3D `n=64`, sharp
+inclusion, contrast 10:
+
+| coarsest | levels | MG | J·MG·J | (FFT) | (J·FFT·J) |
+|---|---|---|---|---|---|
+| 8 | 4 | 36 | 53 | 22 | 52 |
+| 16 | 3 | 35 | 53 | 22 | 52 |
+| 32 | 2 | 35 | 53 | 22 | 52 |
+
+**Consequence:** choose `L` on cost, not convergence. Redundant-level Allreduce
+for a `512³` run — `16³` 0.10 MB, `32³` 0.79 MB, `64³` 6.3 MB, `128³` 50 MB — is
+negligible below `64³`, so the binding constraint is the *other* end: how few
+points per rank the deepest **distributed** level may have before its ghost halo
+costs more than its interior. Hence the rule in §2.2. For `512³` on 64 ranks
+(4×4×4) that lands on a `32³` coarsest level — five levels, 0.79 MB/rank.
+
+One caveat this serial sweep cannot see: work-normalised efficiency `ρ^(1/work)`
+mildly *favours* shallower hierarchies (0.812 at coarsest 32 vs 0.838 at
+coarsest 4, in 3D), but that metric charges nothing for the coarse solve or its
+Allreduce. Do not read it as an argument for stopping early.
+
+### 6.7 Consequences for the plan
+
+- **Gap list unchanged** except that the smoother needs a setup-time `λ_max`
+  power iteration (free: `vecdot` / `norm_sq` already exist) and the constant
+  nodal block is a `dim`-vector, not a `dim×dim` matrix, in every production
+  configuration.
+- **Open question Q1 is resolved**: Q1 needs nothing; only 2D P1 would need the
+  full block, and it is not a production target.
+- The transfers and the three Stage 2 tests are specified and already pass in
+  NumPy, so Stage 2 is a port rather than a design.
+- `L` is a parallel-tuning parameter, not a numerical one (§6.6), so it can be
+  chosen in Stage 4 from measured per-rank sizes rather than fixed now.
+- Nothing here contradicts the design, but §2.8 now says plainly that MG trades
+  flops for communication. Stage 0's baseline (3D decomposition vs the FFT
+  engine's, unpreconditioned) is what will make the Stage 4 numbers
+  interpretable; it has now been measured, in §7.
+
+### 6.8 Unrelated papercut found on the way
+
+`muGrid.CartesianDecomposition(nb_subdivisions=None)` documents "Default is
+automatic" but passes `[0] * nb_dims` to C++, which rejects it with
+*"The total number of subdivisions (0) does not match the size of the
+communicator (1)"*. Every caller must pass `nb_subdivisions` explicitly. Worth a
+small separate fix in `Wrappers.py`.
+
+---
+
+## 7. Stage 0 findings
+
+Measured on one MI300A node (23 Zen4 cores, 1 GPU) with
+`examples/decomposition_baseline.py`, which holds the preconditioner fixed at
+`-P none` and varies only `homogenization.py --decomposition`. No transform runs
+in either arm, so every difference is the domain split alone.
+
+### 7.1 The FFT engine's split is a slab, not a pencil
+
+| ranks | Cartesian | FFT engine |
+|---|---|---|
+| 2 | `2x1x1` | `1x1x2` |
+| 4 | `2x2x1` | `1x1x4` |
+| 8 | `2x2x2` | `1x1x8` |
+| 16 | `2x2x4` | `1x1x16` |
+
+Only the last axis is ever divided. §1 said "pencil at best"; it is one step
+worse than that — **and deliberately so**. A slab leaves two whole axes local,
+so each rank transforms its planes with a *batched 2D* rocFFT/cuFFT call, which
+is substantially faster than the 1D transforms plus an extra transpose that a
+pencil forces. The FFT engine is buying transform speed and paying in rank
+ceiling; the ceiling is a consequence of that choice, not an oversight.
+
+This matters for how every `R` in §7.4 should be read: the FFT arm is not a
+strawman. It is the vendor's fast path, on one device where it also has no
+communication at all. A V-cycle that loses to it by a factor of a few is losing
+to the best case the FFT will ever have.
+
+Two consequences, both structural rather than measured:
+
+- **Halo volume grows twice as fast.** At 128³ the slab's one-deep halo is
+  1.00 / 1.20 / 1.66 / 2.23× the Cartesian one at 2 / 4 / 8 / 16 ranks.
+- **A hard rank ceiling of `P ≤ N`** — 128 ranks on a 128³ grid, against
+  2,097,152 for a 3D split. Well before the ceiling the slab is a few planes
+  thick and its two ghost planes rival its interior.
+
+### 7.2 On one node the slab costs nothing — and its halo is *faster*
+
+This is the result Stage 0 existed to get, and it is not the expected one.
+
+| ranks | halo points | matvec | halo time |
+|---|---|---|---|
+| 2 | 1.00× | 1.02× | 0.76× |
+| 4 | 1.20× | 1.03× | 0.75× |
+| 8 | 1.66× | 1.03× | 0.80× |
+| 16 | 2.23× | 1.02× | 0.90× |
+
+(128³, FFT-engine split relative to Cartesian; 64³ agrees.)
+
+The matvec penalty is a flat 1.02–1.03×, which is noise. The halo *time* goes
+the other way from the halo *volume*: the slab is consistently the faster of the
+two despite moving up to 2.23× the bytes. The mechanism is message count — a
+slab has **2** MPI neighbours where a 3D split has **6**, and its non-distributed
+axes wrap locally with no MPI at all. On shared memory, per-message latency beats
+volume.
+
+Halo exchange is 0.1% of the matvec at one rank and still only 2% at 16, and
+both arms strong-scale at 15.6–15.7× on 16 ranks.
+
+### 7.3 Consequence for Stage 4
+
+**Attribute nothing to the decomposition yet.** On a single node essentially
+100% of any multigrid-versus-FFT difference is the all-to-all; the slab's
+liability is a *scaling* one — growing halo volume and a rank ceiling — that
+appears only where per-message latency stops dominating, i.e. across devices or
+nodes. The crossover in this trade runs the opposite way to the FFT's, so the
+two must keep being measured separately.
+
+This also sharpens §0.4's warning. Shared-memory ranks understate the
+all-to-all penalty, and they *invert* the decomposition penalty. A single-node
+MPI run is therefore a correctness vehicle for Stage 4 and not a performance
+one — more strongly than §0.4 says.
+
+### 7.4 The gating measurement of §0.4 is done
+
+`R = 4.1–4.8` on one MI300A at 128³/192³/256³, stable across grid sizes — the
+"3–5: go, but 4 GPUs may only just show it" band. Two refinements:
+
+- **`--sync-timers` is mandatory** and §0.4's command omits it. muGrid never
+  synchronises the device, so an unsynchronised host-side timer measures kernel
+  *launch* time and charges the work to whichever region is open at the next
+  implicit sync. Without it this measurement returned `R = 5.5 / 12.5 / 28` with
+  an FFT apply that was *cheaper* at 256³ than at 128³.
+- **The per-apply `R` is not the whole cost.** The V-cycle needs 1.50× the CG
+  iterations in production (144 vs 96), matching the prototype's 1.57 (36 vs 23,
+  §6.5). The effective ratio is therefore ~6–8, against a ">8: revisit ν"
+  boundary. `ν` is worth a look before Stage 4, not after.
+
+Measured with `examples/vcycle_vs_fft.py`, which also prices a V-cycle from its
+parts on the GPU — the matvec-only model of §0.4 understates the cycle by ~25%
+on a bandwidth-bound device, because it omits the smoother's vector operations.
+
+### 7.5 The `384³` OOM motivation is gone
+
+§1 and §0.4 both cite `384³` OOMing on one GPU with `-P reference`. It no longer
+does: the run completes using 16.8 GB of 67.4 GB. There is no standalone memory
+result for multigrid to win here.
+
+---
+
+## 8. Choosing ν — measured before Stage 4
+
+§7.4 left `ν` open, with the effective ratio near the ">8: revisit ν" boundary.
+Swept here across `ν ∈ {1,2,3,4}` (always `ν₁ = ν₂`, as symmetry requires).
+
+### 8.1 Iterations fall much more slowly than cost rises
+
+CG iterations, grid-independent in both the oracle and production:
+
+| ν | oracle (n=32, 64) | production (64³, 6 cases) | relative to ν=2 |
+|---|---|---|---|
+| 1 | 47, 47 | 180 | 1.28 (oracle 1.31) |
+| 2 | 36, 36 | 141 | 1.00 |
+| 3 | 32, 32 | 126 | 0.89 (oracle 0.89) |
+| 4 | 30, 30 | 120 | 0.85 (oracle 0.83) |
+
+The production path and `mg_prototype.py` agree on the *shape* of the response
+to within 2%, which is a useful independent check of both.
+
+Cost per cycle rises as `2ν+1`, i.e. 1.00 / 1.67 / 2.33 / 3.00 relative to ν=1,
+while iterations fall only to 0.78 / 0.70 / 0.67. **Smoothing buys less than it
+costs, everywhere in the range.**
+
+### 8.2 Whole-solve cost, measured
+
+`n_iter × (t_matvec + t_preconditioner)`, against the same quantity for `-P
+reference`. Cycle costs priced on the GPU from parts (§7.4); iteration counts
+from production.
+
+| ν | 128³ | 256³ | FFT degradation needed to break even (256³) |
+|---|---|---|---|
+| **1** | **4.52×** | **3.81×** | **5.8×** |
+| 2 | 5.22× | 4.54× | 7.1× |
+| 3 | 6.01× | — | — |
+| 4 | 7.51× | — | — |
+
+`ν = 1` is best at both grids and the ordering is monotone. It lowers the
+required FFT degradation from 7.1× to 5.8×, an 18% easier target, and the
+whole-solve penalty on one device from 4.5× to 3.8×.
+
+Note the trend with size: the V-cycle's relative cost *falls* as the grid grows
+(R_parts 3.53 → 2.77 from 128³ to 256³ at ν=1), so larger problems favour the
+cycle. The 4-GPU benchmark should be run at the largest grid that fits, not the
+most convenient one.
+
+### 8.3 More cycles is strictly worse than more smoothing
+
+The class docstring suggests raising `nb_cycles` rather than the smoothing count
+if the cycle is too weak. On cost that is the wrong way round:
+
+| configuration | iterations (64³) | cycle cost (128³) |
+|---|---|---|
+| ν=1, cycles=1 | 180 | 2406 µs |
+| ν=2, cycles=1 | 141 | 3801 µs |
+| ν=1, cycles=2 | 141 | ~4812 µs |
+| ν=1, cycles=3 | 123 | ~7218 µs |
+
+`ν=1, cycles=2` buys *exactly* the same 141 iterations as `ν=2, cycles=1` for
+about 27% more work, and `ν=1, cycles=3` is worse than `ν=3`. The docstring's
+advice is sound about *symmetry* — `nb_cycles` cannot break it, whereas
+`ν₁ ≠ ν₂` would — but it should not be read as cost guidance.
+
+### 8.4 Recommendation
+
+**Default `ν = 1` for Stage 4**, not 2. It is the cheapest configuration at
+every grid measured, it makes the FFT's required degradation 18% smaller, and
+it reduces the cycle's memory traffic — which is what the halo-bound regime
+Stage 4 is aiming at will be sensitive to.
+
+The SPD requirement is checked, not assumed: `test_preconditioner_is_symmetric`
+and `test_vcycle_converges_on_the_reference_operator` are now swept over
+`ν ∈ {1,2,3}` in both dimensions, and pass. A symmetry guarantee that held only
+at whichever `ν` happened to be the default would have been worth little once
+`ν` became a tuning parameter.
+
+One caveat remains. The sweep is on the smooth/uniform reference operator,
+where the cycle is doing its easiest work. §6.5's sharp-interface results belong
+to the J-FFT scheme rather than to the cycle, but `ν=1` has the least margin if
+that ever stops being true, so re-measure §8.2 if the coarse level is ever
+given the heterogeneous operator (§5).
+
+---
+
+## 9. The Fourier/tridiagonal hybrid — prototyped, and it is exact
+
+An alternative to replacing the FFT entirely. Under the slab split `[1, 1, P]`
+only z is distributed, so: **FFT the local axes, solve tridiagonally along the
+distributed one.** Prototyped in `mg_prototype.py --hybrid`.
+
+### 9.1 Why it works, and why the obvious argument is the wrong one
+
+Two facts suffice, and neither requires the operator to separate:
+
+1. `Kʳᵉᶠ` is translation-invariant in x and y — it is *uniform* by construction
+   — so transforming those axes block-diagonalises it and every `(qₓ, q_y)` mode
+   decouples exactly.
+2. The stencil reaches exactly one node in z. Measured: 27 nodes for Q1 and 19
+   for P1, extent `(1, 1, 1)` in both. So what remains along z is
+   block-tridiagonal with `dim × dim` blocks.
+
+The tempting argument — "the Laplacian factorises as a Kronecker sum" — is not
+the one to lean on. Q1 elasticity is *not* a Kronecker sum, yet the conclusion
+holds anyway, because (2) is a statement about stencil support rather than
+separability. It also means the construction covers P1, including 2D P1, where
+the V-cycle's smoother refuses to run at all (§6.1).
+
+Verified numerically: the three blocks reconstruct the full 3D symbol to
+`4.4e-16`, the coupling blocks satisfy `A₋₁ = A₊₁ᴴ` and `A₀` is Hermitian, so
+each mode's z-operator is Hermitian and the preconditioner stays symmetric.
+
+### 9.2 With an exact z-solve it *is* the reference preconditioner
+
+Not "close to" — the same operator, reached without ever transforming z:
+
+| check | 2D n=32 | 3D n=16 |
+|---|---|---|
+| `‖hybrid − reference‖ / ‖reference‖` | 2.7e-14 | 2.6e-15 |
+| `‖K M⁻¹r − r‖ / ‖r‖` | 7.2e-15 | 9.9e-16 |
+| symmetry `⟨M⁻¹a,b⟩` vs `⟨a,M⁻¹b⟩` | 1.1e-13 | 7.8e-16 |
+
+And the CG counts follow, on the sharp inclusion at contrast 10:
+
+| | 3D 16 | 3D 32 | 3D 64 | 2D 64 | 2D 128 |
+|---|---|---|---|---|---|
+| FFT | 23 | 23 | 22 | 21 | 20 |
+| 3D V-cycle | 36 | 36 | 36 | 37 | 36 |
+| **hybrid, exact z** | **23** | **23** | **22** | **21** | **20** |
+| hybrid, z-cycle (2) | 27 | 27 | 27 | 28 | 27 |
+
+`J`-scaled, the exact hybrid also tracks the FFT exactly — 25/25, 35/35, 52/52,
+54/54 — the one exception being 2D n=128 (83 vs 86), where the scaled system is
+ill-conditioned enough for a 1e-14 difference in the operator to move the count
+by a few.
+
+**This is the result that matters.** The V-cycle's weakness was never its cost
+per apply; it was the 1.5× iteration penalty of being an approximate inverse
+(§8). The hybrid has none of it, while still never transforming the distributed
+axis — so no all-to-all.
+
+### 9.3 The z-only V-cycle is the weaker fallback
+
+If even the interface solve is unwanted, semi-coarsening multigrid in z alone is
+halo-only. It costs 27 iterations against 22–23, grid-independent, with
+diminishing returns per extra cycle (32 → 27 → 26 for 1 → 2 → 3 cycles at
+3D n=32). It is clearly better than the 3D V-cycle's 36, but the `J`-scaled
+column degrades more sharply (64 against 52 at 3D n=64), so the approximation
+interacts badly with the scaling on sharp interfaces.
+
+**Prefer the exact z-solve.**
+
+### 9.4 What this does not settle
+
+The prototype measures *iterations*, not communication or time. The cost claims
+below are analysis and want measuring before any of this is committed to:
+
+- The exact z-solve needs a parallel tridiagonal algorithm along the distributed
+  axis — partitioned Thomas with a reduced interface system of size `2P` per
+  mode, or cyclic reduction. Its communication is the *interface* (`2P` planes)
+  rather than the *volume* (`N_z` planes), so the advantage over the all-to-all
+  scales as `2P / N_z` and narrows as `P` approaches the slab ceiling.
+- The z-operator is periodic tridiagonal, since `Kʳᵉᶠ` is circulant in z too, so
+  Thomas needs a Sherman–Morrison correction.
+- Thomas factors are not circulant in z, so storing them is `O(N_z)` per mode
+  (~5 GB at 256³); recompute per apply, or use the z-cycle, which needs only the
+  three repeating blocks.
+- The `(0,…,0)` mode keeps the constant-in-z nullspace — the rigid translation
+  the reference preconditioner already pseudo-inverts at `q = 0`. The prototype
+  projects it out explicitly; production must too.
+- This removes the *communication*, not the slab. The `P ≤ N_z` ceiling stands.
+
+### 9.5 Consequence for the plan
+
+This is a serious alternative to Stage 4 as specified, and on convergence it
+strictly dominates: the V-cycle starts 3.8× behind on whole-solve cost (§8.2)
+and has to make that up from communication alone, whereas the hybrid starts
+level with `-P reference` and needs only the all-to-all to cost *anything*.
+
+It is also less work than it looks. It reuses the existing symbol assembly, adds
+no new smoother, and the 2D transform is the one the FFT engine already issues.
+What is new is the parallel tridiagonal solve.
+
+Worth noting it is not exotic: this is the classical partial-diagonalisation /
+Fourier-tridiagonal fast solver (FISHPACK and most spectral codes), with the
+elastic generalisation to `dim × dim` blocks.
+
+---
+
+## 10. Costing the parallel tridiagonal solve
+
+§9 settled convergence: the hybrid reproduces the FFT preconditioner's CG count
+exactly. What it left open was cost. Measured with `mg_tridiag_bench.py`, one
+MI300A, 256³, double precision.
+
+### 10.1 Per apply, on one device
+
+| term | reference (measured) | hybrid |
+|---|---|---|
+| transform pair | 2982 µs (3D) | **2207 µs** (2D; ratio 0.74 measured) |
+| mode / z solve | 2653 µs (`scale`) | **724 µs** (fused block-Thomas) |
+| periodic correction | — | 310–1085 µs (from the decay below) |
+| **total** | **5658 µs** | **≈3240–4020 µs** |
+
+Dropping the distributed axis from the transform saves a measured 26% of the
+pair. The sweep is a real HIP kernel — one thread per `(qₓ, q_y)` mode marching
+the z line with the 3×3 blocks in registers — and reaches **2255 GB/s**.
+
+**Read that advantage with care.** The reference's `scale` step moves ~2 GB in
+2653 µs, i.e. ~765 GB/s, against the sweep's 2255 GB/s. Bring `scale` to the
+same bandwidth and it would cost ~900 µs, putting the reference near 3900 µs and
+the two within noise of each other. So per apply on one device the honest claim
+is **comparable**, not "twice as fast": part of the measured gap is headroom in
+the existing `scale` step, not an algorithmic win. The algorithmic win is
+communication.
+
+### 10.2 Communication per apply
+
+Four all-to-alls per reference apply against two interface exchanges per hybrid
+apply, the latter by recursive doubling — a gather to one rank is an `O(P)`
+bottleneck and is not what would be implemented.
+
+| P | all-to-all | interface | MB/apply (a2a) | MB/apply (iface) | ratio |
+|---|---|---|---|---|---|
+| 2 | 42.7 ms | 0.34 ms | 1623 | 13 | 126× |
+| 4 | 39.2 ms | 0.84 ms | 1623 | 25 | 47× |
+| 8 | 51.9 ms | 3.9 ms | 1623 | 51 | 13× |
+| 16 | 30.0 ms | 5.3 ms | 1623 | 101 | 5.7× |
+
+The volume ratio is the robust part, and it is structural: the all-to-all moves
+the whole field (`N_z` planes) regardless of `P`, while the interface moves `2P`
+planes. They meet only at `P = N_z/2` — 128 ranks at 256³, past the slab's own
+`P ≤ N_z` ceiling. **Within the usable rank range the hybrid always moves
+strictly less, and by one to two orders of magnitude at the rank counts that
+matter now.**
+
+These are shared-memory numbers, and §7 showed such numbers understate
+inter-device penalties, so treat the advantage as a lower bound.
+
+### 10.3 Two objections that measurement dissolved
+
+**Factor storage.** §9.4 put the Thomas factors at ~5 GB. But the blocks are
+constant in z, so `D_k = A₀ − A₊₁ D_{k-1}⁻¹ A₋₁` is a fixed-point iteration, and
+it converges: at 64³, median **9** steps to 1e-12, 90th percentile 14. Only
+21 modes of 4096 fail to converge within 64 steps — the near-singular low-`q`
+ones. So ~16 distinct blocks per mode need storing rather than `N_z`, and the
+5 GB becomes a few hundred MB.
+
+**The periodic correction.** The system is circulant in z, so Thomas needs a
+Woodbury correction, whose cost is dominated by reading `T⁻¹E`. Those columns
+are boundary Green's functions and decay: at 64³, median 18 planes of 64 to
+reach 1e-12, 90th percentile 29. 36 of 403 sampled modes need the full line.
+Hence the 310–1085 µs range above — the low end assumes the decay is exploited,
+the high end assumes it is not.
+
+Both exceptions are the same modes: low `(qₓ, q_y)`, where the z-operator is
+nearly singular. They are few, and can simply be stored in full.
+
+### 10.4 Implementation risks, in order
+
+1. **Layout.** The sweep needs `(z, mode, component)` so a wavefront reads
+   contiguous bytes at each z step. The natural `(mode, z, component)` strides
+   by `nz*3` between neighbouring threads and gives up most of the bandwidth.
+   This is the same trap `cuSPARSE gtsv2StridedBatch` documents.
+2. **The Woodbury correction** is the largest cost uncertainty and the fiddliest
+   code. A first implementation could skip it by treating z as non-periodic and
+   accepting the error, purely to get an end-to-end number.
+3. **The near-singular modes** need a fallback path in both the factor
+   recurrence and the decay truncation.
+4. **The reduced system** wants recursive doubling, not a gather.
+
+### 10.5 Verdict
+
+On convergence the hybrid strictly dominates the V-cycle: identical iteration
+counts to `-P reference`, against the V-cycle's 1.5× penalty. On per-apply cost
+it is comparable to `-P reference` on one device. On communication it moves one
+to two orders of magnitude less than the all-to-all across the whole usable
+rank range.
+
+The V-cycle has to climb out of a 3.8× whole-solve hole (§8.2) using
+communication savings alone. The hybrid starts level and needs the all-to-all to
+cost merely *something*. Unless the Woodbury correction proves far worse than
+the decay measurements suggest, this is the better Stage 4.
+
+---
+
+## 11. Stage 4, done — via the hybrid
+
+Implemented as `HybridFourierTridiagonalPreconditioner` in `Preconditioners.py`
+and reachable as `examples/homogenization.py -P hybrid`. It runs under MPI; the
+V-cycle still does not.
+
+### 11.1 The result
+
+CG iterations on 64³, six strain cases, against `-P reference`:
+
+| ranks | `-P reference` | `-P hybrid` |
+|---|---|---|
+| 1 | 96 | **96** |
+| 2 | 96 | **96** |
+| 4 | 96 | **96** |
+| 8 | 96 | **96** |
+
+Identical at every rank count, with `E_eff = 1.3607` throughout — and no
+all-to-all anywhere in the hybrid. Set against the V-cycle's 141 at `ν=2`, this
+is the 1.5× iteration penalty gone.
+
+Correctness, 16³ in 3D at 1/2/4/8 ranks: `‖K M⁻¹r − r‖/‖r‖ ≈ 9e-16`, symmetry
+`≈ 7e-15`, and the gathered solution's checksum agrees **to twelve decimals
+across all four rank counts**. Rank-independence is the sharpest available
+statement about a distributed solve, and it is exact rather than approximate.
+
+### 11.2 What made it work
+
+The Spike/partitioned-Thomas scheme. Each rank eliminates its own slab against
+three right-hand sides — the residual, and the unit responses to its two
+neighbours' interface planes — leaving a reduced system in the `2·dim` interface
+unknowns per rank. Two consequences worth recording:
+
+- **The reduced system absorbs the periodic wrap-around.** §10.4 called the
+  Woodbury correction the largest cost uncertainty and the fiddliest code. In
+  the partitioned formulation it does not exist: the reduced system is dense,
+  small and block-cyclic, so periodicity is one more entry in it.
+- **The spikes do not depend on the residual**, so they and the reduced system's
+  inverse are built once at setup. Per apply the only communication is the
+  interface planes — `2·dim` complex numbers per mode per rank.
+
+### 11.3 The zero mode needs its own path
+
+The all-zero mode keeps the constant-in-z nullspace, so its z-operator is
+singular and both the local Thomas factors and the reduced system degenerate
+there. It is one mode, so its whole z-line is gathered and a pseudo-inverse
+applied — the same treatment `make_reference_stiffness_preconditioner` gives
+`q = 0`. The gather is ~12 KB at 256³.
+
+This cost two debugging rounds and is worth flagging for the GPU port. `inv()`
+does *not* reliably fail on a singular mode — more often it returns something
+large and finite — so `_batched_inverse` checks the residual `‖M M⁻¹ − I‖`
+rather than trusting `isfinite`. With the zero mode silently wrong the
+preconditioner still converged; it just was not the reference operator any more,
+at a relative error of 2e-4.
+
+### 11.4 Constraints, all checked with a clear error
+
+- Slab decomposition only: one subdivision in every axis but the last.
+- The distributed axis must divide evenly among the ranks — the interface
+  exchange and the zero-mode gather both assume equal slabs.
+- At least two planes per rank, so the slab caps at `N_z / 2` ranks.
+- Ranks laid out in order along the distributed axis.
+- Fused kernel, for the per-pixel Lamé fields.
+
+### 11.5 What is left
+
+- **GPU.** Host-only for now: the transform and the tridiagonal solve both go
+  through numpy. That is stage 3, and §10.1 already measured the kernel it
+  needs — 2255 GB/s, with the `(z, mode, component)` layout the trap to avoid.
+- **The reduced system grows as `(2·dim·P)²` per mode**, which is dense-inverted
+  at setup: ~300 MB at P=4 on 256³, ~5 GB at P=16. It is block-cyclic, so
+  exploiting that structure is the fix when P grows.
+- **The Thomas factors are stored in full** (`O(N_z)` per mode). §10.3 showed
+  they reach a fixed point in a median of 9 steps, so this is compressible by
+  roughly an order of magnitude; not yet done.
+- **The per-apply sweep loops over `nz_local` in Python.** Fine on the host,
+  and it is exactly what the fused kernel replaces on the device.
+
+---
+
+## 12. Stage 3 — the hybrid on the GPU
+
+Host and device now share one implementation: the array module follows the
+decomposition, so `numpy` and `cupy` take the identical path. Validated on
+2 x MI300A.
+
+### 12.1 The result
+
+| | ranks | CG iterations | E_eff |
+|---|---|---|---|
+| `-P reference` | 1 GPU | 96 | 1.3607 |
+| `-P hybrid` | 1 GPU | **96** | 1.3607 |
+| `-P reference` | 2 GPUs | 96 | 1.3607 |
+| `-P hybrid` | 2 GPUs | **96** | 1.3607 |
+
+Exactness at 16³, `‖K M⁻¹r − r‖/‖r‖`: 8.4e-16 at 1, 2 and 4 ranks over 2 GPUs.
+The gathered solution's checksum is identical to twelve decimals across every
+rank count **and identical to the host result** — so the device path is not
+merely exact, it is the same computation.
+
+### 12.2 Multi-GPU MPI needs two environment variables here
+
+This cost most of the session's debugging and is not specific to the hybrid:
+**`-P none` aborts on 2 GPUs too.** Any multi-GPU muGrid run on this machine
+needs
+
+```bash
+mpirun -n 2 -x MUGRID_UNIFIED_MEMORY=0 -x MUGRID_GPU_AWARE_MPI=0 ...
+```
+
+Without them, `communicate_ghosts` aborts in `sendrecv_staged`. muGrid's own
+diagnostic explains it exactly: MI300A reports itself host-coherent, so muGrid
+hands raw device pointers to MPI, but the runtime says those pointers have no
+host mapping and MPI faults reading them. Underneath, UCX's `rocm_ipc` transport
+logs `Failed to create ipc` for every buffer.
+
+So the APU's unified memory is the trap: the property that makes MI300A
+attractive is exactly what makes the default path wrong. `MUGRID_UNIFIED_MEMORY=0`
+forces host staging and everything works.
+
+### 12.3 What the port needed
+
+Very little, which is the useful finding: the Spike formulation is array-library
+agnostic. Two real changes:
+
+- **An array-module dispatch**, chosen once from `decomposition.device`, and
+  `_batched_inverse` taking it as an argument. The singular-mode repair loop now
+  brings its indices back to the host in one transfer rather than one per mode.
+- **Interface exchange staged through the host.** Device buffers are copied down
+  before `Allgather` and back after, so the preconditioner does not depend on the
+  MPI build being GPU-aware — which, per §12.2, would not have worked anyway. The
+  payload is interface planes only, a few MB at 256³, so the round trip is cheap
+  next to the all-to-all it replaces.
+
+The stencil probe stays on the host: it is a tiny impulse response on an 8³ grid,
+and it now suppresses muGrid's "serial communicator under MPI" warning, which
+here describes the intent rather than a mistake.
+
+### 12.4 Still open
+
+- **The per-apply sweep loops over `nz_local` in Python**, one batched matmul per
+  plane. Correct but launch-bound on a device: this is exactly what the fused
+  kernel of §10.1 (2255 GB/s, `(z, mode, component)` layout) replaces. The port
+  deliberately did not do that — correctness first, and the kernel is already
+  measured.
+- No GPU **timings** are quoted here. §10 costed the algorithm; turning that into
+  an end-to-end device measurement wants the fused kernel first, otherwise it
+  measures the Python loop.
+- The reduced system's `(2·dim·P)²` growth and the uncompressed Thomas factors
+  (§11.5) are unchanged.
+
+---
+
+## 13. The fused kernel
+
+§12.4 left the per-apply sweep looping over planes in Python. Replaced by a HIP
+kernel: one thread per Fourier mode, marching the whole distributed axis with
+the two constant coupling blocks in registers.
+
+### 13.1 The sweep
+
+| grid | modes | Python loop | fused | speedup | GB/s |
+|---|---|---|---|---|---|
+| 64³ | 2112 | 21661 µs | **182 µs** | 119× | 250 |
+| 128³ | 8320 | 44397 µs | **435 µs** | 102× | 822 |
+| 192³ | 18624 | 66759 µs | **909 µs** | 73× | 1321 |
+| 256³ | 33024 | 84651 µs | **1619 µs** | 52× | 1755 |
+
+Agreement with the loop: 8e-16 to 2e-15. The speedup falls with size because the
+loop is launch-bound — roughly constant per plane — while the kernel is
+bandwidth-bound; the bandwidth rises with size because small grids cannot fill
+the device.
+
+The internal layout is now z-major, `(nz, *modes, ...)`, so a wavefront reads
+contiguous bytes at each step. This cost nothing to adopt: the transform emits
+`(dim, *modes, nz)` and a permutation was already being materialised.
+
+### 13.2 Three things the kernel exposed
+
+Making the sweep fast made everything around it visible, and the first
+end-to-end measurement was **32× slower than `-P reference`**, not faster.
+
+- **cupy reductions on this ROCm build run at ~6 GB/s**, against ~3200 GB/s for
+  elementwise work — a 500× gap, unrelated to muGrid's allocator. The
+  real-space mean projection was therefore costing 89 ms, dwarfing everything.
+  It is also unnecessary: projecting off the rigid translations is exactly
+  zeroing the `q = 0` coefficient, which under this transform is the z-mean of
+  the all-zero mode's line, `nz * dim` numbers rather than the whole field.
+  32× → 5.4×.
+- **The spikes did not need to be stored.** Adding `V left + W right` reads the
+  two largest arrays the preconditioner holds (1.2 GB each at 256³). Solving
+  once more against a right-hand side corrected at its two end planes is the
+  same thing, and costs one extra sweep instead of a 2.4 GB pass. Only the four
+  interface blocks outlive setup. 5.4× → 2.27×, and 2.4 GB freed.
+- **`einsum` was replaced by `matmul`** where it maps to a batched GEMV.
+
+### 13.3 Where it now stands, on one device
+
+| | `-P reference` | `-P hybrid` | ratio |
+|---|---|---|---|
+| 128³ | 690 µs | 3069 µs | 4.45× |
+| 256³ | 5708 µs | 12953 µs | **2.27×** |
+
+96 CG iterations either way. At 256³ the breakdown is fft 3676, tridiag 1690,
+interface 483, ifft 2919, and **4185 µs reading and writing the Field** — a
+third of the total, and layout-bound rather than algorithm-bound: `.p` is a
+strided view over the ghosted buffer, so every apply gathers on the way in and
+scatters on the way out.
+
+So the hybrid is not yet cheaper per apply than the FFT on a single device.
+That was never the claim — §10.2 is: the reference pays four all-to-alls per
+apply, 1623 MB at 256³, where the hybrid pays an interface exchange of 13–101 MB.
+On this node that all-to-all costs 30–52 ms against the hybrid's whole 13 ms
+apply. The arithmetic gap of 2.27× is the price, and the communication is what
+buys it back.
+
+### 13.4 Still open
+
+- **The two transposes and the Field gather/scatter** are now the largest terms.
+  The transposes are inherent to taking the transform in one order and the sweep
+  in another; the Field traffic is not the preconditioner's to fix.
+- **Factor storage** is still `O(N_z)` per mode (1.2 GB at 256³). §10.3 measured
+  the fixed point at a median of 9 steps, so ~10× remains on the table — and it
+  would now be the single biggest remaining win, since `Dinv` is what the sweep
+  streams.
+- **No multi-GPU timings.** Correctness is established at 1, 2 and 4 ranks over
+  2 devices; the crossover this design exists for needs more devices than this
+  box has.
+
+---
+
+## 14. Compressing the factor storage
+
+§13.4 called this the biggest remaining win, because the sweep *streams* the
+factors: compressing them cuts bandwidth as well as memory.
+
+### 14.1 The convergence distribution does not depend on the grid
+
+`D_k = A₁ − A₂ D_{k-1}⁻¹ A₀` has constant coefficients, so it is a fixed-point
+iteration. Measured on the hybrid's own modes:
+
+| n | modes | median | p90 | p99 | > 16 | > 32 | > 64 |
+|---|---|---|---|---|---|---|---|
+| 64 | 2112 | 10 | 16 | 57 | 9.5% | 2.7% | 0.0% |
+| 128 | 8320 | 10 | 16 | 52 | 9.5% | 2.6% | 0.7% |
+| 256 | 33024 | 10 | 16 | 52 | 9.3% | 2.6% | 0.7% |
+
+Flat across a 64× range in volume — it is a property of the operator, not of
+the discretisation. So the *fraction* of the axis that must be stored falls as
+`N_z` grows, and compression improves with problem size.
+
+That also fixes the cutoff. Total storage in units of one plane is
+`K + f(K)·N_z`, minimised near `K = 32`: `32 + 0.026 × 256 ≈ 39` against 256.
+
+### 14.2 Head plus exceptions
+
+The first `K = 32` factors are stored densely and everything beyond reuses the
+last of them. The ~2% of modes that have not converged by then keep a full
+line, reached through an index read once per thread rather than per step. A
+mode is exceptional when reusing the last head factor would be wrong *anywhere*
+along the remaining axis, so this is exact rather than approximate — which is
+what lets the existing exactness tests stand as the check.
+
+| grid | modes | exceptional | full | kept | ratio | sweep |
+|---|---|---|---|---|---|---|
+| 128³ | 8320 | 169 (2.0%) | 153 MB | 41 MB | 3.7× | 435 → 409 µs |
+| 256³ | 33024 | 665 (2.0%) | 1217 MB | **177 MB** | **6.9×** | 1619 → **1280 µs** |
+
+The sweep gains 21% at 256³ for free, because the factor traffic it streams
+falls with the storage.
+
+### 14.3 Where the apply now stands
+
+| | `-P reference` | `-P hybrid` | ratio |
+|---|---|---|---|
+| 128³ | 690 µs | 2955 µs | 4.28× |
+| 256³ | 5688 µs | 12183 µs | **2.14×** |
+
+At 256³: fft 3545, tridiag 1444, interface 479, ifft 2782, and 3934 µs reading
+and writing the Field. The sweep is now the *smallest* of the four regions.
+What remains is transform and data movement, not the tridiagonal solve, so
+further work belongs there rather than here.
+
+### 14.4 Note on the elementwise path
+
+The loop that the kernel replaced now reaches the factors through an accessor
+that understands both representations, so it still runs on a device after
+compression. That is deliberate: it is the reference the fused kernel is tested
+against, and a reference that could not run would be no reference at all.

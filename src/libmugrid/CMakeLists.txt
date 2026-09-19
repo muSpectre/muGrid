@@ -45,6 +45,7 @@ set(MUGRID_SOURCES
         operators/generic.cc
         operators/laplace.cc
         operators/nodal_moments.cc
+        operators/transfer.cc
         operators/solids/isotropic_stiffness_2d.cc
         operators/solids/isotropic_stiffness_3d.cc
     # io/
@@ -58,6 +59,7 @@ set(MUGRID_SOURCES
     # util/
     # linalg/
     linalg/linalg_host.cc
+    linalg/block_thomas.cc
     # fft/
     fft/pocketfft_backend.cc
     fft/transpose.cc
@@ -87,6 +89,7 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
+    list(APPEND MUGRID_SOURCES linalg/block_thomas_gpu.cc)
     list(APPEND MUGRID_SOURCES mpi/ghost_accumulate_gpu.cc)
     # Mark .cc files to be compiled as CUDA
     set_source_files_properties(
@@ -97,6 +100,7 @@ if(MUGRID_ENABLE_CUDA)
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/linalg/block_thomas_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/mpi/ghost_accumulate_gpu.cc
         PROPERTIES LANGUAGE CUDA
     )
@@ -108,6 +112,7 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
+    list(APPEND MUGRID_SOURCES linalg/block_thomas_gpu.cc)
     list(APPEND MUGRID_SOURCES mpi/ghost_accumulate_gpu.cc)
     # Mark .cc files to be compiled as HIP
     set_source_files_properties(
@@ -118,6 +123,7 @@ elseif(MUGRID_ENABLE_HIP)
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/linalg/block_thomas_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/mpi/ghost_accumulate_gpu.cc
         PROPERTIES LANGUAGE HIP
     )

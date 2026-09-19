@@ -65,3 +65,5 @@ nav:
 
 exclude_docs: |
   requirements.txt
+  # Internal planning document, tracked for handoff but not published.
+  multigrid_preconditioner_plan.md

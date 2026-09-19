@@ -41,6 +41,7 @@
 #include "operators/fem_gradient.hh"
 #include "operators/solids/isotropic_stiffness.hh"
 #include "operators/nodal_moments.hh"
+#include "operators/transfer.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -1400,6 +1401,61 @@ void add_nodal_moment_operator(py::module & mod, const char * name) {
 #endif
 }
 
+// ----------------------------------------------------------------------------
+// Bind class GridTransfer{2,3}D (dimension-templated)
+// ----------------------------------------------------------------------------
+template <muGrid::Dim_t Dim>
+void add_grid_transfer(py::module & mod, const char * name) {
+    using Op = muGrid::GridTransfer<Dim>;
+    using FH = TypedFieldBase<Real, HostSpace>;
+    using FH32 = TypedFieldBase<Real32, HostSpace>;
+
+    py::class_<Op>(mod, name, R"pbdoc(
+        Multigrid grid transfer between two nested nodal grids.
+
+        ``prolong`` is multilinear (bi/trilinear) interpolation from a coarse
+        grid to a fine grid of exactly twice the extent; ``restrict`` is its
+        exact adjoint P^T, the tensor product of the [1/2, 1, 1/2] stencil.
+
+        Both act component-wise and never mix the components of a vector
+        field. Because multilinear interpolation reproduces linear
+        displacement fields exactly, range(P) contains every rigid-body mode
+        and every constant strain -- the near-nullspace property that makes a
+        geometric hierarchy work for elasticity without being told about it.
+
+        The grids must be **nested**: the fine subdomain must have twice the
+        extent of the coarse one and start at twice its global location, so
+        that no transfer crosses a rank boundary. Build every level with the
+        same power-of-two ``nb_subdivisions``.
+
+        The caller owns the ghost exchange: ``prolong`` reads the coarse
+        field's ghosts and ``restrict`` reads the fine field's, so call
+        ``communicate_ghosts`` on the *input* field first. Neither writes
+        ghosts, so neither needs ``reduce_ghosts``.
+        )pbdoc")
+        .def(py::init<>())
+        .def_property_readonly("spatial_dim", &Op::get_spatial_dim,
+                               "Spatial dimension of the transfer.")
+        .def("prolong",
+             static_cast<void (Op::*)(const FH &, FH &) const>(&Op::prolong),
+             "coarse"_a, "fine"_a,
+             "Interpolate: fine = P coarse (float64).")
+        .def("prolong",
+             static_cast<void (Op::*)(const FH32 &, FH32 &) const>(
+                 &Op::prolong),
+             "coarse"_a, "fine"_a,
+             "Interpolate: fine = P coarse (float32).")
+        .def("restrict",
+             static_cast<void (Op::*)(const FH &, FH &) const>(&Op::restrict),
+             "fine"_a, "coarse"_a,
+             "Restrict: coarse = P^T fine (float64).")
+        .def("restrict",
+             static_cast<void (Op::*)(const FH32 &, FH32 &) const>(
+                 &Op::restrict),
+             "fine"_a, "coarse"_a,
+             "Restrict: coarse = P^T fine (float32).");
+}
+
 void add_convolution_operator_classes(py::module & mod) {
     add_gradient_operator(mod);
     add_stencil_gradient_operator(mod);
@@ -1411,6 +1467,8 @@ void add_convolution_operator_classes(py::module & mod) {
     add_isotropic_stiffness_operator_3d(mod);
     add_nodal_moment_operator<2>(mod, "NodalMomentOperator2D");
     add_nodal_moment_operator<3>(mod, "NodalMomentOperator3D");
+    add_grid_transfer<2>(mod, "GridTransfer2D");
+    add_grid_transfer<3>(mod, "GridTransfer3D");
 
     // Backwards compatibility aliases
     mod.attr("ConvolutionOperatorBase") = mod.attr("GradientOperator");
