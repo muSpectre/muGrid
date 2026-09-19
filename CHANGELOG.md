@@ -183,6 +183,15 @@ unreleased
 - BUG: `_compress_factors` compares its deviation against a scaled tolerance
   instead of dividing by a guard floor of `1e-300`, which is not a small number
   in single precision but zero
+- TST: `test_hybrid_is_exact_in_single_precision` runs the hybrid end to end at
+  `dtype=np.float32`, which nothing else covered — every tolerance on that path
+  was unmeasured, and two of them were wrong. It is also the sharper form of
+  `test_hybrid_is_the_exact_reference_inverse`: in double the computed zeros of
+  the singular mode straddle `pinv`'s cutoff, so a retained nullspace showed up
+  in 2D but not 3D and only on some numpy versions, while at complex64 they sit
+  ~1e-7 of the largest singular value and are always on the wrong side of it.
+  The same defect therefore registers at every size, in both dimensions, on any
+  numpy — 1.4e-1 in 2D and 1.1e-2 in 3D against a floor of ~1e-6
 
 
 v1.3.0 (16Sep26)

@@ -523,7 +523,7 @@ def test_rejects_2d_p1_nodal_block(comm):
 # --------------------------------------------------------------------------- #
 
 
-def _slab_setup(comm, dim, n, lam=1.3, mu=0.7):
+def _slab_setup(comm, dim, n, lam=1.3, mu=0.7, dtype=np.float64):
     from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
     from muGrid.Wrappers import IsotropicStiffnessOperator
 
@@ -534,7 +534,7 @@ def _slab_setup(comm, dim, n, lam=1.3, mu=0.7):
         nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim)
     op = IsotropicStiffnessOperator(dim, spacing, muGrid.FEMElement.q1)
     prec = HybridFourierTridiagonalPreconditioner(
-        decomp, spacing, lam, mu, communicator=comm)
+        decomp, spacing, lam, mu, communicator=comm, dtype=dtype)
     return decomp, op, prec, lam, mu
 
 
@@ -713,6 +713,54 @@ def test_hybrid_zero_mode_is_a_true_pseudo_inverse(comm, dim, n):
     singular = np.linalg.svd(T, compute_uv=False)
     smallest = singular[:-dim].min()  # the kernel is exactly dim-dimensional
     assert np.linalg.norm(np.asarray(prec._zero_inv), 2) <= 10 / smallest
+
+
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_is_exact_in_single_precision(comm, dim, n):
+    """`K (M^-1 r) == r` again, with the whole preconditioner at complex64.
+
+    `dtype=np.float32` threads all the way down -- the symbol, the Thomas
+    factors, the interface solve and the transforms all run at complex64 -- and
+    nothing else in this suite builds the hybrid that way, so every tolerance
+    on that path was unmeasured. Two of them turned out to be wrong, and single
+    precision is where a threshold picked in double goes bad: it is not a
+    scaled-down version of the same arithmetic, it is a floor eight orders
+    higher, which absolute constants do not follow.
+
+    This is also the sharper form of
+    `test_hybrid_is_the_exact_reference_inverse`. That one catches a zero mode
+    which has kept its nullspace only when the LAPACK build happens to expose
+    it -- in double the computed zeros straddle `pinv`'s cutoff, so it fired in
+    2D and not in 3D, and only on some numpy versions. At complex64 they sit
+    ~1e-7 of the largest singular value, which is *always* the wrong side of a
+    1e-15 cutoff, so the same defect shows up here at every size, in both
+    dimensions, on any numpy: the error was 1.4e-1 in 2D and 1.1e-2 in 3D,
+    against the ~1e-6 below.
+
+    It does not cover the other tolerance that was wrong on this path, the one
+    that made `_batched_inverse` pseudo-invert healthy complex64 blocks. That
+    cost setup time (5x here) and left the answer intact, so it is pinned
+    where it is visible instead, in
+    `test_batched_inverse_tolerance_follows_the_precision`.
+    """
+    if comm is not None and n % comm.size:
+        pytest.skip(f"{n} planes do not divide among {comm.size} ranks")
+    decomp, op, prec, lam, mu = _slab_setup(comm, dim, n, dtype=np.float32)
+    fc = decomp.collection
+    r, z, f = (fc.real_field(f"hyb32-{s}", (dim,), dtype=np.float32)
+               for s in "rzf")
+
+    r.p[...] = _slab_slice(decomp, _zero_mean_global(dim, n, 0))
+    prec.apply(r, z)
+    decomp.communicate_ghosts(z)
+    op.apply_uniform(z, lam, mu, f)
+
+    err = _global_sum(comm, ((np.asarray(f.p) - np.asarray(r.p)) ** 2).sum())
+    ref = _global_sum(comm, (np.asarray(r.p) ** 2).sum())
+    # Measured 3.0e-7 (3D at 16) and 1.3e-6 (2D at 32), which is the complex64
+    # floor of this operator; a preconditioner that has lost its nullspace
+    # lands at 1e-2 and above, so the bound sits clear of both.
+    assert np.sqrt(err / ref) < 1e-5
 
 
 @pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
