@@ -599,6 +599,78 @@ def test_hybrid_is_symmetric(comm, dim, n):
     assert abs(lhs - rhs) <= 1e-10 * max(abs(lhs), abs(rhs))
 
 
+def _singular_batch(nb_modes, size, dtype, singular_at):
+    """A healthy batch of blocks with one exactly singular member."""
+    rng = np.random.default_rng(3)
+    blocks = (rng.standard_normal((nb_modes, size, size))
+              + 1j * rng.standard_normal((nb_modes, size, size)))
+    # Diagonally dominant, so every other block is comfortably invertible.
+    blocks += size * np.eye(size)
+    blocks[singular_at, -1] = blocks[singular_at, 0]  # duplicate row
+    return blocks.astype(dtype)
+
+
+@pytest.mark.parametrize("dtype", [np.complex128, np.complex64])
+def test_batched_inverse_zeroes_only_the_declared_mode(dtype):
+    """The singular mode comes back zero; the rest come back inverted.
+
+    Zero rather than a pseudo-inverse because the hybrid throws that mode's
+    solve away and redoes it globally, so an approximation there would be
+    effort spent on an answer nobody reads -- and, as `_build_zero_mode`
+    records, an approximation reached through a threshold nobody can set.
+    """
+    from muGrid.Preconditioners import _batched_inverse
+
+    blocks = _singular_batch(6, 3, dtype, singular_at=2).reshape(2, 3, 3, 3)
+    out = _batched_inverse(blocks, singular_mode=(0, 2))
+
+    assert not np.any(out[0, 2]), "the declared mode must be exactly zero"
+    healthy = [(i, j) for i in range(2) for j in range(3) if (i, j) != (0, 2)]
+    for index in healthy:
+        product = blocks[index] @ out[index]
+        assert np.abs(product - np.eye(3)).max() <= 1e3 * np.finfo(dtype).eps
+
+
+@pytest.mark.parametrize("dtype", [np.complex128, np.complex64])
+def test_batched_inverse_refuses_an_undeclared_singular_mode(dtype):
+    """A nullspace nobody declared stops the setup instead of riding along.
+
+    The mode would otherwise be inverted to whatever LU produces for a singular
+    matrix -- large, finite and wrong -- and the preconditioner would go on to
+    be quietly wrong in it.
+    """
+    from muGrid.Preconditioners import _batched_inverse
+
+    blocks = _singular_batch(6, 3, dtype, singular_at=2).reshape(2, 3, 3, 3)
+    with pytest.raises(RuntimeError, match="batch of 3x3 Fourier-mode"):
+        _batched_inverse(blocks)
+    # Declaring a *different* mode does not excuse it either.
+    with pytest.raises(RuntimeError, match="not the declared mode|as large as"):
+        _batched_inverse(blocks, singular_mode=(1, 1))
+
+
+def test_batched_inverse_tolerance_follows_the_precision():
+    """A healthy complex64 batch is not mistaken for a singular one.
+
+    Rounding in single precision lands ~1e-7 from the identity, which an
+    absolute tolerance of 1e-8 -- what this used to carry -- reads as singular
+    for *every* block in the batch. The hybrid runs at complex64 whenever the
+    solver does, so that misfire was reachable from `dtype=np.float32` alone.
+    """
+    from muGrid.Preconditioners import _batched_inverse
+
+    rng = np.random.default_rng(4)
+    blocks = (rng.standard_normal((512, 3, 3))
+              + 1j * rng.standard_normal((512, 3, 3)) + 3 * np.eye(3))
+    single = blocks.astype(np.complex64)
+
+    out = _batched_inverse(single)  # must not raise
+    residual = np.abs(single @ out - np.eye(3, dtype=np.complex64)).max()
+    assert residual > np.finfo(np.complex128).eps, (
+        "expected genuine single-precision rounding, or this proves nothing")
+    assert residual < 1e-8 * 1e3, "sanity: still a healthy inverse"
+
+
 @pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
 def test_hybrid_zero_mode_is_a_true_pseudo_inverse(comm, dim, n):
     """The one singular mode is inverted on its range, and nowhere else.

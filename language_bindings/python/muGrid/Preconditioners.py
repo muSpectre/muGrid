@@ -1453,37 +1453,99 @@ def _array_module(on_device):
     return np
 
 
-def _batched_inverse(matrices, xp=np):
-    """Inverse per mode, falling back to a pseudo-inverse where one is singular.
+#: Tolerance on ``|A A^-1 - I|``, in units of the working precision's eps. Both
+#: ends are measured: a healthy block lands within a few eps of zero (5.9e-16 in
+#: double, 4.6e-7 in single) and a singular one at 6e-4 and above, so this sits
+#: a couple of orders clear of each in single and ten or more in double. It is
+#: deliberately *not* an absolute number -- the hybrid runs at complex64
+#: whenever the solver does, where the 1e-8 this used to carry is below the
+#: noise floor and condemns healthy blocks by the hundred.
+_INVERSE_RESIDUAL_EPS = 1e3
 
-    Only the all-zero mode is genuinely singular -- it keeps the rigid
-    translation that the reference preconditioner also pseudo-inverts at q = 0 --
-    so the batched path carries every other mode and the loop runs over a
-    handful of exceptions rather than the whole grid.
+
+def _batched_inverse(matrices, xp=np, singular_mode=None):
+    """Inverse per mode; the one mode that has no inverse is zeroed, not fudged.
+
+    ``singular_mode`` is the index of the all-zero mode, where every matrix
+    built along the distributed axis inherits the reference operator's rigid
+    translation and may therefore be singular. Its inverse is set to zero --
+    unconditionally, whether or not that particular matrix turned out to be
+    invertible, because nothing reads it either way -- rather than approximated,
+    which is what
+    :func:`make_reference_stiffness_preconditioner` does with the same block at
+    ``q = 0``, and is safe here for a stronger reason: :meth:`apply` replaces
+    that mode's entire solve with :meth:`_solve_zero_mode`, so nothing computed
+    from it is ever read. Passing ``None`` states that no mode may be singular.
+
+    What this deliberately does not do is *discover* the singular mode by the
+    size of its residual and repair it with a pseudo-inverse. That is the trap
+    :meth:`_build_zero_mode` documents -- a pseudo-inverse separates kernel from
+    range by a magnitude threshold, and at complex64 the threshold that used to
+    live here sat below the rounding noise of a perfectly healthy block, so it
+    fired on hundreds of them and replaced each one, in a Python loop, with a
+    pseudo-inverse computed at that same precision.
+
+    Everything else is verified instead: a mode that is singular and not
+    declared so raises, because the alternative is a preconditioner that is
+    quietly wrong in one mode rather than one that stops.
     """
+    index = (None if singular_mode is None
+             else int(np.ravel_multi_index(singular_mode, matrices.shape[:-2])))
     flat_in = matrices.reshape((-1,) + matrices.shape[-2:])
+    eye = xp.eye(flat_in.shape[-1], dtype=flat_in.dtype)
+
+    def refuse(what):
+        return RuntimeError(
+            f"{what}, in a batch of {flat_in.shape[-1]}x{flat_in.shape[-1]} "
+            "Fourier-mode blocks. Only the all-zero mode may be singular here, "
+            "where the reference operator keeps the rigid translation and the "
+            "hybrid replaces that mode's whole solve with _solve_zero_mode. "
+            "Anything else is a nullspace this preconditioner does not know "
+            "about, and using it would be silently wrong rather than slow.")
+
     try:
         flat_out = xp.linalg.inv(flat_in)
-    except xp.linalg.LinAlgError:
-        # inv() refuses the whole batch if any one mode is exactly singular.
-        flat_out = xp.empty_like(flat_in)
-        for i in range(flat_in.shape[0]):
-            try:
-                flat_out[i] = xp.linalg.inv(flat_in[i])
-            except xp.linalg.LinAlgError:
-                flat_out[i] = xp.linalg.pinv(flat_in[i])
+    except xp.linalg.LinAlgError as error:
+        # inv() refuses the whole batch if any one member is exactly singular,
+        # and says only "Singular matrix". Substituting the identity for the
+        # mode that is allowed to be singular -- on a copy, since `matrices`
+        # may be the caller's live array -- takes the batch through in one
+        # call. If some other mode was the singular one, it refuses again, and
+        # that is the answer.
+        if index is None:
+            raise refuse("LAPACK rejected a block as exactly singular") \
+                from error
+        patched = flat_in.copy()
+        patched[index] = eye
+        try:
+            flat_out = xp.linalg.inv(patched)
+        except xp.linalg.LinAlgError:
+            raise refuse(
+                "LAPACK rejected a block as exactly singular, and it was not "
+                f"the declared mode {tuple(singular_mode)}") from error
 
     # inv() does not always fail on a singular mode; more often it returns
     # something large and finite. Only the residual catches that, and it is one
     # batched matmul.
-    eye = xp.eye(flat_in.shape[-1], dtype=flat_in.dtype)
     residual = xp.abs(flat_in @ flat_out - eye).max(axis=(-2, -1))
-    bad = ~xp.isfinite(residual) | (residual > 1e-8)
-    # The indices come back to the host because the repair loop is Python; on a
-    # device this is one small transfer, not one per mode.
-    indices = xp.flatnonzero(bad)
-    for i in (indices.get() if hasattr(indices, "get") else indices):
-        flat_out[int(i)] = xp.linalg.pinv(flat_in[int(i)])
+    if index is not None:
+        flat_out[index] = 0
+        residual[index] = 0
+
+    # np.finfo, not xp.finfo: the dtype of a device array is a numpy dtype
+    # either way, and this does not depend on cupy mirroring the call.
+    tolerance = _INVERSE_RESIDUAL_EPS * float(np.finfo(flat_in.dtype).eps)
+    finite = xp.isfinite(residual)
+    bad = ~finite | (residual > tolerance)
+    nb_bad = int(bad.sum())
+    if nb_bad:
+        measured = bad & finite
+        worst = (float(residual[measured].max())
+                 if bool(measured.any()) else float("inf"))
+        raise refuse(
+            f"{nb_bad} of {residual.size} Fourier modes invert to "
+            f"|A A^-1 - I| as large as {worst:.3e}, past a tolerance of "
+            f"{tolerance:.3e}")
     return flat_out.reshape(matrices.shape)
 
 
@@ -1795,6 +1857,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         self.A = _z_coupling_blocks(dim, grid_spacing, element, lambda_ref,
                                     mu_ref, self.local_shape, self._cdtype, xp)
         self._mode_shape = self.A.shape[1:-2]
+        # The one mode whose blocks may be singular, and the only one whose
+        # solve is thrown away and redone by _solve_zero_mode. Every inverse
+        # taken below is told about it rather than left to discover it.
+        self._zero_index = (0,) * len(self._mode_shape)
 
         self.nz_global = nz_global
         self._factorise_local()
@@ -1836,9 +1902,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         # a permutation has to be materialised either way.
         Dinv = xp.empty((nz,) + self._mode_shape + (dim, dim),
                         dtype=self._cdtype)
-        Dinv[0] = _batched_inverse(A1, xp)
+        zero = self._zero_index
+        Dinv[0] = _batched_inverse(A1, xp, singular_mode=zero)
         for k in range(1, nz):
-            Dinv[k] = _batched_inverse(A1 - A2 @ Dinv[k - 1] @ A0, xp)
+            Dinv[k] = _batched_inverse(A1 - A2 @ Dinv[k - 1] @ A0, xp,
+                                       singular_mode=zero)
         self.Dinv = Dinv
 
         eye = xp.broadcast_to(xp.eye(dim, dtype=self._cdtype),
@@ -1892,8 +1960,13 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         tail = self.Dinv[head_len:]
         if tail.shape[0]:
             deviation = xp.abs(tail - head[-1]).max(axis=(0, -2, -1))
-            scale = xp.maximum(xp.abs(head[-1]).max(axis=(-2, -1)), 1e-300)
-            exceptional = (deviation / scale) > 1e-12
+            scale = xp.abs(head[-1]).max(axis=(-2, -1))
+            # Multiplied through rather than divided: `scale` is real32 when
+            # the solve is, where a guard floor like 1e-300 is not a small
+            # number but zero, and the all-zero factor line of the singular
+            # mode then divides 0 by 0. This form needs no floor -- a constant
+            # line, zero included, is exactly what the head reproduces.
+            exceptional = deviation > 1e-12 * scale
         else:
             exceptional = xp.zeros(self._mode_shape, dtype=bool)
 
@@ -2067,7 +2140,8 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             M[..., row_l, next_l] -= W0
             M[..., row_r, prev_r] -= V1
             M[..., row_r, next_l] -= W1
-        self._reduced_inv = _batched_inverse(M, xp)
+        self._reduced_inv = _batched_inverse(
+            M, xp, singular_mode=self._zero_index)
 
     def _solve_local_compiled_device(self, rhs):
         """The device sweep through libmuGrid instead of the CuPy kernel.
@@ -2146,13 +2220,15 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         matmul = xp.matmul
         for _ in range(self._pcr_nb_levels):
             D_inv = _batched_inverse(
-                identity - matmul(A, C) - matmul(C, A), xp)
+                identity - matmul(A, C) - matmul(C, A), xp,
+                singular_mode=self._zero_index)
             # The level keeps the coefficients it eliminates *with*, so store
             # them before the stride doubles.
             self._pcr_levels.append((A, C, D_inv))
             A, C = (-matmul(D_inv, matmul(A, A)),
                     -matmul(D_inv, matmul(C, C)))
-        self._pcr_final_inv = _batched_inverse(identity + A + C, xp)
+        self._pcr_final_inv = _batched_inverse(
+            identity + A + C, xp, singular_mode=self._zero_index)
 
     def _exchange(self, local, distance):
         """Send ``local`` to the ranks at ``±distance`` and receive theirs.
@@ -2237,7 +2313,6 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         """
         xp = self._xp
         dim, nz = self.dim, self.nz_global
-        self._zero_index = (0,) * len(self._mode_shape)
         A0, A1, A2 = (self.A[i][self._zero_index] for i in range(3))
         T = xp.zeros((nz * dim, nz * dim), dtype=self._cdtype)
         for k in range(nz):

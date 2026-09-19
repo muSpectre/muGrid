@@ -167,6 +167,22 @@ unreleased
   2D preconditioner four digits of exactness -- enough to break
   `test_hybrid_is_the_exact_reference_inverse`, and, unnoticed, to slow every
   solve that used it
+- BUG: `_batched_inverse` is told which mode may be singular instead of
+  discovering it. It used to mark a block for pseudo-inversion when
+  `|A A⁻¹ - I|` exceeded an absolute `1e-8` — a threshold below the rounding
+  noise of a *healthy* complex64 block, so at `dtype=np.float32` it fired on
+  hundreds of sound modes (174 in 2D at 32, 1747 in 3D at 16) and replaced each
+  one, through a Python loop over modes, with a pseudo-inverse computed at that
+  same precision. The one mode that is genuinely singular is the all-zero one,
+  it is singular by construction, and `apply` discards its solve wholesale, so
+  it is now named by its caller and zeroed — the same thing
+  `make_reference_stiffness_preconditioner` does at `q = 0`. The tolerance that
+  remains is a verification, not a switch, and scales with the working
+  precision; a mode that is singular without being declared so now raises
+  rather than riding along pseudo-inverted
+- BUG: `_compress_factors` compares its deviation against a scaled tolerance
+  instead of dividing by a guard floor of `1e-300`, which is not a small number
+  in single precision but zero
 
 
 v1.3.0 (16Sep26)
