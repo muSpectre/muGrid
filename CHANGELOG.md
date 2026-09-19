@@ -155,6 +155,18 @@ unreleased
   mode is exceptional when reusing the last factor would be wrong anywhere along
   the remaining axis. 6.9x less storage at 256 cubed, 1217 MB down to 177 MB,
   and the sweep gains 21% because it streams those factors
+- BUG: The hybrid preconditioner deflates the nullspace of its singular `q = 0`
+  z-line instead of pseudo-inverting it. The kernel there is known exactly --
+  the rigid translation, one per component, constant along the distributed axis
+  -- so shifting it out of the way and inverting is both exact and better
+  conditioned. `pinv` had to separate it by magnitude instead, and the gap it
+  was given is not one it can resolve: the computed zeros sit within a digit of
+  its default `1e-15 * sigma_max` cutoff, so which side they land on is a
+  property of the LAPACK build. numpy 2.5 lands one of them on the wrong side
+  at 32 planes, which keeps a kernel direction scaled by `1e13` and costs the
+  2D preconditioner four digits of exactness -- enough to break
+  `test_hybrid_is_the_exact_reference_inverse`, and, unnoticed, to slow every
+  solve that used it
 
 
 v1.3.0 (16Sep26)

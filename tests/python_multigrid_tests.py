@@ -600,6 +600,50 @@ def test_hybrid_is_symmetric(comm, dim, n):
 
 
 @pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_zero_mode_is_a_true_pseudo_inverse(comm, dim, n):
+    """The one singular mode is inverted on its range, and nowhere else.
+
+    `test_hybrid_is_the_exact_reference_inverse` covers this too, but only
+    through the whole preconditioner and only as a residual, so a zero mode
+    that has picked up a kernel direction reads there as a vague loss of
+    digits. Here it is the stated property -- ``T x = b`` on a kernel-free
+    ``b``, with ``T`` reassembled rather than taken from the preconditioner --
+    plus the bound that fails loudly when a kernel direction does survive: it
+    enters divided by a singular value the operator does not have, so the norm
+    does not drift, it jumps by ten orders of magnitude.
+    """
+    if comm is not None and comm.size > 1:
+        pytest.skip("the zero-mode line is global; one rank assembles it all")
+    _, _, prec, _, _ = _slab_setup(comm, dim, n)
+
+    A0, A1, A2 = (np.asarray(prec.A[i][prec._zero_index]) for i in range(3))
+    T = np.zeros((n * dim, n * dim), dtype=complex)
+    for k in range(n):
+        row = slice(k * dim, (k + 1) * dim)
+        T[row, ((k + 1) % n) * dim:((k + 1) % n) * dim + dim] += A0
+        T[row, row] += A1
+        T[row, ((k - 1) % n) * dim:((k - 1) % n) * dim + dim] += A2
+
+    rng = np.random.default_rng(7)
+    b = rng.standard_normal((n, dim))
+    b -= b.mean(axis=0)  # off the rigid-translation kernel, as apply() feeds it
+    x = np.asarray(prec._zero_inv) @ b.reshape(-1)
+
+    residual = T @ x - b.reshape(-1).astype(complex)
+    assert (np.linalg.norm(residual) / np.linalg.norm(b)) < 1e-12
+    # ...and the answer carries no kernel component of its own.
+    mean = x.reshape(n, dim).mean(axis=0)
+    assert np.abs(mean).max() <= 1e-12 * np.abs(x).max()
+
+    # The inverse is bounded by the smallest singular value T actually has,
+    # which is where a leaked kernel direction shows up: it would contribute
+    # 1/(LAPACK noise) instead.
+    singular = np.linalg.svd(T, compute_uv=False)
+    smallest = singular[:-dim].min()  # the kernel is exactly dim-dimensional
+    assert np.linalg.norm(np.asarray(prec._zero_inv), 2) <= 10 / smallest
+
+
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
 def test_hybrid_is_rank_independent(comm, dim, n):
     """The answer does not depend on how the domain was cut.
 

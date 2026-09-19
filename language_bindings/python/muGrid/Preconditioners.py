@@ -2210,9 +2210,30 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         Its z-operator keeps the constant-in-z nullspace -- the rigid
         translation -- so it is singular, and both the local Thomas factors and
         the reduced system degenerate there. It is a single mode, so it is
-        cheaper to gather its whole z-line and apply a pseudo-inverse than to
-        rescue the general path: that is the same treatment
+        cheaper to gather its whole z-line and solve it directly than to rescue
+        the general path: that is the same treatment
         :func:`make_reference_stiffness_preconditioner` gives ``q = 0``.
+
+        The nullspace is *deflated* rather than discovered. ``T`` is Hermitian
+        and its kernel is known exactly -- the ``dim`` constant-in-z
+        translations, which :meth:`_project_constants` already removes from both
+        ends -- so adding ``shift`` times the orthogonal projector onto them
+        moves the kernel to ``shift`` and leaves the complement untouched. A
+        plain inverse of that then reproduces ``T^+`` on every right-hand side
+        this is given, and is better conditioned than ``T`` restricted to its
+        range.
+
+        ``pinv`` cannot do the same job reliably, because it has to separate
+        kernel from range by magnitude and the gap is not one it can resolve:
+        the computed zeros sit at ``~1e-16 * sigma_max``, one digit below the
+        ``1e-15 * sigma_max`` cutoff. Which side of it they land on is a
+        property of the LAPACK build, not of the problem -- numpy 2.5 returns
+        ``3.8e-14`` for one of them at 32 planes, which keeps a kernel direction
+        scaled by ``1e13`` and silently costs the preconditioner four digits of
+        exactness. Nor would a looser threshold settle it: the smallest singular
+        value it must *not* cut is the longest-wavelength mode along the axis,
+        ``2.5e-3 * sigma_max`` at 32 planes and falling as the square of the
+        grid, so the safe window closes as the problem grows.
         """
         xp = self._xp
         dim, nz = self.dim, self.nz_global
@@ -2224,7 +2245,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             T[row, ((k + 1) % nz) * dim:((k + 1) % nz) * dim + dim] += A0
             T[row, row] += A1
             T[row, ((k - 1) % nz) * dim:((k - 1) % nz) * dim + dim] += A2
-        self._zero_pinv = xp.linalg.pinv(T)
+
+        projector = xp.zeros_like(T)
+        for component in range(dim):
+            projector[component::dim, component::dim] = 1.0 / nz
+        self._zero_inv = xp.linalg.inv(T + xp.abs(T).max() * projector)
 
     def _solve_zero_mode(self, v):
         """``T^+ v`` for the all-zero mode, over the whole distributed axis."""
@@ -2237,7 +2262,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         # only defined up to it.
         full = self._project_constants(full)
         solution = self._project_constants(
-            (self._zero_pinv @ full.reshape(-1)).reshape(-1, dim))
+            (self._zero_inv @ full.reshape(-1)).reshape(-1, dim))
         start = self.rank * self.nz_local
         return solution[start:start + self.nz_local]
 
