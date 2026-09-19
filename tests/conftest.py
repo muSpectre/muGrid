@@ -131,10 +131,15 @@ def comm():
     """Provide an MPI communicator (or serial fallback)."""
     try:
         from mpi4py import MPI
-
-        return muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
+    except (ImportError, RuntimeError):
+        # ImportError: mpi4py is absent, as on a serial CI runner.
+        # RuntimeError: it is installed but cannot load libmpi, which is what a
+        # partial MPI install on a developer machine produces. Both mean "no
+        # usable MPI", and without the second the failure surfaces as a
+        # collection error in every test taking this fixture rather than as the
+        # serial fallback it should be.
         return muGrid.Communicator()
+    return muGrid.Communicator(MPI.COMM_WORLD)
 
 
 @pytest.fixture

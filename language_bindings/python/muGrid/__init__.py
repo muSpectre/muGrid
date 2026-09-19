@@ -55,10 +55,19 @@ has_mpi = _muGrid.Communicator.has_mpi
 if has_mpi:
     try:
         from mpi4py import MPI
-    except ModuleNotFoundError:
+    except (ImportError, RuntimeError) as error:
+        # mpi4py fails three ways here and they are not interchangeable.
+        # ModuleNotFoundError: not installed. ImportError: installed, but its
+        # extension cannot dlopen libmpi -- and since ModuleNotFoundError is a
+        # *subclass* of ImportError, catching only the former missed this one.
+        # RuntimeError: its ABI probe cannot find libmpi at all. All three mean
+        # a partial or absent MPI install and deserve the same explanation
+        # rather than a dlopen traceback from inside mpi4py, so the original is
+        # kept as the cause.
         raise RuntimeError(
-            "MPI support is enabled for muGrid but mpi4py is not available."
-        )
+            "MPI support is enabled for muGrid but mpi4py is not usable: "
+            f"{error}"
+        ) from error
 else:
     MPI = None
 
