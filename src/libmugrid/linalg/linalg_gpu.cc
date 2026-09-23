@@ -155,9 +155,11 @@ conj_product(DeviceComplexT<RT> a, DeviceComplexT<RT> b) {
     return {a.re * b.re + a.im * b.im, a.re * b.im - a.im * b.re};
 }
 
-// Real squared magnitude |x|^2.
+// Real squared magnitude |x|^2. There is deliberately no fp32 overload:
+// callers widen() first, so the square itself is always formed in double.
+// Squaring in fp32 and widening afterwards loses half the mantissa and
+// overflows at |x| ~ 1.8e19, far below what the accumulator can hold.
 __host__ __device__ inline Real sq_norm(Real x) { return x * x; }
-__host__ __device__ inline float sq_norm(float x) { return x * x; }
 template <typename RT>
 __host__ __device__ inline RT sq_norm(DeviceComplexT<RT> x) {
     return x.re * x.re + x.im * x.im;
@@ -168,9 +170,12 @@ __host__ __device__ inline RT sq_norm(DeviceComplexT<RT> x) {
  * promoted to double precision (float -> Real, DeviceComplex32 ->
  * DeviceComplex), mirroring internal::promoted in linalg_host.cc and the
  * double accumulation already used by axpy_norm_sq_kernel and
- * interior_three_dots_kernel. The launchers narrow the final value back to
- * the device scalar — a single O(eps_f32) rounding, instead of a running
- * float32 accumulation error over the whole field.
+ * interior_three_dots_kernel. The launchers also *return* this type rather
+ * than narrowing back to the device scalar: see linalg::reduction_result in
+ * linalg.hh — the narrowing overflowed to infinity on large single-precision
+ * solves, which stalled CG silently. This is the device-side mirror of that
+ * trait (it maps the DeviceComplex* types, which the public one does not
+ * know about).
  */
 template <typename T>
 struct reduce_acc {
@@ -193,19 +198,6 @@ __host__ __device__ inline Real widen(float x) { return x; }
 __host__ __device__ inline DeviceComplex widen(DeviceComplex x) { return x; }
 __host__ __device__ inline DeviceComplex widen(DeviceComplex32 x) {
     return {x.re, x.im};
-}
-
-// Narrow an accumulated value back to the device scalar type DS (host side,
-// after the reduction; identity in double).
-template <typename DS>
-inline DS narrow(ReduceAcc<DS> x) {
-    if constexpr (std::is_same_v<DS, float>) {
-        return static_cast<float>(x);
-    } else if constexpr (std::is_same_v<DS, DeviceComplex32>) {
-        return {static_cast<float>(x.re), static_cast<float>(x.im)};
-    } else {
-        return x;
-    }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -269,7 +261,9 @@ __global__ void axpy_norm_sq_kernel(T alpha, const T* x, T* y,
     while (idx < n) {
         T new_y = y[idx] + alpha * x[idx];
         y[idx] = new_y;
-        sum += sq_norm(new_y);
+        // Widen before squaring — an fp32 square both loses precision and
+        // overflows well before the double accumulator would.
+        sum += sq_norm(widen(new_y));
         idx += blockDim.x * gridDim.x;
     }
     shared_data[tid] = sum;
@@ -312,7 +306,11 @@ __global__ void dot_reduce_kernel(const T* a, const T* b,
     // Load and multiply
     Acc sum{};
     while (idx < n) {
-        sum += widen(conj_product(a[idx], b[idx]));
+        // Widen *before* multiplying: conj_product returns the device
+        // scalar, so multiplying first would round each product to fp32 —
+        // the error the promoted accumulator exists to avoid, and an
+        // overflow risk for large entries. Mirrors interior_vecdot.
+        sum += conj_product(widen(a[idx]), widen(b[idx]));
         idx += blockDim.x * gridDim.x;
     }
     shared_data[tid] = sum;
@@ -380,7 +378,8 @@ __global__ void interior_dot_kernel(
         Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
         for (Index_t c = 0; c < nb_components; ++c) {
             const Index_t e = offset + c * stride_c;
-            sum += widen(conj_product(a[e], b[e]));
+            // Widen before multiplying — see dot_reduce_kernel.
+            sum += conj_product(widen(a[e]), widen(b[e]));
         }
     }
 
@@ -676,10 +675,12 @@ inline Complex32 to_public(DeviceComplex32 x) {
     return Complex32{x.re, x.im};
 }
 
-//! Lift a real squared-norm to the public scalar type (norms are real-valued;
-//! the complex API returns it as a zero-imaginary Complex, matching the host).
+//! Lift a real squared-norm to the reduction result type for a field of
+//! scalar type T (norms are real-valued; the complex API returns it as a
+//! zero-imaginary Complex, matching the host). Single-precision fields get
+//! the double-precision result — see linalg::reduction_result.
 template <typename T>
-T norm_to_public(Real r);
+linalg::reduction_result_t<T> norm_to_public(Real r);
 template <>
 Real norm_to_public<Real>(Real r) {
     return r;
@@ -689,12 +690,12 @@ Complex norm_to_public<Complex>(Real r) {
     return Complex{r, 0.0};
 }
 template <>
-Real32 norm_to_public<Real32>(Real r) {
-    return static_cast<Real32>(r);
+Real norm_to_public<Real32>(Real r) {
+    return r;
 }
 template <>
-Complex32 norm_to_public<Complex32>(Real r) {
-    return Complex32{static_cast<Real32>(r), 0.0f};
+Complex norm_to_public<Complex32>(Real r) {
+    return Complex{r, 0.0};
 }
 
 /**
@@ -816,16 +817,17 @@ InteriorBox interior_box(const TypedField<T, DeviceSpace>& f,
 /* ---------------------------------------------------------------------- */
 
 //! Full-buffer reduction of conj_product(a, b) over `n` device-scalar
-//! elements. Partial sums and the final reduction use the promoted
-//! accumulator type (double precision for single-precision DS); the result
-//! is narrowed back to DS.
+//! elements. Partial sums, the final reduction and the *returned* value all
+//! use the promoted accumulator type (double precision for single-precision
+//! DS); see gpu_kernels::reduce_acc for why it is not narrowed back.
 template <typename DS>
-DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
+gpu_kernels::ReduceAcc<DS> reduce_full_dot(const DS* a, const DS* b,
+                                           Index_t n) {
     using Acc = gpu_kernels::ReduceAcc<DS>;
     if (n <= 0) {
         // e.g. an MPI rank with no local pixels; a zero-block kernel launch
         // would be an invalid configuration
-        return DS{};
+        return Acc{};
     }
     const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
                            gpu_kernels::REDUCE_BLOCK_SIZE;
@@ -839,19 +841,20 @@ DS reduce_full_dot(const DS* a, const DS* b, Index_t n) {
 
     Acc result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Acc));
-    return gpu_kernels::narrow<DS>(result);
+    return result;
 }
 
 //! Interior reduction of conj_product(a, b) (ghosts excluded). Strides come
 //! from `box`; the caller guarantees a and b share that layout. Accumulates
-//! in the promoted type like reduce_full_dot.
+//! in — and returns — the promoted type like reduce_full_dot.
 template <typename DS>
-DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
+gpu_kernels::ReduceAcc<DS> reduce_interior_dot(const DS* a, const DS* b,
+                                               const InteriorBox& box) {
     using Acc = gpu_kernels::ReduceAcc<DS>;
     if (box.nb_interior_pixels <= 0) {
         // e.g. an MPI rank with no local pixels; a zero-block kernel launch
         // would be an invalid configuration
-        return DS{};
+        return Acc{};
     }
     const int num_blocks =
         gpu_kernels::reduction_blocks(box.nb_interior_pixels);
@@ -868,7 +871,7 @@ DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
 
     Acc result;
     GPU_MEMCPY_D2H(&result, d_partial, sizeof(Acc));
-    return gpu_kernels::narrow<DS>(result);
+    return result;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -881,8 +884,8 @@ DS reduce_interior_dot(const DS* a, const DS* b, const InteriorBox& box) {
 /* ---------------------------------------------------------------------- */
 
 template <typename T>
-T vecdot_device(const TypedField<T, DeviceSpace>& a,
-                const TypedField<T, DeviceSpace>& b) {
+reduction_result_t<T> vecdot_device(const TypedField<T, DeviceSpace>& a,
+                                    const TypedField<T, DeviceSpace>& b) {
     if (&a.get_collection() != &b.get_collection()) {
         throw FieldError("vecdot: fields must belong to the same collection");
     }
@@ -914,7 +917,7 @@ T vecdot_device(const TypedField<T, DeviceSpace>& a,
 }
 
 template <typename T>
-T norm_sq_device(const TypedField<T, DeviceSpace>& x) {
+reduction_result_t<T> norm_sq_device(const TypedField<T, DeviceSpace>& x) {
     // norm_sq(x) == vecdot(x, x): conj_product(x, x) = |x|^2 for complex
     // (its imaginary part is exactly zero, x_r*x_i - x_i*x_r) and x^2 for real.
     using DS = DeviceScalar<T>;
@@ -1020,8 +1023,9 @@ void copy_device(const TypedField<T, DeviceSpace>& src,
 }
 
 template <typename T>
-T axpy_norm_sq_device(T alpha, const TypedField<T, DeviceSpace>& x,
-                      TypedField<T, DeviceSpace>& y) {
+reduction_result_t<T> axpy_norm_sq_device(T alpha,
+                                          const TypedField<T, DeviceSpace>& x,
+                                          TypedField<T, DeviceSpace>& y) {
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy_norm_sq: fields must belong to the same collection");
     }
@@ -1213,12 +1217,14 @@ void cross<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
 /* double-accumulated reductions).                                            */
 #define MUGRID_LINALG_DEVICE_SPECIALIZATIONS(T)                                \
     template <>                                                                \
-    T vecdot<T, DeviceSpace>(const TypedField<T, DeviceSpace>& a,              \
-                             const TypedField<T, DeviceSpace>& b) {            \
+    reduction_result_t<T> vecdot<T, DeviceSpace>(                              \
+        const TypedField<T, DeviceSpace>& a,                                   \
+        const TypedField<T, DeviceSpace>& b) {                                 \
         return vecdot_device(a, b);                                            \
     }                                                                          \
     template <>                                                                \
-    T norm_sq<T, DeviceSpace>(const TypedField<T, DeviceSpace>& x) {           \
+    reduction_result_t<T> norm_sq<T, DeviceSpace>(                             \
+        const TypedField<T, DeviceSpace>& x) {                                 \
         return norm_sq_device(x);                                             \
     }                                                                          \
     template <>                                                                \
@@ -1241,8 +1247,9 @@ void cross<Complex, DeviceSpace>(const TypedField<Complex, DeviceSpace>& a,
         copy_device(src, dst);                                               \
     }                                                                          \
     template <>                                                                \
-    T axpy_norm_sq<T, DeviceSpace>(T alpha, const TypedField<T, DeviceSpace>& x,\
-                                   TypedField<T, DeviceSpace>& y) {            \
+    reduction_result_t<T> axpy_norm_sq<T, DeviceSpace>(                        \
+        T alpha, const TypedField<T, DeviceSpace>& x,                          \
+        TypedField<T, DeviceSpace>& y) {                                       \
         return axpy_norm_sq_device(alpha, x, y);                              \
     }                                                                          \
     template <>                                                                \
@@ -1261,14 +1268,16 @@ MUGRID_LINALG_DEVICE_SPECIALIZATIONS(Complex32)
 /* Templated on the field real type RT (Real or Real32). The reduction     */
 /* accumulates in Real (double) regardless of RT, so the single-precision  */
 /* variant keeps a double-accurate inner product (only the field reads are */
-/* fp32). The three results are returned as RT.                            */
+/* fp32). The three results are returned in reduction_result_t<RT>, i.e.   */
+/* double precision even for an fp32 field -- see linalg::reduction_result.*/
 /* ---------------------------------------------------------------------- */
 
 template <typename RT>
-std::array<RT, 3> pipelined_cg_dots_device(
+std::array<reduction_result_t<RT>, 3> pipelined_cg_dots_device(
     const TypedField<RT, DeviceSpace>& r,
     const TypedField<RT, DeviceSpace>& u,
     const TypedField<RT, DeviceSpace>& w) {
+    using Acc = reduction_result_t<RT>;
     for (const auto* other : {&u, &w}) {
         if (&other->get_collection() != &r.get_collection()) {
             throw FieldError(
@@ -1293,7 +1302,7 @@ std::array<RT, 3> pipelined_cg_dots_device(
     const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
     const InteriorBox box = interior_box(r, global_coll);
     if (box.nb_interior_pixels <= 0) {
-        return {RT{0}, RT{0}, RT{0}};
+        return {Acc{0}, Acc{0}, Acc{0}};
     }
 
     const int num_blocks =
@@ -1320,8 +1329,7 @@ std::array<RT, 3> pipelined_cg_dots_device(
 
     Real h[3];
     GPU_MEMCPY_D2H(h, d_out, 3 * sizeof(Real));
-    return {static_cast<RT>(h[0]), static_cast<RT>(h[1]),
-            static_cast<RT>(h[2])};
+    return {h[0], h[1], h[2]};
 }
 
 template <>
@@ -1333,7 +1341,7 @@ std::array<Real, 3> pipelined_cg_dots<Real, DeviceSpace>(
 }
 
 template <>
-std::array<Real32, 3> pipelined_cg_dots<Real32, DeviceSpace>(
+std::array<Real, 3> pipelined_cg_dots<Real32, DeviceSpace>(
     const TypedField<Real32, DeviceSpace>& r,
     const TypedField<Real32, DeviceSpace>& u,
     const TypedField<Real32, DeviceSpace>& w) {

@@ -511,10 +511,12 @@ void add_linalg_functions(py::module &mod) {
     // dispatches by argument dtype, so these share the Python names above.
 #define MUGRID_BIND_LINALG_HOST(F, T)                                          \
     linalg.def("vecdot",                                                       \
-        static_cast<T (*)(const F&, const F&)>(                                \
+        static_cast<muGrid::linalg::reduction_result_t<T> (*)(                 \
+            const F&, const F&)>(                                              \
             &muGrid::linalg::vecdot<T, HostSpace>), "a"_a, "b"_a);             \
     linalg.def("norm_sq",                                                      \
-        static_cast<T (*)(const F&)>(&muGrid::linalg::norm_sq<T, HostSpace>),  \
+        static_cast<muGrid::linalg::reduction_result_t<T> (*)(const F&)>(      \
+            &muGrid::linalg::norm_sq<T, HostSpace>),                           \
         "x"_a);                                                                \
     linalg.def("axpy",                                                         \
         static_cast<void (*)(T, const F&, F&)>(                                \
@@ -530,7 +532,8 @@ void add_linalg_functions(py::module &mod) {
         static_cast<void (*)(const F&, F&)>(                                   \
             &muGrid::linalg::copy<T, HostSpace>), "src"_a, "dst"_a);           \
     linalg.def("axpy_norm_sq",                                                 \
-        static_cast<T (*)(T, const F&, F&)>(                                   \
+        static_cast<muGrid::linalg::reduction_result_t<T> (*)(                 \
+            T, const F&, F&)>(                                                 \
             &muGrid::linalg::axpy_norm_sq<T, HostSpace>),                      \
         "alpha"_a, "x"_a, "y"_a);                                              \
     linalg.def("cross",                                                        \
@@ -540,7 +543,7 @@ void add_linalg_functions(py::module &mod) {
     MUGRID_BIND_LINALG_HOST(Complex32FieldHost, Complex32)
 #undef MUGRID_BIND_LINALG_HOST
     linalg.def("pipelined_cg_dots",
-        static_cast<std::array<Real32, 3> (*)(
+        static_cast<std::array<Real, 3> (*)(
             const Real32FieldHost&, const Real32FieldHost&,
             const Real32FieldHost&)>(
             &muGrid::linalg::pipelined_cg_dots<Real32, HostSpace>),
@@ -688,10 +691,12 @@ void add_linalg_functions(py::module &mod) {
     // --- Single-precision (float32) device CG building blocks ---
 #define MUGRID_BIND_LINALG_DEVICE(F, T)                                        \
     linalg.def("vecdot",                                                       \
-        static_cast<T (*)(const F&, const F&)>(                                \
+        static_cast<muGrid::linalg::reduction_result_t<T> (*)(                 \
+            const F&, const F&)>(                                              \
             &muGrid::linalg::vecdot<T, DeviceSpace>), "a"_a, "b"_a);           \
     linalg.def("norm_sq",                                                      \
-        static_cast<T (*)(const F&)>(&muGrid::linalg::norm_sq<T, DeviceSpace>),\
+        static_cast<muGrid::linalg::reduction_result_t<T> (*)(const F&)>(      \
+            &muGrid::linalg::norm_sq<T, DeviceSpace>),                         \
         "x"_a);                                                                \
     linalg.def("axpy",                                                         \
         static_cast<void (*)(T, const F&, F&)>(                                \
@@ -707,7 +712,8 @@ void add_linalg_functions(py::module &mod) {
         static_cast<void (*)(const F&, F&)>(                                   \
             &muGrid::linalg::copy<T, DeviceSpace>), "src"_a, "dst"_a);         \
     linalg.def("axpy_norm_sq",                                                 \
-        static_cast<T (*)(T, const F&, F&)>(                                   \
+        static_cast<muGrid::linalg::reduction_result_t<T> (*)(                 \
+            T, const F&, F&)>(                                                 \
             &muGrid::linalg::axpy_norm_sq<T, DeviceSpace>),                    \
         "alpha"_a, "x"_a, "y"_a);                                              \
     linalg.def("cross",                                                        \
@@ -720,9 +726,9 @@ void add_linalg_functions(py::module &mod) {
     // Single-precision pipelined CG dots + field-valued scal + Leray
     // projection on device (custom kernels, double-accumulated reductions).
     linalg.def("pipelined_cg_dots",
-        static_cast<std::array<Real32, 3> (*)(const Real32FieldDevice&,
-                                              const Real32FieldDevice&,
-                                              const Real32FieldDevice&)>(
+        static_cast<std::array<Real, 3> (*)(const Real32FieldDevice&,
+                                            const Real32FieldDevice&,
+                                            const Real32FieldDevice&)>(
             &muGrid::linalg::pipelined_cg_dots<Real32, DeviceSpace>),
         "r"_a, "u"_a, "w"_a,
         "Fused interior reduction for pipelined CG on device (GPU), float32 "

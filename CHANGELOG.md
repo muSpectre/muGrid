@@ -4,6 +4,28 @@ Change log for µGrid
 unreleased
 ----------
 
+- FIX: `vecdot`, `norm_sq`, `axpy_norm_sq` and `pipelined_cg_dots` now return
+  `linalg::reduction_result_t<T>` — double precision for a `Real32`/`Complex32`
+  field — instead of narrowing the double accumulator back to the field's scalar
+  type on return. The narrowing turned any single-precision reduction whose true
+  value exceeded ~3.4e38 into `inf`, and that bound is reached by ordinary large
+  solves: it tightens as `1/sqrt(N)` with the summation and again as `h²` with the
+  operator norm, so it is some 500x tighter at 512³ than at 64³. The failure was
+  silent rather than loud — an infinite `pAp` makes CG's `alpha = rz/pAp` exactly
+  zero, so the iterate stops moving and the residual repeats bit-for-bit until
+  maxiter, while the pipelined variant divided by the resulting zero `alpha_prev`
+  and raised `ZeroDivisionError` from inside the recurrence. On an `A = 1e25·I`
+  system (condition number 1) a float32 solve stalled for 25 iterations where the
+  float64 one converged in 1; it now also converges in 1. Python sees no API
+  change: both precisions already crossed the binding boundary as a plain `float`
+- FIX: The reduction kernels widen each operand *before* multiplying instead of
+  forming the product in the field's precision and widening afterwards. Squaring
+  in `float32` discards half the mantissa and overflows at `|x| ~ 1.8e19`, far
+  below what the accumulator holds; this affected the scalar (non-vectorised)
+  interior paths on the host — so `pipelined_cg_dots`, which has no vectorised
+  path, lost ~7e-9 relative accuracy where `vecdot`/`norm_sq` did not — and the
+  `dot`/`interior_dot`/`axpy_norm_sq` kernels on the device. The fp32 `sq_norm`
+  overload is gone so the mistake cannot be made again
 - ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between two
   nested nodal grids differing by a factor of two in every direction, and its
   exact adjoint `R = Pᵀ`, the tensor product of the `[1/2, 1, 1/2]` stencil.
