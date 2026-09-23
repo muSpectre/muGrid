@@ -185,8 +185,8 @@ __global__ void isotropic_stiffness_2d_kernel(
 
     // Thread indexing for NODES - iterate over all interior nodes
     // Ghost cells handle periodicity and MPI boundaries
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    Index_t ix = global_thread_x();
+    Index_t iy = global_thread_y();
 
     // Check bounds
     if (ix >= nnx || iy >= nny) return;
@@ -460,8 +460,8 @@ __global__ void isotropic_stiffness_2d_macro_rhs_kernel(
     Index_t force_stride_d, T alpha, bool increment) {
 
     constexpr int NB_DOFS = 2;
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
+    Index_t ix = global_thread_x();
+    Index_t iy = global_thread_y();
     if (ix >= nnx || iy >= nny) return;
 
     const int ELEM_OFFSETS[4][3] = {
@@ -504,9 +504,9 @@ __global__ void isotropic_stiffness_3d_macro_rhs_kernel(
     Index_t force_stride_d, T alpha, bool increment) {
 
     constexpr int NB_DOFS = 3;
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y;
-    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z;
+    Index_t ix = global_thread_x();
+    Index_t iy = global_thread_y();
+    Index_t iz = global_thread_z();
     if (ix >= nnx || iy >= nny || iz >= nnz) return;
 
     const int ELEM_OFFSETS[8][4] = {
@@ -584,9 +584,8 @@ __global__ void isotropic_stiffness_2d_average_kernel(
     #pragma unroll
     for (int k = 0; k < NCOMP; ++k) acc[k] = 0.0;
     Index_t nel = nelx * nely;
-    Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
-    for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
-         e += stride) {
+    Index_t stride = grid_stride_x();
+    for (Index_t e = global_thread_x(); e < nel; e += stride) {
         Index_t ex = e % nelx;
         Index_t ey = e / nelx;
         T u[NB_NODES * NB_DOFS];
@@ -679,9 +678,8 @@ __global__ void isotropic_stiffness_3d_average_kernel(
 
     Index_t nelxy = nelx * nely;
     Index_t nel = nelxy * nelz;
-    Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
-    for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
-         e += stride) {
+    Index_t stride = grid_stride_x();
+    for (Index_t e = global_thread_x(); e < nel; e += stride) {
         Index_t ez = e / nelxy;
         Index_t rem = e - ez * nelxy;
         Index_t ey = rem / nelx;
@@ -804,9 +802,8 @@ __global__ void isotropic_stiffness_2d_sensitivity_kernel(
     const int NODE_OFFSET[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
     Index_t nel = nelx * nely;
-    Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
-    for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
-         e += stride) {
+    Index_t stride = grid_stride_x();
+    for (Index_t e = global_thread_x(); e < nel; e += stride) {
         Index_t ex = e % nelx;
         Index_t ey = e / nelx;
         T a[NB_ELEM_DOFS], b[NB_ELEM_DOFS];
@@ -859,9 +856,8 @@ __global__ void isotropic_stiffness_3d_sensitivity_kernel(
 
     Index_t nelxy = nelx * nely;
     Index_t nel = nelxy * nelz;
-    Index_t stride = static_cast<Index_t>(blockDim.x) * gridDim.x;
-    for (Index_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nel;
-         e += stride) {
+    Index_t stride = grid_stride_x();
+    for (Index_t e = global_thread_x(); e < nel; e += stride) {
         Index_t ez = e / nelxy;
         Index_t rem = e - ez * nelxy;
         Index_t ey = rem / nelx;

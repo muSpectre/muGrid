@@ -209,7 +209,7 @@ __host__ __device__ inline DeviceComplex widen(DeviceComplex32 x) {
 // AXPY kernel: y = alpha * x + y
 template <typename T>
 __global__ void axpy_kernel(T alpha, const T* x, T* y, Index_t n) {
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t idx = global_thread_x();
     if (idx < n) {
         y[idx] += alpha * x[idx];
     }
@@ -218,7 +218,7 @@ __global__ void axpy_kernel(T alpha, const T* x, T* y, Index_t n) {
 // Scale kernel: x = alpha * x
 template <typename T>
 __global__ void scal_kernel(T alpha, T* x, Index_t n) {
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t idx = global_thread_x();
     if (idx < n) {
         x[idx] = alpha * x[idx];
     }
@@ -227,7 +227,7 @@ __global__ void scal_kernel(T alpha, T* x, Index_t n) {
 // Copy kernel: dst = src
 template <typename T>
 __global__ void copy_kernel(const T* src, T* dst, Index_t n) {
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t idx = global_thread_x();
     if (idx < n) {
         dst[idx] = src[idx];
     }
@@ -236,7 +236,7 @@ __global__ void copy_kernel(const T* src, T* dst, Index_t n) {
 // AXPBY kernel: y = alpha * x + beta * y
 template <typename T>
 __global__ void axpby_kernel(T alpha, const T* x, T beta, T* y, Index_t n) {
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t idx = global_thread_x();
     if (idx < n) {
         y[idx] = alpha * x[idx] + beta * y[idx];
     }
@@ -254,7 +254,7 @@ __global__ void axpy_norm_sq_kernel(T alpha, const T* x, T* y,
     __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t idx = global_thread_x();
 
     // Fused: update y AND accumulate squared norm
     Real sum = 0.0;
@@ -264,7 +264,7 @@ __global__ void axpy_norm_sq_kernel(T alpha, const T* x, T* y,
         // Widen before squaring — an fp32 square both loses precision and
         // overflows well before the double accumulator would.
         sum += sq_norm(widen(new_y));
-        idx += blockDim.x * gridDim.x;
+        idx += grid_stride_x();
     }
     shared_data[tid] = sum;
     __syncthreads();
@@ -301,7 +301,7 @@ __global__ void dot_reduce_kernel(const T* a, const T* b,
     __shared__ Acc shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
-    Index_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t idx = global_thread_x();
 
     // Load and multiply
     Acc sum{};
@@ -311,7 +311,7 @@ __global__ void dot_reduce_kernel(const T* a, const T* b,
         // the error the promoted accumulator exists to avoid, and an
         // overflow risk for large entries. Mirrors interior_vecdot.
         sum += conj_product(widen(a[idx]), widen(b[idx]));
-        idx += blockDim.x * gridDim.x;
+        idx += grid_stride_x();
     }
     shared_data[tid] = sum;
     __syncthreads();
@@ -362,12 +362,12 @@ __global__ void interior_dot_kernel(
     __shared__ Acc shared_data[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t global_tid = global_thread_x();
     Index_t nb_pixels = nx * ny * nz;
 
     Acc sum{};
     for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
-         pixel_idx += blockDim.x * gridDim.x) {
+         pixel_idx += grid_stride_x()) {
         // x runs fastest (smallest stride) so consecutive threads make
         // coalesced accesses
         Index_t ix = x0 + pixel_idx % nx;
@@ -453,12 +453,12 @@ __global__ void interior_three_dots_kernel(
     __shared__ Real s_rr[REDUCE_BLOCK_SIZE];
 
     Index_t tid = threadIdx.x;
-    Index_t global_tid = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t global_tid = global_thread_x();
     Index_t nb_pixels = nx * ny * nz;
 
     Real ru = 0.0, wu = 0.0, rr = 0.0;
     for (Index_t pixel_idx = global_tid; pixel_idx < nb_pixels;
-         pixel_idx += blockDim.x * gridDim.x) {
+         pixel_idx += grid_stride_x()) {
         Index_t ix = x0 + pixel_idx % nx;
         Index_t rem = pixel_idx / nx;
         Index_t iy = y0 + rem % ny;
@@ -537,7 +537,7 @@ __global__ void field_scal_complex_kernel(RT* x2, const RT* a,
                                           Index_t npix, Index_t ncomp,
                                           bool soa, bool alpha_per_comp,
                                           Index_t n2) {
-    Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t j = global_thread_x();
     if (j < n2) {
         Index_t elem = j >> 1;  // complex element index
         Index_t i = alpha_per_comp
@@ -553,7 +553,7 @@ __global__ void field_scal_real_kernel(RT* x, const RT* a,
                                        Index_t npix, Index_t ncomp,
                                        bool soa, bool alpha_per_comp,
                                        Index_t n) {
-    Index_t j = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t j = global_thread_x();
     if (j < n) {
         Index_t i =
             alpha_per_comp ? j : (soa ? (j % npix) : (j / ncomp));
@@ -569,7 +569,7 @@ __global__ void field_scal_real_kernel(RT* x, const RT* a,
 template <typename T>
 __global__ void cross_kernel(const T* a, const T* b, T* out, Index_t npix,
                              bool soa) {
-    Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t i = global_thread_x();
     if (i < npix) {
         const Index_t cs = soa ? npix : 1;        // stride between components
         const Index_t base = soa ? i : 3 * i;     // first component of pixel i
@@ -591,7 +591,7 @@ __global__ void cross_kernel(const T* a, const T* b, T* out, Index_t npix,
 template <typename RT>
 __global__ void leray_kernel(const RT* k, const RT* invk, const RT* N2,
                              RT* out2, Index_t npix, bool soa) {
-    Index_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    Index_t i = global_thread_x();
     if (i < npix) {
         const Index_t cs = soa ? npix : 1;     // real component stride
         const Index_t base = soa ? i : 3 * i;  // first real component

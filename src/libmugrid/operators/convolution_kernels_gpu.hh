@@ -82,9 +82,9 @@ namespace gpu {
         const Real* MUGRID_RESTRICT op_values,
         const Index_t nnz) {
 
-        const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
-        const Index_t y = blockIdx.y * blockDim.y + threadIdx.y;
-        const Index_t z = blockIdx.z * blockDim.z + threadIdx.z;
+        const Index_t x = global_thread_x();
+        const Index_t y = global_thread_y();
+        const Index_t z = global_thread_z();
 
         if (x < nx && y < ny && z < nz) {
             const Index_t nodal_offset = nodal_base +
@@ -126,9 +126,9 @@ namespace gpu {
         const Real* MUGRID_RESTRICT weights,  // device pointer, may be nullptr
         const Index_t nnz) {
 
-        const Index_t x = blockIdx.x * blockDim.x + threadIdx.x;
-        const Index_t y = blockIdx.y * blockDim.y + threadIdx.y;
-        const Index_t z = blockIdx.z * blockDim.z + threadIdx.z;
+        const Index_t x = global_thread_x();
+        const Index_t y = global_thread_y();
+        const Index_t z = global_thread_z();
 
         if (x < nx && y < ny && z < nz) {
             const Index_t nodal_offset = nodal_base +

@@ -40,6 +40,7 @@
 #include "memory/gpu_runtime.hh"
 #include "memory/device.hh"
 #include "mpi/gpu_aware_mpi.hh"
+#include "mpi/mpi_counts.hh"
 
 #include <algorithm>
 #include <cstdlib>
@@ -503,13 +504,22 @@ namespace muGrid {
         std::vector<int> send_counts_el(comm_size), send_displs_el(comm_size);
         std::vector<int> recv_counts_el(comm_size), recv_displs_el(comm_size);
         std::size_t send_total{0}, recv_total{0};
+        // MPI types these as int. They grow with the cube of the resolution
+        // and with the component count, so narrow with a range check rather
+        // than a bare cast: a wrapped, negative count would corrupt the
+        // transform silently instead of failing. This is the default exchange
+        // path on the GPU, not just the env-gated host one.
         for (int r{0}; r < comm_size; ++r) {
             std::size_t s{src_pre * src_counts[r] * src_post * ncomp};
             std::size_t d{dst_pre * dst_counts[r] * dst_post * ncomp};
-            send_counts_el[r] = static_cast<int>(s);
-            send_displs_el[r] = static_cast<int>(send_total);
-            recv_counts_el[r] = static_cast<int>(d);
-            recv_displs_el[r] = static_cast<int>(recv_total);
+            send_counts_el[r] = checked_mpi_int(static_cast<Index_t>(s),
+                                                "transpose send count");
+            send_displs_el[r] = checked_mpi_int(
+                static_cast<Index_t>(send_total), "transpose send offset");
+            recv_counts_el[r] = checked_mpi_int(static_cast<Index_t>(d),
+                                                "transpose recv count");
+            recv_displs_el[r] = checked_mpi_int(
+                static_cast<Index_t>(recv_total), "transpose recv offset");
             send_total += s;
             recv_total += d;
         }

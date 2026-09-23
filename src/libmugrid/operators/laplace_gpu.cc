@@ -65,8 +65,8 @@ __global__ void laplace_2d_kernel(
     bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    Index_t ix = global_thread_x() + 1;
+    Index_t iy = global_thread_y() + 1;
 
     // Check bounds (excluding ghost layers)
     if (ix < nx - 1 && iy < ny - 1) {
@@ -103,9 +103,9 @@ __global__ void laplace_3d_kernel(
     bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
-    Index_t ix = blockIdx.x * blockDim.x + threadIdx.x + 1;
-    Index_t iy = blockIdx.y * blockDim.y + threadIdx.y + 1;
-    Index_t iz = blockIdx.z * blockDim.z + threadIdx.z + 1;
+    Index_t ix = global_thread_x() + 1;
+    Index_t iy = global_thread_y() + 1;
+    Index_t iz = global_thread_z() + 1;
 
     // Check bounds (excluding ghost layers)
     if (ix < nx - 1 && iy < ny - 1 && iz < nz - 1) {

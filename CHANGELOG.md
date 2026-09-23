@@ -37,6 +37,22 @@ unreleased
 - TST: `tests/python_solvers_test.py` is renamed to `python_solvers_tests.py`.
   pytest collects `python_*_tests.py`, so the file -- and with it the only test
   of `conjugate_gradients_pipelined` in the repo -- had never run
+- FIX: The FFT transpose's all-to-all counts and displacements are narrowed to
+  MPI's `int` through `checked_mpi_int` instead of a bare `static_cast`, so an
+  oversized transform throws rather than wrapping to a negative count and
+  corrupting the transform. This is the default exchange path on the GPU, not
+  only the env-gated host one. `checked_mpi_int` moved out of
+  `cartesian_communicator.cc`'s anonymous namespace into the new
+  `mpi/mpi_counts.hh` so both callers narrow the same way
+- FIX: GPU kernels compute their global thread index through new
+  `global_thread_{x,y,z}()` / `grid_stride_x()` helpers in `memory/gpu_runtime.hh`
+  rather than open-coding `blockIdx.x * blockDim.x + threadIdx.x`. All three
+  operands are `unsigned int`, so the product was evaluated in 32 bits and
+  wrapped above 2^32 threads *before* any widening — assigning the result to an
+  `Index_t` did not help. Element counts are `nb_pixels * nb_components *
+  nb_sub_pts` and grow with the cube of the resolution, so the bound is reachable.
+  48 sites across linalg, laplace, convolution, FEM-gradient and solid-stiffness
+  kernels; `ghost_accumulate_gpu.cc` already widened by hand and is unchanged
 - FIX: The reduction kernels widen each operand *before* multiplying instead of
   forming the product in the field's precision and widening afterwards. Squaring
   in `float32` discards half the mantissa and overflows at `|x| ~ 1.8e19`, far
