@@ -61,6 +61,25 @@ unreleased
   path, lost ~7e-9 relative accuracy where `vecdot`/`norm_sq` did not — and the
   `dot`/`interior_dot`/`axpy_norm_sq` kernels on the device. The fp32 `sq_norm`
   overload is gone so the mistake cannot be made again
+- PERF: `make_reference_stiffness_preconditioner` assembles the symbol at the
+  solve precision and inverts it one slab of Fourier modes at a time, in place.
+  It previously held `K_hat` in `complex128` regardless of the requested dtype,
+  then built four more arrays that size in a row: `np.zeros_like`, the
+  `blocks[nonzero]` boolean gather, `np.linalg.inv`'s output, and the
+  normalisation multiply. The symbol is n² values per Fourier point — 9.7 GB at
+  512³ in `complex128` — so that chain was tens of GB for one preconditioner.
+  The `complex128` was also half illusory in a single-precision solve: the data
+  reaches it from `column_hat`, a `complex_dtype` field, so it has already been
+  through a float32 FFT. Only the per-mode n×n *inversion* gains from double,
+  and that still happens in double. The singular q=0 block is made the identity
+  before inversion and zeroed after, instead of mask-indexing around it.
+  Measured peak RSS at 96³ with 3 components: 508 → 376 MB single, 575 → 444 MB
+  double. `SYMBOL_INVERSION_SLAB_BYTES` bounds the working set and is
+  module-level so tests can shrink it; the slab boundaries provably do not
+  change the result (`test_reference_stiffness_symbol_is_slab_invariant`)
+- PERF: `BlockFourierPreconditioner`'s Hermitian detection tests one component
+  pair at a time. `np.abs(blocks)` and `blocks - conj(swapaxes(blocks, 0, 1))`
+  each allocated an array the size of the whole symbol, the second complex
 - ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between two
   nested nodal grids differing by a factor of two in every direction, and its
   exact adjoint `R = Pᵀ`, the tensor product of the `[1/2, 1, 1/2]` stencil.
