@@ -62,25 +62,16 @@ inline T conj_product(T a, T b) {
  * double precision (Real32 -> Real, Complex32 -> Complex) so a long running
  * sum does not lose its small-magnitude tail. For CG this keeps rr/rz/pAp
  * accurate enough that a float32 solve converges in the same number of
- * iterations as a float64 one. The final result is narrowed back to T on
- * return; that last rounding is a single O(eps_f32) relative error and
- * harmless — it is the *running* float32 accumulation over millions of
- * entries that loses ~1e-4 relative accuracy.
+ * iterations as a float64 one.
+ *
+ * The accumulator is also what the reductions *return* — do not narrow back
+ * to T on the way out. See linalg::reduction_result in linalg.hh for why:
+ * the narrowing overflows to infinity on large single-precision solves, and
+ * an infinite pAp stalls CG silently rather than reporting divergence. This
+ * is an alias of that public trait so the two cannot drift apart.
  */
 template <typename T>
-struct promoted {
-    using type = T;
-};
-template <>
-struct promoted<Real32> {
-    using type = Real;
-};
-template <>
-struct promoted<Complex32> {
-    using type = Complex;
-};
-template <typename T>
-using promoted_t = typename promoted<T>::type;
+using promoted_t = reduction_result_t<T>;
 
 /**
  * True if the collection carries ghost buffers in any direction.
@@ -128,9 +119,9 @@ inline void check_interior_reduction_layout(const GlobalFieldCollection& coll,
 }
 
 template <typename T>
-T interior_vecdot(const T* a_data, const T* b_data,
-                  const GlobalFieldCollection& coll,
-                  Index_t nb_components_per_pixel) {
+promoted_t<T> interior_vecdot(const T* a_data, const T* b_data,
+                              const GlobalFieldCollection& coll,
+                              Index_t nb_components_per_pixel) {
     const auto spatial_dim = coll.get_spatial_dim();
     const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
     const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
@@ -179,7 +170,7 @@ T interior_vecdot(const T* a_data, const T* b_data,
                 }
             }
         }
-        return static_cast<T>(result);
+        return result;
     }
     for (Index_t iz = start[2]; iz < end[2]; ++iz) {
         for (Index_t iy = start[1]; iy < end[1]; ++iy) {
@@ -188,13 +179,17 @@ T interior_vecdot(const T* a_data, const T* b_data,
                     (ix * stride[0] + iy * stride[1] + iz * stride[2]) *
                     nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    result += static_cast<Acc>(
-                        conj_product(a_data[offset + c], b_data[offset + c]));
+                    // Widen *before* multiplying: conj_product returns T, so
+                    // multiplying first would round each product to fp32 and
+                    // reintroduce the very error the promoted accumulator is
+                    // here to avoid (and can overflow fp32 for large entries).
+                    result += conj_product(static_cast<Acc>(a_data[offset + c]),
+                                           static_cast<Acc>(b_data[offset + c]));
                 }
             }
         }
     }
-    return static_cast<T>(result);
+    return result;
 }
 
 /**
@@ -202,10 +197,9 @@ T interior_vecdot(const T* a_data, const T* b_data,
  * r, u and w once each. Mirrors interior_vecdot's bounds/stride handling.
  */
 template <typename T>
-std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
-                                     const T* w_data,
-                                     const GlobalFieldCollection& coll,
-                                     Index_t nb_components_per_pixel) {
+std::array<promoted_t<T>, 3> interior_three_dots(
+    const T* r_data, const T* u_data, const T* w_data,
+    const GlobalFieldCollection& coll, Index_t nb_components_per_pixel) {
     const auto spatial_dim = coll.get_spatial_dim();
     const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
     const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
@@ -236,17 +230,18 @@ std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
                     (ix * stride[0] + iy * stride[1] + iz * stride[2]) *
                     nb_components_per_pixel;
                 for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
-                    const T rv = r_data[offset + c];
-                    const T uv = u_data[offset + c];
-                    const T wv = w_data[offset + c];
-                    ru += static_cast<Acc>(conj_product(rv, uv));
-                    wu += static_cast<Acc>(conj_product(wv, uv));
-                    rr += static_cast<Acc>(conj_product(rv, rv));
+                    // Widen before multiplying — see interior_vecdot.
+                    const Acc rv = static_cast<Acc>(r_data[offset + c]);
+                    const Acc uv = static_cast<Acc>(u_data[offset + c]);
+                    const Acc wv = static_cast<Acc>(w_data[offset + c]);
+                    ru += conj_product(rv, uv);
+                    wu += conj_product(wv, uv);
+                    rr += conj_product(rv, rv);
                 }
             }
         }
     }
-    return {static_cast<T>(ru), static_cast<T>(wu), static_cast<T>(rr)};
+    return {ru, wu, rr};
 }
 
 /**
@@ -255,25 +250,24 @@ std::array<T, 3> interior_three_dots(const T* r_data, const T* u_data,
  * reduction still streams fp32 from memory but accumulates in double.
  */
 template <typename T>
-T full_vecdot(const TypedField<T, HostSpace>& a,
-              const TypedField<T, HostSpace>& b) {
+promoted_t<T> full_vecdot(const TypedField<T, HostSpace>& a,
+                          const TypedField<T, HostSpace>& b) {
     using Acc = promoted_t<T>;
     if constexpr (std::is_same_v<Acc, T>) {
         return a.eigen_vec().dot(b.eigen_vec());
     } else {
-        return static_cast<T>(a.eigen_vec().template cast<Acc>().dot(
-            b.eigen_vec().template cast<Acc>()));
+        return a.eigen_vec().template cast<Acc>().dot(
+            b.eigen_vec().template cast<Acc>());
     }
 }
 
 template <typename T>
-T full_norm_sq(const TypedField<T, HostSpace>& x) {
+promoted_t<T> full_norm_sq(const TypedField<T, HostSpace>& x) {
     using Acc = promoted_t<T>;
     if constexpr (std::is_same_v<Acc, T>) {
-        return static_cast<T>(x.eigen_vec().squaredNorm());
+        return x.eigen_vec().squaredNorm();
     } else {
-        return static_cast<T>(
-            x.eigen_vec().template cast<Acc>().squaredNorm());
+        return x.eigen_vec().template cast<Acc>().squaredNorm();
     }
 }
 
@@ -289,8 +283,8 @@ T full_norm_sq(const TypedField<T, HostSpace>& x) {
 /* ---------------------------------------------------------------------- */
 
 template <typename T>
-T vecdot_host(const TypedField<T, HostSpace>& a,
-              const TypedField<T, HostSpace>& b) {
+promoted_t<T> vecdot_host(const TypedField<T, HostSpace>& a,
+                          const TypedField<T, HostSpace>& b) {
     if (&a.get_collection() != &b.get_collection()) {
         throw FieldError("vecdot: fields must belong to the same collection");
     }
@@ -367,7 +361,7 @@ void copy_host(const TypedField<T, HostSpace>& src,
 }
 
 template <typename T>
-T norm_sq_host(const TypedField<T, HostSpace>& x) {
+promoted_t<T> norm_sq_host(const TypedField<T, HostSpace>& x) {
     const auto& coll = x.get_collection();
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
@@ -386,8 +380,8 @@ T norm_sq_host(const TypedField<T, HostSpace>& x) {
 }
 
 template <typename T>
-T axpy_norm_sq_host(T alpha, const TypedField<T, HostSpace>& x,
-                    TypedField<T, HostSpace>& y) {
+promoted_t<T> axpy_norm_sq_host(T alpha, const TypedField<T, HostSpace>& x,
+                                TypedField<T, HostSpace>& y) {
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy_norm_sq: fields must belong to the same collection");
     }
@@ -567,12 +561,14 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
 /* -- Single-precision (Real32 / Complex32) generic-op specializations ------ */
 #define MUGRID_LINALG_HOST_SPECIALIZATIONS(T)                                  \
     template <>                                                                \
-    T vecdot<T, HostSpace>(const TypedField<T, HostSpace>& a,                  \
-                           const TypedField<T, HostSpace>& b) {                \
+    reduction_result_t<T> vecdot<T, HostSpace>(                                \
+        const TypedField<T, HostSpace>& a,                                     \
+        const TypedField<T, HostSpace>& b) {                                   \
         return internal::vecdot_host(a, b);                                    \
     }                                                                          \
     template <>                                                                \
-    T norm_sq<T, HostSpace>(const TypedField<T, HostSpace>& x) {               \
+    reduction_result_t<T> norm_sq<T, HostSpace>(                               \
+        const TypedField<T, HostSpace>& x) {                                   \
         return internal::norm_sq_host(x);                                      \
     }                                                                          \
     template <>                                                                \
@@ -595,8 +591,9 @@ Complex axpy_norm_sq<Complex, HostSpace>(Complex alpha,
         internal::copy_host(src, dst);                                         \
     }                                                                          \
     template <>                                                                \
-    T axpy_norm_sq<T, HostSpace>(T alpha, const TypedField<T, HostSpace>& x,   \
-                                 TypedField<T, HostSpace>& y) {                \
+    reduction_result_t<T> axpy_norm_sq<T, HostSpace>(                          \
+        T alpha, const TypedField<T, HostSpace>& x,                            \
+        TypedField<T, HostSpace>& y) {                                         \
         return internal::axpy_norm_sq_host(alpha, x, y);                       \
     }
 MUGRID_LINALG_HOST_SPECIALIZATIONS(Real32)
@@ -605,7 +602,7 @@ MUGRID_LINALG_HOST_SPECIALIZATIONS(Complex32)
 
 // pipelined_cg_dots: single-precision real path (mirrors the Real body).
 template <>
-std::array<Real32, 3> pipelined_cg_dots<Real32, HostSpace>(
+std::array<Real, 3> pipelined_cg_dots<Real32, HostSpace>(
     const TypedField<Real32, HostSpace>& r,
     const TypedField<Real32, HostSpace>& u,
     const TypedField<Real32, HostSpace>& w) {
@@ -618,8 +615,13 @@ std::array<Real32, 3> pipelined_cg_dots<Real32, HostSpace>(
                                              global_coll,
                                              nb_components_per_pixel);
     }
-    return {r.eigen_vec().dot(u.eigen_vec()), w.eigen_vec().dot(u.eigen_vec()),
-            r.eigen_vec().squaredNorm()};
+    // LocalFieldCollection: no ghosts. Cast to double *before* the dots —
+    // an fp32 Eigen reduction here would lose the very accuracy the interior
+    // path is careful to keep.
+    const auto rd{r.eigen_vec().template cast<Real>()};
+    const auto ud{u.eigen_vec().template cast<Real>()};
+    const auto wd{w.eigen_vec().template cast<Real>()};
+    return {rd.dot(ud), wd.dot(ud), rd.squaredNorm()};
 }
 
 template <>

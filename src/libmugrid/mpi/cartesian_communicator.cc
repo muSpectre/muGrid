@@ -7,6 +7,7 @@
 #include "core/exception.hh"
 #include "core/types.hh"
 #include "mpi/communicator.hh"
+#include "mpi/mpi_counts.hh"
 
 #include <cstring>
 #include <numeric>
@@ -190,23 +191,11 @@ namespace muGrid {
          * Used when MPI is not available or not initialized.
          */
 #ifdef WITH_MPI
-        /**
-         * @brief Narrow an Index_t to the int range required by MPI counts,
-         * block lengths and strides; throws instead of silently truncating
-         * (a halo face of more than 2^31 elements would otherwise corrupt
-         * silently).
-         */
-        int checked_mpi_int(Index_t value, const char * what) {
-            if (value < std::numeric_limits<int>::min() ||
-                value > std::numeric_limits<int>::max()) {
-                std::stringstream error{};
-                error << what << " (" << value
-                      << ") exceeds the int range required by MPI; this "
-                         "halo exchange is too large for a single message";
-                throw RuntimeError(error.str());
-            }
-            return static_cast<int>(value);
-        }
+        // Narrow Index_t -> int for MPI counts/block lengths/strides, throwing
+        // rather than truncating. Lives in mpi/mpi_counts.hh so the FFT
+        // transpose narrows the same way; pulled into this namespace so the
+        // call sites below read unchanged.
+        using muGrid::checked_mpi_int;
 #endif  // WITH_MPI
 
         void serial_sendrecv(

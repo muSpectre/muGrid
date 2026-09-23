@@ -50,6 +50,41 @@ namespace muGrid {
 namespace linalg {
 
 /**
+ * Result type of a reduction (vecdot, norm_sq, axpy_norm_sq,
+ * pipelined_cg_dots) over a field of scalar type `T`: `Real32 -> Real`,
+ * `Complex32 -> Complex`, every other type to itself.
+ *
+ * Single-precision reductions accumulate in double so a long running sum does
+ * not lose its small-magnitude tail, and they *return* that double. Narrowing
+ * back to `T` on return would overflow to infinity whenever the true value
+ * exceeds the float32 range (~3.4e38), which a single-precision solve reaches
+ * routinely on a large grid: the threshold on the field entries tightens as
+ * `1/sqrt(N)` with the summation and again as `h^2` with the operator norm, so
+ * it is some 500x tighter at 512^3 than at 64^3. The resulting `inf` is not a
+ * loud failure -- in CG it appears as `pAp`, makes `alpha = rz/pAp` exactly
+ * zero, and stalls the solve silently on an unmoving iterate. Returning the
+ * accumulator type costs nothing (both narrow to a Python float at the binding
+ * boundary anyway) and removes that failure mode entirely.
+ */
+template <typename T>
+struct reduction_result {
+    using type = T;
+};
+//! Single-precision real reductions return double precision.
+template <>
+struct reduction_result<Real32> {
+    using type = Real;
+};
+//! Single-precision complex reductions return double precision.
+template <>
+struct reduction_result<Complex32> {
+    using type = Complex;
+};
+//! Convenience alias for reduction_result<T>::type.
+template <typename T>
+using reduction_result_t = typename reduction_result<T>::type;
+
+/**
  * Fused interior reduction for pipelined conjugate gradients.
  *
  * In a single pass over the interior region (reading r, u and w once each),
@@ -63,11 +98,13 @@ namespace linalg {
  *
  * @tparam T Scalar type (Real)
  * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
+ * @return The three products in reduction_result_t<T> (double precision for a
+ *         single-precision field; see reduction_result)
  */
 template <typename T, typename MemorySpace>
-std::array<T, 3> pipelined_cg_dots(const TypedField<T, MemorySpace>& r,
-                                   const TypedField<T, MemorySpace>& u,
-                                   const TypedField<T, MemorySpace>& w);
+std::array<reduction_result_t<T>, 3> pipelined_cg_dots(
+    const TypedField<T, MemorySpace>& r, const TypedField<T, MemorySpace>& u,
+    const TypedField<T, MemorySpace>& w);
 
 /**
  * Vector dot product on interior pixels only (excludes ghost regions).
@@ -84,12 +121,14 @@ std::array<T, 3> pipelined_cg_dots(const TypedField<T, MemorySpace>& r,
  * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param a First field
  * @param b Second field (must have same shape as a)
- * @return Scalar dot product (local, not MPI-reduced)
+ * @return Scalar dot product (local, not MPI-reduced) in
+ *         reduction_result_t<T> -- double precision for a single-precision
+ *         field (see reduction_result)
  * @throws FieldError if fields have incompatible shapes or collections
  */
 template <typename T, typename MemorySpace>
-T vecdot(const TypedField<T, MemorySpace>& a,
-         const TypedField<T, MemorySpace>& b);
+reduction_result_t<T> vecdot(const TypedField<T, MemorySpace>& a,
+                             const TypedField<T, MemorySpace>& b);
 
 /**
  * AXPY operation: y = alpha * x + y
@@ -169,10 +208,12 @@ void copy(const TypedField<T, MemorySpace>& src,
  * @tparam T Scalar type (Real, Complex, etc.)
  * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @param x Input field
- * @return Squared norm (local, not MPI-reduced)
+ * @return Squared norm (local, not MPI-reduced) in reduction_result_t<T> --
+ *         double precision for a single-precision field (see
+ *         reduction_result)
  */
 template <typename T, typename MemorySpace>
-T norm_sq(const TypedField<T, MemorySpace>& x);
+reduction_result_t<T> norm_sq(const TypedField<T, MemorySpace>& x);
 
 /**
  * Fused AXPY + norm_sq: y = alpha * x + y, returns ||y||² (interior only)
@@ -191,13 +232,16 @@ T norm_sq(const TypedField<T, MemorySpace>& x);
  * @param alpha Scalar multiplier
  * @param x Input field
  * @param y Input/output field (modified in place)
- * @return Squared norm of y after update (local, not MPI-reduced)
+ * @return Squared norm of y after update (local, not MPI-reduced) in
+ *         reduction_result_t<T> -- double precision for a single-precision
+ *         field (see reduction_result). Note `alpha` stays `T`: it scales the
+ *         field data, it is not part of the reduction.
  * @throws FieldError if fields have incompatible shapes
  */
 template <typename T, typename MemorySpace>
-T axpy_norm_sq(T alpha,
-               const TypedField<T, MemorySpace>& x,
-               TypedField<T, MemorySpace>& y);
+reduction_result_t<T> axpy_norm_sq(T alpha,
+                                   const TypedField<T, MemorySpace>& x,
+                                   TypedField<T, MemorySpace>& y);
 
 /**
  * Scale operation with per-pixel multiplier: x[c, i] *= alpha[c, i].

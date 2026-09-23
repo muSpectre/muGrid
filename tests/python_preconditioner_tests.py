@@ -987,3 +987,48 @@ def test_green_jacobi_default_reference_mpi_deterministic(comm):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_reference_stiffness_symbol_is_slab_invariant(comm, monkeypatch):
+    """Inverting the symbol one slab of Fourier modes at a time must give the
+    same preconditioner as inverting it in one go.
+
+    The slab loop bounds the double-precision working set during assembly --
+    at 512^3 the symbol alone is 9.7 GB in complex128, and the previous
+    mask-indexed form held four or five arrays that size at once. At any
+    resolution these tests can afford, the whole symbol fits in one slab, so
+    the multi-slab path is only reachable by shrinking the budget. The
+    per-mode inversion is independent between modes, so the result must not
+    depend on where the slab boundaries fall -- including a boundary that
+    separates the singular q = 0 block from the rest.
+    """
+    import muGrid.Preconditioners as P
+
+    engine = make_engine(comm, (16, 16))
+    grid_spacing = 1 / 16
+    n = 2
+    laplace = muGrid.GenericLinearOperator(
+        [-1, -1], np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    )
+
+    def apply_operator(u, Au):
+        engine.communicate_ghosts(u)
+        laplace.apply(u, Au)
+        Au.s[...] /= -grid_spacing**2
+
+    def symbol(name):
+        prec = make_reference_stiffness_preconditioner(
+            engine, apply_operator, n, name=name)
+        if prec._blocks is not None:
+            return np.asarray(prec._blocks)
+        parts = [np.asarray(prec._diag)]
+        parts += [np.asarray(prec._off[k]) for k in sorted(prec._off)]
+        return np.concatenate([p.ravel() for p in parts])
+
+    one_slab = symbol("slab-whole")
+    # One Fourier index per slab: the most boundaries possible, and it puts
+    # q = 0 alone in the first slab.
+    monkeypatch.setattr(P, "SYMBOL_INVERSION_SLAB_BYTES", 1)
+    many_slabs = symbol("slab-split")
+
+    np.testing.assert_array_equal(one_slab, many_slabs)

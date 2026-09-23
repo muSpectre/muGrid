@@ -415,12 +415,25 @@ class BlockFourierPreconditioner(Preconditioner):
         # and only the compressed pieces are moved to the device -- so the
         # device never has to hold the dense n×n complex block, even
         # transiently, during construction.
-        herm_scale = float(np.max(np.abs(blocks))) if blocks.size else 0.0
-        herm_asym = (
-            float(np.max(np.abs(blocks - np.conj(np.swapaxes(blocks, 0, 1)))))
-            if blocks.size
-            else 0.0
-        )
+        # Component pair at a time: `np.abs(blocks)` and
+        # `blocks - conj(swapaxes(blocks))` each build an array the size of the
+        # whole symbol (n^2 values per Fourier point, 4.8 GB at 512^3 even in
+        # complex64), and the second one is complex. Per pair the temporaries
+        # are n^2 times smaller, and only the upper triangle needs the
+        # asymmetry check.
+        herm_scale = 0.0
+        herm_asym = 0.0
+        for i in range(n):
+            for j in range(n):
+                b_ij = blocks[i, j]
+                if not b_ij.size:
+                    continue
+                herm_scale = max(herm_scale, float(np.abs(b_ij).max()))
+                if j >= i:
+                    herm_asym = max(
+                        herm_asym,
+                        float(np.abs(b_ij - np.conj(blocks[j, i])).max()),
+                    )
         # The detection must be COLLECTIVE: a rank whose Fourier subdomain is
         # empty (more ranks than modes along the split direction) sees an
         # empty slab and would conclude "Hermitian" while data-carrying ranks
@@ -737,6 +750,15 @@ class GreenJacobiPreconditioner(Preconditioner):
             linalg.scal(self._jhalf, z)  # z = J^{1/2} z
 
 
+#: Working-set budget for the per-mode inversion in
+#: :func:`make_reference_stiffness_preconditioner`. The symbol is inverted in
+#: double precision one slab of Fourier modes at a time; this bounds the size
+#: of the double-precision copy, independent of the grid. Module-level so the
+#: tests can shrink it and actually exercise the multi-slab path -- at any
+#: realistic test resolution the whole symbol is one slab.
+SYMBOL_INVERSION_SLAB_BYTES = 128 * 1024 * 1024
+
+
 def make_reference_stiffness_preconditioner(
     engine,
     apply_reference_stiffness,
@@ -834,8 +856,18 @@ def make_reference_stiffness_preconditioner(
     column_hat = engine.fourier_space_field(
         column_hat_name, components=(n,), dtype=complex_dtype)
 
-    # K_hat[alpha, beta, q] = (FFT of Kʳᵉᶠ applied to impulse e_beta)[alpha](q)
-    K_hat = np.zeros((n, n) + fourier_shape, dtype=complex)
+    # K_hat[q, alpha, beta] = (FFT of Kʳᵉᶠ applied to impulse e_beta)[alpha](q)
+    #
+    # Stored at the *solve* precision and in [*fourier, n, n] layout. Both
+    # matter at scale: the symbol is n^2 values per Fourier point, which at
+    # 512^3 is 9.7 GB in complex128 against 4.8 in complex64, and in single
+    # precision the extra width buys nothing anyway -- `column_hat` is a
+    # complex_dtype field, so the data has already been through a float32
+    # FFT by the time it arrives. Only the per-mode n x n *inversion* gains
+    # from double, and that is done below on one slab at a time. The
+    # [*fourier, n, n] layout is what np.linalg.inv batches over, so it also
+    # removes a full-size transposed copy.
+    K_hat = np.zeros(fourier_shape + (n, n), dtype=complex_dtype)
     for beta in range(n):
         host_impulse = np.zeros(impulse.s.shape)
         # component beta, all (single) sub-points, at the origin pixel(s)
@@ -855,19 +887,41 @@ def make_reference_stiffness_preconditioner(
         # (n, [sub...], *fourier) -> (n, *fourier): collapse and drop the
         # single nodal sub-point.
         ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
-        K_hat[:, beta] = ch
+        K_hat[..., :, beta] = np.moveaxis(ch, 0, -1)
 
-    # Invert each n x n block; project out the singular zero-frequency block.
-    blocks = np.moveaxis(K_hat, (0, 1), (-2, -1))  # [*fourier, n, n]
-    inv = np.zeros_like(blocks)
+    # The q = 0 block is singular: the reference operator has the rigid-body
+    # translations in its null space. Invert everything else and project it out.
     q = np.asarray(engine.fftfreq)  # [dim, *fourier]
     zero_mode = np.ones(fourier_shape, dtype=bool)
     for d in range(dim):
         zero_mode &= q[d] == 0.0
-    nonzero = ~zero_mode
-    inv[nonzero] = np.linalg.inv(blocks[nonzero])
-    # [dim, dim, *fourier], with the inverse-transform normalisation folded in.
-    K_inv = np.moveaxis(inv, (-2, -1), (0, 1)) * engine.normalisation
+
+    # Invert in double for accuracy, a slab at a time, in place. Inverting the
+    # whole array at once would hold the double copy, np.linalg.inv's output
+    # and (in the mask-indexed form this replaces) the boolean gather and its
+    # scatter all at the same moment -- four or five arrays the size of the
+    # symbol, ~40 GB at 512^3. A slab bounded by SLAB_BYTES costs that many
+    # bytes instead, and the zero mode is handled by making its block the
+    # identity before the inversion and zeroing it after, so no mask-indexed
+    # copy of the *whole* symbol is ever built.
+    bytes_per_index = int(np.prod(fourier_shape[1:], dtype=np.int64)) * n * n * 16
+    slab = max(1, SYMBOL_INVERSION_SLAB_BYTES // max(bytes_per_index, 1))
+    eye = np.eye(n, dtype=np.complex128)
+    for lo in range(0, fourier_shape[0], slab):
+        hi = min(lo + slab, fourier_shape[0])
+        double_slab = K_hat[lo:hi].astype(np.complex128)
+        singular = zero_mode[lo:hi]
+        double_slab[singular] = eye
+        double_slab = np.linalg.inv(double_slab)
+        # Fold in the inverse-transform normalisation while the slab is still
+        # hot, instead of scaling the whole symbol afterwards (another copy).
+        double_slab *= engine.normalisation
+        double_slab[singular] = 0.0
+        K_hat[lo:hi] = double_slab.astype(complex_dtype, copy=False)
+
+    # [n, n, *fourier], the layout BlockFourierPreconditioner expects. moveaxis
+    # returns a view, so this costs nothing.
+    K_inv = np.moveaxis(K_hat, (-2, -1), (0, 1))
 
     # Release the impulse-response scratch. These three fields (two real, one
     # Fourier) were only needed to assemble the symbol above; left in the

@@ -122,15 +122,20 @@ def test_float32_cg_matches_float64():
 @pytest.mark.parametrize("ghosts", [0, 1])
 def test_float32_reductions_accumulate_in_double(ghosts):
     """vecdot / norm_sq / axpy_norm_sq on float32 fields accumulate in double
-    precision internally (only the final scalar is narrowed to float32).
+    precision internally *and return that double* (see
+    linalg::reduction_result).
 
     A running float32 accumulation of N comparable values loses
     O(N * ulp(sum)) — for the value 0.1 (inexact in binary) over ~1M entries
     this is a relative error of 1e-4..1e-2 depending on lane count, which is
     what inflated float32 CG termination decisions. Double accumulation
-    leaves only the final O(eps_f32) narrowing. Both reduction code paths are
-    exercised: the ghost-free Eigen path and the ghost-skipping interior
-    loop."""
+    removes it, and because the result is no longer narrowed back to float32
+    on the way out, what is left is double-precision round-off rather than
+    the O(eps_f32) of a final narrowing — hence the 1e-9 bounds below (the
+    residual is the double accumulator's own O(N * eps_f64), ~4e-12 here).
+    Both
+    reduction code paths are exercised: the ghost-free Eigen path and the
+    ghost-skipping interior loop."""
     from muGrid import linalg
 
     n = (1024, 1024)
@@ -144,13 +149,63 @@ def test_float32_reductions_accumulate_in_double(ghosts):
     exact = float(np.float64(np.float32(0.1)) ** 2 * nb_interior)
 
     rel = abs(float(linalg.norm_sq(x)) - exact) / exact
-    assert rel < 1e-6, f"norm_sq relative error {rel:.2e}"
+    assert rel < 1e-9, f"norm_sq relative error {rel:.2e}"
 
     y = fc.real_field("y", dtype=np.float32)
     y.s[...] = np.float32(0.1)
     rel = abs(float(linalg.vecdot(x, y)) - exact) / exact
-    assert rel < 1e-6, f"vecdot relative error {rel:.2e}"
+    assert rel < 1e-9, f"vecdot relative error {rel:.2e}"
 
     # axpy_norm_sq(0, x, y) leaves y unchanged and returns ||y||^2.
     rel = abs(float(linalg.axpy_norm_sq(0.0, x, y)) - exact) / exact
-    assert rel < 1e-6, f"axpy_norm_sq relative error {rel:.2e}"
+    assert rel < 1e-9, f"axpy_norm_sq relative error {rel:.2e}"
+
+
+@serial_only
+@pytest.mark.parametrize("ghosts", [0, 1])
+def test_float32_reductions_do_not_overflow(ghosts):
+    """A float32 reduction whose true value exceeds the float32 range must
+    still come back finite.
+
+    The accumulator has always been double; what used to happen is that the
+    result was narrowed back to float32 on return, so anything above ~3.4e38
+    came out as `inf`. That bound is reached by ordinary large single-
+    precision solves -- the threshold on the field entries tightens as
+    1/sqrt(N) with the summation and again as h^2 with the operator norm, so
+    it is ~500x tighter at 512^3 than at 64^3 -- and an infinite pAp makes
+    CG's alpha exactly zero, stalling the solve on an unmoving iterate with
+    no error at all. Both reduction paths are covered (ghost-free Eigen and
+    ghost-skipping interior loop)."""
+    from muGrid import linalg
+
+    n = (64, 64)
+    g = (ghosts, ghosts)
+    fc = GlobalFieldCollection(n, nb_ghosts_left=g, nb_ghosts_right=g)
+
+    # |value|^2 * nb_interior = 4.096e40, comfortably past float32's 3.4e38
+    value = np.float32(1e18)
+    x = fc.real_field("x", dtype=np.float32)
+    x.s[...] = value
+    exact = float(np.float64(value) ** 2 * n[0] * n[1])
+
+    for name, got in (
+        ("norm_sq", float(linalg.norm_sq(x))),
+        ("vecdot", float(linalg.vecdot(x, x))),
+    ):
+        assert np.isfinite(got), f"{name} overflowed to {got}"
+        assert abs(got - exact) / exact < 1e-12, f"{name} = {got:.6e}"
+
+    # axpy_norm_sq takes the fused single-pass path, which reduces separately.
+    y = fc.real_field("y", dtype=np.float32)
+    y.s[...] = value
+    got = float(linalg.axpy_norm_sq(0.0, x, y))
+    assert np.isfinite(got), f"axpy_norm_sq overflowed to {got}"
+    assert abs(got - exact) / exact < 1e-12, f"axpy_norm_sq = {got:.6e}"
+
+    # pipelined_cg_dots returns all three products; none may overflow.
+    w = fc.real_field("w", dtype=np.float32)
+    w.s[...] = value
+    dots = [float(v) for v in linalg.pipelined_cg_dots(x, y, w)]
+    assert all(np.isfinite(v) for v in dots), f"pipelined_cg_dots -> {dots}"
+    for got in dots:
+        assert abs(got - exact) / exact < 1e-12, f"pipelined_cg_dots {got:.6e}"

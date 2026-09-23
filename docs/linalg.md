@@ -36,6 +36,14 @@ Understanding how ghost regions are handled is important for MPI-parallel codes:
 
 **Field-modifying operations** (`axpy`, `scal`, `axpby`, `copy`, `cross`, `leray_project`): These operate on the full buffer including ghost regions. This is more efficient than iterating only over interior pixels, and ghost values will be overwritten by subsequent `communicate_ghosts()` calls anyway.
 
+## Precision of reductions
+
+The scalar-producing operations always accumulate in **double** precision, and they also *return* it: a reduction over a `float32` (`Real32`) field returns `Real`, and over a `complex64` (`Complex32`) field returns `Complex`. In C++ that type is `linalg::reduction_result_t<T>`; in Python it is a plain `float`/`complex` either way, so nothing changes at the binding boundary.
+
+This matters twice over for single-precision solves. A running `float32` sum over millions of entries loses `O(N · ulp)` — enough to distort CG termination decisions — and a `float32` *result* overflows to infinity once the true value passes ~3.4e38. The latter is reached by ordinary large solves: the bound on the field entries tightens as `1/sqrt(N)` with the summation and again as `h²` with the operator norm, so it is roughly 500× tighter at 512³ than at 64³. An infinite `pAp` makes CG's step length exactly zero, which stalls the solve on an unmoving iterate without raising anything.
+
+For the same reason the kernels widen each operand *before* multiplying, rather than forming the product in `float32` and widening afterwards.
+
 ## Usage examples
 
 ### C++ usage

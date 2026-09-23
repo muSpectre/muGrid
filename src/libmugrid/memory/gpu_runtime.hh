@@ -45,6 +45,7 @@
 #include <string>
 
 #include "core/exception.hh"
+#include "core/types.hh"
 
 #if defined(MUGRID_ENABLE_CUDA)
 
@@ -253,6 +254,48 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace muGrid {
+
+// Guarded on the *device compiler*, not on MUGRID_ENABLE_CUDA/HIP. Those say
+// the build has GPU support; they say nothing about which compiler is reading
+// this header. Only the .cc files listed under set_source_files_properties(...
+// LANGUAGE CUDA/HIP) go through nvcc/hipcc -- every other translation unit
+// that includes gpu_runtime.hh is compiled by the host compiler, where
+// blockIdx and friends do not exist and these definitions do not compile.
+#if defined(__CUDACC__) || defined(__HIPCC__)
+
+    /**
+     * This thread's global index along x, as an Index_t.
+     *
+     * `blockIdx.x`, `blockDim.x` and `threadIdx.x` are all `unsigned int`, so
+     * writing `blockIdx.x * blockDim.x + threadIdx.x` evaluates the product in
+     * 32-bit *before* any widening and wraps above 2^32 threads. Assigning the
+     * result to an `Index_t` does not help -- the damage is done inside the
+     * expression. muGrid's element counts are nb_pixels * nb_components *
+     * nb_sub_pts and grow with the cube of the resolution, so this is a real
+     * bound rather than a theoretical one; use these helpers instead of
+     * open-coding the arithmetic.
+     */
+    __device__ __forceinline__ Index_t global_thread_x() {
+        return static_cast<Index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    }
+
+    //! This thread's global index along y (see global_thread_x).
+    __device__ __forceinline__ Index_t global_thread_y() {
+        return static_cast<Index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    }
+
+    //! This thread's global index along z (see global_thread_x).
+    __device__ __forceinline__ Index_t global_thread_z() {
+        return static_cast<Index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
+    }
+
+    //! Stride of a grid-stride loop along x (see global_thread_x).
+    __device__ __forceinline__ Index_t grid_stride_x() {
+        return static_cast<Index_t>(blockDim.x) * gridDim.x;
+    }
+
+#endif  // __CUDACC__ / __HIPCC__
+
     /**
      * Throw a RuntimeError if a runtime-API call returned an error.
      *

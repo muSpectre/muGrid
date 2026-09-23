@@ -2,8 +2,9 @@
 Collection of simple parallel solvers
 """
 
-import numpy as np
 import warnings
+
+import numpy as np
 
 from . import linalg
 
@@ -15,6 +16,56 @@ class ConvergenceError(RuntimeError):
     avoids masking unrelated runtime errors (e.g. out-of-memory) as
     non-convergence.
     """
+
+
+#: Relative tolerance below which a float32 solve cannot certify convergence.
+#: float32 eps is 1.19e-7, so the *true* residual ``b - Ax`` stagnates around
+#: here even though the recursively updated CG residual keeps shrinking.
+#: Asking for less is asking for something arithmetic cannot deliver.
+FLOAT32_RTOL_FLOOR = 1e-6
+
+
+def _warn_unreachable_rtol(dtype, rtol, solver):
+    """Warn once if a single-precision solve is given a tolerance below the
+    float32 accuracy floor."""
+    if (np.dtype(dtype) == np.dtype(np.float32)
+            and 0.0 < rtol < FLOAT32_RTOL_FLOOR):
+        warnings.warn(
+            f"{solver}: rtol={rtol:.1e} is below the float32 solve accuracy "
+            f"floor (~{FLOAT32_RTOL_FLOOR:.0e}). The true residual b - Ax "
+            "cannot reach it -- only the recursive residual can -- so the "
+            "solve will run to maxiter. Use a looser rtol or a float64 "
+            "right-hand side.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+
+def _reject_non_finite(value, what, iteration, dtype, solver):
+    """Raise ConvergenceError if ``value`` is NaN or infinite.
+
+    The two causes need different diagnoses, so they get different messages.
+    An infinity here is almost always dynamic range rather than a modelling
+    error: the reductions accumulate (and return) in double, so an infinite
+    inner product means the *fields* themselves carry values whose squares
+    leave the range of the work dtype.
+    """
+    if value != value:  # NaN
+        raise ConvergenceError(
+            f"{solver}: {what} became NaN at iteration {iteration}. Either the "
+            "operator is not positive definite, or the input contains NaN, or "
+            f"an intermediate field overflowed the {np.dtype(dtype).name} range "
+            "and a subsequent inf - inf produced NaN. If the operator has a "
+            "large norm, rescale it or use a float64 right-hand side."
+        )
+    if value in (float("inf"), float("-inf")):
+        raise ConvergenceError(
+            f"{solver}: {what} overflowed to {value} at iteration "
+            f"{iteration}. The iterate has grown beyond the dynamic range of "
+            f"the {np.dtype(dtype).name} work fields, which means the solve is "
+            "diverging. Rescale the operator and right-hand side, improve the "
+            "preconditioner, or use a float64 right-hand side."
+        )
 
 
 def conjugate_gradients(
@@ -135,6 +186,7 @@ def conjugate_gradients(
     # single-precision (float32) solve stays in single precision throughout
     # (and a default double-precision solve is unchanged).
     dtype = getattr(b, "dtype", np.float64)
+    _warn_unreachable_rtol(dtype, rtol, "conjugate_gradients")
 
     with timed("startup"):
         # Create temporary fields with matching component shape
@@ -142,15 +194,21 @@ def conjugate_gradients(
         # p: search direction field
         # z: preconditioned search direction field (aliased to r if no prec)
         # Ap: Hessian product field
-        r = fc.real_field("cg-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        p = fc.real_field("cg-search-direction", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        r = fc.real_field(
+            "cg-residual", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        p = fc.real_field(
+            "cg-search-direction", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
         if unpreconditioned:
             z = r
         else:
             z = fc.real_field(
-                "cg-preconditioned-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype
-            )
-        Ap = fc.real_field("cg-hessian-product", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+                "cg-preconditioned-residual", b.components_shape,
+                sub_pt=b.sub_division, dtype=dtype)
+        Ap = fc.real_field(
+            "cg-hessian-product", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
 
         # Initial residual: r = b - A*x
         hessp(x, Ap)
@@ -195,8 +253,36 @@ def conjugate_gradients(
             with timed("dot_pAp"):
                 pAp = comm.sum(linalg.vecdot(p, Ap))
 
+            # Guard the curvature term *before* dividing by it. A non-finite
+            # pAp silently gives alpha = 0, which leaves x untouched and rr
+            # unchanged for every remaining iteration -- a stall that looks
+            # exactly like slow convergence. A zero pAp means p lies in the
+            # operator's null space, so it is not positive definite.
+            pAp_val = float(pAp)
+            _reject_non_finite(pAp_val, "the curvature p^T A p", iteration,
+                               dtype, "conjugate_gradients")
+            if pAp_val == 0.0:
+                raise ConvergenceError(
+                    "conjugate_gradients: the curvature p^T A p is zero at "
+                    f"iteration {iteration}; the search direction lies in the "
+                    "null space of the operator, which is therefore not "
+                    "positive definite."
+                )
+
             # Compute alpha
             alpha = rz / pAp
+
+            # A zero step on a residual that has not converged cannot make
+            # progress; with pAp already checked this means rz = 0, i.e. an
+            # indefinite preconditioner.
+            if alpha == 0.0:
+                raise ConvergenceError(
+                    "conjugate_gradients: the step length is zero at "
+                    f"iteration {iteration} while |r|^2 = {rr_val:.6e} is "
+                    f"above the tolerance {tol_sq:.6e}; the preconditioned "
+                    "residual is orthogonal to the residual, which means the "
+                    "preconditioner is not positive definite."
+                )
 
             # Update solution: x += alpha * p
             with timed("update_x"):
@@ -230,11 +316,10 @@ def conjugate_gradients(
                         },
                     )
 
-            # Check for numerical issues (NaN indicates non-positive-definite H)
-            if next_rr_val != next_rr_val:  # NaN check
-                raise ConvergenceError(
-                    "Residual became NaN - Hessian may not be positive definite"
-                )
+            # NaN means a non-positive-definite operator; an infinity means
+            # the iterate has outgrown the work fields' dynamic range.
+            _reject_non_finite(next_rr_val, "the squared residual |r|^2",
+                               iteration, dtype, "conjugate_gradients")
 
             if next_rr_val <= tol_sq:
                 if residual is not None:
@@ -243,8 +328,10 @@ def conjugate_gradients(
 
             # Compute beta
             beta = next_rz / rz
-            # Update rz for next iteration
+            # Carry the residual and its preconditioned inner product into the
+            # next iteration (rr_val is what the guards above report).
             rz = next_rz
+            rr_val = next_rr_val
 
             # Update search direction: p = z + beta * p
             with timed("update_p"):
@@ -330,18 +417,37 @@ def conjugate_gradients_pipelined(
     # Match the precision of the work fields to the right-hand side (float32
     # rhs -> single-precision solve throughout; double rhs is unchanged).
     dtype = getattr(b, "dtype", np.float64)
+    _warn_unreachable_rtol(dtype, rtol, "conjugate_gradients_pipelined")
 
     with timed("startup"):
         # Work fields (zero-initialised by the collection)
-        r = fc.real_field("pcg-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        u = fc.real_field("pcg-prec-residual", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        w = fc.real_field("pcg-w", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        m = fc.real_field("pcg-m", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        n = fc.real_field("pcg-n", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        p = fc.real_field("pcg-p", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        s = fc.real_field("pcg-s", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        q = fc.real_field("pcg-q", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
-        z = fc.real_field("pcg-z", b.components_shape, sub_pt=b.sub_division, dtype=dtype)
+        r = fc.real_field(
+            "pcg-residual", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        u = fc.real_field(
+            "pcg-prec-residual", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        w = fc.real_field(
+            "pcg-w", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        m = fc.real_field(
+            "pcg-m", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        n = fc.real_field(
+            "pcg-n", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        p = fc.real_field(
+            "pcg-p", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        s = fc.real_field(
+            "pcg-s", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        q = fc.real_field(
+            "pcg-q", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
+        z = fc.real_field(
+            "pcg-z", b.components_shape,
+            sub_pt=b.sub_division, dtype=dtype)
 
         # r = b - A x
         hessp(x, r)
@@ -393,19 +499,41 @@ def conjugate_gradients_pipelined(
                         {"x": x, "r": r, "p": p, "rr": rr, "rz": gamma},
                     )
 
-            if rr != rr:  # NaN
-                raise ConvergenceError(
-                    "Residual became NaN - Hessian may not be positive definite"
-                )
+            # NaN means a non-positive-definite operator; an infinity means
+            # the iterate has outgrown the work fields' dynamic range. Both
+            # used to reach the recurrence below, where a non-finite delta
+            # gives alpha = 0 and the *next* iteration then divides by that
+            # zero alpha_prev -- a ZeroDivisionError raised from inside the
+            # recurrence, escaping this solver's own ConvergenceError contract.
+            _reject_non_finite(rr, "the squared residual |r|^2", iteration,
+                               dtype, "conjugate_gradients_pipelined")
+            _reject_non_finite(delta, "the curvature w^T u", iteration, dtype,
+                               "conjugate_gradients_pipelined")
+            _reject_non_finite(gamma, "the inner product r^T u", iteration,
+                               dtype, "conjugate_gradients_pipelined")
             if rr <= tol_sq:
                 return x
 
             if iteration == 0:
                 beta = 0.0
-                alpha = gamma / delta
+                denom = delta
             else:
                 beta = gamma / gamma_prev
-                alpha = gamma / (delta - beta * gamma / alpha_prev)
+                denom = delta - beta * gamma / alpha_prev
+            if denom == 0.0:
+                raise ConvergenceError(
+                    "conjugate_gradients_pipelined: the curvature term is zero "
+                    f"at iteration {iteration} while |r|^2 = {rr:.6e} is above "
+                    f"the tolerance {tol_sq:.6e}; the operator or the "
+                    "preconditioner is not positive definite."
+                )
+            alpha = gamma / denom
+            if alpha == 0.0:
+                raise ConvergenceError(
+                    "conjugate_gradients_pipelined: the step length is zero at "
+                    f"iteration {iteration} while |r|^2 = {rr:.6e} is above the "
+                    f"tolerance {tol_sq:.6e}; the solve cannot make progress."
+                )
             gamma_prev = gamma
             alpha_prev = alpha
 

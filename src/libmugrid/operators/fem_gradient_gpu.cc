@@ -160,10 +160,10 @@ namespace fem_gradient_kernels {
         constexpr Index_t Dim = E::SpatialDim;
         constexpr Index_t NbNodes = E::NbNodes;
         Index_t c[Dim];
-        c[0] = blockIdx.x * blockDim.x + threadIdx.x;
-        c[1] = blockIdx.y * blockDim.y + threadIdx.y;
+        c[0] = global_thread_x();
+        c[1] = global_thread_y();
         if constexpr (Dim == 3) {
-            c[2] = blockIdx.z * blockDim.z + threadIdx.z;
+            c[2] = global_thread_z();
         }
         for (Index_t d = 0; d < Dim; ++d) {
             if (c[d] >= P.nb[d] - 1) return;  // need the +1 corner
@@ -213,10 +213,10 @@ namespace fem_gradient_kernels {
                                           DivParams<T, E> P, bool increment) {
         constexpr Index_t Dim = E::SpatialDim;
         Index_t c[Dim];
-        c[0] = blockIdx.x * blockDim.x + threadIdx.x;
-        c[1] = blockIdx.y * blockDim.y + threadIdx.y;
+        c[0] = global_thread_x();
+        c[1] = global_thread_y();
         if constexpr (Dim == 3) {
-            c[2] = blockIdx.z * blockDim.z + threadIdx.z;
+            c[2] = global_thread_z();
         }
         for (Index_t d = 0; d < Dim; ++d) {
             if (c[d] >= P.nb[d]) return;

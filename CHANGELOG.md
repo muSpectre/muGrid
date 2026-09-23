@@ -1,9 +1,85 @@
 Change log for µGrid
 ====================
 
-unreleased
-----------
+v1.4.0 (23Sep26)
+----------------
 
+- FIX: `vecdot`, `norm_sq`, `axpy_norm_sq` and `pipelined_cg_dots` now return
+  `linalg::reduction_result_t<T>` — double precision for a `Real32`/`Complex32`
+  field — instead of narrowing the double accumulator back to the field's scalar
+  type on return. The narrowing turned any single-precision reduction whose true
+  value exceeded ~3.4e38 into `inf`, and that bound is reached by ordinary large
+  solves: it tightens as `1/sqrt(N)` with the summation and again as `h²` with the
+  operator norm, so it is some 500x tighter at 512³ than at 64³. The failure was
+  silent rather than loud — an infinite `pAp` makes CG's `alpha = rz/pAp` exactly
+  zero, so the iterate stops moving and the residual repeats bit-for-bit until
+  maxiter, while the pipelined variant divided by the resulting zero `alpha_prev`
+  and raised `ZeroDivisionError` from inside the recurrence. On an `A = 1e25·I`
+  system (condition number 1) a float32 solve stalled for 25 iterations where the
+  float64 one converged in 1; it now also converges in 1. Python sees no API
+  change: both precisions already crossed the binding boundary as a plain `float`
+- FIX: Both CG solvers now reject a non-finite residual, curvature term or
+  inner product with a `ConvergenceError` naming the cause, instead of checking
+  only for NaN and letting infinities through. An infinite curvature term made
+  the step length exactly zero, so the solve stalled on an unmoving iterate and
+  reported a generic "did not converge"; in the pipelined variant that zero
+  became the next iteration's `alpha_prev` and a bare `ZeroDivisionError` escaped
+  from inside the recurrence, past the solver's own `ConvergenceError` contract.
+  A zero curvature term (a search direction in the operator's null space) and a
+  zero step length on an unconverged residual are reported too. NaN and overflow
+  get different messages, since one means an indefinite operator and the other
+  means the iterate has outgrown the work fields' dynamic range
+- FIX: A single-precision solve given an `rtol` below the float32 accuracy floor
+  (~1e-6) now warns that the tolerance is unreachable, rather than silently
+  running to maxiter. float32 eps is 1.19e-7, so the true residual `b - Ax`
+  stagnates around there even while the recursively updated CG residual keeps
+  shrinking. Double-precision solves are unaffected
+- TST: `tests/python_solvers_test.py` is renamed to `python_solvers_tests.py`.
+  pytest collects `python_*_tests.py`, so the file -- and with it the only test
+  of `conjugate_gradients_pipelined` in the repo -- had never run
+- FIX: The FFT transpose's all-to-all counts and displacements are narrowed to
+  MPI's `int` through `checked_mpi_int` instead of a bare `static_cast`, so an
+  oversized transform throws rather than wrapping to a negative count and
+  corrupting the transform. This is the default exchange path on the GPU, not
+  only the env-gated host one. `checked_mpi_int` moved out of
+  `cartesian_communicator.cc`'s anonymous namespace into the new
+  `mpi/mpi_counts.hh` so both callers narrow the same way
+- FIX: GPU kernels compute their global thread index through new
+  `global_thread_{x,y,z}()` / `grid_stride_x()` helpers in `memory/gpu_runtime.hh`
+  rather than open-coding `blockIdx.x * blockDim.x + threadIdx.x`. All three
+  operands are `unsigned int`, so the product was evaluated in 32 bits and
+  wrapped above 2^32 threads *before* any widening — assigning the result to an
+  `Index_t` did not help. Element counts are `nb_pixels * nb_components *
+  nb_sub_pts` and grow with the cube of the resolution, so the bound is reachable.
+  48 sites across linalg, laplace, convolution, FEM-gradient and solid-stiffness
+  kernels; `ghost_accumulate_gpu.cc` already widened by hand and is unchanged
+- FIX: The reduction kernels widen each operand *before* multiplying instead of
+  forming the product in the field's precision and widening afterwards. Squaring
+  in `float32` discards half the mantissa and overflows at `|x| ~ 1.8e19`, far
+  below what the accumulator holds; this affected the scalar (non-vectorised)
+  interior paths on the host — so `pipelined_cg_dots`, which has no vectorised
+  path, lost ~7e-9 relative accuracy where `vecdot`/`norm_sq` did not — and the
+  `dot`/`interior_dot`/`axpy_norm_sq` kernels on the device. The fp32 `sq_norm`
+  overload is gone so the mistake cannot be made again
+- PERF: `make_reference_stiffness_preconditioner` assembles the symbol at the
+  solve precision and inverts it one slab of Fourier modes at a time, in place.
+  It previously held `K_hat` in `complex128` regardless of the requested dtype,
+  then built four more arrays that size in a row: `np.zeros_like`, the
+  `blocks[nonzero]` boolean gather, `np.linalg.inv`'s output, and the
+  normalisation multiply. The symbol is n² values per Fourier point — 9.7 GB at
+  512³ in `complex128` — so that chain was tens of GB for one preconditioner.
+  The `complex128` was also half illusory in a single-precision solve: the data
+  reaches it from `column_hat`, a `complex_dtype` field, so it has already been
+  through a float32 FFT. Only the per-mode n×n *inversion* gains from double,
+  and that still happens in double. The singular q=0 block is made the identity
+  before inversion and zeroed after, instead of mask-indexing around it.
+  Measured peak RSS at 96³ with 3 components: 508 → 376 MB single, 575 → 444 MB
+  double. `SYMBOL_INVERSION_SLAB_BYTES` bounds the working set and is
+  module-level so tests can shrink it; the slab boundaries provably do not
+  change the result (`test_reference_stiffness_symbol_is_slab_invariant`)
+- PERF: `BlockFourierPreconditioner`'s Hermitian detection tests one component
+  pair at a time. `np.abs(blocks)` and `blocks - conj(swapaxes(blocks, 0, 1))`
+  each allocated an array the size of the whole symbol, the second complex
 - ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between two
   nested nodal grids differing by a factor of two in every direction, and its
   exact adjoint `R = Pᵀ`, the tensor product of the `[1/2, 1, 1/2]` stencil.
