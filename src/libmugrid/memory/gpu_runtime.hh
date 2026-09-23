@@ -255,6 +255,14 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace muGrid {
 
+// Guarded on the *device compiler*, not on MUGRID_ENABLE_CUDA/HIP. Those say
+// the build has GPU support; they say nothing about which compiler is reading
+// this header. Only the .cc files listed under set_source_files_properties(...
+// LANGUAGE CUDA/HIP) go through nvcc/hipcc -- every other translation unit
+// that includes gpu_runtime.hh is compiled by the host compiler, where
+// blockIdx and friends do not exist and these definitions do not compile.
+#if defined(__CUDACC__) || defined(__HIPCC__)
+
     /**
      * This thread's global index along x, as an Index_t.
      *
@@ -285,6 +293,8 @@ namespace muGrid {
     __device__ __forceinline__ Index_t grid_stride_x() {
         return static_cast<Index_t>(blockDim.x) * gridDim.x;
     }
+
+#endif  // __CUDACC__ / __HIPCC__
 
     /**
      * Throw a RuntimeError if a runtime-API call returned an error.
