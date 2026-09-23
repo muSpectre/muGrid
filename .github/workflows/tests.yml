@@ -98,7 +98,13 @@ jobs:
 
   # CUDA compile-only test (no GPU required)
   cuda-compile:
-    runs-on: ubuntu-26.04
+    # Pinned to 24.04 by the CUDA version below, not by preference: NVIDIA
+    # publishes no CUDA 12.6 packages for Ubuntu 26.04 ("resolute"), so on
+    # 26.04 the toolkit action adds a repo that has nothing in it and apt
+    # fails with "Unable to locate package cuda-nvcc-12-6". Moving to 26.04
+    # means bumping `cuda:` below to a release NVIDIA ships for it (13.x) in
+    # the same change -- do not bump the runner on its own.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -141,7 +147,13 @@ jobs:
 
   # HIP/ROCm compile-only test (no GPU required)
   hip-compile:
-    runs-on: ubuntu-26.04  # ROCm has better support on 22.04
+    # Pinned to 24.04 by the ROCm apt repo below, which serves `jammy`
+    # (22.04) packages. That skew is tolerable on 24.04 and was green until
+    # the runner was bumped; on 26.04 clang cannot run its own amdgcn-link
+    # ("unable to execute command: No such file or directory"). Moving to
+    # 26.04 means moving the repo suite in the same change -- do not bump the
+    # runner on its own.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
