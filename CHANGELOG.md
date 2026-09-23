@@ -18,6 +18,25 @@ unreleased
   system (condition number 1) a float32 solve stalled for 25 iterations where the
   float64 one converged in 1; it now also converges in 1. Python sees no API
   change: both precisions already crossed the binding boundary as a plain `float`
+- FIX: Both CG solvers now reject a non-finite residual, curvature term or
+  inner product with a `ConvergenceError` naming the cause, instead of checking
+  only for NaN and letting infinities through. An infinite curvature term made
+  the step length exactly zero, so the solve stalled on an unmoving iterate and
+  reported a generic "did not converge"; in the pipelined variant that zero
+  became the next iteration's `alpha_prev` and a bare `ZeroDivisionError` escaped
+  from inside the recurrence, past the solver's own `ConvergenceError` contract.
+  A zero curvature term (a search direction in the operator's null space) and a
+  zero step length on an unconverged residual are reported too. NaN and overflow
+  get different messages, since one means an indefinite operator and the other
+  means the iterate has outgrown the work fields' dynamic range
+- FIX: A single-precision solve given an `rtol` below the float32 accuracy floor
+  (~1e-6) now warns that the tolerance is unreachable, rather than silently
+  running to maxiter. float32 eps is 1.19e-7, so the true residual `b - Ax`
+  stagnates around there even while the recursively updated CG residual keeps
+  shrinking. Double-precision solves are unaffected
+- TST: `tests/python_solvers_test.py` is renamed to `python_solvers_tests.py`.
+  pytest collects `python_*_tests.py`, so the file -- and with it the only test
+  of `conjugate_gradients_pipelined` in the repo -- had never run
 - FIX: The reduction kernels widen each operand *before* multiplying instead of
   forming the product in the field's precision and widening afterwards. Squaring
   in `float32` discards half the mantissa and overflows at `|x| ~ 1.8e19`, far
