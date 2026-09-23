@@ -1,8 +1,8 @@
 Change log for µGrid
 ====================
 
-unreleased
-----------
+v1.4.0 (23Sep26)
+----------------
 
 - FIX: `vecdot`, `norm_sq`, `axpy_norm_sq` and `pipelined_cg_dots` now return
   `linalg::reduction_result_t<T>` — double precision for a `Real32`/`Complex32`
