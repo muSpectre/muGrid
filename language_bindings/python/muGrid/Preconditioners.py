@@ -759,13 +759,186 @@ class GreenJacobiPreconditioner(Preconditioner):
 SYMBOL_INVERSION_SLAB_BYTES = 128 * 1024 * 1024
 
 
+class AnalyticReferencePreconditioner(Preconditioner):
+    r"""``Kʳᵉᶠ⁻¹`` with the symbol *evaluated* per mode, never stored.
+
+    Same operator as :class:`BlockFourierPreconditioner` built by
+    :func:`make_reference_stiffness_preconditioner`, reached differently. That
+    class holds the inverse symbol: ``n²`` complex values per Fourier mode,
+    2.3 GB at 512³ for three components in single precision, growing with the
+    grid. A uniform operator is a ``3^dim`` stencil -- 243 numbers in 3D -- so
+    the symbol is the closed-form sum ``Σ_d S[d] exp(-2πi q·d)`` and can be
+    rebuilt for one mode, inverted and applied entirely in registers. What this
+    class stores is the stencil.
+
+    The trade is arithmetic for memory. Rebuilding costs ~630 flops per mode
+    against ~36 bytes read for the stored symbol, so it wants about 17.6
+    flops/byte to break even. A CPU socket is nearer 5, and there the apply is
+    about 28% slower (128³, float32). On a GPU it wins outright: on an H200 at
+    512³, three components, the apply is 9.3 ms against 25.5 ms stored in
+    float32 and 16.1 against 31.2 ms in float64, with 4.9 GB less device
+    memory and a 1.3 s setup instead of 168 s. That is why
+    :func:`make_reference_stiffness_preconditioner` picks this class on a
+    device and the stored symbol on the host.
+
+    The per-mode cost would be nine times higher done naively. Modes along the
+    fastest axis share the frequencies of every other axis, so the kernel
+    hoists those sums out of that loop; without it the symbol build alone is
+    1944 flops per mode instead of 216.
+
+    Parameters
+    ----------
+    engine : muGrid.FFTEngine
+        Defines the grid, the decomposition and the transforms.
+    stencil : ndarray
+        ``(3,) * dim + (dim, dim)``, from :func:`reference_stencil`.
+    name : str, optional
+        Prefix for the engine-managed Fourier work field.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records ``"fft"``, ``"symbol"`` and
+        ``"ifft"``.
+    dtype : data-type, optional
+        Real-space precision of the fields this will be applied to.
+    """
+
+    def __init__(self, engine, stencil, name="analytic-reference-preconditioner",
+                 timer=None, dtype=np.float64):
+        self._engine = engine
+        self._name = name
+        self._timer = timer
+
+        real_dtype = np.dtype(dtype)
+        if real_dtype == np.dtype(np.float32):
+            complex_dtype, suffix = np.dtype(np.complex64), "_f32"
+        elif real_dtype == np.dtype(np.float64):
+            complex_dtype, suffix = np.dtype(np.complex128), ""
+        else:
+            raise ValueError(
+                f"AnalyticReferencePreconditioner dtype must be float32 or "
+                f"float64, got {real_dtype}")
+
+        stencil = np.asarray(stencil)
+        dim = stencil.ndim - 2
+        if dim not in (2, 3) or stencil.shape != (3,) * dim + (dim, dim):
+            raise ValueError(
+                f"stencil must have shape (3,)*dim + (dim, dim) with dim 2 or "
+                f"3; got {stencil.shape}")
+        self._dim = dim
+        # Real, and 243 numbers at most -- this is the whole operator.
+        self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=real_dtype)
+
+        self._fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+        # One frequency table per axis rather than one frequency per mode: the
+        # per-mode form would be 809 MB at 512³ in single precision, which is
+        # most of what not storing the symbol saves. Read off the engine's own
+        # meshgrid so the convention cannot drift -- muGrid makes axis 0 the
+        # half-complex one, unlike numpy.fft.rfftn.
+        #
+        # A rank can own *no* Fourier modes -- more ranks than planes along the
+        # split axis -- and then the meshgrid has a zero-length axis that
+        # cannot be indexed to read the others off. Such a rank has nothing to
+        # scale; it still takes part in the transforms, which are collective.
+        self._nb_modes = int(np.prod(self._fourier_shape))
+        q = np.asarray(engine.fftfreq)
+        self._q = []
+        for d in range(dim):
+            if self._nb_modes == 0:
+                self._q.append(np.empty(self._fourier_shape[d],
+                                        dtype=real_dtype))
+                continue
+            index = [0] * dim
+            index[d] = slice(None)
+            self._q.append(
+                np.ascontiguousarray(q[d][tuple(index)], dtype=real_dtype))
+
+        self._work = engine.fourier_space_field(
+            f"{name}-work", components=(dim,), dtype=complex_dtype)
+        self._normalisation = real_dtype.type(engine.normalisation)
+
+        # The work field's view says where the transforms leave the data: a
+        # cupy array means the device kernel, which takes device addresses.
+        # The frequency tables go to the device once, here -- a few kilobytes,
+        # not worth a transfer per apply. The stencil stays on the host; the
+        # kernel receives it by value, in constant memory.
+        sample = self._work.s
+        self._on_device = type(sample).__module__.startswith("cupy")
+        if self._on_device:
+            import cupy
+
+            self._kernel = getattr(
+                linalg, f"apply_green_symbol_gpu_{dim}d{suffix}", None)
+            if self._kernel is None:
+                raise RuntimeError(
+                    "the work field lives on a device but this muGrid build "
+                    "has no device kernel for the evaluated symbol")
+            self._q_device = [cupy.asarray(qd) for qd in self._q]
+            self._q_ptrs = [qd.data.ptr for qd in self._q_device]
+        else:
+            self._kernel = getattr(linalg, f"apply_green_symbol_{dim}d{suffix}")
+
+        # Element strides of the component and first Fourier axes, read off
+        # the view rather than assumed. The host buffer is array-of-structures
+        # (components fastest, strides 1 and dim) and the device buffer is
+        # structure-of-arrays (strides nb_modes and 1); both must have the
+        # Fourier axes Fortran-ordered, axis 0 fastest, which is how the kernel
+        # decomposes the flat mode index.
+        itemsize = sample.dtype.itemsize
+        shape, strides = sample.shape, sample.strides
+        if shape[1] != 1:
+            raise ValueError(
+                f"expected one sub-point per Fourier mode, got {shape[1]}")
+        self._stride_component = strides[0] // itemsize
+        self._stride_mode = strides[2] // itemsize
+        for d in range(dim - 1):
+            if self._nb_modes and strides[3 + d] != strides[2 + d] * shape[2 + d]:
+                raise ValueError(
+                    f"Fourier work field is not axis-0-fastest over its "
+                    f"modes: shape {shape}, strides {strides}")
+
+    def _timed(self, label):
+        return self._timer(label) if self._timer is not None else nullcontext()
+
+    def apply(self, r, z):
+        engine = self._engine
+        with self._timed("fft"):
+            engine.fft(r, self._work)
+        with self._timed("symbol"):
+            if self._nb_modes == 0:
+                # No local modes; the transforms above and below are still
+                # collective and must not be skipped.
+                pass
+            elif self._on_device:
+                # In place through the device address; strides as read off
+                # the view in __init__ (structure-of-arrays on a device).
+                self._kernel(self._work.s.data.ptr, self._stride_component,
+                             self._stride_mode, self._stencil, self._q_ptrs,
+                             list(self._fourier_shape), self._normalisation)
+            else:
+                # The Fourier buffer is Fortran-ordered, so an order="F"
+                # ravel is a contiguous *view*: components fastest, then modes
+                # with axis 0 fastest, exactly the layout the kernel indexes.
+                # Nothing is copied and the kernel writes back through it.
+                flat = np.asarray(self._work.s).ravel(order="F")
+                self._kernel(flat, self._stride_component, self._stride_mode,
+                             self._stencil, self._q,
+                             list(self._fourier_shape), self._normalisation)
+        with self._timed("ifft"):
+            engine.ifft(self._work, z)
+        return z
+
+
 def make_reference_stiffness_preconditioner(
     engine,
-    apply_reference_stiffness,
-    nb_components,
+    apply_reference_stiffness=None,
+    nb_components=None,
     name="reference-stiffness-preconditioner",
     timer=None,
     dtype=np.float64,
+    element=None,
+    grid_spacing=None,
+    lambda_ref=None,
+    mu_ref=None,
+    evaluate_symbol=None,
 ):
     """
     Build the reference-material (Green's-function) preconditioner of Ladecký et
@@ -815,16 +988,46 @@ def make_reference_stiffness_preconditioner(
         fields; ``apply_reference_stiffness`` is therefore invoked on fields of
         this precision too. The symbol itself is assembled and inverted in
         double regardless, for accuracy.
+    element, grid_spacing, lambda_ref, mu_ref : optional
+        Name the reference operator instead of passing
+        ``apply_reference_stiffness``: the symbol is then built from its
+        ``3^dim`` stencil (:func:`reference_stencil`), with no impulse response
+        and no setup transforms.
+    evaluate_symbol : bool, optional
+        Analytic route only. ``True`` returns an
+        :class:`AnalyticReferencePreconditioner`, which keeps only the stencil
+        and rebuilds the symbol per mode on every apply; ``False`` assembles and
+        stores the inverse symbol (``n²`` complex values per Fourier mode,
+        2.3 GB at 512³ in single precision). The default, ``None``, evaluates
+        when the engine's fields live on a device and stores on the host: on
+        a GPU evaluating is both faster and smaller than storing, on a CPU it
+        is ~28% slower (see :class:`AnalyticReferencePreconditioner`).
 
     Returns
     -------
-    BlockFourierPreconditioner
-        The assembled preconditioner, ready to pass as ``prec=`` to
+    BlockFourierPreconditioner or AnalyticReferencePreconditioner
+        Ready to pass as ``prec=`` to
         :func:`muGrid.Solvers.conjugate_gradients`.
     """
     fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
     dim = len(fourier_shape)
+    if nb_components is None:
+        nb_components = dim
     n = int(nb_components)
+    if element is None and apply_reference_stiffness is None:
+        raise ValueError(
+            "make_reference_stiffness_preconditioner needs either "
+            "`apply_reference_stiffness` (the general route) or `element` "
+            "with `grid_spacing`, `lambda_ref` and `mu_ref` (the analytic "
+            "route, which needs no impulse response and no full-grid FFT)")
+    if element is not None and None in (grid_spacing, lambda_ref, mu_ref):
+        raise ValueError(
+            "the analytic route needs `grid_spacing`, `lambda_ref` and "
+            "`mu_ref` alongside `element`")
+    if evaluate_symbol and element is None:
+        raise ValueError(
+            "evaluate_symbol needs the analytic route: pass `element` with "
+            "`grid_spacing`, `lambda_ref` and `mu_ref`")
 
     real_dtype = np.dtype(dtype)
     if real_dtype == np.dtype(np.float32):
@@ -837,64 +1040,102 @@ def make_reference_stiffness_preconditioner(
             f"float64, got {real_dtype}"
         )
 
-    # Global-origin pixel(s) in this rank's interior: the nodal coordinate is
-    # exactly 0 in every direction only at global index 0 (coord = index / N).
-    # In MPI only the rank owning the origin matches; the others contribute no
-    # impulse, which is correct for the global impulse response.
-    coords = np.asarray(engine.coords)  # [dim, *local_grid]
-    origin_mask = np.ones(coords.shape[1:], dtype=bool)
-    for d in range(dim):
-        origin_mask &= coords[d] == 0.0
+    # Two routes to the same symbol.
+    #
+    # Analytic: the caller named the operator (element, spacing, Lame), so it
+    # is a 3^dim stencil -- 243 numbers in 3D -- and the symbol is the
+    # closed-form sum over its offsets. No impulse, no full-grid FFT, no
+    # device->host round trip, and the assembly is per-mode so it streams in
+    # slabs.
+    #
+    # Impulse: the caller handed over an opaque callable. Recovering the same
+    # information then means one impulse response per component on the *full*
+    # grid, each followed by a full-grid FFT. This stays because it is the
+    # only route that works for an operator muGrid cannot name.
+    analytic = element is not None
+    if analytic:
+        S = reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
+        if S.shape[-1] != n:
+            raise ValueError(
+                f"reference stencil has {S.shape[-1]} components but the "
+                f"preconditioner was asked for {n}")
+        if evaluate_symbol is None:
+            evaluate_symbol = not _engine_on_host(engine)
+        if evaluate_symbol:
+            # Decided before K_hat below is allocated: the point is that the
+            # full-size symbol never exists, not even during setup.
+            return AnalyticReferencePreconditioner(
+                engine, S, name=name, timer=timer, dtype=real_dtype)
 
     impulse_name = f"{name}-impulse"
     column_name = f"{name}-column"
     column_hat_name = f"{name}-column-hat"
-    impulse = engine.real_space_field(
-        impulse_name, components=(n,), dtype=real_dtype)
-    column = engine.real_space_field(
-        column_name, components=(n,), dtype=real_dtype)
-    column_hat = engine.fourier_space_field(
-        column_hat_name, components=(n,), dtype=complex_dtype)
 
-    # K_hat[q, alpha, beta] = (FFT of Kʳᵉᶠ applied to impulse e_beta)[alpha](q)
-    #
-    # Stored at the *solve* precision and in [*fourier, n, n] layout. Both
-    # matter at scale: the symbol is n^2 values per Fourier point, which at
-    # 512^3 is 9.7 GB in complex128 against 4.8 in complex64, and in single
-    # precision the extra width buys nothing anyway -- `column_hat` is a
-    # complex_dtype field, so the data has already been through a float32
-    # FFT by the time it arrives. Only the per-mode n x n *inversion* gains
-    # from double, and that is done below on one slab at a time. The
-    # [*fourier, n, n] layout is what np.linalg.inv batches over, so it also
-    # removes a full-size transposed copy.
+    # K_hat[q, alpha, beta], at the *solve* precision and in [*fourier, n, n]
+    # layout. Both matter at scale: the symbol is n^2 values per Fourier point,
+    # 4.5 GB at 512^3 in complex64 and twice that in complex128, and in single
+    # precision the extra width buys nothing -- only the per-mode n x n
+    # inversion below gains from double, and that is done in double on one slab
+    # at a time. [*fourier, n, n] is what np.linalg.inv batches over, so it also
+    # avoids a full-size transposed copy.
     K_hat = np.zeros(fourier_shape + (n, n), dtype=complex_dtype)
-    for beta in range(n):
-        host_impulse = np.zeros(impulse.s.shape)
-        # component beta, all (single) sub-points, at the origin pixel(s)
-        host_impulse[beta][..., origin_mask] = 1.0
-        try:
-            impulse.s[...] = host_impulse
-        except (TypeError, ValueError):
-            import cupy
 
-            impulse.s[...] = cupy.asarray(host_impulse)
+    fourier_q = np.asarray(engine.fftfreq)  # [dim, *fourier]
+    # Slab bound shared by assembly and inversion; see the inversion comment.
+    bytes_per_index = int(np.prod(fourier_shape[1:], dtype=np.int64)) * n * n * 16
+    slab = max(1, SYMBOL_INVERSION_SLAB_BYTES // max(bytes_per_index, 1))
 
-        apply_reference_stiffness(impulse, column)
-        engine.fft(column, column_hat)
+    if analytic:
+        # Slab at a time: stencil_symbol builds one array of the mode shape per
+        # stencil offset, so evaluating the whole grid at once would allocate
+        # 3^dim transients the size of the symbol.
+        for lo in range(0, fourier_shape[0], slab):
+            hi = min(lo + slab, fourier_shape[0])
+            K_hat[lo:hi] = stencil_symbol(
+                S, [fq[lo:hi] for fq in fourier_q], cdtype=complex_dtype)
+    else:
+        # Global-origin pixel(s) in this rank's interior: the nodal coordinate is
+        # exactly 0 in every direction only at global index 0 (coord = index / N).
+        # In MPI only the rank owning the origin matches; the others contribute no
+        # impulse, which is correct for the global impulse response.
+        coords = np.asarray(engine.coords)  # [dim, *local_grid]
+        origin_mask = np.ones(coords.shape[1:], dtype=bool)
+        for d in range(dim):
+            origin_mask &= coords[d] == 0.0
 
-        ch = column_hat.s
-        ch = ch.get() if hasattr(ch, "get") else np.asarray(ch)
-        # (n, [sub...], *fourier) -> (n, *fourier): collapse and drop the
-        # single nodal sub-point.
-        ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
-        K_hat[..., :, beta] = np.moveaxis(ch, 0, -1)
+        impulse = engine.real_space_field(
+            impulse_name, components=(n,), dtype=real_dtype)
+        column = engine.real_space_field(
+            column_name, components=(n,), dtype=real_dtype)
+        column_hat = engine.fourier_space_field(
+            column_hat_name, components=(n,), dtype=complex_dtype)
+
+        for beta in range(n):
+            host_impulse = np.zeros(impulse.s.shape)
+            # component beta, all (single) sub-points, at the origin pixel(s)
+            host_impulse[beta][..., origin_mask] = 1.0
+            try:
+                impulse.s[...] = host_impulse
+            except (TypeError, ValueError):
+                import cupy
+
+                impulse.s[...] = cupy.asarray(host_impulse)
+
+            apply_reference_stiffness(impulse, column)
+            engine.fft(column, column_hat)
+
+            ch = column_hat.s
+            ch = ch.get() if hasattr(ch, "get") else np.asarray(ch)
+            # (n, [sub...], *fourier) -> (n, *fourier): collapse and drop the
+            # single nodal sub-point.
+            ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
+            K_hat[..., :, beta] = np.moveaxis(ch, 0, -1)
 
     # The q = 0 block is singular: the reference operator has the rigid-body
     # translations in its null space. Invert everything else and project it out.
-    q = np.asarray(engine.fftfreq)  # [dim, *fourier]
     zero_mode = np.ones(fourier_shape, dtype=bool)
     for d in range(dim):
-        zero_mode &= q[d] == 0.0
+        zero_mode &= fourier_q[d] == 0.0
 
     # Invert in double for accuracy, a slab at a time, in place. Inverting the
     # whole array at once would hold the double copy, np.linalg.inv's output
@@ -904,8 +1145,6 @@ def make_reference_stiffness_preconditioner(
     # bytes instead, and the zero mode is handled by making its block the
     # identity before the inversion and zeroing it after, so no mask-indexed
     # copy of the *whole* symbol is ever built.
-    bytes_per_index = int(np.prod(fourier_shape[1:], dtype=np.int64)) * n * n * 16
-    slab = max(1, SYMBOL_INVERSION_SLAB_BYTES // max(bytes_per_index, 1))
     eye = np.eye(n, dtype=np.complex128)
     for lo in range(0, fourier_shape[0], slab):
         hi = min(lo + slab, fourier_shape[0])
@@ -930,13 +1169,20 @@ def make_reference_stiffness_preconditioner(
     # the preconditioner), so the only Fourier buffer the solve then needs is
     # the preconditioner's own work field. Freeing here drops ~3 vector-sized
     # buffers from the resident set during the CG iteration.
-    engine.real_space_collection.pop_field(impulse_name)
-    engine.real_space_collection.pop_field(column_name)
-    engine.fourier_space_collection.pop_field(column_hat_name)
-    del impulse, column, column_hat
+    if not analytic:
+        engine.real_space_collection.pop_field(impulse_name)
+        engine.real_space_collection.pop_field(column_name)
+        engine.fourier_space_collection.pop_field(column_hat_name)
+        del impulse, column, column_hat
 
     return BlockFourierPreconditioner(
         engine, K_inv, name=name, timer=timer, dtype=real_dtype)
+
+
+def _engine_on_host(engine):
+    """Whether the engine's fields live in host memory."""
+    device = getattr(engine, "device", None)
+    return device is None or device.is_host
 
 
 def make_green_jacobi_preconditioner(
@@ -947,10 +1193,13 @@ def make_green_jacobi_preconditioner(
     nb_components,
     reference_lambda=None,
     reference_mu=None,
+    element=None,
+    grid_spacing=None,
     void_tol=0.0,
     name="green-jacobi-preconditioner",
     timer=None,
     dtype=None,
+    evaluate_symbol=None,
 ):
     r"""
     Assemble the Green-Jacobi (J-FFT) preconditioner for FFT-accelerated FE
@@ -1003,6 +1252,10 @@ def make_green_jacobi_preconditioner(
         Green preconditioner's fields so their transforms pair with the solver's
         fields. Defaults to the dtype of ``lambda_field``, so a single-precision
         material yields a single-precision preconditioner automatically.
+    evaluate_symbol : bool, optional
+        Forwarded to :func:`make_reference_stiffness_preconditioner`; only
+        meaningful with ``element``. By default the Green symbol is evaluated
+        per mode on a device and stored on the host.
 
     Returns
     -------
@@ -1044,9 +1297,18 @@ def make_green_jacobi_preconditioner(
         engine.communicate_ghosts(u)
         stiffness_op.apply_uniform(u, reference_lambda, reference_mu, f)
 
+    # Name the operator when the caller can: `element` + `grid_spacing` let the
+    # Green part be assembled from its 3^dim stencil instead of by impulse
+    # response plus n full-grid FFTs. Same symbol to round-off, but no setup
+    # transforms and no device->host round trip. Without them the general
+    # impulse route still applies -- `stiffness_op` does not expose its element
+    # or spacing, so they cannot be recovered here.
     green = make_reference_stiffness_preconditioner(
         engine, apply_reference_stiffness, n, name=f"{name}-green",
-        timer=timer, dtype=dtype
+        timer=timer, dtype=dtype, element=element, grid_spacing=grid_spacing,
+        lambda_ref=reference_lambda if element is not None else None,
+        mu_ref=reference_mu if element is not None else None,
+        evaluate_symbol=evaluate_symbol,
     )
 
     diagonal = engine.real_space_field(
@@ -1603,8 +1865,17 @@ def _batched_inverse(matrices, xp=np, singular_mode=None):
     return flat_out.reshape(matrices.shape)
 
 
-def _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref, probe=8):
-    """The uniform operator's stencil, by impulse response.
+def reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref, probe=8):
+    """The uniform reference operator's stencil, by impulse response.
+
+    **The single definition of "the uniform reference operator".** Everything
+    that needs that operator in Fourier space -- the block preconditioner's
+    symbol, the hybrid's z-coupling blocks -- derives from this stencil via
+    :func:`stencil_symbol` rather than re-deriving a symbol of its own.
+
+    Because it *probes the real operator* rather than re-deriving `B(q)` from
+    the element tables, it matches the C++ discretisation by construction:
+    there is no second expression of the same maths to drift out of sync.
 
     Returns ``S`` with ``f(y) = sum_d S[d] u(y - d)``, indexed ``S[dx+1, ...]``.
     Measured on a small *serial* grid: the operator is uniform, so every rank
@@ -1655,19 +1926,98 @@ def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
     """
     # The stencil probe is a tiny host computation whatever the target is; only
     # the per-mode blocks are big enough to want to live on the device.
-    S = _reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
+    S = reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
     qs = [2 * xp.pi * xp.fft.fftfreq(n) for n in local_shape[:-1]]
     qs.append(2 * xp.pi * xp.fft.rfftfreq(local_shape[-1]))
     grids = xp.meshgrid(*qs, indexing="ij")
-    mode_shape = grids[0].shape
+    return stencil_symbol(S, grids, offset_axis=dim - 1, cdtype=cdtype, xp=xp,
+                          angular=True)
 
-    A = xp.zeros((3,) + mode_shape + (dim, dim), dtype=cdtype)
+
+#: Deprecated private spelling; kept so existing callers keep working.
+_reference_stencil = reference_stencil
+
+
+def stencil_symbol(S, q, offset_axis=None, cdtype=complex, xp=np,
+                   angular=False):
+    r"""Fourier symbol of a real-space stencil, assembled analytically.
+
+    For ``f(y) = Σ_d S[d] u(y - d)`` the symbol is
+    ``Ŝ(q) = Σ_d S[d] exp(-i q·d)``, a closed-form sum over the stencil's
+    ``3^dim`` offsets. This replaces recovering the same information by
+    impulse response on the full grid plus a full-grid FFT: the stencil is
+    243 numbers in 3D and determines the symbol everywhere.
+
+    The caller supplies the frequencies, because the two users of this
+    function do not share a convention: muGrid's FFT engine makes **axis 0**
+    the half-complex one (``engine.fftfreq``), while the hybrid preconditioner
+    transforms the rank-local axes with ``numpy.fft.rfftn`` semantics, which
+    halve the **last** of them. Owning the phase algebra here and the
+    convention at the call site keeps both honest.
+
+    Parameters
+    ----------
+    S : ndarray
+        Stencil of shape ``(3,) * dim + (dim, dim)``, indexed ``S[d + 1]``,
+        as returned by :func:`reference_stencil`.
+    q : sequence of ndarray
+        One frequency array per *phased* axis, all of the mode shape. In
+        cycles unless ``angular`` is set.
+    offset_axis : int, optional
+        An axis to leave *unphased*. The result then carries a leading axis of
+        length three indexed by that offset (``m = d + 1``), which is what a
+        direction-split solver needs: the operator along it is
+        ``(T v)[k] = A[0] v[k+1] + A[1] v[k] + A[2] v[k-1]``. ``None`` (the
+        default) phases every axis and returns a single block per mode.
+    angular : bool, optional
+        ``q`` is already in radians (``2π f``) rather than cycles.
+
+    Returns
+    -------
+    ndarray
+        ``(*mode_shape, dim, dim)``, or ``(3, *mode_shape, dim, dim)`` when
+        ``offset_axis`` is given.
+
+    Notes
+    -----
+    The stencil of a self-adjoint operator satisfies ``S[d] = S[-d]ᵀ``
+    exactly, so the symbol is Hermitian by construction rather than to within
+    round-off -- measured at 8.7e-17 for Q1 elasticity, against an assembled
+    symbol it reproduces to 4.9e-16.
+    """
+    dim = S.ndim - 2
+    phased = [a for a in range(dim) if a != offset_axis]
+    if len(q) != len(phased):
+        raise ValueError(
+            f"stencil_symbol: expected {len(phased)} frequency arrays for a "
+            f"{dim}D stencil with offset_axis={offset_axis}, got {len(q)}")
+    scale = 1.0 if angular else 2.0 * np.pi
+    mode_shape = xp.asarray(q[0]).shape if phased else ()
+
+    # One transcendental pass per phased axis, not one per (offset, axis).
+    # Stencil offsets are d in {-1, 0, +1}: d = 0 contributes nothing, and
+    # e^{+i0} is the conjugate of e^{-i0}. So `dim` calls to exp over the mode
+    # grid cover all 3^dim offsets, where the naive loop makes 3^dim * dim of
+    # them -- 81 in 3D, and exp on a complex grid is the dominant cost.
+    fwd = [xp.exp(-1j * scale * xp.asarray(qk)).astype(cdtype) for qk in q]
+    phase_for = [{-1: xp.conj(f), 0: None, +1: f} for f in fwd]
+
+    lead = () if offset_axis is None else (3,)
+    out = xp.zeros(lead + mode_shape + (dim, dim), dtype=cdtype)
     for offset in np.ndindex((3,) * dim):
-        phase = xp.ones(mode_shape, dtype=cdtype)
-        for axis in range(dim - 1):
-            phase = phase * xp.exp(-1j * grids[axis] * (offset[axis] - 1))
-        A[offset[-1]] += phase[..., None, None] * xp.asarray(S[offset])
-    return A
+        phase = None
+        for k, axis in enumerate(phased):
+            factor = phase_for[k][offset[axis] - 1]
+            if factor is None:
+                continue
+            phase = factor if phase is None else phase * factor
+        block = xp.asarray(S[offset])
+        block = block if phase is None else phase[..., None, None] * block
+        if offset_axis is None:
+            out += block
+        else:
+            out[offset[offset_axis]] += block
+    return out
 
 
 _BLOCK_THOMAS_SOURCE = r"""

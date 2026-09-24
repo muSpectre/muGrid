@@ -37,6 +37,7 @@
 #include "field/field_typed.hh"
 #include "linalg/linalg.hh"
 #include "linalg/block_thomas.hh"
+#include "linalg/green_symbol.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -142,6 +143,86 @@ namespace {
             "over memory instead of the 4*nz an elementwise formulation costs.");
     }
 
+    /**
+     * Bind the per-mode inverse-symbol application for one block size and
+     * precision.
+     *
+     * Like the block-Thomas binding this takes buffers rather than muGrid
+     * fields: the array lives in Fourier space with a mode axis, which no
+     * field collection describes. The frequency tables come in as a list of
+     * one 1D array per axis -- passing a frequency per mode would be 809 MB at
+     * 512^3 in single precision, which would give back most of what evaluating
+     * the symbol instead of storing it saves.
+     */
+    template <muGrid::Dim_t Dim, typename T>
+    void bind_green_symbol(py::module & mod, const char * name) {
+        using Arr = py::array_t<std::complex<T>,
+                                py::array::c_style | py::array::forcecast>;
+        using RArr = py::array_t<T, py::array::c_style | py::array::forcecast>;
+        mod.def(
+            name,
+            [](Arr field, muGrid::Index_t stride_component,
+               muGrid::Index_t stride_mode, RArr stencil,
+               std::vector<RArr> q,
+               std::vector<muGrid::Index_t> nb_fourier_grid_pts,
+               T normalisation) {
+                const auto f = field.request();
+                const auto st = stencil.request();
+
+                if (static_cast<muGrid::Dim_t>(q.size()) != Dim ||
+                    static_cast<muGrid::Dim_t>(nb_fourier_grid_pts.size()) !=
+                        Dim) {
+                    throw muGrid::RuntimeError{
+                        "apply_green_symbol: need one frequency table and one "
+                        "mode count per dimension"};
+                }
+                muGrid::Index_t nb_modes{1};
+                for (auto n : nb_fourier_grid_pts) {
+                    nb_modes *= n;
+                }
+                const muGrid::Index_t nb_offsets{(Dim == 2) ? 9 : 27};
+                if (st.size != nb_offsets * Dim * Dim) {
+                    throw muGrid::RuntimeError{
+                        "apply_green_symbol: stencil must be 3^Dim x Dim x "
+                        "Dim"};
+                }
+                if (f.size < nb_modes * Dim) {
+                    throw muGrid::RuntimeError{
+                        "apply_green_symbol: field is smaller than nb_modes * "
+                        "Dim"};
+                }
+
+                std::vector<py::buffer_info> qb;
+                std::vector<const T *> qp;
+                qb.reserve(Dim);
+                qp.reserve(Dim);
+                for (muGrid::Dim_t d = 0; d < Dim; ++d) {
+                    qb.push_back(q[d].request());
+                    if (qb.back().size != nb_fourier_grid_pts[d]) {
+                        throw muGrid::RuntimeError{
+                            "apply_green_symbol: frequency table length does "
+                            "not match the mode count of its axis"};
+                    }
+                    qp.push_back(static_cast<const T *>(qb.back().ptr));
+                }
+
+                auto * field_p = static_cast<std::complex<T> *>(f.ptr);
+                const auto * stencil_p = static_cast<const T *>(st.ptr);
+
+                py::gil_scoped_release release{};
+                muGrid::green_symbol::apply_inverse<Dim, T>(
+                    field_p, stride_component, stride_mode, stencil_p,
+                    qp.data(), nb_fourier_grid_pts.data(), normalisation,
+                    nb_modes);
+            },
+            "field"_a, "stride_component"_a, "stride_mode"_a, "stencil"_a,
+            "q"_a, "nb_fourier_grid_pts"_a, "normalisation"_a,
+            "Apply the inverse symbol of a uniform stencil operator to a "
+            "Fourier field, in place, evaluating the symbol per mode instead "
+            "of reading a stored one. The q = 0 block is the rigid-body null "
+            "space and is projected out.");
+    }
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     /**
      * Bind the device sweep for one block size and precision.
@@ -179,6 +260,64 @@ namespace {
             "Fused block-Thomas sweep on the device. Arguments are device "
             "addresses (CuPy `array.data.ptr`), not buffers.");
     }
+
+    /**
+     * Bind the device inverse-symbol application for one block size and
+     * precision.
+     *
+     * The field and the per-axis frequency tables are device addresses, for
+     * the same reason as in the sweep above. The stencil stays a host array:
+     * the kernel takes it by value, in constant memory, so there is no device
+     * copy to keep alive. The Fourier buffer on a device is
+     * structure-of-arrays, so the caller passes `stride_component = nb_modes`
+     * and `stride_mode = 1` -- the opposite of the host binding.
+     */
+    template <muGrid::Dim_t Dim, typename T>
+    void bind_green_symbol_gpu(py::module & mod, const char * name) {
+        using RArr = py::array_t<T, py::array::c_style | py::array::forcecast>;
+        mod.def(
+            name,
+            [](std::uintptr_t field, muGrid::Index_t stride_component,
+               muGrid::Index_t stride_mode, RArr stencil,
+               std::vector<std::uintptr_t> q,
+               std::vector<muGrid::Index_t> nb_fourier_grid_pts,
+               T normalisation) {
+                const auto st = stencil.request();
+                if (static_cast<muGrid::Dim_t>(q.size()) != Dim ||
+                    static_cast<muGrid::Dim_t>(nb_fourier_grid_pts.size()) !=
+                        Dim) {
+                    throw muGrid::RuntimeError{
+                        "apply_green_symbol_gpu: need one frequency table and "
+                        "one mode count per dimension"};
+                }
+                const muGrid::Index_t nb_offsets{(Dim == 2) ? 9 : 27};
+                if (st.size != nb_offsets * Dim * Dim) {
+                    throw muGrid::RuntimeError{
+                        "apply_green_symbol_gpu: stencil must be 3^Dim x Dim "
+                        "x Dim"};
+                }
+                muGrid::Index_t nb_modes{1};
+                for (auto n : nb_fourier_grid_pts) {
+                    nb_modes *= n;
+                }
+                std::vector<const T *> qp;
+                qp.reserve(Dim);
+                for (auto p : q) {
+                    qp.push_back(reinterpret_cast<const T *>(p));
+                }
+                const auto * stencil_p = static_cast<const T *>(st.ptr);
+                py::gil_scoped_release release{};
+                muGrid::green_symbol::apply_inverse_gpu<Dim, T>(
+                    reinterpret_cast<std::complex<T> *>(field),
+                    stride_component, stride_mode, stencil_p, qp.data(),
+                    nb_fourier_grid_pts.data(), normalisation, nb_modes);
+            },
+            "field"_a, "stride_component"_a, "stride_mode"_a, "stencil"_a,
+            "q"_a, "nb_fourier_grid_pts"_a, "normalisation"_a,
+            "Device counterpart of apply_green_symbol. `field` and each entry "
+            "of `q` are device addresses (CuPy `array.data.ptr`); the stencil "
+            "is a host array.");
+    }
 #endif
 
 }  // namespace
@@ -203,6 +342,10 @@ void add_linalg_functions(py::module &mod) {
         computations. Use comm.sum() to reduce across MPI ranks.
         )pbdoc");
 
+    bind_green_symbol<2, Real>(linalg, "apply_green_symbol_2d");
+    bind_green_symbol<3, Real>(linalg, "apply_green_symbol_3d");
+    bind_green_symbol<2, Real32>(linalg, "apply_green_symbol_2d_f32");
+    bind_green_symbol<3, Real32>(linalg, "apply_green_symbol_3d_f32");
     bind_block_thomas<2, Real>(linalg, "block_thomas_2d");
     bind_block_thomas<3, Real>(linalg, "block_thomas_3d");
     bind_block_thomas<2, Real32>(linalg, "block_thomas_2d_f32");
@@ -212,6 +355,10 @@ void add_linalg_functions(py::module &mod) {
     bind_block_thomas_gpu<3, Real>(linalg, "block_thomas_gpu_3d");
     bind_block_thomas_gpu<2, Real32>(linalg, "block_thomas_gpu_2d_f32");
     bind_block_thomas_gpu<3, Real32>(linalg, "block_thomas_gpu_3d_f32");
+    bind_green_symbol_gpu<2, Real>(linalg, "apply_green_symbol_gpu_2d");
+    bind_green_symbol_gpu<3, Real>(linalg, "apply_green_symbol_gpu_3d");
+    bind_green_symbol_gpu<2, Real32>(linalg, "apply_green_symbol_gpu_2d_f32");
+    bind_green_symbol_gpu<3, Real32>(linalg, "apply_green_symbol_gpu_3d_f32");
 #endif
 
     // --- Real field operations (host) ---

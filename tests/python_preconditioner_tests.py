@@ -1032,3 +1032,252 @@ def test_reference_stiffness_symbol_is_slab_invariant(comm, monkeypatch):
     many_slabs = symbol("slab-split")
 
     np.testing.assert_array_equal(one_slab, many_slabs)
+
+
+@pytest.mark.parametrize("dim,n", [(2, 16), (3, 12)])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_analytic_reference_symbol_matches_impulse_assembly(comm, dim, n, dtype):
+    """Naming the operator must give the same preconditioner as probing it.
+
+    The uniform reference operator is a ``3^dim`` stencil -- 243 numbers in 3D
+    -- so its symbol is the closed-form sum ``Σ_d S[d] exp(-i q·d)``. The
+    impulse route recovers exactly the same information the expensive way: one
+    impulse response per component on the *full* grid, each followed by a
+    full-grid FFT, then a dense ``n × n`` symbol held at 4.5 GB at 512³.
+
+    This is the gate on the whole analytic path. Getting ``q`` wrong is silent
+    -- muGrid's engine makes **axis 0** the half-complex one, while the hybrid
+    preconditioner's ``numpy.fft.rfftn`` semantics halve the **last** of the
+    axes it transforms -- and a wrong convention still produces a
+    plausible-looking symbol. Comparing the applied results catches it.
+    """
+    engine = make_engine(comm, (n,) * dim)
+    spacing = (1.0 / n,) * dim
+    lam, mu = 1.3, 0.7
+    element = muGrid.FEMElement.q1
+    op = (muGrid.IsotropicStiffnessOperator2D if dim == 2
+          else muGrid.IsotropicStiffnessOperator3D)(list(spacing), element)
+
+    def apply_ref(u, f):
+        engine.communicate_ghosts(u)
+        op.apply_uniform(u, lam, mu, f)
+
+    tag = f"{dim}d-{np.dtype(dtype).name}"
+    impulse = make_reference_stiffness_preconditioner(
+        engine, apply_ref, dim, dtype=dtype, name=f"imp-{tag}")
+    analytic = make_reference_stiffness_preconditioner(
+        engine, nb_components=dim, element=element, grid_spacing=spacing,
+        lambda_ref=lam, mu_ref=mu, dtype=dtype, name=f"ana-{tag}")
+
+    r = engine.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
+    z_imp = engine.real_space_field(f"zi-{tag}", components=(dim,), dtype=dtype)
+    z_ana = engine.real_space_field(f"za-{tag}", components=(dim,), dtype=dtype)
+    rng = np.random.default_rng(0)
+    r.p[...] = rng.standard_normal(r.p.shape).astype(dtype)
+
+    impulse(r, z_imp)
+    analytic(r, z_ana)
+
+    a = np.asarray(z_imp.p).astype(np.float64)
+    b = np.asarray(z_ana.p).astype(np.float64)
+    scale = np.abs(a).max()
+    # float32 fields round the symbol and the transforms; float64 should agree
+    # to assembly round-off.
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    assert np.abs(a - b).max() / scale < tol
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+def test_analytic_reference_needs_a_complete_description(comm, dim):
+    """Half a description is an error, not a silent fallback to the slow path."""
+    engine = make_engine(comm, (8,) * dim)
+    with pytest.raises(ValueError, match="grid_spacing"):
+        make_reference_stiffness_preconditioner(
+            engine, nb_components=dim, element=muGrid.FEMElement.q1,
+            lambda_ref=1.3, name=f"incomplete-{dim}")
+    with pytest.raises(ValueError, match="apply_reference_stiffness"):
+        make_reference_stiffness_preconditioner(
+            engine, nb_components=dim, name=f"nothing-{dim}")
+
+
+@pytest.mark.parametrize("dim,n", [(2, 16), (3, 10)])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_evaluated_symbol_matches_stored_symbol(comm, dim, n, dtype):
+    """Evaluating the symbol per mode must give the same operator as storing it.
+
+    ``AnalyticReferencePreconditioner`` keeps the ``3^dim`` stencil -- 243
+    numbers in 3D -- and rebuilds ``K(q)``, inverts it and applies it in
+    registers, where ``BlockFourierPreconditioner`` holds ``n²`` complex values
+    per Fourier mode (2.3 GB at 512³ in single precision). Measured at 128³:
+    build peak 604 -> 51 MB, total peak 803 -> 258 MB, apply 59 -> 75 ms.
+
+    This is the gate on the C++ kernel, and the thing it most easily gets wrong
+    is the mode ordering: the kernel indexes modes with **axis 0 fastest**,
+    matching the Fourier field's Fortran-ordered buffer, and a C-order reading
+    of the same buffer produces a wrong but entirely plausible result.
+    """
+    from muGrid.Preconditioners import (
+        AnalyticReferencePreconditioner,
+        reference_stencil,
+    )
+
+    engine = make_engine(comm, (n,) * dim)
+    spacing = (1.0 / n,) * dim
+    lam, mu = 1.3, 0.7
+    element = muGrid.FEMElement.q1
+    op = (muGrid.IsotropicStiffnessOperator2D if dim == 2
+          else muGrid.IsotropicStiffnessOperator3D)(list(spacing), element)
+
+    def apply_ref(u, f):
+        engine.communicate_ghosts(u)
+        op.apply_uniform(u, lam, mu, f)
+
+    tag = f"{dim}d-{np.dtype(dtype).name}"
+    stored = make_reference_stiffness_preconditioner(
+        engine, apply_ref, dim, dtype=dtype, name=f"stored-{tag}")
+    evaluated = AnalyticReferencePreconditioner(
+        engine, reference_stencil(dim, spacing, element, lam, mu),
+        dtype=dtype, name=f"eval-{tag}")
+
+    r = engine.real_space_field(f"er-{tag}", components=(dim,), dtype=dtype)
+    z_s = engine.real_space_field(f"ezs-{tag}", components=(dim,), dtype=dtype)
+    z_e = engine.real_space_field(f"eze-{tag}", components=(dim,), dtype=dtype)
+    rng = np.random.default_rng(0)
+    r.p[...] = rng.standard_normal(r.p.shape).astype(dtype)
+
+    stored(r, z_s)
+    evaluated(r, z_e)
+
+    a = np.asarray(z_s.p).astype(np.float64)
+    b = np.asarray(z_e.p).astype(np.float64)
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    assert np.abs(a - b).max() / np.abs(a).max() < tol
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+def test_evaluated_symbol_stores_only_the_stencil(comm, dim):
+    """The point of the class is what it does *not* keep: no array it owns may
+    scale with the number of Fourier modes."""
+    from muGrid.Preconditioners import (
+        AnalyticReferencePreconditioner,
+        reference_stencil,
+    )
+
+    n = 12
+    engine = make_engine(comm, (n,) * dim)
+    spacing = (1.0 / n,) * dim
+    prec = AnalyticReferencePreconditioner(
+        engine, reference_stencil(dim, spacing, muGrid.FEMElement.q1, 1.3, 0.7),
+        name=f"small-{dim}")
+
+    fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+    assert prec._stencil.size == 3 ** dim * dim * dim
+    # Frequency tables are per axis, not per mode -- the per-mode form would be
+    # 809 MB at 512^3, most of what not storing the symbol saves. Stated
+    # structurally rather than as a size comparison: under MPI a subdomain can
+    # hold fewer modes than the axis lengths sum to, which says nothing about
+    # how the storage scales.
+    assert [q.size for q in prec._q] == list(fourier_shape)
+    # Everything it owns is O(stencil + sum of axis lengths), never
+    # O(product). The saving is asymptotic, not universal: 243 numbers is a
+    # fixed cost that only pays off once a subdomain holds many modes, and an
+    # MPI rank with a dozen of them is better served by the stored symbol.
+    stored_scalars = prec._stencil.size + sum(q.size for q in prec._q)
+    assert stored_scalars == 3 ** dim * dim * dim + sum(fourier_shape)
+
+
+@pytest.mark.parametrize("dim,shape", [
+    (2, (16, 16)), (3, (10, 10, 10)),
+    # axis 0 halves to two modes, so a thread block spans more lines than it
+    # keeps in shared memory and every thread builds its own hoisted sums
+    (2, (2, 64)), (3, (3, 16, 16)),
+])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
+                                                           dtype):
+    """The device kernel must reproduce the stored symbol applied on the host.
+
+    What it can get wrong silently is the layout: the device Fourier buffer is
+    structure-of-arrays (component stride ``nb_modes``, mode stride 1) where
+    the host one is array-of-structures, and the kernel's thread blocks share
+    the hoisted sums over axes 1 and 2 per axis-0 line. The short-axis-0 grids
+    take the path where a block spans too many lines to share them.
+    """
+    skip_if_gpu_unavailable("gpu")
+    import cupy
+
+    from muGrid.Preconditioners import AnalyticReferencePreconditioner
+
+    # Isotropic even where the grid is not: a 32:1 element is ill-conditioned
+    # enough to push single precision past the tolerance on its own.
+    spacing = (1.0 / shape[-1],) * dim
+    lam, mu = 1.3, 0.7
+    element = muGrid.FEMElement.q1
+    tag = f"{dim}d-{shape[0]}-{np.dtype(dtype).name}"
+
+    host = muGrid.FFTEngine(shape, comm)
+    device = muGrid.FFTEngine(shape, comm, device=create_device("gpu"))
+    stored = make_reference_stiffness_preconditioner(
+        host, nb_components=dim, dtype=dtype, element=element,
+        grid_spacing=spacing, lambda_ref=lam, mu_ref=mu,
+        evaluate_symbol=False, name=f"stored-{tag}")
+    evaluated = make_reference_stiffness_preconditioner(
+        device, nb_components=dim, dtype=dtype, element=element,
+        grid_spacing=spacing, lambda_ref=lam, mu_ref=mu,
+        name=f"eval-{tag}")
+    assert isinstance(stored, BlockFourierPreconditioner)
+    assert isinstance(evaluated, AnalyticReferencePreconditioner)
+
+    r_h = host.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
+    z_h = host.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
+    r_d = device.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
+    z_d = device.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
+    x = np.random.default_rng(0).standard_normal(r_h.p.shape).astype(dtype)
+    r_h.p[...] = x
+    r_d.p[...] = cupy.asarray(x)
+
+    stored(r_h, z_h)
+    evaluated(r_d, z_d)
+
+    a = np.asarray(z_h.p).astype(np.float64)
+    b = cupy.asnumpy(z_d.p).astype(np.float64)
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    assert np.abs(a - b).max() / np.abs(a).max() < tol
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_reference_factory_chooses_storage_by_device(comm, device):
+    """By default the analytic route evaluates the symbol on a device and
+    stores it on the host; ``evaluate_symbol`` overrides either way."""
+    skip_if_gpu_unavailable(device)
+    from muGrid.Preconditioners import AnalyticReferencePreconditioner
+
+    dim, n = 3, 8
+    engine = muGrid.FFTEngine((n,) * dim, comm, device=create_device(device))
+    kw = dict(nb_components=dim, element=muGrid.FEMElement.q1,
+              grid_spacing=(1.0 / n,) * dim, lambda_ref=1.3, mu_ref=0.7)
+
+    default = make_reference_stiffness_preconditioner(
+        engine, name=f"default-{device}", **kw)
+    expected = (BlockFourierPreconditioner if device == "cpu"
+                else AnalyticReferencePreconditioner)
+    assert isinstance(default, expected)
+
+    forced = make_reference_stiffness_preconditioner(
+        engine, name=f"forced-{device}", evaluate_symbol=device == "cpu",
+        **kw)
+    assert not isinstance(forced, expected)
+
+    with pytest.raises(ValueError, match="analytic route"):
+        make_reference_stiffness_preconditioner(
+            engine, lambda u, f: None, dim, evaluate_symbol=True,
+            name=f"opaque-{device}")
+
+
+def test_evaluated_symbol_rejects_a_malformed_stencil(comm):
+    from muGrid.Preconditioners import AnalyticReferencePreconditioner
+
+    engine = make_engine(comm, (8, 8))
+    with pytest.raises(ValueError, match="stencil must have shape"):
+        AnalyticReferencePreconditioner(engine, np.zeros((3, 3, 2)),
+                                        name="bad-stencil")
