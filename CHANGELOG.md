@@ -1,6 +1,42 @@
 Change log for µGrid
 ====================
 
+unreleased
+----------
+
+- ENH: The reference-material (Green) preconditioner can now *evaluate* its
+  symbol per Fourier mode instead of assembling and storing it. A uniform
+  operator is a `3^dim` stencil — 243 numbers in 3D — so
+  `K(q) = Σ_d S[d] exp(-2πi q·d)` is closed form, and the new
+  `AnalyticReferencePreconditioner` keeps the stencil rather than `n²` complex
+  values per mode (2.3 GB at 512³ for three components in single precision, and
+  it grows with the grid). `linalg/green_symbol.{hh,cc}` is the host kernel and
+  `green_symbol_gpu.cc` the CUDA/HIP one, bound as
+  `linalg.apply_green_symbol_{2,3}d[_f32]` and `..._gpu_*`
+- ENH: `make_reference_stiffness_preconditioner` and
+  `make_green_jacobi_preconditioner` take `evaluate_symbol`, which defaults to
+  evaluating on a device and storing on the host. On an H200 at 512³ with three
+  components, evaluating is 2.7x (float32) and 1.9x (float64) faster per apply
+  than the stored symbol, holds 4.9 GB less device memory, and sets up in 1.3 s
+  against 168 s. On the host the apply is ~28% slower, so the stored symbol
+  stays the default there; pass `evaluate_symbol=True`/`False` to override.
+  The measured device win is larger than an arithmetic-intensity estimate
+  predicts, because the stored path's per-mode multiply runs component by
+  component through CuPy and is far from its own bandwidth floor
+- ENH: `reference_stencil` is public and is the single definition of the uniform
+  reference operator: it *probes* the real C++ operator on an 8^dim serial grid
+  rather than re-deriving `B(q)` from the element tables, so it matches the
+  discretisation by construction. `stencil_symbol` generalises the hybrid
+  preconditioner's `_z_coupling_blocks` — which already assembled its blocks
+  this way — to either phase every axis or leave one explicit, so both
+  preconditioners now derive from the same stencil
+- ENH: The assembled route uses the stencil too, when the caller names the
+  operator (`element` + `grid_spacing` + Lamé), which removes the impulse
+  response, the `n` full-grid FFTs and the three engine-sized fields it needed.
+  An opaque callable still takes the impulse route, which is the only one that
+  works for an operator muGrid cannot name. The two agree to assembly
+  round-off: 1.0e-15 in 3D at float64, ~1e-06 at float32
+
 v1.4.0 (23Sep26)
 ----------------
 
