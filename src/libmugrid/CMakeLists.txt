@@ -60,6 +60,7 @@ set(MUGRID_SOURCES
     # linalg/
     linalg/linalg_host.cc
     linalg/block_thomas.cc
+    linalg/green_symbol.cc
     # fft/
     fft/pocketfft_backend.cc
     fft/transpose.cc

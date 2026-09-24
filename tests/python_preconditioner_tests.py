@@ -1098,3 +1098,98 @@ def test_analytic_reference_needs_a_complete_description(comm, dim):
     with pytest.raises(ValueError, match="apply_reference_stiffness"):
         make_reference_stiffness_preconditioner(
             engine, nb_components=dim, name=f"nothing-{dim}")
+
+
+@pytest.mark.parametrize("dim,n", [(2, 16), (3, 10)])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_evaluated_symbol_matches_stored_symbol(comm, dim, n, dtype):
+    """Evaluating the symbol per mode must give the same operator as storing it.
+
+    ``AnalyticReferencePreconditioner`` keeps the ``3^dim`` stencil -- 243
+    numbers in 3D -- and rebuilds ``K(q)``, inverts it and applies it in
+    registers, where ``BlockFourierPreconditioner`` holds ``n²`` complex values
+    per Fourier mode (2.3 GB at 512³ in single precision). Measured at 128³:
+    build peak 604 -> 51 MB, total peak 803 -> 258 MB, apply 59 -> 75 ms.
+
+    This is the gate on the C++ kernel, and the thing it most easily gets wrong
+    is the mode ordering: the kernel indexes modes with **axis 0 fastest**,
+    matching the Fourier field's Fortran-ordered buffer, and a C-order reading
+    of the same buffer produces a wrong but entirely plausible result.
+    """
+    from muGrid.Preconditioners import (
+        AnalyticReferencePreconditioner,
+        reference_stencil,
+    )
+
+    engine = make_engine(comm, (n,) * dim)
+    spacing = (1.0 / n,) * dim
+    lam, mu = 1.3, 0.7
+    element = muGrid.FEMElement.q1
+    op = (muGrid.IsotropicStiffnessOperator2D if dim == 2
+          else muGrid.IsotropicStiffnessOperator3D)(list(spacing), element)
+
+    def apply_ref(u, f):
+        engine.communicate_ghosts(u)
+        op.apply_uniform(u, lam, mu, f)
+
+    tag = f"{dim}d-{np.dtype(dtype).name}"
+    stored = make_reference_stiffness_preconditioner(
+        engine, apply_ref, dim, dtype=dtype, name=f"stored-{tag}")
+    evaluated = AnalyticReferencePreconditioner(
+        engine, reference_stencil(dim, spacing, element, lam, mu),
+        dtype=dtype, name=f"eval-{tag}")
+
+    r = engine.real_space_field(f"er-{tag}", components=(dim,), dtype=dtype)
+    z_s = engine.real_space_field(f"ezs-{tag}", components=(dim,), dtype=dtype)
+    z_e = engine.real_space_field(f"eze-{tag}", components=(dim,), dtype=dtype)
+    rng = np.random.default_rng(0)
+    r.p[...] = rng.standard_normal(r.p.shape).astype(dtype)
+
+    stored(r, z_s)
+    evaluated(r, z_e)
+
+    a = np.asarray(z_s.p).astype(np.float64)
+    b = np.asarray(z_e.p).astype(np.float64)
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    assert np.abs(a - b).max() / np.abs(a).max() < tol
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+def test_evaluated_symbol_stores_only_the_stencil(comm, dim):
+    """The point of the class is what it does *not* keep: no array it owns may
+    scale with the number of Fourier modes."""
+    from muGrid.Preconditioners import (
+        AnalyticReferencePreconditioner,
+        reference_stencil,
+    )
+
+    n = 12
+    engine = make_engine(comm, (n,) * dim)
+    spacing = (1.0 / n,) * dim
+    prec = AnalyticReferencePreconditioner(
+        engine, reference_stencil(dim, spacing, muGrid.FEMElement.q1, 1.3, 0.7),
+        name=f"small-{dim}")
+
+    fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+    assert prec._stencil.size == 3 ** dim * dim * dim
+    # Frequency tables are per axis, not per mode -- the per-mode form would be
+    # 809 MB at 512^3, most of what not storing the symbol saves. Stated
+    # structurally rather than as a size comparison: under MPI a subdomain can
+    # hold fewer modes than the axis lengths sum to, which says nothing about
+    # how the storage scales.
+    assert [q.size for q in prec._q] == list(fourier_shape)
+    # Everything it owns is O(stencil + sum of axis lengths), never
+    # O(product). The saving is asymptotic, not universal: 243 numbers is a
+    # fixed cost that only pays off once a subdomain holds many modes, and an
+    # MPI rank with a dozen of them is better served by the stored symbol.
+    stored_scalars = prec._stencil.size + sum(q.size for q in prec._q)
+    assert stored_scalars == 3 ** dim * dim * dim + sum(fourier_shape)
+
+
+def test_evaluated_symbol_rejects_a_malformed_stencil(comm):
+    from muGrid.Preconditioners import AnalyticReferencePreconditioner
+
+    engine = make_engine(comm, (8, 8))
+    with pytest.raises(ValueError, match="stencil must have shape"):
+        AnalyticReferencePreconditioner(engine, np.zeros((3, 3, 2)),
+                                        name="bad-stencil")

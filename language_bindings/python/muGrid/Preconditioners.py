@@ -759,6 +759,124 @@ class GreenJacobiPreconditioner(Preconditioner):
 SYMBOL_INVERSION_SLAB_BYTES = 128 * 1024 * 1024
 
 
+class AnalyticReferencePreconditioner(Preconditioner):
+    r"""``Kʳᵉᶠ⁻¹`` with the symbol *evaluated* per mode, never stored.
+
+    Same operator as :class:`BlockFourierPreconditioner` built by
+    :func:`make_reference_stiffness_preconditioner`, reached differently. That
+    class holds the inverse symbol: ``n²`` complex values per Fourier mode,
+    2.3 GB at 512³ for three components in single precision, growing with the
+    grid. A uniform operator is a ``3^dim`` stencil -- 243 numbers in 3D -- so
+    the symbol is the closed-form sum ``Σ_d S[d] exp(-2πi q·d)`` and can be
+    rebuilt for one mode, inverted and applied entirely in registers. What this
+    class stores is the stencil.
+
+    The trade is arithmetic for memory, and it is close to even rather than
+    free. Rebuilding costs ~630 flops per mode against ~36 bytes read for the
+    stored symbol, so it wants about 17.6 flops/byte to break even: an A100
+    balances at 12.6 and an H100 at 17.9, while a CPU socket is nearer 5. Use
+    it where memory is the binding constraint, which on a large grid it is.
+
+    The per-mode cost would be nine times higher done naively. Modes along the
+    fastest axis share the frequencies of every other axis, so the kernel
+    hoists those sums out of that loop; without it the symbol build alone is
+    1944 flops per mode instead of 216.
+
+    Parameters
+    ----------
+    engine : muGrid.FFTEngine
+        Defines the grid, the decomposition and the transforms.
+    stencil : ndarray
+        ``(3,) * dim + (dim, dim)``, from :func:`reference_stencil`.
+    name : str, optional
+        Prefix for the engine-managed Fourier work field.
+    timer : muTimer.Timer, optional
+        When given, :meth:`apply` records ``"fft"``, ``"symbol"`` and
+        ``"ifft"``.
+    dtype : data-type, optional
+        Real-space precision of the fields this will be applied to.
+    """
+
+    def __init__(self, engine, stencil, name="analytic-reference-preconditioner",
+                 timer=None, dtype=np.float64):
+        self._engine = engine
+        self._name = name
+        self._timer = timer
+
+        real_dtype = np.dtype(dtype)
+        if real_dtype == np.dtype(np.float32):
+            complex_dtype, suffix = np.dtype(np.complex64), "_f32"
+        elif real_dtype == np.dtype(np.float64):
+            complex_dtype, suffix = np.dtype(np.complex128), ""
+        else:
+            raise ValueError(
+                f"AnalyticReferencePreconditioner dtype must be float32 or "
+                f"float64, got {real_dtype}")
+
+        stencil = np.asarray(stencil)
+        dim = stencil.ndim - 2
+        if dim not in (2, 3) or stencil.shape != (3,) * dim + (dim, dim):
+            raise ValueError(
+                f"stencil must have shape (3,)*dim + (dim, dim) with dim 2 or "
+                f"3; got {stencil.shape}")
+        self._dim = dim
+        # Real, and 243 numbers at most -- this is the whole operator.
+        self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=real_dtype)
+
+        self._fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
+        # One frequency table per axis rather than one frequency per mode: the
+        # per-mode form would be 809 MB at 512³ in single precision, which is
+        # most of what not storing the symbol saves. Read off the engine's own
+        # meshgrid so the convention cannot drift -- muGrid makes axis 0 the
+        # half-complex one, unlike numpy.fft.rfftn.
+        #
+        # A rank can own *no* Fourier modes -- more ranks than planes along the
+        # split axis -- and then the meshgrid has a zero-length axis that
+        # cannot be indexed to read the others off. Such a rank has nothing to
+        # scale; it still takes part in the transforms, which are collective.
+        self._nb_modes = int(np.prod(self._fourier_shape))
+        q = np.asarray(engine.fftfreq)
+        self._q = []
+        for d in range(dim):
+            if self._nb_modes == 0:
+                self._q.append(np.empty(self._fourier_shape[d],
+                                        dtype=real_dtype))
+                continue
+            index = [0] * dim
+            index[d] = slice(None)
+            self._q.append(
+                np.ascontiguousarray(q[d][tuple(index)], dtype=real_dtype))
+
+        self._work = engine.fourier_space_field(
+            f"{name}-work", components=(dim,), dtype=complex_dtype)
+        self._kernel = getattr(linalg, f"apply_green_symbol_{dim}d{suffix}")
+        self._normalisation = real_dtype.type(engine.normalisation)
+
+    def _timed(self, label):
+        return self._timer(label) if self._timer is not None else nullcontext()
+
+    def apply(self, r, z):
+        engine = self._engine
+        with self._timed("fft"):
+            engine.fft(r, self._work)
+        with self._timed("symbol"):
+            if self._nb_modes == 0:
+                # No local modes; the transforms above and below are still
+                # collective and must not be skipped.
+                pass
+            else:
+                # The Fourier buffer is Fortran-ordered, so an order="F"
+                # ravel is a contiguous *view*: components fastest, then modes
+                # with axis 0 fastest, exactly the layout the kernel indexes.
+                # Nothing is copied and the kernel writes back through it.
+                flat = np.asarray(self._work.s).ravel(order="F")
+                self._kernel(flat, 1, self._dim, self._stencil, self._q,
+                             list(self._fourier_shape), self._normalisation)
+        with self._timed("ifft"):
+            engine.ifft(self._work, z)
+        return z
+
+
 def make_reference_stiffness_preconditioner(
     engine,
     apply_reference_stiffness=None,

@@ -259,6 +259,15 @@ block_thomas_3d = _linalg.block_thomas_3d
 block_thomas_2d_f32 = _linalg.block_thomas_2d_f32
 block_thomas_3d_f32 = _linalg.block_thomas_3d_f32
 
+# Per-mode application of a uniform operator's inverse symbol. Evaluates the
+# symbol from its 3^dim stencil rather than reading a stored one, so the
+# reference preconditioner needs no per-mode storage at all -- 2.3 GB at 512^3
+# in single precision. Same buffer convention as the sweeps above.
+apply_green_symbol_2d = _linalg.apply_green_symbol_2d
+apply_green_symbol_3d = _linalg.apply_green_symbol_3d
+apply_green_symbol_2d_f32 = _linalg.apply_green_symbol_2d_f32
+apply_green_symbol_3d_f32 = _linalg.apply_green_symbol_3d_f32
+
 # The device sweeps are present only in a CUDA/HIP build, and take device
 # addresses rather than buffers. Opt in with MUGRID_BLOCK_THOMAS_COMPILED=1;
 # see HybridFourierTridiagonalPreconditioner.
