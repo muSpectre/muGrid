@@ -35,6 +35,7 @@
 #include "green_symbol.hh"
 
 #include <cmath>
+#include <numbers>
 
 namespace muGrid {
 
@@ -137,7 +138,7 @@ namespace muGrid {
             //! exp(-2 pi i f), the phase of a unit offset at frequency f
             template <typename T>
             inline Cplx<T> unit_phase(T f) {
-                const T theta = T(-2) * T(M_PI) * f;
+                const T theta = T(-2) * std::numbers::pi_v<T> * f;
                 return {std::cos(theta), std::sin(theta)};
             }
 
