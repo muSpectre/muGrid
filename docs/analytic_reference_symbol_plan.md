@@ -8,9 +8,11 @@ applied in registers. The stored symbol is `n²` complex values per Fourier mode
 grid, and it is the largest single allocation in a large single-precision
 topology-optimization run.
 
-**Status:** host path complete and measured. The **CUDA/HIP kernel and the
-device-aware selection are not written** — that is the remaining work, and it is
-why this needs a GPU machine.
+**Status:** host and device paths complete and measured (H200, CUDA 13.3).
+Evaluated is the **default on a device** and stored stays the default on the
+host; see [§0.6](#06-result-of-the-05-measurement). Not yet done: a HIP compile
+and run (the source is written for both, but only nvcc has seen it), and an MPI
+run of the device path.
 
 **If you are picking this up cold, read [§0 Start here](#0-start-here) first.**
 Sections 1–4 are the design, the measurements and the traps behind it.
@@ -134,7 +136,7 @@ so muTopOpt's default `green-jacobi` path inherits it.
 
 **5. Measure, then choose the host default.** See §0.5.
 
-### 0.5 The measurement that decides the default
+### 0.5 The measurement that decides the default (done — see §0.6)
 
 Per-apply time and peak device allocation, evaluated vs stored, at 256³ and
 512³, three components, float32 and float64. The host numbers are in §0.1; what
@@ -143,6 +145,59 @@ is unknown is where the GPU lands relative to its 12.6–17.9 flops/byte balance
 If the GPU apply is within ~30% of the stored symbol, make evaluated the default
 on device — 2.26 GB at 512³ is worth that. If it is much worse, the hoisting in
 §2 is probably not working; check that before concluding anything.
+
+### 0.6 Result of the §0.5 measurement
+
+H200, three components, one process per row, from
+`benchmarks/bench_green_symbol.py N dtype {stored,evaluated}`. *Symbol* = apply − bare
+fft+ifft on the same work field; *memory* = device memory held after setup and
+20 applies (muGrid fields plus the CuPy pool's high-water mark).
+
+| grid | dtype | mode | setup | memory | apply | symbol |
+|---|---|---|---|---|---|---|
+| 256³ | f32 | stored | 21.0 s | 1028 MB | 1.79 ms | 0.94 ms |
+| 256³ | f32 | evaluated | 0.17 s | 417 MB | **1.18 ms** | 0.33 ms |
+| 256³ | f64 | stored | 20.7 s | 1432 MB | 2.62 ms | 1.07 ms |
+| 256³ | f64 | evaluated | 0.17 s | 822 MB | **2.05 ms** | 0.50 ms |
+| 512³ | f32 | stored | 168.5 s | 8110 MB | 25.5 ms | 18.6 ms |
+| 512³ | f32 | evaluated | 1.3 s | 3244 MB | **9.3 ms** | 2.3 ms |
+| 512³ | f64 | stored | 167.5 s | 11329 MB | 31.2 ms | 18.7 ms |
+| 512³ | f64 | evaluated | 1.3 s | 6476 MB | **16.1 ms** | 3.6 ms |
+
+**Evaluated is faster, not merely comparable**: 2.7× (f32) and 1.9× (f64) per
+apply at 512³, 4.9 GB less device memory, and no 3-minute host assembly. The
+stored path's multiply is far from its own bandwidth floor — it runs
+component by component through CuPy — so §0.1's flops/byte argument
+understated the win on a device. The default is therefore evaluated on device,
+through `evaluate_symbol=None` in `make_reference_stiffness_preconditioner`
+(forwarded by `make_green_jacobi_preconditioner`); pass `False` to get the
+stored symbol back.
+
+**The hoist is working** (no profiler counters on the node, so by ablation, 512³
+kernel alone): with the shared-memory hoist forced off, the f64 kernel goes
+from 3.67 to 8.94 ms; f32 from 2.34 to 2.82 ms. A pure read+write pass over the
+same buffer takes 0.96 / 1.51 ms, so the kernel sits at ~2.4× the bandwidth
+floor. The f32 kernel is not arithmetic-bound, so there is headroom there,
+worth at most ~1.4 ms of a 9.3 ms apply. A Hermitian-only build (6 of 9
+entries) would help f64 more than f32.
+
+Implementation notes that differ from §0.4's sketch:
+
+- The stencil is a **kernel argument by value**, not a `__constant__` array.
+  Kernel parameters live in the constant bank, so the access is the same, but
+  a module-global `__constant__` symbol would be shared by every preconditioner
+  in the process and need a memcpy per apply.
+- A block covers 256 consecutive *modes*, not one line: at 512³ lines are 257
+  modes long, which a line-per-block layout fills poorly. The block builds `P`
+  for the ≤ 8 lines it touches; when axis 0 is so short that it touches more,
+  each thread builds its own `P` (tested by the `(2, 64)` and `(3, 16, 16)`
+  cases).
+- Strides are read off the work field's view, not assumed: host AoS gives
+  (1, Dim), device SoA gives (nb_modes, 1), both verified on the H200 build.
+
+Tests: `test_evaluated_symbol_on_device_matches_stored_on_host`,
+`test_reference_factory_chooses_storage_by_device`. ctest on the H200 no-MPI
+build: 16/16.
 
 ---
 
