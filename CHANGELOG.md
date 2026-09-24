@@ -1,23 +1,7 @@
 Change log for µGrid
 ====================
 
-unreleased
-----------
-
-- ENH: The Green preconditioner can evaluate its symbol per Fourier mode instead
-  of storing it: `AnalyticReferencePreconditioner` keeps the `3^dim` stencil, 243
-  numbers in 3D, where the stored symbol is 2.3 GB at 512³
-- ENH: `evaluate_symbol` on the reference and Green-Jacobi factories, defaulting to
-  evaluate on a device and store on the host. H200 at 512³: 2.7x (f32) faster per
-  apply, 4.9 GB less device memory, setup 1.3 s against 168 s
-- ENH: `reference_stencil` is public and is the single definition of the uniform
-  reference operator; `stencil_symbol` generalises the hybrid's
-  `_z_coupling_blocks`, so both preconditioners now derive from one stencil
-- ENH: The assembled route uses the stencil too when the caller names the operator,
-  dropping the impulse response, the `n` full-grid FFTs and three engine-sized
-  fields. An opaque callable still takes the impulse route
-
-v1.4.0 (23Sep26)
+v1.4.0 (24Sep26)
 ----------------
 
 - FIX: Reductions return `reduction_result_t<T>`, double for a `Real32`/`Complex32`
@@ -45,6 +29,18 @@ v1.4.0 (23Sep26)
   Peak RSS at 96³: 508 → 376 MB single, 575 → 444 MB double
 - PERF: `BlockFourierPreconditioner`'s Hermitian detection walks one component pair
   at a time instead of allocating two arrays the size of the whole symbol
+- ENH: The Green preconditioner can evaluate its symbol per Fourier mode instead
+  of storing it: `AnalyticReferencePreconditioner` keeps the `3^dim` stencil, 243
+  numbers in 3D, where the stored symbol is 2.3 GB at 512³
+- ENH: `evaluate_symbol` on the reference and Green-Jacobi factories, defaulting to
+  evaluate on a device and store on the host. H200 at 512³: 2.7x (f32) faster per
+  apply, 4.9 GB less device memory, setup 1.3 s against 168 s
+- ENH: `reference_stencil` is public and is the single definition of the uniform
+  reference operator; `stencil_symbol` generalises the hybrid's
+  `_z_coupling_blocks`, so both preconditioners now derive from one stencil
+- ENH: The assembled route uses the stencil too when the caller names the operator,
+  dropping the impulse response, the `n` full-grid FFTs and three engine-sized
+  fields. An opaque callable still takes the impulse route
 - ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between nested nodal
   grids and its exact adjoint `R = Pᵀ`. Both act component-wise, so `range(P)`
   contains every rigid-body mode and constant strain
