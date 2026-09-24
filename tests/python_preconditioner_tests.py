@@ -1032,3 +1032,69 @@ def test_reference_stiffness_symbol_is_slab_invariant(comm, monkeypatch):
     many_slabs = symbol("slab-split")
 
     np.testing.assert_array_equal(one_slab, many_slabs)
+
+
+@pytest.mark.parametrize("dim,n", [(2, 16), (3, 12)])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_analytic_reference_symbol_matches_impulse_assembly(comm, dim, n, dtype):
+    """Naming the operator must give the same preconditioner as probing it.
+
+    The uniform reference operator is a ``3^dim`` stencil -- 243 numbers in 3D
+    -- so its symbol is the closed-form sum ``Σ_d S[d] exp(-i q·d)``. The
+    impulse route recovers exactly the same information the expensive way: one
+    impulse response per component on the *full* grid, each followed by a
+    full-grid FFT, then a dense ``n × n`` symbol held at 4.5 GB at 512³.
+
+    This is the gate on the whole analytic path. Getting ``q`` wrong is silent
+    -- muGrid's engine makes **axis 0** the half-complex one, while the hybrid
+    preconditioner's ``numpy.fft.rfftn`` semantics halve the **last** of the
+    axes it transforms -- and a wrong convention still produces a
+    plausible-looking symbol. Comparing the applied results catches it.
+    """
+    engine = make_engine(comm, (n,) * dim)
+    spacing = (1.0 / n,) * dim
+    lam, mu = 1.3, 0.7
+    element = muGrid.FEMElement.q1
+    op = (muGrid.IsotropicStiffnessOperator2D if dim == 2
+          else muGrid.IsotropicStiffnessOperator3D)(list(spacing), element)
+
+    def apply_ref(u, f):
+        engine.communicate_ghosts(u)
+        op.apply_uniform(u, lam, mu, f)
+
+    tag = f"{dim}d-{np.dtype(dtype).name}"
+    impulse = make_reference_stiffness_preconditioner(
+        engine, apply_ref, dim, dtype=dtype, name=f"imp-{tag}")
+    analytic = make_reference_stiffness_preconditioner(
+        engine, nb_components=dim, element=element, grid_spacing=spacing,
+        lambda_ref=lam, mu_ref=mu, dtype=dtype, name=f"ana-{tag}")
+
+    r = engine.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
+    z_imp = engine.real_space_field(f"zi-{tag}", components=(dim,), dtype=dtype)
+    z_ana = engine.real_space_field(f"za-{tag}", components=(dim,), dtype=dtype)
+    rng = np.random.default_rng(0)
+    r.p[...] = rng.standard_normal(r.p.shape).astype(dtype)
+
+    impulse(r, z_imp)
+    analytic(r, z_ana)
+
+    a = np.asarray(z_imp.p).astype(np.float64)
+    b = np.asarray(z_ana.p).astype(np.float64)
+    scale = np.abs(a).max()
+    # float32 fields round the symbol and the transforms; float64 should agree
+    # to assembly round-off.
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    assert np.abs(a - b).max() / scale < tol
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+def test_analytic_reference_needs_a_complete_description(comm, dim):
+    """Half a description is an error, not a silent fallback to the slow path."""
+    engine = make_engine(comm, (8,) * dim)
+    with pytest.raises(ValueError, match="grid_spacing"):
+        make_reference_stiffness_preconditioner(
+            engine, nb_components=dim, element=muGrid.FEMElement.q1,
+            lambda_ref=1.3, name=f"incomplete-{dim}")
+    with pytest.raises(ValueError, match="apply_reference_stiffness"):
+        make_reference_stiffness_preconditioner(
+            engine, nb_components=dim, name=f"nothing-{dim}")
